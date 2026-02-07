@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from '@/lib/types';
-import { Brain, Compass, ArrowUpRight, Loader2, Sparkles, X } from 'lucide-react';
+import { Brain, Compass, ArrowUpRight, Sparkles, X } from 'lucide-react';
 
 interface SmartPulseProps {
     links: Link[];
     uid: string;
+    onOpenLink: (link: Link) => void;
 }
 
 interface PulseData {
@@ -18,7 +19,7 @@ interface PulseData {
     }[];
 }
 
-export default function SmartPulse({ links, uid }: SmartPulseProps) {
+export default function SmartPulse({ links, uid, onOpenLink }: SmartPulseProps) {
     const [pulse, setPulse] = useState<PulseData | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [activePathIndex, setActivePathIndex] = useState<number | null>(null);
@@ -71,7 +72,6 @@ export default function SmartPulse({ links, uid }: SmartPulseProps) {
                         const parsed = JSON.parse(data.response.replace(/```json|```/g, ''));
                         setPulse(parsed);
                     } catch {
-                        // Attempt a more robust parse or fallback
                         setPulse({
                             theme: "Current Focus",
                             summary: "I'm synthesizing your recent saves into a coherent direction.",
@@ -130,7 +130,6 @@ export default function SmartPulse({ links, uid }: SmartPulseProps) {
                     )}
                 </div>
 
-                {/* Right Column: Learning Path */}
                 <div className="w-full lg:w-96 shrink-0 lg:pl-4 space-y-4 border-l-0 lg:border-l border-white/5">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-[10px] uppercase font-bold tracking-widest text-text-muted">
@@ -155,16 +154,16 @@ export default function SmartPulse({ links, uid }: SmartPulseProps) {
                                 <div key={i} className="space-y-2">
                                     <button
                                         onClick={() => setActivePathIndex(activePathIndex === i ? null : i)}
-                                        className={`w-full flex items-center justify-between p-3.5 rounded-xl border transition-all text-left ${activePathIndex === i
+                                        className={`w-full flex items-center justify-between p-3.5 rounded-xl border transition-all text-left group/item ${activePathIndex === i
                                                 ? 'bg-accent/20 border-accent/40 ring-1 ring-accent/20 shadow-lg shadow-accent/10'
                                                 : 'bg-white/5 border-white/5 hover:border-accent/40 hover:bg-white/10'
                                             }`}
                                     >
-                                        <span className={`text-[13px] font-bold transition-colors ${activePathIndex === i ? 'text-white' : 'text-text-secondary group-hover:text-text'
+                                        <span className={`text-[13px] font-bold transition-colors ${activePathIndex === i ? 'text-white' : 'text-text-secondary group-hover/item:text-text'
                                             }`}>
                                             {path.topic}
                                         </span>
-                                        <ArrowUpRight className={`w-4 h-4 transition-all duration-300 ${activePathIndex === i ? 'rotate-45 text-accent scale-110' : 'text-text-muted group-hover:text-accent'
+                                        <ArrowUpRight className={`w-4 h-4 transition-all duration-300 ${activePathIndex === i ? 'rotate-45 text-accent scale-110' : 'text-text-muted group-hover/item:text-accent'
                                             }`} />
                                     </button>
 
@@ -176,15 +175,16 @@ export default function SmartPulse({ links, uid }: SmartPulseProps) {
                                             </div>
                                             {path.sourceIds && path.sourceIds.length > 0 ? (
                                                 getSourceLinks(path.sourceIds).map(l => (
-                                                    <div
+                                                    <button
                                                         key={l.id}
-                                                        className="flex items-start gap-2.5 bg-white/5 p-2 rounded-lg border border-white/5 hover:border-white/10 transition-all"
+                                                        onClick={() => onOpenLink(l)}
+                                                        className="w-full flex items-start gap-2.5 bg-white/5 p-2 rounded-lg border border-white/5 hover:border-accent/40 hover:glass transition-all text-left group/source"
                                                     >
-                                                        <div className="mt-1 w-1.5 h-1.5 shrink-0 rounded-full bg-accent/60" />
-                                                        <span className="text-[11px] leading-tight text-text-secondary font-medium italic">
+                                                        <div className="mt-1 w-1.5 h-1.5 shrink-0 rounded-full bg-accent/40 group-hover/source:bg-accent group-hover/source:scale-110 transition-all" />
+                                                        <span className="text-[11px] leading-tight text-text-secondary font-medium italic group-hover/source:text-text">
                                                             {l.title}
                                                         </span>
-                                                    </div>
+                                                    </button>
                                                 ))
                                             ) : (
                                                 <div className="text-[11px] text-text-muted italic pl-4">No specific links identified.</div>

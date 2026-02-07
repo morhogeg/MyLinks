@@ -32,7 +32,7 @@ export async function saveLink(uid: string, linkData: Partial<Link>): Promise<vo
     const linksRef = collection(db, 'users', uid, 'links');
     await addDoc(linksRef, {
         ...linkData,
-        createdAt: new Date().toISOString(),
+        createdAt: Date.now(),
         status: 'unread'
     });
 }
@@ -43,6 +43,14 @@ export async function saveLink(uid: string, linkData: Partial<Link>): Promise<vo
 export async function updateLinkStatus(uid: string, id: string, status: LinkStatus): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', id);
     await updateDoc(linkRef, { status });
+}
+
+/**
+ * Update a link's tags in Firestore
+ */
+export async function updateLinkTags(uid: string, id: string, tags: string[]): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    await updateDoc(linkRef, { tags });
 }
 
 /**

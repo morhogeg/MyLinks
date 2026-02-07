@@ -2,16 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { updateLinkStatus, deleteLink } from '@/lib/storage';
+import { updateLinkStatus, deleteLink, updateLinkTags } from '@/lib/storage';
 import { collection, query, orderBy, onSnapshot, where, getDocs, limit, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Card from './Card';
 import TableView from './TableView';
 import InsightsFeed from './InsightsFeed';
-import SmartPulse from './SmartPulse';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, Brain } from 'lucide-react';
+import LinkDetailModal from './LinkDetailModal';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown } from 'lucide-react';
 
 type FilterType = 'all' | 'unread' | 'archived' | 'favorite';
+type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
 
 /**
  * Main feed component displaying saved links
@@ -27,10 +28,12 @@ export default function Feed() {
     const [searchQuery, setSearchQuery] = useState('');
     const [filter, setFilter] = useState<FilterType>('all');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+    const [activeLink, setActiveLink] = useState<Link | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'grid' | 'table' | 'insights'>('grid');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [sortBy, setSortBy] = useState<SortType>('date-desc');
 
     // 1. Find the user by phone number (mocking auth for now)
     useEffect(() => {
@@ -71,7 +74,7 @@ export default function Feed() {
         return () => unsubscribe();
     }, [uid]);
 
-    // Filter links based on search and status
+    // Filter and sort links
     const filteredLinks = links
         .filter((link) => {
             if (filter === 'all') return true;
@@ -90,6 +93,20 @@ export default function Feed() {
                 link.tags.some((tag) => tag.toLowerCase().includes(query)) ||
                 link.category.toLowerCase().includes(query)
             );
+        })
+        .sort((a, b) => {
+            switch (sortBy) {
+                case 'date-desc':
+                    return (b.createdAt as number) - (a.createdAt as number);
+                case 'date-asc':
+                    return (a.createdAt as number) - (b.createdAt as number);
+                case 'title-asc':
+                    return a.title.localeCompare(b.title);
+                case 'category':
+                    return a.category.localeCompare(b.category);
+                default:
+                    return 0;
+            }
         });
 
     // Calculate category counts
@@ -103,6 +120,11 @@ export default function Feed() {
     const handleStatusChange = async (id: string, status: LinkStatus) => {
         if (!uid) return;
         await updateLinkStatus(uid, id, status);
+    };
+
+    const handleUpdateTags = async (id: string, tags: string[]) => {
+        if (!uid) return;
+        await updateLinkTags(uid, id, tags);
     };
 
     const handleDelete = async (id: string) => {
@@ -153,20 +175,20 @@ export default function Feed() {
     return (
         <div className="space-y-4">
             {/* Search Bar */}
-            <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg pb-4 pt-2 -mt-2">
+            <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg pb-3 sm:pb-4 pt-2 -mt-2">
                 <div className="relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted" />
+                    <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 sm:w-5 h-4 sm:h-5 text-text-muted" />
                     <input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Search your brain..."
-                        className="w-full pl-12 pr-10 py-3 bg-card rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-white/20"
+                        className="w-full pl-10 sm:pl-12 pr-12 sm:pr-10 py-3 sm:py-3 bg-card rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-white/20 min-h-[44px]"
                     />
                     {searchQuery && (
                         <button
                             onClick={() => setSearchQuery('')}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-full"
+                            className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-white/10 rounded-full min-h-[44px] min-w-[44px] flex items-center justify-center"
                         >
                             <X className="w-4 h-4 text-text-muted" />
                         </button>
@@ -174,41 +196,56 @@ export default function Feed() {
                 </div>
 
                 {/* Filter Tabs & View Switcher */}
-                <div className="flex items-center justify-between mt-3 gap-4">
+                <div className="flex items-center justify-between mt-3 gap-2 sm:gap-4">
                     <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide flex-1">
                         {filterButtons.map((btn) => (
                             <button
                                 key={btn.key}
                                 onClick={() => setFilter(btn.key)}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filter === btn.key
+                                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition-colors min-h-[44px] ${filter === btn.key
                                     ? 'bg-white text-black'
                                     : 'bg-card text-text-secondary hover:bg-card-hover'
                                     }`}
                             >
                                 {btn.icon}
-                                {btn.label}
+                                <span className="hidden xs:inline">{btn.label}</span>
                             </button>
                         ))}
+                    </div>
+
+                    {/* Sort Dropdown */}
+                    <div className="relative">
+                        <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value as SortType)}
+                            className="appearance-none bg-card border border-border-subtle rounded-full px-3 sm:px-4 py-2 sm:py-2.5 pr-8 sm:pr-10 text-xs sm:text-sm font-medium text-text-secondary hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/20 min-h-[44px]"
+                        >
+                            <option value="date-desc">Newest First</option>
+                            <option value="date-asc">Oldest First</option>
+                            <option value="title-asc">Title A-Z</option>
+                            <option value="category">Category</option>
+                        </select>
+                        <ArrowUpDown className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
                     </div>
 
                     <div className="flex items-center bg-card rounded-full p-1 border border-border-subtle shadow-sm">
                         <button
                             onClick={() => setViewMode('grid')}
-                            className={`p-1.5 rounded-full transition-all ${viewMode === 'grid' ? 'bg-accent text-white shadow-md' : 'text-text-muted hover:text-text-secondary'}`}
+                            className={`p-2 sm:p-1.5 rounded-full transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${viewMode === 'grid' ? 'bg-accent text-white shadow-md' : 'text-text-muted hover:text-text-secondary'}`}
                             title="Grid View"
                         >
                             <LayoutGrid className="w-4 h-4" />
                         </button>
                         <button
                             onClick={() => setViewMode('table')}
-                            className={`p-1.5 rounded-full transition-all ${viewMode === 'table' ? 'bg-accent text-white shadow-md' : 'text-text-muted hover:text-text-secondary'}`}
+                            className={`p-2 sm:p-1.5 rounded-full transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${viewMode === 'table' ? 'bg-accent text-white shadow-md' : 'text-text-muted hover:text-text-secondary'}`}
                             title="Table View"
                         >
                             <List className="w-4 h-4" />
                         </button>
                         <button
                             onClick={() => setViewMode('insights')}
-                            className={`p-1.5 rounded-full transition-all ${viewMode === 'insights' ? 'bg-accent text-white shadow-md' : 'text-text-muted hover:text-text-secondary'}`}
+                            className={`p-2 sm:p-1.5 rounded-full transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${viewMode === 'insights' ? 'bg-accent text-white shadow-md' : 'text-text-muted hover:text-text-secondary'}`}
                             title="Insights View"
                         >
                             <Sparkles className="w-4 h-4" />
@@ -282,11 +319,7 @@ export default function Feed() {
                 </div>
             </div>
 
-            {uid && filter === 'all' && !searchQuery && !selectedCategory && (
-                <div className="pb-4">
-                    <SmartPulse links={links} uid={uid} />
-                </div>
-            )}
+
 
             {/* Links Grid */}
             {filteredLinks.length === 0 ? (
@@ -306,7 +339,9 @@ export default function Feed() {
             ) : viewMode === 'table' ? (
                 <TableView
                     links={filteredLinks}
+                    onOpenDetails={setActiveLink}
                     onStatusChange={handleStatusChange}
+                    onUpdateTags={handleUpdateTags}
                     onDelete={handleDelete}
                     isSelectionMode={isSelectionMode}
                     selectedIds={selectedIds}
@@ -315,20 +350,18 @@ export default function Feed() {
             ) : viewMode === 'insights' ? (
                 <InsightsFeed
                     links={filteredLinks}
-                    onOpenDetails={(link) => {
-                        console.log('Open insight details', link);
-                    }}
+                    onOpenDetails={setActiveLink}
                     isSelectionMode={isSelectionMode}
                     selectedIds={selectedIds}
                     onToggleSelection={toggleSelection}
                 />
             ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                     {filteredLinks.map((link) => (
                         <Card
                             key={link.id}
                             link={link}
-                            allLinks={links}
+                            onOpenDetails={setActiveLink}
                             onStatusChange={handleStatusChange}
                             onDelete={handleDelete}
                             isSelectionMode={isSelectionMode}
@@ -337,6 +370,19 @@ export default function Feed() {
                         />
                     ))}
                 </div>
+            )}
+            {/* Active Link Modal */}
+            {activeLink && (
+                <LinkDetailModal
+                    link={activeLink}
+                    allLinks={links}
+                    isOpen={!!activeLink}
+                    onClose={() => setActiveLink(null)}
+                    onStatusChange={handleStatusChange}
+                    onUpdateTags={handleUpdateTags}
+                    onDelete={handleDelete}
+                    onOpenOtherLink={(link) => setActiveLink(link)}
+                />
             )}
         </div>
     );

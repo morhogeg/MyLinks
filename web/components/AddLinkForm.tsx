@@ -79,17 +79,17 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
     };
 
     return (
-        <div className="fixed bottom-6 right-6 z-40">
+        <div className="fixed bottom-6 right-4 sm:right-6 z-40" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
             {/* Expanded Form */}
             {isExpanded && (
                 <form
                     onSubmit={handleSubmit}
-                    className="absolute bottom-16 right-0 w-80 bg-card rounded-xl p-4 shadow-2xl animate-slide-up"
+                    className="absolute bottom-16 right-0 w-[calc(100vw-2rem)] sm:w-80 max-w-sm bg-card rounded-xl p-4 shadow-2xl animate-slide-up"
                 >
                     <label htmlFor="url" className="block text-sm font-medium text-text mb-2">
                         Add a link to your Second Brain
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                         <div className="relative flex-1">
                             <Link className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                             <input
@@ -106,7 +106,7 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                         <button
                             type="submit"
                             disabled={isLoading || !url.trim()}
-                            className="px-4 py-3 bg-white text-black font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="px-4 py-3 bg-white text-black font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[44px]"
                         >
                             {isLoading ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -124,7 +124,7 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
             {/* FAB Button */}
             <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 ${isExpanded
+                className={`w-14 h-14 min-h-[44px] min-w-[44px] rounded-full shadow-lg flex items-center justify-center transition-all duration-200 ${isExpanded
                     ? 'bg-white/10 rotate-45'
                     : 'bg-white hover:bg-gray-200'
                     }`}

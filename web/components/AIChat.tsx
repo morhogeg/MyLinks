@@ -57,7 +57,7 @@ export default function AIChat({ link }: AIChatProps) {
             } else {
                 setMessages(prev => [...prev, { role: 'model', content: "Error: " + data.error }]);
             }
-        } catch (error) {
+        } catch (_error) {
             setMessages(prev => [...prev, { role: 'model', content: "Failed to connect to AI." }]);
         } finally {
             setIsLoading(false);
@@ -65,9 +65,9 @@ export default function AIChat({ link }: AIChatProps) {
     };
 
     return (
-        <div className="flex flex-col h-[400px] bg-background/30 rounded-2xl border border-white/5 overflow-hidden">
+        <div className="flex flex-col h-[400px] sm:h-[400px] max-h-[60vh] bg-background/30 rounded-2xl border border-white/5 overflow-hidden">
             {/* Header */}
-            <div className="px-4 py-3 border-b border-white/5 bg-white/5 flex items-center justify-between">
+            <div className="px-3 sm:px-4 py-3 border-b border-white/5 bg-white/5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-accent" />
                     <span className="text-xs font-bold uppercase tracking-wider text-text">AI Assistant</span>
@@ -83,9 +83,9 @@ export default function AIChat({ link }: AIChatProps) {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10">
+            <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10">
                 {messages.length === 0 && (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3 opacity-50">
+                    <div className="h-full flex flex-col items-center justify-center text-center p-4 sm:p-6 space-y-3 opacity-50">
                         <div className="p-3 rounded-full bg-white/5">
                             <Sparkles className="w-6 h-6 text-accent" />
                         </div>
@@ -99,7 +99,7 @@ export default function AIChat({ link }: AIChatProps) {
                 {messages.map((m, i) => (
                     <div
                         key={i}
-                        className={`flex items-start gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}
+                        className={`flex items-start gap-2 sm:gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}
                     >
                         <div className={`p-1.5 rounded-lg ${m.role === 'user' ? 'bg-accent/20' : 'bg-white/10'}`}>
                             {m.role === 'user' ? (
@@ -109,7 +109,7 @@ export default function AIChat({ link }: AIChatProps) {
                             )}
                         </div>
                         <div
-                            className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-relaxed ${m.role === 'user'
+                            className={`max-w-[85%] sm:max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-relaxed ${m.role === 'user'
                                 ? 'bg-accent text-white rounded-tr-none'
                                 : 'bg-card border border-border-subtle text-text rounded-tl-none'
                                 }`}
@@ -120,7 +120,7 @@ export default function AIChat({ link }: AIChatProps) {
                 ))}
 
                 {isLoading && (
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-2 sm:gap-3">
                         <div className="p-1.5 rounded-lg bg-white/10">
                             <Sparkles className="w-3.5 h-3.5 text-white animate-pulse" />
                         </div>
@@ -134,20 +134,20 @@ export default function AIChat({ link }: AIChatProps) {
             </div>
 
             {/* Input */}
-            <form onSubmit={handleSend} className="p-4 bg-white/5 border-t border-white/5">
+            <form onSubmit={handleSend} className="p-3 sm:p-4 bg-white/5 border-t border-white/5">
                 <div className="relative">
                     <input
                         type="text"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         placeholder="Ask a question..."
-                        className="w-full bg-background/50 border border-border-subtle rounded-xl pl-4 pr-12 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
+                        className="w-full bg-background/50 border border-border-subtle rounded-xl pl-4 pr-12 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all min-h-[44px]"
                         disabled={isLoading}
                     />
                     <button
                         type="submit"
                         disabled={!input.trim() || isLoading}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-accent text-white hover:scale-110 active:scale-95 transition-all disabled:opacity-50 disabled:grayscale"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-accent text-white hover:scale-110 active:scale-95 transition-all disabled:opacity-50 disabled:grayscale min-h-[40px] min-w-[40px] flex items-center justify-center"
                     >
                         <Send className="w-4 h-4" />
                     </button>

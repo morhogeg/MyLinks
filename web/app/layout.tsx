@@ -21,10 +21,9 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "Second Brain",
   },
-  // TODO: Add icons when ready
-  // icons: {
-  //   apple: "/apple-touch-icon.png",
-  // },
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
@@ -50,7 +49,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Second Brain" />
-        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-text transition-colors duration-200`}
