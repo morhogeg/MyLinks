@@ -2,8 +2,9 @@
 
 import { Link, LinkStatus } from '@/lib/types';
 import { useState, useEffect } from 'react';
-import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2 } from 'lucide-react';
+import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, MessageSquare, BookOpen, ChevronRight, Sparkles } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
+import AIChat from './AIChat';
 
 interface CardProps {
     link: Link;
@@ -12,6 +13,7 @@ interface CardProps {
     isSelectionMode?: boolean;
     isSelected?: boolean;
     onToggleSelection?: (id: string) => void;
+    allLinks?: Link[];
 }
 
 /**
@@ -21,15 +23,36 @@ interface CardProps {
  * - Summary (Line clamp 3)
  * - Row of Pill Badges (Tags) + Time Ago
  */
-export default function Card({ link, onStatusChange, onDelete }: CardProps) {
+export default function Card({ link, onStatusChange, onDelete, isSelectionMode, isSelected, onToggleSelection, allLinks = [] }: CardProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [now, setNow] = useState<number>(0);
+    const [activeTab, setActiveTab] = useState<'details' | 'chat'>('details');
 
     useEffect(() => {
         const timer = setTimeout(() => setNow(Date.now()), 0);
         return () => clearTimeout(timer);
     }, []);
+
+    // Find related links based on tag/category overlap
+    const getRelatedLinks = () => {
+        if (!allLinks || !allLinks.length) return [];
+        return allLinks
+            .filter(l => l.id !== link.id)
+            .map(l => {
+                let score = 0;
+                if (l.category === link.category) score += 3;
+                const sharedTags = l.tags.filter(t => link.tags.includes(t));
+                score += sharedTags.length * 2;
+                return { link: l, score };
+            })
+            .filter(item => item.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 3)
+            .map(item => item.link);
+    };
+
+    const relatedLinks = isExpanded ? getRelatedLinks() : [];
 
     // Format relative time (e.g., "2h ago")
     const getTimeAgo = (timestamp: number, now: number): string => {
@@ -153,11 +176,104 @@ export default function Card({ link, onStatusChange, onDelete }: CardProps) {
                             </button>
                         </div>
 
-                        {/* Title */}
-                        <h2 className="font-bold text-xl text-white mb-4">{link.title}</h2>
+                        {/* Tab Switcher */}
+                        <div className="flex gap-4 border-b border-white/5 mb-6">
+                            <button
+                                onClick={() => setActiveTab('details')}
+                                className={`pb-2 px-1 text-sm font-bold transition-all relative ${activeTab === 'details' ? 'text-white' : 'text-text-muted hover:text-text-secondary'
+                                    }`}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <BookOpen className="w-4 h-4" />
+                                    Insights
+                                </div>
+                                {activeTab === 'details' && (
+                                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-accent" />
+                                )}
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('chat')}
+                                className={`pb-2 px-1 text-sm font-bold transition-all relative ${activeTab === 'chat' ? 'text-white' : 'text-text-muted hover:text-text-secondary'
+                                    }`}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <MessageSquare className="w-4 h-4" />
+                                    AI Assist
+                                </div>
+                                {activeTab === 'chat' && (
+                                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-accent" />
+                                )}
+                            </button>
+                        </div>
 
-                        {/* Full Summary */}
-                        <p className="text-text-secondary mb-4 leading-relaxed">{link.summary}</p>
+                        {activeTab === 'details' ? (
+                            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                {/* Title */}
+                                <h2 className="font-bold text-xl text-white mb-4">{link.title}</h2>
+
+                                {/* Full Summary */}
+                                <p className="text-text-secondary mb-4 leading-relaxed">{link.summary}</p>
+
+                                <div className="bg-yellow-500/5 rounded-xl p-4 border border-yellow-500/10 mb-6">
+                                    <h4 className="text-[10px] uppercase font-black tracking-widest text-yellow-500 mb-1">Key Takeaway</h4>
+                                    <p className="text-sm italic text-text-secondary">
+                                        {link.metadata.actionableTakeaway || "Analysis in progress..."}
+                                    </p>
+                                </div>
+
+                                <p className="text-sm text-text-muted mb-4 flex items-center gap-2">
+                                    <Clock className="w-4 h-4" />
+                                    {link.metadata.estimatedReadTime} min read {now > 0 && `• ${getTimeAgo(link.createdAt, now)}`}
+                                </p>
+
+                                {/* Tags */}
+                                <div className="flex flex-wrap gap-2 mb-8">
+                                    {link.tags.map((tag) => (
+                                        <span
+                                            key={tag}
+                                            className="inline-flex items-center gap-1 text-sm px-3 py-1 bg-white/5 rounded-full text-text-secondary border border-white/5"
+                                        >
+                                            <Tag className="w-3 h-3" />
+                                            {tag}
+                                        </span>
+                                    ))}
+                                </div>
+
+                                {/* Related Insights */}
+                                {relatedLinks.length > 0 && (
+                                    <div className="mb-8 p-4 bg-accent/5 rounded-2xl border border-accent/10">
+                                        <h4 className="text-[10px] uppercase font-black tracking-widest text-accent mb-3 flex items-center gap-2">
+                                            < Sparkles className="w-3 h-3" />
+                                            Related from your Brain
+                                        </h4>
+                                        <div className="space-y-3">
+                                            {relatedLinks.map((rel: Link) => (
+                                                <div
+                                                    key={rel.id}
+                                                    className="group flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                                                    onClick={() => {
+                                                        // This would ideally open the other link, but for now we just show title
+                                                        console.log("Navigate to", rel.title);
+                                                    }}
+                                                >
+                                                    <div className="flex items-center gap-2 overflow-hidden">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-accent/50" />
+                                                        <span className="text-xs font-bold text-text-secondary truncate group-hover:text-text transition-colors">
+                                                            {rel.title}
+                                                        </span>
+                                                    </div>
+                                                    <ChevronRight className="w-3 h-3 text-text-muted group-hover:text-accent transition-all group-hover:translate-x-0.5" />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                <AIChat link={link} />
+                            </div>
+                        )}
 
                         <p className="text-sm text-text-muted mb-4 flex items-center gap-2">
                             <Clock className="w-4 h-4" />

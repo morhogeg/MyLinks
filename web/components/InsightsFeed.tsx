@@ -40,8 +40,8 @@ export default function InsightsFeed({
                 <article
                     key={link.id}
                     className={`bg-card rounded-2xl border transition-all group flex items-start gap-4 p-6 ${selectedIds?.has(link.id)
-                            ? 'border-accent bg-accent/5 ring-1 ring-accent'
-                            : 'border-border-subtle hover:shadow-xl'
+                        ? 'border-accent bg-accent/5 ring-1 ring-accent'
+                        : 'border-border-subtle hover:shadow-xl'
                         } ${isSelectionMode ? 'cursor-pointer select-none' : 'cursor-default'}`}
                     onClick={() => {
                         if (isSelectionMode && onToggleSelection) {
@@ -54,8 +54,8 @@ export default function InsightsFeed({
                     {isSelectionMode && (
                         <div className="mt-1">
                             <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedIds?.has(link.id)
-                                    ? 'bg-accent border-accent text-white'
-                                    : 'border-text-muted bg-background'
+                                ? 'bg-accent border-accent text-white'
+                                : 'border-text-muted bg-background'
                                 }`}>
                                 {selectedIds?.has(link.id) && <X className="w-3.5 h-3.5" />}
                             </div>
@@ -85,7 +85,7 @@ export default function InsightsFeed({
                                 <div className="bg-background/50 rounded-xl p-4 border border-border-subtle relative overflow-hidden">
                                     <div className="absolute top-0 left-0 w-1 h-full bg-accent opacity-50" />
                                     <p className="text-text-secondary italic text-sm leading-relaxed">
-                                        "{link.metadata.actionableTakeaway || 'Analyze this link to get an actionable insight...'}"
+                                        &quot;{link.metadata.actionableTakeaway || 'Analyze this link to get an actionable insight...'}&quot;
                                     </p>
                                 </div>
 

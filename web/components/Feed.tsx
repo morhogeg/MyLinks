@@ -8,7 +8,8 @@ import { db } from '@/lib/firebase';
 import Card from './Card';
 import TableView from './TableView';
 import InsightsFeed from './InsightsFeed';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2 } from 'lucide-react';
+import SmartPulse from './SmartPulse';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, Brain } from 'lucide-react';
 
 type FilterType = 'all' | 'unread' | 'archived' | 'favorite';
 
@@ -281,6 +282,12 @@ export default function Feed() {
                 </div>
             </div>
 
+            {uid && filter === 'all' && !searchQuery && !selectedCategory && (
+                <div className="pb-4">
+                    <SmartPulse links={links} uid={uid} />
+                </div>
+            )}
+
             {/* Links Grid */}
             {filteredLinks.length === 0 ? (
                 <div className="text-center py-16">
@@ -321,6 +328,7 @@ export default function Feed() {
                         <Card
                             key={link.id}
                             link={link}
+                            allLinks={links}
                             onStatusChange={handleStatusChange}
                             onDelete={handleDelete}
                             isSelectionMode={isSelectionMode}
