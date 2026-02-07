@@ -6,6 +6,7 @@ export type LinkStatus = 'unread' | 'archived' | 'favorite';
 export interface LinkMetadata {
   originalTitle: string;
   estimatedReadTime: number; // in minutes
+  actionableTakeaway?: string;
 }
 
 export interface AIAnalysis {

@@ -1,8 +1,3 @@
-"""
-Gemini AI Service for content analysis
-Using the new google-genai SDK and gemini-3-flash-preview
-"""
-
 import os
 import json
 from google import genai
@@ -30,6 +25,11 @@ class ClaudeService: # Kept name for compatibility with main.py
     
     def __init__(self):
         self.api_key = os.environ.get("GEMINI_API_KEY")
+        if not self.api_key:
+            # Fallback to check if we can load it from a sibling .env manually if needed
+            # but usually Firebase handles this. Let's just log it.
+            print("CRITICAL: GEMINI_API_KEY is empty")
+            
         self.client = genai.Client(api_key=self.api_key) if self.api_key else None
         self.model = "gemini-3-flash-preview"
         
@@ -38,21 +38,27 @@ class ClaudeService: # Kept name for compatibility with main.py
         Analyze text content using Gemini 3.0 Flash
         """
         if not self.client:
-            # Fallback to local logic if no API key
+            print("Gemini client not initialized, using mock")
             return self._mock_analysis(text)
         
         try:
+            # Clean up the text to avoid too much noise
+            clean_text = text[:30000]
+            
             response = self.client.models.generate_content(
                 model=self.model,
-                contents=f"{SYSTEM_PROMPT}\n\nContent to analyze:\n{text[:30000]}",
+                contents=[f"{SYSTEM_PROMPT}\n\nContent to analyze:\n{clean_text}"],
                 config={
                     'response_mime_type': 'application/json',
                 }
             )
             
+            if not response or not response.text:
+                raise Exception("Empty response from Gemini")
+                
             return json.loads(response.text)
         except Exception as e:
-            print(f"Gemini analysis failed: {e}")
+            print(f"Gemini analysis failed: {str(e)}")
             return self._mock_analysis(text)
 
     def _mock_analysis(self, text: str) -> dict:

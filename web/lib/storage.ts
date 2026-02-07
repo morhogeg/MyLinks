@@ -1,64 +1,56 @@
-// localStorage wrapper for link persistence
-// TODO: Replace with Firestore SDK when ready for production
-// Example Firestore replacement:
-//   import { collection, addDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
-//   import { db } from './firebase';
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, getDocs, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { db } from './firebase';
 
 import { Link, LinkStatus } from './types';
 
 const STORAGE_KEY = 'secondbrain_links';
 
 /**
- * Get all links from localStorage
- * TODO: Replace with Firestore onSnapshot listener for real-time updates
+ * Get all links from Firestore (one-time fetch)
+ * Note: Use Feed.tsx's onSnapshot for real-time updates
  */
+export async function getLinksFromFirestore(uid: string): Promise<Link[]> {
+    const linksRef = collection(db, 'users', uid, 'links');
+    const q = query(linksRef, orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+
+    return snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
+        id: doc.id,
+        ...doc.data()
+    } as Link));
+}
+
+// Keeping getLinks as a placeholder for legacy compatibility if needed
 export function getLinks(): Link[] {
-    if (typeof window === 'undefined') return [];
-
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return [];
-
-    try {
-        return JSON.parse(stored) as Link[];
-    } catch {
-        console.error('Failed to parse stored links');
-        return [];
-    }
+    return []; // No longer using localStorage
 }
 
 /**
- * Save a new link
- * TODO: Replace with Firestore addDoc
- * Example: await addDoc(collection(db, 'users', uid, 'links'), linkData);
+ * Save a new link to Firestore
  */
-export function saveLink(link: Link): void {
-    const links = getLinks();
-    links.unshift(link); // Add to beginning (newest first)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
+export async function saveLink(uid: string, linkData: Partial<Link>): Promise<void> {
+    const linksRef = collection(db, 'users', uid, 'links');
+    await addDoc(linksRef, {
+        ...linkData,
+        createdAt: new Date().toISOString(),
+        status: 'unread'
+    });
 }
 
 /**
- * Update a link's status (archive, favorite, unread)
- * TODO: Replace with Firestore updateDoc
+ * Update a link's status in Firestore
  */
-export function updateLinkStatus(id: string, status: LinkStatus): void {
-    const links = getLinks();
-    const index = links.findIndex(l => l.id === id);
-
-    if (index !== -1) {
-        links[index].status = status;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
-    }
+export async function updateLinkStatus(uid: string, id: string, status: LinkStatus): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    await updateDoc(linkRef, { status });
 }
 
 /**
- * Delete a link
- * TODO: Replace with Firestore deleteDoc
+ * Delete a link from Firestore
  */
-export function deleteLink(id: string): void {
-    const links = getLinks();
-    const filtered = links.filter(l => l.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+export async function deleteLink(uid: string, id: string): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    await deleteDoc(linkRef);
 }
 
 /**

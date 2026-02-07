@@ -2,9 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { getLinks, updateLinkStatus, deleteLink, searchLinks } from '@/lib/storage';
+import { updateLinkStatus, deleteLink } from '@/lib/storage';
+import { collection, query, orderBy, onSnapshot, where, getDocs, limit, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import Card from './Card';
-import { Search, Filter, Inbox, Archive, Star, X } from 'lucide-react';
+import TableView from './TableView';
+import InsightsFeed from './InsightsFeed';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2 } from 'lucide-react';
 
 type FilterType = 'all' | 'unread' | 'archived' | 'favorite';
 
@@ -18,38 +22,63 @@ type FilterType = 'all' | 'unread' | 'archived' | 'favorite';
  */
 export default function Feed() {
     const [links, setLinks] = useState<Link[]>([]);
+    const [uid, setUid] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [filter, setFilter] = useState<FilterType>('all');
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [viewMode, setViewMode] = useState<'grid' | 'table' | 'insights'>('grid');
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
 
-    // Load links on mount and poll for changes
-    // TODO: Replace with Firestore onSnapshot for real-time updates:
-    // useEffect(() => {
-    //   const unsubscribe = onSnapshot(
-    //     collection(db, 'users', uid, 'links'),
-    //     (snapshot) => setLinks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
-    //   );
-    //   return unsubscribe;
-    // }, [uid]);
+    // 1. Find the user by phone number (mocking auth for now)
     useEffect(() => {
-        const loadLinks = () => {
-            const storedLinks = getLinks();
-            setLinks(storedLinks);
-            setIsLoading(false);
-        };
-
-        loadLinks();
-
-        // Poll for changes (localStorage doesn't have events across tabs)
-        const interval = setInterval(loadLinks, 1000);
-        return () => clearInterval(interval);
+        async function findUser() {
+            const usersRef = collection(db, 'users');
+            const q = query(usersRef, where('phone_number', '==', '+16462440305'), limit(1));
+            const snapshot = await getDocs(q);
+            if (!snapshot.empty) {
+                setUid(snapshot.docs[0].id);
+            } else {
+                console.error("User not found in Firestore. Please add a document to 'users' collection with phone_number: +16462440305");
+                setIsLoading(false);
+            }
+        }
+        findUser();
     }, []);
+
+    // 2. Real-time sync from Firestore
+    useEffect(() => {
+        if (!uid) return;
+
+        console.log("Starting real-time sync for user:", uid);
+        const linksRef = collection(db, 'users', uid, 'links');
+        const q = query(linksRef, orderBy('createdAt', 'desc'));
+
+        const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
+            const fetchedLinks = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
+                id: doc.id,
+                ...doc.data()
+            } as Link));
+            setLinks(fetchedLinks);
+            setIsLoading(false);
+        }, (error: Error) => {
+            console.error("Firestore sync error:", error);
+            setIsLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [uid]);
 
     // Filter links based on search and status
     const filteredLinks = links
         .filter((link) => {
             if (filter === 'all') return true;
             return link.status === filter;
+        })
+        .filter((link) => {
+            if (!selectedCategory) return true;
+            return link.category === selectedCategory;
         })
         .filter((link) => {
             if (!searchQuery.trim()) return true;
@@ -62,14 +91,47 @@ export default function Feed() {
             );
         });
 
-    const handleStatusChange = (id: string, status: LinkStatus) => {
-        updateLinkStatus(id, status);
-        setLinks(getLinks()); // Refresh
+    // Calculate category counts
+    const categoryCounts = links.reduce((acc, link) => {
+        acc[link.category] = (acc[link.category] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+
+    const categories = Array.from(new Set(links.map(l => l.category))).sort();
+
+    const handleStatusChange = async (id: string, status: LinkStatus) => {
+        if (!uid) return;
+        await updateLinkStatus(uid, id, status);
     };
 
-    const handleDelete = (id: string) => {
-        deleteLink(id);
-        setLinks(getLinks()); // Refresh
+    const handleDelete = async (id: string) => {
+        if (!uid) return;
+        if (window.confirm('Delete this link?')) {
+            await deleteLink(uid, id);
+        }
+    };
+
+    const handleBulkArchive = async () => {
+        if (!uid) return;
+        await Promise.all(Array.from(selectedIds).map(id => updateLinkStatus(uid, id, 'archived')));
+        setSelectedIds(new Set());
+        setIsSelectionMode(false);
+    };
+
+    const handleBulkDelete = async () => {
+        if (!uid) return;
+        if (window.confirm(`Delete ${selectedIds.size} links forever?`)) {
+            await Promise.all(Array.from(selectedIds).map(id => deleteLink(uid, id)));
+            setSelectedIds(new Set());
+            setIsSelectionMode(false);
+        }
+    };
+
+    const toggleSelection = (id: string) => {
+        const next = new Set(selectedIds);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelectedIds(next);
     };
 
     const filterButtons: { key: FilterType; label: string; icon: React.ReactNode }[] = [
@@ -110,19 +172,110 @@ export default function Feed() {
                     )}
                 </div>
 
-                {/* Filter Tabs */}
-                <div className="flex gap-2 mt-3 overflow-x-auto pb-1 scrollbar-hide">
-                    {filterButtons.map((btn) => (
-                        <button
-                            key={btn.key}
-                            onClick={() => setFilter(btn.key)}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filter === btn.key
+                {/* Filter Tabs & View Switcher */}
+                <div className="flex items-center justify-between mt-3 gap-4">
+                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide flex-1">
+                        {filterButtons.map((btn) => (
+                            <button
+                                key={btn.key}
+                                onClick={() => setFilter(btn.key)}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filter === btn.key
                                     ? 'bg-white text-black'
                                     : 'bg-card text-text-secondary hover:bg-card-hover'
-                                }`}
+                                    }`}
+                            >
+                                {btn.icon}
+                                {btn.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="flex items-center bg-card rounded-full p-1 border border-border-subtle shadow-sm">
+                        <button
+                            onClick={() => setViewMode('grid')}
+                            className={`p-1.5 rounded-full transition-all ${viewMode === 'grid' ? 'bg-accent text-white shadow-md' : 'text-text-muted hover:text-text-secondary'}`}
+                            title="Grid View"
                         >
-                            {btn.icon}
-                            {btn.label}
+                            <LayoutGrid className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('table')}
+                            className={`p-1.5 rounded-full transition-all ${viewMode === 'table' ? 'bg-accent text-white shadow-md' : 'text-text-muted hover:text-text-secondary'}`}
+                            title="Table View"
+                        >
+                            <List className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('insights')}
+                            className={`p-1.5 rounded-full transition-all ${viewMode === 'insights' ? 'bg-accent text-white shadow-md' : 'text-text-muted hover:text-text-secondary'}`}
+                            title="Insights View"
+                        >
+                            <Sparkles className="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        {isSelectionMode ? (
+                            <div className="flex items-center gap-2 animate-slide-up">
+                                <span className="text-xs font-bold text-accent mr-1">{selectedIds.size} selected</span>
+                                <button
+                                    onClick={handleBulkArchive}
+                                    disabled={selectedIds.size === 0}
+                                    className="p-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent hover:text-white transition-all disabled:opacity-50"
+                                    title="Archive Selected"
+                                >
+                                    <Archive className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={handleBulkDelete}
+                                    disabled={selectedIds.size === 0}
+                                    className="p-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all disabled:opacity-50"
+                                    title="Delete Selected"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setIsSelectionMode(false);
+                                        setSelectedIds(new Set());
+                                    }}
+                                    className="p-1.5 rounded-lg text-text-muted hover:text-text transition-all"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setIsSelectionMode(true)}
+                                className="p-2 rounded-xl text-text-muted hover:text-accent transition-all flex items-center gap-2 bg-card border border-border-subtle"
+                            >
+                                <span className="text-xs font-bold uppercase tracking-wider hidden sm:inline">Select</span>
+                                <LayoutGrid className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Category Navigator */}
+                <div className="flex gap-2 mt-4 overflow-x-auto pb-1 scrollbar-hide">
+                    <button
+                        onClick={() => setSelectedCategory(null)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${!selectedCategory
+                            ? 'bg-accent/10 border-accent/20 text-accent'
+                            : 'bg-card border-border-subtle text-text-muted hover:border-text-muted'}`}
+                    >
+                        All Categories
+                    </button>
+                    {categories.map(cat => (
+                        <button
+                            key={cat}
+                            onClick={() => setSelectedCategory(cat)}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${selectedCategory === cat
+                                ? 'bg-accent/10 border-accent/20 text-accent'
+                                : 'bg-card border-border-subtle text-text-muted hover:border-text-muted'}`}
+                        >
+                            {cat}
+                            <span className="opacity-50 font-black">{categoryCounts[cat]}</span>
                         </button>
                     ))}
                 </div>
@@ -143,6 +296,25 @@ export default function Feed() {
                             : 'Add your first link using the + button below'}
                     </p>
                 </div>
+            ) : viewMode === 'table' ? (
+                <TableView
+                    links={filteredLinks}
+                    onStatusChange={handleStatusChange}
+                    onDelete={handleDelete}
+                    isSelectionMode={isSelectionMode}
+                    selectedIds={selectedIds}
+                    onToggleSelection={toggleSelection}
+                />
+            ) : viewMode === 'insights' ? (
+                <InsightsFeed
+                    links={filteredLinks}
+                    onOpenDetails={(link) => {
+                        console.log('Open insight details', link);
+                    }}
+                    isSelectionMode={isSelectionMode}
+                    selectedIds={selectedIds}
+                    onToggleSelection={toggleSelection}
+                />
             ) : (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {filteredLinks.map((link) => (
@@ -151,6 +323,9 @@ export default function Feed() {
                             link={link}
                             onStatusChange={handleStatusChange}
                             onDelete={handleDelete}
+                            isSelectionMode={isSelectionMode}
+                            isSelected={selectedIds.has(link.id)}
+                            onToggleSelection={toggleSelection}
                         />
                     ))}
                 </div>

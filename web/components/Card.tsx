@@ -1,13 +1,17 @@
 'use client';
 
 import { Link, LinkStatus } from '@/lib/types';
-import { useState } from 'react';
-import { Archive, ExternalLink, Star, X, Clock, Tag } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2 } from 'lucide-react';
+import ConfirmDialog from './ConfirmDialog';
 
 interface CardProps {
     link: Link;
     onStatusChange: (id: string, status: LinkStatus) => void;
     onDelete: (id: string) => void;
+    isSelectionMode?: boolean;
+    isSelected?: boolean;
+    onToggleSelection?: (id: string) => void;
 }
 
 /**
@@ -19,10 +23,17 @@ interface CardProps {
  */
 export default function Card({ link, onStatusChange, onDelete }: CardProps) {
     const [isExpanded, setIsExpanded] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [now, setNow] = useState<number>(0);
+
+    useEffect(() => {
+        const timer = setTimeout(() => setNow(Date.now()), 0);
+        return () => clearTimeout(timer);
+    }, []);
 
     // Format relative time (e.g., "2h ago")
-    const getTimeAgo = (timestamp: number): string => {
-        const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    const getTimeAgo = (timestamp: number, now: number): string => {
+        const seconds = Math.floor((now - timestamp) / 1000);
 
         if (seconds < 60) return 'just now';
         if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
@@ -65,10 +76,34 @@ export default function Card({ link, onStatusChange, onDelete }: CardProps) {
                     )}
                 </div>
 
-                {/* Title */}
-                <h3 className="font-bold text-lg text-text leading-tight mb-2 group-hover:text-white transition-colors">
-                    {link.title}
-                </h3>
+                {/* Title & Actions */}
+                <div className="flex items-start justify-between gap-2 mb-2">
+                    <h3 className="font-bold text-lg text-text leading-tight group-hover:text-white transition-colors flex-1">
+                        {link.title}
+                    </h3>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowDeleteConfirm(true);
+                            }}
+                            className="p-1.5 hover:bg-red-500/20 rounded-lg text-text-muted hover:text-red-400 transition-colors"
+                            title="Delete"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                        <a
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1.5 hover:bg-white/10 rounded-lg text-text-muted hover:text-white transition-colors"
+                            title="Open Link"
+                        >
+                            <ExternalLink className="w-4 h-4" />
+                        </a>
+                    </div>
+                </div>
 
                 {/* Summary - line clamp 3 */}
                 <p className="text-text-secondary text-sm line-clamp-3 mb-3">
@@ -90,7 +125,7 @@ export default function Card({ link, onStatusChange, onDelete }: CardProps) {
                     </div>
                     <div className="flex items-center gap-1 text-xs text-text-muted">
                         <Clock className="w-3 h-3" />
-                        {getTimeAgo(link.createdAt)}
+                        {now > 0 ? getTimeAgo(link.createdAt, now) : '...'}
                     </div>
                 </div>
             </article>
@@ -124,10 +159,9 @@ export default function Card({ link, onStatusChange, onDelete }: CardProps) {
                         {/* Full Summary */}
                         <p className="text-text-secondary mb-4 leading-relaxed">{link.summary}</p>
 
-                        {/* Estimated Read Time */}
                         <p className="text-sm text-text-muted mb-4 flex items-center gap-2">
                             <Clock className="w-4 h-4" />
-                            {link.metadata.estimatedReadTime} min read
+                            {link.metadata.estimatedReadTime} min read {now > 0 && `• ${getTimeAgo(link.createdAt, now)}`}
                         </p>
 
                         {/* Tags */}
@@ -144,52 +178,76 @@ export default function Card({ link, onStatusChange, onDelete }: CardProps) {
                         </div>
 
                         {/* Actions */}
-                        <div className="flex gap-3">
+                        <div className="flex flex-wrap gap-3">
                             <a
                                 href={link.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex-1 flex items-center justify-center gap-2 bg-white text-black font-medium py-3 px-4 rounded-xl hover:bg-gray-200 transition-colors"
+                                className="flex-[2] flex items-center justify-center gap-2 bg-white text-black font-medium py-3 px-4 rounded-xl hover:bg-gray-200 transition-colors"
                             >
                                 <ExternalLink className="w-4 h-4" />
                                 Open Original
                             </a>
 
-                            {link.status !== 'archived' ? (
-                                <button
-                                    onClick={() => {
-                                        onStatusChange(link.id, 'archived');
-                                        setIsExpanded(false);
-                                    }}
-                                    className="flex items-center justify-center gap-2 bg-white/10 text-text py-3 px-4 rounded-xl hover:bg-white/20 transition-colors"
-                                >
-                                    <Archive className="w-4 h-4" />
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={() => {
-                                        onStatusChange(link.id, 'unread');
-                                        setIsExpanded(false);
-                                    }}
-                                    className="flex items-center justify-center gap-2 bg-white/10 text-text py-3 px-4 rounded-xl hover:bg-white/20 transition-colors"
-                                >
-                                    Unarchive
-                                </button>
-                            )}
+                            <div className="flex gap-2 flex-1">
+                                {link.status !== 'archived' ? (
+                                    <button
+                                        onClick={() => {
+                                            onStatusChange(link.id, 'archived');
+                                            setIsExpanded(false);
+                                        }}
+                                        className="flex-1 flex items-center justify-center gap-2 bg-white/10 text-text py-3 px-4 rounded-xl hover:bg-white/20 transition-colors"
+                                        title="Archive"
+                                    >
+                                        <Archive className="w-4 h-4" />
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => {
+                                            onStatusChange(link.id, 'unread');
+                                            setIsExpanded(false);
+                                        }}
+                                        className="flex-1 flex items-center justify-center gap-2 bg-white/10 text-text py-3 px-4 rounded-xl hover:bg-white/20 transition-colors"
+                                    >
+                                        Unarchive
+                                    </button>
+                                )}
 
-                            <button
-                                onClick={() => {
-                                    onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite');
-                                    setIsExpanded(false);
-                                }}
-                                className="flex items-center justify-center gap-2 bg-white/10 text-text py-3 px-4 rounded-xl hover:bg-white/20 transition-colors"
-                            >
-                                <Star className={`w-4 h-4 ${link.status === 'favorite' ? 'fill-yellow-400 text-yellow-400' : ''}`} />
-                            </button>
+                                <button
+                                    onClick={() => {
+                                        onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite');
+                                        setIsExpanded(false);
+                                    }}
+                                    className="flex-1 flex items-center justify-center gap-2 bg-white/10 text-text py-3 px-4 rounded-xl hover:bg-white/20 transition-colors"
+                                    title="Favorite"
+                                >
+                                    <Star className={`w-4 h-4 ${link.status === 'favorite' ? 'fill-yellow-400 text-yellow-400' : ''}`} />
+                                </button>
+
+                                <button
+                                    onClick={() => setShowDeleteConfirm(true)}
+                                    className="flex-1 flex items-center justify-center gap-2 bg-red-500/10 text-red-400 py-3 px-4 rounded-xl hover:bg-red-500/20 transition-colors"
+                                    title="Delete"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
+            {/* Deletion Confirmation */}
+            <ConfirmDialog
+                isOpen={showDeleteConfirm}
+                onClose={() => setShowDeleteConfirm(false)}
+                onConfirm={() => {
+                    onDelete(link.id);
+                    setIsExpanded(false);
+                }}
+                title="Delete from Brain?"
+                message="This will permanently remove this insight. You can't undo this action."
+                confirmLabel="Delete"
+            />
         </>
     );
 }

@@ -1,0 +1,17 @@
+{
+  "functions": [
+    {
+      "codebase": "default",
+      "source": "functions",
+      "runtime": "python313",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "venv",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ]
+}

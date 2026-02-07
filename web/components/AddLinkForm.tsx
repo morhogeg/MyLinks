@@ -1,7 +1,11 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
+
 import { Link, Plus, Loader2 } from 'lucide-react';
+import { saveLink } from '@/lib/storage';
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 interface AddLinkFormProps {
     onLinkAdded: () => void;
@@ -17,6 +21,17 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
+    const [uid, setUid] = useState<string | null>(null);
+
+    // Get UID on mount
+    useEffect(() => {
+        async function fetchUid() {
+            const q = query(collection(db, 'users'), where('phone_number', '==', '+16462440305'), limit(1));
+            const snap = await getDocs(q);
+            if (!snap.empty) setUid(snap.docs[0].id);
+        }
+        fetchUid();
+    }, []);
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -26,7 +41,6 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
         setError(null);
 
         try {
-            // Call the analyze API
             const response = await fetch('/api/analyze', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -39,14 +53,21 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                 throw new Error(data.error || 'Failed to analyze URL');
             }
 
-            // Save to localStorage
-            // TODO: This will happen server-side with Firestore in production
-            const stored = localStorage.getItem('secondbrain_links');
-            const links = stored ? JSON.parse(stored) : [];
-            links.unshift(data.link);
-            localStorage.setItem('secondbrain_links', JSON.stringify(links));
+            // Save to Firestore
+            if (!uid) throw new Error("User not registered in database");
 
-            // Reset form
+            await saveLink(uid, {
+                url: data.link.url,
+                title: data.link.title,
+                summary: data.link.summary,
+                tags: data.link.tags,
+                category: data.link.category,
+                metadata: {
+                    originalTitle: data.link.metadata.originalTitle,
+                    estimatedReadTime: data.link.metadata.estimatedReadTime
+                }
+            });
+
             setUrl('');
             setIsExpanded(false);
             onLinkAdded();
@@ -104,8 +125,8 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
             <button
                 onClick={() => setIsExpanded(!isExpanded)}
                 className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 ${isExpanded
-                        ? 'bg-white/10 rotate-45'
-                        : 'bg-white hover:bg-gray-200'
+                    ? 'bg-white/10 rotate-45'
+                    : 'bg-white hover:bg-gray-200'
                     }`}
             >
                 <Plus className={`w-6 h-6 transition-colors ${isExpanded ? 'text-white' : 'text-black'}`} />

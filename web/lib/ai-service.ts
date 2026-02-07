@@ -63,7 +63,7 @@ export async function analyzeContent(url: string, pageContent: string): Promise<
  * Generate a realistic mock analysis based on URL/content patterns
  * (Fallback if API fails)
  */
-function generateMockAnalysis(url: string, content: string): AIAnalysis {
+function generateMockAnalysis(url: string, _content: string): AIAnalysis {
     // ... (previous mock logic remains same)
     const urlLower = url.toLowerCase();
     let category = 'General';

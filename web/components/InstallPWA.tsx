@@ -22,7 +22,10 @@ export default function InstallPWA() {
         const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
         if (isIOS && isSafari && !isStandalone) {
-            setShowBanner(true);
+            // Use a slight delay to avoid synchronous setState during render/mount phase
+            // which can trigger cascading render warnings in some React versions
+            const timer = setTimeout(() => setShowBanner(true), 100);
+            return () => clearTimeout(timer);
         }
     }, []);
 

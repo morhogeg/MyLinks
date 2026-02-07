@@ -12,19 +12,24 @@ import re
 import requests
 from datetime import datetime
 from typing import Optional
+from twilio.rest import Client
 
 # Firebase Functions framework
-# TODO: Uncomment when deploying to Firebase
-# from firebase_functions import https_fn
-# from firebase_admin import initialize_app, firestore
+from firebase_functions import https_fn
+from firebase_admin import initialize_app, firestore
 
 from models import WebhookPayload, LinkDocument, LinkStatus, LinkMetadata, AIAnalysis
 from ai_service import ClaudeService
 
-# Initialize Firebase Admin (for Firestore access)
-# TODO: Uncomment when deploying
-# initialize_app()
-# db = firestore.client()
+# Initialize Firebase Admin lazily
+_db = None
+
+def get_db():
+    global _db
+    if _db is None:
+        initialize_app()
+        _db = firestore.client()
+    return _db
 
 
 def scrape_url(url: str) -> dict:
@@ -64,37 +69,63 @@ def scrape_url(url: str) -> dict:
 def find_user_by_phone(phone_number: str) -> Optional[str]:
     """
     Look up user UID by phone number in Firestore
-    
-    TODO: Implement Firestore query:
-        users_ref = db.collection('users')
-        query = users_ref.where('phoneNumber', '==', phone_number).limit(1)
-        docs = query.get()
-        if docs:
-            return docs[0].id
-        return None
     """
-    # Mock implementation - return None (user not found)
-    # In production, this queries Firestore
-    print(f"Looking up user with phone: {phone_number}")
+    db = get_db()
+    # Normalize phone number (strip 'whatsapp:' prefix if present)
+    clean_number = phone_number.replace('whatsapp:', '')
+    
+    users_ref = db.collection('users')
+    query = users_ref.where('phone_number', '==', clean_number).limit(1)
+    docs = query.get()
+    
+    if docs:
+        return docs[0].id
+    
+    print(f"User not found for phone: {clean_number}")
     return None
 
 
 def save_link_to_firestore(uid: str, link_data: dict) -> str:
     """
     Save a new link document to Firestore
-    
-    TODO: Implement Firestore write:
-        doc_ref = db.collection('users').document(uid).collection('links').document()
-        doc_ref.set(link_data)
-        return doc_ref.id
     """
-    # Mock implementation
-    print(f"Saving link for user {uid}: {link_data.get('title', 'Untitled')}")
-    return "mock-link-id"
+    db = get_db()
+    doc_ref = db.collection('users').document(uid).collection('links').document()
+    doc_ref.set(link_data)
+    return doc_ref.id
 
 
-# TODO: Uncomment decorator when deploying to Firebase
-# @https_fn.on_request()
+def send_whatsapp_message(to_number: str, body: str):
+    """
+    Send a WhatsApp message via Twilio
+    """
+    account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
+    auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
+    from_number = os.environ.get("TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238886")
+    
+    if not account_sid or not auth_token:
+        print("Twilio credentials missing")
+        return
+        
+    try:
+        client = Client(account_sid, auth_token)
+        message = client.messages.create(
+            from_=from_number,
+            body=body,
+            to=to_number
+        )
+        print(f"Sent message: {message.sid}")
+    except Exception as e:
+        print(f"Twilio error: {e}")
+
+
+@https_fn.on_request()
+def ping(req: https_fn.Request) -> https_fn.Response:
+    """Simple health check function"""
+    return https_fn.Response("pong")
+
+
+@https_fn.on_request()
 def whatsapp_webhook(request):
     """
     WhatsApp webhook endpoint
@@ -165,8 +196,8 @@ def whatsapp_webhook(request):
         # Save to Firestore
         link_id = save_link_to_firestore(uid, link_data)
         
-        # TODO: Send success message via WhatsApp API
-        # send_whatsapp_message(payload.from_number, f"✅ Saved: {analysis['title']}")
+        # Send success message via WhatsApp API
+        send_whatsapp_message(payload.from_number, f"✅ Saved: {analysis['title']}\n\nCategory: {analysis['category']}")
         
         return {"success": True, "linkId": link_id}, 200
         
@@ -190,22 +221,10 @@ def whatsapp_webhook(request):
         
         link_id = save_link_to_firestore(uid, fallback_data)
         
-        # TODO: Send error notification via WhatsApp
-        # send_whatsapp_message(payload.from_number, f"⚠️ Saved with limited info: {url}")
+        # Send error notification via WhatsApp
+        send_whatsapp_message(payload.from_number, f"⚠️ Saved with limited info: {url}\n\nAI analysis encountered an error.")
         
         return {"success": True, "linkId": link_id, "warning": "AI processing failed"}, 200
 
 
-# Local testing entry point
-if __name__ == "__main__":
-    from flask import Flask, request as flask_request
-    
-    app = Flask(__name__)
-    
-    @app.route("/webhook/whatsapp", methods=["POST"])
-    def local_webhook():
-        return whatsapp_webhook(flask_request)
-    
-    print("Starting local server on http://localhost:5001")
-    print("Test with: curl -X POST http://localhost:5001/webhook/whatsapp -d 'From=+1234567890&Body=https://example.com'")
-    app.run(port=5001, debug=True)
+# Local testing relocated to dev_server.py
