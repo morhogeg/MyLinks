@@ -199,20 +199,34 @@ export default function Feed() {
                 {/* Filter Tabs & View Switcher */}
                 <div className="flex items-center justify-between mt-3 gap-2 sm:gap-4">
                     <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide flex-1">
-                        {filterButtons.map((btn) => (
-                            <button
-                                key={btn.key}
-                                onClick={() => setFilter(btn.key)}
-                                title={btn.label}
-                                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition-colors min-h-[44px] ${filter === btn.key
-                                    ? 'bg-white text-black'
-                                    : 'bg-card text-text-secondary hover:bg-card-hover'
-                                    }`}
-                            >
-                                {btn.icon}
-                                <span className="hidden xs:inline">{btn.label}</span>
-                            </button>
-                        ))}
+                        {filterButtons.map((btn) => {
+                            const isActive = filter === btn.key;
+                            let icon = btn.icon;
+
+                            // Use filled icons when active
+                            if (isActive) {
+                                if (btn.key === 'favorite') {
+                                    icon = <Star className="w-4 h-4 fill-current" />;
+                                } else if (btn.key === 'archived') {
+                                    icon = <Archive className="w-4 h-4 fill-current" />;
+                                }
+                            }
+
+                            return (
+                                <button
+                                    key={btn.key}
+                                    onClick={() => setFilter(btn.key)}
+                                    title={btn.label}
+                                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition-all duration-200 min-h-[44px] ${isActive
+                                            ? 'bg-accent/10 text-accent border border-accent/20 scale-[1.02]'
+                                            : 'bg-card text-text-secondary hover:bg-card-hover border border-transparent'
+                                        }`}
+                                >
+                                    {icon}
+                                    <span className="hidden xs:inline">{btn.label}</span>
+                                </button>
+                            );
+                        })}
                     </div>
 
                     {/* Sort Dropdown */}
