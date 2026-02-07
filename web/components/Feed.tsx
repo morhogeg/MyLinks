@@ -1,4 +1,6 @@
 'use client';
+// Refreshed colors and layout
+
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
@@ -175,148 +177,35 @@ export default function Feed() {
 
     return (
         <div className="space-y-4">
-            {/* Search Bar */}
-            <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg pb-3 sm:pb-4 pt-2 -mt-2">
-                <div className="relative">
+            {/* Sticky Header Section */}
+            <div className="sticky top-[64px] sm:top-[72px] z-30 bg-background/95 backdrop-blur-xl pb-4 pt-4 -mx-4 px-4 sm:mx-0 sm:px-0 border-b border-border-subtle shadow-sm">
+                {/* Search Bar */}
+                <div className="relative mb-4">
                     <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 sm:w-5 h-4 sm:h-5 text-text-muted" />
                     <input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Search your brain..."
-                        className="w-full pl-10 sm:pl-12 pr-12 sm:pr-10 py-3 sm:py-3 bg-card rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-white/20 min-h-[44px]"
+                        className="w-full pl-10 sm:pl-12 pr-12 sm:pr-10 py-3 bg-card rounded-2xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all shadow-inner"
                     />
                     {searchQuery && (
                         <button
                             onClick={() => setSearchQuery('')}
-                            className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-white/10 rounded-full min-h-[44px] min-w-[44px] flex items-center justify-center"
+                            className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-white/10 rounded-full transition-all"
                         >
                             <X className="w-4 h-4 text-text-muted" />
                         </button>
                     )}
                 </div>
 
-                {/* Filter Tabs & View Switcher */}
-                <div className="flex items-center justify-between mt-3 gap-2 sm:gap-4">
-                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide flex-1">
-                        {filterButtons.map((btn) => {
-                            const isActive = filter === btn.key;
-                            let icon = btn.icon;
-
-                            // Use filled icons when active
-                            if (isActive) {
-                                if (btn.key === 'favorite') {
-                                    icon = <Star className="w-4 h-4 fill-current" />;
-                                } else if (btn.key === 'archived') {
-                                    icon = <Archive className="w-4 h-4 fill-current" />;
-                                }
-                            }
-
-                            return (
-                                <button
-                                    key={btn.key}
-                                    onClick={() => setFilter(btn.key)}
-                                    title={btn.label}
-                                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition-all duration-200 min-h-[44px] ${isActive
-                                            ? 'bg-accent/10 text-accent border border-accent/20 scale-[1.02]'
-                                            : 'bg-card text-text-secondary hover:bg-card-hover border border-transparent'
-                                        }`}
-                                >
-                                    {icon}
-                                    <span className="hidden xs:inline">{btn.label}</span>
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    {/* Sort Dropdown */}
-                    <div className="relative">
-                        <select
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value as SortType)}
-                            className="appearance-none bg-card border border-border-subtle rounded-full px-3 sm:px-4 py-2 sm:py-2.5 pr-8 sm:pr-10 text-xs sm:text-sm font-medium text-text-secondary hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/20 min-h-[44px]"
-                        >
-                            <option value="date-desc">Newest First</option>
-                            <option value="date-asc">Oldest First</option>
-                            <option value="title-asc">Title A-Z</option>
-                            <option value="category">Category</option>
-                        </select>
-                        <ArrowUpDown className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
-                    </div>
-
-                    <div className="flex items-center bg-card rounded-full p-1 border border-border-subtle shadow-sm">
-                        <button
-                            onClick={() => setViewMode('grid')}
-                            className={`p-2 sm:p-1.5 rounded-full transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${viewMode === 'grid' ? 'bg-accent text-white shadow-md' : 'text-text-muted hover:text-text-secondary'}`}
-                            title="Grid View"
-                        >
-                            <LayoutGrid className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => setViewMode('table')}
-                            className={`p-2 sm:p-1.5 rounded-full transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${viewMode === 'table' ? 'bg-accent text-white shadow-md' : 'text-text-muted hover:text-text-secondary'}`}
-                            title="Table View"
-                        >
-                            <List className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => setViewMode('insights')}
-                            className={`p-2 sm:p-1.5 rounded-full transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${viewMode === 'insights' ? 'bg-accent text-white shadow-md' : 'text-text-muted hover:text-text-secondary'}`}
-                            title="Insights View"
-                        >
-                            <Sparkles className="w-4 h-4" />
-                        </button>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        {isSelectionMode ? (
-                            <div className="flex items-center gap-2 animate-slide-up">
-                                <span className="text-xs font-bold text-accent mr-1">{selectedIds.size} selected</span>
-                                <button
-                                    onClick={handleBulkArchive}
-                                    disabled={selectedIds.size === 0}
-                                    className="p-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent hover:text-white transition-all disabled:opacity-50"
-                                    title="Archive Selected"
-                                >
-                                    <Archive className="w-4 h-4" />
-                                </button>
-                                <button
-                                    onClick={handleBulkDelete}
-                                    disabled={selectedIds.size === 0}
-                                    className="p-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all disabled:opacity-50"
-                                    title="Delete Selected"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setIsSelectionMode(false);
-                                        setSelectedIds(new Set());
-                                    }}
-                                    className="p-1.5 rounded-lg text-text-muted hover:text-text transition-all"
-                                >
-                                    <X className="w-4 h-4" />
-                                </button>
-                            </div>
-                        ) : (
-                            <button
-                                onClick={() => setIsSelectionMode(true)}
-                                className="p-2 rounded-xl text-text-muted hover:text-accent transition-all flex items-center gap-2 bg-card border border-border-subtle"
-                            >
-                                <span className="text-xs font-bold uppercase tracking-wider hidden sm:inline">Select</span>
-                                <LayoutGrid className="w-4 h-4" />
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                {/* Category Navigator */}
-                <div className="flex gap-2 mt-4 overflow-x-auto pb-1 scrollbar-hide">
+                {/* Row 1: Category Navigator (Primary) */}
+                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 mb-4">
                     <button
                         onClick={() => setSelectedCategory(new Set())}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${selectedCategory.size === 0
-                            ? 'bg-accent/10 border-accent/20 text-accent'
-                            : 'bg-card border-border-subtle text-text-muted hover:border-text-muted'}`}
+                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all border whitespace-nowrap min-h-[40px] flex-shrink-0 ${selectedCategory.size === 0
+                            ? 'bg-accent text-white border-accent shadow-md shadow-accent/20'
+                            : 'bg-card border-border-subtle text-text-muted hover:border-text-secondary hover:text-text-secondary'}`}
                     >
                         All Categories
                     </button>
@@ -335,20 +224,146 @@ export default function Feed() {
                                     }
                                     setSelectedCategory(newSet);
                                 }}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${isSelected
+                                className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all border whitespace-nowrap min-h-[40px] flex-shrink-0 ${isSelected
                                     ? ''
-                                    : 'bg-card border-border-subtle text-text-muted hover:border-text-muted'
+                                    : 'bg-card border-border-subtle text-text-muted hover:border-text-secondary hover:text-text-secondary'
                                     }`}
                                 style={isSelected ? {
                                     backgroundColor: colorStyle.backgroundColor,
                                     color: colorStyle.color,
-                                    border: 'none',
+                                    borderColor: colorStyle.backgroundColor,
+                                    boxShadow: `0 4px 12px ${colorStyle.backgroundColor}33`,
                                 } : undefined}
                             >
                                 {cat}
+                                <span className="opacity-60 font-medium ml-1">({categoryCounts[cat]})</span>
                             </button>
                         );
                     })}
+                </div>
+
+                {/* Row 2 & 3: Status Filters & View Switcher */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    {/* Status Filters - Secondary */}
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
+                        {filterButtons.map((btn) => {
+                            const isActive = filter === btn.key;
+                            let icon = btn.icon;
+
+                            // Use filled icons when active
+                            if (isActive) {
+                                if (btn.key === 'favorite') {
+                                    icon = <Star className="w-3.5 h-3.5 fill-current" />;
+                                } else if (btn.key === 'archived') {
+                                    icon = <Archive className="w-3.5 h-3.5 fill-current" />;
+                                }
+                            }
+
+                            return (
+                                <button
+                                    key={btn.key}
+                                    onClick={() => setFilter(btn.key)}
+                                    title={btn.label}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all duration-200 min-h-[36px] flex-shrink-0 ${isActive
+                                        ? btn.key === 'favorite'
+                                            ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20'
+                                            : 'bg-accent/10 text-accent border border-accent/20'
+                                        : 'bg-card/50 text-text-muted hover:bg-card-hover border border-transparent'
+                                        }`}
+                                >
+                                    <div className={isActive ? btn.key === 'favorite' ? 'text-yellow-500' : 'text-accent' : 'text-text-muted'}>
+                                        {icon}
+                                    </div>
+                                    <span>{btn.label}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Controls Row */}
+                    <div className="flex items-center justify-between sm:justify-end gap-2 scrollbar-hide overflow-visible">
+                        {/* Sort Dropdown */}
+                        <div className="relative">
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value as SortType)}
+                                className="appearance-none bg-card/50 border border-border-subtle rounded-full pl-2.5 pr-7 py-1.5 text-[10px] sm:text-[11px] font-bold text-text-secondary hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/20 min-h-[32px] sm:min-h-[36px]"
+                            >
+                                <option value="date-desc">Newest First</option>
+                                <option value="date-asc">Oldest First</option>
+                                <option value="title-asc">Title A-Z</option>
+                                <option value="category">Category</option>
+                            </select>
+                            <ArrowUpDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-text-muted pointer-events-none" />
+                        </div>
+
+                        {/* View Mode Switcher */}
+                        <div className="flex items-center bg-card/50 rounded-full p-0.5 border border-border-subtle shadow-sm flex-shrink-0">
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={`p-1.5 rounded-full transition-all min-h-[28px] min-w-[28px] flex items-center justify-center ${viewMode === 'grid' ? 'bg-accent text-white shadow-sm' : 'text-text-muted hover:text-text-secondary'}`}
+                                title="Grid View"
+                            >
+                                <LayoutGrid className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('table')}
+                                className={`p-1.5 rounded-full transition-all min-h-[28px] min-w-[28px] flex items-center justify-center ${viewMode === 'table' ? 'bg-accent text-white shadow-sm' : 'text-text-muted hover:text-text-secondary'}`}
+                                title="Table View"
+                            >
+                                <List className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('insights')}
+                                className={`p-1.5 rounded-full transition-all min-h-[28px] min-w-[28px] flex items-center justify-center ${viewMode === 'insights' ? 'bg-accent text-white shadow-sm' : 'text-text-muted hover:text-text-secondary'}`}
+                                title="Insights View"
+                            >
+                                <Sparkles className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+
+                        {/* Selection Control */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            {isSelectionMode ? (
+                                <div className="flex items-center gap-1.5 animate-slide-up bg-accent/5 px-2 py-0.5 rounded-full border border-accent/10 min-h-[36px]">
+                                    <span className="text-[10px] font-bold text-accent px-1">{selectedIds.size}</span>
+                                    <button
+                                        onClick={handleBulkArchive}
+                                        disabled={selectedIds.size === 0}
+                                        className="p-1.5 rounded-full bg-accent/10 text-accent hover:bg-accent hover:text-white transition-all disabled:opacity-30"
+                                        title="Archive Selected"
+                                    >
+                                        <Archive className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                        onClick={handleBulkDelete}
+                                        disabled={selectedIds.size === 0}
+                                        className="p-1.5 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all disabled:opacity-30"
+                                        title="Delete Selected"
+                                    >
+                                        <Trash2 className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setIsSelectionMode(false);
+                                            setSelectedIds(new Set());
+                                        }}
+                                        className="p-1.5 rounded-full text-text-muted hover:text-text transition-all"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setIsSelectionMode(true)}
+                                    className="h-9 px-3 rounded-full text-text-muted hover:text-accent transition-all flex items-center gap-2 bg-card/50 border border-border-subtle"
+                                >
+                                    <span className="text-[10px] font-bold uppercase tracking-wider hidden xs:inline">Select</span>
+                                    <LayoutGrid className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
 

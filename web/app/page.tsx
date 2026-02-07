@@ -26,8 +26,8 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background text-text transition-colors duration-200">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b border-border-subtle">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border-subtle h-[64px] sm:h-[72px] flex items-center">
+        <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
               <Brain className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
