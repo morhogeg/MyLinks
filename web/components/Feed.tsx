@@ -78,6 +78,16 @@ export default function Feed() {
         return () => unsubscribe();
     }, [uid]);
 
+    // Helper to get consistent number for timestamps (handles number, string, or Firestore Timestamp)
+    const getTimestampNumber = (val: any): number => {
+        if (!val) return 0;
+        if (typeof val === 'number') return val;
+        if (typeof val === 'string') return new Date(val).getTime();
+        if (val.toMillis && typeof val.toMillis === 'function') return val.toMillis();
+        if (val.seconds) return val.seconds * 1000;
+        return 0;
+    };
+
     // Filter and sort links
     const filteredLinks = links
         .filter((link) => {
@@ -101,11 +111,11 @@ export default function Feed() {
         .sort((a, b) => {
             switch (sortBy) {
                 case 'date-desc':
-                    return (b.createdAt as number) - (a.createdAt as number);
+                    return getTimestampNumber(b.createdAt) - getTimestampNumber(a.createdAt);
                 case 'date-asc':
-                    return (a.createdAt as number) - (b.createdAt as number);
+                    return getTimestampNumber(a.createdAt) - getTimestampNumber(b.createdAt);
                 case 'title-asc':
-                    return a.title.localeCompare(b.title);
+                    return a.title.toLowerCase().localeCompare(b.title.toLowerCase());
                 case 'category':
                     return a.category.localeCompare(b.category);
                 default:
@@ -200,11 +210,11 @@ export default function Feed() {
                     )}
                 </div>
 
-                {/* Row 1: Category Navigator (Primary) - Slightly more prominent text */}
+                {/* Row 1: Category Navigator (Primary) - DRASTICALLY BIGGER */}
                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 mb-2">
                     <button
                         onClick={() => setSelectedCategory(new Set())}
-                        className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap min-h-[32px] flex-shrink-0 ${selectedCategory.size === 0
+                        className={`px-3 py-1.5 rounded-full text-[13px] font-bold transition-all border whitespace-nowrap min-h-[34px] flex-shrink-0 ${selectedCategory.size === 0
                             ? 'bg-accent text-white border-accent shadow-sm'
                             : 'bg-card border-border-subtle text-text-muted hover:border-text-secondary hover:text-text-secondary'}`}
                     >
@@ -225,7 +235,7 @@ export default function Feed() {
                                     }
                                     setSelectedCategory(newSet);
                                 }}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap min-h-[32px] flex-shrink-0 ${isSelected
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-bold transition-all border whitespace-nowrap min-h-[34px] flex-shrink-0 ${isSelected
                                     ? ''
                                     : 'bg-card border-border-subtle text-text-muted hover:border-text-secondary hover:text-text-secondary'
                                     }`}
@@ -243,27 +253,27 @@ export default function Feed() {
                     })}
                 </div>
 
-                {/* Row 2: Combined Controls - Status, Sort, View, Select (More Subtle) */}
-                <div className="flex items-center justify-between gap-1 -mx-2 px-2 sm:mx-0 sm:px-0 py-0.5 mt-0.5">
+                {/* Row 2: Combined Controls - Status, Sort, View, Select (DRASTICALLY SUBTLE) */}
+                <div className="flex items-center justify-between gap-1 -mx-2 px-2 sm:mx-0 sm:px-0 py-0 mt-0">
                     <div className="flex items-center gap-1">
                         {/* Status Filter Dropdown */}
                         <div className="relative group">
                             <select
                                 value={filter}
                                 onChange={(e) => setFilter(e.target.value as FilterType)}
-                                className="appearance-none bg-card/40 border border-transparent rounded-full pl-6 pr-6 py-1 text-[9.5px] font-medium text-text-muted hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/20 min-h-[28px]"
+                                className="appearance-none bg-card/30 border border-transparent rounded-full pl-6 pr-6 py-0.5 text-[10px] font-medium text-text-muted/60 hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/10 min-h-[28px]"
                             >
                                 {filterButtons.map(btn => (
                                     <option key={btn.key} value={btn.key}>{btn.label}</option>
                                 ))}
                             </select>
-                            <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-60">
+                            <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-40">
                                 {filter === 'all' && <Inbox className="w-3 h-3 text-text-muted" />}
                                 {filter === 'unread' && <Inbox className="w-3 h-3 text-accent" />}
                                 {filter === 'favorite' && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
                                 {filter === 'archived' && <Archive className="w-3 h-3 text-text-muted" />}
                             </div>
-                            <ArrowUpDown className="absolute right-2 top-1/2 -translate-y-1/2 w-2.5 h-2.5 text-text-muted pointer-events-none opacity-60" />
+                            <ArrowUpDown className="absolute right-2 top-1/2 -translate-y-1/2 w-2.5 h-2.5 text-text-muted pointer-events-none opacity-40" />
                         </div>
 
                         {/* Sort Dropdown */}
@@ -271,40 +281,40 @@ export default function Feed() {
                             <select
                                 value={sortBy}
                                 onChange={(e) => setSortBy(e.target.value as SortType)}
-                                className="appearance-none bg-card/40 border border-transparent rounded-full pl-2 pr-6 py-1 text-[9.5px] font-medium text-text-muted hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/20 min-h-[28px]"
+                                className="appearance-none bg-card/30 border border-transparent rounded-full pl-2 pr-6 py-0.5 text-[10px] font-medium text-text-muted/60 hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/10 min-h-[28px]"
                             >
                                 <option value="date-desc">Newest</option>
                                 <option value="date-asc">Oldest</option>
                                 <option value="title-asc">A-Z</option>
                                 <option value="category">Category</option>
                             </select>
-                            <ArrowUpDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-2.5 h-2.5 text-text-muted pointer-events-none opacity-60" />
+                            <ArrowUpDown className="absolute right-2 top-1/2 -translate-y-1/2 w-2.5 h-2.5 text-text-muted pointer-events-none opacity-40" />
                         </div>
                     </div>
 
                     <div className="flex items-center gap-1">
                         {/* View Mode Switcher */}
-                        <div className="flex items-center bg-card/40 rounded-full p-0.5 border border-transparent shadow-sm">
+                        <div className="flex items-center bg-card/30 rounded-full p-0.5 border border-transparent shadow-sm">
                             <button
                                 onClick={() => setViewMode('grid')}
-                                className={`p-1 rounded-full transition-all min-h-[22px] min-w-[22px] flex items-center justify-center ${viewMode === 'grid' ? 'bg-accent text-white shadow-sm' : 'text-text-muted hover:text-text-secondary'}`}
+                                className={`p-1.5 rounded-full transition-all min-h-[26px] min-w-[26px] flex items-center justify-center ${viewMode === 'grid' ? 'bg-accent/80 text-white shadow-sm' : 'text-text-muted/40 hover:text-text-secondary'}`}
                                 title="Grid View"
                             >
-                                <LayoutGrid className="w-2.5 h-2.5" />
+                                <LayoutGrid className="w-3 h-3" />
                             </button>
                             <button
                                 onClick={() => setViewMode('table')}
-                                className={`p-1 rounded-full transition-all min-h-[22px] min-w-[22px] flex items-center justify-center ${viewMode === 'table' ? 'bg-accent text-white shadow-sm' : 'text-text-muted hover:text-text-secondary'}`}
+                                className={`p-1.5 rounded-full transition-all min-h-[26px] min-w-[26px] flex items-center justify-center ${viewMode === 'table' ? 'bg-accent/80 text-white shadow-sm' : 'text-text-muted/40 hover:text-text-secondary'}`}
                                 title="Table View"
                             >
-                                <List className="w-2.5 h-2.5" />
+                                <List className="w-3 h-3" />
                             </button>
                             <button
                                 onClick={() => setViewMode('insights')}
-                                className={`p-1 rounded-full transition-all min-h-[22px] min-w-[22px] flex items-center justify-center ${viewMode === 'insights' ? 'bg-accent text-white shadow-sm' : 'text-text-muted hover:text-text-secondary'}`}
+                                className={`p-1.5 rounded-full transition-all min-h-[26px] min-w-[26px] flex items-center justify-center ${viewMode === 'insights' ? 'bg-accent/80 text-white shadow-sm' : 'text-text-muted/40 hover:text-text-secondary'}`}
                                 title="Insights View"
                             >
-                                <Sparkles className="w-2.5 h-2.5" />
+                                <Sparkles className="w-3 h-3" />
                             </button>
                         </div>
 
@@ -318,7 +328,7 @@ export default function Feed() {
                                         disabled={selectedIds.size === 0}
                                         className="p-1 rounded-full bg-accent/10 text-accent hover:bg-accent hover:text-white transition-all disabled:opacity-30"
                                     >
-                                        <Archive className="w-2.5 h-2.5" />
+                                        <Archive className="w-3 h-3" />
                                     </button>
                                     <button
                                         onClick={() => {
@@ -327,15 +337,15 @@ export default function Feed() {
                                         }}
                                         className="p-1 rounded-full text-text-muted hover:text-text transition-all"
                                     >
-                                        <X className="w-2.5 h-2.5" />
+                                        <X className="w-3 h-3" />
                                     </button>
                                 </div>
                             ) : (
                                 <button
                                     onClick={() => setIsSelectionMode(true)}
-                                    className="h-[28px] w-[28px] rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center bg-card/40 border border-transparent"
+                                    className="h-[28px] w-[28px] rounded-full text-text-muted/40 hover:text-accent transition-all flex items-center justify-center bg-card/30 border border-transparent"
                                 >
-                                    <LayoutGrid className="w-2.5 h-2.5" />
+                                    <LayoutGrid className="w-3 h-3" />
                                 </button>
                             )}
                         </div>
