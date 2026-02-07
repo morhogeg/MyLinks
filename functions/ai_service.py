@@ -1,115 +1,66 @@
 """
-Claude AI Service for content analysis
-TODO: Replace mock implementation with actual Claude API calls
+Gemini AI Service for content analysis
+Using the new google-genai SDK and gemini-3-flash-preview
 """
 
 import os
 import json
-import re
-from typing import Dict, Any
+from google import genai
 from models import AIAnalysis
 
+# Enhanced system prompt
+SYSTEM_PROMPT = """You are an expert knowledge curator building a "Second Brain".
+Your goal is to analyze web content and extract high-quality, actionable insights.
 
-# System prompt from PRD Section 4.2
-SYSTEM_PROMPT = """You are an expert knowledge curator building a Second Brain.
-Your role is to analyze web content and extract the most valuable insights.
+Output MUST be a valid JSON object only.
 
-Input: Raw text from a website.
-Output: JSON only.
-
-JSON Structure:
-{
-  "title": "Concise, punchy title",
-  "summary": "A 3-sentence summary focusing on novel insights, not just describing the content.",
-  "category": "One specific high-level category",
-  "tags": ["tag1", "tag2", "tag3"],
-  "actionable_takeaway": "One thing the user can do or learn from this."
-}"""
+Requirements for the analysis:
+1. title: Create a concise, punchy title that captures the core value.
+2. summary: Write a 3 to 7 sentence summary focusing on novel insights, not just describing the content.
+3. category: Assign exactly one specific high-level category (e.g., Tech, Health, Philosophy).
+4. tags: Provide 3-5 relevant tags.
+5. actionable_takeaway: One specific thing the user can do or learn from this."""
 
 
-class ClaudeService:
+class ClaudeService: # Kept name for compatibility with main.py
     """
-    Wrapper for Anthropic Claude API
-    Uses claude-3-5-sonnet-20240620 as specified in PRD
+    Wrapper for Google Gemini AI
+    Uses gemini-3-flash-preview as requested
     """
     
     def __init__(self):
-        # TODO: In production, get from Firebase Secrets:
-        # firebase functions:secrets:set ANTHROPIC_API_KEY
-        self.api_key = os.environ.get("ANTHROPIC_API_KEY")
-        self.model = "claude-3-5-sonnet-20240620"
+        self.api_key = os.environ.get("GEMINI_API_KEY")
+        self.client = genai.Client(api_key=self.api_key) if self.api_key else None
+        self.model = "gemini-3-flash-preview"
         
-    def analyze_text(self, text: str) -> Dict[str, Any]:
+    def analyze_text(self, text: str) -> dict:
         """
-        Analyze text content and return structured insights
-        
-        Args:
-            text: Raw text content from a webpage
-            
-        Returns:
-            Dict matching AIAnalysis schema
+        Analyze text content using Gemini 3.0 Flash
         """
-        if not self.api_key:
-            # Fall back to mock if no API key
-            return MockClaudeService().analyze_text(text)
+        if not self.client:
+            # Fallback to local logic if no API key
+            return self._mock_analysis(text)
         
-        # TODO: Replace with actual Claude API call
-        # Example implementation:
-        # 
-        # from anthropic import Anthropic
-        # client = Anthropic(api_key=self.api_key)
-        # 
-        # response = client.messages.create(
-        #     model=self.model,
-        #     max_tokens=1024,
-        #     system=SYSTEM_PROMPT,
-        #     messages=[{"role": "user", "content": text}]
-        # )
-        # 
-        # # Parse JSON from response
-        # content = response.content[0].text
-        # return json.loads(content)
-        
-        # For now, use mock
-        return MockClaudeService().analyze_text(text)
-
-
-class MockClaudeService:
-    """
-    Mock implementation for local testing without API calls
-    Returns realistic responses based on content patterns
-    """
-    
-    def analyze_text(self, text: str) -> Dict[str, Any]:
-        """Generate mock analysis based on text content"""
-        
-        text_lower = text.lower()
-        
-        # Detect category from keywords
-        category = "General"
-        tags = ["reference", "bookmark"]
-        
-        if any(kw in text_lower for kw in ["github", "code", "programming", "api", "developer"]):
-            category = "Tech"
-            tags = ["programming", "development", "code"]
-        elif any(kw in text_lower for kw in ["research", "study", "paper", "journal"]):
-            category = "Research"
-            tags = ["academic", "paper", "science"]
-        elif any(kw in text_lower for kw in ["health", "medical", "fitness", "nutrition"]):
-            category = "Health"
-            tags = ["wellness", "health", "lifestyle"]
-        elif any(kw in text_lower for kw in ["startup", "business", "company", "investment"]):
-            category = "Business"
-            tags = ["entrepreneurship", "business", "strategy"]
+        try:
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=f"{SYSTEM_PROMPT}\n\nContent to analyze:\n{text[:30000]}",
+                config={
+                    'response_mime_type': 'application/json',
+                }
+            )
             
-        # Extract potential title from content
-        title_match = re.search(r'<title[^>]*>([^<]+)</title>', text, re.IGNORECASE)
-        title = title_match.group(1).strip()[:60] if title_match else "Untitled Link"
-        
+            return json.loads(response.text)
+        except Exception as e:
+            print(f"Gemini analysis failed: {e}")
+            return self._mock_analysis(text)
+
+    def _mock_analysis(self, text: str) -> dict:
+        """Fallback mock logic"""
         return {
-            "title": title,
-            "summary": f"This resource covers important {category.lower()} insights. It provides practical information that can enhance your understanding. The content is well-organized and suitable for reference.",
-            "category": category,
-            "tags": tags[:3],
-            "actionable_takeaway": f"Review this {category.lower()} content and identify key concepts to apply."
+            "title": "Untitled (Analysis Failed)",
+            "summary": "Processing of this link failed or Gemini API was unavailable. Please check original.",
+            "category": "General",
+            "tags": ["failed"],
+            "actionable_takeaway": "None"
         }
