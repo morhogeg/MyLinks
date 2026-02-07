@@ -321,11 +321,14 @@ export default function Feed() {
                                     }
                                     setSelectedCategory(newSet);
                                 }}
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border"
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
                                 style={isSelected ? {
                                     backgroundColor: colorStyle.backgroundColor,
                                     color: colorStyle.color,
-                                } : undefined}
+                                } : {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                    color: 'var(--text-muted)',
+                                }}
                             >
                                 {cat}
                                 <span className="opacity-50 font-black">{categoryCounts[cat]}</span>
