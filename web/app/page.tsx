@@ -26,15 +26,15 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background text-text transition-colors duration-200">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border-subtle h-[64px] sm:h-[72px] flex items-center">
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border-subtle h-[56px] sm:h-[64px] flex items-center">
         <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
-              <Brain className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
+              <Brain className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-bold text-text">Second Brain</h1>
-              <p className="text-[10px] sm:text-xs text-text-muted">Your knowledge, organized</p>
+              <h1 className="text-base sm:text-lg font-bold text-text">Second Brain</h1>
+              <p className="text-[9px] sm:text-[10px] text-text-muted">Your knowledge, organized</p>
             </div>
           </div>
 
@@ -45,7 +45,7 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6 pb-28 sm:pb-24">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-2 sm:py-4 pb-24 sm:pb-20">
         <Feed key={refreshKey} />
       </main>
 

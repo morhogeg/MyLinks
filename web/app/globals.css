@@ -53,6 +53,14 @@ body {
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 140px;
+  /* Accounts for sticky headers */
+}
+
+/* Header transition on scroll would need JS, but we can set up the base utility */
+.header-compact {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 /* Hide scrollbar but keep functionality */
