@@ -321,17 +321,17 @@ export default function Feed() {
                                     }
                                     setSelectedCategory(newSet);
                                 }}
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${isSelected
+                                    ? ''
+                                    : 'bg-card border-border-subtle text-text-muted hover:border-text-muted'
+                                    }`}
                                 style={isSelected ? {
                                     backgroundColor: colorStyle.backgroundColor,
                                     color: colorStyle.color,
-                                } : {
-                                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                                    color: 'var(--text-muted)',
-                                }}
+                                    border: 'none',
+                                } : undefined}
                             >
                                 {cat}
-                                <span className="opacity-50 font-black">{categoryCounts[cat]}</span>
                             </button>
                         );
                     })}
@@ -344,15 +344,29 @@ export default function Feed() {
             {filteredLinks.length === 0 ? (
                 <div className="text-center py-16">
                     <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-card flex items-center justify-center">
-                        <Inbox className="w-8 h-8 text-text-muted" />
+                        {filter === 'favorite' ? (
+                            <Star className="w-8 h-8 text-text-muted" />
+                        ) : filter === 'archived' ? (
+                            <Archive className="w-8 h-8 text-text-muted" />
+                        ) : (
+                            <Inbox className="w-8 h-8 text-text-muted" />
+                        )}
                     </div>
                     <h3 className="text-lg font-medium text-text mb-2">
-                        {searchQuery ? 'No results found' : 'Your Second Brain is empty'}
+                        {searchQuery ? 'No results found' :
+                            filter === 'favorite' ? 'No favorites yet' :
+                                filter === 'archived' ? 'No archived links' :
+                                    filter === 'unread' ? 'No unread links' :
+                                        selectedCategory.size > 0 ? `No links in ${Array.from(selectedCategory).join(', ')}` :
+                                            'Your Second Brain is empty'}
                     </h3>
                     <p className="text-text-secondary text-sm">
-                        {searchQuery
-                            ? 'Try a different search term'
-                            : 'Add your first link using the + button below'}
+                        {searchQuery ? 'Try a different search term' :
+                            filter === 'favorite' ? 'Star links to add them to your favorites' :
+                                filter === 'archived' ? 'Archive links to see them here' :
+                                    filter === 'unread' ? 'All caught up! No unread links' :
+                                        selectedCategory.size > 0 ? 'Try selecting a different category' :
+                                            'Add your first link using the + button below'}
                     </p>
                 </div>
             ) : viewMode === 'table' ? (
