@@ -12,6 +12,7 @@ export interface LinkMetadata {
 export interface AIAnalysis {
   title: string;
   summary: string;
+  detailedSummary: string;
   category: string;
   tags: string[];
   actionable_takeaway: string;
@@ -22,6 +23,7 @@ export interface Link {
   url: string;
   title: string;
   summary: string;
+  detailedSummary: string;
   tags: string[];
   category: string;
   status: LinkStatus;

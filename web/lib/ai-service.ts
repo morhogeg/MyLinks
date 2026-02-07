@@ -2,22 +2,26 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AIAnalysis } from './types';
 
 // Enhanced system prompt based on user requirements
-const SYSTEM_PROMPT = `You are an expert knowledge curator building a "Second Brain".
-Your goal is to analyze web content and extract high-quality, actionable insights.
+const SYSTEM_PROMPT = `You are a knowledge extraction assistant for a "Second Brain" system.
+Your goal is to objectively summarize web content without adding opinions or interpretations.
 
 Output MUST be a valid JSON object only.
 
 Requirements for the analysis:
-1. title: Create a concise, punchy title that captures the core value.
-2. summary: Write a 3 to 7 sentence summary focusing on novel insights, not just describing the content. Focus on the "so what?".
-3. category: Assign exactly one specific high-level category (e.g., Tech, Health, Philosophy, Business, Research, Meta-Learning).
-4. tags: Provide 3-5 relevant tags for deep organization.
-5. actionable_takeaway: One specific thing the user can do or learn from this.
+1. title: Create a concise, punchy title that captures the core topic.
+2. summary: Write exactly 2 to 4 concise, complete sentences suitable for a card preview. Summarize ONLY what the content actually says - no opinions, interpretations, or value judgments. State facts objectively. Each sentence must end properly.
+3. detailedSummary: Write a comprehensive 5 to 8 sentence summary for the expanded detail view. Objectively describe the main points, key arguments, and conclusions presented in the content. Focus on what is actually stated, not on subjective assessments of value or quality.
+4. category: Assign exactly one specific high-level category (e.g., Tech, Health, Philosophy, Business, Research, Meta-Learning).
+5. tags: Provide 3-5 relevant tags for deep organization.
+6. actionable_takeaway: One specific thing the user can do or learn from this content.
+
+CRITICAL: Both summaries must be purely factual. Avoid phrases like "offers valuable insights", "provides a comprehensive overview", "explores interesting ideas". Instead, describe what the content actually covers.
 
 JSON Structure:
 {
   "title": "...",
   "summary": "...",
+  "detailedSummary": "...",
   "category": "...",
   "tags": ["...", "..."],
   "actionable_takeaway": "..."
@@ -27,7 +31,7 @@ JSON Structure:
  * Analyze text using Google Gemini 1.5 Flash
  */
 export async function analyzeContent(url: string, pageContent: string): Promise<AIAnalysis> {
-    // Check for API key
+    // Check for API key (server-side, called from API route)
     const apiKey = process.env.GEMINI_API_KEY;
     const useMockAI = process.env.USE_MOCK_AI === 'true';
 
@@ -81,7 +85,8 @@ function generateMockAnalysis(url: string, _content: string): AIAnalysis {
 
     return {
         title: new URL(url).hostname,
-        summary: "Mock summary: This resource provides valuable insights into the topic. It explores several key concepts and offers a comprehensive overview suitable for your second brain. (Fallback used because Gemini API was unavailable or mock mode active).",
+        summary: "This resource covers several key concepts related to the topic.",
+        detailedSummary: "The content discusses core principles and frameworks in this domain. It presents arguments supported by examples and case studies. The author examines different perspectives and approaches to the subject matter. Key conclusions are drawn based on the analysis presented. Fallback analysis used because Gemini API was unavailable or mock mode is active.",
         category,
         tags,
         actionable_takeaway: "Review this content to determine its specific relevance to your current projects."
@@ -119,7 +124,7 @@ export async function chatWithContent(
     context: { title: string, category: string, summary: string },
     messages: { role: 'user' | 'model', content: string }[]
 ): Promise<string> {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!apiKey) return "AI chat is currently unavailable (No API key).";
 
     try {

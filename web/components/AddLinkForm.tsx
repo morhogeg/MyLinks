@@ -60,11 +60,13 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                 url: data.link.url,
                 title: data.link.title,
                 summary: data.link.summary,
+                detailedSummary: data.link.detailedSummary,
                 tags: data.link.tags,
                 category: data.link.category,
                 metadata: {
                     originalTitle: data.link.metadata.originalTitle,
-                    estimatedReadTime: data.link.metadata.estimatedReadTime
+                    estimatedReadTime: data.link.metadata.estimatedReadTime,
+                    actionableTakeaway: data.link.metadata.actionableTakeaway
                 }
             });
 

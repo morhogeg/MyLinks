@@ -74,9 +74,18 @@ export default function AIChat({ link }: AIChatProps) {
                 </div>
                 <div className="group relative">
                     <Info className="w-4 h-4 text-text-muted cursor-help" />
-                    <div className="absolute right-0 top-full mt-2 w-48 p-2 bg-card border border-border-subtle rounded-lg shadow-xl opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition-all pointer-events-none z-50">
-                        <p className="text-[10px] text-text-secondary leading-tight">
-                            This AI has specialized context about this link. Ask for summaries, key takeaways, or explanations.
+                    <div className="absolute right-0 top-full mt-2 w-56 p-3 bg-card border border-border-subtle rounded-lg shadow-xl opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition-all pointer-events-none z-50">
+                        <p className="text-[10px] text-text-secondary leading-relaxed space-y-1">
+                            <span className="block font-semibold text-text mb-1">AI Assistant</span>
+                            This AI has specialized context about this link.
+                            <br /><br />
+                            Ask for:
+                            <br />
+                            • Summaries
+                            <br />
+                            • Key takeaways
+                            <br />
+                            • Explanations
                         </p>
                     </div>
                 </div>

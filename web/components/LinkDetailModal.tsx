@@ -90,6 +90,7 @@ export default function LinkDetailModal({
                     <div className="flex gap-1.5 sm:gap-2">
                         <button
                             onClick={() => onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite')}
+                            title={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
                             className={`p-2 rounded-xl border transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${link.status === 'favorite'
                                 ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500 shadow-lg shadow-yellow-500/5'
                                 : 'bg-white/5 border-white/5 text-text-muted hover:text-yellow-500'
@@ -99,6 +100,7 @@ export default function LinkDetailModal({
                         </button>
                         <button
                             onClick={() => onStatusChange(link.id, link.status === 'archived' ? 'unread' : 'archived')}
+                            title={link.status === 'archived' ? 'Unarchive' : 'Archive'}
                             className={`p-2 rounded-xl border transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${link.status === 'archived'
                                 ? 'bg-accent/10 border-accent/20 text-accent shadow-lg shadow-accent/5'
                                 : 'bg-white/5 border-white/5 text-text-muted hover:text-accent'
@@ -108,6 +110,7 @@ export default function LinkDetailModal({
                         </button>
                         <button
                             onClick={() => setShowDeleteConfirm(true)}
+                            title="Delete"
                             className="p-2 rounded-xl bg-white/5 border border-white/5 text-text-muted hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-500 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
                         >
                             <Trash2 className="w-4 h-4" />
@@ -137,7 +140,7 @@ export default function LinkDetailModal({
                     <div className="flex gap-4 border-b border-white/5 mb-6">
                         <button
                             onClick={() => setActiveTab('details')}
-                            className={`pb-2 px-1 text-sm font-bold transition-all relative ${activeTab === 'details' ? 'text-white' : 'text-text-muted hover:text-text-secondary'
+                            className={`pb-2 px-1 text-sm font-bold transition-all relative ${activeTab === 'details' ? 'text-text' : 'text-text-muted hover:text-text-secondary'
                                 }`}
                         >
                             <div className="flex items-center gap-2">
@@ -150,7 +153,7 @@ export default function LinkDetailModal({
                         </button>
                         <button
                             onClick={() => setActiveTab('chat')}
-                            className={`pb-2 px-1 text-sm font-bold transition-all relative ${activeTab === 'chat' ? 'text-white' : 'text-text-muted hover:text-text-secondary'
+                            className={`pb-2 px-1 text-sm font-bold transition-all relative ${activeTab === 'chat' ? 'text-text' : 'text-text-muted hover:text-text-secondary'
                                 }`}
                         >
                             <div className="flex items-center gap-2">
@@ -166,7 +169,7 @@ export default function LinkDetailModal({
                     {activeTab === 'details' ? (
                         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                             <h2 className="font-bold text-2xl text-white mb-4 leading-tight">{link.title}</h2>
-                            <p className="text-text-secondary mb-6 leading-relaxed text-lg">{link.summary}</p>
+                            <p className="text-text-secondary mb-6 leading-relaxed text-lg">{link.detailedSummary || link.summary}</p>
 
                             <div className="bg-yellow-500/5 rounded-2xl p-5 border border-yellow-500/10 mb-8 relative overflow-hidden group">
                                 <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500 opacity-30" />
@@ -188,13 +191,12 @@ export default function LinkDetailModal({
                             </div>
 
                             {/* Tags */}
-                            <div className="flex flex-wrap gap-2 mb-10">
+                            <div className="flex flex-col gap-1.5 mb-10">
                                 {link.tags.map((tag) => (
                                     <span
                                         key={tag}
-                                        className="inline-flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 bg-white/5 rounded-full text-text-secondary border border-white/5 hover:border-accent/30 hover:text-white transition-all group/tag"
+                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/70 hover:text-accent transition-all group/tag"
                                     >
-                                        <Tag className="w-3 h-3" />
                                         {tag}
                                         <X
                                             className="w-3 h-3 ml-1 opacity-40 group-hover/tag:opacity-100 hover:text-red-400 cursor-pointer transition-all"
@@ -207,32 +209,7 @@ export default function LinkDetailModal({
                                 ))}
                             </div>
 
-                            {/* Related Insights */}
-                            {relatedLinks.length > 0 && (
-                                <div className="p-6 bg-accent/5 rounded-3xl border border-accent/10">
-                                    <h4 className="text-[10px] uppercase font-black tracking-widest text-accent mb-4 flex items-center gap-2">
-                                        <Sparkles className="w-3.5 h-3.5" />
-                                        Related from your Brain
-                                    </h4>
-                                    <div className="grid gap-3">
-                                        {relatedLinks.map((rel: Link) => (
-                                            <button
-                                                key={rel.id}
-                                                className="group flex items-center justify-between p-3.5 rounded-xl bg-white/5 border border-white/5 hover:border-accent/30 hover:bg-white/10 transition-all text-left"
-                                                onClick={() => onOpenOtherLink?.(rel)}
-                                            >
-                                                <div className="flex items-center gap-3 overflow-hidden">
-                                                    <div className="w-2 h-2 rounded-full bg-accent/40 group-hover:bg-accent group-hover:scale-125 transition-all" />
-                                                    <span className="text-[13px] font-bold text-text-secondary truncate group-hover:text-text transition-colors">
-                                                        {rel.title}
-                                                    </span>
-                                                </div>
-                                                <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-accent transition-all group-hover:translate-x-1" />
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+
                         </div>
                     ) : (
                         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 h-full">

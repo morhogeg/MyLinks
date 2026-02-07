@@ -1,6 +1,7 @@
 'use client';
 
 import { Link, LinkStatus } from '@/lib/types';
+import { getCategoryColorStyle } from '@/lib/colors';
 import { useState, useEffect } from 'react';
 import { Archive, Star, Clock, Tag } from 'lucide-react';
 
@@ -72,15 +73,27 @@ export default function Card({
             <div className="p-5 flex flex-col h-full space-y-4">
                 {/* Header Row: Category Badge */}
                 <div className="flex justify-between items-start gap-3">
-                    <span className="text-[10px] uppercase font-black tracking-widest text-accent bg-accent/10 px-2 py-1 rounded-lg border border-accent/20">
-                        {link.category}
-                    </span>
+                    {(() => {
+                        const colorStyle = getCategoryColorStyle(link.category);
+                        return (
+                            <span
+                                className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block"
+                                style={{
+                                    backgroundColor: colorStyle.backgroundColor,
+                                    color: colorStyle.color,
+                                }}
+                            >
+                                {link.category}
+                            </span>
+                        );
+                    })()}
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
                                 onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite');
                             }}
+                            title={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
                             className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center ${link.status === 'favorite' ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-muted hover:text-white hover:bg-white/10'
                                 }`}
                         >
@@ -91,6 +104,7 @@ export default function Card({
                                 e.stopPropagation();
                                 onStatusChange(link.id, link.status === 'archived' ? 'unread' : 'archived');
                             }}
+                            title={link.status === 'archived' ? 'Unarchive' : 'Archive'}
                             className="p-2 sm:p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-white/10 transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
                         >
                             <Archive className="w-3.5 h-3.5" />
@@ -99,7 +113,7 @@ export default function Card({
                 </div>
 
                 {/* Title - NO LINE CLAMP */}
-                <h3 className="font-bold text-lg text-text group-hover:text-white transition-colors leading-tight">
+                <h3 className="font-bold text-lg text-text transition-colors leading-tight">
                     {link.title}
                 </h3>
 
@@ -111,13 +125,12 @@ export default function Card({
                 {/* Footer Section */}
                 <div className="pt-4 border-t border-white/5 flex flex-col space-y-3">
                     {/* Tags */}
-                    <div className="flex flex-wrap gap-1.5 max-h-[22px] overflow-hidden">
+                    <div className="flex flex-col gap-1">
                         {link.tags.slice(0, 3).map((tag) => (
                             <span
                                 key={tag}
-                                className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 bg-white/5 rounded-md text-text-muted border border-white/5 group-hover:border-accent/20 transition-all"
+                                className="text-[10px] font-bold text-text-muted/70 group-hover:text-accent transition-all"
                             >
-                                <Tag className="w-2.5 h-2.5" />
                                 {tag}
                             </span>
                         ))}

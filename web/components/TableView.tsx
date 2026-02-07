@@ -1,6 +1,7 @@
 'use client';
 
 import { Link, LinkStatus } from '@/lib/types';
+import { getCategoryColorStyle } from '@/lib/colors';
 import { ExternalLink, Tag, Trash2, Archive, Star, Inbox, X, Plus, Check } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import ConfirmDialog from './ConfirmDialog';
@@ -67,14 +68,14 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
 
     return (
         <div className="w-full overflow-x-auto rounded-2xl border border-border-subtle bg-card shadow-sm">
-            <table className="w-full text-left border-collapse min-w-[750px]">
+            <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="border-b border-border-subtle bg-white/[0.01] dark:bg-white/[0.02]">
                         <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest w-[40%]">Source & Insight</th>
-                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest text-center">Category</th>
-                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest">Tags</th>
-                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest text-center">Saved</th>
-                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest text-right">Actions</th>
+                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest text-center w-[12%]">Category</th>
+                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest w-[18%]">Tags</th>
+                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest text-center w-[10%]">Saved</th>
+                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest text-right w-[13%]">Actions</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-border-subtle">
@@ -96,13 +97,24 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                                 </div>
                             </td>
                             <td className="px-6 py-5 text-center">
-                                <span className={`text-[10px] uppercase font-black tracking-tighter px-2.5 py-1 rounded-lg ${getCategoryColor(link.category)}`}>
-                                    {link.category}
-                                </span>
+                                {(() => {
+                                    const colorStyle = getCategoryColorStyle(link.category);
+                                    return (
+                                        <span
+                                            className="text-[10px] uppercase font-black tracking-tighter px-2.5 py-1 rounded-lg inline-block"
+                                            style={{
+                                                backgroundColor: colorStyle.backgroundColor,
+                                                color: colorStyle.color,
+                                            }}
+                                        >
+                                            {link.category}
+                                        </span>
+                                    );
+                                })()}
                             </td>
                             <td className="px-6 py-5 relative">
                                 <div
-                                    className="flex flex-wrap gap-1.5 max-w-[180px] cursor-pointer hover:bg-white/5 p-1 rounded-lg transition-all"
+                                    className="flex flex-col gap-1 cursor-pointer hover:bg-white/5 p-1 rounded-lg transition-all"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         setActiveTagPicker(activeTagPicker === link.id ? null : link.id);
@@ -112,9 +124,8 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                                         link.tags.slice(0, 3).map(tag => (
                                             <span
                                                 key={tag}
-                                                className="text-[10px] text-text-muted flex items-center gap-1 bg-background/50 px-1.5 py-0.5 rounded border border-border-subtle group-hover:border-accent/30 group/tag relative"
+                                                className="text-[10px] text-text-muted flex items-center gap-1 group/tag relative"
                                             >
-                                                <Tag className="w-2.5 h-2.5" />
                                                 {tag}
                                                 <X
                                                     className="w-2.5 h-2.5 ml-0.5 opacity-0 group-hover/tag:opacity-100 hover:text-red-400 transition-all cursor-pointer"

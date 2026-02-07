@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
+import { getCategoryColorStyle } from '@/lib/colors';
 import { updateLinkStatus, deleteLink, updateLinkTags } from '@/lib/storage';
 import { collection, query, orderBy, onSnapshot, where, getDocs, limit, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -27,7 +28,7 @@ export default function Feed() {
     const [uid, setUid] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [filter, setFilter] = useState<FilterType>('all');
-    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+    const [selectedCategory, setSelectedCategory] = useState<Set<string>>(new Set());
     const [activeLink, setActiveLink] = useState<Link | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'grid' | 'table' | 'insights'>('grid');
@@ -81,8 +82,8 @@ export default function Feed() {
             return link.status === filter;
         })
         .filter((link) => {
-            if (!selectedCategory) return true;
-            return link.category === selectedCategory;
+            if (selectedCategory.size === 0) return true;
+            return selectedCategory.has(link.category);
         })
         .filter((link) => {
             if (!searchQuery.trim()) return true;
@@ -202,6 +203,7 @@ export default function Feed() {
                             <button
                                 key={btn.key}
                                 onClick={() => setFilter(btn.key)}
+                                title={btn.label}
                                 className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition-colors min-h-[44px] ${filter === btn.key
                                     ? 'bg-white text-black'
                                     : 'bg-card text-text-secondary hover:bg-card-hover'
@@ -297,25 +299,39 @@ export default function Feed() {
                 {/* Category Navigator */}
                 <div className="flex gap-2 mt-4 overflow-x-auto pb-1 scrollbar-hide">
                     <button
-                        onClick={() => setSelectedCategory(null)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${!selectedCategory
+                        onClick={() => setSelectedCategory(new Set())}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${selectedCategory.size === 0
                             ? 'bg-accent/10 border-accent/20 text-accent'
                             : 'bg-card border-border-subtle text-text-muted hover:border-text-muted'}`}
                     >
                         All Categories
                     </button>
-                    {categories.map(cat => (
-                        <button
-                            key={cat}
-                            onClick={() => setSelectedCategory(cat)}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${selectedCategory === cat
-                                ? 'bg-accent/10 border-accent/20 text-accent'
-                                : 'bg-card border-border-subtle text-text-muted hover:border-text-muted'}`}
-                        >
-                            {cat}
-                            <span className="opacity-50 font-black">{categoryCounts[cat]}</span>
-                        </button>
-                    ))}
+                    {categories.map(cat => {
+                        const isSelected = selectedCategory.has(cat);
+                        const colorStyle = getCategoryColorStyle(cat);
+                        return (
+                            <button
+                                key={cat}
+                                onClick={() => {
+                                    const newSet = new Set(selectedCategory);
+                                    if (isSelected) {
+                                        newSet.delete(cat);
+                                    } else {
+                                        newSet.add(cat);
+                                    }
+                                    setSelectedCategory(newSet);
+                                }}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border"
+                                style={isSelected ? {
+                                    backgroundColor: colorStyle.backgroundColor,
+                                    color: colorStyle.color,
+                                } : undefined}
+                            >
+                                {cat}
+                                <span className="opacity-50 font-black">{categoryCounts[cat]}</span>
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 

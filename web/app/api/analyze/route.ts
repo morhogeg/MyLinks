@@ -40,13 +40,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
             url: parsedUrl.href,
             title: analysis.title,
             summary: analysis.summary,
+            detailedSummary: analysis.detailedSummary,
             tags: analysis.tags,
             category: analysis.category,
             status: 'unread',
             createdAt: Date.now(),
             metadata: {
                 originalTitle: originalTitle || analysis.title,
-                estimatedReadTime: Math.ceil(html.length / 1500) // Rough estimate: 250 words/min, 6 chars/word
+                estimatedReadTime: Math.ceil(html.length / 1500), // Rough estimate: 250 words/min, 6 chars/word
+                actionableTakeaway: analysis.actionable_takeaway
             }
         };
 
