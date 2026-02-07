@@ -3,7 +3,7 @@
 import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { useState, useEffect } from 'react';
-import { Archive, Star, Clock, Tag } from 'lucide-react';
+import { Archive, Star, Clock, Tag, Trash2 } from 'lucide-react';
 
 interface CardProps {
     link: Link;
@@ -108,6 +108,16 @@ export default function Card({
                             className="p-2 sm:p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-white/10 transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
                         >
                             <Archive className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete(link.id);
+                            }}
+                            title="Delete"
+                            className="p-2 sm:p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
                         </button>
                     </div>
                 </div>

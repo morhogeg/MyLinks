@@ -81,7 +81,7 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                 <tbody className="divide-y divide-border-subtle">
                     {links.map((link) => (
                         <tr key={link.id} className="group hover:bg-white/[0.03] transition-colors relative">
-                            <td className="px-6 py-5 cursor-pointer" onClick={() => onOpenDetails(link)}>
+                            <td className="px-6 py-6 cursor-pointer" onClick={() => onOpenDetails(link)}>
                                 <div className="flex flex-col gap-1">
                                     <div className="text-sm font-bold text-text group-hover:text-accent transition-colors flex items-center gap-2">
                                         {link.title}
@@ -93,10 +93,10 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                                             }}
                                         />
                                     </div>
-                                    <p className="text-xs text-text-secondary line-clamp-1 opacity-80">{link.summary}</p>
+                                    <p className="text-xs text-text-secondary line-clamp-2 opacity-80">{link.summary}</p>
                                 </div>
                             </td>
-                            <td className="px-6 py-5 text-center">
+                            <td className="px-6 py-6 text-center">
                                 {(() => {
                                     const colorStyle = getCategoryColorStyle(link.category);
                                     return (
@@ -112,7 +112,7 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                                     );
                                 })()}
                             </td>
-                            <td className="px-6 py-5 relative">
+                            <td className="px-6 py-6 relative">
                                 <div
                                     className="flex flex-col gap-1 cursor-pointer hover:bg-white/5 p-1 rounded-lg transition-all"
                                     onClick={(e) => {
@@ -226,10 +226,10 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                                     </>
                                 )}
                             </td>
-                            <td className="px-6 py-5 text-center text-[11px] font-medium text-text-muted tabular-nums">
+                            <td className="px-6 py-6 text-center text-[11px] font-medium text-text-muted tabular-nums">
                                 {now > 0 ? getTimeAgo(link.createdAt, now) : '...'}
                             </td>
-                            <td className="px-6 py-5 text-right">
+                            <td className="px-6 py-6 text-right">
                                 <div className="inline-flex items-center gap-1.5">
                                     <button
                                         onClick={() => onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite')}

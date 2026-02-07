@@ -43,54 +43,27 @@ export async function analyzeContent(url: string, pageContent: string): Promise<
         return generateMockAnalysis(url, pageContent);
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const prompt = `${SYSTEM_PROMPT}\n\nURL: ${url}\nContent: ${pageContent.substring(0, 30000)}`;
-
-    // Try primary model first: gemini-3-flash-preview
     try {
-        console.log('[AI Service] Trying gemini-3-flash-preview...');
+        console.log('[AI Service] Analyzing with gemini-2.5-flash...');
+        const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-2.5-flash',
             generationConfig: {
                 responseMimeType: "application/json",
             }
         });
 
+        const prompt = `${SYSTEM_PROMPT}\n\nURL: ${url}\nContent: ${pageContent.substring(0, 30000)}`;
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
 
-        console.log('[AI Service] ✓ Success with gemini-3-flash-preview');
+        console.log('[AI Service] ✓ Analysis complete');
         return JSON.parse(text) as AIAnalysis;
-    } catch (error: any) {
-        // Check if it's a rate limit error (429)
-        const isRateLimit = error?.message?.includes('429') || error?.status === 429;
-
-        if (isRateLimit) {
-            console.log('[AI Service] Rate limit hit on gemini-3-flash-preview, trying gemini-2.5-flash...');
-
-            try {
-                const fallbackModel = genAI.getGenerativeModel({
-                    model: 'gemini-2.5-flash',
-                    generationConfig: {
-                        responseMimeType: "application/json",
-                    }
-                });
-
-                const result = await fallbackModel.generateContent(prompt);
-                const response = await result.response;
-                const text = response.text();
-
-                console.log('[AI Service] ✓ Success with gemini-2.5-flash (fallback)');
-                return JSON.parse(text) as AIAnalysis;
-            } catch (fallbackError) {
-                console.error('[AI Service] Fallback model also failed:', fallbackError);
-                return generateMockAnalysis(url, pageContent);
-            }
-        } else {
-            console.error('[AI Service] Gemini analysis failed (non-rate-limit error):', error);
-            return generateMockAnalysis(url, pageContent);
-        }
+    } catch (error) {
+        console.error('[AI Service] Gemini analysis failed:', error);
+        // Fallback to mock so we don't block the user
+        return generateMockAnalysis(url, pageContent);
     }
 }
 
@@ -158,25 +131,23 @@ export async function chatWithContent(
     const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!apiKey) return "AI chat is currently unavailable (No API key).";
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const systemPrompt = `You are an expert assistant for a "Second Brain" system. 
+    try {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+        const chat = model.startChat({
+            history: [
+                {
+                    role: 'user',
+                    parts: [{
+                        text: `You are an expert assistant for a "Second Brain" system. 
                     I have saved a link titled "${context.title}" in the category "${context.category}".
                     Here is the summary of the content: "${context.summary}".
                     
                     Full content snippet: ${content.substring(0, 10000)}
                     
                     Please answer the user's questions about this specific content based on the information provided. 
-                    Be concise, accurate, and insightful. If the answer isn't in the content, say so.`;
-
-    // Try primary model first
-    try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
-
-        const chat = model.startChat({
-            history: [
-                {
-                    role: 'user',
-                    parts: [{ text: systemPrompt }],
+                    Be concise, accurate, and insightful. If the answer isn't in the content, say so.` }],
                 },
                 {
                     role: 'model',
@@ -193,44 +164,8 @@ export async function chatWithContent(
         const result = await chat.sendMessage(latestMessage.content);
         const response = await result.response;
         return response.text();
-    } catch (error: any) {
-        // Check if it's a rate limit error
-        const isRateLimit = error?.message?.includes('429') || error?.status === 429;
-
-        if (isRateLimit) {
-            console.log('[AI Chat] Rate limit hit, trying gemini-2.5-flash...');
-
-            try {
-                const fallbackModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
-                const chat = fallbackModel.startChat({
-                    history: [
-                        {
-                            role: 'user',
-                            parts: [{ text: systemPrompt }],
-                        },
-                        {
-                            role: 'model',
-                            parts: [{ text: "Understood. I'm ready to help you explore the insights from this content. What would you like to know?" }],
-                        },
-                        ...messages.map(m => ({
-                            role: m.role,
-                            parts: [{ text: m.content }]
-                        }))
-                    ],
-                });
-
-                const latestMessage = messages[messages.length - 1];
-                const result = await chat.sendMessage(latestMessage.content);
-                const response = await result.response;
-                return response.text();
-            } catch (fallbackError) {
-                console.error('[AI Chat] Fallback model also failed:', fallbackError);
-                return "Sorry, I encountered an error while processing your request. Please try again later.";
-            }
-        } else {
-            console.error('[AI Chat] Chat failed:', error);
-            return "Sorry, I encountered an error while processing your request.";
-        }
+    } catch (error) {
+        console.error('[AI Chat] Chat failed:', error);
+        return "Sorry, I encountered an error while processing your request.";
     }
 }
