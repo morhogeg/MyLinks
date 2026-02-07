@@ -180,15 +180,15 @@ export default function Feed() {
         <div className="space-y-4">
             {/* Header Section (Not Sticky) */}
             <div className="pb-3 pt-2 -mx-4 px-4 sm:mx-0 sm:px-0 transition-all duration-300">
-                {/* Search Bar - Hidden or collapsed on scroll could be a future improvement, but for now just making it tighter */}
-                <div className="relative mb-3">
-                    <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 sm:w-5 h-4 sm:h-5 text-text-muted" />
+                {/* Search Bar */}
+                <div className="relative mb-2">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                     <input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Search your brain..."
-                        className="w-full pl-10 sm:pl-12 pr-12 sm:pr-10 py-2.5 bg-card rounded-2xl text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all shadow-inner"
+                        className="w-full pl-9 pr-10 py-2 bg-card rounded-xl text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent/30 transition-all"
                     />
                     {searchQuery && (
                         <button
@@ -201,11 +201,11 @@ export default function Feed() {
                 </div>
 
                 {/* Row 1: Category Navigator (Primary) - Slightly more compact */}
-                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 mb-3">
+                <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 mb-2">
                     <button
                         onClick={() => setSelectedCategory(new Set())}
-                        className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap min-h-[34px] flex-shrink-0 ${selectedCategory.size === 0
-                            ? 'bg-accent text-white border-accent shadow-md shadow-accent/20'
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all border whitespace-nowrap min-h-[30px] flex-shrink-0 ${selectedCategory.size === 0
+                            ? 'bg-accent text-white border-accent shadow-sm'
                             : 'bg-card border-border-subtle text-text-muted hover:border-text-secondary hover:text-text-secondary'}`}
                     >
                         All Categories
@@ -225,7 +225,7 @@ export default function Feed() {
                                     }
                                     setSelectedCategory(newSet);
                                 }}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border whitespace-nowrap min-h-[34px] flex-shrink-0 ${isSelected
+                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all border whitespace-nowrap min-h-[30px] flex-shrink-0 ${isSelected
                                     ? ''
                                     : 'bg-card border-border-subtle text-text-muted hover:border-text-secondary hover:text-text-secondary'
                                     }`}
@@ -244,26 +244,26 @@ export default function Feed() {
                 </div>
 
                 {/* Row 2: Combined Controls - Status, Sort, View, Select */}
-                <div className="flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 py-0.5">
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                        {/* Status Filter Dropdown/Toggle (Compact Mobile Design) */}
+                <div className="flex items-center justify-between gap-1 sm:gap-1.5 -mx-1 px-1 sm:mx-0 sm:px-0 py-0.5 mt-1">
+                    <div className="flex items-center gap-1 sm:gap-1.5">
+                        {/* Status Filter Dropdown */}
                         <div className="relative group">
                             <select
                                 value={filter}
                                 onChange={(e) => setFilter(e.target.value as FilterType)}
-                                className="appearance-none bg-card/50 border border-transparent rounded-full pl-8 pr-8 py-1.5 text-[11px] font-medium text-text-muted hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/20 min-h-[34px]"
+                                className="appearance-none bg-card/50 border border-transparent rounded-full pl-7 pr-7 py-1 text-[10px] font-semibold text-text-muted hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/30 min-h-[30px]"
                             >
                                 {filterButtons.map(btn => (
                                     <option key={btn.key} value={btn.key}>{btn.label}</option>
                                 ))}
                             </select>
-                            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                            <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none">
                                 {filter === 'all' && <Inbox className="w-3.5 h-3.5 text-text-muted opacity-80" />}
                                 {filter === 'unread' && <Inbox className="w-3.5 h-3.5 text-accent opacity-80" />}
                                 {filter === 'favorite' && <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500 opacity-80" />}
                                 {filter === 'archived' && <Archive className="w-3.5 h-3.5 text-text-muted opacity-80" />}
                             </div>
-                            <ArrowUpDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-text-muted opacity-80 pointer-events-none" />
+                            <ArrowUpDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-text-muted opacity-80 pointer-events-none" />
                         </div>
 
                         {/* Sort Dropdown */}
@@ -271,37 +271,37 @@ export default function Feed() {
                             <select
                                 value={sortBy}
                                 onChange={(e) => setSortBy(e.target.value as SortType)}
-                                className="appearance-none bg-card/50 border border-transparent rounded-full pl-3 pr-8 py-1.5 text-[11px] font-medium text-text-muted hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/20 min-h-[34px]"
+                                className="appearance-none bg-card/50 border border-transparent rounded-full pl-2.5 pr-6 py-1 text-[10px] font-semibold text-text-muted hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/30 min-h-[30px]"
                             >
                                 <option value="date-desc">Newest</option>
                                 <option value="date-asc">Oldest</option>
                                 <option value="title-asc">A-Z</option>
                                 <option value="category">Category</option>
                             </select>
-                            <ArrowUpDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-text-muted pointer-events-none" />
+                            <ArrowUpDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-text-muted pointer-events-none" />
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-1 sm:gap-1.5">
                         {/* View Mode Switcher */}
-                        <div className="flex items-center bg-card/50 rounded-full p-0.5 border border-transparent shadow-sm">
+                        <div className="flex items-center bg-card/50 rounded-full p-0.5 border border-border-subtle shadow-sm">
                             <button
                                 onClick={() => setViewMode('grid')}
-                                className={`p-1.5 rounded-full transition-all min-h-[26px] min-w-[26px] flex items-center justify-center ${viewMode === 'grid' ? 'bg-accent text-white shadow-sm' : 'text-text-muted hover:text-text-secondary'}`}
+                                className={`p-1 rounded-full transition-all min-h-[24px] min-w-[24px] flex items-center justify-center ${viewMode === 'grid' ? 'bg-accent text-white shadow-sm' : 'text-text-muted hover:text-text-secondary'}`}
                                 title="Grid View"
                             >
                                 <LayoutGrid className="w-3 h-3" />
                             </button>
                             <button
                                 onClick={() => setViewMode('table')}
-                                className={`p-1.5 rounded-full transition-all min-h-[26px] min-w-[26px] flex items-center justify-center ${viewMode === 'table' ? 'bg-accent text-white shadow-sm' : 'text-text-muted hover:text-text-secondary'}`}
+                                className={`p-1 rounded-full transition-all min-h-[24px] min-w-[24px] flex items-center justify-center ${viewMode === 'table' ? 'bg-accent text-white shadow-sm' : 'text-text-muted hover:text-text-secondary'}`}
                                 title="Table View"
                             >
                                 <List className="w-3 h-3" />
                             </button>
                             <button
                                 onClick={() => setViewMode('insights')}
-                                className={`p-1.5 rounded-full transition-all min-h-[26px] min-w-[26px] flex items-center justify-center ${viewMode === 'insights' ? 'bg-accent text-white shadow-sm' : 'text-text-muted hover:text-text-secondary'}`}
+                                className={`p-1 rounded-full transition-all min-h-[24px] min-w-[24px] flex items-center justify-center ${viewMode === 'insights' ? 'bg-accent text-white shadow-sm' : 'text-text-muted hover:text-text-secondary'}`}
                                 title="Insights View"
                             >
                                 <Sparkles className="w-3 h-3" />
@@ -311,12 +311,12 @@ export default function Feed() {
                         {/* Selection Control */}
                         <div className="flex items-center">
                             {isSelectionMode ? (
-                                <div className="flex items-center gap-1 animate-slide-up bg-accent/5 px-2 py-0.5 rounded-full border border-accent/10 min-h-[34px]">
-                                    <span className="text-[10px] font-bold text-accent px-1">{selectedIds.size}</span>
+                                <div className="flex items-center gap-1 animate-slide-up bg-accent/5 px-1.5 py-0.5 rounded-full border border-accent/10 min-h-[30px]">
+                                    <span className="text-[9px] font-bold text-accent px-1">{selectedIds.size}</span>
                                     <button
                                         onClick={handleBulkArchive}
                                         disabled={selectedIds.size === 0}
-                                        className="p-1.5 rounded-full bg-accent/10 text-accent hover:bg-accent hover:text-white transition-all disabled:opacity-30"
+                                        className="p-1 rounded-full bg-accent/10 text-accent hover:bg-accent hover:text-white transition-all disabled:opacity-30"
                                     >
                                         <Archive className="w-3 h-3" />
                                     </button>
@@ -325,7 +325,7 @@ export default function Feed() {
                                             setIsSelectionMode(false);
                                             setSelectedIds(new Set());
                                         }}
-                                        className="p-1.5 rounded-full text-text-muted hover:text-text transition-all"
+                                        className="p-1 rounded-full text-text-muted hover:text-text transition-all"
                                     >
                                         <X className="w-3 h-3" />
                                     </button>
@@ -333,7 +333,7 @@ export default function Feed() {
                             ) : (
                                 <button
                                     onClick={() => setIsSelectionMode(true)}
-                                    className="h-[34px] px-3 rounded-full text-text-muted hover:text-accent transition-all flex items-center gap-2 bg-card/50 border border-transparent"
+                                    className="h-[30px] w-[30px] rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center bg-card/50 border border-transparent"
                                 >
                                     <LayoutGrid className="w-3 h-3" />
                                 </button>

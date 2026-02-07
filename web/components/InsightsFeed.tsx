@@ -39,9 +39,9 @@ export default function InsightsFeed({
             {links.map((link) => (
                 <article
                     key={link.id}
-                    className={`bg-card rounded-2xl border transition-all group flex items-start gap-4 p-6 ${selectedIds?.has(link.id)
+                    className={`bg-card rounded-2xl border transition-all group flex items-start gap-3 p-4 sm:p-6 ${selectedIds?.has(link.id)
                         ? 'border-accent bg-accent/5 ring-1 ring-accent'
-                        : 'border-border-subtle hover:shadow-xl'
+                        : 'border-border-subtle hover:shadow-lg'
                         } ${isSelectionMode ? 'cursor-pointer select-none' : 'cursor-default'}`}
                     onClick={() => {
                         if (isSelectionMode && onToggleSelection) {
@@ -63,9 +63,9 @@ export default function InsightsFeed({
                     )}
 
                     <div className="flex-1">
-                        <div className="flex items-start gap-4">
-                            <div className="mt-1 p-3 rounded-2xl bg-yellow-500/10 text-yellow-500 shadow-inner group-hover:scale-110 transition-transform">
-                                <Lightbulb className="w-6 h-6 fill-yellow-500/20" />
+                        <div className="flex items-start gap-3 sm:gap-4">
+                            <div className="mt-1 p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-yellow-500/10 text-yellow-500 shadow-inner group-hover:scale-105 transition-transform">
+                                <Lightbulb className="w-5 h-5 sm:w-6 sm:h-6 fill-yellow-500/20" />
                             </div>
 
                             <div className="flex-1 space-y-3">
@@ -78,13 +78,13 @@ export default function InsightsFeed({
                                     </span>
                                 </div>
 
-                                <h3 className="text-xl font-bold text-text group-hover:text-accent transition-colors leading-snug">
+                                <h3 className="text-lg sm:text-xl font-bold text-text group-hover:text-accent transition-colors leading-snug">
                                     {link.title}
                                 </h3>
 
-                                <div className="bg-background/50 rounded-xl p-4 border border-border-subtle relative overflow-hidden">
+                                <div className="bg-background/50 rounded-xl p-3 sm:p-4 border border-border-subtle relative overflow-hidden">
                                     <div className="absolute top-0 left-0 w-1 h-full bg-accent opacity-50" />
-                                    <p className="text-text-secondary italic text-sm leading-relaxed">
+                                    <p className="text-text-secondary italic text-xs sm:text-sm leading-relaxed">
                                         &quot;{link.metadata.actionableTakeaway || 'Analyze this link to get an actionable insight...'}&quot;
                                     </p>
                                 </div>

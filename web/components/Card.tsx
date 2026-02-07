@@ -72,7 +72,7 @@ export default function Card({
                 }
             }}
         >
-            <div className="p-5 flex flex-col h-full space-y-4">
+            <div className="p-4 sm:p-5 flex flex-col h-full space-y-3 sm:space-y-4">
                 {/* Header Row: Category Badge */}
                 <div className="flex justify-between items-start gap-3">
                     {(() => {
@@ -125,17 +125,17 @@ export default function Card({
                 </div>
 
                 {/* Title - NO LINE CLAMP */}
-                <h3 className="font-bold text-lg text-text transition-colors leading-tight">
+                <h3 className="font-bold text-base sm:text-lg text-text transition-colors leading-tight">
                     {link.title}
                 </h3>
 
                 {/* Summary */}
-                <p className="text-text-secondary text-sm line-clamp-3 leading-relaxed flex-grow">
+                <p className="text-text-secondary text-xs sm:text-sm line-clamp-3 leading-relaxed flex-grow">
                     {link.summary}
                 </p>
 
                 {/* Footer Section */}
-                <div className="pt-4 border-t border-white/5 flex flex-col space-y-3">
+                <div className="pt-3 sm:pt-4 border-t border-white/5 flex flex-col space-y-2 sm:space-y-3">
                     {/* Tags */}
                     <div className="flex flex-col gap-1">
                         {link.tags.slice(0, 3).map((tag) => (

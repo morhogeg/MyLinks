@@ -90,80 +90,80 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
 
     return (
         <>
-            {/* Backdrop for mobile focus - now covering the header */}
+            {/* Backdrop for mobile focus - now covering the header completely */}
             {isExpanded && (
                 <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] sm:hidden animate-fade-in"
+                    className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[60] sm:hidden animate-fade-in"
                     onClick={() => setIsExpanded(false)}
                 />
             )}
 
-            <div className="fixed bottom-6 right-4 sm:right-6 z-40" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-                {/* Expanded Form - Now using screen-relative positioning on mobile and higher z-index */}
-                {isExpanded && (
-                    <div className="fixed sm:absolute bottom-[40%] sm:bottom-20 inset-x-4 sm:inset-auto sm:right-0 sm:w-96 max-w-[400px] mx-auto sm:mx-0 z-[70]">
-                        <form
-                            onSubmit={handleSubmit}
-                            className="bg-card border border-white/10 rounded-2xl p-6 shadow-2xl animate-slide-up relative overflow-hidden"
+            {/* Expanded Form - Moved outside the FAB container to fix z-index stacking context */}
+            {isExpanded && (
+                <div className="fixed top-24 sm:top-auto sm:bottom-28 inset-x-4 sm:left-auto sm:right-6 sm:w-96 max-w-[400px] mx-auto sm:mx-0 z-[70] animate-slide-up">
+                    <form
+                        onSubmit={handleSubmit}
+                        className="bg-card border border-white/10 rounded-2xl p-6 shadow-2xl relative overflow-hidden"
+                    >
+                        {/* Close button */}
+                        <button
+                            type="button"
+                            onClick={() => setIsExpanded(false)}
+                            className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 text-text-muted transition-colors z-10"
+                            aria-label="Close"
                         >
-                            {/* Close button */}
+                            <X className="w-5 h-5" />
+                        </button>
+
+                        <div className="mb-6">
+                            <h3 className="text-xl font-bold text-text mb-1 flex items-center gap-2">
+                                <Link className="w-5 h-5 text-accent" />
+                                Add to Brain
+                            </h3>
+                            <p className="text-sm text-text-secondary">
+                                Paste any link to analyze and save it.
+                            </p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="relative">
+                                <input
+                                    id="url"
+                                    type="text"
+                                    value={url}
+                                    onChange={(e) => setUrl(e.target.value)}
+                                    placeholder="example.com or https://..."
+                                    className="w-full px-4 py-4 bg-background border border-white/5 rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-base"
+                                    disabled={isLoading}
+                                    autoFocus
+                                />
+                            </div>
                             <button
-                                type="button"
-                                onClick={() => setIsExpanded(false)}
-                                className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 text-text-muted transition-colors z-10"
-                                aria-label="Close"
+                                type="submit"
+                                disabled={isLoading || !url.trim()}
+                                className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-100 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
                             >
-                                <X className="w-5 h-5" />
+                                {isLoading ? (
+                                    <>
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        <span>Analyzing...</span>
+                                    </>
+                                ) : (
+                                    'Save'
+                                )}
                             </button>
+                        </div>
 
-                            <div className="mb-6">
-                                <h3 className="text-xl font-bold text-text mb-1 flex items-center gap-2">
-                                    <Link className="w-5 h-5 text-accent" />
-                                    Add to Brain
-                                </h3>
-                                <p className="text-sm text-text-secondary">
-                                    Paste any link to analyze and save it.
-                                </p>
-                            </div>
+                        {error && (
+                            <p className="text-red-400 text-sm mt-4 text-center bg-red-400/10 py-2 rounded-lg border border-red-400/20">
+                                {error}
+                            </p>
+                        )}
+                    </form>
+                </div>
+            )}
 
-                            <div className="space-y-4">
-                                <div className="relative">
-                                    <input
-                                        id="url"
-                                        type="text"
-                                        value={url}
-                                        onChange={(e) => setUrl(e.target.value)}
-                                        placeholder="example.com or https://..."
-                                        className="w-full px-4 py-4 bg-background border border-white/5 rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-base"
-                                        disabled={isLoading}
-                                        autoFocus
-                                    />
-                                </div>
-                                <button
-                                    type="submit"
-                                    disabled={isLoading || !url.trim()}
-                                    className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-100 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
-                                >
-                                    {isLoading ? (
-                                        <>
-                                            <Loader2 className="w-5 h-5 animate-spin" />
-                                            <span>Analyzing...</span>
-                                        </>
-                                    ) : (
-                                        'Save'
-                                    )}
-                                </button>
-                            </div>
-
-                            {error && (
-                                <p className="text-red-400 text-sm mt-4 text-center bg-red-400/10 py-2 rounded-lg border border-red-400/20">
-                                    {error}
-                                </p>
-                            )}
-                        </form>
-                    </div>
-                )}
-
+            <div className="fixed bottom-6 right-4 sm:right-6 z-40" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
                 {/* FAB Button */}
                 <button
                     onClick={() => setIsExpanded(!isExpanded)}
