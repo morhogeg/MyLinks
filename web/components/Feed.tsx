@@ -1,5 +1,6 @@
 'use client';
-// Refreshed colors and layout
+// Refreshed colors, layout, and synchronized typography
+
 
 
 import { useState, useEffect } from 'react';
@@ -287,18 +288,18 @@ export default function Feed() {
                             <select
                                 value={sortBy}
                                 onChange={(e) => setSortBy(e.target.value as SortType)}
-                                className="appearance-none bg-card/50 border border-border-subtle rounded-full pl-2.5 pr-7 py-1.5 text-[10px] sm:text-[11px] font-bold text-text-secondary hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/20 min-h-[32px] sm:min-h-[36px]"
+                                className="appearance-none bg-card/50 border border-transparent rounded-full pl-3 pr-8 py-1.5 text-[11px] font-semibold text-text-muted hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/20 min-h-[36px]"
                             >
                                 <option value="date-desc">Newest First</option>
                                 <option value="date-asc">Oldest First</option>
                                 <option value="title-asc">Title A-Z</option>
                                 <option value="category">Category</option>
                             </select>
-                            <ArrowUpDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-text-muted pointer-events-none" />
+                            <ArrowUpDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
                         </div>
 
                         {/* View Mode Switcher */}
-                        <div className="flex items-center bg-card/50 rounded-full p-0.5 border border-border-subtle shadow-sm flex-shrink-0">
+                        <div className="flex items-center bg-card/50 rounded-full p-0.5 border border-transparent shadow-sm flex-shrink-0">
                             <button
                                 onClick={() => setViewMode('grid')}
                                 className={`p-1.5 rounded-full transition-all min-h-[28px] min-w-[28px] flex items-center justify-center ${viewMode === 'grid' ? 'bg-accent text-white shadow-sm' : 'text-text-muted hover:text-text-secondary'}`}
@@ -356,7 +357,7 @@ export default function Feed() {
                             ) : (
                                 <button
                                     onClick={() => setIsSelectionMode(true)}
-                                    className="h-9 px-3 rounded-full text-text-muted hover:text-accent transition-all flex items-center gap-2 bg-card/50 border border-border-subtle"
+                                    className="h-9 px-3 rounded-full text-text-muted hover:text-accent transition-all flex items-center gap-2 bg-card/50 border border-transparent"
                                 >
                                     <span className="text-[10px] font-bold uppercase tracking-wider hidden xs:inline">Select</span>
                                     <LayoutGrid className="w-3.5 h-3.5" />

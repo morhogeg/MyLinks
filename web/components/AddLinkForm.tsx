@@ -90,18 +90,18 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
 
     return (
         <>
-            {/* Backdrop for mobile focus */}
+            {/* Backdrop for mobile focus - now covering the header */}
             {isExpanded && (
                 <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 sm:hidden animate-fade-in"
+                    className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] sm:hidden animate-fade-in"
                     onClick={() => setIsExpanded(false)}
                 />
             )}
 
             <div className="fixed bottom-6 right-4 sm:right-6 z-40" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-                {/* Expanded Form */}
+                {/* Expanded Form - Now using screen-relative positioning on mobile and higher z-index */}
                 {isExpanded && (
-                    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 sm:left-auto sm:right-0 sm:translate-x-0 w-[calc(100vw-2.5rem)] sm:w-96 max-w-[400px]">
+                    <div className="fixed sm:absolute bottom-[40%] sm:bottom-20 inset-x-4 sm:inset-auto sm:right-0 sm:w-96 max-w-[400px] mx-auto sm:mx-0 z-[70]">
                         <form
                             onSubmit={handleSubmit}
                             className="bg-card border border-white/10 rounded-2xl p-6 shadow-2xl animate-slide-up relative overflow-hidden"
