@@ -88,6 +88,7 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
             setIsExpanded(false);
             onLinkAdded();
         } catch (err) {
+            console.error('AddLinkForm Error:', err);
             setError(err instanceof Error ? err.message : 'Something went wrong');
         } finally {
             setIsLoading(false);
@@ -110,6 +111,7 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                     <form
                         onSubmit={handleSubmit}
                         className="bg-card border border-white/10 rounded-2xl p-6 shadow-2xl relative overflow-hidden"
+                        noValidate
                     >
                         {/* Close button */}
                         <button
@@ -135,7 +137,7 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                             <div className="relative">
                                 <input
                                     id="url"
-                                    type="text"
+                                    type="url"
                                     value={url}
                                     onChange={(e) => setUrl(e.target.value)}
                                     placeholder="example.com or https://..."

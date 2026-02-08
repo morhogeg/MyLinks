@@ -10,7 +10,7 @@ import os
 import json
 import re
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from twilio.rest import Client
 
@@ -366,6 +366,36 @@ def send_whatsapp_message(to_number: str, body: str):
         print(f"Twilio error: {e}")
 
 
+def handle_reminder_intent(text: str) -> Optional[datetime]:
+    """Parse text for reminder commands"""
+    text = text.lower()
+    now = datetime.now()
+    
+    if 'tomorrow' in text:
+        return now + timedelta(days=1)
+    
+    if 'next week' in text:
+        # Simplification: Today + 7 days
+        return now + timedelta(days=7)
+    
+    # Match "in X days"
+    match = re.search(r'\bin (\d+) days?', text)
+    if match:
+        days = int(match.group(1))
+        return now + timedelta(days=days)
+        
+    return None
+
+def set_reminder(uid: str, link_id: str, reminder_time: datetime):
+    """Set a reminder for a specific link"""
+    db = get_db()
+    link_ref = db.collection('users').document(uid).collection('links').document(link_id)
+    link_ref.update({
+        'reminder_status': 'pending',
+        'next_reminder_at': reminder_time,
+        'reminder_count': 0
+    })
+
 @https_fn.on_request()
 def ping(req: https_fn.Request) -> https_fn.Response:
     """Simple health check function"""
@@ -376,16 +406,7 @@ def ping(req: https_fn.Request) -> https_fn.Response:
 def whatsapp_webhook(request):
     """
     WhatsApp webhook endpoint
-    
-    Flow:
-    1. Receive incoming message
-    2. Verify sender is a registered user
-    3. Extract URL from message
-    4. Scrape and analyze the URL
-    5. Save to Firestore
-    6. Send confirmation back to user
-    
-    CRITICAL: Uses try/except to save links even if AI fails
+    Handles URLs and Conversational Reminders
     """
     
     # Parse incoming payload
@@ -401,6 +422,8 @@ def whatsapp_webhook(request):
         print(f"Payload parse error: {e}")
         return {"error": "Invalid payload"}, 400
     
+    db = get_db()
+    
     # Find user by phone number
     uid = find_user_by_phone(payload.from_number)
     if not uid:
@@ -410,10 +433,35 @@ def whatsapp_webhook(request):
     
     # Extract URL from message body
     url_match = re.search(r'https?://[^\s]+', payload.body)
+    
     if not url_match:
-        # TODO: Send "No URL found" reply
-        return {"error": "No URL in message"}, 400
+        # NO URL -> Check for conversational commands (Reminders)
+        reminder_time = handle_reminder_intent(payload.body)
         
+        if reminder_time:
+            # Contextual Reminder: Use last saved link
+            user_doc = db.collection('users').document(uid).get()
+            last_link_id = user_doc.to_dict().get('last_saved_link_id')
+            
+            if last_link_id:
+                # Retrieve title for confirmation
+                link_doc = db.collection('users').document(uid).collection('links').document(last_link_id).get()
+                if link_doc.exists:
+                     title = link_doc.to_dict().get('title', 'Unknown Link')
+                     set_reminder(uid, last_link_id, reminder_time)
+                     
+                     date_str = reminder_time.strftime('%b %d')
+                     send_whatsapp_message(payload.from_number, f"⏰ Reminder set for '{title}' on {date_str}")
+                     return {"success": True}, 200
+            
+            send_whatsapp_message(payload.from_number, "❌ No previous link found. Send a link first!")
+            return {"error": "No context"}, 200
+            
+        # Fallback for text messages
+        send_whatsapp_message(payload.from_number, "I can save links or set reminders. Try sending a URL!")
+        return {"success": True}, 200
+        
+    # URL FOUND -> Process Link
     url = url_match.group(0)
     
     # Process the URL
@@ -448,8 +496,20 @@ def whatsapp_webhook(request):
         # Save to Firestore
         link_id = save_link_to_firestore(uid, link_data)
         
+        # Update User Context (Last Saved Link)
+        db.collection('users').document(uid).update({'last_saved_link_id': link_id})
+        
+        # Check for immediate reminder intent (e.g. "Save this and remind me tomorrow")
+        reminder_time = handle_reminder_intent(payload.body)
+        
+        if reminder_time:
+            set_reminder(uid, link_id, reminder_time)
+            msg = f"✅ Saved & Reminder set for {reminder_time.strftime('%b %d')}\n\n{analysis['title']}"
+        else:
+            msg = f"✅ Saved: {analysis['title']}\n\nCategory: {analysis['category']}"
+        
         # Send success message via WhatsApp API
-        send_whatsapp_message(payload.from_number, f"✅ Saved: {analysis['title']}\n\nCategory: {analysis['category']}")
+        send_whatsapp_message(payload.from_number, msg)
         
         return {"success": True, "linkId": link_id}, 200
         
@@ -564,6 +624,7 @@ def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
                 })
             
             print(f"Sent reminder for link {link_id} to {phone_number}")
+
 
 
 # Local testing relocated to dev_server.py

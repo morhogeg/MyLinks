@@ -130,7 +130,7 @@ export default function TagExplorer({
                 />
             </div>
 
-            <div className="flex flex-col gap-1 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 pr-2">
+            <div className="flex flex-col gap-1 pr-2">
                 {tagTree.length === 0 ? (
                     <div className="py-8 text-center text-text-muted opacity-40 italic text-xs">
                         {searchQuery ? 'No matching tags' : 'No tags found'}

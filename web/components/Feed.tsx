@@ -439,7 +439,7 @@ export default function Feed() {
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
-                            <div className="flex-1 overflow-y-auto overscroll-contain pb-32">
+                            <div className="flex-1 overflow-y-auto overscroll-contain pb-safe">
                                 <TagExplorer
                                     tags={allTags}
                                     tagCounts={tagCounts}
