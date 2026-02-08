@@ -34,69 +34,98 @@ def get_db():
 
 def scrape_url(url: str) -> dict:
     """
-    Fetch and extract content from a URL
-    Handles Twitter/X URLs specially via fxtwitter.com API
-    
-    Returns:
-        dict with 'html', 'title', 'text' keys
+    Fetch and extract content from a URL with robustness:
+    - Special Twitter/X handling
+    - Real browser headers
+    - Jina.ai fallback for bot-protected sites
+    - JSON-LD recipe data extraction
     """
     try:
-        # Special handling for Twitter/X URLs
         if 'twitter.com' in url or 'x.com' in url:
             return _scrape_twitter_url(url)
         
-        # General URL scraping with BeautifulSoup
         headers = {
-            "User-Agent": "Mozilla/5.0 (compatible; SecondBrain/1.0)"
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
         }
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
         
-        html = response.text
-        
-        # Use BeautifulSoup for better HTML parsing
         try:
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(html, 'html.parser')
+            response = requests.get(url, headers=headers, timeout=10)
+            # If blocked, try Jina.ai
+            if response.status_code in [403, 429]:
+                print(f"Primary scrape blocked ({response.status_code}), trying r.jina.ai fallback for {url}")
+                jina_url = f"https://r.jina.ai/{url}"
+                response = requests.get(jina_url, timeout=15)
             
-            # Extract title
-            title = ""
-            if soup.title:
-                title = soup.title.string.strip()
-            
-            # Extract text from paragraphs and main content
-            text_parts = []
-            for p in soup.find_all('p'):
+            response.raise_for_status()
+            html = response.text
+        except Exception as e:
+            print(f"Primary scrape failed: {e}, attempting r.jina.ai absolute fallback")
+            jina_url = f"https://r.jina.ai/{url}"
+            response = requests.get(jina_url, timeout=15)
+            response.raise_for_status()
+            html = response.text
+
+        title = ""
+        text = ""
+        
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        # 1. Extract Title
+        if soup.title:
+            title = soup.title.string.strip()
+        
+        # 2. Extract JSON-LD (especially for Recipes)
+        recipe_data = []
+        for script in soup.find_all('script', type='application/ld+json'):
+            try:
+                import json
+                data = json.loads(script.string)
+                
+                def find_recipe(obj):
+                    if isinstance(obj, dict):
+                        if obj.get('@type') == 'Recipe': return obj
+                        if '@graph' in obj:
+                            for item in obj['@graph']:
+                                if item.get('@type') == 'Recipe': return item
+                        for k, v in obj.items():
+                            res = find_recipe(v)
+                            if res: return res
+                    elif isinstance(obj, list):
+                        for item in obj:
+                            res = find_recipe(item)
+                            if res: return res
+                    return None
+                
+                recipe = find_recipe(data)
+                if recipe: recipe_data.append(recipe)
+            except: continue
+
+        # 3. Extract visible text
+        text_parts = []
+        if soup.find('article'):
+            text_parts.append(soup.find('article').get_text(separator=' ', strip=True))
+        else:
+            for p in soup.find_all(['p', 'h1', 'h2', 'h3', 'li']):
                 text_parts.append(p.get_text().strip())
-            
-            # Also try to get article content
-            article = soup.find('article')
-            if article:
-                text_parts.append(article.get_text().strip())
-            
-            text = " ".join(text_parts)[:5000]
-            
-            return {
-                "html": html,
-                "title": title,
-                "text": text or html[:5000]
-            }
-        except ImportError:
-            # Fallback to regex if BeautifulSoup fails
-            title_match = re.search(r'<title[^>]*>([^<]+)</title>', html, re.IGNORECASE)
-            title = title_match.group(1).strip() if title_match else ""
-            
-            p_matches = re.findall(r'<p[^>]*>([^<]+)</p>', html, re.IGNORECASE)
-            text = " ".join(p_matches)[:5000]
-            
-            return {
-                "html": html,
-                "title": title,
-                "text": text or html[:5000]
-            }
+        
+        text = "\n".join(text_parts)
+        
+        # If we have recipe data, prioritize it for the AI
+        if recipe_data:
+            import json
+            text = f"JSON-LD RECIPE DATA:\n{json.dumps(recipe_data, indent=2)}\n\nWEB CONTENT:\n{text}"
+
+        return {
+            "html": html,
+            "title": title or url,
+            "text": text[:15000] # Increased limit for rich recipe data
+        }
             
     except Exception as e:
-        print(f"Scrape error: {e}")
+        print(f"Scrape error for {url}: {e}")
         return {"html": "", "title": "", "text": ""}
 
 def _scrape_twitter_url(url: str) -> dict:

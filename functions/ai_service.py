@@ -87,13 +87,16 @@ Requirements for the analysis:
     IMPORTANT: Cleanly extract ONLY the recipe content. Remove all blog "clutter", stories, and unnecessary introductions.
 
 CRITICAL RULES:
+- STRICT FIDELITY: For recipes, you MUST ONLY use the specific measurements, temperatures, and timings provided in the text.
+- NO HALLUCINATIONS: If the provided text does not contain a specific measurement (e.g., amount of sugar) or instruction, do NOT guess based on your general knowledge. Instead, explicitly state "Data not found in source".
 - Be a neutral reporter. Report WHAT is said, not HOW WELL it is said.
 - TAG LIMIT: You MUST provide exactly 3 or 4 tags. No more, no less.
 - TAG REUSE: Prioritize existing tags.
 - NEVER use: "valuable", "insightful", "comprehensive", "interesting", "excellent", "must-read"
 - ALWAYS use factual language: "The article argues...", "Research shows...", "The author explains..."
-- For tweets: Focus on the actual statement and any linked context.
-- For recipes: Category MUST be "Recipe" and source_type MUST be "recipe"."""
+- For recipes: Category MUST be "Recipe" and source_type MUST be "recipe".
+- If the content appears to be a bot challenge or truncated text, set confidence to "low" and do NOT attempt to generate a full recipe.
+"""
 
 
 class ClaudeService: # Kept name for compatibility with main.py

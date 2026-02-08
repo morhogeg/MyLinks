@@ -83,6 +83,8 @@ Requirements for the analysis:
     IMPORTANT: Cleanly extract ONLY the recipe content. Remove all blog "clutter", stories, and unnecessary introductions.
 
 CRITICAL RULES:
+- STRICT FIDELITY: For recipes, you MUST ONLY use the specific measurements, temperatures, and timings provided in the text.
+- NO HALLUCINATIONS: If the provided text does not contain a specific measurement (e.g., amount of sugar) or instruction, do NOT guess based on your general knowledge. Instead, explicitly state "Data not found in source".
 - Be a neutral reporter. Report WHAT is said, not HOW WELL it is said.
 - TAG LIMIT: You MUST provide exactly 3 or 4 tags. No more, no less.
 - TAG REUSE: Prioritize existing tags.
@@ -195,21 +197,56 @@ export async function fetchPageContent(url: string): Promise<{ html: string; tit
             return await fetchTwitterContent(url);
         }
 
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache',
+        const headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+        };
+
+        let response = await fetch(url, { headers });
+        let html = '';
+
+        // If blocked or high security, try Jina.ai (turns site into clean markdown for LLMs)
+        if (!response.ok || response.status === 403 || response.status === 429) {
+            console.log(`[AI Service] Primary fetch failed (${response.status}), trying Jina.ai fallback for: ${url}`);
+            const jinaUrl = `https://r.jina.ai/${url}`;
+            const jinaResponse = await fetch(jinaUrl);
+            if (jinaResponse.ok) {
+                html = await jinaResponse.text();
             }
-        });
+        } else {
+            html = await response.text();
+        }
 
-        if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+        if (!html) throw new Error('Failed to retrieve content from any source.');
 
-        const html = await response.text();
+        // Extract Title
         const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-        const title = titleMatch ? titleMatch[1].trim() : '';
+        let title = titleMatch ? titleMatch[1].trim() : '';
+
+        // ROBUSTNESS: Extract JSON-LD for Recipes
+        // Many food blogs use schema.org/Recipe which is very reliable
+        const recipeData: any[] = [];
+        const jsonLdMatches = html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi);
+        for (const match of jsonLdMatches) {
+            try {
+                const json = JSON.parse(match[1]);
+                const findRecipe = (obj: any): any => {
+                    if (obj['@type'] === 'Recipe') return obj;
+                    if (obj['@graph']) return obj['@graph'].find((item: any) => item['@type'] === 'Recipe');
+                    if (Array.isArray(obj)) return obj.find(item => findRecipe(item));
+                    return null;
+                };
+                const recipe = findRecipe(json);
+                if (recipe) recipeData.push(recipe);
+            } catch (e) { /* ignore parse errors */ }
+        }
+
+        if (recipeData.length > 0) {
+            html = `JSON-LD STRUCTURED DATA:\n${JSON.stringify(recipeData, null, 2)}\n\nRAW CONTENT:\n${html}`;
+        }
 
         return { html, title };
     } catch (error) {
