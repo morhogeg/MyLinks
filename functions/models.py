@@ -43,15 +43,18 @@ class Recipe(BaseModel):
 
 class AIAnalysis(BaseModel):
     """
-    Output from Claude AI analysis
-    Matches the JSON structure defined in PRD Section 4.2
+    Output from Gemini AI analysis
+    Matches the enhanced JSON structure for knowledge extraction
     """
-    title: str = Field(description="Concise, punchy title")
-    summary: str = Field(description="3-sentence summary focusing on novel insights")
-    category: str = Field(description="One specific high-level category")
-    tags: List[str] = Field(max_length=5, description="Up to 5 relevant tags")
-    actionable_takeaway: str = Field(description="One thing the user can do or learn")
-    detailed_summary: Optional[str] = Field(None, description="Markdown formatted detailed summary")
+    source_type: Optional[str] = Field(None, description="Type of content: article, tweet, video, podcast, paper, recipe, other")
+    title: str = Field(description="Clear, descriptive title (5-12 words)")
+    summary: str = Field(description="2-3 information-dense sentences with key insights")
+    category: str = Field(description="One high-level category")
+    tags: List[str] = Field(max_length=5, description="3-5 specific, searchable tags")
+    actionable_takeaway: str = Field(description="One specific, immediately actionable insight")
+    detailed_summary: Optional[str] = Field(None, description="Markdown formatted detailed summary with Key Points and Why It Matters sections")
+    confidence: Optional[str] = Field(None, description="Extraction quality: high, medium, or low")
+    key_entities: Optional[List[str]] = Field(None, description="2-5 important names, organizations, products, or concepts")
     recipe: Optional[Recipe] = Field(None, description="Structured recipe data if content is a recipe")
 
 

@@ -20,6 +20,22 @@ export async function getLinksFromFirestore(uid: string): Promise<Link[]> {
     } as Link));
 }
 
+/**
+ * Get all unique tags for a user from Firestore
+ */
+export async function getUserTags(uid: string): Promise<string[]> {
+    const linksRef = collection(db, 'users', uid, 'links');
+    const snapshot = await getDocs(linksRef);
+
+    const tags = new Set<string>();
+    snapshot.docs.forEach(doc => {
+        const linkTags = doc.data().tags as string[] || [];
+        linkTags.forEach(tag => tags.add(tag));
+    });
+
+    return Array.from(tags).sort();
+}
+
 // Keeping getLinks as a placeholder for legacy compatibility if needed
 export function getLinks(): Link[] {
     return []; // No longer using localStorage
@@ -30,8 +46,17 @@ export function getLinks(): Link[] {
  */
 export async function saveLink(uid: string, linkData: Partial<Link>): Promise<void> {
     const linksRef = collection(db, 'users', uid, 'links');
+
+    // Remove undefined properties as Firestore doesn't support them
+    const cleanData = Object.entries(linkData).reduce((acc, [key, value]) => {
+        if (value !== undefined) {
+            acc[key] = value;
+        }
+        return acc;
+    }, {} as any);
+
     await addDoc(linksRef, {
-        ...linkData,
+        ...cleanData,
         createdAt: Date.now(),
         status: 'unread'
     });

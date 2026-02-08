@@ -2,7 +2,7 @@
 
 import { useState, useEffect, FormEvent } from 'react';
 import { Link, Plus, Loader2, X } from 'lucide-react';
-import { saveLink } from '@/lib/storage';
+import { saveLink, getUserTags } from '@/lib/storage';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
@@ -49,10 +49,16 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
         setError(null);
 
         try {
+            // Fetch existing tags to pass to AI for reuse
+            const existingTags = uid ? await getUserTags(uid) : [];
+
             const response = await fetch('/api/analyze', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: formattedUrl }),
+                body: JSON.stringify({
+                    url: formattedUrl,
+                    existingTags
+                }),
             });
 
             const data = await response.json();
@@ -75,7 +81,11 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                     originalTitle: data.link.metadata.originalTitle,
                     estimatedReadTime: data.link.metadata.estimatedReadTime,
                     actionableTakeaway: data.link.metadata.actionableTakeaway
-                }
+                },
+                recipe: data.link.recipe,
+                sourceType: data.link.sourceType,
+                confidence: data.link.confidence,
+                keyEntities: data.link.keyEntities
             });
 
             setUrl('');

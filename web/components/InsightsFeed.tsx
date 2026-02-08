@@ -26,12 +26,14 @@ export default function InsightsFeed({
         return () => clearTimeout(timer);
     }, []);
 
-    const getTimeAgo = (timestamp: number, now_val: number): string => {
-        const seconds = Math.floor((now_val - timestamp) / 1000);
+    const getTimeAgo = (timestamp: string | number, now_val: number): string => {
+        const time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
+        if (isNaN(time)) return 'recently';
+        const seconds = Math.floor((now_val - time) / 1000);
         if (seconds < 60) return 'just now';
         if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
         if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
-        return new Date(timestamp).toLocaleDateString();
+        return new Date(time).toLocaleDateString();
     };
 
     return (

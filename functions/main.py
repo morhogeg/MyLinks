@@ -324,6 +324,23 @@ def save_link_to_firestore(uid: str, link_data: dict) -> str:
     return doc_ref.id
 
 
+def get_user_tags(uid: str) -> list:
+    """
+    Get all unique tags for a user from Firestore
+    """
+    db = get_db()
+    links_ref = db.collection('users').document(uid).collection('links')
+    docs = links_ref.get()
+    
+    tags = set()
+    for doc in docs:
+        link_tags = doc.to_dict().get('tags', [])
+        for tag in link_tags:
+            tags.add(tag)
+            
+    return sorted(list(tags))
+
+
 def send_whatsapp_message(to_number: str, body: str):
     """
     Send a WhatsApp message via Twilio
@@ -403,9 +420,12 @@ def whatsapp_webhook(request):
         # Scrape content
         scraped = scrape_url(url)
         
+        # Fetch existing tags for context
+        existing_tags = get_user_tags(uid)
+        
         # Analyze with AI
         claude = ClaudeService()
-        analysis = claude.analyze_text(scraped["text"] or scraped["html"])
+        analysis = claude.analyze_text(scraped["text"] or scraped["html"], existing_tags=existing_tags)
         
         # Build link document
         link_data = {
@@ -422,7 +442,10 @@ def whatsapp_webhook(request):
                 "estimatedReadTime": max(1, len(scraped["text"]) // 1500),
                 "actionableTakeaway": analysis.get("actionable_takeaway")
             },
-            "recipe": analysis.get("recipe")
+            "recipe": analysis.get("recipe"),
+            "sourceType": analysis.get("source_type"),
+            "confidence": analysis.get("confidence"),
+            "keyEntities": analysis.get("key_entities")
         }
         
         # Save to Firestore

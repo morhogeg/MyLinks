@@ -9,13 +9,19 @@ export interface LinkMetadata {
   actionableTakeaway?: string;
 }
 
+export type SourceType = 'article' | 'tweet' | 'video' | 'podcast' | 'paper' | 'recipe' | 'other';
+export type ConfidenceLevel = 'high' | 'medium' | 'low';
+
 export interface AIAnalysis {
+  sourceType?: SourceType;
   title: string;
   summary: string;
   detailedSummary: string;
   category: string;
   tags: string[];
   actionable_takeaway: string;
+  confidence?: ConfidenceLevel;
+  keyEntities?: string[];
 }
 
 export interface Recipe {
@@ -38,6 +44,10 @@ export interface Link {
   createdAt: number | string; // Handle both Unix timestamp and ISO string
   metadata: LinkMetadata;
   recipe?: Recipe;
+  // Enhanced AI fields
+  sourceType?: SourceType;
+  confidence?: ConfidenceLevel;
+  keyEntities?: string[];
   // Reminder fields
   reminderStatus?: 'none' | 'pending' | 'completed';
   nextReminderAt?: number; // Unix timestamp (ms)

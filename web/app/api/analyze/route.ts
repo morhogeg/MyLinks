@@ -32,7 +32,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         const { html, title: originalTitle } = await fetchPageContent(url);
 
         // Analyze with AI (mock or real based on env)
-        const analysis = await analyzeContent(url, html);
+        const analysis = await analyzeContent(url, html, body.existingTags || []);
 
         // Construct the link object
         const link: Link = {
@@ -49,7 +49,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
                 originalTitle: originalTitle || analysis.title,
                 estimatedReadTime: Math.ceil(html.length / 1500), // Rough estimate: 250 words/min, 6 chars/word
                 actionableTakeaway: analysis.actionable_takeaway
-            }
+            },
+            // Enhanced AI fields
+            sourceType: analysis.sourceType,
+            confidence: analysis.confidence,
+            keyEntities: analysis.keyEntities
         };
 
         return NextResponse.json({ success: true, link });
