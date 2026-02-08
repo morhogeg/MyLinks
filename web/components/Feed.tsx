@@ -6,14 +6,15 @@
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { updateLinkStatus, deleteLink, updateLinkTags } from '@/lib/storage';
+import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder } from '@/lib/storage';
 import { collection, query, orderBy, onSnapshot, where, getDocs, limit, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Card from './Card';
 import TableView from './TableView';
 import InsightsFeed from './InsightsFeed';
 import LinkDetailModal from './LinkDetailModal';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter } from 'lucide-react';
+import TagExplorer from './TagExplorer';
 
 type FilterType = 'all' | 'unread' | 'archived' | 'favorite';
 type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
@@ -38,6 +39,8 @@ export default function Feed() {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
+    const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
+    const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
 
     // 1. Find the user by phone number (mocking auth for now)
     useEffect(() => {
@@ -99,6 +102,15 @@ export default function Feed() {
             return selectedCategory.has(link.category);
         })
         .filter((link) => {
+            if (selectedTags.size === 0) return true;
+            // Hierarchical matching: if any link tag matches or is a child of any selected tag
+            return link.tags.some(tag => {
+                return Array.from(selectedTags).some(selected => {
+                    return tag === selected || tag.startsWith(`${selected}/`);
+                });
+            });
+        })
+        .filter((link) => {
             if (!searchQuery.trim()) return true;
             const query = searchQuery.toLowerCase();
             return (
@@ -131,6 +143,23 @@ export default function Feed() {
 
     const categories = Array.from(new Set(links.map(l => l.category))).sort();
 
+    // Calculate tag counts for all links (not just filtered)
+    const tagCounts = links.reduce((acc, link) => {
+        link.tags.forEach(tag => {
+            acc[tag] = (acc[tag] || 0) + 1;
+        });
+        return acc;
+    }, {} as Record<string, number>);
+
+    const allTags = Array.from(new Set(links.flatMap(l => l.tags))).sort();
+
+    const handleToggleTag = (tag: string) => {
+        const next = new Set(selectedTags);
+        if (next.has(tag)) next.delete(tag);
+        else next.add(tag);
+        setSelectedTags(next);
+    };
+
     const handleStatusChange = async (id: string, status: LinkStatus) => {
         if (!uid) return;
         await updateLinkStatus(uid, id, status);
@@ -162,6 +191,11 @@ export default function Feed() {
             setSelectedIds(new Set());
             setIsSelectionMode(false);
         }
+    };
+
+    const handleUpdateReminder = async (id: string, enabled: boolean) => {
+        if (!uid) return;
+        await updateLinkReminder(uid, id, enabled);
     };
 
     const toggleSelection = (id: string) => {
@@ -318,6 +352,18 @@ export default function Feed() {
                             </button>
                         </div>
 
+                        {/* Tag Explorer Toggle (Mobile) */}
+                        <button
+                            onClick={() => setIsTagExplorerOpen(!isTagExplorerOpen)}
+                            className={`lg:hidden h-[28px] px-2 rounded-full text-[10px] font-bold transition-all flex items-center gap-1 border ${selectedTags.size > 0
+                                    ? 'bg-accent/10 border-accent/20 text-accent'
+                                    : 'bg-card/30 border-transparent text-text-muted/40'
+                                }`}
+                        >
+                            <TagIcon className="w-3 h-3" />
+                            <span>Tags {selectedTags.size > 0 && `(${selectedTags.size})`}</span>
+                        </button>
+
                         {/* Selection Control */}
                         <div className="flex items-center">
                             {isSelectionMode ? (
@@ -355,79 +401,139 @@ export default function Feed() {
 
 
 
-            {/* Links Grid */}
-            {filteredLinks.length === 0 ? (
-                <div className="text-center py-16">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-card flex items-center justify-center">
-                        {filter === 'favorite' ? (
-                            <Star className="w-8 h-8 text-text-muted" />
-                        ) : filter === 'archived' ? (
-                            <Archive className="w-8 h-8 text-text-muted" />
-                        ) : (
-                            <Inbox className="w-8 h-8 text-text-muted" />
-                        )}
+            {/* Main Content with Tag Sidebar */}
+            <div className="flex flex-col lg:flex-row gap-6">
+                {/* Tag Explorer Sidebar (Desktop) */}
+                <aside className="hidden lg:block w-64 flex-shrink-0">
+                    <div className="sticky top-4">
+                        <TagExplorer
+                            tags={allTags}
+                            tagCounts={tagCounts}
+                            selectedTags={selectedTags}
+                            onToggleTag={handleToggleTag}
+                            onClearFilters={() => setSelectedTags(new Set())}
+                        />
                     </div>
-                    <h3 className="text-lg font-medium text-text mb-2">
-                        {searchQuery ? 'No results found' :
-                            filter === 'favorite' ? 'No favorites yet' :
-                                filter === 'archived' ? 'No archived links' :
-                                    filter === 'unread' ? 'No unread links' :
-                                        selectedCategory.size > 0 ? `No links in ${Array.from(selectedCategory).join(', ')}` :
-                                            'Your Second Brain is empty'}
-                    </h3>
-                    <p className="text-text-secondary text-sm">
-                        {searchQuery ? 'Try a different search term' :
-                            filter === 'favorite' ? 'Star links to add them to your favorites' :
-                                filter === 'archived' ? 'Archive links to see them here' :
-                                    filter === 'unread' ? 'All caught up! No unread links' :
-                                        selectedCategory.size > 0 ? 'Try selecting a different category' :
-                                            'Add your first link using the + button below'}
-                    </p>
-                </div>
-            ) : viewMode === 'table' ? (
-                <TableView
-                    links={filteredLinks}
-                    onOpenDetails={setActiveLink}
-                    onStatusChange={handleStatusChange}
-                    onUpdateTags={handleUpdateTags}
-                    onDelete={handleDelete}
-                    isSelectionMode={isSelectionMode}
-                    selectedIds={selectedIds}
-                    onToggleSelection={toggleSelection}
-                />
-            ) : viewMode === 'insights' ? (
-                <InsightsFeed
-                    links={filteredLinks}
-                    onOpenDetails={setActiveLink}
-                    isSelectionMode={isSelectionMode}
-                    selectedIds={selectedIds}
-                    onToggleSelection={toggleSelection}
-                />
-            ) : (
-                <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                    {filteredLinks.map((link) => (
-                        <Card
-                            key={link.id}
-                            link={link}
+                </aside>
+
+                {/* Tag Explorer Drawer (Mobile) */}
+                {isTagExplorerOpen && (
+                    <div className="lg:hidden fixed inset-0 z-40 flex justify-end">
+                        <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" onClick={() => setIsTagExplorerOpen(false)} />
+                        <div className="relative w-80 max-w-[85%] h-full bg-card border-l border-white/10 p-6 flex flex-col animate-in slide-in-from-right duration-300">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-sm font-bold flex items-center gap-2">
+                                    <TagIcon className="w-4 h-4 text-accent" />
+                                    Filter Tags
+                                </h2>
+                                <button onClick={() => setIsTagExplorerOpen(false)} className="p-2 hover:bg-white/5 rounded-full">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <TagExplorer
+                                tags={allTags}
+                                tagCounts={tagCounts}
+                                selectedTags={selectedTags}
+                                onToggleTag={handleToggleTag}
+                                onClearFilters={() => setSelectedTags(new Set())}
+                                className="flex-1"
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Links Grid/Table */}
+                <div className="flex-grow min-w-0">
+                    {filteredLinks.length === 0 ? (
+                        <div className="text-center py-16">
+                            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-card flex items-center justify-center">
+                                {filter === 'favorite' ? (
+                                    <Star className="w-8 h-8 text-text-muted" />
+                                ) : filter === 'archived' ? (
+                                    <Archive className="w-8 h-8 text-text-muted" />
+                                ) : (
+                                    <Inbox className="w-8 h-8 text-text-muted" />
+                                )}
+                            </div>
+                            <h3 className="text-lg font-medium text-text mb-2">
+                                {searchQuery ? 'No results found' :
+                                    filter === 'favorite' ? 'No favorites yet' :
+                                        filter === 'archived' ? 'No archived links' :
+                                            filter === 'unread' ? 'No unread links' :
+                                                selectedCategory.size > 0 ? `No links in ${Array.from(selectedCategory).join(', ')}` :
+                                                    selectedTags.size > 0 ? 'No links match selected tags' :
+                                                        'Your Second Brain is empty'}
+                            </h3>
+                            <p className="text-text-secondary text-sm">
+                                {searchQuery ? 'Try a different search term' :
+                                    filter === 'favorite' ? 'Star links to add them to your favorites' :
+                                        filter === 'archived' ? 'Archive links to see them here' :
+                                            filter === 'unread' ? 'All caught up! No unread links' :
+                                                selectedCategory.size > 0 ? 'Try selecting a different category' :
+                                                    selectedTags.size > 0 ? 'Try clearing some tag filters' :
+                                                        'Add your first link using the + button below'}
+                            </p>
+                            {(selectedTags.size > 0 || searchQuery) && (
+                                <button
+                                    onClick={() => {
+                                        setSelectedTags(new Set());
+                                        setSearchQuery('');
+                                    }}
+                                    className="mt-4 px-4 py-2 bg-accent text-white rounded-xl text-sm font-bold hover:bg-accent-hover transition-all"
+                                >
+                                    Reset Filters
+                                </button>
+                            )}
+                        </div>
+                    ) : viewMode === 'table' ? (
+                        <TableView
+                            links={filteredLinks}
                             onOpenDetails={setActiveLink}
                             onStatusChange={handleStatusChange}
+                            onUpdateTags={handleUpdateTags}
                             onDelete={handleDelete}
                             isSelectionMode={isSelectionMode}
-                            isSelected={selectedIds.has(link.id)}
+                            selectedIds={selectedIds}
                             onToggleSelection={toggleSelection}
                         />
-                    ))}
+                    ) : viewMode === 'insights' ? (
+                        <InsightsFeed
+                            links={filteredLinks}
+                            onOpenDetails={setActiveLink}
+                            isSelectionMode={isSelectionMode}
+                            selectedIds={selectedIds}
+                            onToggleSelection={toggleSelection}
+                        />
+                    ) : (
+                        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+                            {filteredLinks.map((link) => (
+                                <Card
+                                    key={link.id}
+                                    link={link}
+                                    onOpenDetails={setActiveLink}
+                                    onStatusChange={handleStatusChange}
+                                    onDelete={handleDelete}
+                                    isSelectionMode={isSelectionMode}
+                                    isSelected={selectedIds.has(link.id)}
+                                    onToggleSelection={toggleSelection}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
-            )}
+            </div>
+
             {/* Active Link Modal */}
             {activeLink && (
                 <LinkDetailModal
                     link={activeLink}
                     allLinks={links}
+                    uid={uid}
                     isOpen={!!activeLink}
                     onClose={() => setActiveLink(null)}
                     onStatusChange={handleStatusChange}
                     onUpdateTags={handleUpdateTags}
+                    onUpdateReminder={handleUpdateReminder}
                     onDelete={handleDelete}
                     onOpenOtherLink={(link) => setActiveLink(link)}
                 />

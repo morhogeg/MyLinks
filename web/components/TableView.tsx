@@ -120,29 +120,37 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                                         setActiveTagPicker(activeTagPicker === link.id ? null : link.id);
                                     }}
                                 >
-                                    {link.tags.length > 0 ? (
-                                        link.tags.slice(0, 3).map(tag => (
-                                            <span
-                                                key={tag}
-                                                className="text-[10px] text-text-muted flex items-center gap-1 group/tag relative"
-                                            >
-                                                {tag}
-                                                <X
-                                                    className="w-2.5 h-2.5 ml-0.5 opacity-0 group-hover/tag:opacity-100 hover:text-red-400 transition-all cursor-pointer"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onUpdateTags(link.id, link.tags.filter(t => t !== tag));
-                                                    }}
-                                                />
+                                    <div className="flex flex-wrap gap-1">
+                                        {link.tags.length > 0 ? (
+                                            link.tags.slice(0, 3).map(tag => {
+                                                const parts = tag.split('/');
+                                                const leaf = parts[parts.length - 1];
+                                                const parents = parts.slice(0, -1).join('/');
+                                                return (
+                                                    <span
+                                                        key={tag}
+                                                        className="text-[9px] font-bold text-text-muted/60 bg-white/5 px-1.5 py-0.5 rounded flex items-center gap-1 group/tag relative"
+                                                    >
+                                                        {parents && <span className="opacity-30 font-normal">{parents}/</span>}
+                                                        {leaf}
+                                                        <X
+                                                            className="w-2.5 h-2.5 ml-0.5 opacity-0 group-hover/tag:opacity-100 hover:text-red-400 transition-all cursor-pointer"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onUpdateTags(link.id, link.tags.filter(t => t !== tag));
+                                                            }}
+                                                        />
+                                                    </span>
+                                                );
+                                            })
+                                        ) : (
+                                            <span className="text-[10px] text-text-muted/40 italic flex items-center gap-1">
+                                                <Plus className="w-2.5 h-2.5" />
+                                                Add tags
                                             </span>
-                                        ))
-                                    ) : (
-                                        <span className="text-[10px] text-text-muted/40 italic flex items-center gap-1">
-                                            <Plus className="w-2.5 h-2.5" />
-                                            Add tags
-                                        </span>
-                                    )}
-                                    {link.tags.length > 3 && <span className="text-[10px] text-text-muted font-medium">+{link.tags.length - 3}</span>}
+                                        )}
+                                        {link.tags.length > 3 && <span className="text-[9px] text-text-muted/30 self-center">+{link.tags.length - 3}</span>}
+                                    </div>
                                 </div>
 
                                 {/* Multi-select Popover */}

@@ -2,29 +2,34 @@
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, MessageSquare, BookOpen, ChevronRight, Sparkles } from 'lucide-react';
+import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, MessageSquare, BookOpen, ChevronRight, Sparkles, Bell, BellOff, ChefHat, Utensils } from 'lucide-react';
 import AIChat from './AIChat';
 import ConfirmDialog from './ConfirmDialog';
+import SimpleMarkdown from './SimpleMarkdown';
 
 interface LinkDetailModalProps {
     link: Link;
     allLinks: Link[];
+    uid: string | null;
     isOpen: boolean;
     onClose: () => void;
     onStatusChange: (id: string, status: LinkStatus) => void;
     onUpdateTags: (id: string, tags: string[]) => void;
     onDelete: (id: string) => void;
+    onUpdateReminder: (id: string, enabled: boolean) => void;
     onOpenOtherLink?: (link: Link) => void;
 }
 
 export default function LinkDetailModal({
     link,
     allLinks,
+    uid,
     isOpen,
     onClose,
     onStatusChange,
     onUpdateTags,
     onDelete,
+    onUpdateReminder,
     onOpenOtherLink
 }: LinkDetailModalProps) {
     const [activeTab, setActiveTab] = useState<'details' | 'chat'>('details');
@@ -66,8 +71,12 @@ export default function LinkDetailModal({
 
     const relatedLinks = getRelatedLinks();
 
-    const getTimeAgo = (timestamp: number, now: number): string => {
-        const seconds = Math.floor((now - timestamp) / 1000);
+    const getTimeAgo = (timestamp: any, now: number): string => {
+        if (!timestamp || !now) return '...';
+        const time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
+        if (isNaN(time)) return 'recently';
+
+        const seconds = Math.floor((now - time) / 1000);
         if (seconds < 60) return 'just now';
         const minutes = Math.floor(seconds / 60);
         if (minutes < 60) return `${minutes}m ago`;
@@ -75,6 +84,14 @@ export default function LinkDetailModal({
         if (hours < 24) return `${hours}h ago`;
         const days = Math.floor(hours / 24);
         return `${days}d ago`;
+    };
+
+    const isReminderActive = link.reminderStatus === 'pending';
+    const nextReminderDate = link.nextReminderAt ? new Date(link.nextReminderAt) : null;
+
+    const handleToggleReminder = () => {
+        if (!uid) return;
+        onUpdateReminder(link.id, !isReminderActive);
     };
 
     return (
@@ -107,6 +124,16 @@ export default function LinkDetailModal({
                                 }`}
                         >
                             <Archive className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={handleToggleReminder}
+                            title={isReminderActive ? `Reminder active (next: ${nextReminderDate?.toLocaleDateString()})` : 'Set reminder'}
+                            className={`p-2 rounded-xl border transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${isReminderActive
+                                ? 'bg-blue-500/10 border-blue-500/20 text-blue-500 shadow-lg shadow-blue-500/5'
+                                : 'bg-white/5 border-white/5 text-text-muted hover:text-blue-500'
+                                }`}
+                        >
+                            {isReminderActive ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
                         </button>
                         <button
                             onClick={() => setShowDeleteConfirm(true)}
@@ -169,7 +196,91 @@ export default function LinkDetailModal({
                     {activeTab === 'details' ? (
                         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                             <h2 className="font-bold text-2xl text-white mb-4 leading-tight">{link.title}</h2>
-                            <p className="text-text-secondary mb-6 leading-relaxed text-lg">{link.detailedSummary || link.summary}</p>
+
+                            {/* Recipe Section */}
+                            {link.recipe && (
+                                <div className="space-y-8 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    {/* Prep/Cook Time Row */}
+                                    {(link.recipe.prep_time || link.recipe.cook_time || link.recipe.servings) && (
+                                        <div className="flex flex-wrap gap-4 p-4 bg-accent/5 rounded-2xl border border-accent/10">
+                                            {link.recipe.servings && (
+                                                <div className="flex items-center gap-2 text-sm text-text-secondary">
+                                                    <Utensils className="w-4 h-4 text-accent" />
+                                                    <span>{link.recipe.servings} servings</span>
+                                                </div>
+                                            )}
+                                            {link.recipe.prep_time && (
+                                                <div className="flex items-center gap-2 text-sm text-text-secondary">
+                                                    <Clock className="w-4 h-4 text-accent" />
+                                                    <span>Prep: {link.recipe.prep_time}</span>
+                                                </div>
+                                            )}
+                                            {link.recipe.cook_time && (
+                                                <div className="flex items-center gap-2 text-sm text-text-secondary">
+                                                    <Clock className="w-4 h-4 text-accent" />
+                                                    <span>Cook: {link.recipe.cook_time}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Ingredients */}
+                                    {link.recipe.ingredients && link.recipe.ingredients.length > 0 && (
+                                        <section>
+                                            <h3 className="flex items-center gap-2 text-lg font-bold text-white mb-4">
+                                                <ChefHat className="w-5 h-5 text-accent" />
+                                                Ingredients
+                                            </h3>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                {link.recipe.ingredients.map((ing, i) => (
+                                                    <div key={i} className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/5 hover:border-accent/20 transition-all group">
+                                                        <div className="mt-0.5 w-4 h-4 rounded border border-white/20 flex items-center justify-center group-hover:border-accent/40 transition-colors">
+                                                            <div className="w-2 h-2 rounded-sm bg-accent opacity-0 group-hover:opacity-20 transition-opacity" />
+                                                        </div>
+                                                        <span className="text-sm text-text-secondary leading-tight">{ing}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </section>
+                                    )}
+
+                                    {/* Instructions */}
+                                    {link.recipe.instructions && link.recipe.instructions.length > 0 && (
+                                        <section>
+                                            <h3 className="flex items-center gap-2 text-lg font-bold text-white mb-4">
+                                                <Utensils className="w-5 h-5 text-accent" />
+                                                Instructions
+                                            </h3>
+                                            <div className="space-y-4">
+                                                {link.recipe.instructions.map((step, i) => (
+                                                    <div key={i} className="flex gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                                                        <span className="flex-shrink-0 w-8 h-8 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center text-accent font-black text-sm">
+                                                            {i + 1}
+                                                        </span>
+                                                        <p className="text-text-secondary leading-relaxed pt-0.5">{step}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </section>
+                                    )}
+
+                                    <div className="h-px bg-white/5 w-full my-8" />
+                                </div>
+                            )}
+
+                            {/* Standard Summary / Detailed Summary (Show only if no recipe or in addition) */}
+                            {(!link.recipe || link.detailedSummary) && (
+                                <div className="mb-6">
+                                    {link.detailedSummary ? (
+                                        <SimpleMarkdown
+                                            content={link.detailedSummary}
+                                            className="mb-6 text-base"
+                                        />
+                                    ) : (
+                                        <p className="text-text-secondary mb-6 leading-relaxed text-lg">{link.summary}</p>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="bg-yellow-500/5 rounded-2xl p-5 border border-yellow-500/10 mb-8 relative overflow-hidden group">
                                 <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500 opacity-30" />
@@ -188,25 +299,39 @@ export default function LinkDetailModal({
                                     <Tag className="w-3.5 h-3.5 text-accent" />
                                     {getTimeAgo(link.createdAt, now)}
                                 </span>
+                                {isReminderActive && nextReminderDate && (
+                                    <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500">
+                                        <Bell className="w-3.5 h-3.5" />
+                                        Reminder: {nextReminderDate.toLocaleDateString()}
+                                    </span>
+                                )}
                             </div>
 
                             {/* Tags */}
-                            <div className="flex flex-col gap-1.5 mb-10">
-                                {link.tags.map((tag) => (
-                                    <span
-                                        key={tag}
-                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/70 hover:text-accent transition-all group/tag"
-                                    >
-                                        {tag}
-                                        <X
-                                            className="w-3 h-3 ml-1 opacity-40 group-hover/tag:opacity-100 hover:text-red-400 cursor-pointer transition-all"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onUpdateTags(link.id, link.tags.filter(t => t !== tag));
-                                            }}
-                                        />
-                                    </span>
-                                ))}
+                            <div className="flex flex-wrap gap-2 mb-10">
+                                {link.tags.map((tag) => {
+                                    const parts = tag.split('/');
+                                    const leaf = parts[parts.length - 1];
+                                    const parents = parts.slice(0, -1).join('/');
+                                    return (
+                                        <span
+                                            key={tag}
+                                            className="inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/70 hover:text-accent transition-all group/tag bg-white/5 hover:bg-white/10 px-2 py-1 rounded-lg border border-transparent hover:border-accent/10"
+                                        >
+                                            <span className="flex items-center">
+                                                {parents && <span className="opacity-30 font-normal mr-0.5">{parents}/</span>}
+                                                {leaf}
+                                            </span>
+                                            <X
+                                                className="w-3 h-3 ml-1 opacity-40 group-hover/tag:opacity-100 hover:text-red-400 cursor-pointer transition-all"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onUpdateTags(link.id, link.tags.filter(t => t !== tag));
+                                                }}
+                                            />
+                                        </span>
+                                    );
+                                })}
                             </div>
 
 

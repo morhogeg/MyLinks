@@ -15,10 +15,10 @@ from typing import Optional
 from twilio.rest import Client
 
 # Firebase Functions framework
-from firebase_functions import https_fn
+from firebase_functions import https_fn, scheduler_fn
 from firebase_admin import initialize_app, firestore
 
-from models import WebhookPayload, LinkDocument, LinkStatus, LinkMetadata, AIAnalysis
+from models import WebhookPayload, LinkDocument, LinkStatus, LinkMetadata, AIAnalysis, ReminderStatus
 from ai_service import ClaudeService
 
 # Initialize Firebase Admin lazily
@@ -99,7 +99,13 @@ def scrape_url(url: str) -> dict:
         print(f"Scrape error: {e}")
         return {"html": "", "title": "", "text": ""}
 
-
+def _scrape_twitter_url(url: str) -> dict:
+    """
+    Scrape Twitter/X URLs using the fxtwitter.com API
+    
+    Returns:
+        dict with 'html', 'title', 'text' keys formatted for AI analysis
+    """
     print(f"Analyzing Twitter URL: {url}")
     
     try:
@@ -161,6 +167,10 @@ def scrape_url(url: str) -> dict:
              print("Scrape failed, reverting to thin vxtwitter result")
              return vx_result
              
+        return {"html": "", "title": "", "text": ""}
+
+    except Exception as e:
+        print(f"Twitter scrape error: {e}")
         return {"html": "", "title": "", "text": ""}
 
 def _scrape_twitter_metadata(url: str) -> dict:
@@ -402,14 +412,17 @@ def whatsapp_webhook(request):
             "url": url,
             "title": analysis["title"],
             "summary": analysis["summary"],
+            "detailedSummary": analysis.get("detailed_summary"),
             "tags": analysis["tags"],
             "category": analysis["category"],
             "status": LinkStatus.UNREAD.value,
             "createdAt": datetime.now().isoformat(),
             "metadata": {
                 "originalTitle": scraped["title"],
-                "estimatedReadTime": max(1, len(scraped["text"]) // 1500)
-            }
+                "estimatedReadTime": max(1, len(scraped["text"]) // 1500),
+                "actionableTakeaway": analysis.get("actionable_takeaway")
+            },
+            "recipe": analysis.get("recipe")
         }
         
         # Save to Firestore
@@ -446,4 +459,92 @@ def whatsapp_webhook(request):
         return {"success": True, "linkId": link_id, "warning": "AI processing failed"}, 200
 
 
+def calculate_next_reminder(reminder_count: int) -> datetime:
+    """
+    Calculate the next reminder date using spaced repetition
+    Stage 0: 1 day
+    Stage 1: 7 days
+    Stage 2: 30 days
+    Stage 3+: 90 days (quarterly)
+    """
+    from datetime import timedelta
+    
+    intervals = {
+        0: timedelta(days=1),
+        1: timedelta(days=7),
+        2: timedelta(days=30),
+    }
+    
+    interval = intervals.get(reminder_count, timedelta(days=90))
+    return datetime.now() + interval
+
+
+@scheduler_fn.on_schedule(schedule="every 1 hours")
+def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
+    """
+    Scheduled function that runs every hour to check for pending reminders
+    Sends WhatsApp messages for links that are due for re-surfacing
+    """
+    db = get_db()
+    
+    # Query all users
+    users_ref = db.collection('users')
+    users = users_ref.get()
+    
+    for user_doc in users:
+        uid = user_doc.id
+        user_data = user_doc.to_dict()
+        
+        # Check if reminders are enabled for this user
+        settings = user_data.get('settings', {})
+        if not settings.get('reminders_enabled', True):
+            continue
+            
+        phone_number = user_data.get('phone_number')
+        if not phone_number:
+            continue
+        
+        # Query links that need reminders
+        links_ref = db.collection('users').document(uid).collection('links')
+        now = datetime.now()
+        
+        # Find links where next_reminder_at <= now and reminder_status == 'pending'
+        query = links_ref.where('reminder_status', '==', 'pending').where('next_reminder_at', '<=', now).limit(10)
+        
+        due_links = query.get()
+        
+        for link_doc in due_links:
+            link_id = link_doc.id
+            link_data = link_doc.to_dict()
+            
+            # Send WhatsApp reminder
+            title = link_data.get('title', 'Untitled')
+            url = link_data.get('url', '')
+            reminder_count = link_data.get('reminder_count', 0)
+            
+            message = f"🧠 Second Brain Reminder\n\nTime to revisit:\n\"{title}\"\n\n{url}\n\n💡 Why now? Research shows spaced repetition strengthens memory retention."
+            
+            send_whatsapp_message(f"whatsapp:{phone_number}", message)
+            
+            # Update the link's reminder status
+            new_reminder_count = reminder_count + 1
+            next_reminder = calculate_next_reminder(new_reminder_count)
+            
+            # If we've reached the max stages (3), mark as completed
+            if new_reminder_count >= 3:
+                link_doc.reference.update({
+                    'reminder_status': ReminderStatus.COMPLETED.value,
+                    'reminder_count': new_reminder_count,
+                    'next_reminder_at': None
+                })
+            else:
+                link_doc.reference.update({
+                    'reminder_count': new_reminder_count,
+                    'next_reminder_at': next_reminder
+                })
+            
+            print(f"Sent reminder for link {link_id} to {phone_number}")
+
+
 # Local testing relocated to dev_server.py
+

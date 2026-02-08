@@ -18,17 +18,31 @@ export interface AIAnalysis {
   actionable_takeaway: string;
 }
 
+export interface Recipe {
+  ingredients: string[];
+  instructions: string[];
+  servings?: string;
+  prep_time?: string;
+  cook_time?: string;
+}
+
 export interface Link {
   id: string;
   url: string;
   title: string;
   summary: string;
-  detailedSummary: string;
+  detailedSummary?: string;
   tags: string[];
   category: string;
   status: LinkStatus;
-  createdAt: number; // Unix timestamp (ms) - Firestore would use Timestamp
+  createdAt: number | string; // Handle both Unix timestamp and ISO string
   metadata: LinkMetadata;
+  recipe?: Recipe;
+  // Reminder fields
+  reminderStatus?: 'none' | 'pending' | 'completed';
+  nextReminderAt?: number; // Unix timestamp (ms)
+  reminderCount?: number;
+  lastViewedAt?: number; // Unix timestamp (ms)
 }
 
 // TODO: Replace with Firebase Auth user type

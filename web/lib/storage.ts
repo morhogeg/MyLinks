@@ -90,3 +90,32 @@ export function filterByStatus(status: LinkStatus): Link[] {
 export function generateId(): string {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
+
+/**
+ * Update a link's reminder settings in Firestore
+ */
+export async function updateLinkReminder(
+    uid: string,
+    id: string,
+    enabled: boolean
+): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', id);
+
+    if (enabled) {
+        // Calculate first reminder (1 day from now)
+        const oneDayFromNow = Date.now() + (24 * 60 * 60 * 1000);
+        await updateDoc(linkRef, {
+            reminderStatus: 'pending',
+            nextReminderAt: oneDayFromNow,
+            reminderCount: 0
+        });
+    } else {
+        // Disable reminders
+        await updateDoc(linkRef, {
+            reminderStatus: 'none',
+            nextReminderAt: null,
+            reminderCount: 0
+        });
+    }
+}
+

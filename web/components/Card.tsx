@@ -5,7 +5,7 @@
 import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { useState, useEffect } from 'react';
-import { Archive, Star, Clock, Tag, Trash2 } from 'lucide-react';
+import { Archive, Star, Clock, Tag, Trash2, ChefHat, Utensils } from 'lucide-react';
 
 interface CardProps {
     link: Link;
@@ -77,16 +77,20 @@ export default function Card({
                 <div className="flex justify-between items-start gap-3">
                     {(() => {
                         const colorStyle = getCategoryColorStyle(link.category);
+                        const isRecipe = link.category.toLowerCase() === 'recipe' || !!link.recipe;
                         return (
-                            <span
-                                className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block"
-                                style={{
-                                    backgroundColor: colorStyle.backgroundColor,
-                                    color: colorStyle.color,
-                                }}
-                            >
-                                {link.category}
-                            </span>
+                            <div className="flex items-center gap-2">
+                                <span
+                                    className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block"
+                                    style={{
+                                        backgroundColor: colorStyle.backgroundColor,
+                                        color: colorStyle.color,
+                                    }}
+                                >
+                                    {link.category}
+                                </span>
+                                {isRecipe && <ChefHat className="w-4 h-4 text-accent" strokeWidth={2.5} />}
+                            </div>
                         );
                     })()}
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -129,23 +133,36 @@ export default function Card({
                     {link.title}
                 </h3>
 
-                {/* Summary */}
-                <p className="text-text-secondary text-xs sm:text-sm line-clamp-3 leading-relaxed flex-grow">
+                {/* Summary - Full display, no truncation */}
+                <p className="text-text-secondary text-xs sm:text-sm leading-relaxed flex-grow">
                     {link.summary}
                 </p>
 
                 {/* Footer Section */}
                 <div className="pt-3 sm:pt-4 border-t border-white/5 flex flex-col space-y-2 sm:space-y-3">
                     {/* Tags */}
-                    <div className="flex flex-col gap-1">
-                        {link.tags.slice(0, 3).map((tag) => (
-                            <span
-                                key={tag}
-                                className="text-[10px] font-bold text-text-muted/70 group-hover:text-accent transition-all"
-                            >
-                                {tag}
+                    <div className="flex flex-wrap gap-1.5 min-h-[1.5rem]">
+                        {link.tags.slice(0, 3).map((tag) => {
+                            const parts = tag.split('/');
+                            const leaf = parts[parts.length - 1];
+                            const parents = parts.slice(0, -1).join('/');
+
+                            return (
+                                <span
+                                    key={tag}
+                                    title={tag}
+                                    className="inline-flex items-center text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-white/5 text-text-muted/60 group-hover:text-accent group-hover:bg-accent/10 transition-all border border-transparent group-hover:border-accent/10"
+                                >
+                                    {parents && <span className="opacity-40 font-normal mr-0.5">{parents}/</span>}
+                                    {leaf}
+                                </span>
+                            );
+                        })}
+                        {link.tags.length > 3 && (
+                            <span className="text-[9px] font-bold text-text-muted/30 self-center">
+                                +{link.tags.length - 3}
                             </span>
-                        ))}
+                        )}
                     </div>
 
                     {/* Metadata Buttons Row */}
