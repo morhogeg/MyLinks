@@ -35,11 +35,17 @@ def get_db():
 def scrape_url(url: str) -> dict:
     """
     Fetch and extract content from a URL
+    Handles Twitter/X URLs specially via fxtwitter.com API
     
     Returns:
         dict with 'html', 'title', 'text' keys
     """
     try:
+        # Special handling for Twitter/X URLs
+        if 'twitter.com' in url or 'x.com' in url:
+            return _scrape_twitter_url(url)
+        
+        # General URL scraping with BeautifulSoup
         headers = {
             "User-Agent": "Mozilla/5.0 (compatible; SecondBrain/1.0)"
         }
@@ -48,22 +54,235 @@ def scrape_url(url: str) -> dict:
         
         html = response.text
         
-        # Extract title
-        title_match = re.search(r'<title[^>]*>([^<]+)</title>', html, re.IGNORECASE)
-        title = title_match.group(1).strip() if title_match else ""
-        
-        # Extract text from paragraphs
-        p_matches = re.findall(r'<p[^>]*>([^<]+)</p>', html, re.IGNORECASE)
-        text = " ".join(p_matches)[:5000]  # Limit text length
-        
-        return {
-            "html": html,
-            "title": title,
-            "text": text or html[:5000]
-        }
+        # Use BeautifulSoup for better HTML parsing
+        try:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html, 'html.parser')
+            
+            # Extract title
+            title = ""
+            if soup.title:
+                title = soup.title.string.strip()
+            
+            # Extract text from paragraphs and main content
+            text_parts = []
+            for p in soup.find_all('p'):
+                text_parts.append(p.get_text().strip())
+            
+            # Also try to get article content
+            article = soup.find('article')
+            if article:
+                text_parts.append(article.get_text().strip())
+            
+            text = " ".join(text_parts)[:5000]
+            
+            return {
+                "html": html,
+                "title": title,
+                "text": text or html[:5000]
+            }
+        except ImportError:
+            # Fallback to regex if BeautifulSoup fails
+            title_match = re.search(r'<title[^>]*>([^<]+)</title>', html, re.IGNORECASE)
+            title = title_match.group(1).strip() if title_match else ""
+            
+            p_matches = re.findall(r'<p[^>]*>([^<]+)</p>', html, re.IGNORECASE)
+            text = " ".join(p_matches)[:5000]
+            
+            return {
+                "html": html,
+                "title": title,
+                "text": text or html[:5000]
+            }
+            
     except Exception as e:
         print(f"Scrape error: {e}")
         return {"html": "", "title": "", "text": ""}
+
+
+    print(f"Analyzing Twitter URL: {url}")
+    
+    try:
+        # 1. Try fxtwitter.com API first
+        fx_api_url = url.replace('twitter.com', 'api.fxtwitter.com').replace('x.com', 'api.fxtwitter.com')
+        print(f"Attempting fxtwitter API: {fx_api_url}")
+        
+        try:
+            response = requests.get(fx_api_url, timeout=10)
+            if response.ok:
+                data = response.json()
+                if data.get('tweet'):
+                    tweet = data['tweet']
+                    # Valid content check
+                    has_text = bool(tweet.get('text'))
+                    has_quote = bool(tweet.get('quote'))
+                    has_media = bool(tweet.get('media'))
+                    
+                    # If it has content, use it
+                    if has_text or has_quote or has_media:
+                        return _format_twitter_data(tweet, 'fxtwitter')
+        except Exception as e:
+            print(f"fxtwitter failed: {e}")
+
+        # 2. Fallback to vxtwitter.com
+        print("fxtwitter failed or empty, trying vxtwitter...")
+        vx_api_url = url.replace('twitter.com', 'api.vxtwitter.com').replace('x.com', 'api.vxtwitter.com')
+        
+        vx_result = None
+        try:
+            response = requests.get(vx_api_url, timeout=10)
+            if response.ok:
+                data = response.json()
+                
+                # VALIDATION: Check if vxtwitter gave us meaningful content
+                has_media = bool(data.get('mediaURLs') or data.get('media_extended'))
+                text_len = len(data.get('text', ''))
+                
+                # If we have media, or text is substantial (>100 chars), trust it.
+                if has_media or text_len > 100:
+                     return _format_vxtwitter_data(data)
+                
+                # Store for potential usage if scrape fails
+                print("vxtwitter content found but 'thin' (no media, short text). Attempting scrape...")
+                vx_result = _format_vxtwitter_data(data)
+                
+        except Exception as e:
+            print(f"vxtwitter failed: {e}")
+
+        # 3. Final Fallback: Direct metadata scrape (Twitter Article support)
+        print("APIs failed/thin. Trying direct metadata scrape...")
+        scrape_result = _scrape_twitter_metadata(url)
+        
+        if scrape_result.get('title') or scrape_result.get('text'):
+            return scrape_result
+            
+        # If scrape failed but we had a "thin" vxtwitter result, likely better than nothing
+        if vx_result:
+             print("Scrape failed, reverting to thin vxtwitter result")
+             return vx_result
+             
+        return {"html": "", "title": "", "text": ""}
+
+def _scrape_twitter_metadata(url: str) -> dict:
+    """Scrape OpenGraph tags for Twitter Articles"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        if not response.ok:
+            return {"html": "", "title": "", "text": ""}
+            
+        html = response.text
+        
+        # Simple regex for OG tags
+        title_match = re.search(r'<meta property="og:title" content="([^"]+)"', html)
+        desc_match = re.search(r'<meta property="og:description" content="([^"]+)"', html)
+        
+        title = title_match.group(1) if title_match else ""
+        desc = desc_match.group(1) if desc_match else ""
+        
+        if not title and not desc:
+            return {"html": "", "title": "", "text": ""}
+            
+        formatted_text = f"""
+TWEET/ARTICLE METADATA:
+Title: {title}
+Description: {desc}
+
+(Full content not available via API, analyzed based on preview metadata)
+"""
+        return {
+            "html": formatted_text,
+            "title": title or "Twitter Article",
+            "text": formatted_text
+        }
+    except Exception as e:
+        print(f"Metadata scrape failed: {e}")
+        return {"html": "", "title": "", "text": ""}
+
+def _format_twitter_data(tweet: dict, source: str) -> dict:
+    # Build richer content string
+    content_parts = []
+    
+    # 1. Main Text
+    if tweet.get('text'):
+            content_parts.append(tweet['text'])
+            
+    # 2. Quote Tweet
+    if tweet.get('quote'):
+        q_author = tweet['quote'].get('author', {}).get('name', 'Unknown')
+        q_handle = tweet['quote'].get('author', {}).get('screen_name', 'unknown')
+        q_text = tweet['quote'].get('text', '')
+        content_parts.append(f'\n[Replying to/Quoting {q_author} (@{q_handle})]:\n"{q_text}"')
+        
+    # 3. Media Descriptions
+    if tweet.get('media'):
+        media = tweet['media']
+        if media.get('photos'):
+                content_parts.append(f"\n[Contains {len(media['photos'])} Image(s)]")
+        if media.get('videos'):
+                content_parts.append("\n[Contains Video]")
+                
+    # Join content
+    final_tweet_content = "\n\n".join(content_parts) or "[Media-only tweet or no text content available]"
+
+    author = tweet.get('author', {})
+    author_name = author.get('name', 'Unknown')
+    author_handle = author.get('screen_name', '')
+    created_at = tweet.get('created_at', '')
+    likes = tweet.get('likes', 0)
+    retweets = tweet.get('retweets', 0)
+    
+    # Format as readable text for AI analysis - Emphasize CONTENT over metadata
+    formatted_text = f"""
+TWEET CONTENT:
+"{final_tweet_content}"
+
+---
+METADATA:
+Author: {author_name} (@{author_handle})
+Date: {created_at}
+Engagement: {likes} likes, {retweets} retweets
+Source: {source} API
+"""
+    
+    title = f"Tweet by {author_name}: {final_tweet_content[:100].replace(chr(10), ' ')}"
+    
+    return {
+        "html": formatted_text,
+        "title": title,
+        "text": formatted_text
+    }
+
+def _format_vxtwitter_data(data: dict) -> dict:
+    content_parts = []
+    if data.get('text'):
+        content_parts.append(data['text'])
+        
+    if data.get('mediaURLs') or data.get('media_extended'):
+        count = max(len(data.get('mediaURLs', [])), len(data.get('media_extended', [])))
+        content_parts.append(f"\n[Contains {count} Media Item(s)]")
+        
+    final_content = "\n\n".join(content_parts) or "[Media-only tweet]"
+    
+    formatted_text = f"""
+TWEET CONTENT:
+"{final_content}"
+
+---
+METADATA:
+Author: {data.get('user_name')} (@{data.get('user_screen_name')})
+Date: {data.get('date')}
+Engagement: {data.get('likes')} likes, {data.get('retweets')} retweets
+Source: vxtwitter API
+"""
+    
+    return {
+        "html": formatted_text,
+        "title": f"Tweet by {data.get('user_name')}: {final_content[:100].replace(chr(10), ' ')}",
+        "text": formatted_text
+    }
 
 
 def find_user_by_phone(phone_number: str) -> Optional[str]:
