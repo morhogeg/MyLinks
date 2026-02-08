@@ -137,7 +137,8 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                             <div className="relative">
                                 <input
                                     id="url"
-                                    type="url"
+                                    type="text"
+                                    pattern={undefined}
                                     value={url}
                                     onChange={(e) => setUrl(e.target.value)}
                                     placeholder="example.com or https://..."
