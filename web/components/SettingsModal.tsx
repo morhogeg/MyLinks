@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { User } from '@/lib/types';
-import { X, Bell, BellOff, Sun, Moon, Phone } from 'lucide-react';
-import { updateUserSettings, getUserSettings } from '@/lib/storage'; // We'll add these next
+
+import { X, Bell, BellOff, Sun, Moon, Phone, Sparkles } from 'lucide-react';
+import { updateUserSettings, getUserSettings } from '@/lib/storage';
 
 interface SettingsModalProps {
     uid: string;
@@ -45,15 +46,27 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
         }
     };
 
-    const handleToggleReminders = async () => {
-        const newValue = !settings.reminders_enabled;
-        setSettings(prev => ({ ...prev, reminders_enabled: newValue }));
-        await updateUserSettings(uid, { reminders_enabled: newValue });
+    const handleToggleReminders = () => {
+        setSettings(prev => ({ ...prev, reminders_enabled: !prev.reminders_enabled }));
     };
 
-    const handleFrequencyChange = async (frequency: User['settings']['reminder_frequency']) => {
+    const handleFrequencyChange = (frequency: User['settings']['reminder_frequency']) => {
         setSettings(prev => ({ ...prev, reminder_frequency: frequency }));
-        await updateUserSettings(uid, { reminder_frequency: frequency });
+    };
+
+    const handleSave = async () => {
+        setIsLoading(true);
+        try {
+            await updateUserSettings(uid, {
+                reminders_enabled: settings.reminders_enabled,
+                reminder_frequency: settings.reminder_frequency
+            });
+            onClose();
+        } catch (error) {
+            console.error('Failed to save settings:', error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     if (!isOpen) return null;
@@ -66,8 +79,8 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
             />
 
             <div className="relative bg-card border border-white/10 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
-                <div className="flex items-center justify-between p-6 border-b border-white/5">
-                    <h2 className="text-xl font-bold text-white">Settings</h2>
+                <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+                    <h2 className="text-lg font-bold text-white">Settings</h2>
                     <button
                         onClick={onClose}
                         className="p-2 rounded-full hover:bg-white/5 transition-colors"
@@ -76,7 +89,7 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                     </button>
                 </div>
 
-                <div className="p-6 space-y-8">
+                <div className="p-6 space-y-6">
                     {/* Notifications Section */}
                     <section>
                         <h3 className="text-sm font-bold text-text-muted uppercase tracking-wider mb-4">Notifications</h3>
@@ -109,8 +122,8 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                                                 key={freq}
                                                 onClick={() => handleFrequencyChange(freq)}
                                                 className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all ${settings.reminder_frequency === freq
-                                                        ? 'bg-accent/10 border-accent/20 text-accent'
-                                                        : 'bg-white/5 border-white/5 text-text-muted hover:bg-white/10'
+                                                    ? 'bg-accent/10 border-accent/20 text-accent'
+                                                    : 'bg-white/5 border-white/5 text-text-muted hover:bg-white/10'
                                                     }`}
                                             >
                                                 {freq.charAt(0).toUpperCase() + freq.slice(1)}
@@ -119,14 +132,38 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                                     </div>
                                 </div>
                             )}
+
+                            {settings.reminders_enabled && settings.reminder_frequency === 'smart' && (
+                                <div className="mt-3 p-3 rounded-xl bg-accent/5 border border-accent/10 animate-in fade-in slide-in-from-top-2">
+                                    <div className="flex gap-2">
+                                        <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                                        <div className="space-y-1">
+                                            <p className="text-xs font-medium text-text">Smart Scheduling</p>
+                                            <p className="text-[11px] text-text-muted leading-relaxed">
+                                                Optimizes learning using spaced repetition (1 day, 1 week, 1 month) to ensure long-term retention.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </section>
                 </div>
 
-                <div className="p-6 bg-white/5 border-t border-white/5 text-center">
-                    <p className="text-xs text-text-muted">
-                        Changes are saved automatically
-                    </p>
+                <div className="p-6 bg-black/20 border-t border-white/5 flex items-center justify-end gap-3">
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 rounded-xl text-sm font-medium text-text-muted hover:text-text transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        disabled={isLoading}
+                        className="px-4 py-2 rounded-xl text-sm font-medium bg-accent text-white hover:bg-accent/90 transition-colors disabled:opacity-50 shadow-lg shadow-accent/20"
+                    >
+                        {isLoading ? 'Saving...' : 'Save Changes'}
+                    </button>
                 </div>
             </div>
         </div>

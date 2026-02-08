@@ -24,7 +24,7 @@ export default function Home() {
       try {
         const usersRef = collection(db, 'users');
         // Using the default test phone number for now
-        const q = query(usersRef, where('phoneNumber', '==', '+1234567890'));
+        const q = query(usersRef, where('phone_number', '==', '+16462440305'));
         const snapshot = await getDocs(q);
 
         if (!snapshot.empty) {

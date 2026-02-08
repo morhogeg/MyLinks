@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, MessageSquare, BookOpen, ChevronRight, Sparkles, Bell, BellOff } from 'lucide-react';
-import AIChat from './AIChat';
+import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, BookOpen, ChevronRight, Sparkles, Bell, BellOff } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
 
@@ -32,7 +31,6 @@ export default function LinkDetailModal({
     onUpdateReminder,
     onOpenOtherLink
 }: LinkDetailModalProps) {
-    const [activeTab, setActiveTab] = useState<'details' | 'chat'>('details');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [now, setNow] = useState<number>(0);
 
@@ -45,10 +43,7 @@ export default function LinkDetailModal({
         };
     }, []);
 
-    // Reset tab when link changes
-    useEffect(() => {
-        setActiveTab('details');
-    }, [link.id]);
+
 
     if (!isOpen) return null;
 
@@ -162,112 +157,68 @@ export default function LinkDetailModal({
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 scrollbar-thin scrollbar-thumb-white/10">
-                    {/* Tab Switcher */}
-                    <div className="flex gap-4 border-b border-white/5 mb-6">
-                        <button
-                            onClick={() => setActiveTab('details')}
-                            className={`pb-2 px-1 text-sm font-bold transition-all relative ${activeTab === 'details' ? 'text-text' : 'text-text-muted hover:text-text-secondary'
-                                }`}
-                        >
-                            <div className="flex items-center gap-2">
-                                <BookOpen className="w-4 h-4" />
-                                Insights
-                            </div>
-                            {activeTab === 'details' && (
-                                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-accent" />
+                <div className="flex-1 overflow-y-auto pt-4 px-4 pb-4 sm:px-6 sm:pb-6 md:px-8 md:pb-8 scrollbar-thin scrollbar-thumb-white/10">
+                    {/* Content Section */}
+                    <h2 className="font-bold text-2xl text-text mb-4 leading-tight">{link.title}</h2>
+
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {/* Summary */}
+                        <div className="mb-6">
+                            {link.detailedSummary ? (
+                                <SimpleMarkdown
+                                    content={link.detailedSummary}
+                                    className="mb-6 text-base"
+                                />
+                            ) : (
+                                <p className="text-text-secondary mb-6 leading-relaxed text-lg">{link.summary}</p>
                             )}
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('chat')}
-                            className={`pb-2 px-1 text-sm font-bold transition-all relative ${activeTab === 'chat' ? 'text-text' : 'text-text-muted hover:text-text-secondary'
-                                }`}
-                        >
-                            <div className="flex items-center gap-2">
-                                <MessageSquare className="w-4 h-4" />
-                                AI Assist
-                            </div>
-                            {activeTab === 'chat' && (
-                                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-accent" />
+                        </div>
+
+
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-text-muted mb-8">
+                            <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/5">
+                                <Clock className="w-3.5 h-3.5" />
+                                {link.metadata.estimatedReadTime} min read
+                            </span>
+                            <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/5">
+                                <Tag className="w-3.5 h-3.5 text-accent" />
+                                {getTimeAgo(link.createdAt, now)}
+                            </span>
+                            {isReminderActive && nextReminderDate && (
+                                <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500">
+                                    <Bell className="w-3.5 h-3.5" />
+                                    Reminder: {nextReminderDate.toLocaleDateString()}
+                                </span>
                             )}
-                        </button>
-                    </div>
+                        </div>
 
-                    {activeTab === 'details' ? (
-                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <h2 className="font-bold text-2xl text-white mb-4 leading-tight">{link.title}</h2>
-
-                            {/* Content Section */}
-                            <div className="mb-6">
-                                {link.detailedSummary ? (
-                                    <SimpleMarkdown
-                                        content={link.detailedSummary}
-                                        className="mb-6 text-base"
-                                    />
-                                ) : (
-                                    <p className="text-text-secondary mb-6 leading-relaxed text-lg">{link.summary}</p>
-                                )}
-                            </div>
-
-                            <div className="bg-yellow-500/5 rounded-2xl p-5 border border-yellow-500/10 mb-8 relative overflow-hidden group">
-                                <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500 opacity-30" />
-                                <h4 className="text-[10px] uppercase font-black tracking-widest text-yellow-500 mb-2">Key Takeaway</h4>
-                                <p className="text-sm italic text-text-secondary leading-relaxed">
-                                    &quot;{link.metadata.actionableTakeaway || "Analysis in progress..."}&quot;
-                                </p>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-4 text-sm text-text-muted mb-8">
-                                <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/5">
-                                    <Clock className="w-3.5 h-3.5" />
-                                    {link.metadata.estimatedReadTime} min read
-                                </span>
-                                <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/5">
-                                    <Tag className="w-3.5 h-3.5 text-accent" />
-                                    {getTimeAgo(link.createdAt, now)}
-                                </span>
-                                {isReminderActive && nextReminderDate && (
-                                    <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500">
-                                        <Bell className="w-3.5 h-3.5" />
-                                        Reminder: {nextReminderDate.toLocaleDateString()}
-                                    </span>
-                                )}
-                            </div>
-
-                            {/* Tags */}
-                            <div className="flex flex-wrap gap-2 mb-10">
-                                {link.tags.map((tag) => {
-                                    const parts = tag.split('/');
-                                    const leaf = parts[parts.length - 1];
-                                    const parents = parts.slice(0, -1).join('/');
-                                    return (
-                                        <span
-                                            key={tag}
-                                            className="inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/70 hover:text-accent transition-all group/tag bg-white/5 hover:bg-white/10 px-2 py-1 rounded-lg border border-transparent hover:border-accent/10"
-                                        >
-                                            <span className="flex items-center">
-                                                {parents && <span className="opacity-30 font-normal mr-0.5">{parents}/</span>}
-                                                {leaf}
-                                            </span>
-                                            <X
-                                                className="w-3 h-3 ml-1 opacity-40 group-hover/tag:opacity-100 hover:text-red-400 cursor-pointer transition-all"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onUpdateTags(link.id, link.tags.filter(t => t !== tag));
-                                                }}
-                                            />
+                        {/* Tags */}
+                        <div className="flex flex-wrap gap-2 mb-10">
+                            {link.tags.map((tag) => {
+                                const parts = tag.split('/');
+                                const leaf = parts[parts.length - 1];
+                                const parents = parts.slice(0, -1).join('/');
+                                return (
+                                    <span
+                                        key={tag}
+                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/70 hover:text-accent transition-all group/tag bg-white/5 hover:bg-white/10 px-2 py-1 rounded-lg border border-transparent hover:border-accent/10"
+                                    >
+                                        <span className="flex items-center">
+                                            {parents && <span className="opacity-30 font-normal mr-0.5">{parents}/</span>}
+                                            {leaf}
                                         </span>
-                                    );
-                                })}
-                            </div>
-
-
+                                        <X
+                                            className="w-3 h-3 ml-1 opacity-40 group-hover/tag:opacity-100 hover:text-red-400 cursor-pointer transition-all"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onUpdateTags(link.id, link.tags.filter(t => t !== tag));
+                                            }}
+                                        />
+                                    </span>
+                                );
+                            })}
                         </div>
-                    ) : (
-                        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 h-full">
-                            <AIChat link={link} />
-                        </div>
-                    )}
+                    </div>
                 </div>
             </div>
 

@@ -10,6 +10,7 @@ import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder } from
 import { collection, query, orderBy, onSnapshot, where, getDocs, limit, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Card from './Card';
+import ReminderModal from './ReminderModal';
 import TableView from './TableView';
 import InsightsFeed from './InsightsFeed';
 import LinkDetailModal from './LinkDetailModal';
@@ -41,6 +42,7 @@ export default function Feed() {
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
     const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
+    const [reminderModalLink, setReminderModalLink] = useState<Link | null>(null);
 
     // 1. Find the user by phone number (mocking auth for now)
     useEffect(() => {
@@ -194,9 +196,8 @@ export default function Feed() {
         }
     };
 
-    const handleUpdateReminder = async (id: string, enabled: boolean) => {
-        if (!uid) return;
-        await updateLinkReminder(uid, id, enabled);
+    const handleOpenReminderModal = (link: Link) => {
+        setReminderModalLink(link);
     };
 
     const toggleSelection = (id: string) => {
@@ -526,6 +527,7 @@ export default function Feed() {
                                     onOpenDetails={setActiveLink}
                                     onStatusChange={handleStatusChange}
                                     onDelete={handleDelete}
+                                    onUpdateReminder={(link) => handleOpenReminderModal(link)}
                                     isSelectionMode={isSelectionMode}
                                     isSelected={selectedIds.has(link.id)}
                                     onToggleSelection={toggleSelection}
@@ -546,9 +548,23 @@ export default function Feed() {
                     onClose={() => setActiveLink(null)}
                     onStatusChange={handleStatusChange}
                     onUpdateTags={handleUpdateTags}
-                    onUpdateReminder={handleUpdateReminder}
+                    onUpdateReminder={(id) => {
+                        const linkToRemind = links.find(l => l.id === id);
+                        if (linkToRemind) handleOpenReminderModal(linkToRemind);
+                    }}
                     onDelete={handleDelete}
                     onOpenOtherLink={(link) => setActiveLink(link)}
+                />
+            )}
+
+            {/* Reminder Modal */}
+            {reminderModalLink && uid && (
+                <ReminderModal
+                    uid={uid}
+                    link={reminderModalLink}
+                    isOpen={!!reminderModalLink}
+                    onClose={() => setReminderModalLink(null)}
+                    onUpdate={() => setReminderModalLink(null)}
                 />
             )}
         </div>

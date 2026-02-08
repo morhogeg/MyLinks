@@ -122,16 +122,19 @@ export function generateId(): string {
 export async function updateLinkReminder(
     uid: string,
     id: string,
-    enabled: boolean
+    enabled: boolean,
+    reminderTime?: number
 ): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', id);
+    const linkDoc = doc(db, 'users', uid, 'links', id); // Re-declaring for clarity or use linkRef
 
     if (enabled) {
-        // Calculate first reminder (1 day from now)
-        const oneDayFromNow = Date.now() + (24 * 60 * 60 * 1000);
+        // Use provided time or default to 24h from now (Smart Default)
+        const nextReminder = reminderTime || (Date.now() + (24 * 60 * 60 * 1000));
+
         await updateDoc(linkRef, {
             reminderStatus: 'pending',
-            nextReminderAt: oneDayFromNow,
+            nextReminderAt: nextReminder,
             reminderCount: 0
         });
     } else {

@@ -49,6 +49,7 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
         setError(null);
 
         try {
+            // Stage 1: Analysis
             // Fetch existing tags to pass to AI for reuse
             const existingTags = uid ? await getUserTags(uid) : [];
 
@@ -64,25 +65,30 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
             const data = await response.json();
 
             if (!data.success) {
-                throw new Error(data.error || 'Failed to analyze URL');
+                throw new Error(`Analysis Error: ${data.error || 'Failed to analyze URL'}`);
             }
 
+            // Stage 2: Save
             // Save to Firestore
             if (!uid) throw new Error("User not registered in database");
 
-            await saveLink(uid, {
-                url: data.link.url,
-                title: data.link.title,
-                summary: data.link.summary,
-                detailedSummary: data.link.detailedSummary,
-                tags: data.link.tags,
-                category: data.link.category,
-                metadata: {
-                    originalTitle: data.link.metadata.originalTitle,
-                    estimatedReadTime: data.link.metadata.estimatedReadTime,
-                    actionableTakeaway: data.link.metadata.actionableTakeaway
-                }
-            });
+            try {
+                await saveLink(uid, {
+                    url: data.link.url,
+                    title: data.link.title,
+                    summary: data.link.summary,
+                    detailedSummary: data.link.detailedSummary,
+                    tags: data.link.tags,
+                    category: data.link.category,
+                    metadata: {
+                        originalTitle: data.link.metadata.originalTitle,
+                        estimatedReadTime: data.link.metadata.estimatedReadTime,
+                        actionableTakeaway: data.link.metadata.actionableTakeaway
+                    }
+                });
+            } catch (saveErr) {
+                throw new Error(`Firestore Save Error: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
+            }
 
             setUrl('');
             setIsExpanded(false);

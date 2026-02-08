@@ -80,7 +80,7 @@ export async function analyzeContent(url: string, pageContent: string, existingT
             ? `\n\nExisting Tags in Brain (Reuse these if possible):\n${existingTags.join(', ')}`
             : '';
 
-        const prompt = `${SYSTEM_PROMPT}${tagsContext}\n\nURL: ${url}\nContent: ${pageContent.substring(0, 30000)}`;
+        const prompt = `${SYSTEM_PROMPT}${tagsContext}\n\nURL: ${url}\nContent: ${pageContent.substring(0, 150000)}`;
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
@@ -146,11 +146,39 @@ export async function fetchPageContent(url: string): Promise<{ html: string; tit
         const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
         const title = titleMatch ? titleMatch[1].trim() : '';
 
-        return { html, title };
+        // Clean HTML to remove noise (scripts, styles, etc)
+        const cleanedHtml = cleanHtml(html);
+
+        return { html: cleanedHtml, title };
     } catch (error) {
         console.error('Fetch failed:', error);
         return { html: '', title: new URL(url).hostname };
     }
+}
+
+function cleanHtml(html: string): string {
+    // 1. Extract body if possible
+    const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    let content = bodyMatch ? bodyMatch[1] : html;
+
+    // 2. Remove scripts and styles and other non-content tags
+    content = content
+        .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, '')
+        .replace(/<nav\b[^>]*>[\s\S]*?<\/nav>/gi, '')
+        .replace(/<footer\b[^>]*>[\s\S]*?<\/footer>/gi, '')
+        .replace(/<!--[\s\S]*?-->/g, '');
+
+    // 3. Remove remaining HTML tags but keep some structure tokens if needed? 
+    // Actually, asking Gemini to parse HTML is fine, but we want to reduce token count.
+    // Let's keep basic tags but remove attributes to save space?
+    // For now, just removing the heavy blocks (scripts/styles) is the biggest win.
+
+    // Collapse whitespace
+    content = content.replace(/\s+/g, ' ').trim();
+
+    return content;
 }
 
 /**

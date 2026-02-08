@@ -5,7 +5,7 @@
 import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { useState, useEffect } from 'react';
-import { Archive, Star, Clock, Tag, Trash2, ChefHat, Utensils } from 'lucide-react';
+import { Archive, Star, Clock, Tag, Trash2, ChefHat, Utensils, Bell, BellOff } from 'lucide-react';
 import SimpleMarkdown from './SimpleMarkdown';
 
 interface CardProps {
@@ -13,6 +13,7 @@ interface CardProps {
     onOpenDetails: (link: Link) => void;
     onStatusChange: (id: string, status: LinkStatus) => void;
     onDelete: (id: string) => void;
+    onUpdateReminder: (link: Link) => void;
     isSelectionMode?: boolean;
     isSelected?: boolean;
     onToggleSelection?: (id: string) => void;
@@ -26,6 +27,7 @@ export default function Card({
     onOpenDetails,
     onStatusChange,
     onDelete,
+    onUpdateReminder,
     isSelectionMode = false,
     isSelected = false,
     onToggleSelection
@@ -111,6 +113,21 @@ export default function Card({
                             className="p-2 sm:p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-white/10 transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
                         >
                             <Archive className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onUpdateReminder(link);
+                            }}
+                            title={link.reminderStatus === 'pending' ? 'Cancel reminder' : 'Remind me'}
+                            className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-accent hover:bg-white/10'
+                                }`}
+                        >
+                            {link.reminderStatus === 'pending' ? (
+                                <Bell className="w-3.5 h-3.5 fill-current" />
+                            ) : (
+                                <Bell className="w-3.5 h-3.5" />
+                            )}
                         </button>
                         <button
                             onClick={(e) => {
