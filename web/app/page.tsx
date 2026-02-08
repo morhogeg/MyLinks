@@ -1,23 +1,41 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import Feed from "@/components/Feed";
 import AddLinkForm from "@/components/AddLinkForm";
 import InstallPWA from "@/components/InstallPWA";
-import { Brain } from "lucide-react";
+import SettingsModal from "@/components/SettingsModal";
+import { Brain, Settings } from "lucide-react";
+import ThemeToggle from "@/components/ThemeToggle";
 
 /**
  * Main dashboard page
- * TODO: Add authentication check and redirect to /login if not authenticated
- * Example with Firebase:
- *   const { user, loading } = useAuth();
- *   if (loading) return <LoadingScreen />;
- *   if (!user) redirect('/login');
  */
-import ThemeToggle from "@/components/ThemeToggle";
-
 export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [uid, setUid] = useState<string | null>(null);
+
+  // Find the user (Mock Auth)
+  useEffect(() => {
+    async function findUser() {
+      try {
+        const usersRef = collection(db, 'users');
+        // Using the default test phone number for now
+        const q = query(usersRef, where('phoneNumber', '==', '+1234567890'));
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+          setUid(snapshot.docs[0].id);
+        }
+      } catch (err) {
+        console.error("Error finding user:", err);
+      }
+    }
+    findUser();
+  }, []);
 
   const handleLinkAdded = () => {
     setRefreshKey(prev => prev + 1);
@@ -39,6 +57,13 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-text-muted hover:text-text"
+              aria-label="Settings"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
             <ThemeToggle />
           </div>
         </div>
@@ -51,6 +76,15 @@ export default function Home() {
 
       {/* Add Link FAB */}
       <AddLinkForm onLinkAdded={handleLinkAdded} />
+
+      {/* Settings Modal */}
+      {uid && (
+        <SettingsModal
+          uid={uid}
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+        />
+      )}
 
       {/* iOS Install Banner */}
       <InstallPWA />

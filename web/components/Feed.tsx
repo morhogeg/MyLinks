@@ -13,10 +13,10 @@ import Card from './Card';
 import TableView from './TableView';
 import InsightsFeed from './InsightsFeed';
 import LinkDetailModal from './LinkDetailModal';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell } from 'lucide-react';
 import TagExplorer from './TagExplorer';
 
-type FilterType = 'all' | 'unread' | 'archived' | 'favorite';
+type FilterType = 'all' | 'unread' | 'archived' | 'favorite' | 'reminders';
 type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
 
 /**
@@ -95,6 +95,7 @@ export default function Feed() {
     const filteredLinks = links
         .filter((link) => {
             if (filter === 'all') return true;
+            if (filter === 'reminders') return link.reminderStatus === 'pending';
             return link.status === filter;
         })
         .filter((link) => {
@@ -209,6 +210,7 @@ export default function Feed() {
         { key: 'all', label: 'All', icon: <Inbox className="w-4 h-4" /> },
         { key: 'unread', label: 'Unread', icon: <Inbox className="w-4 h-4" /> },
         { key: 'favorite', label: 'Favorites', icon: <Star className="w-4 h-4" /> },
+        { key: 'reminders', label: 'Reminders', icon: <Bell className="w-4 h-4" /> },
         { key: 'archived', label: 'Archived', icon: <Archive className="w-4 h-4" /> },
     ];
 
@@ -305,6 +307,7 @@ export default function Feed() {
                                 {filter === 'all' && <Inbox className="w-3 h-3 text-text-muted" />}
                                 {filter === 'unread' && <Inbox className="w-3 h-3 text-accent" />}
                                 {filter === 'favorite' && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
+                                {filter === 'reminders' && <Bell className="w-3 h-3 text-accent" />}
                                 {filter === 'archived' && <Archive className="w-3 h-3 text-text-muted" />}
                             </div>
                             <ArrowUpDown className="absolute right-2 top-1/2 -translate-y-1/2 w-2.5 h-2.5 text-text-muted pointer-events-none opacity-40" />
@@ -436,7 +439,7 @@ export default function Feed() {
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
-                            <div className="flex-1 overflow-y-auto overscroll-contain pb-safe">
+                            <div className="flex-1 overflow-y-auto overscroll-contain pb-32">
                                 <TagExplorer
                                     tags={allTags}
                                     tagCounts={tagCounts}
@@ -459,6 +462,8 @@ export default function Feed() {
                                     <Star className="w-8 h-8 text-text-muted" />
                                 ) : filter === 'archived' ? (
                                     <Archive className="w-8 h-8 text-text-muted" />
+                                ) : filter === 'reminders' ? (
+                                    <Bell className="w-8 h-8 text-text-muted" />
                                 ) : (
                                     <Inbox className="w-8 h-8 text-text-muted" />
                                 )}

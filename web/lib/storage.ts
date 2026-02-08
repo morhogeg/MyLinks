@@ -1,7 +1,7 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, getDocs, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, getDocs, getDoc, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { db } from './firebase';
 
-import { Link, LinkStatus } from './types';
+import { Link, LinkStatus, User } from './types';
 
 const STORAGE_KEY = 'secondbrain_links';
 
@@ -144,3 +144,29 @@ export async function updateLinkReminder(
     }
 }
 
+
+/**
+ * Get user settings from Firestore
+ */
+export async function getUserSettings(uid: string): Promise<User['settings'] | null> {
+    const userRef = doc(db, 'users', uid);
+    const snapshot = await getDoc(userRef);
+    if (snapshot.exists()) {
+        const data = snapshot.data();
+        return data.settings || null;
+    }
+    return null;
+}
+
+/**
+ * Update user settings in Firestore
+ */
+export async function updateUserSettings(uid: string, settings: Partial<User['settings']>): Promise<void> {
+    const userRef = doc(db, 'users', uid);
+    // Construct dot notation for partial updates to avoid overwriting other settings
+    const updates: Record<string, any> = {};
+    Object.entries(settings).forEach(([key, value]) => {
+        updates[`settings.${key}`] = value;
+    });
+    await updateDoc(userRef, updates);
+}

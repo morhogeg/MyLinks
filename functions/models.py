@@ -90,3 +90,4 @@ class UserDocument(BaseModel):
     phone_number: str = Field(description="Phone number in E.164 format, e.g., +97250...")
     created_at: datetime = Field(default_factory=datetime.now)
     settings: UserSettings = Field(default_factory=UserSettings)
+    last_saved_link_id: Optional[str] = Field(None, description="ID of the last saved link for context")
