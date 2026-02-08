@@ -356,8 +356,8 @@ export default function Feed() {
                         <button
                             onClick={() => setIsTagExplorerOpen(!isTagExplorerOpen)}
                             className={`lg:hidden h-[28px] px-2 rounded-full text-[10px] font-bold transition-all flex items-center gap-1 border ${selectedTags.size > 0
-                                    ? 'bg-accent/10 border-accent/20 text-accent'
-                                    : 'bg-card/30 border-transparent text-text-muted/40'
+                                ? 'bg-accent/10 border-accent/20 text-accent'
+                                : 'bg-card/30 border-transparent text-text-muted/40'
                                 }`}
                         >
                             <TagIcon className="w-3 h-3" />
@@ -418,26 +418,34 @@ export default function Feed() {
 
                 {/* Tag Explorer Drawer (Mobile) */}
                 {isTagExplorerOpen && (
-                    <div className="lg:hidden fixed inset-0 z-40 flex justify-end">
-                        <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" onClick={() => setIsTagExplorerOpen(false)} />
-                        <div className="relative w-80 max-w-[85%] h-full bg-card border-l border-white/10 p-6 flex flex-col animate-in slide-in-from-right duration-300">
-                            <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-sm font-bold flex items-center gap-2">
+                    <div className="lg:hidden fixed inset-0 z-50 flex justify-end isolate">
+                        <div
+                            className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+                            onClick={() => setIsTagExplorerOpen(false)}
+                        />
+                        <div className="relative w-full sm:w-80 h-[100dvh] bg-card border-l border-white/10 flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+                            <div className="flex-none p-4 border-b border-white/10 flex justify-between items-center bg-card/50 backdrop-blur-xl z-10">
+                                <h2 className="text-base font-bold flex items-center gap-2">
                                     <TagIcon className="w-4 h-4 text-accent" />
                                     Filter Tags
                                 </h2>
-                                <button onClick={() => setIsTagExplorerOpen(false)} className="p-2 hover:bg-white/5 rounded-full">
-                                    <X className="w-4 h-4" />
+                                <button
+                                    onClick={() => setIsTagExplorerOpen(false)}
+                                    className="p-2 hover:bg-white/5 rounded-full touch-manipulation"
+                                >
+                                    <X className="w-5 h-5" />
                                 </button>
                             </div>
-                            <TagExplorer
-                                tags={allTags}
-                                tagCounts={tagCounts}
-                                selectedTags={selectedTags}
-                                onToggleTag={handleToggleTag}
-                                onClearFilters={() => setSelectedTags(new Set())}
-                                className="flex-1"
-                            />
+                            <div className="flex-1 overflow-y-auto overscroll-contain pb-safe">
+                                <TagExplorer
+                                    tags={allTags}
+                                    tagCounts={tagCounts}
+                                    selectedTags={selectedTags}
+                                    onToggleTag={handleToggleTag}
+                                    onClearFilters={() => setSelectedTags(new Set())}
+                                    className="p-4"
+                                />
+                            </div>
                         </div>
                     </div>
                 )}

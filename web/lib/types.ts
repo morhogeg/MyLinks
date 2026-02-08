@@ -16,6 +16,16 @@ export interface AIAnalysis {
   category: string;
   tags: string[];
   actionable_takeaway: string;
+  sourceType?: string;
+  confidence?: string;
+  keyEntities?: string[];
+  recipe?: {
+    ingredients: string[];
+    instructions: string[];
+    servings?: string;
+    prep_time?: string;
+    cook_time?: string;
+  };
 }
 
 export interface Link {
@@ -29,6 +39,11 @@ export interface Link {
   status: LinkStatus;
   createdAt: number | string; // Handle both Unix timestamp and ISO string
   metadata: LinkMetadata;
+  // AI Analysis metadata
+  sourceType?: string;
+  confidence?: string;
+  keyEntities?: string[];
+
   // Recipe data if applicable
   recipe?: {
     ingredients: string[];
