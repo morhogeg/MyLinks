@@ -6,6 +6,7 @@ import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { useState, useEffect } from 'react';
 import { Archive, Star, Clock, Tag, Trash2, ChefHat, Utensils } from 'lucide-react';
+import SimpleMarkdown from './SimpleMarkdown';
 
 interface CardProps {
     link: Link;
@@ -77,20 +78,16 @@ export default function Card({
                 <div className="flex justify-between items-start gap-3">
                     {(() => {
                         const colorStyle = getCategoryColorStyle(link.category);
-                        const isRecipe = link.category.toLowerCase() === 'recipe' || !!link.recipe;
                         return (
-                            <div className="flex items-center gap-2">
-                                <span
-                                    className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block"
-                                    style={{
-                                        backgroundColor: colorStyle.backgroundColor,
-                                        color: colorStyle.color,
-                                    }}
-                                >
-                                    {link.category}
-                                </span>
-                                {isRecipe && <ChefHat className="w-4 h-4 text-accent" strokeWidth={2.5} />}
-                            </div>
+                            <span
+                                className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block"
+                                style={{
+                                    backgroundColor: colorStyle.backgroundColor,
+                                    color: colorStyle.color,
+                                }}
+                            >
+                                {link.category}
+                            </span>
                         );
                     })()}
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -133,10 +130,12 @@ export default function Card({
                     {link.title}
                 </h3>
 
-                {/* Summary - Full display, no truncation */}
-                <p className="text-text-secondary text-xs sm:text-sm leading-relaxed flex-grow">
-                    {link.summary}
-                </p>
+                {/* Summary - Structured display */}
+                <SimpleMarkdown
+                    content={link.summary}
+                    isCompact={true}
+                    className="flex-grow"
+                />
 
                 {/* Footer Section */}
                 <div className="pt-3 sm:pt-4 border-t border-white/5 flex flex-col space-y-2 sm:space-y-3">

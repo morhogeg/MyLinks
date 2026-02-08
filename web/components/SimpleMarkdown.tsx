@@ -5,13 +5,14 @@ import React from 'react';
 interface SimpleMarkdownProps {
     content: string;
     className?: string;
+    isCompact?: boolean;
 }
 
 /**
  * Simple markdown renderer for AI summaries
  * Handles: ## headings, - bullet points, **bold**
  */
-export default function SimpleMarkdown({ content, className = '' }: SimpleMarkdownProps) {
+export default function SimpleMarkdown({ content, className = '', isCompact = false }: SimpleMarkdownProps) {
     if (!content) return null;
 
     const lines = content.split('\n');
@@ -22,7 +23,7 @@ export default function SimpleMarkdown({ content, className = '' }: SimpleMarkdo
     const flushList = () => {
         if (currentListItems.length > 0) {
             elements.push(
-                <ul key={key++} className="list-disc list-inside space-y-1.5 mb-4 text-text-secondary">
+                <ul key={key++} className={`list-disc list-inside ${isCompact ? 'space-y-0.5 mb-2' : 'space-y-1.5 mb-4'} text-text-secondary`}>
                     {currentListItems.map((item, i) => (
                         <li key={i} className="leading-relaxed">
                             {formatInlineStyles(item)}
@@ -72,8 +73,8 @@ export default function SimpleMarkdown({ content, className = '' }: SimpleMarkdo
             flushList();
             const headingText = trimmed.slice(3);
             elements.push(
-                <h3 key={key++} className="text-sm font-bold text-text uppercase tracking-wider mt-5 mb-3 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent"></span>
+                <h3 key={key++} className={`font-bold text-text uppercase tracking-wider flex items-center gap-2 ${isCompact ? 'text-[10px] mt-3 mb-1.5' : 'text-sm mt-5 mb-3'}`}>
+                    <span className={`rounded-full bg-accent ${isCompact ? 'w-1 h-1' : 'w-1.5 h-1.5'}`}></span>
                     {headingText}
                 </h3>
             );
@@ -89,7 +90,7 @@ export default function SimpleMarkdown({ content, className = '' }: SimpleMarkdo
         // Regular paragraph
         flushList();
         elements.push(
-            <p key={key++} className="text-text-secondary leading-relaxed mb-3">
+            <p key={key++} className={`text-text-secondary leading-relaxed ${isCompact ? 'mb-2 text-xs' : 'mb-3'}`}>
                 {formatInlineStyles(trimmed)}
             </p>
         );

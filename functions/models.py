@@ -30,32 +30,16 @@ class LinkMetadata(BaseModel):
     actionable_takeaway: Optional[str] = Field(None, description="Key takeaway from AI analysis")
 
 
-class Recipe(BaseModel):
-    """
-    Structured recipe data extracted from content
-    """
-    ingredients: List[str] = Field(default_factory=list)
-    instructions: List[str] = Field(default_factory=list)
-    servings: Optional[str] = None
-    prep_time: Optional[str] = None
-    cook_time: Optional[str] = None
-
-
 class AIAnalysis(BaseModel):
     """
     Output from Gemini AI analysis
-    Matches the enhanced JSON structure for knowledge extraction
     """
-    source_type: Optional[str] = Field(None, description="Type of content: article, tweet, video, podcast, paper, recipe, other")
-    title: str = Field(description="Clear, descriptive title (5-12 words)")
-    summary: str = Field(description="2-3 information-dense sentences with key insights")
+    title: str = Field(description="Clear, descriptive title")
+    summary: str = Field(description="2-4 sentences for snackable preview")
     category: str = Field(description="One high-level category")
-    tags: List[str] = Field(max_length=5, description="3-5 specific, searchable tags")
-    actionable_takeaway: str = Field(description="One specific, immediately actionable insight")
-    detailed_summary: Optional[str] = Field(None, description="Markdown formatted detailed summary with Key Points and Why It Matters sections")
-    confidence: Optional[str] = Field(None, description="Extraction quality: high, medium, or low")
-    key_entities: Optional[List[str]] = Field(None, description="2-5 important names, organizations, products, or concepts")
-    recipe: Optional[Recipe] = Field(None, description="Structured recipe data if content is a recipe")
+    tags: List[str] = Field(max_length=5, description="3-5 relevant tags")
+    actionable_takeaway: str = Field(description="One concrete specific action")
+    detailed_summary: Optional[str] = Field(None, description="Markdown formatted detailed summary")
 
 
 class LinkDocument(BaseModel):
@@ -72,7 +56,6 @@ class LinkDocument(BaseModel):
     status: LinkStatus = LinkStatus.UNREAD
     created_at: datetime = Field(default_factory=datetime.now)
     metadata: LinkMetadata
-    recipe: Optional[Recipe] = None
     # Reminder fields
     reminder_status: ReminderStatus = ReminderStatus.NONE
     next_reminder_at: Optional[datetime] = None

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, MessageSquare, BookOpen, ChevronRight, Sparkles, Bell, BellOff, ChefHat, Utensils } from 'lucide-react';
+import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, MessageSquare, BookOpen, ChevronRight, Sparkles, Bell, BellOff } from 'lucide-react';
 import AIChat from './AIChat';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
@@ -197,90 +197,17 @@ export default function LinkDetailModal({
                         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                             <h2 className="font-bold text-2xl text-white mb-4 leading-tight">{link.title}</h2>
 
-                            {/* Recipe Section */}
-                            {link.recipe && (
-                                <div className="space-y-8 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    {/* Prep/Cook Time Row */}
-                                    {(link.recipe.prep_time || link.recipe.cook_time || link.recipe.servings) && (
-                                        <div className="flex flex-wrap gap-4 p-4 bg-accent/5 rounded-2xl border border-accent/10">
-                                            {link.recipe.servings && (
-                                                <div className="flex items-center gap-2 text-sm text-text-secondary">
-                                                    <Utensils className="w-4 h-4 text-accent" />
-                                                    <span>{link.recipe.servings} servings</span>
-                                                </div>
-                                            )}
-                                            {link.recipe.prep_time && (
-                                                <div className="flex items-center gap-2 text-sm text-text-secondary">
-                                                    <Clock className="w-4 h-4 text-accent" />
-                                                    <span>Prep: {link.recipe.prep_time}</span>
-                                                </div>
-                                            )}
-                                            {link.recipe.cook_time && (
-                                                <div className="flex items-center gap-2 text-sm text-text-secondary">
-                                                    <Clock className="w-4 h-4 text-accent" />
-                                                    <span>Cook: {link.recipe.cook_time}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* Ingredients */}
-                                    {link.recipe.ingredients && link.recipe.ingredients.length > 0 && (
-                                        <section>
-                                            <h3 className="flex items-center gap-2 text-lg font-bold text-white mb-4">
-                                                <ChefHat className="w-5 h-5 text-accent" />
-                                                Ingredients
-                                            </h3>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                {link.recipe.ingredients.map((ing, i) => (
-                                                    <div key={i} className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/5 hover:border-accent/20 transition-all group">
-                                                        <div className="mt-0.5 w-4 h-4 rounded border border-white/20 flex items-center justify-center group-hover:border-accent/40 transition-colors">
-                                                            <div className="w-2 h-2 rounded-sm bg-accent opacity-0 group-hover:opacity-20 transition-opacity" />
-                                                        </div>
-                                                        <span className="text-sm text-text-secondary leading-tight">{ing}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </section>
-                                    )}
-
-                                    {/* Instructions */}
-                                    {link.recipe.instructions && link.recipe.instructions.length > 0 && (
-                                        <section>
-                                            <h3 className="flex items-center gap-2 text-lg font-bold text-white mb-4">
-                                                <Utensils className="w-5 h-5 text-accent" />
-                                                Instructions
-                                            </h3>
-                                            <div className="space-y-4">
-                                                {link.recipe.instructions.map((step, i) => (
-                                                    <div key={i} className="flex gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
-                                                        <span className="flex-shrink-0 w-8 h-8 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center text-accent font-black text-sm">
-                                                            {i + 1}
-                                                        </span>
-                                                        <p className="text-text-secondary leading-relaxed pt-0.5">{step}</p>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </section>
-                                    )}
-
-                                    <div className="h-px bg-white/5 w-full my-8" />
-                                </div>
-                            )}
-
-                            {/* Standard Summary / Detailed Summary (Show only if no recipe or in addition) */}
-                            {(!link.recipe || link.detailedSummary) && (
-                                <div className="mb-6">
-                                    {link.detailedSummary ? (
-                                        <SimpleMarkdown
-                                            content={link.detailedSummary}
-                                            className="mb-6 text-base"
-                                        />
-                                    ) : (
-                                        <p className="text-text-secondary mb-6 leading-relaxed text-lg">{link.summary}</p>
-                                    )}
-                                </div>
-                            )}
+                            {/* Content Section */}
+                            <div className="mb-6">
+                                {link.detailedSummary ? (
+                                    <SimpleMarkdown
+                                        content={link.detailedSummary}
+                                        className="mb-6 text-base"
+                                    />
+                                ) : (
+                                    <p className="text-text-secondary mb-6 leading-relaxed text-lg">{link.summary}</p>
+                                )}
+                            </div>
 
                             <div className="bg-yellow-500/5 rounded-2xl p-5 border border-yellow-500/10 mb-8 relative overflow-hidden group">
                                 <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500 opacity-30" />

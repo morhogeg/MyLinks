@@ -81,11 +81,7 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                     originalTitle: data.link.metadata.originalTitle,
                     estimatedReadTime: data.link.metadata.estimatedReadTime,
                     actionableTakeaway: data.link.metadata.actionableTakeaway
-                },
-                recipe: data.link.recipe,
-                sourceType: data.link.sourceType,
-                confidence: data.link.confidence,
-                keyEntities: data.link.keyEntities
+                }
             });
 
             setUrl('');
