@@ -73,7 +73,7 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
             flushList();
             const headingText = trimmed.slice(3);
             elements.push(
-                <h3 key={key++} className={`font-bold text-text uppercase tracking-wide ${isCompact ? 'text-[11px] mt-6 mb-3' : 'text-base mt-8 mb-5 border-b border-neutral-200 dark:border-white/10 pb-2'}`}>
+                <h3 key={key++} className={`font-bold text-text uppercase tracking-wide ${isCompact ? 'text-[11px] mt-6 mb-3' : 'text-base mt-8 mb-5 border-b border-black/10 dark:border-white/10 pb-2'}`}>
                     {headingText}
                 </h3>
             );
