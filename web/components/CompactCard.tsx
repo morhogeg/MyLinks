@@ -48,7 +48,7 @@ export default function CompactCard({
                 {/* Top Section: Category and Actions */}
                 <div className="flex justify-between items-start gap-2">
                     <span
-                        className="text-[8px] uppercase font-black tracking-widest px-1.5 py-0.5 rounded-md inline-block whitespace-nowrap overflow-hidden text-ellipsis max-w-[60%]"
+                        className="text-[8px] uppercase font-black tracking-widest px-1.5 py-0.5 rounded-md inline-block whitespace-nowrap overflow-hidden text-ellipsis max-w-[75%]"
                         style={{
                             backgroundColor: colorStyle.backgroundColor,
                             color: colorStyle.color,
@@ -72,7 +72,7 @@ export default function CompactCard({
                 </div>
 
                 {/* Title: Centered and prominent */}
-                <h3 className="font-bold text-[11px] sm:text-xs text-text transition-colors leading-tight text-center line-clamp-5 flex-grow flex items-center justify-center px-1">
+                <h3 className="font-bold text-[11px] sm:text-xs text-text transition-colors leading-tight text-center line-clamp-5 px-1 my-auto">
                     {link.title}
                 </h3>
 
