@@ -67,7 +67,7 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                                         {link.title}
                                     </div>
                                     <div
-                                        className="flex items-center gap-1.5 text-[10px] text-text-muted/50 hover:text-white transition-colors cursor-pointer w-fit mt-1 group/link"
+                                        className="flex items-center gap-1.5 text-[10px] text-text-muted/50 hover:text-accent transition-colors cursor-pointer w-fit mt-1 group/link"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             window.open(link.url, '_blank');

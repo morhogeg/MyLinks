@@ -48,7 +48,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
             metadata: {
                 originalTitle: originalTitle || analysis.title,
                 estimatedReadTime: Math.ceil(html.length / 1500), // Rough estimate: 250 words/min, 6 chars/word
-                actionableTakeaway: analysis.actionable_takeaway
+                actionableTakeaway: analysis.actionableTakeaway
             },
             // Enhanced AI fields
             sourceType: analysis.sourceType,

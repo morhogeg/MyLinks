@@ -24,7 +24,7 @@ Requirements for the analysis:
    GOOD: "Researchers at **MIT** found that **intermittent fasting** reduced inflammation markers by **40%** in a 12-week trial.\n\nThe study showed benefits appeared after just **2 weeks**."
 
 
-3. detailed_summary: Write a well-structured, professional summary using markdown formatting:
+3. detailedSummary: Write a well-structured, professional summary using markdown formatting:
    - Start with a 1-2 sentence overview paragraph.
    - Use "## Key Points" as a subheading, followed by bullet points (use - for bullets).
    - Each bullet should be a factual statement from the content.
@@ -40,7 +40,7 @@ Requirements for the analysis:
    - PREFER REUSING EXISTING TAGS provided in the "Existing Tags" list if they are applicable.
    - Only create a new tag if no existing tags fit the content.
 
-6. actionable_takeaway: One concrete, specific action or learning the reader can apply.
+6. actionableTakeaway: One concrete, specific action or learning the reader can apply.
 
 CRITICAL RULES:
 - Be a neutral reporter, not a reviewer. Report WHAT is said, not HOW WELL it is said.
@@ -101,5 +101,5 @@ class ClaudeService: # Kept name for compatibility with main.py
             "summary": "Processing of this link failed or Gemini API was unavailable. Please check original.",
             "category": "General",
             "tags": ["failed"],
-            "actionable_takeaway": "None"
+            "actionableTakeaway": "None"
         }

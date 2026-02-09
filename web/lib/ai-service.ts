@@ -34,7 +34,7 @@ Requirements for the analysis:
    - PREFER REUSING EXISTING TAGS provided in the "Existing Tags" list if they are applicable.
    - Only create a new tag if no existing tags fit the content.
 
-6. actionable_takeaway: One concrete, specific action or learning the reader can apply.
+6. actionableTakeaway: One concrete, specific action or learning the reader can apply.
 
 CRITICAL RULES:
 - Be a neutral reporter, not a reviewer. Report WHAT is said, not HOW WELL it is said.
@@ -48,7 +48,7 @@ JSON Structure:
   "detailedSummary": "...",
   "category": "...",
   "tags": ["...", "..."],
-  "actionable_takeaway": "..."
+  "actionableTakeaway": "..."
 }`;
 
 /**
@@ -121,7 +121,7 @@ function generateMockAnalysis(url: string, _content: string): AIAnalysis {
         detailedSummary: "The content discusses core principles and frameworks in this domain. It presents arguments supported by examples and case studies. The author examines different perspectives and approaches to the subject matter. Key conclusions are drawn based on the analysis presented. Fallback analysis used because Gemini API was unavailable or mock mode is active.",
         category,
         tags,
-        actionable_takeaway: "Review this content to determine its specific relevance to your current projects."
+        actionableTakeaway: "Review this content to determine its specific relevance to your current projects."
     };
 }
 

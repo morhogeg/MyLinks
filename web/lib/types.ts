@@ -66,9 +66,9 @@ export interface User {
   createdAt: number;
   settings: {
     theme: 'dark' | 'light';
-    daily_digest: boolean;
-    reminders_enabled: boolean;
-    reminder_frequency: 'smart' | 'daily' | 'weekly' | 'off';
+    dailyDigest: boolean;
+    remindersEnabled: boolean;
+    reminderFrequency: 'smart' | 'daily' | 'weekly' | 'off';
   };
 }
 

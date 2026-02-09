@@ -150,7 +150,7 @@ export default function LinkDetailModal({
                         </a>
                         <button
                             onClick={onClose}
-                            className="p-2 rounded-xl bg-white/5 border border-white/5 text-text-muted hover:bg-white/10 hover:text-white transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                            className="p-2 rounded-xl bg-white/5 border border-white/5 text-text-muted hover:bg-white/10 hover:text-accent transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
                         >
                             <X className="w-4 h-4" />
                         </button>

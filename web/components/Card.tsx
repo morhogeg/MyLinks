@@ -99,7 +99,7 @@ export default function Card({
                                 onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite');
                             }}
                             title={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
-                            className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center ${link.status === 'favorite' ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-muted hover:text-white hover:bg-white/10'
+                            className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center ${link.status === 'favorite' ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-muted hover:text-accent hover:bg-white/10'
                                 }`}
                         >
                             <Star className={`w-3.5 h-3.5 ${link.status === 'favorite' ? 'fill-yellow-500' : ''}`} />

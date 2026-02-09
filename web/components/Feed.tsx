@@ -577,7 +577,7 @@ export default function Feed() {
                     ) : (
                         <div
                             className="grid gap-2 sm:gap-3"
-                            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))' }}
+                            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}
                         >
                             {filteredLinks.map((link) => (
                                 <CompactCard

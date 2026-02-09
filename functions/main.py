@@ -378,14 +378,14 @@ def find_user_by_phone(phone_number: str) -> Optional[str]:
     # We'll search by the cleaned number. Note: This assumes stored numbers are ALSO searchable or we clean them.
     # To be safest, we query all users and compare cleaned versions, OR assume E.164 without '+' in DB.
     # Let's try the direct match first, but with a fallback.
-    query = users_ref.where('phoneNumber', '==', f"+{clean_number}").limit(1)
+    query = users_ref.where('phone_number', '==', f"+{clean_number}").limit(1)
     docs = query.get()
     
     if docs:
         return docs[0].id
     
     # Fallback: search without the '+' if that's how it's stored
-    query = users_ref.where('phoneNumber', '==', clean_number).limit(1)
+    query = users_ref.where('phone_number', '==', clean_number).limit(1)
     docs = query.get()
     if docs:
         return docs[0].id
@@ -469,9 +469,10 @@ def set_reminder(uid: str, link_id: str, reminder_time: datetime):
     """Set a reminder for a specific link"""
     db = get_db()
     link_ref = db.collection('users').document(uid).collection('links').document(link_id)
+    reminder_time_ms = int(reminder_time.timestamp() * 1000)
     link_ref.update({
         'reminderStatus': 'pending',
-        'nextReminderAt': reminder_time,
+        'nextReminderAt': reminder_time_ms,
         'reminderCount': 0
     })
 
@@ -521,7 +522,7 @@ def debug_status(req: https_fn.Request) -> https_fn.Response:
         
         # 3. Check for specific user by phone (from env)
         test_phone = "+16462440305"
-        user_match = db.collection('users').where('phoneNumber', '==', test_phone).limit(1).get()
+        user_match = db.collection('users').where('phone_number', '==', test_phone).limit(1).get()
         user_exists = len(user_match) > 0
         
         status = {
@@ -723,11 +724,11 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             "tags": analysis["tags"],
             "category": analysis["category"],
             "status": LinkStatus.UNREAD.value,
-            "createdAt": datetime.now().isoformat(),
+            "createdAt": int(datetime.now().timestamp() * 1000),
             "metadata": {
                 "originalTitle": scraped.get("title", ""),
                 "estimatedReadTime": max(1, len(scraped.get("text", "")) // 1500),
-                "actionableTakeaway": analysis.get("actionable_takeaway")
+                "actionableTakeaway": analysis.get("actionableTakeaway")
             }
         }
         
@@ -758,7 +759,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             "tags": ["Processing Failed"],
             "category": "Uncategorized",
             "status": LinkStatus.UNREAD.value,
-            "createdAt": datetime.now().isoformat(),
+            "createdAt": int(datetime.now().timestamp() * 1000),
             "metadata": {
                 "originalTitle": scraped.get("title", ""),
                 "estimatedReadTime": 0
@@ -821,10 +822,10 @@ def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
         
         # Query links that need reminders
         links_ref = db.collection('users').document(uid).collection('links')
-        now = datetime.now()
+        now_ms = int(datetime.now().timestamp() * 1000)
         
-        # Find links where nextReminderAt <= now and reminderStatus == 'pending'
-        query = links_ref.where('reminderStatus', '==', 'pending').where('nextReminderAt', '<=', now).limit(10)
+        # Find links where nextReminderAt <= now_ms and reminderStatus == 'pending'
+        query = links_ref.where('reminderStatus', '==', 'pending').where('nextReminderAt', '<=', now_ms).limit(10)
         
         due_links = query.get()
         
@@ -850,6 +851,7 @@ def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
             # Update the link's reminder status
             new_reminder_count = reminder_count + 1
             next_reminder = calculate_next_reminder(new_reminder_count)
+            next_reminder_ms = int(next_reminder.timestamp() * 1000)
             
             # If we've reached the max stages (3), mark as completed
             if new_reminder_count >= 3:
@@ -861,7 +863,7 @@ def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
             else:
                 link_doc.reference.update({
                     'reminderCount': new_reminder_count,
-                    'nextReminderAt': next_reminder
+                    'nextReminderAt': next_reminder_ms
                 })
             
             print(f"Sent reminder for link {link_id} to {phone_number}")

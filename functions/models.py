@@ -81,13 +81,9 @@ class WebhookPayload(BaseModel):
 class UserSettings(BaseModel):
     """User preferences"""
     theme: str = "dark"
-    dailyDigest: bool = Field(default=False, alias="daily_digest")
-    remindersEnabled: bool = Field(default=True, alias="reminders_enabled")
-    reminderFrequency: str = Field(default="smart", alias="reminder_frequency")  # "smart", "daily", "weekly", "off"
-
-    model_config = ConfigDict(
-        populate_by_name=True
-    )
+    dailyDigest: bool = False
+    remindersEnabled: bool = True
+    reminderFrequency: str = "smart"  # "smart", "daily", "weekly", "off"
 
 
 class UserDocument(BaseModel):

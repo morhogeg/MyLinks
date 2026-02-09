@@ -17,6 +17,9 @@ def check_health():
         # Check users count
         users = db.collection('users').get()
         print(f"Found {len(users)} users in 'users' collection")
+        if users:
+            print(f"First user keys: {users[0].to_dict().keys()}")
+            print(f"First user phone data: { {k: v for k, v in users[0].to_dict().items() if 'phone' in k.lower()} }")
         
     except Exception as e:
         print(f"Health check failed: {e}")
