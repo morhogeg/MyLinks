@@ -27,7 +27,11 @@ _db = None
 def get_db():
     global _db
     if _db is None:
-        initialize_app()
+        try:
+            from firebase_admin import get_app
+            get_app()
+        except ValueError:
+            initialize_app()
         _db = firestore.client()
     return _db
 
@@ -298,20 +302,32 @@ Source: vxtwitter API
 
 def find_user_by_phone(phone_number: str) -> Optional[str]:
     """
-    Look up user UID by phone number in Firestore
+    Look up user UID by phone number in Firestore.
+    Robust matching: strips 'whatsapp:', '+', and other non-digits.
     """
     db = get_db()
-    # Normalize phone number (strip 'whatsapp:' prefix if present)
-    clean_number = phone_number.replace('whatsapp:', '')
+    # Normalize: keep only digits
+    clean_number = re.sub(r'\D', '', phone_number)
+    
+    print(f"Searching for user with normalized phone: {clean_number}")
     
     users_ref = db.collection('users')
-    query = users_ref.where('phone_number', '==', clean_number).limit(1)
+    # We'll search by the cleaned number. Note: This assumes stored numbers are ALSO searchable or we clean them.
+    # To be safest, we query all users and compare cleaned versions, OR assume E.164 without '+' in DB.
+    # Let's try the direct match first, but with a fallback.
+    query = users_ref.where('phone_number', '==', f"+{clean_number}").limit(1)
     docs = query.get()
     
     if docs:
         return docs[0].id
     
-    print(f"User not found for phone: {clean_number}")
+    # Fallback: search without the '+' if that's how it's stored
+    query = users_ref.where('phone_number', '==', clean_number).limit(1)
+    docs = query.get()
+    if docs:
+        return docs[0].id
+        
+    print(f"User not found for phone: {phone_number} (normalized: {clean_number})")
     return None
 
 
@@ -351,7 +367,7 @@ def send_whatsapp_message(to_number: str, body: str):
     from_number = os.environ.get("TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238886")
     
     if not account_sid or not auth_token:
-        print("Twilio credentials missing")
+        print(f"Twilio credentials missing. Would have sent to {to_number}: {body}")
         return
         
     try:
@@ -411,16 +427,16 @@ def whatsapp_webhook(request):
     
     # Parse incoming payload
     try:
-        # Handle both form-encoded (Twilio) and JSON payloads
         if request.content_type == 'application/x-www-form-urlencoded':
             data = request.form.to_dict()
         else:
             data = request.get_json()
-            
+        
+        print(f"Received webhook payload: {json.dumps(data)}")
         payload = WebhookPayload(**data)
     except Exception as e:
         print(f"Payload parse error: {e}")
-        return {"error": "Invalid payload"}, 400
+        return {"error": f"Invalid payload: {str(e)}"}, 400
     
     db = get_db()
     
@@ -428,7 +444,7 @@ def whatsapp_webhook(request):
     uid = find_user_by_phone(payload.from_number)
     if not uid:
         print(f"Unauthorized number: {payload.from_number}")
-        # TODO: Send "Unauthorized" reply via WhatsApp API
+        send_whatsapp_message(payload.from_number, "❌ Sorry, your phone number is not recognized. Please make sure it matches the number in your Second Brain settings.")
         return {"error": "User not found"}, 403
     
     # Extract URL from message body

@@ -67,11 +67,14 @@ class WebhookPayload(BaseModel):
     """
     Incoming WhatsApp message payload
     This structure depends on your WhatsApp provider (Twilio, etc.)
-    TODO: Adjust fields based on actual provider
     """
     from_number: str = Field(alias="From", description="Sender phone number in E.164 format")
     body: str = Field(alias="Body", description="Message content containing the URL")
     message_sid: Optional[str] = Field(None, alias="MessageSid")
+
+    class Config:
+        extra = "allow"
+        populate_by_name = True
 
 
 class UserSettings(BaseModel):
@@ -87,7 +90,7 @@ class UserDocument(BaseModel):
     Firestore document schema for a user
     Collection path: users/{uid}
     """
-    phone_number: str = Field(description="Phone number in E.164 format, e.g., +97250...")
+    phone_number: str = Field(description="Phone number in E.164 format, e.g., +16462440305")
     created_at: datetime = Field(default_factory=datetime.now)
     settings: UserSettings = Field(default_factory=UserSettings)
     last_saved_link_id: Optional[str] = Field(None, description="ID of the last saved link for context")
