@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Link } from '@/lib/types';
-import { X, Sparkles, Calendar, Clock, Bell, BellOff } from 'lucide-react';
+import { X, Sparkles, Calendar, Clock, Bell, BellOff, Loader2, Check } from 'lucide-react';
 import { updateLinkReminder } from '@/lib/storage';
 
 interface ReminderModalProps {
@@ -13,180 +13,329 @@ interface ReminderModalProps {
     onUpdate?: () => void;
 }
 
+type ReminderOption = 'smart' | 'tomorrow' | 'next-week' | 'custom' | 'off';
+
 export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: ReminderModalProps) {
-    const [isLoading, setIsLoading] = useState(false);
+    const [selectedOption, setSelectedOption] = useState<ReminderOption | null>(null);
     const [customDate, setCustomDate] = useState('');
+    const [customTime, setCustomTime] = useState('09:00');
+    const [isSaving, setIsSaving] = useState(false);
 
     if (!isOpen) return null;
 
-    const handleSetReminder = async (option: 'smart' | 'tomorrow' | 'next-week' | 'custom' | 'off') => {
-        console.log('Reminder option selected:', option);
-        setIsLoading(true);
+    const handleSave = async () => {
+        if (!selectedOption) return;
+
+        console.log('Saving reminder option:', selectedOption);
+        setIsSaving(true);
+
         try {
             let nextReminderTime: number | undefined;
             const now = new Date();
 
-            switch (option) {
+            switch (selectedOption) {
                 case 'smart':
                     nextReminderTime = now.getTime() + (24 * 60 * 60 * 1000);
-                    console.log('Smart reminder time:', new Date(nextReminderTime));
                     break;
                 case 'tomorrow':
                     const tomorrow = new Date(now);
                     tomorrow.setDate(tomorrow.getDate() + 1);
                     tomorrow.setHours(9, 0, 0, 0);
                     nextReminderTime = tomorrow.getTime();
-                    console.log('Tomorrow reminder time:', new Date(nextReminderTime));
                     break;
                 case 'next-week':
                     const nextWeek = new Date(now);
                     nextWeek.setDate(nextWeek.getDate() + 7);
                     nextWeek.setHours(9, 0, 0, 0);
                     nextReminderTime = nextWeek.getTime();
-                    console.log('Next week reminder time:', new Date(nextReminderTime));
                     break;
                 case 'custom':
                     if (!customDate) {
-                        console.error('No custom date selected');
-                        setIsLoading(false);
+                        setIsSaving(false);
                         return;
                     }
                     const picked = new Date(customDate);
-                    picked.setHours(9, 0, 0, 0);
+                    const [hours, minutes] = customTime.split(':').map(Number);
+                    picked.setHours(hours, minutes, 0, 0);
                     nextReminderTime = picked.getTime();
-                    console.log('Custom reminder time:', new Date(nextReminderTime));
                     break;
                 case 'off':
-                    console.log('Turning off reminder for link:', link.id);
                     await updateLinkReminder(uid, link.id, false);
-                    console.log('Reminder disabled successfully');
                     onClose();
                     if (onUpdate) onUpdate();
-                    setIsLoading(false);
                     return;
             }
 
             if (nextReminderTime) {
-                console.log('Setting reminder for link:', link.id, 'at', new Date(nextReminderTime));
+                console.log('Setting reminder for:', new Date(nextReminderTime).toLocaleString());
                 await updateLinkReminder(uid, link.id, true, nextReminderTime);
-                console.log('Reminder set successfully');
                 onClose();
                 if (onUpdate) onUpdate();
-            } else {
-                console.error('No reminder time calculated');
             }
 
         } catch (error) {
             console.error("Failed to set reminder:", error);
             alert(`Failed to set reminder: ${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
-            setIsLoading(false);
+            setIsSaving(false);
         }
     };
 
+    const handleSelectOption = (option: ReminderOption) => {
+        setSelectedOption(option);
+        console.log('Selected option:', option);
+    };
+
     const isReminderActive = link.reminderStatus === 'pending';
+
+    const OptionButton = ({
+        option,
+        icon: Icon,
+        title,
+        subtitle,
+        highlighted = false
+    }: {
+        option: ReminderOption;
+        icon: typeof Sparkles;
+        title: string;
+        subtitle: string;
+        highlighted?: boolean;
+    }) => {
+        const isSelected = selectedOption === option;
+
+        return (
+            <button
+                onClick={() => handleSelectOption(option)}
+                disabled={isSaving}
+                className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left group relative overflow-hidden
+                    ${isSelected
+                        ? 'bg-accent/20 border-accent ring-2 ring-accent'
+                        : highlighted
+                            ? 'bg-accent/5 border-accent/10 hover:bg-accent/10'
+                            : 'bg-white/5 border-white/5 hover:bg-white/10'
+                    }
+                    ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+            >
+                <div className={`p-2 rounded-lg transition-colors
+                    ${isSelected
+                        ? 'bg-accent text-white'
+                        : highlighted
+                            ? 'bg-accent/10 text-accent group-hover:bg-accent group-hover:text-white'
+                            : 'bg-white/5 text-text-muted'
+                    }
+                `}>
+                    {isSelected ? (
+                        <Check className="w-5 h-5" />
+                    ) : (
+                        <Icon className="w-5 h-5" />
+                    )}
+                </div>
+                <div className="flex-1">
+                    <div className={`font-medium text-sm ${isSelected ? 'text-text' : 'text-text'}`}>
+                        {title}
+                    </div>
+                    <div className="text-[11px] text-text-muted">{subtitle}</div>
+                </div>
+            </button>
+        );
+    };
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <div
                 className="absolute inset-0 bg-background/80 backdrop-blur-sm animate-in fade-in duration-300"
-                onClick={onClose}
+                onClick={isSaving ? undefined : onClose}
             />
 
-            <div className="relative bg-card border border-white/10 w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+            <div className="relative bg-card border border-white/10 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
-                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-text flex items-center gap-2">
                         <Bell className="w-5 h-5 text-accent" />
                         Set Reminder
                     </h2>
                     <button
                         onClick={onClose}
-                        className="p-2 rounded-full hover:bg-white/5 transition-colors"
+                        disabled={isSaving}
+                        className="p-2 rounded-full hover:bg-white/5 transition-all disabled:opacity-50"
                     >
                         <X className="w-5 h-5 text-text-muted" />
                     </button>
                 </div>
 
-                <div className="p-4 space-y-3">
-                    <p className="text-sm text-text-muted px-2">
-                        When should we remind you about <span className="text-text font-medium line-clamp-1">&quot;{link.title}&quot;</span>?
-                    </p>
+                <div className="p-4 space-y-4">
+                    <div className="px-2">
+                        <p className="text-sm text-text-muted mb-1">When should we remind you about:</p>
+                        <p className="text-base text-text font-semibold leading-snug">
+                            &quot;{link.title}&quot;?
+                        </p>
+                    </div>
 
                     <div className="grid grid-cols-1 gap-2">
-                        <button
-                            onClick={() => handleSetReminder('smart')}
-                            disabled={isLoading}
-                            className="flex items-center gap-3 p-3 rounded-xl bg-accent/5 border border-accent/10 hover:bg-accent/10 transition-all text-left group"
-                        >
-                            <div className="p-2 rounded-lg bg-accent/10 text-accent group-hover:bg-accent group-hover:text-white transition-colors">
-                                <Sparkles className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <div className="font-medium text-text text-sm">Smart Reminder</div>
-                                <div className="text-[11px] text-text-muted">Optimized for retention (starts in 24h)</div>
-                            </div>
-                        </button>
+                        <OptionButton
+                            option="smart"
+                            icon={Sparkles}
+                            title="Smart Reminder"
+                            subtitle="Optimized for retention (starts in 24h)"
+                        />
+                        <OptionButton
+                            option="tomorrow"
+                            icon={Clock}
+                            title="Tomorrow"
+                            subtitle="9:00 AM"
+                        />
+                        <OptionButton
+                            option="next-week"
+                            icon={Calendar}
+                            title="Next Week"
+                            subtitle="In 7 days"
+                        />
 
-                        <button
-                            onClick={() => handleSetReminder('tomorrow')}
-                            disabled={isLoading}
-                            className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-left"
-                        >
-                            <div className="p-2 rounded-lg bg-white/5 text-text-muted">
-                                <Clock className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <div className="font-medium text-text text-sm">Tomorrow</div>
-                                <div className="text-[11px] text-text-muted">9:00 AM</div>
-                            </div>
-                        </button>
-
-                        <button
-                            onClick={() => handleSetReminder('next-week')}
-                            disabled={isLoading}
-                            className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all text-left"
-                        >
-                            <div className="p-2 rounded-lg bg-white/5 text-text-muted">
-                                <Calendar className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <div className="font-medium text-text text-sm">Next Week</div>
-                                <div className="text-[11px] text-text-muted">In 7 days</div>
-                            </div>
-                        </button>
-
-                        <div className="p-3 rounded-xl bg-white/5 border border-white/5">
-                            <label className="text-xs text-text-muted block mb-2 font-medium">Pick a date</label>
-                            <div className="flex gap-2">
-                                <input
-                                    type="date"
-                                    className="flex-1 bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50"
-                                    onChange={(e) => setCustomDate(e.target.value)}
-                                    min={new Date().toISOString().split('T')[0]}
-                                />
-                                <button
-                                    onClick={() => handleSetReminder('custom')}
-                                    disabled={!customDate || isLoading}
-                                    className="px-4 py-2 bg-white/10 hover:bg-accent text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50"
-                                >
-                                    Set
-                                </button>
-                            </div>
+                        {/* Separator */}
+                        <div className="flex items-center gap-3 py-2">
+                            <div className="flex-1 h-px bg-white/10"></div>
+                            <span className="text-xs text-text-muted uppercase tracking-wider">Or</span>
+                            <div className="flex-1 h-px bg-white/10"></div>
                         </div>
+
+                        {/* Custom Date & Time */}
+                        <button
+                            onClick={() => setSelectedOption('custom')}
+                            disabled={isSaving}
+                            className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left w-full
+                                ${selectedOption === 'custom'
+                                    ? 'bg-accent/20 border-accent ring-2 ring-accent'
+                                    : 'bg-white/5 border-white/5 hover:bg-white/10'
+                                }
+                            `}
+                        >
+                            <div className={`p-2 rounded-lg transition-colors
+                                ${selectedOption === 'custom'
+                                    ? 'bg-accent text-white'
+                                    : 'bg-white/5 text-text-muted'
+                                }
+                            `}>
+                                {selectedOption === 'custom' ? (
+                                    <Check className="w-5 h-5" />
+                                ) : (
+                                    <Calendar className="w-5 h-5" />
+                                )}
+                            </div>
+                            <div className="flex-1">
+                                <div className="font-medium text-text text-sm">Custom Date & Time</div>
+                                <div className="text-[11px] text-text-muted">Pick your own schedule</div>
+                            </div>
+                        </button>
+
+                        {selectedOption === 'custom' && (
+                            <div className="pl-3 pr-3 pb-3 space-y-2">
+                                <div className="grid grid-cols-3 gap-2">
+                                    <select
+                                        className="bg-black/20 border border-white/10 rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
+                                        onChange={(e) => {
+                                            const currentDate = customDate ? new Date(customDate) : new Date();
+                                            currentDate.setMonth(parseInt(e.target.value));
+                                            setCustomDate(currentDate.toISOString().split('T')[0]);
+                                        }}
+                                        value={customDate ? new Date(customDate).getMonth() : new Date().getMonth()}
+                                        disabled={isSaving}
+                                    >
+                                        {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, i) => (
+                                            <option key={i} value={i}>{month}</option>
+                                        ))}
+                                    </select>
+                                    <select
+                                        className="bg-black/20 border border-white/10 rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
+                                        onChange={(e) => {
+                                            const currentDate = customDate ? new Date(customDate) : new Date();
+                                            currentDate.setDate(parseInt(e.target.value));
+                                            setCustomDate(currentDate.toISOString().split('T')[0]);
+                                        }}
+                                        value={customDate ? new Date(customDate).getDate() : new Date().getDate()}
+                                        disabled={isSaving}
+                                    >
+                                        {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                                            <option key={day} value={day}>{day}</option>
+                                        ))}
+                                    </select>
+                                    <select
+                                        className="bg-black/20 border border-white/10 rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
+                                        onChange={(e) => {
+                                            const currentDate = customDate ? new Date(customDate) : new Date();
+                                            currentDate.setFullYear(parseInt(e.target.value));
+                                            setCustomDate(currentDate.toISOString().split('T')[0]);
+                                        }}
+                                        value={customDate ? new Date(customDate).getFullYear() : new Date().getFullYear()}
+                                        disabled={isSaving}
+                                    >
+                                        {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + i).map(year => (
+                                            <option key={year} value={year}>{year}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <select
+                                    className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
+                                    onChange={(e) => setCustomTime(e.target.value)}
+                                    value={customTime}
+                                    disabled={isSaving}
+                                >
+                                    {Array.from({ length: 24 }, (_, i) => {
+                                        const hour = i.toString().padStart(2, '0');
+                                        return [
+                                            <option key={`${hour}:00`} value={`${hour}:00`}>{`${hour}:00`}</option>,
+                                            <option key={`${hour}:15`} value={`${hour}:15`}>{`${hour}:15`}</option>,
+                                            <option key={`${hour}:30`} value={`${hour}:30`}>{`${hour}:30`}</option>,
+                                            <option key={`${hour}:45`} value={`${hour}:45`}>{`${hour}:45`}</option>
+                                        ];
+                                    }).flat()}
+                                </select>
+                            </div>
+                        )}
                     </div>
 
                     {isReminderActive && (
                         <div className="pt-2 border-t border-white/5 mt-2">
                             <button
-                                onClick={() => handleSetReminder('off')}
-                                disabled={isLoading}
-                                className="w-full py-3 rounded-xl text-red-400 hover:bg-red-500/10 hover:text-red-500 transition-all text-sm font-medium flex items-center justify-center gap-2"
+                                onClick={() => handleSelectOption('off')}
+                                disabled={isSaving}
+                                className={`w-full py-3 rounded-xl transition-all text-sm font-medium flex items-center justify-center gap-2
+                                    ${selectedOption === 'off'
+                                        ? 'bg-red-500/20 border-2 border-red-500 text-red-500'
+                                        : 'text-red-400 hover:bg-red-500/10 hover:text-red-500'
+                                    }
+                                `}
                             >
+                                {selectedOption === 'off' && <Check className="w-4 h-4" />}
                                 <BellOff className="w-4 h-4" />
                                 Turn off Reminder
                             </button>
                         </div>
                     )}
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2 pt-2">
+                        <button
+                            onClick={onClose}
+                            disabled={isSaving}
+                            className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-text-muted transition-all disabled:opacity-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleSave}
+                            disabled={!selectedOption || isSaving || (selectedOption === 'custom' && !customDate)}
+                            className="flex-1 py-3 rounded-xl bg-accent hover:bg-accent/90 text-white font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {isSaving ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Saving...
+                                </>
+                            ) : (
+                                'Save'
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

@@ -12,6 +12,7 @@ Requirements for the analysis:
 1. title: Create a concise, descriptive title that captures the core topic. Be factual, not clickbait.
 
 2. summary: Write exactly 2 to 4 complete, factual sentences for a card preview. 
+   - **STRUCTURE**: Add a line break (\\n) between each sentence to create visual separation.
    - Summarize ONLY what the content explicitly states.
    - NO opinions, NO value judgments (avoid "valuable", "insightful", "comprehensive", "interesting", "excellent").
    - Each sentence must end with a period.

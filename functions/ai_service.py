@@ -15,12 +15,14 @@ Requirements for the analysis:
 
 2. summary: Write 2 to 4 concise, information-dense sentences for a card preview. 
    - **SCANNABILITY**: Use **bolding** (double asterisks) for key terms, dates, or names to make them pop.
+   - **STRUCTURE**: Add a line break (\\n) between each sentence to create visual separation.
    - Summarize ONLY what the content explicitly states.
    - NO opinions, NO value judgments.
    - Each sentence must end with a period.
    - You MAY use a single bullet point if it makes a critical finding clearer.
    
-   GOOD: "Researchers at **MIT** found that **intermittent fasting** reduced inflammation markers by **40%** in a 12-week trial. The study showed benefits appeared after just **2 weeks**."
+   GOOD: "Researchers at **MIT** found that **intermittent fasting** reduced inflammation markers by **40%** in a 12-week trial.\n\nThe study showed benefits appeared after just **2 weeks**."
+
 
 3. detailed_summary: Write a well-structured, professional summary using markdown formatting:
    - Start with a 1-2 sentence overview paragraph.

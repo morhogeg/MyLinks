@@ -23,9 +23,9 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
     const flushList = () => {
         if (currentListItems.length > 0) {
             elements.push(
-                <ul key={key++} className={`list-disc list-inside ${isCompact ? 'space-y-0.5 mb-2' : 'space-y-1.5 mb-4'} text-text-secondary`}>
+                <ul key={key++} className={`list-disc list-inside ${isCompact ? 'space-y-3 mb-5' : 'space-y-3 mb-6'} text-text-secondary`}>
                     {currentListItems.map((item, i) => (
-                        <li key={i} className="leading-relaxed">
+                        <li key={i} className={isCompact ? "leading-relaxed" : "leading-relaxed"}>
                             {formatInlineStyles(item)}
                         </li>
                     ))}
@@ -73,8 +73,7 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
             flushList();
             const headingText = trimmed.slice(3);
             elements.push(
-                <h3 key={key++} className={`font-bold text-text uppercase tracking-wider flex items-center gap-2 ${isCompact ? 'text-[10px] mt-3 mb-1.5' : 'text-sm mt-5 mb-3'}`}>
-                    <span className={`rounded-full bg-accent ${isCompact ? 'w-1 h-1' : 'w-1.5 h-1.5'}`}></span>
+                <h3 key={key++} className={`font-bold text-text uppercase tracking-wide ${isCompact ? 'text-[11px] mt-6 mb-3' : 'text-base mt-8 mb-5 border-b border-white/10 pb-2'}`}>
                     {headingText}
                 </h3>
             );
@@ -89,11 +88,32 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
 
         // Regular paragraph
         flushList();
-        elements.push(
-            <p key={key++} className={`text-text-secondary leading-relaxed ${isCompact ? 'mb-2 text-xs' : 'mb-3'}`}>
-                {formatInlineStyles(trimmed)}
-            </p>
-        );
+
+        // If compact mode and text looks like multiple sentences without breaks, split them
+        if (isCompact && trimmed.includes('. ') && !trimmed.includes('\n')) {
+            // Split by period + space, but keep the period
+            const sentences = trimmed.split(/(\. )/g).reduce((acc: string[], part, i, arr) => {
+                if (i % 2 === 0) {
+                    const sentence = part + (arr[i + 1] || '');
+                    if (sentence.trim()) acc.push(sentence.trim());
+                }
+                return acc;
+            }, []);
+
+            sentences.forEach((sentence, i) => {
+                elements.push(
+                    <p key={`${key++}-${i}`} className={`text-text-secondary ${isCompact ? 'mb-3 text-xs leading-relaxed' : 'mb-5 leading-relaxed'}`}>
+                        {formatInlineStyles(sentence)}
+                    </p>
+                );
+            });
+        } else {
+            elements.push(
+                <p key={key++} className={`text-text-secondary ${isCompact ? 'mb-4 text-xs leading-relaxed' : 'mb-5 leading-relaxed'}`}>
+                    {formatInlineStyles(trimmed)}
+                </p>
+            );
+        }
     }
 
     // Flush any remaining list items
