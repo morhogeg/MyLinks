@@ -42,7 +42,7 @@ export default function Feed() {
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
     const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
-    const [isTagExplorerCollapsed, setIsTagExplorerCollapsed] = useState(true);
+    const [isTagExplorerCollapsed, setIsTagExplorerCollapsed] = useState(false);
     const [reminderModalLink, setReminderModalLink] = useState<Link | null>(null);
 
     // Load collapsed state from localStorage
@@ -428,30 +428,24 @@ export default function Feed() {
                     className={`hidden lg:block flex-shrink-0 transition-all duration-300 ease-in-out ${isTagExplorerCollapsed ? 'w-10' : 'w-64'
                         }`}
                 >
-                    <div className="sticky top-4">
+                    <div className={`sticky top-[72px] h-[calc(100vh-88px)] flex flex-col ${isTagExplorerCollapsed ? '' : 'min-w-[256px]'}`}>
                         {isTagExplorerCollapsed ? (
                             <button
                                 onClick={toggleTagExplorer}
                                 className="w-10 h-10 rounded-xl bg-card border border-border-subtle flex items-center justify-center text-text-muted hover:text-accent hover:border-accent/30 transition-all shadow-sm"
-                                title="Expand Tags"
+                                title="Expand Tags Explorer"
                             >
-                                <TagIcon className="w-5 h-5" />
+                                <TagIcon className="w-5 h-5 transition-transform hover:scale-110" />
                             </button>
                         ) : (
-                            <div className="relative group">
-                                <button
-                                    onClick={toggleTagExplorer}
-                                    className="absolute -right-3 top-2 z-10 w-6 h-6 rounded-full bg-card border border-border-subtle flex items-center justify-center text-text-muted hover:text-accent hover:border-accent/30 transition-all shadow-sm opacity-0 group-hover:opacity-100"
-                                    title="Collapse"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
+                            <div className="overflow-hidden">
                                 <TagExplorer
                                     tags={allTags}
                                     tagCounts={tagCounts}
                                     selectedTags={selectedTags}
                                     onToggleTag={handleToggleTag}
                                     onClearFilters={() => setSelectedTags(new Set())}
+                                    onCollapse={toggleTagExplorer}
                                 />
                             </div>
                         )}

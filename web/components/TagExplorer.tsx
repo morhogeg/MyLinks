@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { TagNode, buildTagTree } from '@/lib/tags';
-import { ChevronRight, ChevronDown, Tag, Hash, Folder, X, Search, Filter } from 'lucide-react';
+import { ChevronRight, ChevronDown, Tag, Hash, Folder, X, Search, Filter, ChevronLeft } from 'lucide-react';
 
 interface TagExplorerProps {
     tags: string[];
@@ -10,6 +10,7 @@ interface TagExplorerProps {
     selectedTags: Set<string>;
     onToggleTag: (tag: string) => void;
     onClearFilters: () => void;
+    onCollapse?: () => void;
     className?: string;
 }
 
@@ -19,6 +20,7 @@ export default function TagExplorer({
     selectedTags,
     onToggleTag,
     onClearFilters,
+    onCollapse,
     className = ""
 }: TagExplorerProps) {
     const [searchQuery, setSearchQuery] = useState('');
@@ -101,21 +103,32 @@ export default function TagExplorer({
     };
 
     return (
-        <div className={`flex flex-col gap-4 ${className}`}>
+        <div className={`flex flex-col gap-4 h-full ${className}`}>
             <div className="flex items-center justify-between">
                 <h3 className="text-xs font-black uppercase tracking-widest text-text-muted flex items-center gap-2">
                     <Tag className="w-3.5 h-3.5" />
                     Tag Explorer
                 </h3>
-                {selectedTags.size > 0 && (
-                    <button
-                        onClick={onClearFilters}
-                        className="text-[10px] font-bold text-accent hover:underline flex items-center gap-1"
-                    >
-                        <X className="w-3 h-3" />
-                        Clear
-                    </button>
-                )}
+                <div className="flex items-center gap-2">
+                    {selectedTags.size > 0 && (
+                        <button
+                            onClick={onClearFilters}
+                            className="text-[10px] font-bold text-accent hover:underline flex items-center gap-1"
+                        >
+                            <X className="w-3 h-3" />
+                            Clear
+                        </button>
+                    )}
+                    {onCollapse && (
+                        <button
+                            onClick={onCollapse}
+                            className="p-1 hover:bg-white/5 rounded-md text-text-muted hover:text-text transition-all"
+                            title="Collapse Sidebar"
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Tag Search */}
@@ -130,7 +143,7 @@ export default function TagExplorer({
                 />
             </div>
 
-            <div className="flex flex-col gap-1 pr-2">
+            <div className="flex-1 overflow-y-auto overscroll-contain pr-2 scrollbar-subtle">
                 {tagTree.length === 0 ? (
                     <div className="py-8 text-center text-text-muted opacity-40 italic text-xs">
                         {searchQuery ? 'No matching tags' : 'No tags found'}

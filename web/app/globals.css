@@ -73,6 +73,29 @@ html {
   display: none;
 }
 
+/* Subtle scrollbar for sidebars */
+.scrollbar-subtle::-webkit-scrollbar {
+  width: 2px;
+}
+
+.scrollbar-subtle::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-subtle::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.scrollbar-subtle::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.scrollbar-subtle {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.05) transparent;
+}
+
 /* Animations */
 @keyframes slide-up {
   from {

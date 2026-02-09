@@ -41,75 +41,53 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
         return () => clearTimeout(timer);
     }, []);
 
-    const getCategoryColor = (category: string): string => {
-        const colors: Record<string, string> = {
-            'Tech': 'bg-blue-500/20 text-blue-400',
-            'Articles': 'bg-purple-500/20 text-purple-400',
-            'Video': 'bg-red-500/20 text-red-400',
-            'Social': 'bg-pink-500/20 text-pink-400',
-            'Research': 'bg-green-500/20 text-green-400',
-            'Health': 'bg-emerald-500/20 text-emerald-400',
-            'General': 'bg-gray-500/20 text-gray-400',
-        };
-        return colors[category] || colors['General'];
-    };
-
-    const getTimeAgo = (timestamp: any, now: number): string => {
-        if (!timestamp || !now) return '...';
-        const time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
-        if (isNaN(time)) return 'recently';
-
-        const seconds = Math.floor((now - time) / 1000);
-        if (seconds < 60) return 'just now';
-        if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-        if (seconds < 84600) return `${Math.floor(seconds / 3600)}h`;
-        return new Date(time).toLocaleDateString([], { month: 'short', day: 'numeric' });
-    };
-
     return (
-        <div className="w-full overflow-x-auto rounded-2xl border border-border-subtle bg-card shadow-sm">
-            <table className="w-full text-left border-collapse">
+        <div className="w-full overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-sm">
+            <table className="w-full text-left border-collapse table-fixed">
                 <thead>
                     <tr className="border-b border-border-subtle bg-white/[0.01] dark:bg-white/[0.02]">
-                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest w-[50%]">Source & Insight</th>
-                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest text-center w-[12%]">Category</th>
-                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest w-[25%]">Tags</th>
-                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest text-right w-[13%]">Actions</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[22%]">Source</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[38%]">Insight</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-center w-[12%]">Category</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[18%]">Tags</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-right w-[10%]">Actions</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-border-subtle">
                     {links.map((link) => (
-                        <tr key={link.id} className="group hover:bg-white/[0.03] transition-colors relative">
-                            <td className="px-6 py-6 cursor-pointer" onClick={() => onOpenDetails(link)}>
-                                <div className="flex flex-col gap-1">
-                                    <div className="text-sm font-bold text-text group-hover:text-accent transition-colors flex items-center gap-2">
+                        <tr key={link.id} className="group hover:bg-white/[0.03] transition-all duration-200 relative">
+                            <td className="px-6 py-5 cursor-pointer align-top" onClick={() => onOpenDetails(link)}>
+                                <div className="flex flex-col gap-0.5 min-w-0">
+                                    <div className="text-[13px] font-bold text-text group-hover:text-accent transition-colors flex items-center gap-1.5 truncate">
                                         {link.title}
+                                    </div>
+                                    <div className="flex items-center gap-1 text-[10px] text-text-muted/60 truncate italic">
+                                        {new URL(link.url).hostname.replace('www.', '')}
                                         <ExternalLink
-                                            className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:text-white"
+                                            className="w-2.5 h-2.5 opacity-40 group-hover:opacity-100 transition-opacity cursor-pointer hover:text-white"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 window.open(link.url, '_blank');
                                             }}
                                         />
                                     </div>
-                                    <p className="text-xs text-text-secondary line-clamp-2 opacity-80">{link.summary}</p>
-                                    <div className="flex items-center gap-3 mt-1 text-[10px] font-medium text-text-muted/50 tabular-nums uppercase tracking-wider">
-                                        <span className="flex items-center gap-1">
-                                            <Inbox className="w-3 h-3" />
-                                            Saved {now > 0 ? getTimeAgo(link.createdAt, now) : '...'}
-                                        </span>
-                                    </div>
                                 </div>
                             </td>
-                            <td className="px-6 py-6 text-center">
+                            <td className="px-6 py-5 cursor-pointer align-top" onClick={() => onOpenDetails(link)}>
+                                <p className="text-xs text-text-secondary leading-relaxed line-clamp-2 opacity-90 group-hover:opacity-100 transition-opacity">
+                                    {link.summary}
+                                </p>
+                            </td>
+                            <td className="px-6 py-5 text-center align-top">
                                 {(() => {
                                     const colorStyle = getCategoryColorStyle(link.category);
                                     return (
                                         <span
-                                            className="text-[10px] uppercase font-black tracking-tighter px-2.5 py-1 rounded-lg inline-block"
+                                            className="text-[9px] uppercase font-black tracking-tighter px-2.5 py-1 rounded-full inline-block border border-transparent"
                                             style={{
                                                 backgroundColor: colorStyle.backgroundColor,
                                                 color: colorStyle.color,
+                                                borderColor: colorStyle.borderColor,
                                             }}
                                         >
                                             {link.category}
@@ -117,45 +95,40 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                                     );
                                 })()}
                             </td>
-                            <td className="px-6 py-6 relative">
+                            <td className="px-6 py-5 relative align-top">
                                 <div
-                                    className="flex flex-col gap-1 cursor-pointer hover:bg-white/5 p-1 rounded-lg transition-all"
+                                    className="flex flex-wrap gap-1 cursor-pointer min-h-[24px]"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         setActiveTagPicker(activeTagPicker === link.id ? null : link.id);
                                     }}
                                 >
-                                    <div className="flex flex-wrap gap-1">
-                                        {link.tags.length > 0 ? (
-                                            link.tags.slice(0, 3).map(tag => {
-                                                const parts = tag.split('/');
-                                                const leaf = parts[parts.length - 1];
-                                                const parents = parts.slice(0, -1).join('/');
-                                                return (
-                                                    <span
-                                                        key={tag}
-                                                        className="text-[9px] font-bold text-text-muted/60 bg-white/5 px-1.5 py-0.5 rounded flex items-center gap-1 group/tag relative"
-                                                    >
-                                                        {parents && <span className="opacity-30 font-normal">{parents}/</span>}
-                                                        {leaf}
-                                                        <X
-                                                            className="w-2.5 h-2.5 ml-0.5 opacity-0 group-hover/tag:opacity-100 hover:text-red-400 transition-all cursor-pointer"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                onUpdateTags(link.id, link.tags.filter(t => t !== tag));
-                                                            }}
-                                                        />
-                                                    </span>
-                                                );
-                                            })
-                                        ) : (
-                                            <span className="text-[10px] text-text-muted/40 italic flex items-center gap-1">
-                                                <Plus className="w-2.5 h-2.5" />
-                                                Add tags
-                                            </span>
-                                        )}
-                                        {link.tags.length > 3 && <span className="text-[9px] text-text-muted/30 self-center">+{link.tags.length - 3}</span>}
-                                    </div>
+                                    {link.tags.length > 0 ? (
+                                        link.tags.map(tag => {
+                                            const parts = tag.split('/');
+                                            const leaf = parts[parts.length - 1];
+                                            return (
+                                                <span
+                                                    key={tag}
+                                                    className="text-[9px] font-bold text-accent bg-accent/10 border border-accent/20 px-2.5 py-0.5 rounded-full flex items-center gap-1 group/tag transition-all hover:bg-accent/20 hover:border-accent/30"
+                                                >
+                                                    {leaf}
+                                                    <X
+                                                        className="w-2.5 h-2.5 ml-0.5 opacity-0 group-hover/tag:opacity-100 hover:text-red-400 transition-all cursor-pointer"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onUpdateTags(link.id, link.tags.filter(t => t !== tag));
+                                                        }}
+                                                    />
+                                                </span>
+                                            );
+                                        })
+                                    ) : (
+                                        <button className="text-[10px] text-text-muted/30 hover:text-accent transition-colors flex items-center gap-1 italic">
+                                            <Plus className="w-2.5 h-2.5" />
+                                            Add tags
+                                        </button>
+                                    )}
                                 </div>
 
                                 {/* Multi-select Popover */}
@@ -165,7 +138,7 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                                             className="fixed inset-0 z-10"
                                             onClick={() => setActiveTagPicker(null)}
                                         />
-                                        <div className="absolute top-full left-6 mt-1 w-64 bg-card border border-white/10 rounded-xl shadow-2xl z-20 flex flex-col p-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                                        <div className="absolute top-10 right-0 w-64 bg-card/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-20 flex flex-col p-2 animate-in fade-in zoom-in-95 duration-200">
                                             <div className="flex items-center justify-between px-2 py-1.5 border-b border-white/5 mb-1">
                                                 <span className="text-[10px] font-black uppercase tracking-widest text-text-muted">Tags</span>
                                                 <X
@@ -182,15 +155,15 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                                                 <input
                                                     autoFocus
                                                     type="text"
-                                                    placeholder="Search or create tag..."
-                                                    className="w-full bg-white/5 border border-white/5 rounded-md px-2 py-1 text-xs text-text placeholder:text-text-muted/50 focus:outline-none focus:border-accent/50"
+                                                    placeholder="Search or create..."
+                                                    className="w-full bg-white/5 border border-white/5 rounded-lg px-2 py-1.5 text-xs text-text placeholder:text-text-muted/50 focus:outline-none focus:border-accent/50 transition-all"
                                                     value={tagSearch}
                                                     onChange={(e) => setTagSearch(e.target.value)}
                                                     onClick={(e) => e.stopPropagation()}
                                                 />
                                             </div>
 
-                                            <div className="max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 pr-1">
+                                            <div className="max-h-48 overflow-y-auto pr-1 custom-scrollbar">
                                                 {filteredAllTags.map(tag => {
                                                     const isSelected = link.tags.includes(tag);
                                                     return (
@@ -203,7 +176,7 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                                                                     : [...link.tags, tag];
                                                                 onUpdateTags(link.id, newTags);
                                                             }}
-                                                            className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-all hover:bg-white/5 ${isSelected ? 'text-accent font-bold bg-accent/5' : 'text-text-secondary'}`}
+                                                            className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-all hover:bg-white/5 mb-0.5 ${isSelected ? 'text-accent font-bold bg-accent/5' : 'text-text-secondary'}`}
                                                         >
                                                             <div className="flex items-center gap-2">
                                                                 <Tag className={`w-3 h-3 ${isSelected ? 'text-accent' : 'text-text-muted'}`} />
@@ -240,28 +213,28 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                                 )}
                             </td>
 
-                            <td className="px-6 py-6 text-right">
-                                <div className="inline-flex items-center gap-1.5">
+                            <td className="px-6 py-5 text-right align-top">
+                                <div className="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
                                     <button
                                         onClick={() => onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite')}
-                                        className={`p-2 rounded-xl transition-all ${link.status === 'favorite' ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-muted hover:bg-white/5 hover:text-text'}`}
+                                        className={`p-2 rounded-lg transition-all ${link.status === 'favorite' ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-muted hover:bg-white/5 hover:text-text'}`}
                                         title="Favorite"
                                     >
-                                        <Star className={`w-4 h-4 ${link.status === 'favorite' ? 'fill-yellow-500' : ''}`} />
+                                        <Star className={`w-3.5 h-3.5 ${link.status === 'favorite' ? 'fill-yellow-500' : ''}`} />
                                     </button>
                                     <button
                                         onClick={() => onStatusChange(link.id, link.status === 'archived' ? 'unread' : 'archived')}
-                                        className={`p-2 rounded-xl transition-all ${link.status === 'archived' ? 'text-accent bg-accent/10' : 'text-text-muted hover:bg-white/5 hover:text-text'}`}
+                                        className={`p-2 rounded-lg transition-all ${link.status === 'archived' ? 'text-accent bg-accent/10' : 'text-text-muted hover:bg-white/5 hover:text-text'}`}
                                         title={link.status === 'archived' ? 'Unarchive' : 'Archive'}
                                     >
-                                        {link.status === 'archived' ? <Inbox className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+                                        {link.status === 'archived' ? <Inbox className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
                                     </button>
                                     <button
                                         onClick={() => setDeleteLinkId(link.id)}
-                                        className="p-2 rounded-xl text-text-muted hover:bg-red-500/10 hover:text-red-500 transition-all"
+                                        className="p-2 rounded-lg text-text-muted hover:bg-red-500/10 hover:text-red-500 transition-all"
                                         title="Delete"
                                     >
-                                        <Trash2 className="w-4 h-4" />
+                                        <Trash2 className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
                             </td>
