@@ -11,9 +11,13 @@ Output MUST be a valid JSON object only.
 
 Requirements for the analysis:
 
-1. title: Create a concise, descriptive title that captures the core topic. Be factual, not clickbait.
+1. language: Identify the primary language of the content. Use ISO 639-1 codes (e.g., "he" for Hebrew, "en" for English).
 
-2. summary: Write 2 to 4 concise, information-dense sentences for a card preview. 
+2. title: Create a concise, descriptive title that captures the core topic. Be factual, not clickbait.
+   - **LANGUAGE**: Write the title in the SAME language as the input content.
+
+3. summary: Write 2 to 4 concise, information-dense sentences for a card preview. 
+   - **LANGUAGE**: Write the summary in the SAME language as the input content.
    - **SCANNABILITY**: Use **bolding** (double asterisks) for key terms, dates, or names to make them pop.
    - **STRUCTURE**: Add a line break (\\n) between each sentence to create visual separation.
    - Summarize ONLY what the content explicitly states.
@@ -24,7 +28,8 @@ Requirements for the analysis:
    GOOD: "Researchers at **MIT** found that **intermittent fasting** reduced inflammation markers by **40%** in a 12-week trial.\n\nThe study showed benefits appeared after just **2 weeks**."
 
 
-3. detailedSummary: Write a well-structured, professional summary using markdown formatting:
+4. detailedSummary: Write a well-structured, professional summary using markdown formatting:
+   - **LANGUAGE**: Write the detailed summary in the SAME language as the input content.
    - Start with a 1-2 sentence overview paragraph.
    - Use "## Key Points" as a subheading, followed by bullet points (use - for bullets).
    - Each bullet should be a factual statement from the content.
@@ -33,14 +38,17 @@ Requirements for the analysis:
    - Keep the tone neutral and professional throughout.
    - Total length: 150-300 words.
 
-4. category: Assign exactly one high-level category (e.g., Tech, Health, Philosophy, Business, Research, Science, Finance, Productivity, Design, Career). If the content is a recipe, use "Recipe".
+5. category: Assign exactly one high-level category (e.g., Tech, Health, Philosophy, Business, Research, Science, Finance, Productivity, Design, Career). If the content is a recipe, use "Recipe".
+   - **CRITICAL**: The category MUST ALWAYS be in English, even if the content is in another language.
 
-5. tags: Provide exactly 3 or 4 specific, relevant tags for organization.
+6. tags: Provide exactly 3 or 4 specific, relevant tags for organization.
+   - **LANGUAGE**: Write tags in the SAME language as the input content.
    - Use lowercase.
    - PREFER REUSING EXISTING TAGS provided in the "Existing Tags" list if they are applicable.
    - Only create a new tag if no existing tags fit the content.
 
-6. actionableTakeaway: One concrete, specific action or learning the reader can apply.
+7. actionableTakeaway: One concrete, specific action or learning the reader can apply.
+   - **LANGUAGE**: Write the takeaway in the SAME language as the input content.
 
 CRITICAL RULES:
 - Be a neutral reporter, not a reviewer. Report WHAT is said, not HOW WELL it is said.

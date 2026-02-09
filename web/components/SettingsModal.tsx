@@ -15,9 +15,9 @@ interface SettingsModalProps {
 export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalProps) {
     const [settings, setSettings] = useState<User['settings']>({
         theme: 'dark',
-        dailyDigest: false,
-        remindersEnabled: true,
-        reminderFrequency: 'smart'
+        daily_digest: false,
+        reminders_enabled: true,
+        reminder_frequency: 'smart'
     });
     const [isLoading, setIsLoading] = useState(true);
 
@@ -34,9 +34,9 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
             if (userSettings) {
                 setSettings({
                     theme: userSettings.theme || 'dark',
-                    dailyDigest: userSettings.dailyDigest || false,
-                    remindersEnabled: userSettings.remindersEnabled ?? true,
-                    reminderFrequency: userSettings.reminderFrequency || 'smart'
+                    daily_digest: userSettings.daily_digest || false,
+                    reminders_enabled: userSettings.reminders_enabled ?? true,
+                    reminder_frequency: userSettings.reminder_frequency || 'smart'
                 });
             }
         } catch (error) {
@@ -47,19 +47,19 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
     };
 
     const handleToggleReminders = () => {
-        setSettings(prev => ({ ...prev, remindersEnabled: !prev.remindersEnabled }));
+        setSettings(prev => ({ ...prev, reminders_enabled: !prev.reminders_enabled }));
     };
 
-    const handleFrequencyChange = (frequency: User['settings']['reminderFrequency']) => {
-        setSettings(prev => ({ ...prev, reminderFrequency: frequency }));
+    const handleFrequencyChange = (frequency: User['settings']['reminder_frequency']) => {
+        setSettings(prev => ({ ...prev, reminder_frequency: frequency }));
     };
 
     const handleSave = async () => {
         setIsLoading(true);
         try {
             await updateUserSettings(uid, {
-                remindersEnabled: settings.remindersEnabled,
-                reminderFrequency: settings.reminderFrequency
+                reminders_enabled: settings.reminders_enabled,
+                reminder_frequency: settings.reminder_frequency
             });
             onClose();
         } catch (error) {
@@ -97,8 +97,8 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className={`p-2.5 rounded-xl ${settings.remindersEnabled ? 'bg-accent/10 text-accent' : 'bg-white/5 text-text-muted'}`}>
-                                        {settings.remindersEnabled ? <Bell className="w-5 h-5" /> : <BellOff className="w-5 h-5" />}
+                                    <div className={`p-2.5 rounded-xl ${settings.reminders_enabled ? 'bg-accent/10 text-accent' : 'bg-white/5 text-text-muted'}`}>
+                                        {settings.reminders_enabled ? <Bell className="w-5 h-5" /> : <BellOff className="w-5 h-5" />}
                                     </div>
                                     <div>
                                         <div className="font-medium text-text">Global Reminders</div>
@@ -107,13 +107,13 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                                 </div>
                                 <button
                                     onClick={handleToggleReminders}
-                                    className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${settings.remindersEnabled ? 'bg-accent' : 'bg-white/10'}`}
+                                    className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${settings.reminders_enabled ? 'bg-accent' : 'bg-white/10'}`}
                                 >
-                                    <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${settings.remindersEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                                    <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${settings.reminders_enabled ? 'translate-x-6' : 'translate-x-0'}`} />
                                 </button>
                             </div>
 
-                            {settings.remindersEnabled && (
+                            {settings.reminders_enabled && (
                                 <div className="ml-[52px] space-y-2">
                                     <label className="text-xs text-text-muted block mb-1">Frequency</label>
                                     <div className="grid grid-cols-3 gap-2">
@@ -121,7 +121,7 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                                             <button
                                                 key={freq}
                                                 onClick={() => handleFrequencyChange(freq)}
-                                                className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all ${settings.reminderFrequency === freq
+                                                className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all ${settings.reminder_frequency === freq
                                                     ? 'bg-accent/10 border-accent/20 text-accent'
                                                     : 'bg-white/5 border-white/5 text-text-muted hover:bg-white/10'
                                                     }`}
@@ -133,7 +133,7 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                                 </div>
                             )}
 
-                            {settings.remindersEnabled && settings.reminderFrequency === 'smart' && (
+                            {settings.reminders_enabled && settings.reminder_frequency === 'smart' && (
                                 <div className="mt-3 p-3 rounded-xl bg-accent/5 border border-accent/10 animate-in fade-in slide-in-from-top-2">
                                     <div className="flex gap-2">
                                         <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />

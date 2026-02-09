@@ -306,67 +306,143 @@ Source: vxtwitter API
 
 def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
     """
-    Scrape Instagram URLs using ddinstagram.com bridge for metadata
-    Also incorporates the original WhatsApp message body as context.
+    Scrape Instagram URLs using direct scraping first (reliable with mobile headers), then fall back to bridges.
     """
     print(f"Analyzing Instagram URL: {url}")
     
     metadata_lines = []
-    title = "Instagram Post"
-    desc = ""
+    best_title = "Instagram Post"
+    best_desc = ""
+    generic_titles = ["Instagram Post", "Instagram", "Open in App", "Login • Instagram", "Instagram Video", "Instagram Reel"]
     
-    # 1. Try bridge services (Reliable for meta tags)
-    bridges = ['instagramez.com', 'kkinstagram.com', 'ddinstagram.com']
-    for bridge in bridges:
-        try:
-            bridge_url = url.replace('instagram.com', bridge)
-            print(f"Trying Instagram bridge: {bridge_url}")
-            headers = {
-                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
+    # User-Agent that usually gets the meta description from Instagram
+    MOBILE_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
+
+    # 1. Try direct scrape first (Often contains full caption in meta tags)
+    try:
+        print("Trying direct Instagram scrape...")
+        headers = {
+            "User-Agent": MOBILE_USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.ok:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Extract meta tags
+            meta_sources = {
+                'title': ['og:title', 'twitter:title', 'title'],
+                'desc': ['og:description', 'twitter:description', 'description']
             }
-            response = requests.get(bridge_url, headers=headers, timeout=5)
-            if response.ok:
-                from bs4 import BeautifulSoup
-                soup = BeautifulSoup(response.text, 'html.parser')
-                
-                # Extract OG tags
-                title_tag = soup.find('meta', property='og:title')
-                desc_tag = soup.find('meta', property='og:description')
-                
-                if title_tag:
-                    title = title_tag['content'].split('|')[0].strip() # Clean up titles like "User on Instagram | Title"
-                if desc_tag:
-                    desc = desc_tag['content']
+            
+            results = {'title': None, 'desc': None}
+            for key, tags in meta_sources.items():
+                for tag_name in tags:
+                    tag = soup.find('meta', property=tag_name) or soup.find('meta', attrs={'name': tag_name})
+                    if tag and tag.get('content'):
+                        # Check for the common "Likes, Comments - User on Instagram" pattern
+                        content = tag['content']
+                        if "Likes," in content and "Comments" in content and "Instagram" in content:
+                            # It's a rich description
+                            results[key] = content
+                            break
+                        results[key] = content
+                        break
+
+            d_title = results['title'].split('|')[0].strip() if results['title'] else ""
+            d_desc = results['desc'] if results['desc'] else ""
+            
+            if d_title and d_title not in generic_titles:
+                best_title = d_title
+            if d_desc and len(d_desc) > 20: # Instagram meta desc is usually rich
+                best_desc = d_desc
+                metadata_lines.append(f"CONTENT DESCRIPTION:\n{d_desc}")
+    except Exception as e:
+        print(f"Direct scrape failed: {e}")
+
+    # 2. Try bridge services only if direct scrape was "thin"
+    if len(best_desc) < 100:
+        bridges = ['instagramez.com', 'kkinstagram.com', 'ddinstagram.com']
+        for bridge in bridges:
+            try:
+                bridge_url = url.replace('instagram.com', bridge)
+                print(f"Trying Instagram bridge: {bridge_url}")
+                headers = {"User-Agent": MOBILE_USER_AGENT}
+                response = requests.get(bridge_url, headers=headers, timeout=5)
+                if response.ok:
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(response.text, 'html.parser')
                     
-                if title or desc:
-                    metadata_lines.append(f"BRIDGE METADATA ({bridge}):\nTitle: {title}\nDescription: {desc}")
-                    break # Stop if one bridge works
-        except Exception as e:
-            print(f"Instagram bridge {bridge} failed: {e}")
+                    results = {'title': None, 'desc': None}
+                    meta_tags = soup.find_all('meta')
+                    for tag in meta_tags:
+                        prop = tag.get('property', '') or tag.get('name', '')
+                        if prop in ['og:description', 'twitter:description', 'description']:
+                            results['desc'] = tag.get('content')
+                        if prop in ['og:title', 'twitter:title', 'title']:
+                            results['title'] = tag.get('content')
 
-    # 2. Incorporate original message body (Often contains shared caption)
+                    b_title = results['title'].split('|')[0].strip() if results['title'] else ""
+                    b_desc = results['desc'] if results['desc'] else ""
+                    
+                    # Ignore AliExpress or bridge landing pages
+                    if "AliExpress" in b_title or "AliExpress" in b_desc or "Open in App" in b_title:
+                        continue
+
+                    if b_desc and len(b_desc) > len(best_desc):
+                        best_desc = b_desc
+                        metadata_lines.append(f"SECONDARY SOURCE DESCRIPTION:\n{b_desc}")
+                        if b_title and b_title not in generic_titles:
+                            best_title = b_title
+                        if len(best_desc) > 200:
+                            break
+            except Exception as e:
+                print(f"Instagram bridge {bridge} failed: {e}")
+
+    # 3. Incorporate original message body (Often contains shared caption)
     if message_body and url in message_body:
-        # Remove the URL from the body to isolate the caption
         caption_guess = message_body.replace(url, '').strip()
-        if caption_guess:
+        noise = ["Check out this reel!", "Watch this reel by", "Instagram post by", "See this post on Instagram", "Watch this video on Instagram"]
+        for n in noise:
+            caption_guess = caption_guess.replace(n, '').strip()
+            
+        if caption_guess and len(caption_guess) > 5:
             metadata_lines.append(f"WHATSAPP SHARED CAPTION:\n{caption_guess}")
+            if len(caption_guess) > len(best_desc):
+                best_desc = caption_guess
+            if best_title in generic_titles:
+                best_title = caption_guess[:100].split('\n')[0]
 
-    if not metadata_lines:
+    if not metadata_lines and not best_desc:
         return {"html": "", "title": "Instagram Link", "text": "Instagram content (metadata extraction failed)"}
+
+    # Final Title fallback if still generic but we have a description
+    if best_title in generic_titles and best_desc:
+        # If it's the rich Instagram desc, it might contain the user name
+        if " - " in best_desc and " on Instagram: " in best_desc:
+            parts = best_desc.split(" on Instagram: ")
+            if len(parts) > 1:
+                # Use the part AFTER the user name as title
+                best_title = parts[1][:100].split('\n')[0].strip('"')
+            else:
+                best_title = best_desc[:100].split('\n')[0]
+        else:
+            best_title = best_desc[:100].split('\n')[0]
 
     final_text = "\n\n---\n\n".join(metadata_lines)
     
     return {
         "html": final_text,
-        "title": title,
+        "title": best_title,
         "text": final_text
     }
-
 
 def find_user_by_phone(phone_number: str) -> Optional[str]:
     """
     Look up user UID by phone number in Firestore.
-    Robust matching: strips 'whatsapp:', '+', and other non-digits.
+    Robust matching: searches both 'phone_number' and 'phoneNumber'.
     """
     db = get_db()
     # Normalize: keep only digits
@@ -375,20 +451,18 @@ def find_user_by_phone(phone_number: str) -> Optional[str]:
     print(f"Searching for user with normalized phone: {clean_number}")
     
     users_ref = db.collection('users')
-    # We'll search by the cleaned number. Note: This assumes stored numbers are ALSO searchable or we clean them.
-    # To be safest, we query all users and compare cleaned versions, OR assume E.164 without '+' in DB.
-    # Let's try the direct match first, but with a fallback.
-    query = users_ref.where('phone_number', '==', f"+{clean_number}").limit(1)
-    docs = query.get()
     
-    if docs:
-        return docs[0].id
+    # Try all permutations of keys and values (with/without +)
+    formats = [f"+{clean_number}", clean_number]
+    fields = ['phone_number', 'phoneNumber']
     
-    # Fallback: search without the '+' if that's how it's stored
-    query = users_ref.where('phone_number', '==', clean_number).limit(1)
-    docs = query.get()
-    if docs:
-        return docs[0].id
+    for field in fields:
+        for val in formats:
+            query = users_ref.where(field, '==', val).limit(1)
+            docs = query.get()
+            if docs:
+                logger.info(f"Found user {docs[0].id} via {field}={val}")
+                return docs[0].id
         
     print(f"User not found for phone: {phone_number} (normalized: {clean_number})")
     return None
@@ -623,9 +697,10 @@ def whatsapp_webhook(request):
     return {"success": True, "queued": True, "id": process_ref.id}, 200
 
 
-def _format_success_message(link_data: dict, reminder_time: Optional[datetime] = None) -> str:
+def _format_success_message(link_data: dict, reminder_time: Optional[datetime] = None, language: str = "en") -> str:
     """
-    Format a rich success message using the final link data structure
+    Format a rich success message using the final link data structure.
+    Supports English ("en") and Hebrew ("he").
     """
     title = link_data.get("title", "Untitled")
     category = link_data.get("category", "General")
@@ -635,7 +710,7 @@ def _format_success_message(link_data: dict, reminder_time: Optional[datetime] =
     read_time = meta.get("estimatedReadTime", 1)
     takeaway = meta.get("actionableTakeaway")
     
-    # Emojis for categories?
+    # Emojis for categories
     cat_emoji = "📂"
     if "Recipe" in category: cat_emoji = "🍲"
     elif "Tech" in category: cat_emoji = "💻"
@@ -643,28 +718,41 @@ def _format_success_message(link_data: dict, reminder_time: Optional[datetime] =
     elif "Business" in category: cat_emoji = "💼"
     elif "Science" in category: cat_emoji = "🔬"
     
+    # Localization strings
+    is_hebrew = language == "he"
+    
+    lbl_saved = "✅ *נשמר למוח השני*" if is_hebrew else "✅ *Saved to Second Brain*"
+    lbl_category = "קטגוריה" if is_hebrew else "Category"
+    lbl_read_time = "זמן קריאה" if is_hebrew else "Read Time"
+    lbl_min = "דק׳" if is_hebrew else "min"
+    lbl_tags = "תגיות" if is_hebrew else "Tags"
+    lbl_insight = "💡 *תובנה מרכזית:*" if is_hebrew else "💡 *Key Insight:*"
+    lbl_reminder_set = "⏰ *התזכורת נקבעה:*" if is_hebrew else "⏰ *Reminder Set:*"
+    lbl_reply_hint = "השב/י עם \"הזכר לי מחר\" לקביעת תזכורת." if is_hebrew else "REPLY with \"remind me tomorrow\" to set a reminder."
+    
+    # Format message
     lines = [
-        f"✅ *Saved to Second Brain*",
+        f"{lbl_saved}",
         f"",
         f"📄 *{title}*",
         f"",
-        f"{cat_emoji} *Category:* {category}",
-        f"⏱️ *Read Time:* {read_time} min",
-        f"🏷️ *Tags:* {', '.join([f'#{t}' for t in tags[:3]])}"
+        f"{cat_emoji} *{lbl_category}:* {category}",
+        f"⏱️ *{lbl_read_time}:* {read_time} {lbl_min}",
+        f"🏷️ *{lbl_tags}:* {', '.join([f'#{t}' for t in tags[:3]])}"
     ]
     
     if takeaway:
         lines.append(f"")
-        lines.append(f"💡 *Key Insight:*")
+        lines.append(f"{lbl_insight}")
         lines.append(f"{takeaway}")
         
     lines.append(f"")
     
     if reminder_time:
         date_str = reminder_time.strftime('%b %d at %I:%M %p')
-        lines.append(f"⏰ *Reminder Set:* {date_str}")
+        lines.append(f"{lbl_reminder_set} {date_str}")
     else:
-        lines.append(f"REPLY with \"remind me tomorrow\" to set a reminder.")
+        lines.append(f"{lbl_reply_hint}")
         
     return "\n".join(lines)
 
@@ -712,17 +800,27 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         claude = ClaudeService()
         analysis = claude.analyze_text(scraped["text"] or scraped["html"], existing_tags=existing_tags)
         
+        # VALIDATION: Ensure analysis is a dict (AI sometimes returns a list or string)
+        if not isinstance(analysis, dict):
+            logger.warning(f"AI returned unexpected type: {type(analysis)}. Attempting to fix.")
+            if isinstance(analysis, list) and len(analysis) > 0:
+                analysis = analysis[0] # Grab first item if it's a list
+            
+            if not isinstance(analysis, dict):
+                raise ValueError(f"AI Analysis failed to return a valid object: {analysis}")
+
         # 3. Build link document
-        log_to_firestore(task_id, "Saving processed link to brain", data={"finalTitle": analysis["title"]})
+        final_title = analysis.get("title", scraped.get("title", "Untitled"))
+        log_to_firestore(task_id, "Saving processed link to brain", data={"finalTitle": final_title})
         ref.update({"status": "saving"})
         
         link_data = {
             "url": url,
-            "title": analysis["title"],
-            "summary": analysis["summary"],
+            "title": final_title,
+            "summary": analysis.get("summary", "No summary available"),
             "detailedSummary": analysis.get("detailedSummary"),
-            "tags": analysis["tags"],
-            "category": analysis["category"],
+            "tags": analysis.get("tags", []),
+            "category": analysis.get("category", "General"),
             "status": LinkStatus.UNREAD.value,
             "createdAt": int(datetime.now().timestamp() * 1000),
             "metadata": {
@@ -739,7 +837,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # 5. Check for reminder intent
         reminder_time = handle_reminder_intent(original_body)
         
-        msg = _format_success_message(link_data, reminder_time)
+        msg = _format_success_message(link_data, reminder_time, language=analysis.get("language", "en"))
         
         logger.info(f"Processing complete, sending message to {from_number}")
         send_whatsapp_message(from_number, msg)
@@ -795,28 +893,36 @@ def calculate_next_reminder(reminder_count: int) -> datetime:
     return datetime.now() + interval
 
 
-@scheduler_fn.on_schedule(schedule="every 1 hours")
+@scheduler_fn.on_schedule(schedule="every 2 minutes")
 def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
     """
-    Scheduled function that runs every hour to check for pending reminders
+    Scheduled function that runs every 2 minutes to check for pending reminders
     Sends WhatsApp messages for links that are due for re-surfacing
     """
     db = get_db()
+    logger.info("Starting scheduled reminder check...")
     
     # Query all users
     users_ref = db.collection('users')
     users = users_ref.get()
     
+    user_count = 0
+    reminders_sent = 0
+    
     for user_doc in users:
         uid = user_doc.id
         user_data = user_doc.to_dict()
+        user_count += 1
         
         # Check if reminders are enabled for this user
         settings = user_data.get('settings', {})
-        if not settings.get('reminders_enabled', True):
+        # Note: Frontend uses camelCase, but keep snake_case fallback for safety
+        enabled = settings.get('reminders_enabled', settings.get('remindersEnabled', True))
+        
+        if not enabled:
             continue
             
-        phone_number = user_data.get('phone_number')
+        phone_number = user_data.get('phone_number') or user_data.get('phoneNumber')
         if not phone_number:
             continue
         
@@ -828,6 +934,8 @@ def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
         query = links_ref.where('reminderStatus', '==', 'pending').where('nextReminderAt', '<=', now_ms).limit(10)
         
         due_links = query.get()
+        if due_links:
+            logger.info(f"Found {len(due_links)} reminders for user {phone_number}")
         
         for link_doc in due_links:
             link_id = link_doc.id
@@ -846,27 +954,33 @@ def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
             
             message = f"🧠 *Second Brain Loop*\n\nTime to revisit:\n📄 *{title}*\n{cat_emoji} {category}\n\n{url}\n\n💡 *Why now?* Spaced repetition strengthens long-term retention."
             
-            send_whatsapp_message(f"whatsapp:{phone_number}", message)
-            
-            # Update the link's reminder status
-            new_reminder_count = reminder_count + 1
-            next_reminder = calculate_next_reminder(new_reminder_count)
-            next_reminder_ms = int(next_reminder.timestamp() * 1000)
-            
-            # If we've reached the max stages (3), mark as completed
-            if new_reminder_count >= 3:
-                link_doc.reference.update({
-                    'reminderStatus': ReminderStatus.COMPLETED.value,
-                    'reminderCount': new_reminder_count,
-                    'nextReminderAt': None
-                })
-            else:
-                link_doc.reference.update({
-                    'reminderCount': new_reminder_count,
-                    'nextReminderAt': next_reminder_ms
-                })
-            
-            print(f"Sent reminder for link {link_id} to {phone_number}")
+            try:
+                send_whatsapp_message(f"whatsapp:{phone_number}", message)
+                reminders_sent += 1
+                
+                # Update the link's reminder status
+                new_reminder_count = reminder_count + 1
+                next_reminder = calculate_next_reminder(new_reminder_count)
+                next_reminder_ms = int(next_reminder.timestamp() * 1000)
+                
+                # If we've reached the max stages (3), mark as completed
+                if new_reminder_count >= 3:
+                    link_doc.reference.update({
+                        'reminderStatus': ReminderStatus.COMPLETED.value,
+                        'reminderCount': new_reminder_count,
+                        'nextReminderAt': None
+                    })
+                else:
+                    link_doc.reference.update({
+                        'reminderCount': new_reminder_count,
+                        'nextReminderAt': next_reminder_ms
+                    })
+                
+                logger.info(f"Successfully sent reminder for link {link_id} to {phone_number}")
+            except Exception as e:
+                logger.error(f"Failed to send reminder for link {link_id}: {e}")
+
+    logger.info(f"Reminder check complete. Users checked: {user_count}, Reminders sent: {reminders_sent}")
 
 
 

@@ -10,6 +10,7 @@ export interface LinkMetadata {
 }
 
 export interface AIAnalysis {
+  language?: string;
   title: string;
   summary: string;
   detailedSummary: string;
@@ -66,9 +67,9 @@ export interface User {
   createdAt: number;
   settings: {
     theme: 'dark' | 'light';
-    dailyDigest: boolean;
-    remindersEnabled: boolean;
-    reminderFrequency: 'smart' | 'daily' | 'weekly' | 'off';
+    daily_digest: boolean;
+    reminders_enabled: boolean;
+    reminder_frequency: 'smart' | 'daily' | 'weekly' | 'off';
   };
 }
 

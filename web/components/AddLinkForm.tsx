@@ -51,7 +51,15 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
         try {
             // Stage 1: Analysis
             // Fetch existing tags to pass to AI for reuse
-            const existingTags = uid ? await getUserTags(uid) : [];
+            let existingTags: string[] = [];
+            try {
+                if (uid) {
+                    existingTags = await getUserTags(uid);
+                }
+            } catch (tagErr) {
+                console.warn('Failed to fetch existing tags (proceeding without):', tagErr);
+                // Continue without tags - this is non-critical optimization
+            }
 
             const response = await fetch('/api/analyze', {
                 method: 'POST',

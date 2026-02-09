@@ -34,6 +34,7 @@ class AIAnalysis(BaseModel):
     """
     Output from Gemini AI analysis
     """
+    language: str = Field(description="ISO 639-1 language code of the content (e.g., 'en', 'he')", default="en")
     title: str = Field(description="Clear, descriptive title")
     summary: str = Field(description="2-4 sentences for snackable preview")
     category: str = Field(description="One high-level category")
@@ -81,9 +82,9 @@ class WebhookPayload(BaseModel):
 class UserSettings(BaseModel):
     """User preferences"""
     theme: str = "dark"
-    dailyDigest: bool = False
-    remindersEnabled: bool = True
-    reminderFrequency: str = "smart"  # "smart", "daily", "weekly", "off"
+    daily_digest: bool = False
+    reminders_enabled: bool = True
+    reminder_frequency: str = "smart"  # "smart", "daily", "weekly", "off"
 
 
 class UserDocument(BaseModel):
@@ -91,7 +92,7 @@ class UserDocument(BaseModel):
     Firestore document schema for a user
     Collection path: users/{uid}
     """
-    phoneNumber: str = Field(description="Phone number in E.164 format, e.g., +16462440305")
+    phone_number: str = Field(description="Phone number in E.164 format, e.g., +16462440305")
     createdAt: datetime = Field(default_factory=datetime.now)
     settings: UserSettings = Field(default_factory=UserSettings)
-    lastSavedLinkId: Optional[str] = Field(None, description="ID of the last saved link for context")
+    last_saved_link_id: Optional[str] = Field(None, description="ID of the last saved link for context")
