@@ -519,22 +519,38 @@ def send_whatsapp_message(to_number: str, body: str):
         print(f"Twilio error: {e}")
 
 
+def is_hebrew(text: str) -> bool:
+    """Check if text contains Hebrew characters"""
+    return any("\u0590" <= char <= "\u05FF" for char in text)
+
 def handle_reminder_intent(text: str) -> Optional[datetime]:
-    """Parse text for reminder commands"""
+    """Parse text for reminder commands (English and Hebrew)"""
     text = text.lower()
     now = datetime.now()
     
+    # English Patterns
     if 'tomorrow' in text:
         return now + timedelta(days=1)
     
     if 'next week' in text:
-        # Simplification: Today + 7 days
         return now + timedelta(days=7)
     
-    # Match "in X days"
     match = re.search(r'\bin (\d+) days?', text)
     if match:
         days = int(match.group(1))
+        return now + timedelta(days=days)
+
+    # Hebrew Patterns
+    if 'מחר' in text:
+        return now + timedelta(days=1)
+        
+    if 'שבוע הבא' in text:
+        return now + timedelta(days=7)
+
+    # "בעוד X ימים" or "עוד X ימים"
+    match_he = re.search(r'(?:בעוד|עוד)\s+(\d+)\s+ימים', text)
+    if match_he:
+        days = int(match_he.group(1))
         return now + timedelta(days=days)
         
     return None
@@ -623,6 +639,74 @@ def debug_status(req: https_fn.Request) -> https_fn.Response:
         return https_fn.Response(f"Debug failed: {str(e)}", status=500)
 
 @https_fn.on_request()
+def analyze_link(req: https_fn.Request) -> https_fn.Response:
+    """
+    HTTP endpoint for analyzing URLs immediately (Synchronous)
+    Used by the frontend "Add Link" form.
+    """
+    # Enable CORS
+    if req.method == 'OPTIONS':
+        headers = {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Max-Age': '3600'
+        }
+        return https_fn.Response('', status=204, headers=headers)
+
+    headers = {'Access-Control-Allow-Origin': '*'}
+
+    try:
+        data = req.get_json()
+        if not data:
+            return https_fn.Response(json.dumps({"success": False, "error": "Invalid JSON body"}), status=400, headers=headers)
+        
+        url = data.get('url')
+        existing_tags = data.get('existingTags', [])
+        
+        if not url:
+            return https_fn.Response(json.dumps({"success": False, "error": "URL is required"}), status=400, headers=headers)
+            
+        logger.info(f"Analyzing URL synchronously: {url}")
+        
+        # 1. Scrape content
+        scraped = scrape_url(url)
+        if not scraped.get("text") and not scraped.get("html"):
+             return https_fn.Response(json.dumps({"success": False, "error": "Failed to scrape content"}), status=500, headers=headers)
+
+        # 2. Analyze with AI
+        claude = ClaudeService()
+        analysis = claude.analyze_text(scraped["text"] or scraped["html"], existing_tags=existing_tags)
+        
+        # 3. Construct Link Object (matching frontend expectation)
+        link_data = {
+            "url": url,
+            "title": analysis.get("title", scraped.get("title", "Untitled")),
+            "summary": analysis.get("summary", ""),
+            "detailedSummary": analysis.get("detailedSummary", ""),
+            "tags": analysis.get("tags", []),
+            "category": analysis.get("category", "General"),
+            "status": LinkStatus.UNREAD.value,
+            "createdAt": int(datetime.now().timestamp() * 1000),
+            "metadata": {
+                "originalTitle": scraped.get("title", ""),
+                "estimatedReadTime": max(1, len(scraped.get("text", "")) // 1500),
+                "actionableTakeaway": analysis.get("actionableTakeaway")
+            },
+            # Enhanced fields
+            "sourceType": "web", # Default
+            "confidence": 0.8,   # Default
+            "keyEntities": []    # Default
+        }
+        
+        return https_fn.Response(json.dumps({"success": True, "link": link_data}), status=200, headers=headers, mimetype='application/json')
+        
+    except Exception as e:
+        logger.error(f"Analysis failed: {e}")
+        return https_fn.Response(json.dumps({"success": False, "error": str(e)}), status=500, headers=headers, mimetype='application/json')
+
+
+@https_fn.on_request()
 def whatsapp_webhook(request):
     """
     WhatsApp webhook endpoint
@@ -644,9 +728,14 @@ def whatsapp_webhook(request):
     
     # Find user by phone number
     uid = find_user_by_phone(payload.from_number)
+    
+    # Detect language from incoming message
+    user_msg_is_hebrew = is_hebrew(payload.body)
+    
     if not uid:
         logger.warning(f"Unauthorized number: {payload.from_number}")
-        send_whatsapp_message(payload.from_number, "❌ Sorry, your phone number is not recognized. Please make sure it matches the number in your Second Brain settings.")
+        msg = "❌ מצטערים, מספר הטלפון שלך לא מזוהה. אנא וודא שהוא תואם להגדרות." if user_msg_is_hebrew else "❌ Sorry, your phone number is not recognized. Please make sure it matches the number in your Second Brain settings."
+        send_whatsapp_message(payload.from_number, msg)
         return {"error": "User not found"}, 403
     
     # Extract URL from message body
@@ -656,27 +745,37 @@ def whatsapp_webhook(request):
         # Handling conversational commands (Reminders) remains synchronous for instant feedback
         logger.info("No URL found, checking for commands")
         reminder_time = handle_reminder_intent(payload.body)
+        
         if reminder_time:
             user_doc = db.collection('users').document(uid).get()
             last_link_id = user_doc.to_dict().get('lastSavedLinkId')
             if last_link_id:
                 link_doc = db.collection('users').document(uid).collection('links').document(last_link_id).get()
                 if link_doc.exists:
-                     title = link_doc.to_dict().get('title', 'Unknown Link')
                      set_reminder(uid, last_link_id, reminder_time)
-                     date_str = reminder_time.strftime('%b %d at %I:%M %p')
                      
-                     # Try to get more details for a richer message if possible
+                     # Get Link Details
                      link_data = link_doc.to_dict()
                      title = link_data.get('title', 'Unknown Link')
                      category = link_data.get('category', 'General')
                      
-                     msg = f"⏰ *Reminder Set*\n\n📄 *{title}*\n📂 {category}\n📅 {date_str}"
+                     # Format Date
+                     date_str = reminder_time.strftime('%d/%m %H:%M') if user_msg_is_hebrew else reminder_time.strftime('%b %d at %I:%M %p')
+                     
+                     if user_msg_is_hebrew:
+                        msg = f"⏰ *התזכורת נקבעה*\n\n📄 *{title}*\n📂 {category}\n📅 {date_str}"
+                     else:
+                        msg = f"⏰ *Reminder Set*\n\n📄 *{title}*\n📂 {category}\n📅 {date_str}"
+                        
                      send_whatsapp_message(payload.from_number, msg)
                      return {"success": True}, 200
-            send_whatsapp_message(payload.from_number, "❌ No previous link found. Send a link first!")
+            
+            msg = "❌ לא נמצא לינק קודם. שלח לינק קודם!" if user_msg_is_hebrew else "❌ No previous link found. Send a link first!"
+            send_whatsapp_message(payload.from_number, msg)
             return {"error": "No context"}, 200
-        send_whatsapp_message(payload.from_number, "I can save links or set reminders. Try sending a URL!")
+            
+        msg = "אני יכול לשמור לינקים או לקבוע תזכורות. נסה לשלוח לינק!" if user_msg_is_hebrew else "I can save links or set reminders. Try sending a URL!"
+        send_whatsapp_message(payload.from_number, msg)
         return {"success": True}, 200
         
     # URL FOUND -> Save to pending_processing for Background Processing
@@ -821,6 +920,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             "detailedSummary": analysis.get("detailedSummary"),
             "tags": analysis.get("tags", []),
             "category": analysis.get("category", "General"),
+            "language": analysis.get("language", "en"),
             "status": LinkStatus.UNREAD.value,
             "createdAt": int(datetime.now().timestamp() * 1000),
             "metadata": {

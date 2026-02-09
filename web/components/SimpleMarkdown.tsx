@@ -6,13 +6,14 @@ interface SimpleMarkdownProps {
     content: string;
     className?: string;
     isCompact?: boolean;
+    isRtl?: boolean;
 }
 
 /**
  * Simple markdown renderer for AI summaries
  * Handles: ## headings, - bullet points, **bold**
  */
-export default function SimpleMarkdown({ content, className = '', isCompact = false }: SimpleMarkdownProps) {
+export default function SimpleMarkdown({ content, className = '', isCompact = false, isRtl = false }: SimpleMarkdownProps) {
     if (!content) return null;
 
     const lines = content.split('\n');
@@ -119,5 +120,5 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
     // Flush any remaining list items
     flushList();
 
-    return <div className={className}>{elements}</div>;
+    return <div className={`${className} ${isRtl ? 'text-right' : ''}`} dir={isRtl ? 'rtl' : 'ltr'}>{elements}</div>;
 }

@@ -58,6 +58,7 @@ export interface Link {
   nextReminderAt?: number; // Unix timestamp (ms)
   reminderCount?: number;
   lastViewedAt?: number; // Unix timestamp (ms)
+  language?: string;
 }
 
 // TODO: Replace with Firebase Auth user type

@@ -32,6 +32,7 @@ export default function Card({
     isSelected = false,
     onToggleSelection
 }: CardProps) {
+    const isRtl = link.language === 'he';
     const [now, setNow] = useState<number>(0);
 
     useEffect(() => {
@@ -75,7 +76,10 @@ export default function Card({
                 }
             }}
         >
-            <div className="p-4 sm:p-5 flex flex-col h-full space-y-3 sm:space-y-4">
+            <div
+                className="p-4 sm:p-5 flex flex-col h-full space-y-3 sm:space-y-4"
+                dir={isRtl ? "rtl" : "ltr"}
+            >
                 {/* Header Row: Category Badge */}
                 <div className="flex justify-between items-start gap-3">
                     {(() => {
@@ -143,7 +147,10 @@ export default function Card({
                 </div>
 
                 {/* Title - NO LINE CLAMP */}
-                <h3 className="font-bold text-base sm:text-lg text-text transition-colors leading-tight">
+                <h3
+                    dir={isRtl ? "rtl" : "ltr"}
+                    className={`font-bold text-base sm:text-lg text-text transition-colors leading-tight ${isRtl ? 'text-right' : ''}`}
+                >
                     {link.title}
                 </h3>
 
@@ -151,6 +158,7 @@ export default function Card({
                 <SimpleMarkdown
                     content={link.summary}
                     isCompact={true}
+                    isRtl={isRtl}
                     className="flex-grow"
                 />
 

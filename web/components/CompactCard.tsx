@@ -29,6 +29,7 @@ export default function CompactCard({
     onToggleSelection
 }: CompactCardProps) {
     const colorStyle = getCategoryColorStyle(link.category);
+    const isRtl = link.language === 'he';
 
     return (
         <article
@@ -44,7 +45,10 @@ export default function CompactCard({
                 }
             }}
         >
-            <div className="p-2 sm:p-3 flex flex-col h-full relative">
+            <div
+                className="p-2 sm:p-3 flex flex-col h-full relative"
+                dir={isRtl ? "rtl" : "ltr"}
+            >
                 {/* Top Section: Category and Star */}
                 <div className="flex justify-between items-start gap-2 z-10">
                     <span
@@ -71,7 +75,10 @@ export default function CompactCard({
 
                 {/* Title Container: Centered vertically and horizontally */}
                 <div className="flex-1 flex items-center justify-center py-1">
-                    <h3 className="font-bold text-[11px] sm:text-xs text-text transition-colors leading-tight text-center line-clamp-5 px-1">
+                    <h3
+                        dir={isRtl ? "rtl" : "ltr"}
+                        className={`font-bold text-[11px] sm:text-xs text-text transition-colors leading-tight text-center line-clamp-5 px-1 ${isRtl ? 'font-hebrew' : ''}`}
+                    >
                         {link.title}
                     </h3>
                 </div>

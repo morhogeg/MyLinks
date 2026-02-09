@@ -65,6 +65,7 @@ export default function LinkDetailModal({
     };
 
     const relatedLinks = getRelatedLinks();
+    const isRtl = link.language === 'he';
 
     const getTimeAgo = (timestamp: any, now: number): string => {
         if (!timestamp || !now) return '...';
@@ -157,9 +158,17 @@ export default function LinkDetailModal({
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto pt-4 px-4 pb-4 sm:px-6 sm:pb-6 md:px-8 md:pb-8 scrollbar-thin scrollbar-thumb-white/10">
+                <div
+                    className="flex-1 overflow-y-auto pt-4 px-4 pb-4 sm:px-6 sm:pb-6 md:px-8 md:pb-8 scrollbar-thin scrollbar-thumb-white/10"
+                    dir={isRtl ? "rtl" : "ltr"}
+                >
                     {/* Content Section */}
-                    <h2 className="font-bold text-2xl text-text mb-4 leading-tight">{link.title}</h2>
+                    <h2
+                        dir={isRtl ? "rtl" : "ltr"}
+                        className={`font-bold text-2xl text-text mb-4 leading-tight ${isRtl ? 'text-right' : ''}`}
+                    >
+                        {link.title}
+                    </h2>
 
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                         {/* Summary */}
@@ -167,10 +176,16 @@ export default function LinkDetailModal({
                             {link.detailedSummary ? (
                                 <SimpleMarkdown
                                     content={link.detailedSummary}
+                                    isRtl={isRtl}
                                     className="mb-6 text-base"
                                 />
                             ) : (
-                                <p className="text-text-secondary mb-6 leading-relaxed text-lg">{link.summary}</p>
+                                <p
+                                    dir={isRtl ? "rtl" : "ltr"}
+                                    className={`text-text-secondary mb-6 leading-relaxed text-lg ${isRtl ? 'text-right' : ''}`}
+                                >
+                                    {link.summary}
+                                </p>
                             )}
                         </div>
 

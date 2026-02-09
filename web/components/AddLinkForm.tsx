@@ -42,8 +42,15 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
+        console.log('Submit triggered with URL:', url); // DEBUG
+
         const formattedUrl = formatUrl(url);
-        if (!formattedUrl || isLoading) return;
+        console.log('Formatted URL:', formattedUrl); // DEBUG
+
+        if (!formattedUrl || isLoading) {
+            console.log('Validation failed or already loading'); // DEBUG
+            return;
+        }
 
         setIsLoading(true);
         setError(null);
@@ -61,16 +68,42 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                 // Continue without tags - this is non-critical optimization
             }
 
-            const response = await fetch('/api/analyze', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    url: formattedUrl,
-                    existingTags
-                }),
-            });
+            console.log('Calling /api/analyze...'); // DEBUG
+            let response;
+            try {
+                response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url: formattedUrl,
+                        existingTags
+                    }),
+                });
+            } catch (netErr) {
+                console.error('Network request failed:', netErr);
+                throw new Error(`Network Error: ${netErr instanceof Error ? netErr.message : String(netErr)}`);
+            }
 
-            const data = await response.json();
+            console.log('Response status:', response.status); // DEBUG
+
+            let responseText = '';
+            try {
+                responseText = await response.text();
+                console.log('Raw server response body:', responseText); // DEBUG
+            } catch (textErr) {
+                console.error('Failed to read response text:', textErr);
+                throw new Error('Failed to read server response');
+            }
+
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (jsonErr) {
+                console.error('JSON parse failed:', jsonErr);
+                throw new Error(`Invalid Server Response (Not JSON): ${jsonErr instanceof Error ? jsonErr.message : String(jsonErr)}`);
+            }
+
+            console.log('Analysis data:', data); // DEBUG
 
             if (!data.success) {
                 throw new Error(`Analysis Error: ${data.error || 'Failed to analyze URL'}`);
@@ -102,8 +135,13 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
             setIsExpanded(false);
             onLinkAdded();
         } catch (err) {
-            console.error('AddLinkForm Error:', err);
-            setError(err instanceof Error ? err.message : 'Something went wrong');
+            console.error('AddLinkForm Error Details:', err);
+            // Check if it's a DOMException or other weird browser error
+            if (err instanceof DOMException) {
+                console.error('DOMException name:', err.name);
+                console.error('DOMException message:', err.message);
+            }
+            setError(err instanceof Error ? err.message : `Unknown error: ${String(err)}`);
         } finally {
             setIsLoading(false);
         }
@@ -152,7 +190,7 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                                 <input
                                     id="url"
                                     type="text"
-                                    inputMode="url"
+                                    // inputMode="url" removed to prevent browser validation interference
                                     autoComplete="off"
                                     autoCorrect="off"
                                     autoCapitalize="off"
