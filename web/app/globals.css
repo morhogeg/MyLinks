@@ -75,20 +75,32 @@ html {
 
 /* Subtle scrollbar for sidebars */
 .scrollbar-subtle::-webkit-scrollbar {
-  width: 2px;
+  width: 2px !important;
+  height: 2px !important;
 }
 
-.scrollbar-subtle::-webkit-scrollbar-track {
-  background: transparent;
+.scrollbar-subtle::-webkit-scrollbar-track,
+.scrollbar-subtle::-webkit-scrollbar-track-piece,
+.scrollbar-subtle::-webkit-scrollbar-corner {
+  background: transparent !important;
+  -webkit-box-shadow: none !important;
+  box-shadow: none !important;
 }
 
 .scrollbar-subtle::-webkit-scrollbar-thumb {
-  background: rgba(150, 150, 150, 0.2);
-  border-radius: 10px;
+  background-color: rgba(150, 150, 150, 0.2) !important;
+  border-radius: 10px !important;
+  border: none !important;
+  -webkit-box-shadow: none !important;
+  box-shadow: none !important;
 }
 
 .scrollbar-subtle::-webkit-scrollbar-thumb:hover {
-  background: rgba(150, 150, 150, 0.4);
+  background-color: rgba(150, 150, 150, 0.2) !important;
+}
+
+.scrollbar-subtle::-webkit-scrollbar-button {
+  display: none !important;
 }
 
 .scrollbar-subtle {

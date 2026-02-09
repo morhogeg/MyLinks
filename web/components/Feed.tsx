@@ -10,11 +10,12 @@ import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder } from
 import { collection, query, orderBy, onSnapshot, where, getDocs, limit, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Card from './Card';
+import CompactCard from './CompactCard';
 import ReminderModal from './ReminderModal';
 import TableView from './TableView';
 import InsightsFeed from './InsightsFeed';
 import LinkDetailModal from './LinkDetailModal';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2 } from 'lucide-react';
 import TagExplorer from './TagExplorer';
 
 type FilterType = 'all' | 'unread' | 'archived' | 'favorite' | 'reminders';
@@ -36,7 +37,7 @@ export default function Feed() {
     const [selectedCategory, setSelectedCategory] = useState<Set<string>>(new Set());
     const [activeLink, setActiveLink] = useState<Link | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [viewMode, setViewMode] = useState<'grid' | 'table' | 'insights'>('grid');
+    const [viewMode, setViewMode] = useState<'grid' | 'table' | 'insights' | 'compact'>('grid');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
@@ -364,6 +365,13 @@ export default function Feed() {
                                 <List className="w-3 h-3" />
                             </button>
                             <button
+                                onClick={() => setViewMode('compact')}
+                                className={`p-1.5 rounded-full transition-all min-h-[26px] min-w-[26px] flex items-center justify-center ${viewMode === 'compact' ? 'bg-accent/80 text-white shadow-sm' : 'text-text-muted/40 hover:text-text-secondary'}`}
+                                title="Compact View"
+                            >
+                                <Grid2X2 className="w-3 h-3" />
+                            </button>
+                            <button
                                 onClick={() => setViewMode('insights')}
                                 className={`p-1.5 rounded-full transition-all min-h-[26px] min-w-[26px] flex items-center justify-center ${viewMode === 'insights' ? 'bg-accent/80 text-white shadow-sm' : 'text-text-muted/40 hover:text-text-secondary'}`}
                                 title="Insights View"
@@ -550,10 +558,29 @@ export default function Feed() {
                             selectedIds={selectedIds}
                             onToggleSelection={toggleSelection}
                         />
-                    ) : (
+                    ) : viewMode === 'grid' ? (
                         <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
                             {filteredLinks.map((link) => (
                                 <Card
+                                    key={link.id}
+                                    link={link}
+                                    onOpenDetails={setActiveLink}
+                                    onStatusChange={handleStatusChange}
+                                    onDelete={handleDelete}
+                                    onUpdateReminder={(link) => handleOpenReminderModal(link)}
+                                    isSelectionMode={isSelectionMode}
+                                    isSelected={selectedIds.has(link.id)}
+                                    onToggleSelection={toggleSelection}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <div
+                            className="grid gap-2 sm:gap-3"
+                            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))' }}
+                        >
+                            {filteredLinks.map((link) => (
+                                <CompactCard
                                     key={link.id}
                                     link={link}
                                     onOpenDetails={setActiveLink}

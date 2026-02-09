@@ -15,7 +15,7 @@ from typing import Optional
 from twilio.rest import Client
 
 # Firebase Functions framework
-from firebase_functions import https_fn, scheduler_fn
+from firebase_functions import https_fn, scheduler_fn, firestore_fn, options
 from firebase_admin import initialize_app, firestore
 
 from models import WebhookPayload, LinkDocument, LinkStatus, LinkMetadata, AIAnalysis, ReminderStatus
@@ -418,24 +418,88 @@ def ping(req: https_fn.Request) -> https_fn.Response:
     return https_fn.Response("pong")
 
 
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def log_to_firestore(task_id: str, message: str, level: str = "INFO", data: dict = None):
+    """Log a heartbeat to Firestore for visibility"""
+    try:
+        db = get_db()
+        log_entry = {
+            "taskId": task_id,
+            "message": message,
+            "level": level,
+            "timestamp": datetime.now().isoformat(),
+            "data": data or {}
+        }
+        db.collection('task_logs').add(log_entry)
+        logger.info(f"[{task_id}] {message}")
+    except Exception as e:
+        logger.error(f"Failed to log to Firestore: {e}")
+
+@https_fn.on_request()
+def debug_status(req: https_fn.Request) -> https_fn.Response:
+    """
+    Public debug endpoint to inspect system state
+    """
+    try:
+        db = get_db()
+        
+        # 1. Get recent pending tasks
+        pending = db.collection('pending_processing').order_by('createdAt', direction='DESCENDING').limit(5).get()
+        pending_data = [{**d.to_dict(), "id": d.id} for d in pending]
+        
+        # 2. Get recent logs
+        logs = db.collection('task_logs').order_by('timestamp', direction='DESCENDING').limit(10).get()
+        logs_data = [d.to_dict() for d in logs]
+        
+        # 3. Check for specific user by phone (from env)
+        test_phone = "+16462440305"
+        user_match = db.collection('users').where('phone_number', '==', test_phone).limit(1).get()
+        user_exists = len(user_match) > 0
+        
+        status = {
+            "status": "online",
+            "timestamp": datetime.now().isoformat(),
+            "environment": {
+                "project": os.environ.get("GCLOUD_PROJECT"),
+                "has_gemini_key": bool(os.environ.get("GEMINI_API_KEY")),
+                "has_twilio_sid": bool(os.environ.get("TWILIO_ACCOUNT_SID")),
+            },
+            "system_check": {
+                "user_exists_16462440305": user_exists,
+                "pending_tasks_count": len(pending_data),
+            },
+            "recent_pending_tasks": pending_data,
+            "recent_logs": logs_data
+        }
+        
+        return https_fn.Response(
+            json.dumps(status, indent=2),
+            mimetype="application/json"
+        )
+    except Exception as e:
+        return https_fn.Response(f"Debug failed: {str(e)}", status=500)
+
 @https_fn.on_request()
 def whatsapp_webhook(request):
     """
     WhatsApp webhook endpoint
-    Handles URLs and Conversational Reminders
+    Respond-First Pattern: Saves to pending_processing and returns 200 immediately.
     """
-    
-    # Parse incoming payload
     try:
         if request.content_type == 'application/x-www-form-urlencoded':
             data = request.form.to_dict()
         else:
             data = request.get_json()
         
-        print(f"Received webhook payload: {json.dumps(data)}")
+        logger.info(f"Received webhook payload: {json.dumps(data)}")
         payload = WebhookPayload(**data)
     except Exception as e:
-        print(f"Payload parse error: {e}")
+        logger.error(f"Payload parse error: {e}")
         return {"error": f"Invalid payload: {str(e)}"}, 400
     
     db = get_db()
@@ -443,7 +507,7 @@ def whatsapp_webhook(request):
     # Find user by phone number
     uid = find_user_by_phone(payload.from_number)
     if not uid:
-        print(f"Unauthorized number: {payload.from_number}")
+        logger.warning(f"Unauthorized number: {payload.from_number}")
         send_whatsapp_message(payload.from_number, "❌ Sorry, your phone number is not recognized. Please make sure it matches the number in your Second Brain settings.")
         return {"error": "User not found"}, 403
     
@@ -451,48 +515,90 @@ def whatsapp_webhook(request):
     url_match = re.search(r'https?://[^\s]+', payload.body)
     
     if not url_match:
-        # NO URL -> Check for conversational commands (Reminders)
+        # Handling conversational commands (Reminders) remains synchronous for instant feedback
+        logger.info("No URL found, checking for commands")
         reminder_time = handle_reminder_intent(payload.body)
-        
         if reminder_time:
-            # Contextual Reminder: Use last saved link
             user_doc = db.collection('users').document(uid).get()
             last_link_id = user_doc.to_dict().get('last_saved_link_id')
-            
             if last_link_id:
-                # Retrieve title for confirmation
                 link_doc = db.collection('users').document(uid).collection('links').document(last_link_id).get()
                 if link_doc.exists:
                      title = link_doc.to_dict().get('title', 'Unknown Link')
                      set_reminder(uid, last_link_id, reminder_time)
-                     
                      date_str = reminder_time.strftime('%b %d')
                      send_whatsapp_message(payload.from_number, f"⏰ Reminder set for '{title}' on {date_str}")
                      return {"success": True}, 200
-            
             send_whatsapp_message(payload.from_number, "❌ No previous link found. Send a link first!")
             return {"error": "No context"}, 200
-            
-        # Fallback for text messages
         send_whatsapp_message(payload.from_number, "I can save links or set reminders. Try sending a URL!")
         return {"success": True}, 200
         
-    # URL FOUND -> Process Link
+    # URL FOUND -> Save to pending_processing for Background Processing
     url = url_match.group(0)
+    logger.info(f"Queueing URL for processing: {url}")
     
-    # Process the URL
+    process_ref = db.collection('pending_processing').document()
+    process_ref.set({
+        "uid": uid,
+        "url": url,
+        "fromNumber": payload.from_number,
+        "body": payload.body,
+        "createdAt": datetime.now().isoformat(),
+        "status": "queued",
+        "attempts": 0
+    })
+    
+    return {"success": True, "queued": True, "id": process_ref.id}, 200
+
+
+@firestore_fn.on_document_created(
+    document="pending_processing/{doc_id}",
+    memory=1024,
+    timeout_sec=300
+)
+def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
+    """
+    Background Task: Scrapes URL, Runs AI analysis, and saves final link.
+    Now with status tracking and better logging.
+    """
+    snapshot = event.data
+    if not snapshot:
+        logger.error("No snapshot in background trigger")
+        return
+        
+    data = snapshot.to_dict()
+    ref = snapshot.reference
+    task_id = snapshot.id
+    
+    uid = data.get("uid")
+    url = data.get("url")
+    from_number = data.get("fromNumber")
+    original_body = data.get("body")
+    
+    log_to_firestore(task_id, f"Background processing started", data={"url": url, "uid": uid})
+    ref.update({"status": "processing", "startedAt": datetime.now().isoformat()})
+    
+    scraped = {"html": "", "title": "", "text": ""}
     try:
-        # Scrape content
+        # 1. Scrape content
+        log_to_firestore(task_id, f"Scraping content for: {url}")
+        ref.update({"status": "scraping"})
         scraped = scrape_url(url)
         
-        # Fetch existing tags for context
-        existing_tags = get_user_tags(uid)
+        # 2. Analyze with AI
+        log_to_firestore(task_id, "Starting AI analysis", data={"scrapedTitle": scraped.get("title")})
+        ref.update({"status": "analyzing", "scrapedTitle": scraped.get("title", "")})
         
-        # Analyze with AI
+        db = get_db()
+        existing_tags = get_user_tags(uid)
         claude = ClaudeService()
         analysis = claude.analyze_text(scraped["text"] or scraped["html"], existing_tags=existing_tags)
         
-        # Build link document
+        # 3. Build link document
+        log_to_firestore(task_id, "Saving processed link to brain", data={"finalTitle": analysis["title"]})
+        ref.update({"status": "saving"})
+        
         link_data = {
             "url": url,
             "title": analysis["title"],
@@ -503,40 +609,39 @@ def whatsapp_webhook(request):
             "status": LinkStatus.UNREAD.value,
             "createdAt": datetime.now().isoformat(),
             "metadata": {
-                "originalTitle": scraped["title"],
-                "estimatedReadTime": max(1, len(scraped["text"]) // 1500),
+                "originalTitle": scraped.get("title", ""),
+                "estimatedReadTime": max(1, len(scraped.get("text", "")) // 1500),
                 "actionableTakeaway": analysis.get("actionable_takeaway")
             }
         }
         
-        # Save to Firestore
+        # 4. Save to Firestore
         link_id = save_link_to_firestore(uid, link_data)
-        
-        # Update User Context (Last Saved Link)
         db.collection('users').document(uid).update({'last_saved_link_id': link_id})
         
-        # Check for immediate reminder intent (e.g. "Save this and remind me tomorrow")
-        reminder_time = handle_reminder_intent(payload.body)
-        
+        # 5. Check for reminder intent
+        reminder_time = handle_reminder_intent(original_body)
         if reminder_time:
             set_reminder(uid, link_id, reminder_time)
             msg = f"✅ Saved & Reminder set for {reminder_time.strftime('%b %d')}\n\n{analysis['title']}"
         else:
             msg = f"✅ Saved: {analysis['title']}\n\nCategory: {analysis['category']}"
         
-        # Send success message via WhatsApp API
-        send_whatsapp_message(payload.from_number, msg)
+        logger.info(f"Processing complete, sending message to {from_number}")
+        send_whatsapp_message(from_number, msg)
         
-        return {"success": True, "linkId": link_id}, 200
+        # Successful cleanup
+        ref.delete()
         
     except Exception as e:
-        # CRITICAL: Even if AI fails, save the link with error tag
-        print(f"Processing error: {e}")
+        logger.error(f"Background processing error: {e}", exc_info=True)
+        ref.update({"status": "failed", "error": str(e)})
         
+        # Fallback if AI/Scraping fails completely
         fallback_data = {
             "url": url,
             "title": scraped.get("title", url),
-            "summary": "Processing failed. Click to view original.",
+            "summary": f"Cloud processing error: {str(e)}",
             "tags": ["Processing Failed"],
             "category": "Uncategorized",
             "status": LinkStatus.UNREAD.value,
@@ -546,13 +651,14 @@ def whatsapp_webhook(request):
                 "estimatedReadTime": 0
             }
         }
+        save_link_to_firestore(uid, fallback_data)
+        send_whatsapp_message(from_number, f"⚠️ Saved: {url}\n\nNote: Detailed AI analysis encountered an issue ({str(e)[:50]}...).")
         
-        link_id = save_link_to_firestore(uid, fallback_data)
-        
-        # Send error notification via WhatsApp
-        send_whatsapp_message(payload.from_number, f"⚠️ Saved with limited info: {url}\n\nAI analysis encountered an error.")
-        
-        return {"success": True, "linkId": link_id, "warning": "AI processing failed"}, 200
+        # We DON'T delete failed docs immediately now, so we can debug them. 
+        # But for auto-cleanup, we might want to. Let's keep them for now.
+        # Actually, if we don't delete them, the collection will grow.
+        # Let's delete it anyway but after a short delay or just log it.
+        # For now, let's keep it for the user to see.
 
 
 def calculate_next_reminder(reminder_count: int) -> datetime:

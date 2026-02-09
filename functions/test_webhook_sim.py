@@ -20,6 +20,8 @@ def test_webhook(from_number, body):
         )
         print(f"Status Code: {response.status_code}")
         print(f"Response: {response.json()}")
+        if response.json().get("queued"):
+            print("SUCCESS: Webhook responded immediately and queued the task.")
     except Exception as e:
         print(f"Error: {e}")
 
