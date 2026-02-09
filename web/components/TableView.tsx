@@ -71,10 +71,9 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="border-b border-border-subtle bg-white/[0.01] dark:bg-white/[0.02]">
-                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest w-[40%]">Source & Insight</th>
+                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest w-[50%]">Source & Insight</th>
                         <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest text-center w-[12%]">Category</th>
-                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest w-[18%]">Tags</th>
-                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest text-center w-[10%]">Saved</th>
+                        <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest w-[25%]">Tags</th>
                         <th className="px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest text-right w-[13%]">Actions</th>
                     </tr>
                 </thead>
@@ -94,6 +93,12 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                                         />
                                     </div>
                                     <p className="text-xs text-text-secondary line-clamp-2 opacity-80">{link.summary}</p>
+                                    <div className="flex items-center gap-3 mt-1 text-[10px] font-medium text-text-muted/50 tabular-nums uppercase tracking-wider">
+                                        <span className="flex items-center gap-1">
+                                            <Inbox className="w-3 h-3" />
+                                            Saved {now > 0 ? getTimeAgo(link.createdAt, now) : '...'}
+                                        </span>
+                                    </div>
                                 </div>
                             </td>
                             <td className="px-6 py-6 text-center">
@@ -234,9 +239,7 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                                     </>
                                 )}
                             </td>
-                            <td className="px-6 py-6 text-center text-[11px] font-medium text-text-muted tabular-nums">
-                                {now > 0 ? getTimeAgo(link.createdAt, now) : '...'}
-                            </td>
+
                             <td className="px-6 py-6 text-right">
                                 <div className="inline-flex items-center gap-1.5">
                                     <button

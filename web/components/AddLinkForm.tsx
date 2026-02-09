@@ -144,7 +144,11 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                                 <input
                                     id="url"
                                     type="text"
-                                    pattern={undefined}
+                                    inputMode="url"
+                                    autoComplete="off"
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck={false}
                                     value={url}
                                     onChange={(e) => setUrl(e.target.value)}
                                     placeholder="example.com or https://..."

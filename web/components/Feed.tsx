@@ -42,7 +42,23 @@ export default function Feed() {
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
     const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
+    const [isTagExplorerCollapsed, setIsTagExplorerCollapsed] = useState(true);
     const [reminderModalLink, setReminderModalLink] = useState<Link | null>(null);
+
+    // Load collapsed state from localStorage
+    useEffect(() => {
+        const saved = localStorage.getItem('tag-explorer-collapsed');
+        if (saved !== null) {
+            setIsTagExplorerCollapsed(saved === 'true');
+        }
+    }, []);
+
+    // Save collapsed state to localStorage
+    const toggleTagExplorer = () => {
+        const newState = !isTagExplorerCollapsed;
+        setIsTagExplorerCollapsed(newState);
+        localStorage.setItem('tag-explorer-collapsed', String(newState));
+    };
 
     // 1. Find the user by phone number (mocking auth for now)
     useEffect(() => {
@@ -406,17 +422,39 @@ export default function Feed() {
 
 
             {/* Main Content with Tag Sidebar */}
-            <div className="flex flex-col lg:flex-row gap-6">
+            <div className="flex flex-col lg:flex-row gap-6 relative">
                 {/* Tag Explorer Sidebar (Desktop) */}
-                <aside className="hidden lg:block w-64 flex-shrink-0">
+                <aside
+                    className={`hidden lg:block flex-shrink-0 transition-all duration-300 ease-in-out ${isTagExplorerCollapsed ? 'w-10' : 'w-64'
+                        }`}
+                >
                     <div className="sticky top-4">
-                        <TagExplorer
-                            tags={allTags}
-                            tagCounts={tagCounts}
-                            selectedTags={selectedTags}
-                            onToggleTag={handleToggleTag}
-                            onClearFilters={() => setSelectedTags(new Set())}
-                        />
+                        {isTagExplorerCollapsed ? (
+                            <button
+                                onClick={toggleTagExplorer}
+                                className="w-10 h-10 rounded-xl bg-card border border-border-subtle flex items-center justify-center text-text-muted hover:text-accent hover:border-accent/30 transition-all shadow-sm"
+                                title="Expand Tags"
+                            >
+                                <TagIcon className="w-5 h-5" />
+                            </button>
+                        ) : (
+                            <div className="relative group">
+                                <button
+                                    onClick={toggleTagExplorer}
+                                    className="absolute -right-3 top-2 z-10 w-6 h-6 rounded-full bg-card border border-border-subtle flex items-center justify-center text-text-muted hover:text-accent hover:border-accent/30 transition-all shadow-sm opacity-0 group-hover:opacity-100"
+                                    title="Collapse"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                                <TagExplorer
+                                    tags={allTags}
+                                    tagCounts={tagCounts}
+                                    selectedTags={selectedTags}
+                                    onToggleTag={handleToggleTag}
+                                    onClearFilters={() => setSelectedTags(new Set())}
+                                />
+                            </div>
+                        )}
                     </div>
                 </aside>
 
