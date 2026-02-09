@@ -15,7 +15,7 @@ export interface AIAnalysis {
   detailedSummary: string;
   category: string;
   tags: string[];
-  actionable_takeaway: string;
+  actionableTakeaway: string;
   sourceType?: string;
   confidence?: string;
   keyEntities?: string[];

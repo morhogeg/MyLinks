@@ -47,11 +47,11 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
             <table className="w-full text-left border-collapse table-fixed">
                 <thead>
                     <tr className="border-b border-border-subtle bg-white/[0.01] dark:bg-white/[0.02]">
-                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[28%]">Source</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[25%]">Source</th>
                         <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[30%]">Insight</th>
                         <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-center w-[10%]">Category</th>
                         <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[20%]">Tags</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-right w-[12%]">Actions</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-right w-[15%]">Actions</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-border-subtle">
@@ -118,7 +118,7 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                                             return (
                                                 <span
                                                     key={tag}
-                                                    className="text-[9px] font-bold text-text-muted/60 bg-white/5 border border-white/5 px-2.5 py-0.5 rounded-full flex items-center gap-1 group/tag transition-all hover:bg-white/10 hover:border-white/10"
+                                                    className="text-[9px] font-bold text-text-muted/60 bg-white/5 border border-white/5 px-2.5 py-1 rounded-full flex items-center gap-1 group/tag transition-all hover:bg-white/10 hover:border-white/10 whitespace-nowrap"
                                                 >
                                                     {leaf}
                                                     <X
@@ -227,7 +227,7 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                             </td>
 
                             <td className="px-3 py-10 text-right align-top" onClick={(e) => e.stopPropagation()}>
-                                <div className="inline-flex items-center gap-1 transition-all duration-200">
+                                <div className="inline-flex items-center justify-end gap-1 transition-all duration-200 w-full">
                                     <button
                                         onClick={() => onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite')}
                                         className={`p-2 rounded-lg transition-all ${link.status === 'favorite' ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-muted hover:bg-white/5 hover:text-text'}`}

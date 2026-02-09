@@ -3,7 +3,7 @@ Pydantic models for SecondBrain
 These mirror the Firestore schema from the PRD
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -25,9 +25,9 @@ class ReminderStatus(str, Enum):
 
 class LinkMetadata(BaseModel):
     """Metadata extracted from the original page"""
-    original_title: str = Field(description="Original <title> from the page")
-    estimated_read_time: int = Field(description="Estimated read time in minutes")
-    actionable_takeaway: Optional[str] = Field(None, description="Key takeaway from AI analysis")
+    originalTitle: str = Field(description="Original <title> from the page")
+    estimatedReadTime: int = Field(description="Estimated read time in minutes")
+    actionableTakeaway: Optional[str] = Field(None, description="Key takeaway from AI analysis")
 
 
 class AIAnalysis(BaseModel):
@@ -38,8 +38,8 @@ class AIAnalysis(BaseModel):
     summary: str = Field(description="2-4 sentences for snackable preview")
     category: str = Field(description="One high-level category")
     tags: List[str] = Field(max_length=5, description="3-5 relevant tags")
-    actionable_takeaway: str = Field(description="One concrete specific action")
-    detailed_summary: Optional[str] = Field(None, description="Markdown formatted detailed summary")
+    actionableTakeaway: str = Field(description="One concrete specific action")
+    detailedSummary: Optional[str] = Field(None, description="Markdown formatted detailed summary")
 
 
 class LinkDocument(BaseModel):
@@ -50,17 +50,17 @@ class LinkDocument(BaseModel):
     url: str
     title: str
     summary: str
-    detailed_summary: Optional[str] = None
+    detailedSummary: Optional[str] = None
     tags: List[str] = Field(max_length=5)
     category: str
     status: LinkStatus = LinkStatus.UNREAD
-    created_at: datetime = Field(default_factory=datetime.now)
+    createdAt: datetime = Field(default_factory=datetime.now)
     metadata: LinkMetadata
     # Reminder fields
-    reminder_status: ReminderStatus = ReminderStatus.NONE
-    next_reminder_at: Optional[datetime] = None
-    reminder_count: int = 0
-    last_viewed_at: Optional[datetime] = None
+    reminderStatus: ReminderStatus = ReminderStatus.NONE
+    nextReminderAt: Optional[datetime] = None
+    reminderCount: int = 0
+    lastViewedAt: Optional[datetime] = None
 
 
 class WebhookPayload(BaseModel):
@@ -72,17 +72,22 @@ class WebhookPayload(BaseModel):
     body: str = Field(alias="Body", description="Message content containing the URL")
     message_sid: Optional[str] = Field(None, alias="MessageSid")
 
-    class Config:
-        extra = "allow"
-        populate_by_name = True
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True
+    )
 
 
 class UserSettings(BaseModel):
     """User preferences"""
     theme: str = "dark"
-    daily_digest: bool = False
-    reminders_enabled: bool = True
-    reminder_frequency: str = "smart"  # "smart", "daily", "weekly", "off"
+    dailyDigest: bool = Field(default=False, alias="daily_digest")
+    remindersEnabled: bool = Field(default=True, alias="reminders_enabled")
+    reminderFrequency: str = Field(default="smart", alias="reminder_frequency")  # "smart", "daily", "weekly", "off"
+
+    model_config = ConfigDict(
+        populate_by_name=True
+    )
 
 
 class UserDocument(BaseModel):
@@ -90,7 +95,7 @@ class UserDocument(BaseModel):
     Firestore document schema for a user
     Collection path: users/{uid}
     """
-    phone_number: str = Field(description="Phone number in E.164 format, e.g., +16462440305")
-    created_at: datetime = Field(default_factory=datetime.now)
+    phoneNumber: str = Field(description="Phone number in E.164 format, e.g., +16462440305")
+    createdAt: datetime = Field(default_factory=datetime.now)
     settings: UserSettings = Field(default_factory=UserSettings)
-    last_saved_link_id: Optional[str] = Field(None, description="ID of the last saved link for context")
+    lastSavedLinkId: Optional[str] = Field(None, description="ID of the last saved link for context")

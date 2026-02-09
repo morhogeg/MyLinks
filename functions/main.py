@@ -36,10 +36,10 @@ def get_db():
     return _db
 
 
-def scrape_url(url: str) -> dict:
+def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
     """
     Fetch and extract content from a URL
-    Handles Twitter/X URLs specially via fxtwitter.com API
+    Handles Twitter/X and Instagram URLs specially
     
     Returns:
         dict with 'html', 'title', 'text' keys
@@ -48,6 +48,10 @@ def scrape_url(url: str) -> dict:
         # Special handling for Twitter/X URLs
         if 'twitter.com' in url or 'x.com' in url:
             return _scrape_twitter_url(url)
+            
+        # Special handling for Instagram URLs
+        if 'instagram.com' in url:
+            return _scrape_instagram_url(url, message_body)
         
         # General URL scraping with BeautifulSoup
         headers = {
@@ -300,6 +304,65 @@ Source: vxtwitter API
     }
 
 
+def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
+    """
+    Scrape Instagram URLs using ddinstagram.com bridge for metadata
+    Also incorporates the original WhatsApp message body as context.
+    """
+    print(f"Analyzing Instagram URL: {url}")
+    
+    metadata_lines = []
+    title = "Instagram Post"
+    desc = ""
+    
+    # 1. Try bridge services (Reliable for meta tags)
+    bridges = ['instagramez.com', 'kkinstagram.com', 'ddinstagram.com']
+    for bridge in bridges:
+        try:
+            bridge_url = url.replace('instagram.com', bridge)
+            print(f"Trying Instagram bridge: {bridge_url}")
+            headers = {
+                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
+            }
+            response = requests.get(bridge_url, headers=headers, timeout=5)
+            if response.ok:
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # Extract OG tags
+                title_tag = soup.find('meta', property='og:title')
+                desc_tag = soup.find('meta', property='og:description')
+                
+                if title_tag:
+                    title = title_tag['content'].split('|')[0].strip() # Clean up titles like "User on Instagram | Title"
+                if desc_tag:
+                    desc = desc_tag['content']
+                    
+                if title or desc:
+                    metadata_lines.append(f"BRIDGE METADATA ({bridge}):\nTitle: {title}\nDescription: {desc}")
+                    break # Stop if one bridge works
+        except Exception as e:
+            print(f"Instagram bridge {bridge} failed: {e}")
+
+    # 2. Incorporate original message body (Often contains shared caption)
+    if message_body and url in message_body:
+        # Remove the URL from the body to isolate the caption
+        caption_guess = message_body.replace(url, '').strip()
+        if caption_guess:
+            metadata_lines.append(f"WHATSAPP SHARED CAPTION:\n{caption_guess}")
+
+    if not metadata_lines:
+        return {"html": "", "title": "Instagram Link", "text": "Instagram content (metadata extraction failed)"}
+
+    final_text = "\n\n---\n\n".join(metadata_lines)
+    
+    return {
+        "html": final_text,
+        "title": title,
+        "text": final_text
+    }
+
+
 def find_user_by_phone(phone_number: str) -> Optional[str]:
     """
     Look up user UID by phone number in Firestore.
@@ -315,14 +378,14 @@ def find_user_by_phone(phone_number: str) -> Optional[str]:
     # We'll search by the cleaned number. Note: This assumes stored numbers are ALSO searchable or we clean them.
     # To be safest, we query all users and compare cleaned versions, OR assume E.164 without '+' in DB.
     # Let's try the direct match first, but with a fallback.
-    query = users_ref.where('phone_number', '==', f"+{clean_number}").limit(1)
+    query = users_ref.where('phoneNumber', '==', f"+{clean_number}").limit(1)
     docs = query.get()
     
     if docs:
         return docs[0].id
     
     # Fallback: search without the '+' if that's how it's stored
-    query = users_ref.where('phone_number', '==', clean_number).limit(1)
+    query = users_ref.where('phoneNumber', '==', clean_number).limit(1)
     docs = query.get()
     if docs:
         return docs[0].id
@@ -407,9 +470,9 @@ def set_reminder(uid: str, link_id: str, reminder_time: datetime):
     db = get_db()
     link_ref = db.collection('users').document(uid).collection('links').document(link_id)
     link_ref.update({
-        'reminder_status': 'pending',
-        'next_reminder_at': reminder_time,
-        'reminder_count': 0
+        'reminderStatus': 'pending',
+        'nextReminderAt': reminder_time,
+        'reminderCount': 0
     })
 
 @https_fn.on_request()
@@ -458,7 +521,7 @@ def debug_status(req: https_fn.Request) -> https_fn.Response:
         
         # 3. Check for specific user by phone (from env)
         test_phone = "+16462440305"
-        user_match = db.collection('users').where('phone_number', '==', test_phone).limit(1).get()
+        user_match = db.collection('users').where('phoneNumber', '==', test_phone).limit(1).get()
         user_exists = len(user_match) > 0
         
         status = {
@@ -520,14 +583,21 @@ def whatsapp_webhook(request):
         reminder_time = handle_reminder_intent(payload.body)
         if reminder_time:
             user_doc = db.collection('users').document(uid).get()
-            last_link_id = user_doc.to_dict().get('last_saved_link_id')
+            last_link_id = user_doc.to_dict().get('lastSavedLinkId')
             if last_link_id:
                 link_doc = db.collection('users').document(uid).collection('links').document(last_link_id).get()
                 if link_doc.exists:
                      title = link_doc.to_dict().get('title', 'Unknown Link')
                      set_reminder(uid, last_link_id, reminder_time)
-                     date_str = reminder_time.strftime('%b %d')
-                     send_whatsapp_message(payload.from_number, f"⏰ Reminder set for '{title}' on {date_str}")
+                     date_str = reminder_time.strftime('%b %d at %I:%M %p')
+                     
+                     # Try to get more details for a richer message if possible
+                     link_data = link_doc.to_dict()
+                     title = link_data.get('title', 'Unknown Link')
+                     category = link_data.get('category', 'General')
+                     
+                     msg = f"⏰ *Reminder Set*\n\n📄 *{title}*\n📂 {category}\n📅 {date_str}"
+                     send_whatsapp_message(payload.from_number, msg)
                      return {"success": True}, 200
             send_whatsapp_message(payload.from_number, "❌ No previous link found. Send a link first!")
             return {"error": "No context"}, 200
@@ -550,6 +620,52 @@ def whatsapp_webhook(request):
     })
     
     return {"success": True, "queued": True, "id": process_ref.id}, 200
+
+
+def _format_success_message(link_data: dict, reminder_time: Optional[datetime] = None) -> str:
+    """
+    Format a rich success message using the final link data structure
+    """
+    title = link_data.get("title", "Untitled")
+    category = link_data.get("category", "General")
+    tags = link_data.get("tags", [])
+    
+    meta = link_data.get("metadata", {})
+    read_time = meta.get("estimatedReadTime", 1)
+    takeaway = meta.get("actionableTakeaway")
+    
+    # Emojis for categories?
+    cat_emoji = "📂"
+    if "Recipe" in category: cat_emoji = "🍲"
+    elif "Tech" in category: cat_emoji = "💻"
+    elif "Health" in category: cat_emoji = "❤️"
+    elif "Business" in category: cat_emoji = "💼"
+    elif "Science" in category: cat_emoji = "🔬"
+    
+    lines = [
+        f"✅ *Saved to Second Brain*",
+        f"",
+        f"📄 *{title}*",
+        f"",
+        f"{cat_emoji} *Category:* {category}",
+        f"⏱️ *Read Time:* {read_time} min",
+        f"🏷️ *Tags:* {', '.join([f'#{t}' for t in tags[:3]])}"
+    ]
+    
+    if takeaway:
+        lines.append(f"")
+        lines.append(f"💡 *Key Insight:*")
+        lines.append(f"{takeaway}")
+        
+    lines.append(f"")
+    
+    if reminder_time:
+        date_str = reminder_time.strftime('%b %d at %I:%M %p')
+        lines.append(f"⏰ *Reminder Set:* {date_str}")
+    else:
+        lines.append(f"REPLY with \"remind me tomorrow\" to set a reminder.")
+        
+    return "\n".join(lines)
 
 
 @firestore_fn.on_document_created(
@@ -584,7 +700,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # 1. Scrape content
         log_to_firestore(task_id, f"Scraping content for: {url}")
         ref.update({"status": "scraping"})
-        scraped = scrape_url(url)
+        scraped = scrape_url(url, original_body)
         
         # 2. Analyze with AI
         log_to_firestore(task_id, "Starting AI analysis", data={"scrapedTitle": scraped.get("title")})
@@ -603,7 +719,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             "url": url,
             "title": analysis["title"],
             "summary": analysis["summary"],
-            "detailedSummary": analysis.get("detailed_summary"),
+            "detailedSummary": analysis.get("detailedSummary"),
             "tags": analysis["tags"],
             "category": analysis["category"],
             "status": LinkStatus.UNREAD.value,
@@ -617,15 +733,12 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         
         # 4. Save to Firestore
         link_id = save_link_to_firestore(uid, link_data)
-        db.collection('users').document(uid).update({'last_saved_link_id': link_id})
+        db.collection('users').document(uid).update({'lastSavedLinkId': link_id})
         
         # 5. Check for reminder intent
         reminder_time = handle_reminder_intent(original_body)
-        if reminder_time:
-            set_reminder(uid, link_id, reminder_time)
-            msg = f"✅ Saved & Reminder set for {reminder_time.strftime('%b %d')}\n\n{analysis['title']}"
-        else:
-            msg = f"✅ Saved: {analysis['title']}\n\nCategory: {analysis['category']}"
+        
+        msg = _format_success_message(link_data, reminder_time)
         
         logger.info(f"Processing complete, sending message to {from_number}")
         send_whatsapp_message(from_number, msg)
@@ -710,8 +823,8 @@ def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
         links_ref = db.collection('users').document(uid).collection('links')
         now = datetime.now()
         
-        # Find links where next_reminder_at <= now and reminder_status == 'pending'
-        query = links_ref.where('reminder_status', '==', 'pending').where('next_reminder_at', '<=', now).limit(10)
+        # Find links where nextReminderAt <= now and reminderStatus == 'pending'
+        query = links_ref.where('reminderStatus', '==', 'pending').where('nextReminderAt', '<=', now).limit(10)
         
         due_links = query.get()
         
@@ -722,9 +835,15 @@ def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
             # Send WhatsApp reminder
             title = link_data.get('title', 'Untitled')
             url = link_data.get('url', '')
-            reminder_count = link_data.get('reminder_count', 0)
+            category = link_data.get('category', 'General')
+            reminder_count = link_data.get('reminderCount', 0)
             
-            message = f"🧠 Second Brain Reminder\n\nTime to revisit:\n\"{title}\"\n\n{url}\n\n💡 Why now? Research shows spaced repetition strengthens memory retention."
+            # Richer reminder message
+            cat_emoji = "📂"
+            if "Recipe" in category: cat_emoji = "🍲"
+            elif "Tech" in category: cat_emoji = "💻"
+            
+            message = f"🧠 *Second Brain Loop*\n\nTime to revisit:\n📄 *{title}*\n{cat_emoji} {category}\n\n{url}\n\n💡 *Why now?* Spaced repetition strengthens long-term retention."
             
             send_whatsapp_message(f"whatsapp:{phone_number}", message)
             
@@ -735,14 +854,14 @@ def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
             # If we've reached the max stages (3), mark as completed
             if new_reminder_count >= 3:
                 link_doc.reference.update({
-                    'reminder_status': ReminderStatus.COMPLETED.value,
-                    'reminder_count': new_reminder_count,
-                    'next_reminder_at': None
+                    'reminderStatus': ReminderStatus.COMPLETED.value,
+                    'reminderCount': new_reminder_count,
+                    'nextReminderAt': None
                 })
             else:
                 link_doc.reference.update({
-                    'reminder_count': new_reminder_count,
-                    'next_reminder_at': next_reminder
+                    'reminderCount': new_reminder_count,
+                    'nextReminderAt': next_reminder
                 })
             
             print(f"Sent reminder for link {link_id} to {phone_number}")
