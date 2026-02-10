@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, BookOpen, ChevronRight, Sparkles, Bell, BellOff, Plus, Pencil, CheckCircle2 } from 'lucide-react';
+import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -33,8 +33,7 @@ export default function LinkDetailModal({
     onUpdateTags,
     onUpdateCategory,
     onDelete,
-    onUpdateReminder,
-    onOpenOtherLink
+    onUpdateReminder
 }: LinkDetailModalProps) {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
@@ -44,6 +43,7 @@ export default function LinkDetailModal({
     const [tagInput, setTagInput] = useState('');
     const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         setEditedCategory(link.category);
     }, [link.category]);
