@@ -58,7 +58,8 @@ export async function saveLink(uid: string, linkData: Partial<Link>): Promise<vo
     await addDoc(linksRef, {
         ...cleanData,
         createdAt: Date.now(),
-        status: 'unread'
+        status: 'unread',
+        isRead: false
     });
 }
 
@@ -71,11 +72,27 @@ export async function updateLinkStatus(uid: string, id: string, status: LinkStat
 }
 
 /**
+ * Update a link's read status in Firestore
+ */
+export async function updateLinkReadStatus(uid: string, id: string, isRead: boolean): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    await updateDoc(linkRef, { isRead });
+}
+
+/**
  * Update a link's tags in Firestore
  */
 export async function updateLinkTags(uid: string, id: string, tags: string[]): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', id);
     await updateDoc(linkRef, { tags });
+}
+
+/**
+ * Update a link's category in Firestore
+ */
+export async function updateLinkCategory(uid: string, id: string, category: string): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    await updateDoc(linkRef, { category });
 }
 
 /**
@@ -123,10 +140,10 @@ export async function updateLinkReminder(
     uid: string,
     id: string,
     enabled: boolean,
-    reminderTime?: number
+    reminderTime?: number,
+    profile?: 'smart' | 'spaced'
 ): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', id);
-    const linkDoc = doc(db, 'users', uid, 'links', id); // Re-declaring for clarity or use linkRef
 
     if (enabled) {
         // Use provided time or default to 24h from now (Smart Default)
@@ -135,14 +152,16 @@ export async function updateLinkReminder(
         await updateDoc(linkRef, {
             reminderStatus: 'pending',
             nextReminderAt: nextReminder,
-            reminderCount: 0
+            reminderCount: 0,
+            reminderProfile: profile || 'smart'
         });
     } else {
         // Disable reminders
         await updateDoc(linkRef, {
             reminderStatus: 'none',
             nextReminderAt: null,
-            reminderCount: 0
+            reminderCount: 0,
+            reminderProfile: null
         });
     }
 }

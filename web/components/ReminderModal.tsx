@@ -13,7 +13,7 @@ interface ReminderModalProps {
     onUpdate?: () => void;
 }
 
-type ReminderOption = 'smart' | 'tomorrow' | 'next-week' | 'custom' | 'off';
+type ReminderOption = 'smart' | 'tomorrow' | 'next-week' | 'spaced' | 'custom' | 'off';
 
 export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: ReminderModalProps) {
     const [selectedOption, setSelectedOption] = useState<ReminderOption | null>(null);
@@ -49,6 +49,13 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     nextWeek.setHours(9, 0, 0, 0);
                     nextReminderTime = nextWeek.getTime();
                     break;
+                case 'spaced':
+                    // Start with 3 days
+                    const staggered = new Date(now);
+                    staggered.setDate(staggered.getDate() + 3);
+                    staggered.setHours(9, 0, 0, 0);
+                    nextReminderTime = staggered.getTime();
+                    break;
                 case 'custom':
                     if (!customDate) {
                         setIsSaving(false);
@@ -68,7 +75,13 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
 
             if (nextReminderTime) {
                 console.log('Setting reminder for:', new Date(nextReminderTime).toLocaleString());
-                await updateLinkReminder(uid, link.id, true, nextReminderTime);
+                await updateLinkReminder(
+                    uid,
+                    link.id,
+                    true,
+                    nextReminderTime,
+                    selectedOption === 'spaced' ? 'spaced' : 'smart'
+                );
                 onClose();
                 if (onUpdate) onUpdate();
             }
@@ -171,6 +184,26 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                         </p>
                     </div>
 
+                    {isReminderActive && link.nextReminderAt && (
+                        <div className="mx-2 p-3 rounded-xl bg-accent/10 border border-accent/20 flex items-center gap-3 animate-in fade-in slide-in-from-top-1 duration-300">
+                            <div className="p-2 rounded-lg bg-accent/20 text-accent">
+                                <Clock className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-[11px] text-accent font-bold uppercase tracking-wider">Active Reminder</p>
+                                <p className="text-sm text-text font-medium">
+                                    {new Date(link.nextReminderAt).toLocaleString([], {
+                                        weekday: 'short',
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    })}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 gap-2">
                         <OptionButton
                             option="smart"
@@ -189,6 +222,12 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                             icon={Calendar}
                             title="Next Week"
                             subtitle="In 7 days"
+                        />
+                        <OptionButton
+                            option="spaced"
+                            icon={Bell}
+                            title="Spaced Repetition"
+                            subtitle="3, 5, then 7 days"
                         />
 
                         {/* Separator */}

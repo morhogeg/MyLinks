@@ -2,12 +2,15 @@
 
 import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { Archive, Star, Bell, Trash2 } from 'lucide-react';
+import { Archive, Star, Bell, Trash2, Pencil, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 interface CompactCardProps {
     link: Link;
     onOpenDetails: (link: Link) => void;
     onStatusChange: (id: string, status: LinkStatus) => void;
+    onReadStatusChange: (id: string, isRead: boolean) => void;
+    onUpdateCategory: (id: string, category: string) => void;
     onDelete: (id: string) => void;
     onUpdateReminder: (link: Link) => void;
     isSelectionMode?: boolean;
@@ -22,12 +25,21 @@ export default function CompactCard({
     link,
     onOpenDetails,
     onStatusChange,
+    onReadStatusChange,
+    onUpdateCategory,
     onDelete,
     onUpdateReminder,
     isSelectionMode = false,
     isSelected = false,
     onToggleSelection
 }: CompactCardProps) {
+    const [isEditingCategory, setIsEditingCategory] = useState(false);
+    const [editedCategory, setEditedCategory] = useState(link.category);
+
+    useEffect(() => {
+        setEditedCategory(link.category);
+    }, [link.category]);
+
     const colorStyle = getCategoryColorStyle(link.category);
     const isRtl = link.language === 'he';
 
@@ -36,7 +48,7 @@ export default function CompactCard({
             className={`group bg-card rounded-xl border transition-all cursor-pointer relative overflow-hidden flex flex-col items-stretch aspect-square ${isSelected
                 ? 'border-accent bg-accent/5 ring-1 ring-accent'
                 : 'border-white/5 hover:border-accent/30 hover:bg-white/5'
-                }`}
+                } ${link.isRead ? 'opacity-60 grayscale-[0.3]' : ''}`}
             onClick={() => {
                 if (isSelectionMode && onToggleSelection) {
                     onToggleSelection(link.id);
@@ -51,15 +63,50 @@ export default function CompactCard({
             >
                 {/* Top Section: Category and Star */}
                 <div className="flex justify-between items-start gap-2 z-10">
-                    <span
-                        className="text-[8px] uppercase font-black tracking-widest px-1.5 py-0.5 rounded-md inline-block whitespace-nowrap overflow-hidden text-ellipsis max-w-[75%]"
-                        style={{
-                            backgroundColor: colorStyle.backgroundColor,
-                            color: colorStyle.color,
-                        }}
-                    >
-                        {link.category}
-                    </span>
+                    <div className="relative group/cat max-w-[75%]">
+                        {isEditingCategory ? (
+                            <input
+                                autoFocus
+                                className="text-[8px] uppercase font-black tracking-widest px-1.5 py-0.5 rounded-md inline-block w-full bg-white/10 outline-none focus:ring-1 focus:ring-accent/50"
+                                style={{
+                                    color: colorStyle.color,
+                                }}
+                                value={editedCategory}
+                                onChange={(e) => setEditedCategory(e.target.value)}
+                                onBlur={() => {
+                                    setIsEditingCategory(false);
+                                    if (editedCategory.trim() && editedCategory !== link.category) {
+                                        onUpdateCategory(link.id, editedCategory.trim());
+                                    }
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.currentTarget.blur();
+                                    } else if (e.key === 'Escape') {
+                                        setEditedCategory(link.category);
+                                        setIsEditingCategory(false);
+                                    }
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        ) : (
+                            <span
+                                className="text-[8px] uppercase font-black tracking-widest px-1.5 py-0.5 rounded-md inline-block whitespace-nowrap overflow-hidden text-ellipsis cursor-pointer hover:brightness-110 transition-all flex items-center gap-1 group/chip"
+                                style={{
+                                    backgroundColor: colorStyle.backgroundColor,
+                                    color: colorStyle.color,
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsEditingCategory(true);
+                                }}
+                                title={link.category}
+                            >
+                                {link.category}
+                                <Pencil className="w-1.5 h-1.5 opacity-0 group-hover/chip:opacity-100 transition-opacity flex-shrink-0" />
+                            </span>
+                        )}
+                    </div>
 
                     <button
                         onClick={(e) => {
@@ -85,6 +132,16 @@ export default function CompactCard({
 
                 {/* Hover Action Overlay: Does not take up space in the layout flow */}
                 <div className="absolute inset-x-0 bottom-0 p-2 flex justify-center gap-2 bg-gradient-to-t from-card/90 via-card/80 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-2 group-hover:translate-y-0 backdrop-blur-[2px]">
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onReadStatusChange(link.id, !link.isRead);
+                        }}
+                        className={`p-1.5 rounded-lg transition-all ${link.isRead ? 'text-green-500 bg-green-500/10' : 'text-text-muted hover:text-green-500 hover:bg-white/10'}`}
+                        title={link.isRead ? 'Mark as unread' : 'Mark as read'}
+                    >
+                        <CheckCircle2 className={`w-3 h-3 ${link.isRead ? 'fill-current' : ''}`} />
+                    </button>
                     <button
                         onClick={(e) => {
                             e.stopPropagation();

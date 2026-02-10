@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, BookOpen, ChevronRight, Sparkles, Bell, BellOff } from 'lucide-react';
+import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, BookOpen, ChevronRight, Sparkles, Bell, BellOff, Plus, Pencil, CheckCircle2 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
+import { getCategoryColorStyle } from '@/lib/colors';
 
 interface LinkDetailModalProps {
     link: Link;
@@ -13,7 +14,9 @@ interface LinkDetailModalProps {
     isOpen: boolean;
     onClose: () => void;
     onStatusChange: (id: string, status: LinkStatus) => void;
+    onReadStatusChange: (id: string, isRead: boolean) => void;
     onUpdateTags: (id: string, tags: string[]) => void;
+    onUpdateCategory: (id: string, category: string) => void;
     onDelete: (id: string) => void;
     onUpdateReminder: (id: string, enabled: boolean) => void;
     onOpenOtherLink?: (link: Link) => void;
@@ -26,13 +29,24 @@ export default function LinkDetailModal({
     isOpen,
     onClose,
     onStatusChange,
+    onReadStatusChange,
     onUpdateTags,
+    onUpdateCategory,
     onDelete,
     onUpdateReminder,
     onOpenOtherLink
 }: LinkDetailModalProps) {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [isEditingCategory, setIsEditingCategory] = useState(false);
+    const [editedCategory, setEditedCategory] = useState(link.category);
     const [now, setNow] = useState<number>(0);
+    const [isAddingTag, setIsAddingTag] = useState(false);
+    const [tagInput, setTagInput] = useState('');
+    const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+
+    useEffect(() => {
+        setEditedCategory(link.category);
+    }, [link.category]);
 
     useEffect(() => {
         const initialTimer = setTimeout(() => setNow(Date.now()), 0);
@@ -70,16 +84,16 @@ export default function LinkDetailModal({
     const getTimeAgo = (timestamp: any, now: number): string => {
         if (!timestamp || !now) return '...';
         const time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
-        if (isNaN(time)) return 'recently';
+        if (isNaN(time)) return isRtl ? 'לאחרונה' : 'recently';
 
         const seconds = Math.floor((now - time) / 1000);
-        if (seconds < 60) return 'just now';
+        if (seconds < 60) return isRtl ? 'זה עתה' : 'just now';
         const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return `${minutes}m ago`;
+        if (minutes < 60) return isRtl ? `לפני ${minutes} דק׳` : `${minutes}m ago`;
         const hours = Math.floor(minutes / 60);
-        if (hours < 24) return `${hours}h ago`;
+        if (hours < 24) return isRtl ? `לפני ${hours} שע׳` : `${hours}h ago`;
         const days = Math.floor(hours / 24);
-        return `${days}d ago`;
+        return isRtl ? `לפני ${days} ימים` : `${days}d ago`;
     };
 
     const isReminderActive = link.reminderStatus === 'pending';
@@ -88,6 +102,23 @@ export default function LinkDetailModal({
     const handleToggleReminder = () => {
         if (!uid) return;
         onUpdateReminder(link.id, !isReminderActive);
+    };
+
+    const allTags = Array.from(new Set(allLinks.flatMap(l => l.tags))).sort();
+    const suggestions = tagInput.trim()
+        ? allTags.filter(t =>
+            t.toLowerCase().includes(tagInput.toLowerCase()) &&
+            !link.tags.includes(t)
+        ).slice(0, 5)
+        : [];
+
+    const handleAddTag = (tag: string) => {
+        const cleanedTag = tag.trim();
+        if (cleanedTag && !link.tags.includes(cleanedTag)) {
+            onUpdateTags(link.id, [...link.tags, cleanedTag]);
+        }
+        setTagInput('');
+        setIsAddingTag(false);
     };
 
     return (
@@ -101,6 +132,16 @@ export default function LinkDetailModal({
                 {/* Header Actions */}
                 <div className="flex items-center justify-between p-3 sm:p-4 border-b border-white/5 bg-white/5">
                     <div className="flex gap-1.5 sm:gap-2">
+                        <button
+                            onClick={() => onReadStatusChange(link.id, !link.isRead)}
+                            title={link.isRead ? 'Mark as unread' : 'Mark as read'}
+                            className={`p-2 rounded-xl border transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${link.isRead
+                                ? 'bg-green-500/10 border-green-500/20 text-green-500 shadow-lg shadow-green-500/5'
+                                : 'bg-white/5 border-white/5 text-text-muted hover:text-green-500'
+                                }`}
+                        >
+                            <CheckCircle2 className={`w-4 h-4 ${link.isRead ? 'fill-current' : ''}`} />
+                        </button>
                         <button
                             onClick={() => onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite')}
                             title={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
@@ -163,6 +204,57 @@ export default function LinkDetailModal({
                     dir={isRtl ? "rtl" : "ltr"}
                 >
                     {/* Content Section */}
+                    <div className="mb-4">
+                        {(() => {
+                            const colorStyle = getCategoryColorStyle(link.category);
+                            return (
+                                <div className="relative group/cat inline-block">
+                                    {isEditingCategory ? (
+                                        <input
+                                            autoFocus
+                                            className="text-[10px] uppercase font-black tracking-widest px-2.5 py-1.5 rounded-lg inline-block w-32 bg-white/10 outline-none focus:ring-1 focus:ring-accent/50"
+                                            style={{
+                                                color: colorStyle.color,
+                                            }}
+                                            value={editedCategory}
+                                            onChange={(e) => setEditedCategory(e.target.value)}
+                                            onBlur={() => {
+                                                setIsEditingCategory(false);
+                                                if (editedCategory.trim() && editedCategory !== link.category) {
+                                                    onUpdateCategory(link.id, editedCategory.trim());
+                                                }
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.currentTarget.blur();
+                                                } else if (e.key === 'Escape') {
+                                                    setEditedCategory(link.category);
+                                                    setIsEditingCategory(false);
+                                                }
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                    ) : (
+                                        <span
+                                            className="text-[10px] uppercase font-black tracking-widest px-2.5 py-1.5 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all flex items-center gap-1.5 group/chip"
+                                            style={{
+                                                backgroundColor: colorStyle.backgroundColor,
+                                                color: colorStyle.color,
+                                            }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setIsEditingCategory(true);
+                                            }}
+                                        >
+                                            {link.category}
+                                            <Pencil className="w-2.5 h-2.5 opacity-40 group-hover/chip:opacity-100 transition-opacity" />
+                                        </span>
+                                    )}
+                                </div>
+                            );
+                        })()}
+                    </div>
+
                     <h2
                         dir={isRtl ? "rtl" : "ltr"}
                         className={`font-bold text-2xl text-text mb-4 leading-tight ${isRtl ? 'text-right' : ''}`}
@@ -193,7 +285,7 @@ export default function LinkDetailModal({
                         <div className="flex flex-wrap items-center gap-4 text-sm text-text-muted mb-8">
                             <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/5">
                                 <Clock className="w-3.5 h-3.5" />
-                                {link.metadata.estimatedReadTime} min read
+                                {link.metadata.estimatedReadTime} {isRtl ? 'דק׳ קריאה' : 'min read'}
                             </span>
                             <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/5">
                                 <Tag className="w-3.5 h-3.5 text-accent" />
@@ -202,7 +294,7 @@ export default function LinkDetailModal({
                             {isReminderActive && nextReminderDate && (
                                 <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500">
                                     <Bell className="w-3.5 h-3.5" />
-                                    Reminder: {nextReminderDate.toLocaleDateString()}
+                                    {isRtl ? 'תזכורת:' : 'Reminder:'} {nextReminderDate.toLocaleDateString(isRtl ? 'he-IL' : undefined)}
                                 </span>
                             )}
                         </div>
@@ -232,6 +324,73 @@ export default function LinkDetailModal({
                                     </span>
                                 );
                             })}
+
+                            {isAddingTag ? (
+                                <div className="relative">
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        value={tagInput}
+                                        onChange={(e) => {
+                                            setTagInput(e.target.value);
+                                            setSelectedSuggestionIndex(-1);
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                if (selectedSuggestionIndex >= 0 && suggestions[selectedSuggestionIndex]) {
+                                                    handleAddTag(suggestions[selectedSuggestionIndex]);
+                                                } else {
+                                                    handleAddTag(tagInput);
+                                                }
+                                            } else if (e.key === 'Escape') {
+                                                setIsAddingTag(false);
+                                                setTagInput('');
+                                            } else if (e.key === 'ArrowDown') {
+                                                e.preventDefault();
+                                                setSelectedSuggestionIndex(prev => Math.min(prev + 1, suggestions.length - 1));
+                                            } else if (e.key === 'ArrowUp') {
+                                                e.preventDefault();
+                                                setSelectedSuggestionIndex(prev => Math.max(prev - 1, -1));
+                                            }
+                                        }}
+                                        onBlur={() => {
+                                            // Delay blur to allow clicking suggestions
+                                            setTimeout(() => {
+                                                setIsAddingTag(false);
+                                                setTagInput('');
+                                                setSelectedSuggestionIndex(-1);
+                                            }, 200);
+                                        }}
+                                        placeholder="Add tag..."
+                                        className="text-xs bg-white/5 border border-accent/30 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-accent w-32 animate-in fade-in zoom-in-95 duration-200"
+                                    />
+                                    {suggestions.length > 0 && (
+                                        <div className="absolute top-full left-0 mt-1 w-48 bg-background border border-white/10 rounded-xl shadow-2xl z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200 backdrop-blur-md">
+                                            {suggestions.map((suggestion, index) => (
+                                                <button
+                                                    key={suggestion}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleAddTag(suggestion);
+                                                    }}
+                                                    className={`w-full text-left px-3 py-2 text-xs transition-colors ${index === selectedSuggestionIndex ? 'bg-accent text-white' : 'hover:bg-white/10 text-text-muted hover:text-text'
+                                                        }`}
+                                                >
+                                                    {suggestion}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setIsAddingTag(true)}
+                                    className="inline-flex items-center gap-1 text-xs font-bold text-text-muted/50 hover:text-accent transition-all bg-white/5 hover:bg-white/10 px-2 py-1 rounded-lg border border-dashed border-white/10 hover:border-accent/30"
+                                >
+                                    <Plus className="w-3 h-3" />
+                                    <span>Add Tag</span>
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

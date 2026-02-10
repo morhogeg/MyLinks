@@ -59,9 +59,10 @@ class LinkDocument(BaseModel):
     metadata: LinkMetadata
     # Reminder fields
     reminderStatus: ReminderStatus = ReminderStatus.NONE
-    nextReminderAt: Optional[datetime] = None
+    nextReminderAt: Optional[int] = None # Using int for Unix ms timestamp
     reminderCount: int = 0
-    lastViewedAt: Optional[datetime] = None
+    reminderProfile: Optional[str] = "smart" # "smart" or "spaced"
+    lastViewedAt: Optional[int] = None
 
 
 class WebhookPayload(BaseModel):

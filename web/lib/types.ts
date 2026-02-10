@@ -57,8 +57,10 @@ export interface Link {
   reminderStatus?: 'none' | 'pending' | 'completed';
   nextReminderAt?: number; // Unix timestamp (ms)
   reminderCount?: number;
+  reminderProfile?: 'smart' | 'spaced';
   lastViewedAt?: number; // Unix timestamp (ms)
   language?: string;
+  isRead?: boolean;
 }
 
 // TODO: Replace with Firebase Auth user type

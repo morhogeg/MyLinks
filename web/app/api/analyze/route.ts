@@ -51,6 +51,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
                 actionableTakeaway: analysis.actionableTakeaway
             },
             // Enhanced AI fields
+            language: analysis.language,
             sourceType: analysis.sourceType,
             confidence: analysis.confidence,
             keyEntities: analysis.keyEntities

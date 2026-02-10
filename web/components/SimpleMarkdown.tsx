@@ -72,7 +72,15 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
         // ## Heading
         if (trimmed.startsWith('## ')) {
             flushList();
-            const headingText = trimmed.slice(3);
+            let headingText = trimmed.slice(3);
+
+            // Translate headers if RTL
+            if (isRtl) {
+                const upperHeading = headingText.toUpperCase();
+                if (upperHeading === 'KEY POINTS') headingText = 'נקודות עיקריות';
+                else if (upperHeading === 'CONCLUSIONS' || upperHeading === 'CONCLUSION') headingText = 'מסקנות';
+            }
+
             elements.push(
                 <h3 key={key++} className={`font-bold text-text uppercase tracking-wide ${isCompact ? 'text-[11px] mt-6 mb-3' : 'text-base mt-8 mb-5 border-b border-red-500 pb-2'}`}>
                     {headingText}

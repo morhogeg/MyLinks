@@ -1,12 +1,15 @@
 'use client';
 
 import { Link } from '@/lib/types';
-import { Lightbulb, Tag, ArrowRight, X } from 'lucide-react';
+import { Lightbulb, Tag, ArrowRight, X, Pencil, CheckCircle2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { getCategoryColorStyle } from '@/lib/colors';
 
 interface InsightsFeedProps {
     links: Link[];
     onOpenDetails: (link: Link) => void;
+    onUpdateCategory: (id: string, category: string) => void;
+    onReadStatusChange: (id: string, isRead: boolean) => void;
     isSelectionMode?: boolean;
     selectedIds?: Set<string>;
     onToggleSelection?: (id: string) => void;
@@ -15,11 +18,15 @@ interface InsightsFeedProps {
 export default function InsightsFeed({
     links,
     onOpenDetails,
+    onUpdateCategory,
+    onReadStatusChange,
     isSelectionMode,
     selectedIds,
     onToggleSelection
 }: InsightsFeedProps) {
     const [now, setNow] = useState<number>(0);
+    const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+    const [editedCategory, setEditedCategory] = useState('');
 
     useEffect(() => {
         const timer = setTimeout(() => setNow(Date.now()), 0);
@@ -44,7 +51,7 @@ export default function InsightsFeed({
                     className={`bg-card rounded-2xl border transition-all group flex items-start gap-3 p-4 sm:p-6 ${selectedIds?.has(link.id)
                         ? 'border-accent bg-accent/5 ring-1 ring-accent'
                         : 'border-border-subtle hover:shadow-lg'
-                        } ${isSelectionMode ? 'cursor-pointer select-none' : 'cursor-default'}`}
+                        } ${isSelectionMode ? 'cursor-pointer select-none' : 'cursor-default'} ${link.isRead ? 'opacity-50 grayscale-[0.2]' : ''}`}
                     onClick={() => {
                         if (isSelectionMode && onToggleSelection) {
                             onToggleSelection(link.id);
@@ -72,12 +79,70 @@ export default function InsightsFeed({
 
                             <div className="flex-1 space-y-3">
                                 <div className="flex items-center justify-between gap-4">
-                                    <span className="text-[10px] uppercase font-black tracking-widest text-accent bg-accent/10 px-2 py-0.5 rounded-md">
-                                        {link.category}
-                                    </span>
-                                    <span className="text-[10px] text-text-muted font-medium tabular-nums">
-                                        {now > 0 ? getTimeAgo(link.createdAt, now) : '...'}
-                                    </span>
+                                    {(() => {
+                                        const colorStyle = getCategoryColorStyle(link.category);
+                                        const isEditing = editingCategoryId === link.id;
+                                        return (
+                                            <div className="relative group/cat">
+                                                {isEditing ? (
+                                                    <input
+                                                        autoFocus
+                                                        className="text-[10px] uppercase font-black tracking-widest px-2 py-0.5 rounded-md inline-block w-24 bg-white/10 outline-none focus:ring-1 focus:ring-accent/50"
+                                                        style={{
+                                                            color: colorStyle.color,
+                                                        }}
+                                                        value={editedCategory}
+                                                        onChange={(e) => setEditedCategory(e.target.value)}
+                                                        onBlur={() => {
+                                                            setEditingCategoryId(null);
+                                                            if (editedCategory.trim() && editedCategory !== link.category) {
+                                                                onUpdateCategory(link.id, editedCategory.trim());
+                                                            }
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                e.currentTarget.blur();
+                                                            } else if (e.key === 'Escape') {
+                                                                setEditingCategoryId(null);
+                                                            }
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    />
+                                                ) : (
+                                                    <span
+                                                        className="text-[10px] uppercase font-black tracking-widest px-2 py-0.5 rounded-md inline-block cursor-pointer hover:brightness-110 transition-all flex items-center gap-1 group/chip"
+                                                        style={{
+                                                            backgroundColor: colorStyle.backgroundColor,
+                                                            color: colorStyle.color,
+                                                        }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingCategoryId(link.id);
+                                                            setEditedCategory(link.category);
+                                                        }}
+                                                    >
+                                                        {link.category}
+                                                        <Pencil className="w-2 h-2 opacity-0 group-hover/chip:opacity-100 transition-opacity" />
+                                                    </span>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onReadStatusChange(link.id, !link.isRead);
+                                            }}
+                                            className={`p-1.5 rounded-lg transition-all ${link.isRead ? 'text-green-500 bg-green-500/10' : 'text-text-muted hover:text-green-500 hover:bg-white/5'}`}
+                                            title={link.isRead ? 'Mark as unread' : 'Mark as read'}
+                                        >
+                                            <CheckCircle2 className={`w-3.5 h-3.5 ${link.isRead ? 'fill-current' : ''}`} />
+                                        </button>
+                                        <span className="text-[10px] text-text-muted font-medium tabular-nums">
+                                            {now > 0 ? getTimeAgo(link.createdAt, now) : '...'}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <h3 className="text-lg sm:text-xl font-bold text-text group-hover:text-accent transition-colors leading-snug">

@@ -121,6 +121,7 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                     detailedSummary: data.link.detailedSummary,
                     tags: data.link.tags,
                     category: data.link.category,
+                    language: data.link.language,
                     metadata: {
                         originalTitle: data.link.metadata.originalTitle,
                         estimatedReadTime: data.link.metadata.estimatedReadTime,

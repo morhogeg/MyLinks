@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder } from '@/lib/storage';
+import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus } from '@/lib/storage';
 import { collection, query, orderBy, onSnapshot, where, getDocs, limit, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Card from './Card';
@@ -15,10 +15,12 @@ import ReminderModal from './ReminderModal';
 import TableView from './TableView';
 import InsightsFeed from './InsightsFeed';
 import LinkDetailModal from './LinkDetailModal';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2 } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2 } from 'lucide-react';
 import TagExplorer from './TagExplorer';
+import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
-type FilterType = 'all' | 'unread' | 'archived' | 'favorite' | 'reminders';
+type FilterType = 'all' | 'unread' | 'read' | 'archived' | 'favorite' | 'reminders';
 type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
 
 /**
@@ -28,14 +30,17 @@ type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
  * - Search functionality
  * - Filter by status
  * - Infinite scroll / load more
+ * - Deep linking to specific links via URL params
  */
-export default function Feed() {
+function FeedContent() {
+    const searchParams = useSearchParams();
     const [links, setLinks] = useState<Link[]>([]);
     const [uid, setUid] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [filter, setFilter] = useState<FilterType>('all');
     const [selectedCategory, setSelectedCategory] = useState<Set<string>>(new Set());
-    const [activeLink, setActiveLink] = useState<Link | null>(null);
+    const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
+    const activeLink = links.find(l => l.id === activeLinkId) || null;
     const [isLoading, setIsLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'grid' | 'table' | 'insights' | 'compact'>('grid');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -110,11 +115,27 @@ export default function Feed() {
         return 0;
     };
 
+    // 3. Handle deep linking
+    useEffect(() => {
+        const linkId = searchParams.get('linkId');
+        if (linkId && links.length > 0) {
+            const link = links.find(l => l.id === linkId);
+            if (link) {
+                setActiveLinkId(link.id);
+                // Clear the param after opening to avoid re-opening on re-renders
+                // but keep it if the user wants to share the URL. 
+                // For now, just opening it is enough.
+            }
+        }
+    }, [searchParams, links]);
+
     // Filter and sort links
     const filteredLinks = links
         .filter((link) => {
             if (filter === 'all') return true;
             if (filter === 'reminders') return link.reminderStatus === 'pending';
+            if (filter === 'unread') return !link.isRead;
+            if (filter === 'read') return !!link.isRead;
             return link.status === filter;
         })
         .filter((link) => {
@@ -185,9 +206,19 @@ export default function Feed() {
         await updateLinkStatus(uid, id, status);
     };
 
+    const handleReadStatusChange = async (id: string, isRead: boolean) => {
+        if (!uid) return;
+        await updateLinkReadStatus(uid, id, isRead);
+    };
+
     const handleUpdateTags = async (id: string, tags: string[]) => {
         if (!uid) return;
         await updateLinkTags(uid, id, tags);
+    };
+
+    const handleUpdateCategory = async (id: string, category: string) => {
+        if (!uid) return;
+        await updateLinkCategory(uid, id, category);
     };
 
     const handleDelete = async (id: string) => {
@@ -227,6 +258,7 @@ export default function Feed() {
     const filterButtons: { key: FilterType; label: string; icon: React.ReactNode }[] = [
         { key: 'all', label: 'All', icon: <Inbox className="w-4 h-4" /> },
         { key: 'unread', label: 'Unread', icon: <Inbox className="w-4 h-4" /> },
+        { key: 'read', label: 'Read', icon: <CheckCircle2 className="w-4 h-4" /> },
         { key: 'favorite', label: 'Favorites', icon: <Star className="w-4 h-4" /> },
         { key: 'reminders', label: 'Reminders', icon: <Bell className="w-4 h-4" /> },
         { key: 'archived', label: 'Archived', icon: <Archive className="w-4 h-4" /> },
@@ -324,6 +356,7 @@ export default function Feed() {
                             <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-40">
                                 {filter === 'all' && <Inbox className="w-3 h-3 text-text-muted" />}
                                 {filter === 'unread' && <Inbox className="w-3 h-3 text-accent" />}
+                                {filter === 'read' && <CheckCircle2 className="w-3 h-3 text-green-500" />}
                                 {filter === 'favorite' && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
                                 {filter === 'reminders' && <Bell className="w-3 h-3 text-accent" />}
                                 {filter === 'archived' && <Archive className="w-3 h-3 text-text-muted" />}
@@ -514,18 +547,20 @@ export default function Feed() {
                                     filter === 'favorite' ? 'No favorites yet' :
                                         filter === 'archived' ? 'No archived links' :
                                             filter === 'unread' ? 'No unread links' :
-                                                selectedCategory.size > 0 ? `No links in ${Array.from(selectedCategory).join(', ')}` :
-                                                    selectedTags.size > 0 ? 'No links match selected tags' :
-                                                        'Your Second Brain is empty'}
+                                                filter === 'read' ? 'No read links yet' :
+                                                    selectedCategory.size > 0 ? `No links in ${Array.from(selectedCategory).join(', ')}` :
+                                                        selectedTags.size > 0 ? 'No links match selected tags' :
+                                                            'Your Second Brain is empty'}
                             </h3>
                             <p className="text-text-secondary text-sm">
                                 {searchQuery ? 'Try a different search term' :
                                     filter === 'favorite' ? 'Star links to add them to your favorites' :
                                         filter === 'archived' ? 'Archive links to see them here' :
                                             filter === 'unread' ? 'All caught up! No unread links' :
-                                                selectedCategory.size > 0 ? 'Try selecting a different category' :
-                                                    selectedTags.size > 0 ? 'Try clearing some tag filters' :
-                                                        'Add your first link using the + button below'}
+                                                filter === 'read' ? 'Items you mark as read will appear here' :
+                                                    selectedCategory.size > 0 ? 'Try selecting a different category' :
+                                                        selectedTags.size > 0 ? 'Try clearing some tag filters' :
+                                                            'Add your first link using the + button below'}
                             </p>
                             {(selectedTags.size > 0 || searchQuery) && (
                                 <button
@@ -542,9 +577,11 @@ export default function Feed() {
                     ) : viewMode === 'table' ? (
                         <TableView
                             links={filteredLinks}
-                            onOpenDetails={setActiveLink}
+                            onOpenDetails={(link) => setActiveLinkId(link.id)}
                             onStatusChange={handleStatusChange}
+                            onReadStatusChange={handleReadStatusChange}
                             onUpdateTags={handleUpdateTags}
+                            onUpdateCategory={handleUpdateCategory}
                             onDelete={handleDelete}
                             isSelectionMode={isSelectionMode}
                             selectedIds={selectedIds}
@@ -553,7 +590,9 @@ export default function Feed() {
                     ) : viewMode === 'insights' ? (
                         <InsightsFeed
                             links={filteredLinks}
-                            onOpenDetails={setActiveLink}
+                            onOpenDetails={(link) => setActiveLinkId(link.id)}
+                            onUpdateCategory={handleUpdateCategory}
+                            onReadStatusChange={handleReadStatusChange}
                             isSelectionMode={isSelectionMode}
                             selectedIds={selectedIds}
                             onToggleSelection={toggleSelection}
@@ -564,8 +603,10 @@ export default function Feed() {
                                 <Card
                                     key={link.id}
                                     link={link}
-                                    onOpenDetails={setActiveLink}
+                                    onOpenDetails={(link) => setActiveLinkId(link.id)}
                                     onStatusChange={handleStatusChange}
+                                    onReadStatusChange={handleReadStatusChange}
+                                    onUpdateCategory={handleUpdateCategory}
                                     onDelete={handleDelete}
                                     onUpdateReminder={(link) => handleOpenReminderModal(link)}
                                     isSelectionMode={isSelectionMode}
@@ -583,8 +624,10 @@ export default function Feed() {
                                 <CompactCard
                                     key={link.id}
                                     link={link}
-                                    onOpenDetails={setActiveLink}
+                                    onOpenDetails={(link) => setActiveLinkId(link.id)}
                                     onStatusChange={handleStatusChange}
+                                    onReadStatusChange={handleReadStatusChange}
+                                    onUpdateCategory={handleUpdateCategory}
                                     onDelete={handleDelete}
                                     onUpdateReminder={(link) => handleOpenReminderModal(link)}
                                     isSelectionMode={isSelectionMode}
@@ -604,15 +647,17 @@ export default function Feed() {
                     allLinks={links}
                     uid={uid}
                     isOpen={!!activeLink}
-                    onClose={() => setActiveLink(null)}
+                    onClose={() => setActiveLinkId(null)}
                     onStatusChange={handleStatusChange}
+                    onReadStatusChange={handleReadStatusChange}
                     onUpdateTags={handleUpdateTags}
+                    onUpdateCategory={handleUpdateCategory}
                     onUpdateReminder={(id) => {
                         const linkToRemind = links.find(l => l.id === id);
                         if (linkToRemind) handleOpenReminderModal(linkToRemind);
                     }}
                     onDelete={handleDelete}
-                    onOpenOtherLink={(link) => setActiveLink(link)}
+                    onOpenOtherLink={(link) => setActiveLinkId(link.id)}
                 />
             )}
 
@@ -627,5 +672,17 @@ export default function Feed() {
                 />
             )}
         </div>
+    );
+}
+
+export default function Feed() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center h-64">
+                <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+            </div>
+        }>
+            <FeedContent />
+        </Suspense>
     );
 }

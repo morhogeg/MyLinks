@@ -2,7 +2,7 @@
 
 import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { ExternalLink, Tag, Trash2, Archive, Star, Inbox, X, Plus, Check } from 'lucide-react';
+import { ExternalLink, Tag, Trash2, Archive, Star, Inbox, X, Plus, Check, Pencil, CheckCircle2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
@@ -11,7 +11,9 @@ interface TableViewProps {
     links: Link[];
     onOpenDetails: (link: Link) => void;
     onStatusChange: (id: string, status: LinkStatus) => void;
+    onReadStatusChange: (id: string, isRead: boolean) => void;
     onUpdateTags: (id: string, tags: string[]) => void;
+    onUpdateCategory: (id: string, category: string) => void;
     onDelete: (id: string) => void;
     isSelectionMode?: boolean;
     selectedIds?: Set<string>;
@@ -21,9 +23,11 @@ interface TableViewProps {
 /**
  * High-density table view for rapid link scanning
  */
-export default function TableView({ links, onOpenDetails, onStatusChange, onUpdateTags, onDelete }: TableViewProps) {
+export default function TableView({ links, onOpenDetails, onStatusChange, onReadStatusChange, onUpdateTags, onUpdateCategory, onDelete }: TableViewProps) {
     const [deleteLinkId, setDeleteLinkId] = useState<string | null>(null);
     const [activeTagPicker, setActiveTagPicker] = useState<string | null>(null);
+    const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+    const [editedCategory, setEditedCategory] = useState('');
     const [tagSearch, setTagSearch] = useState('');
     const [now, setNow] = useState<number>(0);
 
@@ -47,8 +51,9 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
             <table className="w-full text-left border-collapse table-fixed">
                 <thead>
                     <tr className="border-b border-border-subtle bg-white/[0.01] dark:bg-white/[0.02]">
-                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[25%]">Source</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[30%]">Insight</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[50px] text-center">Read</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[25%] text-left">Source</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[30%] text-left">Insight</th>
                         <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-center w-[10%]">Category</th>
                         <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[20%]">Tags</th>
                         <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-right w-[15%]">Actions</th>
@@ -58,9 +63,18 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                     {links.map((link) => (
                         <tr
                             key={link.id}
-                            className="group hover:bg-white/[0.03] transition-all duration-200 cursor-pointer"
+                            className={`group hover:bg-white/[0.03] transition-all duration-200 cursor-pointer ${link.isRead ? 'opacity-50 grayscale-[0.2]' : ''}`}
                             onClick={() => onOpenDetails(link)}
                         >
+                            <td className="px-6 py-10 align-top text-center" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                    onClick={() => onReadStatusChange(link.id, !link.isRead)}
+                                    className={`p-2 rounded-lg transition-all ${link.isRead ? 'text-green-500 bg-green-500/10' : 'text-text-muted hover:bg-white/5 hover:text-green-500'}`}
+                                    title={link.isRead ? 'Mark as unread' : 'Mark as read'}
+                                >
+                                    <CheckCircle2 className={`w-4 h-4 ${link.isRead ? 'fill-current' : ''}`} />
+                                </button>
+                            </td>
                             <td className="px-6 py-10 align-top">
                                 <div className="flex flex-col gap-1 min-w-0">
                                     <div className="text-[14px] font-bold text-text group-hover:text-accent transition-colors whitespace-normal leading-relaxed">
@@ -89,17 +103,53 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onUpda
                             <td className="px-6 py-10 text-center align-top">
                                 {(() => {
                                     const colorStyle = getCategoryColorStyle(link.category);
+                                    const isEditing = editingCategoryId === link.id;
                                     return (
-                                        <span
-                                            className="text-[9px] uppercase font-black tracking-tighter px-2.5 py-1 rounded-full inline-block border border-transparent"
-                                            style={{
-                                                backgroundColor: colorStyle.backgroundColor,
-                                                color: colorStyle.color,
-                                                borderColor: colorStyle.borderColor,
-                                            }}
-                                        >
-                                            {link.category}
-                                        </span>
+                                        <div className="flex justify-center">
+                                            {isEditing ? (
+                                                <input
+                                                    autoFocus
+                                                    className="text-[9px] uppercase font-black tracking-tighter px-2.5 py-1 rounded-full inline-block border bg-white/10 outline-none focus:ring-1 focus:ring-accent/50 w-24 text-center"
+                                                    style={{
+                                                        color: colorStyle.color,
+                                                        borderColor: colorStyle.borderColor,
+                                                    }}
+                                                    value={editedCategory}
+                                                    onChange={(e) => setEditedCategory(e.target.value)}
+                                                    onBlur={() => {
+                                                        setEditingCategoryId(null);
+                                                        if (editedCategory.trim() && editedCategory !== link.category) {
+                                                            onUpdateCategory(link.id, editedCategory.trim());
+                                                        }
+                                                    }}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.currentTarget.blur();
+                                                        } else if (e.key === 'Escape') {
+                                                            setEditingCategoryId(null);
+                                                        }
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
+                                            ) : (
+                                                <span
+                                                    className="text-[9px] uppercase font-black tracking-tighter px-2.5 py-1 rounded-full inline-block border border-transparent cursor-pointer hover:brightness-110 transition-all flex items-center gap-1 group/chip"
+                                                    style={{
+                                                        backgroundColor: colorStyle.backgroundColor,
+                                                        color: colorStyle.color,
+                                                        borderColor: colorStyle.borderColor,
+                                                    }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setEditingCategoryId(link.id);
+                                                        setEditedCategory(link.category);
+                                                    }}
+                                                >
+                                                    {link.category}
+                                                    <Pencil className="w-2 h-2 opacity-0 group-hover/chip:opacity-100 transition-opacity" />
+                                                </span>
+                                            )}
+                                        </div>
                                     );
                                 })()}
                             </td>

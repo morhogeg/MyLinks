@@ -23,12 +23,12 @@ Requirements for the analysis:
    - State the main subject, key points, and conclusions objectively.
 
 4. detailedSummary: Write a well-structured, professional summary using markdown formatting:
-   - **LANGUAGE**: Write the detailed summary in the SAME language as the input content.
-   - Start with a 1-2 sentence overview paragraph.
-   - Use "## Key Points" as a subheading, followed by bullet points (use - for bullets).
-   - Each bullet should be a factual statement from the content.
-   - Include 3-6 bullet points covering the main arguments or information.
-   - If applicable, add "## Conclusions" with the author's stated conclusions.
+    - **LANGUAGE**: Write the detailed summary in the SAME language as the input content.
+    - Start with a 1-2 sentence overview paragraph.
+    - Use "## Key Points" (or "## נקודות עיקריות" for Hebrew) as a subheading, followed by bullet points (use - for bullets).
+    - Each bullet should be a factual statement from the content.
+    - Include 3-6 bullet points covering the main arguments or information.
+    - If applicable, add "## Conclusions" (or "## מסקנות" for Hebrew) with the author's stated conclusions.
    - Keep the tone neutral and professional throughout.
    - Total length: 150-300 words.
 

@@ -24,6 +24,8 @@ from ai_service import ClaudeService
 # Initialize Firebase Admin lazily
 _db = None
 
+APP_URL = os.environ.get("APP_URL", "https://secondbrain-app-94da2.web.app")
+
 def get_db():
     global _db
     if _db is None:
@@ -553,6 +555,15 @@ def handle_reminder_intent(text: str) -> Optional[datetime]:
         days = int(match_he.group(1))
         return now + timedelta(days=days)
         
+    # Numeric shortcuts (1, 2, 3) from menu
+    # EXACT match only to avoid false positives
+    if text.strip() == '1':
+        return now + timedelta(days=1)
+    if text.strip() == '2':
+        return now + timedelta(days=3)
+    if text.strip() == '3':
+        return now + timedelta(days=7)
+
     return None
 
 def set_reminder(uid: str, link_id: str, reminder_time: datetime):
@@ -744,6 +755,18 @@ def whatsapp_webhook(request):
     if not url_match:
         # Handling conversational commands (Reminders) remains synchronous for instant feedback
         logger.info("No URL found, checking for commands")
+        
+        # Check for "Reminder" / "תזכורת" keyword first
+        msg_lower = payload.body.lower().strip()
+        if msg_lower == "reminder" or msg_lower == "תזכורת":
+            is_he = (msg_lower == "תזכורת") or user_msg_is_hebrew
+            if is_he:
+                menu = "מתי להזכיר לך?\n1. מחר\n2. בעוד 3 ימים\n3. בעוד שבוע"
+            else:
+                menu = "When should I remind you?\n1. Tomorrow\n2. In 3 days\n3. In 1 week"
+            send_whatsapp_message(payload.from_number, menu)
+            return {"success": True}, 200
+
         reminder_time = handle_reminder_intent(payload.body)
         
         if reminder_time:
@@ -796,7 +819,7 @@ def whatsapp_webhook(request):
     return {"success": True, "queued": True, "id": process_ref.id}, 200
 
 
-def _format_success_message(link_data: dict, reminder_time: Optional[datetime] = None, language: str = "en") -> str:
+def _format_success_message(link_data: dict, reminder_time: Optional[datetime] = None, language: str = "en", link_id: Optional[str] = None) -> str:
     """
     Format a rich success message using the final link data structure.
     Supports English ("en") and Hebrew ("he").
@@ -827,7 +850,8 @@ def _format_success_message(link_data: dict, reminder_time: Optional[datetime] =
     lbl_tags = "תגיות" if is_hebrew else "Tags"
     lbl_insight = "💡 *תובנה מרכזית:*" if is_hebrew else "💡 *Key Insight:*"
     lbl_reminder_set = "⏰ *התזכורת נקבעה:*" if is_hebrew else "⏰ *Reminder Set:*"
-    lbl_reply_hint = "השב/י עם \"הזכר לי מחר\" לקביעת תזכורת." if is_hebrew else "REPLY with \"remind me tomorrow\" to set a reminder."
+    lbl_reply_hint = "השב/י עם \"תזכורת\" לקביעת תזכורת." if is_hebrew else "REPLY with \"reminder\" to set a reminder."
+    lbl_view_app = "🔗 *פתח במוח השני:*" if is_hebrew else "🔗 *Open in Second Brain:*"
     
     # Format message
     lines = [
@@ -852,6 +876,11 @@ def _format_success_message(link_data: dict, reminder_time: Optional[datetime] =
         lines.append(f"{lbl_reminder_set} {date_str}")
     else:
         lines.append(f"{lbl_reply_hint}")
+    
+    if link_id:
+        lines.append(f"")
+        lines.append(f"{lbl_view_app}")
+        lines.append(f"{APP_URL}?linkId={link_id}")
         
     return "\n".join(lines)
 
@@ -937,7 +966,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # 5. Check for reminder intent
         reminder_time = handle_reminder_intent(original_body)
         
-        msg = _format_success_message(link_data, reminder_time, language=analysis.get("language", "en"))
+        msg = _format_success_message(link_data, reminder_time, language=analysis.get("language", "en"), link_id=link_id)
         
         logger.info(f"Processing complete, sending message to {from_number}")
         send_whatsapp_message(from_number, msg)
@@ -973,21 +1002,26 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # For now, let's keep it for the user to see.
 
 
-def calculate_next_reminder(reminder_count: int) -> datetime:
+def calculate_next_reminder(reminder_count: int, profile: str = "smart") -> datetime:
     """
     Calculate the next reminder date using spaced repetition
-    Stage 0: 1 day
-    Stage 1: 7 days
-    Stage 2: 30 days
-    Stage 3+: 90 days (quarterly)
+    
+    Profiles:
+    - smart: 1, 7, 30, 90 days
+    - spaced: initial (3), 5, 7 days
     """
     from datetime import timedelta
     
-    intervals = {
-        0: timedelta(days=1),
-        1: timedelta(days=7),
-        2: timedelta(days=30),
-    }
+    if profile == "spaced":
+        intervals = {
+            1: timedelta(days=5),
+            2: timedelta(days=7),
+        }
+    else: # smart
+        intervals = {
+            1: timedelta(days=7),
+            2: timedelta(days=30),
+        }
     
     interval = intervals.get(reminder_count, timedelta(days=90))
     return datetime.now() + interval
@@ -1060,7 +1094,8 @@ def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
                 
                 # Update the link's reminder status
                 new_reminder_count = reminder_count + 1
-                next_reminder = calculate_next_reminder(new_reminder_count)
+                profile = link_data.get('reminderProfile', 'smart')
+                next_reminder = calculate_next_reminder(new_reminder_count, profile=profile)
                 next_reminder_ms = int(next_reminder.timestamp() * 1000)
                 
                 # If we've reached the max stages (3), mark as completed
