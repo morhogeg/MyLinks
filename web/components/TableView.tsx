@@ -6,6 +6,7 @@ import { ExternalLink, Tag, Trash2, Archive, Star, Inbox, X, Plus, Check, Pencil
 import { useState, useEffect } from 'react';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
+import CategoryInput from './CategoryInput';
 
 interface TableViewProps {
     links: Link[];
@@ -14,6 +15,7 @@ interface TableViewProps {
     onReadStatusChange: (id: string, isRead: boolean) => void;
     onUpdateTags: (id: string, tags: string[]) => void;
     onUpdateCategory: (id: string, category: string) => void;
+    allCategories: string[];
     onDelete: (id: string) => void;
     isSelectionMode?: boolean;
     selectedIds?: Set<string>;
@@ -23,7 +25,7 @@ interface TableViewProps {
 /**
  * High-density table view for rapid link scanning
  */
-export default function TableView({ links, onOpenDetails, onStatusChange, onReadStatusChange, onUpdateTags, onUpdateCategory, onDelete }: TableViewProps) {
+export default function TableView({ links, onOpenDetails, onStatusChange, onReadStatusChange, onUpdateTags, onUpdateCategory, allCategories, onDelete }: TableViewProps) {
     const [deleteLinkId, setDeleteLinkId] = useState<string | null>(null);
     const [activeTagPicker, setActiveTagPicker] = useState<string | null>(null);
     const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -107,29 +109,17 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
                                     return (
                                         <div className="flex justify-center">
                                             {isEditing ? (
-                                                <input
-                                                    autoFocus
-                                                    className="text-[9px] uppercase font-black tracking-tighter px-2.5 py-1 rounded-full inline-block border bg-white/10 outline-none focus:ring-1 focus:ring-accent/50 w-24 text-center"
-                                                    style={{
-                                                        color: colorStyle.color,
-                                                        borderColor: colorStyle.borderColor,
-                                                    }}
-                                                    value={editedCategory}
-                                                    onChange={(e) => setEditedCategory(e.target.value)}
-                                                    onBlur={() => {
+                                                <CategoryInput
+                                                    currentCategory={link.category}
+                                                    allCategories={allCategories}
+                                                    onUpdate={(newCategory) => {
                                                         setEditingCategoryId(null);
-                                                        if (editedCategory.trim() && editedCategory !== link.category) {
-                                                            onUpdateCategory(link.id, editedCategory.trim());
+                                                        if (newCategory !== link.category) {
+                                                            onUpdateCategory(link.id, newCategory);
                                                         }
                                                     }}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.currentTarget.blur();
-                                                        } else if (e.key === 'Escape') {
-                                                            setEditingCategoryId(null);
-                                                        }
-                                                    }}
-                                                    onClick={(e) => e.stopPropagation()}
+                                                    onCancel={() => setEditingCategoryId(null)}
+                                                    className="w-24 text-[9px] px-2.5 py-1 text-center"
                                                 />
                                             ) : (
                                                 <span

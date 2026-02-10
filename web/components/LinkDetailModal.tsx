@@ -6,10 +6,12 @@ import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
+import CategoryInput from './CategoryInput';
 
 interface LinkDetailModalProps {
     link: Link;
     allLinks: Link[];
+    allCategories: string[];
     uid: string | null;
     isOpen: boolean;
     onClose: () => void;
@@ -25,6 +27,7 @@ interface LinkDetailModalProps {
 export default function LinkDetailModal({
     link,
     allLinks,
+    allCategories,
     uid,
     isOpen,
     onClose,
@@ -210,29 +213,17 @@ export default function LinkDetailModal({
                             return (
                                 <div className="relative group/cat inline-block">
                                     {isEditingCategory ? (
-                                        <input
-                                            autoFocus
-                                            className="text-[10px] uppercase font-black tracking-widest px-2.5 py-1.5 rounded-lg inline-block w-32 bg-white/10 outline-none focus:ring-1 focus:ring-accent/50"
-                                            style={{
-                                                color: colorStyle.color,
-                                            }}
-                                            value={editedCategory}
-                                            onChange={(e) => setEditedCategory(e.target.value)}
-                                            onBlur={() => {
+                                        <CategoryInput
+                                            currentCategory={link.category}
+                                            allCategories={allCategories}
+                                            onUpdate={(newCategory) => {
                                                 setIsEditingCategory(false);
-                                                if (editedCategory.trim() && editedCategory !== link.category) {
-                                                    onUpdateCategory(link.id, editedCategory.trim());
+                                                if (newCategory !== link.category) {
+                                                    onUpdateCategory(link.id, newCategory);
                                                 }
                                             }}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    e.currentTarget.blur();
-                                                } else if (e.key === 'Escape') {
-                                                    setEditedCategory(link.category);
-                                                    setIsEditingCategory(false);
-                                                }
-                                            }}
-                                            onClick={(e) => e.stopPropagation()}
+                                            onCancel={() => setIsEditingCategory(false)}
+                                            className="w-32 text-[10px] px-2.5 py-1.5"
                                         />
                                     ) : (
                                         <span

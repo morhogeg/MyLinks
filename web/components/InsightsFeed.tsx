@@ -4,12 +4,14 @@ import { Link } from '@/lib/types';
 import { Lightbulb, Tag, ArrowRight, X, Pencil, CheckCircle2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getCategoryColorStyle } from '@/lib/colors';
+import CategoryInput from './CategoryInput';
 
 interface InsightsFeedProps {
     links: Link[];
     onOpenDetails: (link: Link) => void;
     onUpdateCategory: (id: string, category: string) => void;
     onReadStatusChange: (id: string, isRead: boolean) => void;
+    allCategories: string[];
     isSelectionMode?: boolean;
     selectedIds?: Set<string>;
     onToggleSelection?: (id: string) => void;
@@ -20,6 +22,7 @@ export default function InsightsFeed({
     onOpenDetails,
     onUpdateCategory,
     onReadStatusChange,
+    allCategories,
     isSelectionMode,
     selectedIds,
     onToggleSelection
@@ -85,28 +88,17 @@ export default function InsightsFeed({
                                         return (
                                             <div className="relative group/cat">
                                                 {isEditing ? (
-                                                    <input
-                                                        autoFocus
-                                                        className="text-[10px] uppercase font-black tracking-widest px-2 py-0.5 rounded-md inline-block w-24 bg-white/10 outline-none focus:ring-1 focus:ring-accent/50"
-                                                        style={{
-                                                            color: colorStyle.color,
-                                                        }}
-                                                        value={editedCategory}
-                                                        onChange={(e) => setEditedCategory(e.target.value)}
-                                                        onBlur={() => {
+                                                    <CategoryInput
+                                                        currentCategory={link.category}
+                                                        allCategories={allCategories}
+                                                        onUpdate={(newCategory) => {
                                                             setEditingCategoryId(null);
-                                                            if (editedCategory.trim() && editedCategory !== link.category) {
-                                                                onUpdateCategory(link.id, editedCategory.trim());
+                                                            if (newCategory !== link.category) {
+                                                                onUpdateCategory(link.id, newCategory);
                                                             }
                                                         }}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') {
-                                                                e.currentTarget.blur();
-                                                            } else if (e.key === 'Escape') {
-                                                                setEditingCategoryId(null);
-                                                            }
-                                                        }}
-                                                        onClick={(e) => e.stopPropagation()}
+                                                        onCancel={() => setEditingCategoryId(null)}
+                                                        className="w-24 text-[10px] px-2 py-0.5"
                                                     />
                                                 ) : (
                                                     <span

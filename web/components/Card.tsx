@@ -3,10 +3,11 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { getCategoryColorStyle } from '@/lib/colors';
+import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { Archive, Star, Clock, Tag, Trash2, ChefHat, Utensils, Bell, BellOff, Pencil, CheckCircle2 } from 'lucide-react';
 import SimpleMarkdown from './SimpleMarkdown';
+import { getCategoryColorStyle } from '@/lib/colors';
+import CategoryInput from './CategoryInput';
 
 interface CardProps {
     link: Link;
@@ -14,6 +15,7 @@ interface CardProps {
     onStatusChange: (id: string, status: LinkStatus) => void;
     onReadStatusChange: (id: string, isRead: boolean) => void;
     onUpdateCategory: (id: string, category: string) => void;
+    allCategories: string[];
     onDelete: (id: string) => void;
     onUpdateReminder: (link: Link) => void;
     isSelectionMode?: boolean;
@@ -30,6 +32,7 @@ export default function Card({
     onStatusChange,
     onReadStatusChange,
     onUpdateCategory,
+    allCategories,
     onDelete,
     onUpdateReminder,
     isSelectionMode = false,
@@ -37,13 +40,8 @@ export default function Card({
     onToggleSelection
 }: CardProps) {
     const isRtl = link.language === 'he';
-    const [now, setNow] = useState<number>(0);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
-    const [editedCategory, setEditedCategory] = useState(link.category);
-
-    useEffect(() => {
-        setEditedCategory(link.category);
-    }, [link.category]);
+    const [now, setNow] = useState<number>(0);
 
     useEffect(() => {
         const initialTimer = setTimeout(() => setNow(Date.now()), 0);
@@ -97,29 +95,16 @@ export default function Card({
                         return (
                             <div className="relative group/cat">
                                 {isEditingCategory ? (
-                                    <input
-                                        autoFocus
-                                        className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block w-24 bg-white/10 outline-none focus:ring-1 focus:ring-accent/50"
-                                        style={{
-                                            color: colorStyle.color,
-                                        }}
-                                        value={editedCategory}
-                                        onChange={(e) => setEditedCategory(e.target.value)}
-                                        onBlur={() => {
+                                    <CategoryInput
+                                        currentCategory={link.category}
+                                        allCategories={allCategories}
+                                        onUpdate={(newCategory) => {
                                             setIsEditingCategory(false);
-                                            if (editedCategory.trim() && editedCategory !== link.category) {
-                                                onUpdateCategory(link.id, editedCategory.trim());
+                                            if (newCategory !== link.category) {
+                                                onUpdateCategory(link.id, newCategory);
                                             }
                                         }}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                e.currentTarget.blur();
-                                            } else if (e.key === 'Escape') {
-                                                setEditedCategory(link.category);
-                                                setIsEditingCategory(false);
-                                            }
-                                        }}
-                                        onClick={(e) => e.stopPropagation()}
+                                        onCancel={() => setIsEditingCategory(false)}
                                     />
                                 ) : (
                                     <span
@@ -134,7 +119,7 @@ export default function Card({
                                         }}
                                     >
                                         {link.category}
-                                        <Pencil className="w-2 h-2 opacity-0 group-hover/chip:opacity-100 transition-opacity" />
+                                        <Pencil className="w-2.5 h-2.5 opacity-40 group-hover/chip:opacity-100 transition-opacity" />
                                     </span>
                                 )}
                             </div>

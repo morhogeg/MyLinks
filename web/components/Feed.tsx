@@ -582,6 +582,7 @@ function FeedContent() {
                             onReadStatusChange={handleReadStatusChange}
                             onUpdateTags={handleUpdateTags}
                             onUpdateCategory={handleUpdateCategory}
+                            allCategories={categories}
                             onDelete={handleDelete}
                             isSelectionMode={isSelectionMode}
                             selectedIds={selectedIds}
@@ -595,6 +596,7 @@ function FeedContent() {
                             onReadStatusChange={handleReadStatusChange}
                             isSelectionMode={isSelectionMode}
                             selectedIds={selectedIds}
+                            allCategories={categories}
                             onToggleSelection={toggleSelection}
                         />
                     ) : viewMode === 'grid' ? (
@@ -607,6 +609,7 @@ function FeedContent() {
                                     onStatusChange={handleStatusChange}
                                     onReadStatusChange={handleReadStatusChange}
                                     onUpdateCategory={handleUpdateCategory}
+                                    allCategories={categories}
                                     onDelete={handleDelete}
                                     onUpdateReminder={(link) => handleOpenReminderModal(link)}
                                     isSelectionMode={isSelectionMode}
@@ -628,6 +631,7 @@ function FeedContent() {
                                     onStatusChange={handleStatusChange}
                                     onReadStatusChange={handleReadStatusChange}
                                     onUpdateCategory={handleUpdateCategory}
+                                    allCategories={categories}
                                     onDelete={handleDelete}
                                     onUpdateReminder={(link) => handleOpenReminderModal(link)}
                                     isSelectionMode={isSelectionMode}
@@ -645,6 +649,7 @@ function FeedContent() {
                 <LinkDetailModal
                     link={activeLink}
                     allLinks={links}
+                    allCategories={categories}
                     uid={uid}
                     isOpen={!!activeLink}
                     onClose={() => setActiveLinkId(null)}

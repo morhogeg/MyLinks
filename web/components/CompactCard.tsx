@@ -4,6 +4,7 @@ import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { Archive, Star, Bell, Trash2, Pencil, CheckCircle2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import CategoryInput from './CategoryInput';
 
 interface CompactCardProps {
     link: Link;
@@ -11,6 +12,7 @@ interface CompactCardProps {
     onStatusChange: (id: string, status: LinkStatus) => void;
     onReadStatusChange: (id: string, isRead: boolean) => void;
     onUpdateCategory: (id: string, category: string) => void;
+    allCategories: string[];
     onDelete: (id: string) => void;
     onUpdateReminder: (link: Link) => void;
     isSelectionMode?: boolean;
@@ -27,6 +29,7 @@ export default function CompactCard({
     onStatusChange,
     onReadStatusChange,
     onUpdateCategory,
+    allCategories,
     onDelete,
     onUpdateReminder,
     isSelectionMode = false,
@@ -65,29 +68,17 @@ export default function CompactCard({
                 <div className="flex justify-between items-start gap-2 z-10">
                     <div className="relative group/cat max-w-[75%]">
                         {isEditingCategory ? (
-                            <input
-                                autoFocus
-                                className="text-[8px] uppercase font-black tracking-widest px-1.5 py-0.5 rounded-md inline-block w-full bg-white/10 outline-none focus:ring-1 focus:ring-accent/50"
-                                style={{
-                                    color: colorStyle.color,
-                                }}
-                                value={editedCategory}
-                                onChange={(e) => setEditedCategory(e.target.value)}
-                                onBlur={() => {
+                            <CategoryInput
+                                currentCategory={link.category}
+                                allCategories={allCategories}
+                                onUpdate={(newCategory) => {
                                     setIsEditingCategory(false);
-                                    if (editedCategory.trim() && editedCategory !== link.category) {
-                                        onUpdateCategory(link.id, editedCategory.trim());
+                                    if (newCategory !== link.category) {
+                                        onUpdateCategory(link.id, newCategory);
                                     }
                                 }}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.currentTarget.blur();
-                                    } else if (e.key === 'Escape') {
-                                        setEditedCategory(link.category);
-                                        setIsEditingCategory(false);
-                                    }
-                                }}
-                                onClick={(e) => e.stopPropagation()}
+                                onCancel={() => setIsEditingCategory(false)}
+                                className="text-[8px] px-1.5 py-0.5 w-full"
                             />
                         ) : (
                             <span
