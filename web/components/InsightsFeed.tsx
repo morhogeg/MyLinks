@@ -1,7 +1,7 @@
 'use client';
 
 import { Link } from '@/lib/types';
-import { Lightbulb, Tag, ArrowRight, X, Pencil, CheckCircle2 } from 'lucide-react';
+import { Lightbulb, Tag, ArrowRight, X, Pencil, CheckCircle2, Circle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
@@ -122,7 +122,7 @@ export default function InsightsFeed({
                                                                 setEditingCategoryId(link.id);
                                                                 setEditedCategory(link.category);
                                                             }}
-                                                            className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ml-1 hover:bg-white/5 rounded-md"
+                                                            className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ms-1 hover:bg-white/5 rounded-md"
                                                         >
                                                             <Pencil className="w-3 h-3 text-text-muted/40 hover:text-text-muted" />
                                                         </button>
@@ -140,7 +140,11 @@ export default function InsightsFeed({
                                             className={`p-1.5 rounded-lg transition-all ${link.isRead ? 'text-green-500 bg-green-500/10' : 'text-text-muted hover:text-green-500 hover:bg-white/5'}`}
                                             title={link.isRead ? 'Mark as unread' : 'Mark as read'}
                                         >
-                                            <CheckCircle2 className={`w-3.5 h-3.5 ${link.isRead ? 'fill-current' : ''}`} />
+                                            {link.isRead ? (
+                                                <CheckCircle2 className="w-3.5 h-3.5 fill-current" />
+                                            ) : (
+                                                <Circle className="w-3.5 h-3.5" />
+                                            )}
                                         </button>
                                         <span className="text-[10px] text-text-muted font-medium tabular-nums">
                                             {now > 0 ? getTimeAgo(link.createdAt, now) : '...'}

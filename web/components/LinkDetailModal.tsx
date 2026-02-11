@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2 } from 'lucide-react';
+import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
+import TagInput from './TagInput';
 
 interface LinkDetailModalProps {
     link: Link;
@@ -43,8 +44,6 @@ export default function LinkDetailModal({
     const [editedCategory, setEditedCategory] = useState(link.category);
     const [now, setNow] = useState<number>(0);
     const [isAddingTag, setIsAddingTag] = useState(false);
-    const [tagInput, setTagInput] = useState('');
-    const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
@@ -108,21 +107,6 @@ export default function LinkDetailModal({
     };
 
     const allTags = Array.from(new Set(allLinks.flatMap(l => l.tags))).sort();
-    const suggestions = tagInput.trim()
-        ? allTags.filter(t =>
-            t.toLowerCase().includes(tagInput.toLowerCase()) &&
-            !link.tags.includes(t)
-        ).slice(0, 5)
-        : [];
-
-    const handleAddTag = (tag: string) => {
-        const cleanedTag = tag.trim();
-        if (cleanedTag && !link.tags.includes(cleanedTag)) {
-            onUpdateTags(link.id, [...link.tags, cleanedTag]);
-        }
-        setTagInput('');
-        setIsAddingTag(false);
-    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4">
@@ -143,7 +127,11 @@ export default function LinkDetailModal({
                                 : 'bg-white/5 border-white/5 text-text-muted hover:text-green-500'
                                 }`}
                         >
-                            <CheckCircle2 className={`w-4 h-4 ${link.isRead ? 'fill-current' : ''}`} />
+                            {link.isRead ? (
+                                <CheckCircle2 className="w-4 h-4 fill-current" />
+                            ) : (
+                                <Circle className="w-4 h-4" />
+                            )}
                         </button>
                         <button
                             onClick={() => onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite')}
@@ -245,7 +233,7 @@ export default function LinkDetailModal({
                                                     e.stopPropagation();
                                                     setIsEditingCategory(true);
                                                 }}
-                                                className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1.5 -ml-1.5 hover:bg-white/5 rounded-md"
+                                                className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1.5 -ms-1.5 hover:bg-white/5 rounded-md"
                                             >
                                                 <Pencil className="w-3.5 h-3.5 text-text-muted/40 hover:text-text-muted" />
                                             </button>
@@ -332,62 +320,15 @@ export default function LinkDetailModal({
                             })}
 
                             {isAddingTag ? (
-                                <div className="relative">
-                                    <input
-                                        autoFocus
-                                        type="text"
-                                        value={tagInput}
-                                        onChange={(e) => {
-                                            setTagInput(e.target.value);
-                                            setSelectedSuggestionIndex(-1);
-                                        }}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                if (selectedSuggestionIndex >= 0 && suggestions[selectedSuggestionIndex]) {
-                                                    handleAddTag(suggestions[selectedSuggestionIndex]);
-                                                } else {
-                                                    handleAddTag(tagInput);
-                                                }
-                                            } else if (e.key === 'Escape') {
-                                                setIsAddingTag(false);
-                                                setTagInput('');
-                                            } else if (e.key === 'ArrowDown') {
-                                                e.preventDefault();
-                                                setSelectedSuggestionIndex(prev => Math.min(prev + 1, suggestions.length - 1));
-                                            } else if (e.key === 'ArrowUp') {
-                                                e.preventDefault();
-                                                setSelectedSuggestionIndex(prev => Math.max(prev - 1, -1));
-                                            }
-                                        }}
-                                        onBlur={() => {
-                                            // Delay blur to allow clicking suggestions
-                                            setTimeout(() => {
-                                                setIsAddingTag(false);
-                                                setTagInput('');
-                                                setSelectedSuggestionIndex(-1);
-                                            }, 200);
-                                        }}
-                                        placeholder="Add tag..."
-                                        className="text-xs bg-white/5 border border-accent/30 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-accent w-32 animate-in fade-in zoom-in-95 duration-200"
-                                    />
-                                    {suggestions.length > 0 && (
-                                        <div className="absolute top-full left-0 mt-1 w-48 bg-background border border-white/10 rounded-xl shadow-2xl z-20 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200 backdrop-blur-md">
-                                            {suggestions.map((suggestion, index) => (
-                                                <button
-                                                    key={suggestion}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleAddTag(suggestion);
-                                                    }}
-                                                    className={`w-full text-left px-3 py-2 text-xs transition-colors ${index === selectedSuggestionIndex ? 'bg-accent text-white' : 'hover:bg-white/10 text-text-muted hover:text-text'
-                                                        }`}
-                                                >
-                                                    {suggestion}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
+                                <TagInput
+                                    allTags={allTags}
+                                    existingTags={link.tags}
+                                    onAdd={(tag) => {
+                                        onUpdateTags(link.id, [...link.tags, tag]);
+                                        setIsAddingTag(false);
+                                    }}
+                                    onCancel={() => setIsAddingTag(false)}
+                                />
                             ) : (
                                 <button
                                     onClick={() => setIsAddingTag(true)}

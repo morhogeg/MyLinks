@@ -2,7 +2,7 @@
 
 import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { ExternalLink, Tag, Trash2, Archive, Star, Inbox, X, Plus, Check, Pencil, CheckCircle2, Bell } from 'lucide-react';
+import { ExternalLink, Tag, Trash2, Archive, Star, Inbox, X, Plus, Check, Pencil, CheckCircle2, Bell, Circle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
@@ -75,7 +75,11 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
                                     className={`p-2 rounded-lg transition-all ${link.isRead ? 'text-green-500 bg-green-500/10' : 'text-text-muted hover:bg-white/5 hover:text-green-500'}`}
                                     title={link.isRead ? 'Mark as unread' : 'Mark as read'}
                                 >
-                                    <CheckCircle2 className={`w-4 h-4 ${link.isRead ? 'fill-current' : ''}`} />
+                                    {link.isRead ? (
+                                        <CheckCircle2 className="w-4 h-4 fill-current" />
+                                    ) : (
+                                        <Circle className="w-4 h-4" />
+                                    )}
                                 </button>
                             </td>
                             <td className="px-6 py-10 align-top">
@@ -145,7 +149,7 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
                                                             setEditingCategoryId(link.id);
                                                             setEditedCategory(link.category);
                                                         }}
-                                                        className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ml-1 hover:bg-white/5 rounded-md"
+                                                        className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ms-1 hover:bg-white/5 rounded-md"
                                                     >
                                                         <Pencil className="w-2.5 h-2.5 text-text-muted/40 hover:text-text-muted" />
                                                     </button>

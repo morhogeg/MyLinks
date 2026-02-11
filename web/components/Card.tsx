@@ -3,7 +3,7 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil } from 'lucide-react';
+import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -126,7 +126,7 @@ export default function Card({
                                                 e.stopPropagation();
                                                 setIsEditingCategory(true);
                                             }}
-                                            className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ml-1 hover:bg-white/5 rounded-md"
+                                            className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ms-1 hover:bg-white/5 rounded-md"
                                         >
                                             <Pencil className="w-3 h-3 text-text-muted/40 hover:text-text-muted" />
                                         </button>
@@ -145,7 +145,11 @@ export default function Card({
                             className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center ${link.isRead ? 'text-green-500 bg-green-500/10' : 'text-text-muted hover:text-green-500 hover:bg-white/10'
                                 }`}
                         >
-                            <CheckCircle2 className={`w-3.5 h-3.5 ${link.isRead ? 'fill-current' : ''}`} />
+                            {link.isRead ? (
+                                <CheckCircle2 className="w-3.5 h-3.5 fill-current" />
+                            ) : (
+                                <Circle className="w-3.5 h-3.5" />
+                            )}
                         </button>
                         <button
                             onClick={(e) => {
