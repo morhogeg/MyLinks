@@ -178,7 +178,9 @@ export default function Card({
                                 onUpdateReminder(link);
                             }}
                             title={link.reminderStatus === 'pending'
-                                ? `Reminder active${link.reminderProfile === 'spaced' ? ' (Spaced Repetition)' : ''}`
+                                ? `Reminder active${link.reminderProfile?.startsWith('spaced')
+                                    ? ` (Spaced Repetition${link.reminderProfile.split('-')[1] ? ` - ${link.reminderProfile.split('-')[1]} days` : ''})`
+                                    : ''}`
                                 : 'Remind me'}
                             className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center relative ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-accent hover:bg-white/10'
                                 }`}
@@ -186,7 +188,7 @@ export default function Card({
                             {link.reminderStatus === 'pending' ? (
                                 <>
                                     <Bell className="w-3.5 h-3.5 fill-current" />
-                                    {link.reminderProfile === 'spaced' && (
+                                    {link.reminderProfile?.startsWith('spaced') && (
                                         <span className="absolute -top-1 -right-1 flex h-2 w-2">
                                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
                                             <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>

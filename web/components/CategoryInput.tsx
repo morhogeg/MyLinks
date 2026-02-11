@@ -52,8 +52,7 @@ export default function CategoryInput({
 
     // Filter categories
     const filteredCategories = allCategories
-        .filter(c => c.toLowerCase().includes(value.toLowerCase()))
-        .slice(0, 5); // Limit to 5 suggestions
+        .filter(c => c.toLowerCase().includes(value.toLowerCase()));
 
     const exactMatch = allCategories.some(c => c.toLowerCase() === value.toLowerCase().trim());
     const isNew = value.trim() !== '' && !exactMatch;
@@ -93,7 +92,7 @@ export default function CategoryInput({
 
             {isOpen && (value.trim() !== '' || filteredCategories.length > 0) && (
                 <div
-                    className="absolute top-full start-0 mt-1 w-48 bg-card border border-white/10 rounded-lg shadow-xl z-50 overflow-hidden flex flex-col py-1 animate-in fade-in zoom-in-95 duration-200"
+                    className="absolute top-full start-0 mt-1 w-48 bg-card border border-white/10 rounded-lg shadow-xl z-50 overflow-hidden flex flex-col py-1 animate-in fade-in zoom-in-95 duration-200 max-h-60 overflow-y-auto"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {filteredCategories.map(category => (

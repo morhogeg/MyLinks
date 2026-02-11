@@ -141,7 +141,7 @@ export async function updateLinkReminder(
     id: string,
     enabled: boolean,
     reminderTime?: number,
-    profile?: 'smart' | 'spaced'
+    profile?: string
 ): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', id);
 

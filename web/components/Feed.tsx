@@ -347,13 +347,13 @@ function FeedContent() {
                             <select
                                 value={filter}
                                 onChange={(e) => setFilter(e.target.value as FilterType)}
-                                className="appearance-none bg-card/30 border border-transparent rounded-full pl-6 pr-6 py-0.5 text-[10px] font-medium text-text-muted/60 hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/10 min-h-[28px]"
+                                className="appearance-none bg-card/30 border border-transparent rounded-full pl-8 pr-3 py-0.5 text-[10px] font-medium text-text-muted/60 hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/10 min-h-[28px]"
                             >
                                 {filterButtons.map(btn => (
                                     <option key={btn.key} value={btn.key}>{btn.label}</option>
                                 ))}
                             </select>
-                            <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-40">
+                            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-40">
                                 {filter === 'all' && <Inbox className="w-3 h-3 text-text-muted" />}
                                 {filter === 'unread' && <Inbox className="w-3 h-3 text-accent" />}
                                 {filter === 'read' && <CheckCircle2 className="w-3 h-3 text-green-500" />}
@@ -361,7 +361,6 @@ function FeedContent() {
                                 {filter === 'reminders' && <Bell className="w-3 h-3 text-accent" />}
                                 {filter === 'archived' && <Archive className="w-3 h-3 text-text-muted" />}
                             </div>
-                            <ArrowUpDown className="absolute right-2 top-1/2 -translate-y-1/2 w-2.5 h-2.5 text-text-muted pointer-events-none opacity-40" />
                         </div>
 
                         {/* Sort Dropdown */}

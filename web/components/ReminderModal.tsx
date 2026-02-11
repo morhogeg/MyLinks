@@ -80,7 +80,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     link.id,
                     true,
                     nextReminderTime,
-                    selectedOption === 'spaced' ? 'spaced' : 'smart'
+                    selectedOption === 'spaced' ? `spaced-${spacedInterval}` : 'smart'
                 );
                 onClose();
                 if (onUpdate) onUpdate();

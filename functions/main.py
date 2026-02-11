@@ -1021,6 +1021,18 @@ def calculate_next_reminder(reminder_count: int, profile: str = "smart") -> date
             1: timedelta(days=5),
             2: timedelta(days=7),
         }
+    elif profile.startswith("spaced-"):
+        try:
+            days = int(profile.split("-")[1])
+            interval = timedelta(days=days)
+            return datetime.now() + interval
+        except:
+            # Fallback to default spaced logic if parsing fails
+            intervals = {
+                0: timedelta(days=3),
+                1: timedelta(days=5),
+                2: timedelta(days=7),
+            }
     else: # smart
         intervals = {
             0: timedelta(days=1),
@@ -1072,7 +1084,13 @@ def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
         # Find links where nextReminderAt <= now_ms and reminderStatus == 'pending'
         query = links_ref.where('reminderStatus', '==', 'pending').where('nextReminderAt', '<=', now_ms).limit(10)
         
-        due_links = query.get()
+        try:
+            due_links = query.get()
+        except Exception as e:
+            logger.error(f"Failed to query reminders for user {phone_number}: {e}")
+            # If verify_index fails, it will likely return PRECONDITION_FAILED
+            continue
+            
         if due_links:
             logger.info(f"Found {len(due_links)} reminders for user {phone_number}")
         

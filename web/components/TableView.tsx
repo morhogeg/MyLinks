@@ -288,11 +288,13 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
                                         onClick={() => onUpdateReminder(link)}
                                         className={`p-2 rounded-lg transition-all relative ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:bg-white/5 hover:text-accent'}`}
                                         title={link.reminderStatus === 'pending'
-                                            ? `Reminder active${link.reminderProfile === 'spaced' ? ' (Spaced Repetition)' : ''}`
+                                            ? `Reminder active${link.reminderProfile && link.reminderProfile.startsWith('spaced')
+                                                ? ` (Spaced Repetition ${link.reminderProfile.split('-')[1] || ''}d)`
+                                                : ''}`
                                             : 'Remind me'}
                                     >
                                         <Bell className={`w-3.5 h-3.5 ${link.reminderStatus === 'pending' ? 'fill-current' : ''}`} />
-                                        {link.reminderStatus === 'pending' && link.reminderProfile === 'spaced' && (
+                                        {link.reminderStatus === 'pending' && link.reminderProfile && link.reminderProfile.startsWith('spaced') && (
                                             <span className="absolute top-1.5 right-1.5 flex h-1.5 w-1.5">
                                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
                                                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-accent"></span>

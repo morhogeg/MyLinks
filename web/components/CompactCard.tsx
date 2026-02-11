@@ -163,11 +163,13 @@ export default function CompactCard({
                         }}
                         className={`p-1.5 rounded-lg transition-all relative ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-accent hover:bg-white/10'}`}
                         title={link.reminderStatus === 'pending'
-                            ? `Reminder active${link.reminderProfile === 'spaced' ? ' (Spaced Repetition)' : ''}`
+                            ? `Reminder active${link.reminderProfile?.startsWith('spaced')
+                                ? ` (Spaced Repetition${link.reminderProfile.split('-')[1] ? ` - ${link.reminderProfile.split('-')[1]} days` : ''})`
+                                : ''}`
                             : 'Remind me'}
                     >
                         <Bell className={`w-3 h-3 ${link.reminderStatus === 'pending' ? 'fill-current' : ''}`} />
-                        {link.reminderStatus === 'pending' && link.reminderProfile === 'spaced' && (
+                        {link.reminderStatus === 'pending' && link.reminderProfile && link.reminderProfile.startsWith('spaced') && (
                             <span className="absolute top-1 right-1 flex h-1.5 w-1.5">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-accent"></span>

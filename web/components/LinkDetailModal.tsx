@@ -124,7 +124,7 @@ export default function LinkDetailModal({
                             title={link.isRead ? 'Mark as unread' : 'Mark as read'}
                             className={`p-2 rounded-xl border transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${link.isRead
                                 ? 'bg-white/10 border-white/5 text-text shadow-lg opacity-100'
-                                : 'bg-white/5 border-white/5 text-text-muted/40 hover:text-text'
+                                : 'bg-transparent border-transparent text-text-muted/40 hover:text-text'
                                 }`}
                         >
                             {link.isRead ? (
@@ -138,7 +138,7 @@ export default function LinkDetailModal({
                             title={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
                             className={`p-2 rounded-xl border transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${link.status === 'favorite'
                                 ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500 shadow-lg shadow-yellow-500/5'
-                                : 'bg-white/5 border-white/5 text-text-muted hover:text-yellow-500'
+                                : 'bg-transparent border-transparent text-text-muted hover:text-yellow-500'
                                 }`}
                         >
                             <Star className={`w-4 h-4 ${link.status === 'favorite' ? 'fill-current' : ''}`} />
@@ -148,7 +148,7 @@ export default function LinkDetailModal({
                             title={link.status === 'archived' ? 'Unarchive' : 'Archive'}
                             className={`p-2 rounded-xl border transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${link.status === 'archived'
                                 ? 'bg-accent/10 border-accent/20 text-accent shadow-lg shadow-accent/5'
-                                : 'bg-white/5 border-white/5 text-text-muted hover:text-accent'
+                                : 'bg-transparent border-transparent text-text-muted hover:text-accent'
                                 }`}
                         >
                             <Archive className="w-4 h-4" />
@@ -158,7 +158,7 @@ export default function LinkDetailModal({
                             title={isReminderActive ? `Reminder active (next: ${nextReminderDate?.toLocaleDateString()})` : 'Set reminder'}
                             className={`p-2 rounded-xl border transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${isReminderActive
                                 ? 'bg-blue-500/10 border-blue-500/20 text-blue-500 shadow-lg shadow-blue-500/5'
-                                : 'bg-white/5 border-white/5 text-text-muted hover:text-blue-500'
+                                : 'bg-transparent border-transparent text-text-muted hover:text-blue-500'
                                 }`}
                         >
                             {isReminderActive ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
@@ -166,7 +166,7 @@ export default function LinkDetailModal({
                         <button
                             onClick={() => setShowDeleteConfirm(true)}
                             title="Delete"
-                            className="p-2 rounded-xl bg-white/5 border border-white/5 text-text-muted hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-500 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                            className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-500 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
                         >
                             <Trash2 className="w-4 h-4" />
                         </button>
@@ -177,13 +177,13 @@ export default function LinkDetailModal({
                             href={link.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="p-2 rounded-xl bg-white/5 border border-white/5 text-text-muted hover:bg-accent hover:border-accent hover:text-white transition-all shadow-lg shadow-accent/0 hover:shadow-accent/20 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                            className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:bg-accent hover:border-accent hover:text-white transition-all shadow-lg shadow-accent/0 hover:shadow-accent/20 min-h-[44px] min-w-[44px] flex items-center justify-center"
                         >
                             <ExternalLink className="w-4 h-4" />
                         </a>
                         <button
                             onClick={onClose}
-                            className="p-2 rounded-xl bg-white/5 border border-white/5 text-text-muted hover:bg-white/10 hover:text-accent transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                            className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:bg-white/10 hover:text-accent transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
                         >
                             <X className="w-4 h-4" />
                         </button>
@@ -283,9 +283,13 @@ export default function LinkDetailModal({
                             {isReminderActive && nextReminderDate && (
                                 <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500">
                                     <Bell className="w-3.5 h-3.5" />
-                                    {link.reminderProfile === 'spaced' && (
+                                    {link.reminderProfile?.startsWith('spaced') && (
                                         <span className="font-bold flex items-center mr-1">
-                                            {isRtl ? '[חזרתי]' : '[Spaced]'}
+                                            {(() => {
+                                                const parts = link.reminderProfile.split('-');
+                                                const interval = parts.length > 1 ? ` - ${parts[1]}` : '';
+                                                return isRtl ? `[חזרתי${interval}]` : `[Spaced${interval}]`;
+                                            })()}
                                         </span>
                                     )}
                                     {isRtl ? 'תזכורת:' : 'Reminder:'} {nextReminderDate.toLocaleDateString(isRtl ? 'he-IL' : undefined)}
