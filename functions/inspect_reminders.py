@@ -41,25 +41,28 @@ def check_reminders():
     print(f"Found user: {uid}")
     print(f"Settings: {json.dumps(user_data.get('settings', {}), indent=2)}")
     
-    # Check links
+    # Check all links to see their status
     links_ref = db.collection('users').document(uid).collection('links')
-    pending_links = links_ref.where('reminderStatus', '==', 'pending').get()
+    all_links = links_ref.get()
     
-    print(f"\nFound {len(pending_links)} pending reminders:")
+    print(f"\nTotal links: {len(all_links)}")
     now_ms = int(datetime.now().timestamp() * 1000)
     print(f"Current time (ms): {now_ms}")
     
-    for link in pending_links:
+    for link in all_links:
         data = link.to_dict()
+        reminder_status = data.get('reminderStatus')
         next_at = data.get('nextReminderAt')
-        print(f"Link ID: {link.id}")
-        print(f"  Title: {data.get('title')}")
-        print(f"  nextReminderAt: {next_at}")
-        if isinstance(next_at, int):
-            due_diff = (next_at - now_ms) / 1000 / 60
-            print(f"  Due in: {due_diff:.2f} minutes")
-        else:
-            print(f"  Due (raw): {next_at}")
+        
+        if reminder_status or next_at:
+            print(f"Link ID: {link.id}")
+            print(f"  Title: {data.get('title')}")
+            print(f"  reminderStatus: {reminder_status}")
+            print(f"  nextReminderAt: {next_at}")
+            if isinstance(next_at, int):
+                due_diff = (next_at - now_ms) / 1000 / 60
+                print(f"  Due in: {due_diff:.2f} minutes")
+            print("-" * 20)
 
 if __name__ == "__main__":
     check_reminders()

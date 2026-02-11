@@ -527,7 +527,8 @@ def is_hebrew(text: str) -> bool:
 
 def handle_reminder_intent(text: str) -> Optional[datetime]:
     """Parse text for reminder commands (English and Hebrew)"""
-    text = text.lower()
+    # Remove URLs first
+    text = re.sub(r'https?://[^\s]+', '', text).lower().strip()
     now = datetime.now()
     
     # English Patterns
@@ -642,6 +643,17 @@ def debug_status(req: https_fn.Request) -> https_fn.Response:
             "recent_pending_tasks": pending_data,
             "recent_logs": logs_data
         }
+        
+        def serialize_firestore(obj):
+            if hasattr(obj, 'isoformat'):
+                return obj.isoformat()
+            if isinstance(obj, dict):
+                return {k: serialize_firestore(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [serialize_firestore(i) for i in obj]
+            return obj
+
+        status = serialize_firestore(status)
         
         return https_fn.Response(
             json.dumps(status, indent=2),
@@ -968,6 +980,10 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         
         # 5. Check for reminder intent
         reminder_time = handle_reminder_intent(original_body)
+        if reminder_time:
+             # Detect profile from shortcut
+             profile = "spaced" if "2" in original_body else "smart"
+             set_reminder(uid, link_id, reminder_time, profile=profile)
         
         msg = _format_success_message(link_data, reminder_time, language=analysis.get("language", "en"), link_id=link_id)
         
@@ -1012,66 +1028,89 @@ def calculate_next_reminder(reminder_count: int, profile: str = "smart") -> date
     Profiles:
     - smart: 1, 7, 30, 90 days
     - spaced: initial (3), 5, 7 days
+    - spaced-N: initial N, then progression
     """
     from datetime import timedelta
     
-    if profile == "spaced":
-        intervals = {
-            0: timedelta(days=3),
-            1: timedelta(days=5),
-            2: timedelta(days=7),
-        }
-    elif profile.startswith("spaced-"):
-        try:
-            days = int(profile.split("-")[1])
-            interval = timedelta(days=days)
-            return datetime.now() + interval
-        except:
-            # Fallback to default spaced logic if parsing fails
-            intervals = {
-                0: timedelta(days=3),
-                1: timedelta(days=5),
-                2: timedelta(days=7),
-            }
+    if profile.startswith("spaced"):
+        start_days = 3
+        if "-" in profile:
+            try:
+                start_days = int(profile.split("-")[1])
+            except:
+                pass
+        
+        # Helper for spaced repetition logic
+        # Sequence: start -> start+2 -> start+4 ... approximate
+        # 3 -> 5 -> 7
+        # 5 -> 7 -> 14
+        # 7 -> 14 -> 30
+        
+        days = 90 # default long term
+        
+        if reminder_count == 0:
+            days = start_days
+        elif start_days == 3:
+            if reminder_count == 1: days = 5
+            elif reminder_count == 2: days = 7
+        elif start_days == 5:
+            if reminder_count == 1: days = 7
+            elif reminder_count == 2: days = 14
+        elif start_days == 7:
+            if reminder_count == 1: days = 14
+            elif reminder_count == 2: days = 30
+            
+        return datetime.now() + timedelta(days=days)
+        
     else: # smart
         intervals = {
             0: timedelta(days=1),
             1: timedelta(days=7),
             2: timedelta(days=30),
         }
-    
-    interval = intervals.get(reminder_count, timedelta(days=90))
-    return datetime.now() + interval
-
+        interval = intervals.get(reminder_count, timedelta(days=90))
+        return datetime.now() + interval
 
 @scheduler_fn.on_schedule(schedule="every 2 minutes")
 def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
     """
     Scheduled function that runs every 2 minutes to check for pending reminders
-    Sends WhatsApp messages for links that are due for re-surfacing
+    """
+    run_reminder_check()
+
+def run_reminder_check() -> dict:
+    """
+    Main logic for checking pending reminders and sending WhatsApp messages
+    Returns a summary dict
     """
     db = get_db()
-    logger.info("Starting scheduled reminder check...")
+    logger.info("Starting reminder logic execution...")
     
     # Query all users
     users_ref = db.collection('users')
     users = users_ref.get()
     
-    user_count = 0
-    reminders_sent = 0
+    report = {
+        "users_checked": 0,
+        "users_with_reminders_enabled": 0,
+        "reminders_found": 0,
+        "reminders_sent": 0,
+        "errors": []
+    }
     
     for user_doc in users:
         uid = user_doc.id
         user_data = user_doc.to_dict()
-        user_count += 1
+        report["users_checked"] += 1
         
         # Check if reminders are enabled for this user
         settings = user_data.get('settings', {})
-        # Note: Frontend uses camelCase, but keep snake_case fallback for safety
         enabled = settings.get('reminders_enabled', settings.get('remindersEnabled', True))
         
         if not enabled:
             continue
+            
+        report["users_with_reminders_enabled"] += 1
             
         phone_number = user_data.get('phone_number') or user_data.get('phoneNumber')
         if not phone_number:
@@ -1082,17 +1121,29 @@ def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
         now_ms = int(datetime.now().timestamp() * 1000)
         
         # Find links where nextReminderAt <= now_ms and reminderStatus == 'pending'
+        # Data Cleanup: Ensure nextReminderAt is always an integer
+        all_links_to_clean = links_ref.where('reminderStatus', '==', 'pending').get()
+        for l in all_links_to_clean:
+            d = l.to_dict()
+            nra = d.get('nextReminderAt')
+            if hasattr(nra, 'timestamp'): # It's a Firestore Timestamp / datetime
+                new_ms = int(nra.timestamp() * 1000)
+                l.reference.update({'nextReminderAt': new_ms})
+                logger.info(f"Cleaned up nextReminderAt for link {l.id} (converted Timestamp to {new_ms})")
+
         query = links_ref.where('reminderStatus', '==', 'pending').where('nextReminderAt', '<=', now_ms).limit(10)
         
         try:
             due_links = query.get()
         except Exception as e:
-            logger.error(f"Failed to query reminders for user {phone_number}: {e}")
-            # If verify_index fails, it will likely return PRECONDITION_FAILED
+            err_msg = f"Failed to query reminders for user {phone_number}: {e}"
+            logger.error(err_msg)
+            report["errors"].append(err_msg)
             continue
             
         if due_links:
             logger.info(f"Found {len(due_links)} reminders for user {phone_number}")
+            report["reminders_found"] += len(due_links)
         
         for link_doc in due_links:
             link_id = link_doc.id
@@ -1119,7 +1170,7 @@ def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
             
             try:
                 send_whatsapp_message(f"whatsapp:{phone_number}", message)
-                reminders_sent += 1
+                report["reminders_sent"] += 1
                 
                 # Update the link's reminder status
                 new_reminder_count = reminder_count + 1
@@ -1142,9 +1193,24 @@ def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
                 
                 logger.info(f"Successfully sent reminder for link {link_id} to {phone_number}")
             except Exception as e:
-                logger.error(f"Failed to send reminder for link {link_id}: {e}")
+                err_msg = f"Failed to send reminder for link {link_id}: {e}"
+                logger.error(err_msg)
+                report["errors"].append(err_msg)
 
-    logger.info(f"Reminder check complete. Users checked: {user_count}, Reminders sent: {reminders_sent}")
+    logger.info(f"Reminder execution complete. Report: {report}")
+    return report
+
+@https_fn.on_request()
+def force_check_reminders(req: https_fn.Request) -> https_fn.Response:
+    """
+    Manual trigger for reminder check to debug without waiting for schedule
+    """
+    try:
+        report = run_reminder_check()
+        return https_fn.Response(json.dumps(report, indent=2), status=200, mimetype="application/json")
+    except Exception as e:
+        logger.error(f"Manual trigger failed: {e}")
+        return https_fn.Response(f"Error: {e}", status=500)
 
 
 
