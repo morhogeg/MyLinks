@@ -566,7 +566,7 @@ def handle_reminder_intent(text: str) -> Optional[datetime]:
 
     return None
 
-def set_reminder(uid: str, link_id: str, reminder_time: datetime):
+def set_reminder(uid: str, link_id: str, reminder_time: datetime, profile: str = "smart"):
     """Set a reminder for a specific link"""
     db = get_db()
     link_ref = db.collection('users').document(uid).collection('links').document(link_id)
@@ -574,7 +574,8 @@ def set_reminder(uid: str, link_id: str, reminder_time: datetime):
     link_ref.update({
         'reminderStatus': 'pending',
         'nextReminderAt': reminder_time_ms,
-        'reminderCount': 0
+        'reminderCount': 0,
+        'reminderProfile': profile
     })
 
 @https_fn.on_request()
@@ -775,7 +776,9 @@ def whatsapp_webhook(request):
             if last_link_id:
                 link_doc = db.collection('users').document(uid).collection('links').document(last_link_id).get()
                 if link_doc.exists:
-                     set_reminder(uid, last_link_id, reminder_time)
+                     # Detect profile from shortcut
+                     profile = "spaced" if payload.body.strip() == "2" else "smart"
+                     set_reminder(uid, last_link_id, reminder_time, profile=profile)
                      
                      # Get Link Details
                      link_data = link_doc.to_dict()
@@ -1014,11 +1017,13 @@ def calculate_next_reminder(reminder_count: int, profile: str = "smart") -> date
     
     if profile == "spaced":
         intervals = {
+            0: timedelta(days=3),
             1: timedelta(days=5),
             2: timedelta(days=7),
         }
     else: # smart
         intervals = {
+            0: timedelta(days=1),
             1: timedelta(days=7),
             2: timedelta(days=30),
         }
@@ -1082,11 +1087,17 @@ def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
             reminder_count = link_data.get('reminderCount', 0)
             
             # Richer reminder message
-            cat_emoji = "📂"
-            if "Recipe" in category: cat_emoji = "🍲"
-            elif "Tech" in category: cat_emoji = "💻"
+            is_he = is_hebrew(title)
             
-            message = f"🧠 *Second Brain Loop*\n\nTime to revisit:\n📄 *{title}*\n{cat_emoji} {category}\n\n{url}\n\n💡 *Why now?* Spaced repetition strengthens long-term retention."
+            if is_he:
+                cat_name = "מתכון" if category == "Recipe" else category
+                message = f"🧠 *לולאת המוח השני*\n\nזמן לחזור אל:\n📄 *{title}*\n📂 {cat_name}\n\n{url}\n\n🔗 *פתח במוח השני:*\n{APP_URL}?linkId={link_id}\n\n💡 *למה עכשיו?* חזרה ברווחים מחזקת את הזיכרון לטווח ארוך."
+            else:
+                cat_emoji = "📂"
+                if "Recipe" in category: cat_emoji = "🍲"
+                elif "Tech" in category: cat_emoji = "💻"
+                
+                message = f"🧠 *Second Brain Loop*\n\nTime to revisit:\n📄 *{title}*\n{cat_emoji} {category}\n\n{url}\n\n🔗 *Open in Second Brain:*\n{APP_URL}?linkId={link_id}\n\n💡 *Why now?* Spaced repetition strengthens long-term retention."
             
             try:
                 send_whatsapp_message(f"whatsapp:{phone_number}", message)

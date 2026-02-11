@@ -20,7 +20,7 @@ interface LinkDetailModalProps {
     onUpdateTags: (id: string, tags: string[]) => void;
     onUpdateCategory: (id: string, category: string) => void;
     onDelete: (id: string) => void;
-    onUpdateReminder: (id: string, enabled: boolean) => void;
+    onUpdateReminder: (link: Link) => void;
     onOpenOtherLink?: (link: Link) => void;
 }
 
@@ -104,7 +104,7 @@ export default function LinkDetailModal({
 
     const handleToggleReminder = () => {
         if (!uid) return;
-        onUpdateReminder(link.id, !isReminderActive);
+        onUpdateReminder(link);
     };
 
     const allTags = Array.from(new Set(allLinks.flatMap(l => l.tags))).sort();
@@ -211,7 +211,7 @@ export default function LinkDetailModal({
                         {(() => {
                             const colorStyle = getCategoryColorStyle(link.category);
                             return (
-                                <div className="relative group/cat inline-block">
+                                <div className="relative group/cat inline-block flex items-center gap-1.5">
                                     {isEditingCategory ? (
                                         <CategoryInput
                                             currentCategory={link.category}
@@ -226,20 +226,30 @@ export default function LinkDetailModal({
                                             className="w-32 text-[10px] px-2.5 py-1.5"
                                         />
                                     ) : (
-                                        <span
-                                            className="text-[10px] uppercase font-black tracking-widest px-2.5 py-1.5 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all flex items-center gap-1.5 group/chip"
-                                            style={{
-                                                backgroundColor: colorStyle.backgroundColor,
-                                                color: colorStyle.color,
-                                            }}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setIsEditingCategory(true);
-                                            }}
-                                        >
-                                            {link.category}
-                                            <Pencil className="w-2.5 h-2.5 opacity-40 group-hover/chip:opacity-100 transition-opacity" />
-                                        </span>
+                                        <>
+                                            <span
+                                                className="text-[10px] uppercase font-black tracking-widest px-2.5 py-1.5 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all flex items-center shadow-lg shadow-black/5"
+                                                style={{
+                                                    backgroundColor: colorStyle.backgroundColor,
+                                                    color: colorStyle.color,
+                                                }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setIsEditingCategory(true);
+                                                }}
+                                            >
+                                                {link.category}
+                                            </span>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setIsEditingCategory(true);
+                                                }}
+                                                className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1.5 -ml-1.5 hover:bg-white/5 rounded-md"
+                                            >
+                                                <Pencil className="w-3.5 h-3.5 text-text-muted/40 hover:text-text-muted" />
+                                            </button>
+                                        </>
                                     )}
                                 </div>
                             );
@@ -285,6 +295,11 @@ export default function LinkDetailModal({
                             {isReminderActive && nextReminderDate && (
                                 <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500">
                                     <Bell className="w-3.5 h-3.5" />
+                                    {link.reminderProfile === 'spaced' && (
+                                        <span className="font-bold flex items-center mr-1">
+                                            {isRtl ? '[חזרתי]' : '[Spaced]'}
+                                        </span>
+                                    )}
                                     {isRtl ? 'תזכורת:' : 'Reminder:'} {nextReminderDate.toLocaleDateString(isRtl ? 'he-IL' : undefined)}
                                 </span>
                             )}

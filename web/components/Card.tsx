@@ -93,7 +93,7 @@ export default function Card({
                     {(() => {
                         const colorStyle = getCategoryColorStyle(link.category);
                         return (
-                            <div className="relative group/cat">
+                            <div className="relative group/cat flex items-center gap-1">
                                 {isEditingCategory ? (
                                     <CategoryInput
                                         currentCategory={link.category}
@@ -107,20 +107,30 @@ export default function Card({
                                         onCancel={() => setIsEditingCategory(false)}
                                     />
                                 ) : (
-                                    <span
-                                        className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all flex items-center gap-1 group/chip"
-                                        style={{
-                                            backgroundColor: colorStyle.backgroundColor,
-                                            color: colorStyle.color,
-                                        }}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setIsEditingCategory(true);
-                                        }}
-                                    >
-                                        {link.category}
-                                        <Pencil className="w-2.5 h-2.5 opacity-40 group-hover/chip:opacity-100 transition-opacity" />
-                                    </span>
+                                    <>
+                                        <span
+                                            className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all group/chip"
+                                            style={{
+                                                backgroundColor: colorStyle.backgroundColor,
+                                                color: colorStyle.color,
+                                            }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setIsEditingCategory(true);
+                                            }}
+                                        >
+                                            {link.category}
+                                        </span>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setIsEditingCategory(true);
+                                            }}
+                                            className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ml-1 hover:bg-white/5 rounded-md"
+                                        >
+                                            <Pencil className="w-3 h-3 text-text-muted/40 hover:text-text-muted" />
+                                        </button>
+                                    </>
                                 )}
                             </div>
                         );
@@ -163,12 +173,22 @@ export default function Card({
                                 e.stopPropagation();
                                 onUpdateReminder(link);
                             }}
-                            title={link.reminderStatus === 'pending' ? 'Cancel reminder' : 'Remind me'}
-                            className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-accent hover:bg-white/10'
+                            title={link.reminderStatus === 'pending'
+                                ? `Reminder active${link.reminderProfile === 'spaced' ? ' (Spaced Repetition)' : ''}`
+                                : 'Remind me'}
+                            className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center relative ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-accent hover:bg-white/10'
                                 }`}
                         >
                             {link.reminderStatus === 'pending' ? (
-                                <Bell className="w-3.5 h-3.5 fill-current" />
+                                <>
+                                    <Bell className="w-3.5 h-3.5 fill-current" />
+                                    {link.reminderProfile === 'spaced' && (
+                                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
+                                        </span>
+                                    )}
+                                </>
                             ) : (
                                 <Bell className="w-3.5 h-3.5" />
                             )}

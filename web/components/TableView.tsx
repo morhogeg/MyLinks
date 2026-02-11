@@ -2,7 +2,7 @@
 
 import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { ExternalLink, Tag, Trash2, Archive, Star, Inbox, X, Plus, Check, Pencil, CheckCircle2 } from 'lucide-react';
+import { ExternalLink, Tag, Trash2, Archive, Star, Inbox, X, Plus, Check, Pencil, CheckCircle2, Bell } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
@@ -17,6 +17,7 @@ interface TableViewProps {
     onUpdateCategory: (id: string, category: string) => void;
     allCategories: string[];
     onDelete: (id: string) => void;
+    onUpdateReminder: (link: Link) => void;
     isSelectionMode?: boolean;
     selectedIds?: Set<string>;
     onToggleSelection?: (id: string) => void;
@@ -25,7 +26,7 @@ interface TableViewProps {
 /**
  * High-density table view for rapid link scanning
  */
-export default function TableView({ links, onOpenDetails, onStatusChange, onReadStatusChange, onUpdateTags, onUpdateCategory, allCategories, onDelete }: TableViewProps) {
+export default function TableView({ links, onOpenDetails, onStatusChange, onReadStatusChange, onUpdateTags, onUpdateCategory, allCategories, onDelete, onUpdateReminder }: TableViewProps) {
     const [deleteLinkId, setDeleteLinkId] = useState<string | null>(null);
     const [activeTagPicker, setActiveTagPicker] = useState<string | null>(null);
     const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -107,7 +108,7 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
                                     const colorStyle = getCategoryColorStyle(link.category);
                                     const isEditing = editingCategoryId === link.id;
                                     return (
-                                        <div className="flex justify-center">
+                                        <div className="flex justify-center items-center gap-1 group/cat">
                                             {isEditing ? (
                                                 <CategoryInput
                                                     currentCategory={link.category}
@@ -122,22 +123,33 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
                                                     className="w-24 text-[9px] px-2.5 py-1 text-center"
                                                 />
                                             ) : (
-                                                <span
-                                                    className="text-[9px] uppercase font-black tracking-tighter px-2.5 py-1 rounded-full inline-block border border-transparent cursor-pointer hover:brightness-110 transition-all flex items-center gap-1 group/chip"
-                                                    style={{
-                                                        backgroundColor: colorStyle.backgroundColor,
-                                                        color: colorStyle.color,
-                                                        borderColor: colorStyle.borderColor,
-                                                    }}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setEditingCategoryId(link.id);
-                                                        setEditedCategory(link.category);
-                                                    }}
-                                                >
-                                                    {link.category}
-                                                    <Pencil className="w-2 h-2 opacity-0 group-hover/chip:opacity-100 transition-opacity" />
-                                                </span>
+                                                <>
+                                                    <span
+                                                        className="text-[9px] uppercase font-black tracking-tighter px-2.5 py-1 rounded-full inline-block border border-transparent cursor-pointer hover:brightness-110 transition-all flex items-center"
+                                                        style={{
+                                                            backgroundColor: colorStyle.backgroundColor,
+                                                            color: colorStyle.color,
+                                                            borderColor: colorStyle.borderColor,
+                                                        }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingCategoryId(link.id);
+                                                            setEditedCategory(link.category);
+                                                        }}
+                                                    >
+                                                        {link.category}
+                                                    </span>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingCategoryId(link.id);
+                                                            setEditedCategory(link.category);
+                                                        }}
+                                                        className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ml-1 hover:bg-white/5 rounded-md"
+                                                    >
+                                                        <Pencil className="w-2.5 h-2.5 text-text-muted/40 hover:text-text-muted" />
+                                                    </button>
+                                                </>
                                             )}
                                         </div>
                                     );
@@ -268,6 +280,21 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
 
                             <td className="px-3 py-10 text-right align-top" onClick={(e) => e.stopPropagation()}>
                                 <div className="inline-flex items-center justify-end gap-1 transition-all duration-200 w-full">
+                                    <button
+                                        onClick={() => onUpdateReminder(link)}
+                                        className={`p-2 rounded-lg transition-all relative ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:bg-white/5 hover:text-accent'}`}
+                                        title={link.reminderStatus === 'pending'
+                                            ? `Reminder active${link.reminderProfile === 'spaced' ? ' (Spaced Repetition)' : ''}`
+                                            : 'Remind me'}
+                                    >
+                                        <Bell className={`w-3.5 h-3.5 ${link.reminderStatus === 'pending' ? 'fill-current' : ''}`} />
+                                        {link.reminderStatus === 'pending' && link.reminderProfile === 'spaced' && (
+                                            <span className="absolute top-1.5 right-1.5 flex h-1.5 w-1.5">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-accent"></span>
+                                            </span>
+                                        )}
+                                    </button>
                                     <button
                                         onClick={() => onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite')}
                                         className={`p-2 rounded-lg transition-all ${link.status === 'favorite' ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-muted hover:bg-white/5 hover:text-text'}`}

@@ -66,7 +66,7 @@ export default function CompactCard({
             >
                 {/* Top Section: Category and Star */}
                 <div className="flex justify-between items-start gap-2 z-10">
-                    <div className="relative group/cat max-w-[75%]">
+                    <div className="relative group/cat max-w-[75%] flex items-center gap-1">
                         {isEditingCategory ? (
                             <CategoryInput
                                 currentCategory={link.category}
@@ -81,21 +81,31 @@ export default function CompactCard({
                                 className="text-[8px] px-1.5 py-0.5 w-full"
                             />
                         ) : (
-                            <span
-                                className="text-[8px] uppercase font-black tracking-widest px-1.5 py-0.5 rounded-md inline-block whitespace-nowrap overflow-hidden text-ellipsis cursor-pointer hover:brightness-110 transition-all flex items-center gap-1 group/chip"
-                                style={{
-                                    backgroundColor: colorStyle.backgroundColor,
-                                    color: colorStyle.color,
-                                }}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setIsEditingCategory(true);
-                                }}
-                                title={link.category}
-                            >
-                                {link.category}
-                                <Pencil className="w-1.5 h-1.5 opacity-0 group-hover/chip:opacity-100 transition-opacity flex-shrink-0" />
-                            </span>
+                            <>
+                                <span
+                                    className="text-[8px] uppercase font-black tracking-widest px-1.5 py-0.5 rounded-md inline-block whitespace-nowrap overflow-hidden text-ellipsis cursor-pointer hover:brightness-110 transition-all flex items-center"
+                                    style={{
+                                        backgroundColor: colorStyle.backgroundColor,
+                                        color: colorStyle.color,
+                                    }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsEditingCategory(true);
+                                    }}
+                                    title={link.category}
+                                >
+                                    {link.category}
+                                </span>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsEditingCategory(true);
+                                    }}
+                                    className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-0.5 -ml-1 hover:bg-white/5 rounded-md"
+                                >
+                                    <Pencil className="w-2 h-2 text-text-muted/40 hover:text-text-muted" />
+                                </button>
+                            </>
                         )}
                     </div>
 
@@ -147,9 +157,18 @@ export default function CompactCard({
                             e.stopPropagation();
                             onUpdateReminder(link);
                         }}
-                        className={`p-1.5 rounded-lg transition-all ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-accent hover:bg-white/10'}`}
+                        className={`p-1.5 rounded-lg transition-all relative ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-accent hover:bg-white/10'}`}
+                        title={link.reminderStatus === 'pending'
+                            ? `Reminder active${link.reminderProfile === 'spaced' ? ' (Spaced Repetition)' : ''}`
+                            : 'Remind me'}
                     >
                         <Bell className={`w-3 h-3 ${link.reminderStatus === 'pending' ? 'fill-current' : ''}`} />
+                        {link.reminderStatus === 'pending' && link.reminderProfile === 'spaced' && (
+                            <span className="absolute top-1 right-1 flex h-1.5 w-1.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-accent"></span>
+                            </span>
+                        )}
                     </button>
                     <button
                         onClick={(e) => {

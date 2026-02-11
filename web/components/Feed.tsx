@@ -584,6 +584,7 @@ function FeedContent() {
                             onUpdateCategory={handleUpdateCategory}
                             allCategories={categories}
                             onDelete={handleDelete}
+                            onUpdateReminder={(link) => handleOpenReminderModal(link)}
                             isSelectionMode={isSelectionMode}
                             selectedIds={selectedIds}
                             onToggleSelection={toggleSelection}
@@ -657,10 +658,7 @@ function FeedContent() {
                     onReadStatusChange={handleReadStatusChange}
                     onUpdateTags={handleUpdateTags}
                     onUpdateCategory={handleUpdateCategory}
-                    onUpdateReminder={(id) => {
-                        const linkToRemind = links.find(l => l.id === id);
-                        if (linkToRemind) handleOpenReminderModal(linkToRemind);
-                    }}
+                    onUpdateReminder={(link) => handleOpenReminderModal(link)}
                     onDelete={handleDelete}
                     onOpenOtherLink={(link) => setActiveLinkId(link.id)}
                 />
