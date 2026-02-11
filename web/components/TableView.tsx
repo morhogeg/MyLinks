@@ -50,7 +50,7 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
     }, []);
 
     return (
-        <div className="w-full overflow-hidden rounded-2xl border border-border-subtle bg-card shadow-sm">
+        <div className={`w-full rounded-2xl border border-border-subtle bg-card shadow-sm ${editingCategoryId ? 'overflow-visible' : 'overflow-hidden'}`}>
             <table className="w-full text-left border-collapse table-fixed">
                 <thead>
                     <tr className="border-b border-border-subtle bg-white/[0.01] dark:bg-white/[0.02]">

@@ -72,10 +72,10 @@ export default function Card({
 
     return (
         <article
-            className={`group bg-card rounded-2xl border transition-all cursor-pointer relative overflow-hidden flex flex-col items-stretch h-full ${isSelected
+            className={`group bg-card rounded-2xl border transition-all cursor-pointer relative flex flex-col items-stretch h-full ${isSelected
                 ? 'border-accent bg-accent/5 ring-1 ring-accent'
                 : 'border-white/5 hover:border-accent/30 hover:bg-white/5'
-                } ${link.isRead ? 'opacity-60 grayscale-[0.3]' : ''}`}
+                } ${link.isRead ? 'opacity-60 grayscale-[0.3]' : ''} ${isEditingCategory ? 'overflow-visible z-50' : 'overflow-hidden'}`}
             onClick={() => {
                 if (isSelectionMode && onToggleSelection) {
                     onToggleSelection(link.id);

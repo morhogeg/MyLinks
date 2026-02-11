@@ -41,6 +41,10 @@ function FeedContent() {
     const [selectedCategory, setSelectedCategory] = useState<Set<string>>(new Set());
     const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
     const categoryScrollRef = useRef<HTMLDivElement>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const isDraggingRef = useRef(false);
+    const [startX, setStartX] = useState(0);
+    const [scrollLeft, setScrollLeft] = useState(0);
     const activeLink = links.find(l => l.id === activeLinkId) || null;
     const [isLoading, setIsLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'grid' | 'table' | 'insights' | 'compact'>('grid');
@@ -305,18 +309,46 @@ function FeedContent() {
 
                     <div
                         ref={categoryScrollRef}
-                        className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide"
+                        className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide cursor-grab active:cursor-grabbing select-none"
                         onWheel={(e) => {
                             if (categoryScrollRef.current) {
-                                // Convert vertical scroll to horizontal
                                 if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
                                     categoryScrollRef.current.scrollLeft += e.deltaY;
                                 }
                             }
                         }}
+                        onMouseDown={(e) => {
+                            if (!categoryScrollRef.current) return;
+                            setIsDragging(true);
+                            isDraggingRef.current = false; // Reset on mousedown
+                            setStartX(e.pageX - categoryScrollRef.current.offsetLeft);
+                            setScrollLeft(categoryScrollRef.current.scrollLeft);
+                        }}
+                        onMouseLeave={() => {
+                            setIsDragging(false);
+                            // Keep ref as is for a moment to block pending clicks
+                            setTimeout(() => { isDraggingRef.current = false; }, 100);
+                        }}
+                        onMouseUp={() => {
+                            setIsDragging(false);
+                            // We use a small timeout to let any pending click event fire first (which we'll block)
+                            setTimeout(() => { isDraggingRef.current = false; }, 100);
+                        }}
+                        onMouseMove={(e) => {
+                            if (!isDragging || !categoryScrollRef.current) return;
+                            const x = e.pageX - categoryScrollRef.current.offsetLeft;
+                            const walk = (x - startX) * 2;
+                            if (Math.abs(walk) > 5) {
+                                isDraggingRef.current = true;
+                            }
+                            categoryScrollRef.current.scrollLeft = scrollLeft - walk;
+                        }}
                     >
                         <button
-                            onClick={() => setSelectedCategory(new Set())}
+                            onClick={() => {
+                                if (isDraggingRef.current) return;
+                                setSelectedCategory(new Set());
+                            }}
                             className={`px-3 py-1.5 rounded-full text-[13px] font-bold transition-all border whitespace-nowrap min-h-[34px] flex-shrink-0 ${selectedCategory.size === 0
                                 ? 'bg-accent text-white border-accent shadow-sm'
                                 : 'bg-card border-border-subtle text-text-muted hover:border-text-secondary hover:text-text-secondary'}`}
@@ -330,6 +362,7 @@ function FeedContent() {
                                 <button
                                     key={cat}
                                     onClick={() => {
+                                        if (isDraggingRef.current) return;
                                         const newSet = new Set(selectedCategory);
                                         if (isSelected) {
                                             newSet.delete(cat);

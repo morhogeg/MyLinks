@@ -51,8 +51,11 @@ export default function CategoryInput({
     }, [value, currentCategory, onUpdate, onCancel]);
 
     // Filter categories
-    const filteredCategories = allCategories
-        .filter(c => c.toLowerCase().includes(value.toLowerCase()));
+    const isEditingOriginal = value.toLowerCase().trim() === currentCategory.toLowerCase().trim();
+
+    const filteredCategories = isEditingOriginal
+        ? allCategories
+        : allCategories.filter(c => c.toLowerCase().includes(value.toLowerCase()));
 
     const exactMatch = allCategories.some(c => c.toLowerCase() === value.toLowerCase().trim());
     const isNew = value.trim() !== '' && !exactMatch;
