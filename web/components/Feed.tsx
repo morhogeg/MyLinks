@@ -3,7 +3,7 @@
 
 
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus } from '@/lib/storage';
@@ -40,6 +40,7 @@ function FeedContent() {
     const [filter, setFilter] = useState<FilterType>('all');
     const [selectedCategory, setSelectedCategory] = useState<Set<string>>(new Set());
     const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
+    const categoryScrollRef = useRef<HTMLDivElement>(null);
     const activeLink = links.find(l => l.id === activeLinkId) || null;
     const [isLoading, setIsLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'grid' | 'table' | 'insights' | 'compact'>('grid');
@@ -297,46 +298,63 @@ function FeedContent() {
                 </div>
 
                 {/* Row 1: Category Navigator (Primary) - DRASTICALLY BIGGER */}
-                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 mb-2">
-                    <button
-                        onClick={() => setSelectedCategory(new Set())}
-                        className={`px-3 py-1.5 rounded-full text-[13px] font-bold transition-all border whitespace-nowrap min-h-[34px] flex-shrink-0 ${selectedCategory.size === 0
-                            ? 'bg-accent text-white border-accent shadow-sm'
-                            : 'bg-card border-border-subtle text-text-muted hover:border-text-secondary hover:text-text-secondary'}`}
+                <div className="relative -mx-4 px-4 sm:mx-0 sm:px-0 mb-2 group/category-nav">
+                    {/* Left/Right Fades for Scrollability Cue */}
+                    <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none opacity-0 group-hover/category-nav:opacity-100 transition-opacity duration-300 sm:left-0 sm:from-background" />
+                    <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none opacity-0 group-hover/category-nav:opacity-100 transition-opacity duration-300 sm:right-0 sm:from-background" />
+
+                    <div
+                        ref={categoryScrollRef}
+                        className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide"
+                        onWheel={(e) => {
+                            if (categoryScrollRef.current) {
+                                // Convert vertical scroll to horizontal
+                                if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                                    categoryScrollRef.current.scrollLeft += e.deltaY;
+                                }
+                            }
+                        }}
                     >
-                        All Categories
-                    </button>
-                    {categories.map(cat => {
-                        const isSelected = selectedCategory.has(cat);
-                        const colorStyle = getCategoryColorStyle(cat);
-                        return (
-                            <button
-                                key={cat}
-                                onClick={() => {
-                                    const newSet = new Set(selectedCategory);
-                                    if (isSelected) {
-                                        newSet.delete(cat);
-                                    } else {
-                                        newSet.add(cat);
-                                    }
-                                    setSelectedCategory(newSet);
-                                }}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-bold transition-all border whitespace-nowrap min-h-[34px] flex-shrink-0 ${isSelected
-                                    ? ''
-                                    : 'bg-card border-border-subtle text-text-muted hover:border-text-secondary hover:text-text-secondary'
-                                    }`}
-                                style={isSelected ? {
-                                    backgroundColor: colorStyle.backgroundColor,
-                                    color: colorStyle.color,
-                                    borderColor: colorStyle.backgroundColor,
-                                    boxShadow: `0 4px 10px ${colorStyle.backgroundColor}22`,
-                                } : undefined}
-                            >
-                                {cat}
-                                <span className="opacity-60 font-medium ml-1">({categoryCounts[cat]})</span>
-                            </button>
-                        );
-                    })}
+                        <button
+                            onClick={() => setSelectedCategory(new Set())}
+                            className={`px-3 py-1.5 rounded-full text-[13px] font-bold transition-all border whitespace-nowrap min-h-[34px] flex-shrink-0 ${selectedCategory.size === 0
+                                ? 'bg-accent text-white border-accent shadow-sm'
+                                : 'bg-card border-border-subtle text-text-muted hover:border-text-secondary hover:text-text-secondary'}`}
+                        >
+                            All Categories
+                        </button>
+                        {categories.map(cat => {
+                            const isSelected = selectedCategory.has(cat);
+                            const colorStyle = getCategoryColorStyle(cat);
+                            return (
+                                <button
+                                    key={cat}
+                                    onClick={() => {
+                                        const newSet = new Set(selectedCategory);
+                                        if (isSelected) {
+                                            newSet.delete(cat);
+                                        } else {
+                                            newSet.add(cat);
+                                        }
+                                        setSelectedCategory(newSet);
+                                    }}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-bold transition-all border whitespace-nowrap min-h-[34px] flex-shrink-0 ${isSelected
+                                        ? ''
+                                        : 'bg-card border-border-subtle text-text-muted hover:border-text-secondary hover:text-text-secondary'
+                                        }`}
+                                    style={isSelected ? {
+                                        backgroundColor: colorStyle.backgroundColor,
+                                        color: colorStyle.color,
+                                        borderColor: colorStyle.backgroundColor,
+                                        boxShadow: `0 4px 10px ${colorStyle.backgroundColor}22`,
+                                    } : undefined}
+                                >
+                                    {cat}
+                                    <span className="opacity-60 font-medium ml-1">({categoryCounts[cat]})</span>
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
 
                 {/* Row 2: Combined Controls - Status, Sort, View, Select (DRASTICALLY SUBTLE) */}
