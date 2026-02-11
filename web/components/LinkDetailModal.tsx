@@ -123,8 +123,8 @@ export default function LinkDetailModal({
                             onClick={() => onReadStatusChange(link.id, !link.isRead)}
                             title={link.isRead ? 'Mark as unread' : 'Mark as read'}
                             className={`p-2 rounded-xl border transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${link.isRead
-                                ? 'bg-green-500/10 border-green-500/20 text-green-500 shadow-lg shadow-green-500/5'
-                                : 'bg-white/5 border-white/5 text-text-muted hover:text-green-500'
+                                ? 'bg-white/10 border-white/5 text-text shadow-lg opacity-100'
+                                : 'bg-white/5 border-white/5 text-text-muted/40 hover:text-text'
                                 }`}
                         >
                             {link.isRead ? (

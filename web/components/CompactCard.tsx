@@ -2,7 +2,7 @@
 
 import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { Archive, Star, Bell, Trash2, Pencil, CheckCircle2, Circle } from 'lucide-react';
+import { Archive, Star, Bell, Trash2, Pencil, Circle, Check } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import CategoryInput from './CategoryInput';
 
@@ -138,13 +138,13 @@ export default function CompactCard({
                             e.stopPropagation();
                             onReadStatusChange(link.id, !link.isRead);
                         }}
-                        className={`p-1.5 rounded-lg transition-all ${link.isRead ? 'text-green-500 bg-green-500/10' : 'text-text-muted hover:text-green-500 hover:bg-white/10'}`}
+                        className={`p-1.5 rounded-lg transition-all ${link.isRead ? 'text-text items-center opacity-100 bg-white/10' : 'text-text-muted/40 hover:text-text hover:bg-white/10'}`}
                         title={link.isRead ? 'Mark as unread' : 'Mark as read'}
                     >
                         {link.isRead ? (
-                            <CheckCircle2 className="w-3 h-3 fill-current" />
+                            <Check className="w-3 h-3" />
                         ) : (
-                            <Circle className="w-3 h-3" />
+                            <Circle className="w-3 h-3 opacity-40" />
                         )}
                     </button>
                     <button

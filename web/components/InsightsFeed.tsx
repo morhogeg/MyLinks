@@ -137,7 +137,7 @@ export default function InsightsFeed({
                                                 e.stopPropagation();
                                                 onReadStatusChange(link.id, !link.isRead);
                                             }}
-                                            className={`p-1.5 rounded-lg transition-all ${link.isRead ? 'text-green-500 bg-green-500/10' : 'text-text-muted hover:text-green-500 hover:bg-white/5'}`}
+                                            className={`p-1.5 rounded-lg transition-all ${link.isRead ? 'text-text items-center opacity-100 bg-white/10' : 'text-text-muted/40 hover:text-text hover:bg-white/5'}`}
                                             title={link.isRead ? 'Mark as unread' : 'Mark as read'}
                                         >
                                             {link.isRead ? (

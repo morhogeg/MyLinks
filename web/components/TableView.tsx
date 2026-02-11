@@ -72,7 +72,7 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
                             <td className="px-6 py-10 align-top text-center" onClick={(e) => e.stopPropagation()}>
                                 <button
                                     onClick={() => onReadStatusChange(link.id, !link.isRead)}
-                                    className={`p-2 rounded-lg transition-all ${link.isRead ? 'text-green-500 bg-green-500/10' : 'text-text-muted hover:bg-white/5 hover:text-green-500'}`}
+                                    className={`p-2 rounded-lg transition-all ${link.isRead ? 'text-text items-center opacity-100 bg-white/10' : 'text-text-muted/40 hover:bg-white/5 hover:text-text'}`}
                                     title={link.isRead ? 'Mark as unread' : 'Mark as read'}
                                 >
                                     {link.isRead ? (

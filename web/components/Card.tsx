@@ -3,7 +3,7 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle } from 'lucide-react';
+import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -142,13 +142,13 @@ export default function Card({
                                 onReadStatusChange(link.id, !link.isRead);
                             }}
                             title={link.isRead ? 'Mark as unread' : 'Mark as read'}
-                            className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center ${link.isRead ? 'text-green-500 bg-green-500/10' : 'text-text-muted hover:text-green-500 hover:bg-white/10'
+                            className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center ${link.isRead ? 'text-text items-center opacity-100 bg-white/10' : 'text-text-muted/40 hover:text-text hover:bg-white/10'
                                 }`}
                         >
                             {link.isRead ? (
-                                <CheckCircle2 className="w-3.5 h-3.5 fill-current" />
+                                <Check className="w-3.5 h-3.5" />
                             ) : (
-                                <Circle className="w-3.5 h-3.5" />
+                                <Circle className="w-3.5 h-3.5 opacity-40" />
                             )}
                         </button>
                         <button
