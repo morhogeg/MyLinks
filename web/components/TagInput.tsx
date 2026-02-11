@@ -50,8 +50,7 @@ export default function TagInput({
         .filter(t =>
             t.toLowerCase().includes(value.toLowerCase()) &&
             !existingTags.includes(t)
-        )
-        .slice(0, 8);
+        );
 
     const exactMatch = allTags.some(t => t.toLowerCase() === value.toLowerCase().trim());
     const isNew = value.trim() !== '' && !exactMatch && !existingTags.includes(value.trim());
@@ -111,7 +110,7 @@ export default function TagInput({
                     className="absolute top-full left-0 mt-1 w-48 bg-background border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200 backdrop-blur-md"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <div className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10">
+                    <div className="max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10">
                         {suggestions.map((suggestion, index) => (
                             <button
                                 key={suggestion}

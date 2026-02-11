@@ -1,7 +1,7 @@
 'use client';
 
 import { Link } from '@/lib/types';
-import { Lightbulb, Tag, ArrowRight, X, Pencil, CheckCircle2, Circle } from 'lucide-react';
+import { Lightbulb, Tag, ArrowRight, X, Pencil, CheckCircle2, Circle, Check } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
@@ -141,9 +141,9 @@ export default function InsightsFeed({
                                             title={link.isRead ? 'Mark as unread' : 'Mark as read'}
                                         >
                                             {link.isRead ? (
-                                                <CheckCircle2 className="w-3.5 h-3.5 fill-current" />
+                                                <Check className="w-3.5 h-3.5" />
                                             ) : (
-                                                <Circle className="w-3.5 h-3.5" />
+                                                <Circle className="w-3.5 h-3.5 opacity-40" />
                                             )}
                                         </button>
                                         <span className="text-[10px] text-text-muted font-medium tabular-nums">

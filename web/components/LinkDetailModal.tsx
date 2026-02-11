@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle } from 'lucide-react';
+import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -128,9 +128,9 @@ export default function LinkDetailModal({
                                 }`}
                         >
                             {link.isRead ? (
-                                <CheckCircle2 className="w-4 h-4 fill-current" />
+                                <Check className="w-4 h-4" />
                             ) : (
-                                <Circle className="w-4 h-4" />
+                                <Circle className="w-4 h-4 opacity-40" />
                             )}
                         </button>
                         <button

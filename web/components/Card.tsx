@@ -230,7 +230,7 @@ export default function Card({
                 <div className="pt-3 sm:pt-4 border-t border-white/5 flex flex-col space-y-2 sm:space-y-3">
                     {/* Tags */}
                     <div className="flex flex-wrap gap-1.5 min-h-[1.5rem]">
-                        {link.tags.slice(0, 3).map((tag) => {
+                        {link.tags.map((tag) => {
                             const parts = tag.split('/');
                             const leaf = parts[parts.length - 1];
                             const parents = parts.slice(0, -1).join('/');
@@ -246,11 +246,6 @@ export default function Card({
                                 </span>
                             );
                         })}
-                        {link.tags.length > 3 && (
-                            <span className="text-[9px] font-bold text-text-muted/30 self-center">
-                                +{link.tags.length - 3}
-                            </span>
-                        )}
                     </div>
 
                     {/* Metadata Buttons Row */}

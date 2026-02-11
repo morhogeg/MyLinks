@@ -76,9 +76,9 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
                                     title={link.isRead ? 'Mark as unread' : 'Mark as read'}
                                 >
                                     {link.isRead ? (
-                                        <CheckCircle2 className="w-4 h-4 fill-current" />
+                                        <Check className="w-4 h-4" />
                                     ) : (
-                                        <Circle className="w-4 h-4" />
+                                        <Circle className="w-4 h-4 opacity-40" />
                                     )}
                                 </button>
                             </td>

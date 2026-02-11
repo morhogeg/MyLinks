@@ -57,7 +57,7 @@ export interface Link {
   reminderStatus?: 'none' | 'pending' | 'completed';
   nextReminderAt?: number; // Unix timestamp (ms)
   reminderCount?: number;
-  reminderProfile?: 'smart' | 'spaced';
+  reminderProfile?: string;
   lastViewedAt?: number; // Unix timestamp (ms)
   language?: string;
   isRead?: boolean;

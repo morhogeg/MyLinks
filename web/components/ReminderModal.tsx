@@ -17,6 +17,7 @@ type ReminderOption = 'smart' | 'tomorrow' | 'next-week' | 'spaced' | 'custom' |
 
 export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: ReminderModalProps) {
     const [selectedOption, setSelectedOption] = useState<ReminderOption | null>(null);
+    const [spacedInterval, setSpacedInterval] = useState<number>(3);
     const [customDate, setCustomDate] = useState('');
     const [customTime, setCustomTime] = useState('09:00');
     const [isSaving, setIsSaving] = useState(false);
@@ -50,9 +51,8 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     nextReminderTime = nextWeek.getTime();
                     break;
                 case 'spaced':
-                    // Start with 3 days
                     const staggered = new Date(now);
-                    staggered.setDate(staggered.getDate() + 3);
+                    staggered.setDate(staggered.getDate() + spacedInterval);
                     staggered.setHours(9, 0, 0, 0);
                     nextReminderTime = staggered.getTime();
                     break;
@@ -223,12 +223,32 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                             title="Next Week"
                             subtitle="In 7 days"
                         />
-                        <OptionButton
-                            option="spaced"
-                            icon={Bell}
-                            title="Spaced Repetition"
-                            subtitle="3, 5, then 7 days"
-                        />
+                        <div className="space-y-2">
+                            <OptionButton
+                                option="spaced"
+                                icon={Bell}
+                                title="Spaced Repetition"
+                                subtitle="Initial interval for review"
+                            />
+                            {selectedOption === 'spaced' && (
+                                <div className="flex gap-2 mx-2 p-1 bg-white/5 rounded-xl border border-white/5 animate-in slide-in-from-top-2 duration-300">
+                                    {[3, 5, 7].map((interval) => (
+                                        <button
+                                            key={interval}
+                                            onClick={() => setSpacedInterval(interval)}
+                                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all
+                                                ${spacedInterval === interval
+                                                    ? 'bg-accent text-white shadow-sm'
+                                                    : 'text-text-muted hover:bg-white/5 hover:text-text'
+                                                }
+                                            `}
+                                        >
+                                            {interval} Days
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
 
                         {/* Separator */}
                         <div className="flex items-center gap-3 py-2">
