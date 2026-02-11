@@ -107,7 +107,7 @@ export default function TagInput({
 
             {isOpen && (
                 <div
-                    className="absolute top-full left-0 mt-1 w-48 bg-background border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200 backdrop-blur-md"
+                    className="absolute top-full right-0 mt-1 w-48 bg-background border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200 backdrop-blur-md"
                     onClick={(e) => e.stopPropagation()}
                 >
                     <div className="max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10">
