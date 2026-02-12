@@ -22,6 +22,34 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
     const [customTime, setCustomTime] = useState('09:00');
     const [isSaving, setIsSaving] = useState(false);
 
+    // Effect to initialize state when modal opens
+    useState(() => {
+        if (!isOpen) return;
+
+        if (link.reminderStatus === 'pending' && link.reminderProfile) {
+            const profile = link.reminderProfile;
+            if (profile.startsWith('spaced-')) {
+                setSelectedOption('spaced');
+                setSpacedInterval(parseInt(profile.split('-')[1]) || 3);
+            } else if (profile === 'smart') {
+                setSelectedOption('smart');
+            } else if (profile === 'tomorrow') {
+                setSelectedOption('tomorrow');
+            } else if (profile === 'next-week') {
+                setSelectedOption('next-week');
+            } else if (profile === 'custom') {
+                setSelectedOption('custom');
+                if (link.nextReminderAt) {
+                    const date = new Date(link.nextReminderAt);
+                    setCustomDate(date.toISOString().split('T')[0]);
+                    setCustomTime(`${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`);
+                }
+            } else {
+                setSelectedOption('smart');
+            }
+        }
+    });
+
     if (!isOpen) return null;
 
     const handleSave = async () => {
@@ -80,7 +108,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     link.id,
                     true,
                     nextReminderTime,
-                    selectedOption === 'spaced' ? `spaced-${spacedInterval}` : 'smart'
+                    selectedOption === 'spaced' ? `spaced-${spacedInterval}` : selectedOption
                 );
                 onClose();
                 if (onUpdate) onUpdate();
@@ -161,7 +189,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                 onClick={isSaving ? undefined : onClose}
             />
 
-            <div className="relative bg-card border border-white/10 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+            <div className="relative bg-card border border-white/10 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 safe-pt">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
                     <h2 className="text-lg font-bold text-text flex items-center gap-2">
                         <Bell className="w-5 h-5 text-accent" />

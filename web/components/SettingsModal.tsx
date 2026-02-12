@@ -78,7 +78,7 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                 onClick={onClose}
             />
 
-            <div className="relative bg-card border border-white/10 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+            <div className="relative bg-card border border-white/10 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 safe-pt">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
                     <h2 className="text-lg font-bold text-white">Settings</h2>
                     <button

@@ -117,7 +117,7 @@ export default function LinkDetailModal({
 
             <div className="relative bg-card border-0 sm:border border-white/10 w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
                 {/* Header Actions */}
-                <div className="flex items-center justify-between p-3 sm:p-4">
+                <div className="flex items-center justify-between p-3 sm:p-4 safe-pt">
                     <div className="flex gap-1.5 sm:gap-2">
                         <button
                             onClick={() => onReadStatusChange(link.id, !link.isRead)}
@@ -281,7 +281,10 @@ export default function LinkDetailModal({
                                 {getTimeAgo(link.createdAt, now)}
                             </span>
                             {isReminderActive && nextReminderDate && (
-                                <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500">
+                                <span
+                                    onClick={handleToggleReminder}
+                                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500 cursor-pointer hover:brightness-110 active:scale-95 transition-all"
+                                >
                                     <Bell className="w-3.5 h-3.5" />
                                     {link.reminderProfile?.startsWith('spaced') && (
                                         <span className="font-bold flex items-center mr-1">
