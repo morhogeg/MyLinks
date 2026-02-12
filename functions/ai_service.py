@@ -77,7 +77,7 @@ class ClaudeService: # Kept name for compatibility with main.py
             print("CRITICAL: GEMINI_API_KEY is empty")
             
         self.client = genai.Client(api_key=self.api_key) if self.api_key else None
-        self.model = "gemini-3-flash-preview"
+        self.model = "gemini-2.0-flash" # Use latest stable model name
         
     def analyze_text(self, text: str, existing_tags: list = None) -> dict:
         """

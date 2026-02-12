@@ -41,6 +41,9 @@ def debug_search(req: https_fn.Request) -> https_fn.Response:
         try:
             from search import perform_search_logic, EmbeddingService
             service = EmbeddingService()
+            if req.args.get("test_vector"):
+                 v = service.generate_embedding("test")
+                 return https_fn.Response(json.dumps({"len": len(v), "sample": v[:5]}, indent=2), status=200, mimetype="application/json")
             if req.args.get("list_models"):
                  models = service.client.models.list()
                  model_list = [{"name": m.name, "actions": m.supported_actions if hasattr(m, "supported_actions") else []} for m in models]
@@ -788,7 +791,7 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             },
             # Expanded fields
             "concepts": analysis.get("concepts", []),
-            "embedding": embedding,
+            "embedding_vector": embedding, 
             "relatedLinks": related_links,
             # Enhanced fields
             "sourceType": "web", # Default
@@ -1095,7 +1098,21 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             if not isinstance(analysis, dict):
                 raise ValueError(f"AI Analysis failed to return a valid object: {analysis}")
 
-        # 3. Build link document
+        # 3. Generate Embedding & Find Connections
+        embedding_text = f"{analysis.get('title', '')}\n{analysis.get('summary', '')}"
+        embedding = claude.embed_text(embedding_text)
+        
+        graph_service = GraphService(get_db())
+        related_links = graph_service.find_related_links(
+            new_link_id="pending", # Temp ID
+            title=analysis.get("title", ""),
+            summary=analysis.get("summary", ""),
+            embedding=embedding,
+            new_concepts=analysis.get("concepts", []),
+            uid=uid
+        )
+
+        # 4. Build link document
         final_title = analysis.get("title", scraped.get("title", "Untitled"))
         log_to_firestore(task_id, "Saving processed link to brain", data={"finalTitle": final_title})
         ref.update({"status": "saving"})
@@ -1106,6 +1123,9 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             "summary": analysis.get("summary", "No summary available"),
             "detailedSummary": analysis.get("detailedSummary"),
             "tags": analysis.get("tags", []),
+            "concepts": analysis.get("concepts", []),
+            "embedding_vector": Vector(embedding), # Store vector directly
+            "relatedLinks": related_links,
             "category": analysis.get("category", "General"),
             "language": analysis.get("language", "en"),
             "status": LinkStatus.UNREAD.value,
