@@ -20,6 +20,48 @@ from firebase_admin import initialize_app, firestore
 
 from models import WebhookPayload, LinkDocument, LinkStatus, LinkMetadata, AIAnalysis, ReminderStatus
 from ai_service import ClaudeService
+from graph_service import GraphService
+from search import sync_link_embedding, search_links
+from backfill_embeddings import backfill_embeddings
+
+@https_fn.on_request()
+def debug_search(req: https_fn.Request) -> https_fn.Response:
+    try:
+        from search import search_links
+        # Mock a CallableRequest for testing
+        class MockReq:
+            def __init__(self, data, auth=None):
+                self.data = data
+                self.auth = auth
+        
+        query = req.args.get("q", "ai agents")
+        uid = req.args.get("uid", "+16462440305") # Default test UID
+        
+        # Call the logic directly to avoid decorator wrapping
+        try:
+            from search import perform_search_logic, EmbeddingService
+            service = EmbeddingService()
+            if req.args.get("list_models"):
+                 models = service.client.models.list()
+                 model_list = [{"name": m.name, "actions": m.supported_actions if hasattr(m, "supported_actions") else []} for m in models]
+                 return https_fn.Response(json.dumps(model_list, indent=2), status=200, mimetype="application/json")
+            
+            links = perform_search_logic(uid, query, limit=20)
+            return https_fn.Response(json.dumps({"links": links}, indent=2), status=200, mimetype="application/json")
+        except Exception as search_err:
+             import traceback
+             return https_fn.Response(f"Search Logic Error: {str(search_err)}\n\n{traceback.format_exc()}", status=200)
+    except Exception as e:
+        import traceback
+        return https_fn.Response(f"Wrapper Error: {str(e)}\n\n{traceback.format_exc()}", status=500)
+
+@https_fn.on_request()
+def admin_backfill_embeddings(req: https_fn.Request) -> https_fn.Response:
+    try:
+        backfill_embeddings()
+        return https_fn.Response("Backfill completed successfully", status=200)
+    except Exception as e:
+        return https_fn.Response(f"Backfill failed: {str(e)}", status=500)
 
 # Initialize Firebase Admin lazily
 _db = None
@@ -702,7 +744,34 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         claude = ClaudeService()
         analysis = claude.analyze_text(scraped["text"] or scraped["html"], existing_tags=existing_tags)
         
-        # 3. Construct Link Object (matching frontend expectation)
+        # 3. Generate Embedding & Find Connections
+        # Create a rich text representation for embedding
+        embedding_text = f"{analysis.get('title', '')}\n{analysis.get('summary', '')}"
+        embedding = claude.embed_text(embedding_text)
+        
+        # Find related links (if we have a uid context - but here we verify generically first)
+        # Note: analyze_link is often called BEFORE saving, so we might not have a UID if it's a public tool. 
+        # But typically this is called from the frontend which has auth.
+        # However, the current endpoint doesn't extract UID from auth header easily without verify_token.
+        # For now, we'll skip DB lookup in this specific endpoint OR we need to pass UID.
+        # Front-end typically passes 'uid' in body or we use context.
+        
+        # Let's check if 'uid' is in data, otherwise skip graph lookup (it will be done on save if we move logic there, but user wants to see it in UI?)
+        # If the user wants to see "Related Notes" in the "Add Link" modal *before* saving, we need UID.
+        uid = data.get('uid')
+        related_links = []
+        if uid:
+            graph_service = GraphService(get_db())
+            related_links = graph_service.find_related_links(
+                new_link_id="preview", # Temporary ID
+                title=analysis.get("title", ""),
+                summary=analysis.get("summary", ""),
+                embedding=embedding,
+                new_concepts=analysis.get("concepts", []),
+                uid=uid
+            )
+
+        # 4. Construct Link Object (matching frontend expectation)
         link_data = {
             "url": url,
             "title": analysis.get("title", scraped.get("title", "Untitled")),
@@ -717,6 +786,10 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
                 "estimatedReadTime": max(1, len(scraped.get("text", "")) // 1500),
                 "actionableTakeaway": analysis.get("actionableTakeaway")
             },
+            # Expanded fields
+            "concepts": analysis.get("concepts", []),
+            "embedding": embedding,
+            "relatedLinks": related_links,
             # Enhanced fields
             "sourceType": "web", # Default
             "confidence": 0.8,   # Default
@@ -726,8 +799,78 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         return https_fn.Response(json.dumps({"success": True, "link": link_data}), status=200, headers=headers, mimetype='application/json')
         
     except Exception as e:
-        logger.error(f"Analysis failed: {e}")
         return https_fn.Response(json.dumps({"success": False, "error": str(e)}), status=500, headers=headers, mimetype='application/json')
+
+
+@https_fn.on_request()
+def analyze_image(req: https_fn.Request) -> https_fn.Response:
+    """
+    HTTP endpoint for analyzing Images immediately (Synchronous)
+    """
+    # Enable CORS
+    if req.method == 'OPTIONS':
+        headers = {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Max-Age': '3600'
+        }
+        return https_fn.Response('', status=204, headers=headers)
+
+    headers = {'Access-Control-Allow-Origin': '*'}
+
+    try:
+        data = req.get_json()
+        if not data:
+            return https_fn.Response(json.dumps({"success": False, "error": "Invalid JSON body"}), status=400, headers=headers)
+        
+        image_url = data.get('imageUrl')
+        existing_tags = data.get('existingTags', [])
+        
+        if not image_url:
+            return https_fn.Response(json.dumps({"success": False, "error": "Image URL is required"}), status=400, headers=headers)
+            
+        logger.info(f"Analyzing Image: {image_url}")
+        
+        # 1. Download Image
+        try:
+            img_response = requests.get(image_url, timeout=20)
+            img_response.raise_for_status()
+            image_bytes = img_response.content
+            mime_type = img_response.headers.get('Content-Type', 'image/jpeg')
+        except Exception as e:
+            return https_fn.Response(json.dumps({"success": False, "error": f"Failed to download image: {str(e)}"}), status=500, headers=headers)
+
+        # 2. Analyze with AI
+        claude = ClaudeService()
+        analysis = claude.analyze_image(image_bytes, mime_type, existing_tags=existing_tags)
+        
+        # 3. Construct Link Object (Adapter for frontend)
+        link_data = {
+            "url": image_url,
+            "title": analysis.get("title", "Image Analysis"),
+            "summary": analysis.get("summary", ""),
+            "detailedSummary": analysis.get("detailedSummary", ""),
+            "tags": analysis.get("tags", []),
+            "category": analysis.get("category", "General"),
+            "status": LinkStatus.UNREAD.value,
+            "createdAt": int(datetime.now().timestamp() * 1000),
+            "metadata": {
+                "originalTitle": "Image Upload",
+                "estimatedReadTime": 1,
+                "actionableTakeaway": analysis.get("actionableTakeaway")
+            },
+            "sourceType": "image",
+            "confidence": 0.9,
+            "keyEntities": []
+        }
+        
+        return https_fn.Response(json.dumps({"success": True, "link": link_data}), status=200, headers=headers, mimetype='application/json')
+        
+    except Exception as e:
+        logger.error(f"Image analysis failed: {e}")
+        return https_fn.Response(json.dumps({"success": False, "error": str(e)}), status=500, headers=headers, mimetype='application/json')
+
 
 
 @https_fn.on_request()

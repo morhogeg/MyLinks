@@ -3,7 +3,7 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check } from 'lucide-react';
+import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -93,7 +93,7 @@ export default function Card({
                     {(() => {
                         const colorStyle = getCategoryColorStyle(link.category);
                         return (
-                            <div className="relative group/cat flex items-center gap-1">
+                            <div className="relative group/cat flex items-center gap-2">
                                 {isEditingCategory ? (
                                     <CategoryInput
                                         currentCategory={link.category}
@@ -108,19 +108,31 @@ export default function Card({
                                     />
                                 ) : (
                                     <>
-                                        <span
-                                            className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all group/chip"
-                                            style={{
-                                                backgroundColor: colorStyle.backgroundColor,
-                                                color: colorStyle.color,
-                                            }}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setIsEditingCategory(true);
-                                            }}
-                                        >
-                                            {link.category}
-                                        </span>
+                                        <div className="flex items-center gap-1.5">
+                                            <span
+                                                className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all group/chip"
+                                                style={{
+                                                    backgroundColor: colorStyle.backgroundColor,
+                                                    color: colorStyle.color,
+                                                }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setIsEditingCategory(true);
+                                                }}
+                                            >
+                                                {link.category}
+                                            </span>
+                                            {link.sourceType === 'image' && (
+                                                <div className="flex items-center gap-1 text-accent animate-pulse-subtle" title="Source: Screenshot">
+                                                    <ImageIcon className="w-3.5 h-3.5" />
+                                                    {link.url && (
+                                                        <div className="w-6 h-6 rounded-md overflow-hidden border border-white/10 bg-white/5">
+                                                            <img src={link.url} alt="Thumbnail" className="w-full h-full object-cover" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();

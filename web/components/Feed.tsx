@@ -8,7 +8,8 @@ import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus } from '@/lib/storage';
 import { collection, query, orderBy, onSnapshot, where, getDocs, limit, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
 import Card from './Card';
 import CompactCard from './CompactCard';
 import ReminderModal from './ReminderModal';
@@ -55,6 +56,50 @@ function FeedContent() {
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isTagExplorerCollapsed, setIsTagExplorerCollapsed] = useState(false);
     const [reminderModalLink, setReminderModalLink] = useState<Link | null>(null);
+
+    // Semantic Search State
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchResults, setSearchResults] = useState<Link[]>([]);
+    const [debouncedQuery, setDebouncedQuery] = useState('');
+
+    // Debounce search query
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedQuery(searchQuery);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    // Semantic Search Effect
+    useEffect(() => {
+        if (!debouncedQuery.trim()) {
+            setIsSearching(false);
+            setSearchResults([]);
+            return;
+        }
+
+        const performSearch = async () => {
+            setIsSearching(true);
+            try {
+                const searchFn = httpsCallable(functions, 'search_links');
+                const result = await searchFn({
+                    query: debouncedQuery,
+                    limit: 20
+                    // We can pass uid here if needed for dev, but auth context should handle it
+                });
+                const data = result.data as { links: Link[] };
+                setSearchResults(data.links || []);
+            } catch (err) {
+                console.error("Search failed:", err);
+                // Fallback to local filtering if server search fails? 
+                // For now, just show empty or previous results
+            } finally {
+                setIsSearching(false);
+            }
+        };
+
+        performSearch();
+    }, [debouncedQuery]);
 
     // Load collapsed state from localStorage
     useEffect(() => {
@@ -135,8 +180,11 @@ function FeedContent() {
     }, [searchParams, links]);
 
     // Filter and sort links
-    const filteredLinks = links
+    const linksToDisplay = debouncedQuery.trim() ? searchResults : links;
+
+    const filteredLinks = linksToDisplay
         .filter((link) => {
+            if (debouncedQuery.trim()) return true; // Skip keyword filtering if using semantic search
             if (filter === 'all') return true;
             if (filter === 'reminders') return link.reminderStatus === 'pending';
             if (filter === 'unread') return !link.isRead;
@@ -157,6 +205,7 @@ function FeedContent() {
             });
         })
         .filter((link) => {
+            if (debouncedQuery.trim()) return true; // Skip local keyword search if doing semantic
             if (!searchQuery.trim()) return true;
             const query = searchQuery.toLowerCase();
             return (
@@ -167,6 +216,12 @@ function FeedContent() {
             );
         })
         .sort((a, b) => {
+            if (filter === 'reminders') {
+                // specific sort for reminders: soonest first
+                const timeA = a.nextReminderAt || Number.MAX_SAFE_INTEGER;
+                const timeB = b.nextReminderAt || Number.MAX_SAFE_INTEGER;
+                return timeA - timeB;
+            }
             switch (sortBy) {
                 case 'date-desc':
                     return getTimestampNumber(b.createdAt) - getTimestampNumber(a.createdAt);
@@ -205,6 +260,10 @@ function FeedContent() {
         else next.add(tag);
         setSelectedTags(next);
     };
+
+    const reminderCount = links.filter(l => l.reminderStatus === 'pending').length;
+
+
 
     const handleStatusChange = async (id: string, status: LinkStatus) => {
         if (!uid) return;
@@ -400,7 +459,7 @@ function FeedContent() {
                                 onChange={(e) => setFilter(e.target.value as FilterType)}
                                 className="appearance-none bg-card/30 border border-transparent rounded-full pl-8 pr-3 py-0.5 text-[10px] font-medium text-text-muted/60 hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/10 min-h-[28px]"
                             >
-                                {filterButtons.map(btn => (
+                                {filterButtons.filter(btn => btn.key !== 'reminders').map(btn => (
                                     <option key={btn.key} value={btn.key}>{btn.label}</option>
                                 ))}
                             </select>
@@ -409,10 +468,27 @@ function FeedContent() {
                                 {filter === 'unread' && <Inbox className="w-3 h-3 text-accent" />}
                                 {filter === 'read' && <CheckCircle2 className="w-3 h-3 text-green-500" />}
                                 {filter === 'favorite' && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
-                                {filter === 'reminders' && <Bell className="w-3 h-3 text-accent" />}
                                 {filter === 'archived' && <Archive className="w-3 h-3 text-text-muted" />}
                             </div>
                         </div>
+
+                        {/* Reminders Toggle */}
+                        <button
+                            onClick={() => setFilter(filter === 'reminders' ? 'all' : 'reminders')}
+                            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium transition-all min-h-[28px] ${filter === 'reminders'
+                                ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
+                                : 'bg-card/30 text-text-muted/60 hover:text-blue-500 border border-transparent'
+                                }`}
+                        >
+                            <Bell className={`w-3 h-3 ${filter === 'reminders' ? 'fill-current' : ''}`} />
+                            <span>Reminders</span>
+                            {reminderCount > 0 && (
+                                <span className={`flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold ${filter === 'reminders' ? 'bg-blue-500 text-white' : 'bg-blue-500/10 text-blue-500'
+                                    }`}>
+                                    {reminderCount}
+                                </span>
+                            )}
+                        </button>
 
                         {/* Sort Dropdown */}
                         <div className="relative">
@@ -602,8 +678,14 @@ function FeedContent() {
                                                         selectedTags.size > 0 ? 'No links match selected tags' :
                                                             'Your Second Brain is empty'}
                             </h3>
+                            {debouncedQuery && isSearching && (
+                                <div className="flex items-center justify-center gap-2 text-accent mt-2">
+                                    <div className="w-4 h-4 border-2 border-accent/20 border-t-accent rounded-full animate-spin" />
+                                    <span className="text-sm font-medium">Searching meanings...</span>
+                                </div>
+                            )}
                             <p className="text-text-secondary text-sm">
-                                {searchQuery ? 'Try a different search term' :
+                                {searchQuery ? (isSearching ? 'Thinking...' : 'Try a different search term') :
                                     filter === 'favorite' ? 'Star links to add them to your favorites' :
                                         filter === 'archived' ? 'Archive links to see them here' :
                                             filter === 'unread' ? 'All caught up! No unread links' :

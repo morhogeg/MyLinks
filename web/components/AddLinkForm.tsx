@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, FormEvent } from 'react';
-import { Link, Plus, Loader2, X } from 'lucide-react';
+import { Link, Plus, Loader2, X, Image as ImageIcon, Upload } from 'lucide-react';
 import { saveLink, getUserTags } from '@/lib/storage';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 interface AddLinkFormProps {
@@ -25,6 +26,9 @@ const formatUrl = (input: string) => {
  */
 export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
     const [url, setUrl] = useState('');
+    const [activeTab, setActiveTab] = useState<'link' | 'image'>('link');
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
@@ -33,9 +37,33 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
     // Get UID on mount
     useEffect(() => {
         async function fetchUid() {
-            const q = query(collection(db, 'users'), where('phone_number', '==', '+16462440305'), limit(1));
-            const snap = await getDocs(q);
-            if (!snap.empty) setUid(snap.docs[0].id);
+            try {
+                const phone = '+16462440305';
+                const q = query(collection(db, 'users'), where('phone_number', '==', phone), limit(1));
+                const snap = await getDocs(q);
+
+                if (!snap.empty) {
+                    setUid(snap.docs[0].id);
+                } else {
+                    // In development/emulator, auto-create the user if they don't exist
+                    if (window.location.hostname === 'localhost') {
+                        console.log('Test user not found, creating one...');
+                        const { addDoc, collection } = await import('firebase/firestore');
+                        const docRef = await addDoc(collection(db, 'users'), {
+                            phone_number: phone,
+                            createdAt: Date.now(),
+                            settings: {
+                                theme: 'dark',
+                                reminders_enabled: true
+                            }
+                        });
+                        setUid(docRef.id);
+                        console.log('Created test user with ID:', docRef.id);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to fetch/create UID:', err);
+            }
         }
         fetchUid();
     }, []);
@@ -47,7 +75,7 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
         const formattedUrl = formatUrl(url);
         console.log('Formatted URL:', formattedUrl); // DEBUG
 
-        if (!formattedUrl || isLoading) {
+        if ((activeTab === 'link' && !formattedUrl) || (activeTab === 'image' && !imageFile) || isLoading) {
             console.log('Validation failed or already loading'); // DEBUG
             return;
         }
@@ -68,20 +96,54 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                 // Continue without tags - this is non-critical optimization
             }
 
-            console.log('Calling /api/analyze...'); // DEBUG
             let response;
-            try {
-                response = await fetch('/api/analyze', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        url: formattedUrl,
-                        existingTags
-                    }),
-                });
-            } catch (netErr) {
-                console.error('Network request failed:', netErr);
-                throw new Error(`Network Error: ${netErr instanceof Error ? netErr.message : String(netErr)}`);
+
+            if (activeTab === 'link') {
+                // LINK MODE
+                console.log('Calling /api/analyze...'); // DEBUG
+                try {
+                    response = await fetch('/api/analyze', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            url: formattedUrl,
+                            existingTags
+                        }),
+                    });
+                } catch (netErr) {
+                    console.error('Network request failed:', netErr);
+                    throw new Error(`Network Error: ${netErr instanceof Error ? netErr.message : String(netErr)}`);
+                }
+            } else {
+                // IMAGE MODE
+                console.log('Current UID before upload:', uid); // DEBUG
+                if (!imageFile || !uid) {
+                    const msg = !uid ? "User ID not found. Please ensure you are logged in or the test user exists." : "No image selected.";
+                    throw new Error(msg);
+                }
+
+                // 1. Upload to Firebase Storage
+                const storagePath = `users/${uid}/uploads/${Date.now()}_${imageFile.name}`;
+                console.log('Uploading to path:', storagePath); // DEBUG
+                const storageRef = ref(storage, storagePath);
+                await uploadBytes(storageRef, imageFile);
+                const downloadURL = await getDownloadURL(storageRef);
+
+                // 2. Call Analyze Image API
+                console.log('Calling /api/analyze-image...'); // DEBUG
+                try {
+                    response = await fetch('/api/analyze-image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            imageUrl: downloadURL,
+                            existingTags
+                        }),
+                    });
+                } catch (netErr) {
+                    console.error('Network request failed:', netErr);
+                    throw new Error(`Network Error: ${netErr instanceof Error ? netErr.message : String(netErr)}`);
+                }
             }
 
             console.log('Response status:', response.status); // DEBUG
@@ -115,7 +177,7 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
 
             try {
                 await saveLink(uid, {
-                    url: data.link.url,
+                    url: data.link.url, // For images, this will be the storage URL
                     title: data.link.title,
                     summary: data.link.summary,
                     detailedSummary: data.link.detailedSummary,
@@ -126,13 +188,17 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                         originalTitle: data.link.metadata.originalTitle,
                         estimatedReadTime: data.link.metadata.estimatedReadTime,
                         actionableTakeaway: data.link.metadata.actionableTakeaway
-                    }
+                    },
+                    // Add source type info if available (backend should provide this, but we can default for now)
+                    sourceType: activeTab === 'image' ? 'image' : 'web'
                 });
             } catch (saveErr) {
                 throw new Error(`Firestore Save Error: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
             }
 
             setUrl('');
+            setImageFile(null);
+            setImagePreview(null);
             setIsExpanded(false);
             onLinkAdded();
         } catch (err) {
@@ -160,7 +226,7 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
 
             {/* Expanded Form - Moved outside the FAB container to fix z-index stacking context */}
             {isExpanded && (
-                <div className="fixed top-24 sm:top-auto sm:bottom-28 inset-x-4 sm:left-auto sm:right-6 sm:w-96 max-w-[400px] mx-auto sm:mx-0 z-[70] animate-slide-up">
+                <div className="fixed top-24 sm:top-auto sm:bottom-28 inset-x-4 sm:left-auto sm:right-4 sm:w-96 max-w-[400px] mx-auto sm:mx-0 z-[70] animate-slide-up">
                     <form
                         onSubmit={handleSubmit}
                         className="bg-card border border-white/10 rounded-2xl p-6 shadow-2xl relative overflow-hidden"
@@ -182,37 +248,110 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                                 Add to Brain
                             </h3>
                             <p className="text-sm text-text-secondary">
-                                Paste any link to analyze and save it.
+                                Capture anything to your second brain.
                             </p>
                         </div>
 
+                        {/* Tabs */}
+                        <div className="flex bg-white/5 p-1 rounded-xl mb-6 border border-white/5">
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('link')}
+                                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'link'
+                                    ? 'bg-accent/10 text-accent shadow-sm border border-accent/20'
+                                    : 'text-text-muted hover:text-text'
+                                    }`}
+                            >
+                                Link
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('image')}
+                                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'image'
+                                    ? 'bg-accent/10 text-accent shadow-sm border border-accent/20'
+                                    : 'text-text-muted hover:text-text'
+                                    }`}
+                            >
+                                Image
+                            </button>
+                        </div>
+
                         <div className="space-y-4">
-                            <div className="relative">
-                                <input
-                                    id="url"
-                                    type="text"
-                                    // inputMode="url" removed to prevent browser validation interference
-                                    autoComplete="off"
-                                    autoCorrect="off"
-                                    autoCapitalize="off"
-                                    spellCheck={false}
-                                    value={url}
-                                    onChange={(e) => setUrl(e.target.value)}
-                                    placeholder="example.com or https://..."
-                                    className="w-full px-4 py-4 bg-background border border-white/5 rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-base"
-                                    disabled={isLoading}
-                                    autoFocus
-                                />
-                            </div>
+                            {activeTab === 'link' ? (
+                                <div className="relative">
+                                    <input
+                                        id="url"
+                                        type="text"
+                                        autoComplete="off"
+                                        autoCorrect="off"
+                                        autoCapitalize="off"
+                                        spellCheck={false}
+                                        value={url || ''}
+                                        onChange={(e) => setUrl(e.target.value)}
+                                        placeholder="example.com or https://..."
+                                        className="w-full px-4 py-4 bg-background border border-white/5 rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-base"
+                                        disabled={isLoading}
+                                        autoFocus
+                                    />
+                                </div>
+                            ) : (
+                                <div className="relative">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                setImageFile(file);
+                                                const reader = new FileReader();
+                                                reader.onloadend = () => {
+                                                    setImagePreview(reader.result as string);
+                                                };
+                                                reader.readAsDataURL(file);
+                                            }
+                                        }}
+                                        className="hidden"
+                                        id="image-upload"
+                                        disabled={isLoading}
+                                    />
+                                    <label
+                                        htmlFor="image-upload"
+                                        className={`w-full aspect-video rounded-xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer transition-all hover:border-accent/50 hover:bg-white/5 ${imagePreview ? 'p-0 border-none overflow-hidden' : 'p-8'
+                                            }`}
+                                    >
+                                        {imagePreview ? (
+                                            <div className="relative w-full h-full group">
+                                                <img
+                                                    src={imagePreview}
+                                                    alt="Preview"
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                    <p className="text-white font-medium">Change Image</p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3">
+                                                    <Upload className="w-6 h-6 text-accent" />
+                                                </div>
+                                                <p className="text-text font-medium text-sm">Tap to upload image</p>
+                                                <p className="text-text-muted text-xs mt-1">Screenshots, tweets, articles</p>
+                                            </>
+                                        )}
+                                    </label>
+                                </div>
+                            )}
+
                             <button
                                 type="submit"
-                                disabled={isLoading || !url.trim()}
+                                disabled={isLoading || (activeTab === 'link' ? !url.trim() : !imageFile)}
                                 className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-100 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
                             >
                                 {isLoading ? (
                                     <>
                                         <Loader2 className="w-5 h-5 animate-spin" />
-                                        <span>Analyzing...</span>
+                                        <span>{activeTab === 'link' ? 'Analyzing...' : 'Processing Image...'}</span>
                                     </>
                                 ) : (
                                     'Save'

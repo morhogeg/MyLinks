@@ -148,7 +148,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
             <button
                 onClick={() => handleSelectOption(option)}
                 disabled={isSaving}
-                className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left group relative overflow-hidden
+                className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left group relative overflow-hidden
                     ${isSelected
                         ? 'bg-accent/20 border-accent ring-2 ring-accent'
                         : highlighted

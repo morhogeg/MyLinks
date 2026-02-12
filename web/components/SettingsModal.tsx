@@ -148,6 +148,27 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                             )}
                         </div>
                     </section>
+
+                    {/* App Version / Maintenance */}
+                    <section className="pt-2 border-t border-white/5">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <div className="text-sm font-medium text-text">Force Update</div>
+                                <div className="text-xs text-text-muted">Reload app to apply latest fixes</div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    if (typeof window !== 'undefined') {
+                                        window.location.reload();
+                                    }
+                                }}
+                                className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-text hover:bg-white/10 transition-all flex items-center gap-2"
+                            >
+                                <Sparkles className="w-3 h-3 text-accent" />
+                                Reload App
+                            </button>
+                        </div>
+                    </section>
                 </div>
 
                 <div className="p-6 bg-black/20 border-t border-white/5 flex items-center justify-end gap-3">

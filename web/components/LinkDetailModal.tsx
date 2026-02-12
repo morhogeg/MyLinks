@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check } from 'lucide-react';
+import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -37,7 +37,8 @@ export default function LinkDetailModal({
     onUpdateTags,
     onUpdateCategory,
     onDelete,
-    onUpdateReminder
+    onUpdateReminder,
+    onOpenOtherLink
 }: LinkDetailModalProps) {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
@@ -195,6 +196,22 @@ export default function LinkDetailModal({
                     dir={isRtl ? "rtl" : "ltr"}
                 >
                     {/* Content Section */}
+                    {link.sourceType === 'image' && (
+                        <div className="mb-6 rounded-2xl overflow-hidden border border-white/10 bg-white/5 group/img relative">
+                            <img
+                                src={link.url}
+                                alt="Source Screenshot"
+                                className="w-full h-auto max-h-[400px] object-contain cursor-zoom-in transition-transform duration-500 group-hover/img:scale-105"
+                                onClick={() => window.open(link.url, '_blank')}
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                <span className="text-white text-xs font-bold px-3 py-1.5 bg-black/60 rounded-full backdrop-blur-md border border-white/20">
+                                    Click to View Original
+                                </span>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="mb-4">
                         {(() => {
                             const colorStyle = getCategoryColorStyle(link.category);
@@ -346,6 +363,63 @@ export default function LinkDetailModal({
                                 </button>
                             )}
                         </div>
+
+                        {/* See Also / Contextual Connections */}
+                        {link.relatedLinks && link.relatedLinks.length > 0 && (
+                            <div className="mb-8 border-t border-white/5 pt-6">
+                                <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                                    <Network className="w-4 h-4" />
+                                    {isRtl ? 'קשרים סמנטיים' : 'See Also (AI Connections)'}
+                                </h3>
+                                <div className="grid gap-3">
+                                    {link.relatedLinks.map((rel) => {
+                                        const fullLink = allLinks.find(l => l.id === rel.id);
+                                        if (!fullLink && !rel.title) return null; // Skip if dead link and no title fallback
+
+                                        return (
+                                            <div
+                                                key={rel.id}
+                                                onClick={() => {
+                                                    if (fullLink && onOpenOtherLink) {
+                                                        onOpenOtherLink(fullLink);
+                                                    }
+                                                }}
+                                                className={`group p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-accent/20 transition-all cursor-pointer ${!fullLink ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            >
+                                                <div className="flex justify-between items-start gap-3">
+                                                    <h4
+                                                        dir={isRtl ? "rtl" : "ltr"}
+                                                        className={`font-medium text-text-secondary group-hover:text-accent transition-colors text-sm ${isRtl ? 'text-right' : ''}`}
+                                                    >
+                                                        {fullLink?.title || rel.title}
+                                                    </h4>
+                                                    {rel.similarity > 0.85 && (
+                                                        <span className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-mono">
+                                                            strong
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p
+                                                    dir={isRtl ? "rtl" : "ltr"}
+                                                    className={`text-xs text-text-muted/60 mt-1.5 font-normal italic ${isRtl ? 'text-right' : ''}`}
+                                                >
+                                                    {isRtl ? "✨ " : "✨ "}{rel.reason}
+                                                </p>
+                                                {rel.commonConcepts && rel.commonConcepts.length > 0 && (
+                                                    <div className={`flex flex-wrap gap-1.5 mt-2 ${isRtl ? 'justify-end' : ''}`}>
+                                                        {rel.commonConcepts.map(c => (
+                                                            <span key={c} className="text-[10px] text-text-muted/50 bg-black/20 px-1.5 py-0.5 rounded">
+                                                                {c}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

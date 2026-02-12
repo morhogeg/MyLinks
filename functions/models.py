@@ -41,6 +41,7 @@ class AIAnalysis(BaseModel):
     tags: List[str] = Field(max_length=5, description="3-5 relevant tags")
     actionableTakeaway: str = Field(description="One concrete specific action")
     detailedSummary: Optional[str] = Field(None, description="Markdown formatted detailed summary")
+    concepts: List[str] = Field(default_factory=list, description="3-5 abstract concepts or mental models")
 
 
 class LinkDocument(BaseModel):
@@ -63,6 +64,24 @@ class LinkDocument(BaseModel):
     reminderCount: int = 0
     reminderProfile: Optional[str] = "smart" # "smart" or "spaced"
     lastViewedAt: Optional[int] = None
+
+    # Contextual Linking & graph fields
+    embedding: Optional[List[float]] = Field(None, description="Vector embedding of title + summary")
+    concepts: List[str] = Field(default_factory=list, description="List of abstract concepts/philosophical anchors")
+    relatedLinks: List["RelatedLink"] = Field(default_factory=list, description="AI-suggested related notes")
+
+
+class RelatedLink(BaseModel):
+    """
+    Snapshot of a related link
+    """
+    id: str
+    title: str
+    reason: str = Field(description="AI-generated explanation of the connection")
+    similarity: float = Field(description="Cosine similarity score (0-1)")
+    commonConcepts: List[str] = Field(default_factory=list)
+    # Semantic Search
+    embedding_vector: Optional[List[float]] = Field(None, description="768-dimensional vector for semantic search")
 
 
 class WebhookPayload(BaseModel):

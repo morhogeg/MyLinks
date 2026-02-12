@@ -135,6 +135,24 @@ html {
   animation: fade-in 0.2s ease-out;
 }
 
+@keyframes pulse-subtle {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.8;
+    transform: scale(0.98);
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s ease-in-out infinite;
+}
+
 /* Safe area insets for iOS */
 @supports (padding: max(0px)) {
   body {

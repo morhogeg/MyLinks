@@ -1,5 +1,6 @@
 import os
 import json
+from typing import List
 from google import genai
 from models import AIAnalysis
 
@@ -53,7 +54,13 @@ Requirements for the analysis:
 CRITICAL RULES:
 - Be a neutral reporter, not a reviewer. Report WHAT is said, not HOW WELL it is said.
 - Avoid subjective phrases like: "offers valuable insights", "provides a comprehensive overview", "explores interesting ideas", "is a must-read", "excellently explains".
-- Use factual language: "The article discusses...", "The author argues...", "The research shows...", "Key topics include..."."""
+- Use factual language: "The article discusses...", "The author argues...", "The research shows...", "Key topics include...".
+
+8. concepts: Identify 3-5 "Philosophical Anchors" or "Abstract Concepts".
+   - **LANGUAGE**: English (always).
+   - These should be high-level mental models or themes, not just keywords.
+   - Example: "Spaced Repetition", "Pareto Principle", "Stoicism", "Network Effects", "Opportunity Cost".
+   - Max 5 concepts."""
 
 
 class ClaudeService: # Kept name for compatibility with main.py
@@ -101,6 +108,65 @@ class ClaudeService: # Kept name for compatibility with main.py
         except Exception as e:
             print(f"Gemini analysis failed: {str(e)}")
             return self._mock_analysis(text)
+
+    def analyze_image(self, image_bytes: bytes, mime_type: str, existing_tags: list = None) -> dict:
+        """
+        Analyze image content using Gemini 3.0 Flash
+        """
+        if not self.client:
+            print("Gemini client not initialized, using mock")
+            return self._mock_analysis("Image content")
+        
+        try:
+            tags_context = f"\n\nExisting Tags in Brain (Reuse these if possible):\n{', '.join(existing_tags)}" if existing_tags else ""
+            
+            prompt = f"""{SYSTEM_PROMPT}{tags_context}
+            
+            Based on the image provided, extract the text and analyze it according to the instructions above.
+            If the image contains a tweet or social media post, extract the content as if it were the text.
+            If the image is an article, extract the headline and body.
+            """
+            
+            # Use 'types' from the creating the Part object to handle binary data
+            from google.genai import types
+            
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=[
+                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+                    prompt
+                ],
+                config={
+                    'response_mime_type': 'application/json',
+                }
+            )
+            
+            if not response or not response.text:
+                raise Exception("Empty response from Gemini")
+                
+            return json.loads(response.text)
+        except Exception as e:
+            print(f"Gemini image analysis failed: {str(e)}")
+            return self._mock_analysis("Image content")
+
+    def embed_text(self, text: str) -> List[float]:
+        """
+        Generate vector embedding for text using Gemini
+        """
+        if not self.client:
+            print("Gemini client not initialized, returning mock embedding")
+            return [0.0] * 768
+            
+        try:
+            # text-embedding-004 is the current standard
+            result = self.client.models.embed_content(
+                model="models/text-embedding-004",
+                contents=text[:9000] # Limit to avoid token errors
+            )
+            return result.embeddings[0].values
+        except Exception as e:
+            print(f"Embedding generation failed: {str(e)}")
+            return [0.0] * 768
 
     def _mock_analysis(self, text: str) -> dict:
         """Fallback mock logic"""

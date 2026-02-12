@@ -16,6 +16,7 @@ export interface AIAnalysis {
   detailedSummary: string;
   category: string;
   tags: string[];
+  concepts?: string[];
   actionableTakeaway: string;
   sourceType?: string;
   confidence?: string;
@@ -61,6 +62,18 @@ export interface Link {
   lastViewedAt?: number; // Unix timestamp (ms)
   language?: string;
   isRead?: boolean;
+
+  // Contextual Linking
+  concepts?: string[];
+  relatedLinks?: RelatedLink[];
+}
+
+export interface RelatedLink {
+  id: string;
+  title: string;
+  reason: string;
+  similarity: number;
+  commonConcepts: string[];
 }
 
 // TODO: Replace with Firebase Auth user type
