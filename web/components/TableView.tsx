@@ -54,12 +54,12 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
             <table className="w-full text-left border-collapse table-fixed min-w-[1000px] lg:min-w-0">
                 <thead>
                     <tr className="border-b border-border-subtle bg-white/[0.01] dark:bg-white/[0.02]">
-                        <th className="sticky left-0 z-20 px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[70px] text-center bg-card/95 backdrop-blur-sm shadow-[2px_0_5px_rgba(0,0,0,0.1)] border-b border-border-subtle lg:static lg:bg-transparent lg:shadow-none lg:w-[50px]">Read</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[70px] text-center bg-transparent border-b border-border-subtle lg:w-[50px]">Read</th>
                         <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[25%] text-left lg:w-[25%]">Source</th>
                         <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[30%] text-left lg:w-[30%]">Insight</th>
                         <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-center w-[12%] lg:w-[10%]">Category</th>
                         <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[20%] lg:w-[20%]">Tags</th>
-                        <th className="sticky right-0 z-20 px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-right w-[100px] bg-card/95 backdrop-blur-sm shadow-[-2px_0_5px_rgba(0,0,0,0.1)] border-b border-border-subtle lg:static lg:bg-transparent lg:shadow-none lg:w-[15%]">Actions</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-right w-[100px] bg-transparent border-b border-border-subtle lg:w-[15%]">Actions</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-border-subtle">
@@ -69,7 +69,7 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
                             className={`group hover:bg-white/[0.03] transition-all duration-200 cursor-pointer ${link.isRead ? 'opacity-50 grayscale-[0.2]' : ''}`}
                             onClick={() => onOpenDetails(link)}
                         >
-                            <td className="sticky left-0 z-10 px-6 py-10 align-top text-center bg-card/95 backdrop-blur-sm shadow-[2px_0_5px_rgba(0,0,0,0.1)] lg:static lg:bg-transparent lg:shadow-none" onClick={(e) => e.stopPropagation()}>
+                            <td className="px-6 py-10 align-top text-center bg-transparent" onClick={(e) => e.stopPropagation()}>
                                 <button
                                     onClick={() => onReadStatusChange(link.id, !link.isRead)}
                                     className={`p-2 rounded-lg transition-all ${link.isRead ? 'text-text items-center opacity-100 bg-white/10' : 'text-text-muted/40 hover:bg-white/5 hover:text-text'}`}
@@ -282,7 +282,7 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
                                 )}
                             </td>
 
-                            <td className="sticky right-0 z-10 px-3 py-10 text-right align-top bg-card/95 backdrop-blur-sm shadow-[-2px_0_5px_rgba(0,0,0,0.1)] lg:static lg:bg-transparent lg:shadow-none" onClick={(e) => e.stopPropagation()}>
+                            <td className="px-3 py-10 text-right align-top bg-transparent" onClick={(e) => e.stopPropagation()}>
                                 <div className="inline-flex items-center justify-end gap-1 transition-all duration-200 w-full">
                                     <button
                                         onClick={() => onUpdateReminder(link)}

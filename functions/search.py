@@ -33,7 +33,7 @@ class EmbeddingService:
     def __init__(self):
         self.api_key = os.environ.get("GEMINI_API_KEY")
         self.client = genai.Client(api_key=self.api_key) if self.api_key else None
-        self.model = "models/text-embedding-004"
+        self.model = "models/gemini-embedding-001"
 
     def generate_embedding(self, text: str) -> List[float]:
         """Generate 768-dim embedding for text"""
