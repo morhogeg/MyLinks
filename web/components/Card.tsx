@@ -151,7 +151,7 @@ export default function Card({
                                     onReadStatusChange(link.id, !link.isRead);
                                 }}
                                 title={link.isRead ? 'Mark as unread' : 'Mark as read'}
-                                className={`p-1.5 rounded-lg transition-all flex items-center justify-center ${link.isRead ? 'text-text items-center opacity-100 bg-white/10' : 'text-text-muted/40 hover:text-text hover:bg-white/10'
+                                className={`p-1.5 rounded-lg transition-all flex items-center justify-center ${link.isRead ? 'text-text items-center opacity-100 bg-white/10' : 'text-text-muted/40 hover:text-text'
                                     }`}
                             >
                                 {link.isRead ? (
@@ -166,7 +166,7 @@ export default function Card({
                                     onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite');
                                 }}
                                 title={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
-                                className={`p-1.5 rounded-lg transition-all flex items-center justify-center ${link.status === 'favorite' ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-muted hover:text-accent hover:bg-white/10'
+                                className={`p-1.5 rounded-lg transition-all flex items-center justify-center ${link.status === 'favorite' ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-muted hover:text-accent'
                                     }`}
                             >
                                 <Star className={`w-3 h-3 ${link.status === 'favorite' ? 'fill-yellow-500' : ''}`} />
@@ -177,7 +177,7 @@ export default function Card({
                                     onStatusChange(link.id, link.status === 'archived' ? 'unread' : 'archived');
                                 }}
                                 title={link.status === 'archived' ? 'Unarchive' : 'Archive'}
-                                className="p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-white/10 transition-all flex items-center justify-center"
+                                className="p-1.5 rounded-lg text-text-muted hover:text-accent transition-all flex items-center justify-center"
                             >
                                 <Archive className="w-3 h-3" />
                             </button>
@@ -191,7 +191,7 @@ export default function Card({
                                         ? ` (Spaced Repetition${link.reminderProfile.split('-')[1] ? ` - ${link.reminderProfile.split('-')[1]} days` : ''})`
                                         : ''}`
                                     : 'Remind me'}
-                                className={`p-1.5 rounded-lg transition-all flex items-center justify-center relative ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-accent hover:bg-white/10'
+                                className={`p-1.5 rounded-lg transition-all flex items-center justify-center relative ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-accent'
                                     }`}
                             >
                                 {link.reminderStatus === 'pending' ? (
@@ -214,7 +214,7 @@ export default function Card({
                                     onDelete(link.id);
                                 }}
                                 title="Delete"
-                                className="p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-all flex items-center justify-center"
+                                className="p-1.5 rounded-lg text-text-muted hover:text-red-500 transition-all flex items-center justify-center"
                             >
                                 <Trash2 className="w-3 h-3" />
                             </button>

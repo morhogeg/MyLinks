@@ -143,7 +143,7 @@ export default function CompactCard({
                             e.stopPropagation();
                             onReadStatusChange(link.id, !link.isRead);
                         }}
-                        className={`p-1.5 rounded-lg transition-all ${link.isRead ? 'text-text items-center opacity-100 bg-white/10' : 'text-text-muted/40 hover:text-text hover:bg-white/10'}`}
+                        className={`p-1.5 rounded-lg transition-all ${link.isRead ? 'text-text items-center opacity-100 bg-white/10' : 'text-text-muted/40 hover:text-text'}`}
                         title={link.isRead ? 'Mark as unread' : 'Mark as read'}
                     >
                         {link.isRead ? (
@@ -157,7 +157,7 @@ export default function CompactCard({
                             e.stopPropagation();
                             onStatusChange(link.id, link.status === 'archived' ? 'unread' : 'archived');
                         }}
-                        className="p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-white/10 transition-all"
+                        className="p-1.5 rounded-lg text-text-muted hover:text-accent transition-all"
                     >
                         <Archive className="w-3 h-3" />
                     </button>
@@ -166,7 +166,7 @@ export default function CompactCard({
                             e.stopPropagation();
                             onUpdateReminder(link);
                         }}
-                        className={`p-1.5 rounded-lg transition-all relative ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-accent hover:bg-white/10'}`}
+                        className={`p-1.5 rounded-lg transition-all relative ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-accent'}`}
                         title={link.reminderStatus === 'pending'
                             ? `Reminder active${link.reminderProfile?.startsWith('spaced')
                                 ? ` (Spaced Repetition${link.reminderProfile.split('-')[1] ? ` - ${link.reminderProfile.split('-')[1]} days` : ''})`
@@ -186,7 +186,7 @@ export default function CompactCard({
                             e.stopPropagation();
                             onDelete(link.id);
                         }}
-                        className="p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-all"
+                        className="p-1.5 rounded-lg text-text-muted hover:text-red-500 transition-all"
                     >
                         <Trash2 className="w-3 h-3" />
                     </button>

@@ -168,7 +168,7 @@ export default function LinkDetailModal({
                         <button
                             onClick={() => setShowDeleteConfirm(true)}
                             title="Delete"
-                            className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-500 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                            className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:text-red-500 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
                         >
                             <Trash2 className="w-4 h-4" />
                         </button>
@@ -179,13 +179,13 @@ export default function LinkDetailModal({
                             href={link.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:bg-accent hover:border-accent hover:text-white transition-all shadow-lg shadow-accent/0 hover:shadow-accent/20 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                            className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:text-accent transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
                         >
                             <ExternalLink className="w-4 h-4" />
                         </a>
                         <button
                             onClick={onClose}
-                            className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:bg-white/10 hover:text-accent transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                            className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:text-accent transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
                         >
                             <X className="w-4 h-4" />
                         </button>

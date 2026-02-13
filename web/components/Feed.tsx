@@ -586,7 +586,32 @@ function FeedContent() {
                 </div>
             </div>
 
-
+            {/* Active Tag Filters (Visible when sidebar is collapsed or on mobile) */}
+            {selectedTags.size > 0 && (
+                <div className={`flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300 ${!isTagExplorerCollapsed ? 'lg:hidden' : ''
+                    }`}>
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent/5 border border-accent/10">
+                        <TagIcon className="w-3 h-3 text-accent" />
+                        <span className="text-[10px] font-bold text-accent uppercase tracking-wider">Filtered By:</span>
+                    </div>
+                    {Array.from(selectedTags).map(tag => (
+                        <button
+                            key={tag}
+                            onClick={() => handleToggleTag(tag)}
+                            className="group flex items-center gap-1.5 px-2 py-1 rounded-full bg-card border border-border-subtle hover:border-accent/30 text-text-muted hover:text-accent transition-all text-xs font-semibold shadow-sm"
+                        >
+                            <span>{tag.split('/').pop()}</span>
+                            <X className="w-3.5 h-3.5 text-text-muted group-hover:text-accent transition-colors" />
+                        </button>
+                    ))}
+                    <button
+                        onClick={() => setSelectedTags(new Set())}
+                        className="text-[10px] font-bold text-text-muted/60 hover:text-accent hover:underline px-2 transition-colors uppercase tracking-tight"
+                    >
+                        Clear All
+                    </button>
+                </div>
+            )}
 
             {/* Main Content with Tag Sidebar */}
             <div className="flex flex-col lg:flex-row gap-6 relative">
