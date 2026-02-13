@@ -217,50 +217,52 @@ export default function LinkDetailModal({
                         {(() => {
                             const colorStyle = getCategoryColorStyle(link.category);
                             return (
-                                <div className="relative group/cat inline-block flex items-center gap-1.5">
-                                    {isEditingCategory ? (
-                                        <CategoryInput
-                                            currentCategory={link.category}
-                                            allCategories={allCategories}
-                                            onUpdate={(newCategory) => {
-                                                setIsEditingCategory(false);
-                                                if (newCategory !== link.category) {
-                                                    onUpdateCategory(link.id, newCategory);
-                                                }
-                                            }}
-                                            onCancel={() => setIsEditingCategory(false)}
-                                            className="w-32 text-[10px] px-2.5 py-1.5"
-                                        />
-                                    ) : (
-                                        <>
-                                            <span
-                                                className="text-[10px] uppercase font-black tracking-widest px-2.5 py-1.5 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all flex items-center shadow-lg shadow-black/5"
-                                                style={{
-                                                    backgroundColor: colorStyle.backgroundColor,
-                                                    color: colorStyle.color,
+                                <div className="relative group/cat flex items-center justify-between w-full">
+                                    <div className="flex items-center gap-1.5">
+                                        {isEditingCategory ? (
+                                            <CategoryInput
+                                                currentCategory={link.category}
+                                                allCategories={allCategories}
+                                                onUpdate={(newCategory) => {
+                                                    setIsEditingCategory(false);
+                                                    if (newCategory !== link.category) {
+                                                        onUpdateCategory(link.id, newCategory);
+                                                    }
                                                 }}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setIsEditingCategory(true);
-                                                }}
-                                            >
-                                                {link.category}
-                                            </span>
-                                            {link.sourceName && (
-                                                <span className="text-[10px] font-bold text-text-muted/70 bg-white/5 px-2.5 py-1.5 rounded-lg border border-white/10 shadow-sm">
-                                                    {link.sourceName}
+                                                onCancel={() => setIsEditingCategory(false)}
+                                                className="w-32 text-[10px] px-2.5 py-1.5"
+                                            />
+                                        ) : (
+                                            <>
+                                                <span
+                                                    className="text-[10px] uppercase font-black tracking-widest px-2.5 py-1.5 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all flex items-center shadow-lg shadow-black/5"
+                                                    style={{
+                                                        backgroundColor: colorStyle.backgroundColor,
+                                                        color: colorStyle.color,
+                                                    }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setIsEditingCategory(true);
+                                                    }}
+                                                >
+                                                    {link.category}
                                                 </span>
-                                            )}
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setIsEditingCategory(true);
-                                                }}
-                                                className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1.5 -ms-1.5 hover:bg-white/5 rounded-md"
-                                            >
-                                                <Pencil className="w-3.5 h-3.5 text-text-muted/40 hover:text-text-muted" />
-                                            </button>
-                                        </>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setIsEditingCategory(true);
+                                                    }}
+                                                    className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1.5 -ms-1.5 hover:bg-white/5 rounded-md"
+                                                >
+                                                    <Pencil className="w-3.5 h-3.5 text-text-muted/40 hover:text-text-muted" />
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                    {link.sourceName && (
+                                        <span className="text-[10px] font-bold text-text-muted/70 bg-black/5 border border-black/10 dark:bg-white/5 dark:border-white/10 px-2.5 py-1.5 rounded-lg shadow-sm">
+                                            {link.sourceName}
+                                        </span>
                                     )}
                                 </div>
                             );
