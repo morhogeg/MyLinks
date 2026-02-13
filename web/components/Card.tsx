@@ -90,76 +90,61 @@ export default function Card({
                 dir={isRtl ? "rtl" : "ltr"}
             >
                 {/* Header Row: Category Badge */}
-                <div className="flex justify-between items-center gap-3 w-full">
-                    {(() => {
-                        const colorStyle = getCategoryColorStyle(link.category);
-                        return (
-                            <div className="relative group/cat flex items-center gap-2">
-                                {isEditingCategory ? (
-                                    <CategoryInput
-                                        currentCategory={link.category}
-                                        allCategories={allCategories}
-                                        onUpdate={(newCategory) => {
-                                            setIsEditingCategory(false);
-                                            if (newCategory !== link.category) {
-                                                onUpdateCategory(link.id, newCategory);
-                                            }
-                                        }}
-                                        onCancel={() => setIsEditingCategory(false)}
-                                    />
-                                ) : (
-                                    <>
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                            <span
-                                                className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all group/chip whitespace-nowrap"
-                                                style={{
-                                                    backgroundColor: colorStyle.backgroundColor,
-                                                    color: colorStyle.color,
-                                                }}
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 w-full">
+                    {/* Slot 1: Category Badge (Start) */}
+                    <div className="flex justify-start">
+                        {(() => {
+                            const colorStyle = getCategoryColorStyle(link.category);
+                            return (
+                                <div className="relative group/cat flex items-center gap-2">
+                                    {isEditingCategory ? (
+                                        <CategoryInput
+                                            currentCategory={link.category}
+                                            allCategories={allCategories}
+                                            onUpdate={(newCategory) => {
+                                                setIsEditingCategory(false);
+                                                if (newCategory !== link.category) {
+                                                    onUpdateCategory(link.id, newCategory);
+                                                }
+                                            }}
+                                            onCancel={() => setIsEditingCategory(false)}
+                                        />
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span
+                                                    className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all group/chip whitespace-nowrap"
+                                                    style={{
+                                                        backgroundColor: colorStyle.backgroundColor,
+                                                        color: colorStyle.color,
+                                                    }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setIsEditingCategory(true);
+                                                    }}
+                                                >
+                                                    {link.category}
+                                                </span>
+                                            </div>
+                                            <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     setIsEditingCategory(true);
                                                 }}
+                                                className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ms-1 hover:bg-white/5 rounded-md"
                                             >
-                                                {link.category}
-                                            </span>
-                                        </div>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setIsEditingCategory(true);
-                                            }}
-                                            className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ms-1 hover:bg-white/5 rounded-md"
-                                        >
-                                            <Pencil className="w-3 h-3 text-text-muted/40 hover:text-text-muted" />
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-                        );
-                    })()}
-
-                    <div className="flex items-center gap-3">
-                        {/* Source Info - Opposite side of header */}
-                        <div className="flex items-center gap-2">
-                            {link.sourceName && (
-                                <span className="text-[9px] font-bold text-text-muted/60 dark:bg-white/5 dark:px-2 dark:py-1 dark:rounded-lg dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all">
-                                    {link.sourceName}
-                                </span>
-                            )}
-                            {link.sourceType === 'image' && (
-                                <div className="flex items-center gap-1 text-accent animate-pulse-subtle" title="Source: Screenshot">
-                                    <ImageIcon className="w-3.5 h-3.5" />
-                                    {link.url && (
-                                        <div className="w-6 h-6 rounded-md overflow-hidden border border-white/10 bg-white/5">
-                                            <img src={link.url} alt="Thumbnail" className="w-full h-full object-cover" />
-                                        </div>
+                                                <Pencil className="w-3 h-3 text-text-muted/40 hover:text-text-muted" />
+                                            </button>
+                                        </>
                                     )}
                                 </div>
-                            )}
-                        </div>
+                            );
+                        })()}
+                    </div>
 
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Slot 2: Action Buttons (Center) */}
+                    <div className="flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1">
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -234,6 +219,25 @@ export default function Card({
                                 <Trash2 className="w-3.5 h-3.5" />
                             </button>
                         </div>
+                    </div>
+
+                    {/* Slot 3: Source Tag (End) */}
+                    <div className="flex justify-end items-center gap-2">
+                        {link.sourceName && (
+                            <span className="text-[9px] font-bold text-text-muted/60 dark:bg-white/5 dark:px-2 dark:py-1 dark:rounded-lg dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all">
+                                {link.sourceName}
+                            </span>
+                        )}
+                        {link.sourceType === 'image' && (
+                            <div className="flex items-center gap-1 text-accent animate-pulse-subtle" title="Source: Screenshot">
+                                <ImageIcon className="w-3.5 h-3.5" />
+                                {link.url && (
+                                    <div className="w-6 h-6 rounded-md overflow-hidden border border-white/10 bg-white/5">
+                                        <img src={link.url} alt="Thumbnail" className="w-full h-full object-cover" />
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 
