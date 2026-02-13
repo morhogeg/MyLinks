@@ -261,7 +261,7 @@ export default function LinkDetailModal({
                                     </div>
                                     {link.sourceName && (
                                         <span
-                                            className="text-[9px] font-bold text-text-muted/60 bg-black/5 border border-black/10 px-2 py-1 rounded-lg dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all max-w-[100px] truncate"
+                                            className="text-[10px] font-black text-text-muted/60 bg-black/5 border border-black/10 dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap px-2.5 py-1.5 rounded-lg shadow-lg shadow-black/5 transition-all max-w-[100px] truncate"
                                             title={link.sourceName}
                                         >
                                             {link.sourceName}
