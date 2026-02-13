@@ -245,6 +245,11 @@ export default function LinkDetailModal({
                                             >
                                                 {link.category}
                                             </span>
+                                            {link.sourceName && (
+                                                <span className="text-[10px] font-bold text-text-muted/70 bg-white/5 px-2.5 py-1.5 rounded-lg border border-white/10 shadow-sm">
+                                                    {link.sourceName}
+                                                </span>
+                                            )}
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();

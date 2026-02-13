@@ -50,16 +50,15 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
     }, []);
 
     return (
-        <div className={`w-full rounded-2xl border border-border-subtle bg-card shadow-sm overflow-x-auto ${editingCategoryId ? 'lg:overflow-visible' : 'lg:overflow-hidden'}`}>
+        <div className={`w-full rounded-2xl border border-border-subtle bg-card shadow-sm overflow-x-auto table-view-container ${editingCategoryId ? 'lg:overflow-visible' : 'lg:overflow-hidden'}`}>
             <table className="w-full text-left border-collapse table-fixed min-w-[1000px] lg:min-w-0">
                 <thead>
                     <tr className="border-b border-border-subtle bg-white/[0.01] dark:bg-white/[0.02]">
-                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[70px] text-center bg-transparent border-b border-border-subtle lg:w-[50px]">Read</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[25%] text-left lg:w-[25%]">Source</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[30%] text-left lg:w-[30%]">Insight</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-center w-[12%] lg:w-[10%]">Category</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[20%] lg:w-[20%]">Tags</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-right w-[100px] bg-transparent border-b border-border-subtle lg:w-[15%]">Actions</th>
+                        <th style={{ position: 'static' }} className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[70px] text-center bg-transparent border-b border-border-subtle lg:w-[50px]">Read (Static)</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[25%] text-left lg:w-[25%]">Headline</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[30%] text-left lg:w-[35%]">Summary</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-center w-[20%] lg:w-[20%]">Category & Tags</th>
+                        <th style={{ position: 'static' }} className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-right w-[100px] bg-transparent border-b border-border-subtle lg:w-[15%]">Actions (Static)</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-border-subtle">
@@ -69,7 +68,7 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
                             className={`group hover:bg-white/[0.03] transition-all duration-200 cursor-pointer ${link.isRead ? 'opacity-50 grayscale-[0.2]' : ''}`}
                             onClick={() => onOpenDetails(link)}
                         >
-                            <td className="px-6 py-10 align-top text-center bg-transparent" onClick={(e) => e.stopPropagation()}>
+                            <td style={{ position: 'static' }} className="px-6 py-10 align-top text-center bg-transparent" onClick={(e) => e.stopPropagation()}>
                                 <button
                                     onClick={() => onReadStatusChange(link.id, !link.isRead)}
                                     className={`p-2 rounded-lg transition-all ${link.isRead ? 'text-text items-center opacity-100 bg-white/10' : 'text-text-muted/40 hover:bg-white/5 hover:text-text'}`}
@@ -84,8 +83,15 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
                             </td>
                             <td className="px-6 py-10 align-top">
                                 <div className="flex flex-col gap-1 min-w-0">
-                                    <div className="text-[14px] font-bold text-text group-hover:text-accent transition-colors whitespace-normal leading-relaxed">
-                                        {link.title}
+                                    <div className="flex items-center gap-2">
+                                        <div className="text-[14px] font-bold text-text group-hover:text-accent transition-colors whitespace-normal leading-relaxed">
+                                            {link.title}
+                                        </div>
+                                        {link.sourceName && (
+                                            <span className="shrink-0 text-[8px] font-bold text-text-muted/60 bg-white/5 px-1.2 py-0.4 rounded border border-white/5 uppercase tracking-tighter">
+                                                {link.sourceName}
+                                            </span>
+                                        )}
                                     </div>
                                     <div
                                         className="flex items-center gap-1.5 text-[10px] text-text-muted/50 hover:text-accent transition-colors cursor-pointer w-fit mt-1 group/link"
@@ -103,186 +109,191 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
                             </td>
                             <td className="px-6 py-10 align-top">
                                 <SimpleMarkdown
-                                    content={link.summary}
+                                    content={link.summary?.split('\n\n')[0] || link.summary}
                                     isCompact={true}
                                 />
                             </td>
                             <td className="px-6 py-10 text-center align-top">
-                                {(() => {
-                                    const colorStyle = getCategoryColorStyle(link.category);
-                                    const isEditing = editingCategoryId === link.id;
-                                    return (
-                                        <div className="flex justify-center items-center gap-1 group/cat">
-                                            {isEditing ? (
-                                                <CategoryInput
-                                                    currentCategory={link.category}
-                                                    allCategories={allCategories}
-                                                    onUpdate={(newCategory) => {
-                                                        setEditingCategoryId(null);
-                                                        if (newCategory !== link.category) {
-                                                            onUpdateCategory(link.id, newCategory);
-                                                        }
-                                                    }}
-                                                    onCancel={() => setEditingCategoryId(null)}
-                                                    className="w-24 text-[9px] px-2.5 py-1 text-center"
-                                                />
-                                            ) : (
-                                                <>
-                                                    <span
-                                                        className="text-[9px] uppercase font-black tracking-tighter px-2.5 py-1 rounded-full inline-block border border-transparent cursor-pointer hover:brightness-110 transition-all flex items-center"
-                                                        style={{
-                                                            backgroundColor: colorStyle.backgroundColor,
-                                                            color: colorStyle.color,
-                                                            borderColor: colorStyle.borderColor,
+                                <div className="flex flex-col items-center gap-3">
+                                    {/* Category */}
+                                    {(() => {
+                                        const colorStyle = getCategoryColorStyle(link.category);
+                                        const isEditing = editingCategoryId === link.id;
+                                        return (
+                                            <div className="flex justify-center items-center gap-1 group/cat">
+                                                {isEditing ? (
+                                                    <CategoryInput
+                                                        currentCategory={link.category}
+                                                        allCategories={allCategories}
+                                                        onUpdate={(newCategory) => {
+                                                            setEditingCategoryId(null);
+                                                            if (newCategory !== link.category) {
+                                                                onUpdateCategory(link.id, newCategory);
+                                                            }
                                                         }}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setEditingCategoryId(link.id);
-                                                            setEditedCategory(link.category);
-                                                        }}
-                                                    >
-                                                        {link.category}
-                                                    </span>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setEditingCategoryId(link.id);
-                                                            setEditedCategory(link.category);
-                                                        }}
-                                                        className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ms-1 hover:bg-white/5 rounded-md"
-                                                    >
-                                                        <Pencil className="w-2.5 h-2.5 text-text-muted/40 hover:text-text-muted" />
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
-                                    );
-                                })()}
-                            </td>
-                            <td className="px-6 py-10 relative align-top">
-                                <div
-                                    className="flex flex-wrap gap-1 min-h-[24px]"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveTagPicker(activeTagPicker === link.id ? null : link.id);
-                                    }}
-                                >
-                                    {link.tags.length > 0 ? (
-                                        link.tags.map(tag => {
-                                            const parts = tag.split('/');
-                                            const leaf = parts[parts.length - 1];
-                                            return (
-                                                <span
-                                                    key={tag}
-                                                    className="text-[9px] font-bold text-text-muted/60 bg-white/5 border border-white/5 px-2.5 py-1 rounded-full flex items-center gap-1 group/tag transition-all hover:bg-white/10 hover:border-white/10 whitespace-nowrap"
-                                                >
-                                                    {leaf}
-                                                    <X
-                                                        className="w-2 h-2 ml-0.5 opacity-0 group-hover/tag:opacity-100 hover:text-red-400 transition-all cursor-pointer"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            onUpdateTags(link.id, link.tags.filter(t => t !== tag));
-                                                        }}
+                                                        onCancel={() => setEditingCategoryId(null)}
+                                                        className="w-24 text-[9px] px-2.5 py-1 text-center"
                                                     />
-                                                </span>
-                                            );
-                                        })
-                                    ) : (
-                                        <button className="text-[10px] text-text-muted/30 hover:text-accent transition-colors flex items-center gap-1 italic">
-                                            <Plus className="w-2.5 h-2.5" />
-                                            Add tags
-                                        </button>
-                                    )}
-                                </div>
-
-                                {/* Multi-select Popover */}
-                                {activeTagPicker === link.id && (
-                                    <>
-                                        <div
-                                            className="fixed inset-0 z-10"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setActiveTagPicker(null);
-                                            }}
-                                        />
-                                        <div
-                                            className="absolute top-10 right-0 w-64 bg-card/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-20 flex flex-col p-2 animate-in fade-in zoom-in-95 duration-200"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            <div className="flex items-center justify-between px-2 py-1.5 border-b border-white/5 mb-1">
-                                                <span className="text-[10px] font-black uppercase tracking-widest text-text-muted">Tags</span>
-                                                <X
-                                                    className="w-3 h-3 text-text-muted hover:text-white cursor-pointer"
-                                                    onClick={() => {
-                                                        setActiveTagPicker(null);
-                                                        setTagSearch('');
-                                                    }}
-                                                />
-                                            </div>
-
-                                            {/* Search Input */}
-                                            <div className="p-1 mb-1">
-                                                <input
-                                                    autoFocus
-                                                    type="text"
-                                                    placeholder="Search or create..."
-                                                    className="w-full bg-white/5 border border-white/5 rounded-lg px-2 py-1.5 text-xs text-text placeholder:text-text-muted/50 focus:outline-none focus:border-accent/50 transition-all"
-                                                    value={tagSearch}
-                                                    onChange={(e) => setTagSearch(e.target.value)}
-                                                />
-                                            </div>
-
-                                            <div className="max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-                                                {filteredAllTags.map(tag => {
-                                                    const isSelected = link.tags.includes(tag);
-                                                    return (
-                                                        <button
-                                                            key={tag}
+                                                ) : (
+                                                    <>
+                                                        <span
+                                                            className="text-[9px] uppercase font-black tracking-tighter px-2.5 py-1 rounded-full inline-block border border-transparent cursor-pointer hover:brightness-110 transition-all flex items-center"
+                                                            style={{
+                                                                backgroundColor: colorStyle.backgroundColor,
+                                                                color: colorStyle.color,
+                                                                borderColor: colorStyle.borderColor,
+                                                            }}
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                const newTags = isSelected
-                                                                    ? link.tags.filter(t => t !== tag)
-                                                                    : [...link.tags, tag];
-                                                                onUpdateTags(link.id, newTags);
+                                                                setEditingCategoryId(link.id);
+                                                                setEditedCategory(link.category);
                                                             }}
-                                                            className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-all hover:bg-white/5 mb-0.5 ${isSelected ? 'text-accent font-bold bg-accent/5' : 'text-text-secondary'}`}
                                                         >
-                                                            <div className="flex items-center gap-2">
-                                                                <Tag className={`w-3 h-3 ${isSelected ? 'text-accent' : 'text-text-muted'}`} />
-                                                                {tag}
-                                                            </div>
-                                                            {isSelected && <Check className="w-3 h-3" />}
+                                                            {link.category}
+                                                        </span>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setEditingCategoryId(link.id);
+                                                                setEditedCategory(link.category);
+                                                            }}
+                                                            className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ms-1 hover:bg-white/5 rounded-md"
+                                                        >
+                                                            <Pencil className="w-2.5 h-2.5 text-text-muted/40 hover:text-text-muted" />
                                                         </button>
-                                                    );
-                                                })}
-
-                                                {/* Create New Tag Button */}
-                                                {tagSearch.trim() !== '' && !isExistingTag && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            onUpdateTags(link.id, [...link.tags, tagSearch.trim()]);
-                                                            setTagSearch('');
-                                                        }}
-                                                        className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs text-accent hover:bg-accent/5 transition-all text-left mt-1 border border-dashed border-accent/20"
-                                                    >
-                                                        <Plus className="w-3 h-3" />
-                                                        <span>Create &quot;{tagSearch}&quot;</span>
-                                                    </button>
-                                                )}
-
-                                                {filteredAllTags.length === 0 && tagSearch.trim() === '' && (
-                                                    <div className="py-4 text-center text-text-muted/40 italic text-[10px]">
-                                                        No tags yet. Type to create one.
-                                                    </div>
+                                                    </>
                                                 )}
                                             </div>
+                                        );
+                                    })()}
+
+                                    {/* Tags */}
+                                    <div className="relative">
+                                        <div
+                                            className="flex flex-wrap justify-center gap-1 min-h-[24px]"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveTagPicker(activeTagPicker === link.id ? null : link.id);
+                                            }}
+                                        >
+                                            {link.tags.length > 0 ? (
+                                                link.tags.map(tag => {
+                                                    const parts = tag.split('/');
+                                                    const leaf = parts[parts.length - 1];
+                                                    return (
+                                                        <span
+                                                            key={tag}
+                                                            className="text-[9px] font-bold text-text-muted/60 bg-white/5 border border-white/5 px-2.5 py-1 rounded-full flex items-center gap-1 group/tag transition-all hover:bg-white/10 hover:border-white/10 whitespace-nowrap"
+                                                        >
+                                                            {leaf}
+                                                            <X
+                                                                className="w-2 h-2 ml-0.5 opacity-0 group-hover/tag:opacity-100 hover:text-red-400 transition-all cursor-pointer"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    onUpdateTags(link.id, link.tags.filter(t => t !== tag));
+                                                                }}
+                                                            />
+                                                        </span>
+                                                    );
+                                                })
+                                            ) : (
+                                                <button className="text-[10px] text-text-muted/30 hover:text-accent transition-colors flex items-center gap-1 italic">
+                                                    <Plus className="w-2.5 h-2.5" />
+                                                    Add tags
+                                                </button>
+                                            )}
                                         </div>
-                                    </>
-                                )}
+
+                                        {/* Multi-select Popover */}
+                                        {activeTagPicker === link.id && (
+                                            <>
+                                                <div
+                                                    className="fixed inset-0 z-10 cursor-default"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setActiveTagPicker(null);
+                                                    }}
+                                                />
+                                                <div
+                                                    className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-64 bg-card/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-20 flex flex-col p-2 animate-in fade-in zoom-in-95 duration-200 text-left"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <div className="flex items-center justify-between px-2 py-1.5 border-b border-white/5 mb-1">
+                                                        <span className="text-[10px] font-black uppercase tracking-widest text-text-muted">Tags</span>
+                                                        <X
+                                                            className="w-3 h-3 text-text-muted hover:text-white cursor-pointer"
+                                                            onClick={() => {
+                                                                setActiveTagPicker(null);
+                                                                setTagSearch('');
+                                                            }}
+                                                        />
+                                                    </div>
+
+                                                    {/* Search Input */}
+                                                    <div className="p-1 mb-1">
+                                                        <input
+                                                            autoFocus
+                                                            type="text"
+                                                            placeholder="Search or create..."
+                                                            className="w-full bg-white/5 border border-white/5 rounded-lg px-2 py-1.5 text-xs text-text placeholder:text-text-muted/50 focus:outline-none focus:border-accent/50 transition-all"
+                                                            value={tagSearch}
+                                                            onChange={(e) => setTagSearch(e.target.value)}
+                                                        />
+                                                    </div>
+
+                                                    <div className="max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                                                        {filteredAllTags.map(tag => {
+                                                            const isSelected = link.tags.includes(tag);
+                                                            return (
+                                                                <button
+                                                                    key={tag}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        const newTags = isSelected
+                                                                            ? link.tags.filter(t => t !== tag)
+                                                                            : [...link.tags, tag];
+                                                                        onUpdateTags(link.id, newTags);
+                                                                    }}
+                                                                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-all hover:bg-white/5 mb-0.5 ${isSelected ? 'text-accent font-bold bg-accent/5' : 'text-text-secondary'}`}
+                                                                >
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Tag className={`w-3 h-3 ${isSelected ? 'text-accent' : 'text-text-muted'}`} />
+                                                                        {tag}
+                                                                    </div>
+                                                                    {isSelected && <Check className="w-3 h-3" />}
+                                                                </button>
+                                                            );
+                                                        })}
+
+                                                        {/* Create New Tag Button */}
+                                                        {tagSearch.trim() !== '' && !isExistingTag && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    onUpdateTags(link.id, [...link.tags, tagSearch.trim()]);
+                                                                    setTagSearch('');
+                                                                }}
+                                                                className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs text-accent hover:bg-accent/5 transition-all text-left mt-1 border border-dashed border-accent/20"
+                                                            >
+                                                                <Plus className="w-3 h-3" />
+                                                                <span>Create &quot;{tagSearch}&quot;</span>
+                                                            </button>
+                                                        )}
+
+                                                        {filteredAllTags.length === 0 && tagSearch.trim() === '' && (
+                                                            <div className="py-4 text-center text-text-muted/40 italic text-[10px]">
+                                                                No tags yet. Type to create one.
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
                             </td>
 
-                            <td className="px-3 py-10 text-right align-top bg-transparent" onClick={(e) => e.stopPropagation()}>
+                            <td style={{ position: 'static' }} className="px-3 py-10 text-right align-top bg-transparent" onClick={(e) => e.stopPropagation()}>
                                 <div className="inline-flex items-center justify-end gap-1 transition-all duration-200 w-full">
                                     <button
                                         onClick={() => onUpdateReminder(link)}

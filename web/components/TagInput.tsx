@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Plus, Check, Search } from 'lucide-react';
 
 interface TagInputProps {
@@ -33,23 +34,71 @@ export default function TagInput({
         }
     }, []);
 
-    // Handle outside clicks
+    const [coords, setCoords] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+    const [isMobile, setIsMobile] = useState(false);
+
+    // Update coordinates when opening or resizing
+    useEffect(() => {
+        if (isOpen) {
+            const checkMobile = () => setIsMobile(window.innerWidth < 640);
+
+            const updatePosition = () => {
+                if (inputRef.current) {
+                    const rect = inputRef.current.getBoundingClientRect();
+                    const viewportHeight = window.innerHeight;
+                    const spaceBelow = viewportHeight - rect.bottom;
+
+                    // Default max height is 320px (20rem), but constrain to available space
+                    const maxAllowedHeight = Math.min(320, spaceBelow - 20);
+
+                    setCoords({
+                        top: rect.bottom, // Fixed position relative to viewport (no scrollY)
+                        left: rect.left,  // Fixed position relative to viewport (no scrollX)
+                        width: rect.width,
+                        maxHeight: Math.max(100, maxAllowedHeight) // Ensure at least 100px
+                    });
+                }
+                checkMobile();
+            };
+
+            updatePosition();
+            window.addEventListener('resize', updatePosition);
+            window.addEventListener('scroll', updatePosition, true);
+
+            return () => {
+                window.removeEventListener('resize', updatePosition);
+                window.removeEventListener('scroll', updatePosition, true);
+            };
+        }
+    }, [isOpen]);
+
+    // Handle outside clicks - updated for Portal
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+            const target = event.target as Node;
+            // If click is on input, do nothing (input handles its own focus/click)
+            const isInputClick = inputRef.current && inputRef.current.contains(target);
+
+            // If we are in Portal, checking strict hierarchy with `contains` on specific node is hard 
+            // without a ref to the portal root. 
+            // However, the dropdown logic stops propagation of mousedown events.
+            // So if `handleClickOutside` triggers, it effectively means the click was NOT in the dropdown.
+            // Thus, we only need to ensure it wasn't on the input.
+            if (!isInputClick) {
                 onCancel();
             }
         }
 
-        document.addEventListener('mousedown', handleClickOutside);
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [onCancel]);
+    }, [isOpen, onCancel]);
 
-    // Filter tags: those that match input and are not already added
+    // Filter tags: those that match input
     const suggestions = allTags
         .filter(t =>
-            t.toLowerCase().includes(value.toLowerCase()) &&
-            !existingTags.includes(t)
+            t.toLowerCase().includes(value.toLowerCase())
         );
 
     const exactMatch = allTags.some(t => t.toLowerCase() === value.toLowerCase().trim());
@@ -61,6 +110,7 @@ export default function TagInput({
     }, [value]);
 
     const handleSelectTag = (tag: string) => {
+        if (existingTags.includes(tag)) return;
         onAdd(tag);
         setValue('');
     };
@@ -88,6 +138,88 @@ export default function TagInput({
         }
     };
 
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    // Portal content
+    // Mobile: Center on screen
+    // Desktop: Align with input
+    const dropdownStyle: React.CSSProperties = isMobile ? {
+        top: '20%',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: '90%',
+        maxWidth: '320px',
+        maxHeight: '60vh'
+    } : {
+        top: coords?.top ? coords.top + 4 : 0,
+        left: coords?.left || 0,
+        width: '12rem', // w-48
+        maxHeight: coords?.maxHeight ? `${coords.maxHeight}px` : '20rem'
+    };
+
+    const dropdown = isOpen && mounted ? (
+        <div
+            className="fixed z-[100] overflow-hidden rounded-xl shadow-2xl bg-background border border-white/10 animate-in fade-in zoom-in-95 duration-200 backdrop-blur-md"
+            style={dropdownStyle}
+            onMouseDown={(e) => e.stopPropagation()}
+        >
+            <div className={`overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-white/10 ${isMobile ? 'max-h-[50vh]' : ''} p-1 space-y-0.5`} style={!isMobile ? { maxHeight: coords?.maxHeight ? `${coords.maxHeight}px` : '20rem' } : {}}>
+                {suggestions.map((suggestion, index) => {
+                    const isSelected = existingTags.includes(suggestion);
+                    return (
+                        <button
+                            key={suggestion}
+                            onClick={() => handleSelectTag(suggestion)}
+                            onMouseEnter={() => setSelectedIndex(index)}
+                            disabled={isSelected}
+                            className={`w-full text-left px-3 py-2 text-xs transition-all flex items-center justify-between rounded-lg
+                                ${index === selectedIndex ? 'bg-accent text-white' : ''}
+                                ${isSelected
+                                    ? 'bg-accent/10 text-accent font-bold cursor-default opacity-80 hover:bg-accent/10'
+                                    : index !== selectedIndex ? 'hover:bg-white/10 text-text-muted hover:text-text' : ''
+                                }
+                            `}
+                        >
+                            <span>{suggestion}</span>
+                            {isSelected && <Check className="w-3.5 h-3.5" />}
+                        </button>
+                    );
+                })}
+
+                {isNew && (
+                    <button
+                        onClick={() => handleSelectTag(value.trim())}
+                        onMouseEnter={() => setSelectedIndex(suggestions.length)}
+                        className={`w-full text-left px-3 py-2 text-xs transition-colors border-t border-white/5 flex items-center gap-2 ${selectedIndex === suggestions.length ? 'bg-accent/20 text-accent' : 'text-accent hover:bg-accent/10'
+                            }`}
+                    >
+                        <Plus className="w-3 h-3" />
+                        <span className="font-bold">Create &quot;{value.trim()}&quot;</span>
+                    </button>
+                )}
+
+                {suggestions.length === 0 && !isNew && value.trim() === '' && (
+                    <div className="px-3 py-3 text-xs text-text-muted/50 text-center italic">
+                        No recent tags
+                    </div>
+                )}
+
+                {suggestions.length === 0 && !isNew && value.trim() !== '' && (
+                    <div className="px-3 py-3 text-xs text-text-muted/50 text-center italic">
+                        No tags found
+                    </div>
+                )}
+            </div>
+        </div>
+    ) : null;
+
+    // Use createPortal to render dropdown
+
+
     return (
         <div className="relative inline-block" ref={containerRef}>
             <div className="relative flex items-center">
@@ -99,57 +231,13 @@ export default function TagInput({
                         setValue(e.target.value);
                         setIsOpen(true);
                     }}
+                    onFocus={() => setIsOpen(true)}
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder}
                     className={`text-xs bg-white/5 border border-accent/30 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-accent w-32 animate-in fade-in zoom-in-95 duration-200 ${className}`}
                 />
             </div>
-
-            {isOpen && (
-                <div
-                    className="absolute top-full right-0 mt-1 w-48 bg-background border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200 backdrop-blur-md"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <div className="max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10">
-                        {suggestions.map((suggestion, index) => (
-                            <button
-                                key={suggestion}
-                                onClick={() => handleSelectTag(suggestion)}
-                                onMouseEnter={() => setSelectedIndex(index)}
-                                className={`w-full text-left px-3 py-2 text-xs transition-colors flex items-center justify-between ${index === selectedIndex ? 'bg-accent text-white' : 'hover:bg-white/10 text-text-muted hover:text-text'
-                                    }`}
-                            >
-                                <span>{suggestion}</span>
-                                {existingTags.includes(suggestion) && <Check className="w-3 h-3" />}
-                            </button>
-                        ))}
-
-                        {isNew && (
-                            <button
-                                onClick={() => handleSelectTag(value.trim())}
-                                onMouseEnter={() => setSelectedIndex(suggestions.length)}
-                                className={`w-full text-left px-3 py-2 text-xs transition-colors border-t border-white/5 flex items-center gap-2 ${selectedIndex === suggestions.length ? 'bg-accent/20 text-accent' : 'text-accent hover:bg-accent/10'
-                                    }`}
-                            >
-                                <Plus className="w-3 h-3" />
-                                <span className="font-bold">Create &quot;{value.trim()}&quot;</span>
-                            </button>
-                        )}
-
-                        {suggestions.length === 0 && !isNew && value.trim() === '' && (
-                            <div className="px-3 py-3 text-xs text-text-muted/50 text-center italic">
-                                No recent tags
-                            </div>
-                        )}
-
-                        {suggestions.length === 0 && !isNew && value.trim() !== '' && (
-                            <div className="px-3 py-3 text-xs text-text-muted/50 text-center italic">
-                                No tags found
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
+            {isOpen && mounted && createPortal(dropdown, document.body)}
         </div>
     );
 }

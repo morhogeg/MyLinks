@@ -19,6 +19,7 @@ export interface AIAnalysis {
   concepts?: string[];
   actionableTakeaway: string;
   sourceType?: string;
+  sourceName?: string;
   confidence?: string;
   keyEntities?: string[];
   recipe?: {
@@ -43,6 +44,7 @@ export interface Link {
   metadata: LinkMetadata;
   // AI Analysis metadata
   sourceType?: string;
+  sourceName?: string;
   confidence?: string;
   keyEntities?: string[];
 

@@ -450,7 +450,7 @@ function FeedContent() {
                 </div>
 
                 {/* Row 2: Combined Controls - Status, Sort, View, Select (DRASTICALLY SUBTLE) */}
-                <div className="flex items-center justify-between gap-1 -mx-2 px-2 sm:mx-0 sm:px-0 py-0 mt-0">
+                <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-1 -mx-2 px-2 sm:mx-0 sm:px-0 py-0 mt-0">
                     <div className="flex items-center gap-1">
                         {/* Status Filter Dropdown */}
                         <div className="relative group">

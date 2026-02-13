@@ -32,16 +32,20 @@ Requirements for the analysis:
    - Keep the tone neutral and professional throughout.
    - Total length: 150-300 words.
 
-5. category: Assign exactly one high-level category (e.g., Tech, Health, Philosophy, Business, Research, Science, Finance, Productivity, Design, Career). If the content is a recipe, use "Recipe".
+5. sourceName: Extract the name of the source or publisher (e.g., CNN, The New York Times, X, Reddit, Wikipedia, YouTube, TikTok).
+   - For images or screenshots that don't reveal a source, use "Screenshot".
+   - **CRITICAL**: The sourceName MUST ALWAYS be in English or its original brand name? No, use the common English name if possible.
+
+6. category: Assign exactly one high-level category (e.g., Tech, Health, Philosophy, Business, Research, Science, Finance, Productivity, Design, Career). If the content is a recipe, use "Recipe".
    - **CRITICAL**: The category MUST ALWAYS be in English, even if the content is in another language.
 
-6. tags: Provide exactly 3 or 4 specific, relevant tags for organization.
+7. tags: Provide exactly 3 or 4 specific, relevant tags for organization.
    - **LANGUAGE**: Write tags in the SAME language as the input content.
    - Use lowercase.
    - PREFER REUSING EXISTING TAGS provided in the "Existing Tags" list if they are applicable.
    - Only create a new tag if no existing tags fit the content.
 
-7. actionableTakeaway: One concrete, specific action or learning the reader can apply.
+8. actionableTakeaway: One concrete, specific action or learning the reader can apply.
    - **LANGUAGE**: Write the takeaway in the SAME language as the input content.
 
 CRITICAL RULES:
@@ -56,6 +60,7 @@ JSON Structure:
   "summary": "...",
   "detailedSummary": "...",
   "category": "...",
+  "sourceName": "...",
   "tags": ["...", "..."],
   "actionableTakeaway": "..."
 }`;

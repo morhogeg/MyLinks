@@ -53,6 +53,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
             // Enhanced AI fields
             language: analysis.language,
             sourceType: analysis.sourceType,
+            sourceName: analysis.sourceName || new URL(url).hostname.replace('www.', '').split('.')[0],
             confidence: analysis.confidence,
             keyEntities: analysis.keyEntities
         };

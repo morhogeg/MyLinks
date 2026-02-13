@@ -13,7 +13,7 @@ from google import genai
 sys.path.append(os.path.join(os.getcwd(), 'functions'))
 from search import EmbeddingService
 
-def backfill_embeddings():
+def backfill_embeddings(force=False):
     # Initialize Firebase Admin
     try:
         initialize_app()
@@ -50,7 +50,7 @@ def backfill_embeddings():
             total_processed += 1
             data = link_doc.to_dict()
             
-            if "embedding_vector" in data:
+            if "embedding_vector" in data and not force:
                 # print(f"  Skipping {link_doc.id} (already has embedding)")
                 continue
                 

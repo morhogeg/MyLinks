@@ -189,8 +189,9 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                         estimatedReadTime: data.link.metadata.estimatedReadTime,
                         actionableTakeaway: data.link.metadata.actionableTakeaway
                     },
-                    // Add source type info if available (backend should provide this, but we can default for now)
-                    sourceType: activeTab === 'image' ? 'image' : 'web'
+                    // Add source type info if available
+                    sourceType: activeTab === 'image' ? 'image' : 'web',
+                    sourceName: data.link.sourceName
                 });
             } catch (saveErr) {
                 throw new Error(`Firestore Save Error: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);

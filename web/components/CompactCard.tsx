@@ -96,6 +96,11 @@ export default function CompactCard({
                                 >
                                     {link.category}
                                 </span>
+                                {link.sourceName && (
+                                    <span className="shrink-0 text-[7px] font-bold text-text-muted/60 bg-white/5 px-1 py-0.5 rounded border border-white/5 uppercase tracking-tighter truncate max-w-[40px]">
+                                        {link.sourceName}
+                                    </span>
+                                )}
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();

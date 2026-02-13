@@ -13,6 +13,19 @@
                     "order": "ASCENDING"
                 }
             ]
+        },
+        {
+            "collectionGroup": "links",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "embedding_vector",
+                    "vectorConfig": {
+                        "dimension": 768,
+                        "flat": {}
+                    }
+                }
+            ]
         }
     ],
     "fieldOverrides": []

@@ -201,3 +201,13 @@ a {
     font-size: 16px !important;
   }
 }
+
+/* Aggressive override for sticky columns in TableView */
+.table-view-container th,
+.table-view-container td {
+  position: static !important;
+  left: auto !important;
+  right: auto !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}

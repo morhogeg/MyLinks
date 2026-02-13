@@ -41,6 +41,7 @@ class AIAnalysis(BaseModel):
     tags: List[str] = Field(max_length=5, description="3-5 relevant tags")
     actionableTakeaway: str = Field(description="One concrete specific action")
     detailedSummary: Optional[str] = Field(None, description="Markdown formatted detailed summary")
+    sourceName: Optional[str] = Field(None, description="Name of the source/publisher (e.g., CNN, X)")
     concepts: List[str] = Field(default_factory=list, description="3-5 abstract concepts or mental models")
 
 
@@ -55,6 +56,7 @@ class LinkDocument(BaseModel):
     detailedSummary: Optional[str] = None
     tags: List[str] = Field(max_length=5)
     category: str
+    sourceName: Optional[str] = None
     status: LinkStatus = LinkStatus.UNREAD
     createdAt: datetime = Field(default_factory=datetime.now)
     metadata: LinkMetadata

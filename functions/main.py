@@ -24,50 +24,8 @@ from graph_service import GraphService
 from search import sync_link_embedding, search_links
 from backfill_embeddings import backfill_embeddings
 
-@https_fn.on_request()
-def debug_search(req: https_fn.Request) -> https_fn.Response:
-    try:
-        from search import search_links
-        # Mock a CallableRequest for testing
-        class MockReq:
-            def __init__(self, data, auth=None):
-                self.data = data
-                self.auth = auth
-        
-        query = req.args.get("q", "ai agents")
-        uid = req.args.get("uid", "+16462440305") # Default test UID
-        
-        # Call the logic directly to avoid decorator wrapping
-        try:
-            from search import perform_search_logic, EmbeddingService
-            service = EmbeddingService()
-            if req.args.get("test_vector"):
-                 v = service.generate_embedding("test")
-                 return https_fn.Response(json.dumps({"len": len(v), "sample": v[:5]}, indent=2), status=200, mimetype="application/json")
-            if req.args.get("list_models"):
-                 models = service.client.models.list()
-                 model_list = [{"name": m.name, "actions": m.supported_actions if hasattr(m, "supported_actions") else []} for m in models]
-                 return https_fn.Response(json.dumps(model_list, indent=2), status=200, mimetype="application/json")
-            
-            links = perform_search_logic(uid, query, limit=20)
-            return https_fn.Response(json.dumps({"links": links}, indent=2), status=200, mimetype="application/json")
-        except Exception as search_err:
-             import traceback
-             return https_fn.Response(f"Search Logic Error: {str(search_err)}\n\n{traceback.format_exc()}", status=200)
-    except Exception as e:
-        import traceback
-        return https_fn.Response(f"Wrapper Error: {str(e)}\n\n{traceback.format_exc()}", status=500)
 
-@https_fn.on_request()
-def admin_backfill_embeddings(req: https_fn.Request) -> https_fn.Response:
-    try:
-        backfill_embeddings()
-        return https_fn.Response("Backfill completed successfully", status=200)
-    except Exception as e:
-        return https_fn.Response(f"Backfill failed: {str(e)}", status=500)
 
-# Initialize Firebase Admin lazily
-_db = None
 
 APP_URL = os.environ.get("APP_URL", "https://secondbrain-app-94da2.web.app")
 
@@ -794,9 +752,10 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             "embedding_vector": embedding, 
             "relatedLinks": related_links,
             # Enhanced fields
-            "sourceType": "web", # Default
-            "confidence": 0.8,   # Default
-            "keyEntities": []    # Default
+            "sourceType": "web", 
+            "sourceName": analysis.get("sourceName"),
+            "confidence": 0.8,   
+            "keyEntities": []    
         }
         
         return https_fn.Response(json.dumps({"success": True, "link": link_data}), status=200, headers=headers, mimetype='application/json')
@@ -864,6 +823,7 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
                 "actionableTakeaway": analysis.get("actionableTakeaway")
             },
             "sourceType": "image",
+            "sourceName": "Screenshot",
             "confidence": 0.9,
             "keyEntities": []
         }
@@ -873,6 +833,10 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
     except Exception as e:
         logger.error(f"Image analysis failed: {e}")
         return https_fn.Response(json.dumps({"success": False, "error": str(e)}), status=500, headers=headers, mimetype='application/json')
+
+
+
+@https_fn.on_request()
 
 
 
@@ -898,6 +862,10 @@ def whatsapp_webhook(request):
     
     # Find user by phone number
     uid = find_user_by_phone(payload.from_number)
+    
+    # Normalize UID (remove whatsapp: prefix if present)
+    if uid and uid.startswith("whatsapp:"):
+        uid = uid.replace("whatsapp:", "")
     
     # Detect language from incoming message
     user_msg_is_hebrew = is_hebrew(payload.body)
@@ -1127,6 +1095,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             "embedding_vector": Vector(embedding), # Store vector directly
             "relatedLinks": related_links,
             "category": analysis.get("category", "General"),
+            "sourceName": analysis.get("sourceName"),
             "language": analysis.get("language", "en"),
             "status": LinkStatus.UNREAD.value,
             "createdAt": int(datetime.now().timestamp() * 1000),

@@ -108,9 +108,9 @@ export default function Card({
                                     />
                                 ) : (
                                     <>
-                                        <div className="flex items-center gap-1.5">
+                                        <div className="flex items-center justify-between flex-grow gap-2">
                                             <span
-                                                className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all group/chip"
+                                                className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all group/chip whitespace-nowrap"
                                                 style={{
                                                     backgroundColor: colorStyle.backgroundColor,
                                                     color: colorStyle.color,
@@ -122,17 +122,22 @@ export default function Card({
                                             >
                                                 {link.category}
                                             </span>
-                                            {link.sourceType === 'image' && (
-                                                <div className="flex items-center gap-1 text-accent animate-pulse-subtle" title="Source: Screenshot">
-                                                    <ImageIcon className="w-3.5 h-3.5" />
-                                                    {link.url && (
-                                                        <div className="w-6 h-6 rounded-md overflow-hidden border border-white/10 bg-white/5">
-                                                            <img src={link.url} alt="Thumbnail" className="w-full h-full object-cover" />
-                                                        </div>
-                                                    )}
-                                                </div>
+                                            {link.sourceName && (
+                                                <span className="text-[9px] font-bold text-text-muted/60 bg-black/20 dark:bg-white/5 px-2 py-1 rounded-lg border border-black/5 dark:border-white/10 uppercase tracking-widest whitespace-nowrap ml-auto">
+                                                    {link.sourceName}
+                                                </span>
                                             )}
                                         </div>
+                                        {link.sourceType === 'image' && (
+                                            <div className="flex items-center gap-1 text-accent animate-pulse-subtle" title="Source: Screenshot">
+                                                <ImageIcon className="w-3.5 h-3.5" />
+                                                {link.url && (
+                                                    <div className="w-6 h-6 rounded-md overflow-hidden border border-white/10 bg-white/5">
+                                                        <img src={link.url} alt="Thumbnail" className="w-full h-full object-cover" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
