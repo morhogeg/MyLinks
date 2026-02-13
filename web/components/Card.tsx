@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
+import { hasHebrew } from '@/lib/rtl';
 
 interface CardProps {
     link: Link;
@@ -39,7 +40,7 @@ export default function Card({
     isSelected = false,
     onToggleSelection
 }: CardProps) {
-    const isRtl = link.language === 'he';
+    const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
     const [now, setNow] = useState<number>(0);
 
@@ -89,7 +90,7 @@ export default function Card({
                 dir={isRtl ? "rtl" : "ltr"}
             >
                 {/* Header Row: Category Badge */}
-                <div className="flex justify-between items-start gap-3">
+                <div className="flex justify-between items-center gap-3 w-full">
                     {(() => {
                         const colorStyle = getCategoryColorStyle(link.category);
                         return (
@@ -137,86 +138,108 @@ export default function Card({
                             </div>
                         );
                     })()}
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onReadStatusChange(link.id, !link.isRead);
-                            }}
-                            title={link.isRead ? 'Mark as unread' : 'Mark as read'}
-                            className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center ${link.isRead ? 'text-text items-center opacity-100 bg-white/10' : 'text-text-muted/40 hover:text-text hover:bg-white/10'
-                                }`}
-                        >
-                            {link.isRead ? (
-                                <Check className="w-3.5 h-3.5" />
-                            ) : (
-                                <Circle className="w-3.5 h-3.5 opacity-40" />
+
+                    <div className="flex items-center gap-3">
+                        {/* Source Info - Opposite side of header */}
+                        <div className="flex items-center gap-2">
+                            {link.sourceName && (
+                                <span className="text-[9px] font-bold text-text-muted/60 dark:bg-white/5 dark:px-2 dark:py-1 dark:rounded-lg dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all">
+                                    {link.sourceName}
+                                </span>
                             )}
-                        </button>
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite');
-                            }}
-                            title={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
-                            className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center ${link.status === 'favorite' ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-muted hover:text-accent hover:bg-white/10'
-                                }`}
-                        >
-                            <Star className={`w-3.5 h-3.5 ${link.status === 'favorite' ? 'fill-yellow-500' : ''}`} />
-                        </button>
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onStatusChange(link.id, link.status === 'archived' ? 'unread' : 'archived');
-                            }}
-                            title={link.status === 'archived' ? 'Unarchive' : 'Archive'}
-                            className="p-2 sm:p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-white/10 transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
-                        >
-                            <Archive className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onUpdateReminder(link);
-                            }}
-                            title={link.reminderStatus === 'pending'
-                                ? `Reminder active${link.reminderProfile?.startsWith('spaced')
-                                    ? ` (Spaced Repetition${link.reminderProfile.split('-')[1] ? ` - ${link.reminderProfile.split('-')[1]} days` : ''})`
-                                    : ''}`
-                                : 'Remind me'}
-                            className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center relative ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-accent hover:bg-white/10'
-                                }`}
-                        >
-                            {link.reminderStatus === 'pending' ? (
-                                <>
-                                    <Bell className="w-3.5 h-3.5 fill-current" />
-                                    {link.reminderProfile?.startsWith('spaced') && (
-                                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
-                                        </span>
+                            {link.sourceType === 'image' && (
+                                <div className="flex items-center gap-1 text-accent animate-pulse-subtle" title="Source: Screenshot">
+                                    <ImageIcon className="w-3.5 h-3.5" />
+                                    {link.url && (
+                                        <div className="w-6 h-6 rounded-md overflow-hidden border border-white/10 bg-white/5">
+                                            <img src={link.url} alt="Thumbnail" className="w-full h-full object-cover" />
+                                        </div>
                                     )}
-                                </>
-                            ) : (
-                                <Bell className="w-3.5 h-3.5" />
+                                </div>
                             )}
-                        </button>
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onDelete(link.id);
-                            }}
-                            title="Delete"
-                            className="p-2 sm:p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
-                        >
-                            <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        </div>
+
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onReadStatusChange(link.id, !link.isRead);
+                                }}
+                                title={link.isRead ? 'Mark as unread' : 'Mark as read'}
+                                className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center ${link.isRead ? 'text-text items-center opacity-100 bg-white/10' : 'text-text-muted/40 hover:text-text hover:bg-white/10'
+                                    }`}
+                            >
+                                {link.isRead ? (
+                                    <Check className="w-3.5 h-3.5" />
+                                ) : (
+                                    <Circle className="w-3.5 h-3.5 opacity-40" />
+                                )}
+                            </button>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite');
+                                }}
+                                title={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
+                                className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center ${link.status === 'favorite' ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-muted hover:text-accent hover:bg-white/10'
+                                    }`}
+                            >
+                                <Star className={`w-3.5 h-3.5 ${link.status === 'favorite' ? 'fill-yellow-500' : ''}`} />
+                            </button>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onStatusChange(link.id, link.status === 'archived' ? 'unread' : 'archived');
+                                }}
+                                title={link.status === 'archived' ? 'Unarchive' : 'Archive'}
+                                className="p-2 sm:p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-white/10 transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
+                            >
+                                <Archive className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onUpdateReminder(link);
+                                }}
+                                title={link.reminderStatus === 'pending'
+                                    ? `Reminder active${link.reminderProfile?.startsWith('spaced')
+                                        ? ` (Spaced Repetition${link.reminderProfile.split('-')[1] ? ` - ${link.reminderProfile.split('-')[1]} days` : ''})`
+                                        : ''}`
+                                    : 'Remind me'}
+                                className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center relative ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-accent hover:bg-white/10'
+                                    }`}
+                            >
+                                {link.reminderStatus === 'pending' ? (
+                                    <>
+                                        <Bell className="w-3.5 h-3.5 fill-current" />
+                                        {link.reminderProfile?.startsWith('spaced') && (
+                                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
+                                            </span>
+                                        )}
+                                    </>
+                                ) : (
+                                    <Bell className="w-3.5 h-3.5" />
+                                )}
+                            </button>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDelete(link.id);
+                                }}
+                                title="Delete"
+                                className="p-2 sm:p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 {/* Title - NO LINE CLAMP */}
                 <h3
-                    dir={isRtl ? "rtl" : "ltr"}
+                    dir="auto"
                     className={`font-bold text-base sm:text-lg text-text transition-colors leading-tight ${isRtl ? 'text-right' : ''}`}
                 >
                     {link.title}
@@ -260,25 +283,6 @@ export default function Card({
                                 {link.metadata.estimatedReadTime}{isRtl ? ' דק׳' : 'm'}
                             </span>
                             {now > 0 && <span>{getTimeAgo(link.createdAt, now)}</span>}
-                        </div>
-
-                        {/* Source Info - Opposite corner */}
-                        <div className="flex items-center gap-2">
-                            {link.sourceName && (
-                                <span className="text-[9px] font-bold text-text-muted/60 dark:bg-white/5 dark:px-2 dark:py-1 dark:rounded-lg dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all">
-                                    {link.sourceName}
-                                </span>
-                            )}
-                            {link.sourceType === 'image' && (
-                                <div className="flex items-center gap-1 text-accent animate-pulse-subtle" title="Source: Screenshot">
-                                    <ImageIcon className="w-3.5 h-3.5" />
-                                    {link.url && (
-                                        <div className="w-6 h-6 rounded-md overflow-hidden border border-white/10 bg-white/5">
-                                            <img src={link.url} alt="Thumbnail" className="w-full h-full object-cover" />
-                                        </div>
-                                    )}
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>

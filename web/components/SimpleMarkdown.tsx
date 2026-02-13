@@ -24,7 +24,7 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
     const flushList = () => {
         if (currentListItems.length > 0) {
             elements.push(
-                <ul key={key++} className={`list-disc list-inside ${isCompact ? 'space-y-3 mb-5' : 'space-y-3 mb-6'} text-text-secondary`}>
+                <ul key={key++} className={`list-disc ${isRtl ? 'pr-5' : 'pl-5'} ${isCompact ? 'space-y-3 mb-5' : 'space-y-3 mb-6'} text-text-secondary`} dir="auto">
                     {currentListItems.map((item, i) => (
                         <li key={i} className={isCompact ? "leading-relaxed" : "leading-relaxed"}>
                             {formatInlineStyles(item)}
@@ -82,7 +82,7 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
             }
 
             elements.push(
-                <h3 key={key++} className={`font-bold text-text uppercase tracking-wide ${isCompact ? 'text-[11px] mt-6 mb-3' : 'text-base mt-8 mb-5 border-b border-red-500 pb-2'}`}>
+                <h3 key={key++} dir="auto" className={`font-bold text-text uppercase tracking-wide ${isCompact ? 'text-[11px] mt-6 mb-3' : 'text-base mt-8 mb-5 border-b border-red-500 pb-2'} ${isRtl ? 'text-right' : 'text-left'}`}>
                     {headingText}
                 </h3>
             );
@@ -111,14 +111,14 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
 
             sentences.forEach((sentence, i) => {
                 elements.push(
-                    <p key={`${key++}-${i}`} className={`text-text-secondary ${isCompact ? 'mb-3 text-xs leading-relaxed' : 'mb-5 leading-relaxed'}`}>
+                    <p key={`${key++}-${i}`} dir="auto" className={`text-text-secondary ${isCompact ? 'mb-3 text-xs leading-relaxed' : 'mb-5 leading-relaxed'} ${isRtl ? 'text-right' : 'text-left'}`}>
                         {formatInlineStyles(sentence)}
                     </p>
                 );
             });
         } else {
             elements.push(
-                <p key={key++} className={`text-text-secondary ${isCompact ? 'mb-4 text-xs leading-relaxed' : 'mb-5 leading-relaxed'}`}>
+                <p key={key++} dir="auto" className={`text-text-secondary ${isCompact ? 'mb-4 text-xs leading-relaxed' : 'mb-5 leading-relaxed'} ${isRtl ? 'text-right' : 'text-left'}`}>
                     {formatInlineStyles(trimmed)}
                 </p>
             );
@@ -128,5 +128,5 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
     // Flush any remaining list items
     flushList();
 
-    return <div className={`${className} ${isRtl ? 'text-right' : ''}`} dir={isRtl ? 'rtl' : 'ltr'}>{elements}</div>;
+    return <div className={`${className} ${isRtl ? 'text-right' : 'text-left'}`} dir="auto">{elements}</div>;
 }

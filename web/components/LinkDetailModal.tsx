@@ -8,6 +8,7 @@ import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import TagInput from './TagInput';
+import { hasHebrew } from '@/lib/rtl';
 
 interface LinkDetailModalProps {
     link: Link;
@@ -82,7 +83,7 @@ export default function LinkDetailModal({
     };
 
     const relatedLinks = getRelatedLinks();
-    const isRtl = link.language === 'he';
+    const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary) || (link.detailedSummary ? hasHebrew(link.detailedSummary) : false);
 
     const getTimeAgo = (timestamp: any, now: number): string => {
         if (!timestamp || !now) return '...';
@@ -193,7 +194,7 @@ export default function LinkDetailModal({
 
                 <div
                     className="flex-1 overflow-y-auto pt-4 px-4 pb-4 sm:px-6 sm:pb-6 md:px-8 md:pb-8 scrollbar-thin scrollbar-thumb-white/10"
-                    dir={isRtl ? "rtl" : "ltr"}
+                    dir="auto"
                 >
                     {/* Content Section */}
                     {link.sourceType === 'image' && (
@@ -267,7 +268,7 @@ export default function LinkDetailModal({
                     </div>
 
                     <h2
-                        dir={isRtl ? "rtl" : "ltr"}
+                        dir="auto"
                         className={`font-bold text-2xl text-text mb-4 leading-tight ${isRtl ? 'text-right' : ''}`}
                     >
                         {link.title}
@@ -284,7 +285,7 @@ export default function LinkDetailModal({
                                 />
                             ) : (
                                 <p
-                                    dir={isRtl ? "rtl" : "ltr"}
+                                    dir="auto"
                                     className={`text-text-secondary mb-6 leading-relaxed text-lg ${isRtl ? 'text-right' : ''}`}
                                 >
                                     {link.summary}

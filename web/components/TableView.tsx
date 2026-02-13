@@ -54,11 +54,11 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
             <table className="w-full text-left border-collapse table-fixed min-w-[1000px] lg:min-w-0">
                 <thead>
                     <tr className="border-b border-border-subtle bg-white/[0.01] dark:bg-white/[0.02]">
-                        <th style={{ position: 'static' }} className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[70px] text-center bg-transparent border-b border-border-subtle lg:w-[50px]">Read (Static)</th>
+                        <th style={{ position: 'static' }} className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[70px] text-center bg-transparent border-b border-border-subtle lg:w-[50px]">Read</th>
                         <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[25%] text-left lg:w-[25%]">Headline</th>
                         <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] w-[30%] text-left lg:w-[35%]">Summary</th>
                         <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-center w-[20%] lg:w-[20%]">Category & Tags</th>
-                        <th style={{ position: 'static' }} className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-right w-[100px] bg-transparent border-b border-border-subtle lg:w-[15%]">Actions (Static)</th>
+                        <th style={{ position: 'static' }} className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-[0.2em] text-right w-[100px] bg-transparent border-b border-border-subtle lg:w-[15%]">Actions</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-border-subtle">
