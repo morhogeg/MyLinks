@@ -626,8 +626,8 @@ function FeedContent() {
                             className="absolute inset-0 bg-background/80 backdrop-blur-sm"
                             onClick={() => setIsTagExplorerOpen(false)}
                         />
-                        <div className="relative w-full sm:w-80 h-[100dvh] bg-card border-l border-white/10 flex flex-col shadow-2xl animate-in slide-in-from-right duration-300 safe-pt">
-                            <div className="flex-none p-4 border-b border-white/10 flex justify-between items-center bg-card/50 backdrop-blur-xl z-10">
+                        <div className="relative w-full sm:w-80 h-[100dvh] bg-card border-l border-white/10 flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+                            <div className="flex-none p-4 border-b border-white/10 flex justify-between items-center bg-card/50 backdrop-blur-xl z-10 safe-pt">
                                 <h2 className="text-base font-bold flex items-center gap-2">
                                     <TagIcon className="w-4 h-4 text-accent" />
                                     Filter Tags
@@ -639,7 +639,7 @@ function FeedContent() {
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
-                            <div className="flex-1 overflow-y-auto overscroll-contain pb-48">
+                            <div className="flex-1 min-h-0 safe-pb">
                                 <TagExplorer
                                     tags={allTags}
                                     tagCounts={tagCounts}

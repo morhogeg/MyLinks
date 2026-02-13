@@ -144,7 +144,7 @@ export default function Card({
 
                     {/* Action Buttons (Absolute Center) */}
                     <div className="invisible group-hover:visible transition-all absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
-                        <div className="flex items-center gap-1 bg-card/80 backdrop-blur-sm px-1 py-0.5 rounded-xl border border-white/5 shadow-xl">
+                        <div className="flex items-center gap-1">
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();

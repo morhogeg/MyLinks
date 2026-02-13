@@ -137,7 +137,7 @@ export default function CompactCard({
                 </div>
 
                 {/* Hover Action Overlay: Does not take up space in the layout flow */}
-                <div className="absolute inset-x-0 bottom-0 p-2 flex justify-center gap-2 bg-gradient-to-t from-card/90 via-card/80 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-2 group-hover:translate-y-0 backdrop-blur-[2px]">
+                <div className="absolute inset-x-0 bottom-0 p-2 flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-2 group-hover:translate-y-0">
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
