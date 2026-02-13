@@ -91,11 +91,6 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
                                                 <div className="text-[14px] font-bold text-text group-hover:text-accent transition-colors whitespace-normal leading-relaxed">
                                                     {link.title}
                                                 </div>
-                                                {link.sourceName && (
-                                                    <span className="shrink-0 text-[8px] font-bold text-text-muted/60 bg-white/5 px-1.2 py-0.4 rounded border border-white/5 uppercase tracking-tighter">
-                                                        {link.sourceName}
-                                                    </span>
-                                                )}
                                             </div>
                                             <div
                                                 className={`flex items-center gap-1.5 text-[10px] text-text-muted/50 hover:text-accent transition-colors cursor-pointer w-fit mt-1 group/link ${isRtl ? 'ms-auto' : ''}`}
