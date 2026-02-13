@@ -90,13 +90,13 @@ export default function Card({
                 dir={isRtl ? "rtl" : "ltr"}
             >
                 {/* Header Row: Category Badge */}
-                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 w-full">
-                    {/* Slot 1: Category Badge (Start) */}
-                    <div className="flex justify-start">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 w-full">
+                    {/* Slot 1: Category Badge (Start) - Flexible with min-0 */}
+                    <div className="flex justify-start min-w-0">
                         {(() => {
                             const colorStyle = getCategoryColorStyle(link.category);
                             return (
-                                <div className="relative group/cat flex items-center gap-2">
+                                <div className="relative group/cat flex items-center gap-2 max-w-full">
                                     {isEditingCategory ? (
                                         <CategoryInput
                                             currentCategory={link.category}
@@ -111,9 +111,9 @@ export default function Card({
                                         />
                                     ) : (
                                         <>
-                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                            <div className="flex items-center gap-1.5 min-w-0">
                                                 <span
-                                                    className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all group/chip whitespace-nowrap"
+                                                    className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all group/chip whitespace-nowrap truncate"
                                                     style={{
                                                         backgroundColor: colorStyle.backgroundColor,
                                                         color: colorStyle.color,
@@ -131,7 +131,7 @@ export default function Card({
                                                     e.stopPropagation();
                                                     setIsEditingCategory(true);
                                                 }}
-                                                className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ms-1 hover:bg-white/5 rounded-md"
+                                                className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ms-1 hover:bg-white/5 rounded-md flex-shrink-0"
                                             >
                                                 <Pencil className="w-3 h-3 text-text-muted/40 hover:text-text-muted" />
                                             </button>
@@ -142,8 +142,8 @@ export default function Card({
                         })()}
                     </div>
 
-                    {/* Slot 2: Action Buttons (Center) */}
-                    <div className="flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Slot 2: Action Buttons (Center) - Fixed width auto */}
+                    <div className="flex justify-center opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                         <div className="flex items-center gap-1">
                             <button
                                 onClick={(e) => {
@@ -221,18 +221,18 @@ export default function Card({
                         </div>
                     </div>
 
-                    {/* Slot 3: Source Tag (End) */}
-                    <div className="flex justify-end items-center gap-2">
+                    {/* Slot 3: Source Tag (End) - Flexible with min-0 */}
+                    <div className="flex justify-end items-center gap-2 min-w-0">
                         {link.sourceName && (
-                            <span className="text-[9px] font-bold text-text-muted/60 dark:bg-white/5 dark:px-2 dark:py-1 dark:rounded-lg dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all">
+                            <span className="text-[9px] font-bold text-text-muted/60 bg-black/5 border border-black/10 px-2 py-1 rounded-lg dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all truncate" title={link.sourceName}>
                                 {link.sourceName}
                             </span>
                         )}
                         {link.sourceType === 'image' && (
-                            <div className="flex items-center gap-1 text-accent animate-pulse-subtle" title="Source: Screenshot">
+                            <div className="flex items-center gap-1 text-accent animate-pulse-subtle flex-shrink-0" title="Source: Screenshot">
                                 <ImageIcon className="w-3.5 h-3.5" />
                                 {link.url && (
-                                    <div className="w-6 h-6 rounded-md overflow-hidden border border-white/10 bg-white/5">
+                                    <div className="w-6 h-6 rounded-md overflow-hidden border border-white/10 bg-white/5 flex-shrink-0">
                                         <img src={link.url} alt="Thumbnail" className="w-full h-full object-cover" />
                                     </div>
                                 )}
