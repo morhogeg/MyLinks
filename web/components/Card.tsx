@@ -90,13 +90,13 @@ export default function Card({
                 dir={isRtl ? "rtl" : "ltr"}
             >
                 {/* Header Row: Category Badge */}
-                <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 w-full">
-                    {/* Slot 1: Category Badge (Start) - Flexible with min-0 */}
-                    <div className="flex justify-start min-w-0">
+                <div className="relative flex items-center justify-between w-full h-7 mb-1">
+                    {/* Category Section (Start) */}
+                    <div className="flex items-center min-w-0 z-10">
                         {(() => {
                             const colorStyle = getCategoryColorStyle(link.category);
                             return (
-                                <div className="relative group/cat flex items-center gap-2 max-w-full">
+                                <div className="relative group/cat flex items-center gap-2">
                                     {isEditingCategory ? (
                                         <CategoryInput
                                             currentCategory={link.category}
@@ -111,9 +111,9 @@ export default function Card({
                                         />
                                     ) : (
                                         <>
-                                            <div className="flex items-center gap-1.5 min-w-0">
+                                            <div className="flex items-center gap-1.5 overflow-visible">
                                                 <span
-                                                    className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all group/chip whitespace-nowrap truncate"
+                                                    className="text-[10px] uppercase font-black tracking-widest px-2 py-1 rounded-lg inline-block cursor-pointer hover:brightness-110 transition-all group/chip whitespace-nowrap"
                                                     style={{
                                                         backgroundColor: colorStyle.backgroundColor,
                                                         color: colorStyle.color,
@@ -142,22 +142,22 @@ export default function Card({
                         })()}
                     </div>
 
-                    {/* Slot 2: Action Buttons (Center) - Fixed width auto */}
-                    <div className="flex justify-center opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                        <div className="flex items-center gap-1">
+                    {/* Action Buttons (Absolute Center) */}
+                    <div className="invisible group-hover:visible transition-all absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
+                        <div className="flex items-center gap-1 bg-card/80 backdrop-blur-sm px-1 py-0.5 rounded-xl border border-white/5 shadow-xl">
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onReadStatusChange(link.id, !link.isRead);
                                 }}
                                 title={link.isRead ? 'Mark as unread' : 'Mark as read'}
-                                className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center ${link.isRead ? 'text-text items-center opacity-100 bg-white/10' : 'text-text-muted/40 hover:text-text hover:bg-white/10'
+                                className={`p-1.5 rounded-lg transition-all flex items-center justify-center ${link.isRead ? 'text-text items-center opacity-100 bg-white/10' : 'text-text-muted/40 hover:text-text hover:bg-white/10'
                                     }`}
                             >
                                 {link.isRead ? (
-                                    <Check className="w-3.5 h-3.5" />
+                                    <Check className="w-3 h-3" />
                                 ) : (
-                                    <Circle className="w-3.5 h-3.5 opacity-40" />
+                                    <Circle className="w-3 h-3 opacity-40" />
                                 )}
                             </button>
                             <button
@@ -166,10 +166,10 @@ export default function Card({
                                     onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite');
                                 }}
                                 title={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
-                                className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center ${link.status === 'favorite' ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-muted hover:text-accent hover:bg-white/10'
+                                className={`p-1.5 rounded-lg transition-all flex items-center justify-center ${link.status === 'favorite' ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-muted hover:text-accent hover:bg-white/10'
                                     }`}
                             >
-                                <Star className={`w-3.5 h-3.5 ${link.status === 'favorite' ? 'fill-yellow-500' : ''}`} />
+                                <Star className={`w-3 h-3 ${link.status === 'favorite' ? 'fill-yellow-500' : ''}`} />
                             </button>
                             <button
                                 onClick={(e) => {
@@ -177,9 +177,9 @@ export default function Card({
                                     onStatusChange(link.id, link.status === 'archived' ? 'unread' : 'archived');
                                 }}
                                 title={link.status === 'archived' ? 'Unarchive' : 'Archive'}
-                                className="p-2 sm:p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-white/10 transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
+                                className="p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-white/10 transition-all flex items-center justify-center"
                             >
-                                <Archive className="w-3.5 h-3.5" />
+                                <Archive className="w-3 h-3" />
                             </button>
                             <button
                                 onClick={(e) => {
@@ -191,21 +191,21 @@ export default function Card({
                                         ? ` (Spaced Repetition${link.reminderProfile.split('-')[1] ? ` - ${link.reminderProfile.split('-')[1]} days` : ''})`
                                         : ''}`
                                     : 'Remind me'}
-                                className={`p-2 sm:p-1.5 rounded-lg transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center relative ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-accent hover:bg-white/10'
+                                className={`p-1.5 rounded-lg transition-all flex items-center justify-center relative ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-accent hover:bg-white/10'
                                     }`}
                             >
                                 {link.reminderStatus === 'pending' ? (
                                     <>
-                                        <Bell className="w-3.5 h-3.5 fill-current" />
+                                        <Bell className="w-3 h-3 fill-current" />
                                         {link.reminderProfile?.startsWith('spaced') && (
-                                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                                            <span className="absolute -top-0.5 -right-0.5 flex h-1.5 w-1.5">
                                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
+                                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-accent"></span>
                                             </span>
                                         )}
                                     </>
                                 ) : (
-                                    <Bell className="w-3.5 h-3.5" />
+                                    <Bell className="w-3 h-3" />
                                 )}
                             </button>
                             <button
@@ -214,17 +214,20 @@ export default function Card({
                                     onDelete(link.id);
                                 }}
                                 title="Delete"
-                                className="p-2 sm:p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-all min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
+                                className="p-1.5 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-all flex items-center justify-center"
                             >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-3 h-3" />
                             </button>
                         </div>
                     </div>
 
-                    {/* Slot 3: Source Tag (End) - Flexible with min-0 */}
-                    <div className="flex justify-end items-center gap-2 min-w-0">
+                    {/* Source Tag (End) */}
+                    <div className="flex items-center gap-2 min-w-0 z-10 ms-auto">
                         {link.sourceName && (
-                            <span className="text-[9px] font-bold text-text-muted/60 bg-black/5 border border-black/10 px-2 py-1 rounded-lg dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all truncate" title={link.sourceName}>
+                            <span
+                                className="text-[9px] font-bold text-text-muted/60 bg-black/5 border border-black/10 px-2 py-1 rounded-lg dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all max-w-[100px] truncate"
+                                title={link.sourceName}
+                            >
                                 {link.sourceName}
                             </span>
                         )}
