@@ -34,7 +34,7 @@ export default function TagInput({
         }
     }, []);
 
-    const [coords, setCoords] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+    const [coords, setCoords] = useState<{ top?: number; bottom?: number; left: number; width: number; maxHeight: number; openUpwards: boolean } | null>(null);
     const [isMobile, setIsMobile] = useState(false);
 
     // Update coordinates when opening or resizing
@@ -47,15 +47,23 @@ export default function TagInput({
                     const rect = inputRef.current.getBoundingClientRect();
                     const viewportHeight = window.innerHeight;
                     const spaceBelow = viewportHeight - rect.bottom;
+                    const spaceAbove = rect.top;
 
-                    // Default max height is 320px (20rem), but constrain to available space
-                    const maxAllowedHeight = Math.min(320, spaceBelow - 20);
+                    // Decide whether to open upwards: 
+                    // If space below is limited (< 250px) AND there's more space above
+                    const openUpwards = spaceBelow < 250 && spaceAbove > spaceBelow;
+
+                    // Max height should be at most 320px (20rem), constrained by available space in chosen direction
+                    const availableSpace = openUpwards ? spaceAbove - 20 : spaceBelow - 20;
+                    const maxHeight = Math.min(320, Math.max(160, availableSpace)); // Try to keep at least 160px for ~4-5 tags
 
                     setCoords({
-                        top: rect.bottom, // Fixed position relative to viewport (no scrollY)
-                        left: rect.left,  // Fixed position relative to viewport (no scrollX)
+                        top: openUpwards ? undefined : rect.bottom,
+                        bottom: openUpwards ? viewportHeight - rect.top : undefined,
+                        left: rect.left,
                         width: rect.width,
-                        maxHeight: Math.max(100, maxAllowedHeight) // Ensure at least 100px
+                        maxHeight,
+                        openUpwards
                     });
                 }
                 checkMobile();
@@ -155,7 +163,8 @@ export default function TagInput({
         maxWidth: '320px',
         maxHeight: '60vh'
     } : {
-        top: coords?.top ? coords.top + 4 : 0,
+        top: coords?.openUpwards ? undefined : (coords?.top ? coords.top + 4 : 0),
+        bottom: coords?.openUpwards ? (coords?.bottom ? coords.bottom + 4 : 0) : undefined,
         left: coords?.left || 0,
         width: '12rem', // w-48
         maxHeight: coords?.maxHeight ? `${coords.maxHeight}px` : '20rem'

@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
 import CategoryInput from './CategoryInput';
+import { hasHebrew } from '@/lib/rtl';
 
 interface TableViewProps {
     links: Link[];
@@ -82,35 +83,41 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
                                 </button>
                             </td>
                             <td className="px-6 py-10 align-top">
-                                <div className="flex flex-col gap-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <div className="text-[14px] font-bold text-text group-hover:text-accent transition-colors whitespace-normal leading-relaxed">
-                                            {link.title}
+                                {(() => {
+                                    const isRtl = hasHebrew(link.title);
+                                    return (
+                                        <div className={`flex flex-col gap-1 min-w-0 ${isRtl ? 'text-right' : 'text-left'}`} dir="auto">
+                                            <div className="flex items-center gap-2">
+                                                <div className="text-[14px] font-bold text-text group-hover:text-accent transition-colors whitespace-normal leading-relaxed">
+                                                    {link.title}
+                                                </div>
+                                                {link.sourceName && (
+                                                    <span className="shrink-0 text-[8px] font-bold text-text-muted/60 bg-white/5 px-1.2 py-0.4 rounded border border-white/5 uppercase tracking-tighter">
+                                                        {link.sourceName}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div
+                                                className={`flex items-center gap-1.5 text-[10px] text-text-muted/50 hover:text-accent transition-colors cursor-pointer w-fit mt-1 group/link ${isRtl ? 'ms-auto' : ''}`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    window.open(link.url, '_blank');
+                                                }}
+                                            >
+                                                <span className="truncate italic max-w-[200px]">
+                                                    {new URL(link.url).hostname.replace('www.', '')}
+                                                </span>
+                                                <ExternalLink className="w-2.5 h-2.5 opacity-40 group-hover/link:opacity-100" />
+                                            </div>
                                         </div>
-                                        {link.sourceName && (
-                                            <span className="shrink-0 text-[8px] font-bold text-text-muted/60 bg-white/5 px-1.2 py-0.4 rounded border border-white/5 uppercase tracking-tighter">
-                                                {link.sourceName}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div
-                                        className="flex items-center gap-1.5 text-[10px] text-text-muted/50 hover:text-accent transition-colors cursor-pointer w-fit mt-1 group/link"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            window.open(link.url, '_blank');
-                                        }}
-                                    >
-                                        <span className="truncate italic max-w-[200px]">
-                                            {new URL(link.url).hostname.replace('www.', '')}
-                                        </span>
-                                        <ExternalLink className="w-2.5 h-2.5 opacity-40 group-hover/link:opacity-100" />
-                                    </div>
-                                </div>
+                                    );
+                                })()}
                             </td>
                             <td className="px-6 py-10 align-top">
                                 <SimpleMarkdown
                                     content={link.summary?.split('\n\n')[0] || link.summary}
                                     isCompact={true}
+                                    isRtl={hasHebrew(link.summary || '')}
                                 />
                             </td>
                             <td className="px-6 py-10 text-center align-top">
@@ -137,7 +144,7 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
                                                 ) : (
                                                     <>
                                                         <span
-                                                            className="text-[9px] uppercase font-black tracking-tighter px-2.5 py-1 rounded-full inline-block border border-transparent cursor-pointer hover:brightness-110 transition-all flex items-center"
+                                                            className="text-[9px] uppercase font-black tracking-tighter px-2.5 py-1 rounded-full inline-flex items-center border border-transparent cursor-pointer hover:brightness-110 transition-all"
                                                             style={{
                                                                 backgroundColor: colorStyle.backgroundColor,
                                                                 color: colorStyle.color,
@@ -183,11 +190,11 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
                                                     return (
                                                         <span
                                                             key={tag}
-                                                            className="text-[9px] font-bold text-text-muted/60 bg-white/5 border border-white/5 px-2.5 py-1 rounded-full flex items-center gap-1 group/tag transition-all hover:bg-white/10 hover:border-white/10 whitespace-nowrap"
+                                                            className="text-[9px] font-bold text-text-muted/60 bg-white/5 border border-white/5 px-2 py-0.5 rounded-full inline-flex items-center gap-0.5 group/tag transition-all hover:bg-white/10 hover:border-white/10 whitespace-nowrap"
                                                         >
                                                             {leaf}
                                                             <X
-                                                                className="w-2 h-2 ml-0.5 opacity-0 group-hover/tag:opacity-100 hover:text-red-400 transition-all cursor-pointer"
+                                                                className="w-2 h-2 ml-0.5 hidden group-hover/tag:block hover:text-red-400 transition-all cursor-pointer"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     onUpdateTags(link.id, link.tags.filter(t => t !== tag));
