@@ -22,6 +22,7 @@ from models import WebhookPayload, LinkDocument, LinkStatus, LinkMetadata, AIAna
 from ai_service import ClaudeService
 from graph_service import GraphService
 from search import sync_link_embedding, search_links
+from google.cloud.firestore_v1.vector import Vector
 from backfill_embeddings import backfill_embeddings
 
 
