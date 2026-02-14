@@ -221,9 +221,9 @@ export default function Card({
                         </div>
                     </div>
 
-                    {/* Source Tag (End) */}
+                    {/* Source Tag (End) - Hidden for screenshots as per user request */}
                     <div className="flex items-center gap-2 min-w-0 z-10 ms-auto">
-                        {link.sourceName && (
+                        {link.sourceName && link.sourceName !== 'Screenshot' && link.sourceType !== 'image' && (
                             <span
                                 className="text-[9px] font-bold text-text-muted/60 bg-black/5 border border-black/10 px-2 py-1 rounded-lg dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all max-w-[100px] truncate"
                                 title={link.sourceName}
@@ -231,14 +231,16 @@ export default function Card({
                                 {link.sourceName}
                             </span>
                         )}
-                        {link.sourceType === 'image' && (
-                            <div className="flex items-center gap-1 text-accent animate-pulse-subtle flex-shrink-0" title="Source: Screenshot">
-                                <ImageIcon className="w-3.5 h-3.5" />
-                                {link.url && (
-                                    <div className="w-6 h-6 rounded-md overflow-hidden border border-white/10 bg-white/5 flex-shrink-0">
-                                        <img src={link.url} alt="Thumbnail" className="w-full h-full object-cover" />
-                                    </div>
-                                )}
+                        {/* 
+                         * Originally showed an icon for images, but user requested to remove it
+                         * and just rely on the thumbnail if available.
+                         * 
+                         * Keeping the code commented out or removed? 
+                         * User said: "remove the screenshot tag, and remove that purple image icon - just leave the small thumbnail"
+                         */}
+                        {link.sourceType === 'image' && link.url && (
+                            <div className="w-8 h-8 rounded-md overflow-hidden border border-white/10 bg-white/5 flex-shrink-0">
+                                <img src={link.url} alt="Thumbnail" className="w-full h-full object-cover" />
                             </div>
                         )}
                     </div>

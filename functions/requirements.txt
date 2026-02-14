@@ -6,3 +6,4 @@ requests>=2.31.0
 pydantic>=2.0.0
 flask>=3.0.0
 twilio>=8.0.0
+youtube-transcript-api>=0.6.0

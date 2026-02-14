@@ -13,10 +13,11 @@ import requests
 from datetime import datetime, timedelta
 from typing import Optional
 from twilio.rest import Client
+from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
 
 # Firebase Functions framework
 from firebase_functions import https_fn, scheduler_fn, firestore_fn, options
-from firebase_admin import initialize_app, firestore
+from firebase_admin import initialize_app, firestore, storage
 
 from models import WebhookPayload, LinkDocument, LinkStatus, LinkMetadata, AIAnalysis, ReminderStatus
 from ai_service import ClaudeService
@@ -25,8 +26,13 @@ from search import sync_link_embedding, search_links
 from google.cloud.firestore_v1.vector import Vector
 from backfill_embeddings import backfill_embeddings
 
+import logging
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
+_db = None
 
 APP_URL = os.environ.get("APP_URL", "https://secondbrain-app-94da2.web.app")
 
@@ -58,6 +64,10 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         # Special handling for Instagram URLs
         if 'instagram.com' in url:
             return _scrape_instagram_url(url, message_body)
+
+        # Special handling for YouTube URLs
+        if 'youtube.com' in url or 'youtu.be' in url:
+            return _scrape_youtube_url(url)
         
         # General URL scraping with BeautifulSoup
         headers = {
@@ -445,6 +455,97 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
         "text": final_text
     }
 
+def _scrape_youtube_url(url: str) -> dict:
+    """
+    Scrape YouTube video metadata and transcript
+    """
+    print(f"Analyzing YouTube URL: {url}")
+    
+    try:
+        # 1. Extract Video ID
+        video_id = None
+        if "youtu.be" in url:
+            video_id = url.split("/")[-1].split("?")[0]
+        elif "v=" in url:
+            video_id = url.split("v=")[1].split("&")[0]
+            
+        if not video_id:
+            print("Could not extract video ID")
+            return {"html": "", "title": "YouTube Video", "text": ""}
+            
+        print(f"Video ID: {video_id}")
+        
+        # 2. Get Metadata (Title, Author, Description) via lightweight scrape
+        # We don't want to use pytube/yt-dlp as they are heavy/unstable
+        # We'll fetch the page and parse the initial data JSON
+        
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        html = response.text
+        
+        title = "YouTube Video"
+        author = "Unknown Channel"
+        description = ""
+        
+        # Regex for Title
+        t_match = re.search(r'<meta name="title" content="([^"]+)">', html)
+        if t_match:
+            title = t_match.group(1)
+            
+        # Regex for Description
+        d_match = re.search(r'<meta name="description" content="([^"]+)">', html)
+        if d_match:
+            description = d_match.group(1)
+            
+        # Regex for Author (Channel Name)
+        a_match = re.search(r'<link itemprop="name" content="([^"]+)">', html)
+        if a_match:
+            author = a_match.group(1)
+            
+        print(f"Metadata found: {title} by {author}")
+        
+        # 3. Get Transcript
+        transcript_text = ""
+        try:
+            transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+            # Combine transcript lines
+            lines = [t['text'] for t in transcript_list]
+            transcript_text = " ".join(lines)
+            print(f"Transcript found, length: {len(transcript_text)}")
+        except TranscriptsDisabled:
+            print("Transcripts are disabled for this video")
+            transcript_text = "[Transcript disabled by uploader]"
+        except Exception as e:
+            print(f"Transcript extraction failed: {e}")
+            transcript_text = "[Transcript unavailable]"
+            
+        # 4. Format for AI Analysis
+        formatted_text = f"""
+VIDEO MATA DATA:
+Title: {title}
+Channel: {author}
+Description: {description}
+
+---
+TRANSCRIPT:
+{transcript_text[:25000]} 
+""" 
+# Limit transcript to avoidance of token limits (approx 25k chars is safe for Flash)
+
+        return {
+            "html": formatted_text,
+            "title": title,
+            "text": formatted_text
+        }
+
+    except Exception as e:
+        print(f"YouTube scrape error: {e}")
+        return {"html": "", "title": "YouTube Video", "text": ""}
+
 def find_user_by_phone(phone_number: str) -> Optional[str]:
     """
     Look up user UID by phone number in Firestore.
@@ -589,11 +690,7 @@ def ping(req: https_fn.Request) -> https_fn.Response:
     return https_fn.Response("pong")
 
 
-import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 def log_to_firestore(task_id: str, message: str, level: str = "INFO", data: dict = None):
     """Log a heartbeat to Firestore for visibility"""
@@ -857,7 +954,7 @@ def whatsapp_webhook(request):
         payload = WebhookPayload(**data)
     except Exception as e:
         logger.error(f"Payload parse error: {e}")
-        return {"error": f"Invalid payload: {str(e)}"}, 400
+        return https_fn.Response(json.dumps({"error": f"Invalid payload: {str(e)}"}), status=400, mimetype="application/json")
     
     db = get_db()
     
@@ -875,11 +972,29 @@ def whatsapp_webhook(request):
         logger.warning(f"Unauthorized number: {payload.from_number}")
         msg = "❌ מצטערים, מספר הטלפון שלך לא מזוהה. אנא וודא שהוא תואם להגדרות." if user_msg_is_hebrew else "❌ Sorry, your phone number is not recognized. Please make sure it matches the number in your Second Brain settings."
         send_whatsapp_message(payload.from_number, msg)
-        return {"error": "User not found"}, 403
+        return https_fn.Response(json.dumps({"error": "User not found"}), status=403, mimetype="application/json")
     
     # Extract URL from message body
     url_match = re.search(r'https?://[^\s]+', payload.body)
     
+    # 1. Image Support: Check if media is attached
+    if payload.num_media > 0 and payload.media_url0:
+        logger.info(f"Media detected: {payload.media_url0} (Type: {payload.media_content_type0})")
+        
+        process_ref = db.collection('pending_processing').document()
+        process_ref.set({
+            "uid": uid,
+            "url": payload.media_url0,
+            "mimeType": payload.media_content_type0,
+            "fromNumber": payload.from_number,
+            "body": payload.body,
+            "createdAt": datetime.now().isoformat(),
+            "status": "queued",
+            "isImage": True,
+            "attempts": 0
+        })
+        return https_fn.Response(json.dumps({"success": True, "queued": True, "id": process_ref.id}), status=200, mimetype="application/json")
+
     if not url_match:
         # Handling conversational commands (Reminders) remains synchronous for instant feedback
         logger.info("No URL found, checking for commands")
@@ -893,7 +1008,7 @@ def whatsapp_webhook(request):
             else:
                 menu = "When should I remind you?\n1. Tomorrow\n2. In 3 days\n3. In 1 week"
             send_whatsapp_message(payload.from_number, menu)
-            return {"success": True}, 200
+            return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
 
         reminder_time = handle_reminder_intent(payload.body)
         
@@ -921,15 +1036,15 @@ def whatsapp_webhook(request):
                         msg = f"⏰ *Reminder Set*\n\n📄 *{title}*\n📂 {category}\n📅 {date_str}"
                         
                      send_whatsapp_message(payload.from_number, msg)
-                     return {"success": True}, 200
+                     return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
             
             msg = "❌ לא נמצא לינק קודם. שלח לינק קודם!" if user_msg_is_hebrew else "❌ No previous link found. Send a link first!"
             send_whatsapp_message(payload.from_number, msg)
-            return {"error": "No context"}, 200
+            return https_fn.Response(json.dumps({"error": "No context"}), status=200, mimetype="application/json")
             
         msg = "אני יכול לשמור לינקים או לקבוע תזכורות. נסה לשלוח לינק!" if user_msg_is_hebrew else "I can save links or set reminders. Try sending a URL!"
         send_whatsapp_message(payload.from_number, msg)
-        return {"success": True}, 200
+        return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
         
     # URL FOUND -> Save to pending_processing for Background Processing
     url = url_match.group(0)
@@ -946,7 +1061,7 @@ def whatsapp_webhook(request):
         "attempts": 0
     })
     
-    return {"success": True, "queued": True, "id": process_ref.id}, 200
+    return https_fn.Response(json.dumps({"success": True, "queued": True, "id": process_ref.id}), status=200, mimetype="application/json")
 
 
 def _format_success_message(link_data: dict, reminder_time: Optional[datetime] = None, language: str = "en", link_id: Optional[str] = None) -> str:
@@ -1036,10 +1151,12 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     
     uid = data.get("uid")
     url = data.get("url")
+    is_image = data.get("isImage", False)
+    mime_type = data.get("mimeType", "image/jpeg")
     from_number = data.get("fromNumber")
     original_body = data.get("body")
     
-    log_to_firestore(task_id, f"Background processing started", data={"url": url, "uid": uid})
+    log_to_firestore(task_id, f"Background processing started", data={"url": url, "uid": uid, "isImage": is_image})
     ref.update({"status": "processing", "startedAt": datetime.now().isoformat()})
     
     scraped = {"html": "", "title": "", "text": ""}
@@ -1056,7 +1173,38 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         db = get_db()
         existing_tags = get_user_tags(uid)
         claude = ClaudeService()
-        analysis = claude.analyze_text(scraped["text"] or scraped["html"], existing_tags=existing_tags)
+
+        if is_image:
+            log_to_firestore(task_id, f"Downloading image bytes from: {url}")
+            ref.update({"status": "downloading_image"})
+            
+            # Twilio media URLs require Basic Auth
+            account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
+            auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
+            
+            img_response = requests.get(url, timeout=30, auth=(account_sid, auth_token))
+            img_response.raise_for_status()
+            image_bytes = img_response.content
+            
+            # Upload to Firebase Storage
+            log_to_firestore(task_id, "Uploading image to Firebase Storage")
+            bucket = storage.bucket()
+            blob_path = f"screenshots/{uid}/{task_id}.jpg"
+            blob = bucket.blob(blob_path)
+            blob.upload_from_string(image_bytes, content_type=mime_type)
+            blob.make_public()
+            public_url = blob.public_url
+            
+            # Update url to point to the stored image
+            url = public_url
+            
+            log_to_firestore(task_id, "Starting AI image analysis")
+            ref.update({"status": "analyzing_image", "storageUrl": public_url})
+            analysis = claude.analyze_image(image_bytes, mime_type, existing_tags=existing_tags)
+        else:
+            log_to_firestore(task_id, "Starting AI text analysis", data={"scrapedTitle": scraped.get("title")})
+            ref.update({"status": "analyzing", "scrapedTitle": scraped.get("title", "")})
+            analysis = claude.analyze_text(scraped["text"] or scraped["html"], existing_tags=existing_tags)
         
         # VALIDATION: Ensure analysis is a dict (AI sometimes returns a list or string)
         if not isinstance(analysis, dict):
@@ -1096,13 +1244,14 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             "embedding_vector": Vector(embedding), # Store vector directly
             "relatedLinks": related_links,
             "category": analysis.get("category", "General"),
-            "sourceName": analysis.get("sourceName"),
+            "sourceName": analysis.get("sourceName") or ("Screenshot" if is_image else None),
+            "sourceType": "image" if is_image else "web",
             "language": analysis.get("language", "en"),
             "status": LinkStatus.UNREAD.value,
             "createdAt": int(datetime.now().timestamp() * 1000),
             "metadata": {
-                "originalTitle": scraped.get("title", ""),
-                "estimatedReadTime": max(1, len(scraped.get("text", "")) // 1500),
+                "originalTitle": scraped.get("title", "Image Upload" if is_image else ""),
+                "estimatedReadTime": 1 if is_image else max(1, len(scraped.get("text", "")) // 1500),
                 "actionableTakeaway": analysis.get("actionableTakeaway")
             }
         }

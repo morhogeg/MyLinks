@@ -94,6 +94,9 @@ class WebhookPayload(BaseModel):
     from_number: str = Field(alias="From", description="Sender phone number in E.164 format")
     body: str = Field(alias="Body", description="Message content containing the URL")
     message_sid: Optional[str] = Field(None, alias="MessageSid")
+    num_media: int = Field(0, alias="NumMedia", description="Number of media items attached")
+    media_url0: Optional[str] = Field(None, alias="MediaUrl0", description="URL for the first media item")
+    media_content_type0: Optional[str] = Field(None, alias="MediaContentType0", description="Mime type for the first media item")
 
     model_config = ConfigDict(
         extra="allow",

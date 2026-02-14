@@ -65,6 +65,7 @@ def backfill_embeddings(force=False):
             try:
                 vector = service.generate_embedding(text_to_embed)
                 if vector:
+                    print(f"    Vector length: {len(vector)}")
                     link_doc.reference.update({
                         "embedding_vector": Vector(vector)
                     })
@@ -81,4 +82,6 @@ def backfill_embeddings(force=False):
     print(f"Total updated: {total_updated}")
 
 if __name__ == "__main__":
-    backfill_embeddings()
+    # FORCE update for model migration
+    print("Running backfill with FORCE=True for model migration (gemini-embedding-001)...")
+    backfill_embeddings(force=True)

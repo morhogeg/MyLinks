@@ -33,6 +33,7 @@ class EmbeddingService:
     def __init__(self):
         self.api_key = os.environ.get("GEMINI_API_KEY")
         self.client = genai.Client(api_key=self.api_key) if self.api_key else None
+        # Fallback to older model as text-embedding-004 is not available
         self.model = "models/gemini-embedding-001"
         print(f"EmbeddingService initialized with model: {self.model}")
 
@@ -43,10 +44,11 @@ class EmbeddingService:
             return [0.0] * 768
         
         try:
+            # gemini-embedding-001 is 768 dims by default
             result = self.client.models.embed_content(
                 model=self.model,
                 contents=text,
-                config={"output_dimensionality": 768}
+                config={"output_dimensionality": 768} 
             )
             return result.embeddings[0].values
         except Exception as e:

@@ -162,10 +162,11 @@ class ClaudeService: # Kept name for compatibility with main.py
             return [0.0] * 768
             
         try:
-            # text-embedding-004 is the current standard
+            # Fallback to older model as text-embedding-004 is not available
             result = self.client.models.embed_content(
-                model="models/text-embedding-004",
-                contents=text[:9000] # Limit to avoid token errors
+                model="models/gemini-embedding-001",
+                contents=text[:9000], # Limit to avoid token errors
+                config={"output_dimensionality": 768}
             )
             return result.embeddings[0].values
         except Exception as e:
