@@ -68,6 +68,7 @@ export interface Link {
   // Contextual Linking
   concepts?: string[];
   relatedLinks?: RelatedLink[];
+  embedding_vector?: number[]; // 768-dim vector for semantic search
 }
 
 export interface RelatedLink {
