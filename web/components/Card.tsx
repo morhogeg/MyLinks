@@ -86,13 +86,13 @@ export default function Card({
             }}
         >
             <div
-                className="pt-8 pb-4 px-4 sm:pt-10 sm:pb-5 sm:px-5 flex flex-col h-full space-y-3 sm:space-y-4"
+                className="p-4 sm:p-5 flex flex-col h-full space-y-3 sm:space-y-4"
                 dir={isRtl ? "rtl" : "ltr"}
             >
-                {/* Header Row: Category Badge */}
+                {/* Header Row: Category and Source Badge (Fade Toggle) */}
                 <div className="relative flex items-center justify-between w-full h-7 mb-1">
-                    {/* Category Section (Start) */}
-                    <div className="flex items-center min-w-0 z-10">
+                    {/* Category Section (Start) - Fades out on hover */}
+                    <div className="flex items-center min-w-0 z-10 transition-opacity duration-200 group-hover:opacity-0">
                         {(() => {
                             const colorStyle = getCategoryColorStyle(link.category);
                             return (
@@ -142,9 +142,9 @@ export default function Card({
                         })()}
                     </div>
 
-                    {/* Action Buttons (Top Center) */}
-                    <div className="invisible group-hover:visible transition-all absolute top-2.5 left-1/2 -translate-x-1/2 z-20">
-                        <div className="flex items-center gap-1 bg-white/5 backdrop-blur-md border border-white/10 p-1 rounded-full shadow-xl">
+                    {/* Action Buttons (Absolute Center) - Fades in on hover */}
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none group-hover:pointer-events-auto">
+                        <div className="flex items-center gap-1 bg-card/90 backdrop-blur-md border border-white/10 p-1 rounded-full shadow-xl">
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -221,8 +221,8 @@ export default function Card({
                         </div>
                     </div>
 
-                    {/* Source Tag (End) - Hidden for screenshots as per user request */}
-                    <div className="flex items-center gap-2 min-w-0 z-10 ms-auto">
+                    {/* Source Tag (End) - Fades out on hover */}
+                    <div className="flex items-center gap-2 min-w-0 z-10 ms-auto transition-opacity duration-200 group-hover:opacity-0">
                         {link.sourceName && link.sourceName !== 'Screenshot' && link.sourceType !== 'image' && (
                             <span
                                 className="text-[9px] font-bold text-text-muted/60 bg-black/5 border border-black/10 px-2 py-1 rounded-lg dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all max-w-[100px] truncate"
@@ -231,13 +231,6 @@ export default function Card({
                                 {link.sourceName}
                             </span>
                         )}
-                        {/* 
-                         * Originally showed an icon for images, but user requested to remove it
-                         * and just rely on the thumbnail if available.
-                         * 
-                         * Keeping the code commented out or removed? 
-                         * User said: "remove the screenshot tag, and remove that purple image icon - just leave the small thumbnail"
-                         */}
                         {link.sourceType === 'image' && link.url && (
                             <div className="w-8 h-8 rounded-md overflow-hidden border border-white/10 bg-white/5 flex-shrink-0">
                                 <img src={link.url} alt="Thumbnail" className="w-full h-full object-cover" />
@@ -296,6 +289,6 @@ export default function Card({
                     </div>
                 </div>
             </div>
-        </article>
+        </article >
     );
 }
