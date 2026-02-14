@@ -157,7 +157,11 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                     },
                     // Add source type info if available
                     sourceType: activeTab === 'image' ? 'image' : 'web',
-                    sourceName: data.link.sourceName
+                    sourceName: data.link.sourceName,
+                    // Fields for semantic search and knowledge graph (Issue #2 fix)
+                    embedding_vector: data.link.embedding_vector,
+                    concepts: data.link.concepts,
+                    relatedLinks: data.link.relatedLinks
                 });
             } catch (saveErr) {
                 throw new Error(`Firestore Save Error: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
