@@ -452,12 +452,21 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     log_to_firestore(task_id, "Background processing started", data={"url": url, "uid": uid, "isImage": is_image})
     ref.update({"status": "processing", "startedAt": datetime.now(timezone.utc).isoformat()})
 
+    analysis = {}
     scraped = {"html": "", "title": "", "text": ""}
+    
     try:
-        # 1. Scrape content
+        # 1. Scrape content (only once)
         log_to_firestore(task_id, f"Scraping content for: {url}")
         ref.update({"status": "scraping"})
-        scraped = scrape_url(url, original_body)
+        scraped_raw = scrape_url(url, original_body)
+        
+        # Ensure scraped is a dict
+        if isinstance(scraped_raw, dict):
+            scraped = scraped_raw
+        else:
+            logger.error(f"Scraper returned non-dict {type(scraped_raw)}: {scraped_raw}")
+            scraped = {"html": str(scraped_raw), "title": "Scrape Failed", "text": str(scraped_raw)}
 
         # 2. Analyze with AI
         log_to_firestore(task_id, "Starting AI analysis", data={"scrapedTitle": scraped.get("title")})
@@ -493,18 +502,14 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             ref.update({"status": "analyzing_image", "storageUrl": public_url})
             analysis = ai.analyze_image(image_bytes, mime_type, existing_tags=existing_tags)
         else:
-            log_to_firestore(task_id, "Starting AI text analysis", data={"scrapedTitle": scraped.get("title")})
-            ref.update({"status": "analyzing", "scrapedTitle": scraped.get("title", "")})
+            # Analyze with AI
             content_type = scraped.get("content_type")  # e.g. "youtube"
-            analysis = ai.analyze_text(scraped["text"] or scraped["html"], existing_tags=existing_tags, content_type=content_type)
-
-        # VALIDATION: Ensure analysis is a dict
+            analysis = ai.analyze_text(scraped.get("text") or scraped.get("html", ""), existing_tags=existing_tags, content_type=content_type)
+        
+        # Final Defensive check for analysis
         if not isinstance(analysis, dict):
-            logger.warning(f"AI returned unexpected type: {type(analysis)}. Attempting to fix.")
-            if isinstance(analysis, list) and len(analysis) > 0:
-                analysis = analysis[0]
-            if not isinstance(analysis, dict):
-                raise ValueError(f"AI Analysis failed to return a valid object: {analysis}")
+            logger.warning(f"Final analysis check failed. Type: {type(analysis)}")
+            analysis = {}
 
         # 3. Generate Embedding & Find Connections
         embedding_text = f"{analysis.get('title', '')}\n{analysis.get('summary', '')}"

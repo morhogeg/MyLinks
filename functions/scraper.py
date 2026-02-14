@@ -7,6 +7,7 @@ for Twitter/X, Instagram, and YouTube.
 import re
 import requests
 import logging
+import json
 from typing import Optional
 
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
@@ -394,10 +395,10 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
 
 
 def _scrape_youtube_url(url: str) -> dict:
-    """Scrape YouTube video metadata and transcript with rich context."""
+    """
+    Scrape YouTube video metadata and transcript.
+    """
     logger.info(f"Analyzing YouTube URL: {url}")
-
-    import json as _json
 
     try:
         # 1. Extract Video ID — support youtube.com/watch, youtu.be, and /shorts/
@@ -439,121 +440,128 @@ def _scrape_youtube_url(url: str) -> dict:
         duration_seconds = 0
         view_count = 0
         keywords = []
+        full_description = ""
+        chapters_text = ""
+        transcript_text = ""
+        has_transcript = False
 
-        # Use balanced-brace extraction for robust JSON parsing
-        player_idx = html.find('ytInitialPlayerResponse')
-        if player_idx >= 0:
-            # Find the opening brace after the = sign
-            eq_idx = html.find('=', player_idx)
-            if eq_idx >= 0:
-                brace_start = html.find('{', eq_idx)
-                if brace_start >= 0:
-                    brace_count = 0
-                    for i in range(brace_start, min(brace_start + 500000, len(html))):
-                        if html[i] == '{':
-                            brace_count += 1
-                        elif html[i] == '}':
-                            brace_count -= 1
-                            if brace_count == 0:
-                                try:
-                                    player_data = _json.loads(html[brace_start:i+1])
-                                    vd = player_data.get("videoDetails", {})
-                                    title = vd.get("title", title)
-                                    author = vd.get("author", author)
-                                    description = vd.get("shortDescription", "")
-                                    duration_seconds = int(vd.get("lengthSeconds", 0))
-                                    view_count = int(vd.get("viewCount", 0))
-                                    keywords = vd.get("keywords", [])
-                                    logger.info(f"ytInitialPlayerResponse parsed: {title} by {author}, {duration_seconds}s, {view_count} views")
-                                except Exception as e:
-                                    logger.warning(f"Failed to parse ytInitialPlayerResponse JSON: {e}")
-                                break
-        else:
-            logger.warning("ytInitialPlayerResponse not found in HTML")
+        # Phase A: ytInitialPlayerResponse (Primary source for metadata)
+        player_data = {}
+        player_match = re.search(r'var ytInitialPlayerResponse\s*=\s*({.+?});', html)
+        if player_match:
+            try:
+                # Use standard json library
+                player_data = json.loads(player_match.group(1))
+                vd = player_data.get("videoDetails", {})
+                title = vd.get("title", title)
+                author = vd.get("author", author)
+                duration_seconds = int(vd.get("lengthSeconds", 0))
+                view_count = int(vd.get("viewCount", 0))
+                keywords = vd.get("keywords", [])
+                full_description = vd.get("shortDescription", "")
+                
+                # Try microformat for a slightly longer description
+                micro = player_data.get("microformat", {}).get("playerMicroformatRenderer", {})
+                micro_desc = micro.get("description", {}).get("simpleText", "")
+                if micro_desc and len(micro_desc) > len(full_description):
+                    full_description = micro_desc
+            except Exception as e:
+                logger.warning(f"Error parsing ytInitialPlayerResponse: {e}")
 
-        # 4. Fallback to meta tags
+        # Phase B: ytInitialData (Deep dive for full description and chapters)
+        try:
+            data_match = re.search(r'var ytInitialData\s*=\s*({.+?});', html)
+            if data_match:
+                data = json.loads(data_match.group(1))
+                def scavenger(obj):
+                    desc, chaps = None, None
+                    if isinstance(obj, dict):
+                        if "videoSecondaryInfoRenderer" in obj:
+                            r = obj["videoSecondaryInfoRenderer"].get("description", {}).get("runs", [])
+                            desc = "".join([i.get("text", "") if isinstance(i, dict) else str(i) for i in r])
+                        for v in obj.values():
+                            d, c = scavenger(v)
+                            if d and not desc: desc = d
+                            if c and not chaps: chaps = c
+                    elif isinstance(obj, list):
+                        for item in obj:
+                            d, c = scavenger(item)
+                            if d and not desc: desc = d
+                            if c and not chaps: chaps = c
+                    return desc, chaps
+
+                d, c = scavenger(data)
+                if d and len(d) > len(full_description): 
+                    full_description = d
+        except Exception as e:
+            logger.warning(f"Error parsing ytInitialData: {e}")
+
+        # Phase C: Final Metadata Fallbacks
         if title == "YouTube Video":
             t_match = re.search(r'<meta name="title" content="([^"]+)">', html)
-            if t_match:
-                title = t_match.group(1)
+            if t_match: title = t_match.group(1)
         if author == "Unknown Channel":
             a_match = re.search(r'<link itemprop="name" content="([^"]+)">', html)
-            if a_match:
-                author = a_match.group(1)
-        if not description:
-            d_match = re.search(r'<meta name="description" content="([^"]+)">', html)
-            if d_match:
-                description = d_match.group(1)
-
-        # 5. Final fallback: oEmbed API (always works, even from cloud IPs)
+            if a_match: author = a_match.group(1)
+        
+        # oEmbed fallback as last resort
         if title == "YouTube Video" or author == "Unknown Channel":
             try:
                 oembed_url = f"https://www.youtube.com/oembed?url={canonical_url}&format=json"
                 oembed_resp = requests.get(oembed_url, timeout=5)
                 if oembed_resp.ok:
                     oembed = oembed_resp.json()
-                    if title == "YouTube Video":
-                        title = oembed.get("title", title)
-                    if author == "Unknown Channel":
-                        author = oembed.get("author_name", author)
-                    logger.info(f"oEmbed fallback: {title} by {author}")
-            except Exception as e:
-                logger.warning(f"oEmbed fallback failed: {e}")
+                    if title == "YouTube Video": title = oembed.get("title", title)
+                    if author == "Unknown Channel": author = oembed.get("author_name", author)
+            except Exception: pass
 
-        logger.info(f"Metadata found: {title} by {author}")
-
-        # 6. Get Transcript with corrected library usage and better fallback
-        transcript_text = ""
-        has_transcript = False
+        # Phase D: Multi-Layered Transcript Fetching
         try:
-            # Note: YouTubeTranscriptApi.get_transcript is the correct static method
+            # Try library first (latest version with better support)
             transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'iw', 'he'])
-            # Include timestamps for AI to generate key moments
             lines = []
             for t in transcript_list:
-                timestamp = int(float(t['start']))
-                mins, secs = divmod(timestamp, 60)
+                ts = int(float(t['start']))
+                mins, secs = divmod(ts, 60)
                 lines.append(f"[{mins}:{secs:02d}] {t['text']}")
             transcript_text = "\n".join(lines)
             has_transcript = True
-            logger.info(f"Transcript found, length: {len(transcript_text)}")
-        except TranscriptsDisabled:
-            logger.info("Transcripts are disabled for this video")
-            transcript_text = "[Transcript disabled by uploader]"
         except Exception as e:
-            logger.warning(f"Transcript extraction failed: {e}")
-            transcript_text = f"[Transcript unavailable: {str(e)[:100]}]"
+            logger.info(f"Transcript library attempt failed: {e}")
+            # Manual XML Fallback
+            try:
+                captions = player_data.get("captions", {})
+                tracks = captions.get("playerCaptionsTracklistRenderer", {}).get("captionTracks", [])
+                if tracks:
+                    t_url = tracks[0].get("baseUrl")
+                    t_resp = requests.get(t_url, headers=headers, cookies=cookies, timeout=10)
+                    if t_resp.ok and len(t_resp.text) > 50:
+                        import html as html_lib
+                        clean_text = re.sub(r'<[^>]+>', ' ', t_resp.text)
+                        transcript_text = html_lib.unescape(clean_text)
+                        has_transcript = True
+            except Exception: pass
 
-        # 7. Format duration for display
+        if not transcript_text:
+            transcript_text = "[Full transcript unavailable. Base analysis on Title and Description.]"
+
+        # 4. Format for display
         duration_display = ""
         if duration_seconds > 0:
-            hours, remainder = divmod(duration_seconds, 3600)
-            mins, secs = divmod(remainder, 60)
-            if hours > 0:
-                duration_display = f"{hours}h {mins}m"
-            else:
-                duration_display = f"{mins}m {secs}s"
-
-        # 8. Format view count for display
-        view_display = ""
-        if view_count > 0:
-            if view_count >= 1_000_000:
-                view_display = f"{view_count / 1_000_000:.1f}M views"
-            elif view_count >= 1_000:
-                view_display = f"{view_count / 1_000:.1f}K views"
-            else:
-                view_display = f"{view_count} views"
-
-        # 9. Build formatted text for AI analysis
+            mins, secs = divmod(duration_seconds, 60)
+            duration_display = f"{mins}m {secs:02d}s"
+        
+        view_display = f"{view_count:,} views" if view_count > 0 else "N/A"
+        
         formatted_text = f"""YOUTUBE VIDEO ANALYSIS:
 Title: {title}
 Channel: {author}
-Duration: {duration_display or 'Unknown'}
-Views: {view_display or 'Unknown'}
-Keywords: {', '.join(keywords[:10]) if keywords else 'None'}
+Duration: {duration_display}
+Views: {view_display}
+Keywords: {", ".join(keywords)}
 
 DESCRIPTION:
-{description[:3000]}
+{full_description or "No description available."}
 
 ---
 TRANSCRIPT {'(with timestamps)' if has_transcript else ''}:

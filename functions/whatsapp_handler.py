@@ -119,10 +119,13 @@ def format_success_message(
             lines.append(f"")
             lines.append(lbl_moments)
             for h in highlights[:4]:
-                ts = h.get("timestamp", "")
-                desc = h.get("description", "")
-                if ts and desc:
-                    lines.append(f"• {ts} — {desc}")
+                if isinstance(h, dict):
+                    ts = h.get("timestamp", "")
+                    desc = h.get("description", "")
+                    if ts and desc:
+                        lines.append(f"• {ts} — {desc}")
+                elif isinstance(h, str):
+                    lines.append(f"• {h}")
 
     if takeaway:
         lines.append(f"")

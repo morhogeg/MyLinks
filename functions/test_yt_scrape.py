@@ -3,7 +3,7 @@ import requests
 import re
 import json
 
-url = "https://www.youtube.com/watch?v=hX17U0Oas9Q"
+url = "https://www.youtube.com/watch?v=88-q3TIwdnA"
 headers = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Accept-Language": "en-US,en;q=0.9",
@@ -62,10 +62,16 @@ if player_match2:
                     print(f"Title: {vd.get('title', 'N/A')}")
                     print(f"Author: {vd.get('author', 'N/A')}")
                     print(f"Length: {vd.get('lengthSeconds', 'N/A')}s")
-                    print(f"Views: {vd.get('viewCount', 'N/A')}")
                     print(f"Keywords: {vd.get('keywords', [])[:5]}")
-                    print(f"Description: {vd.get('shortDescription', 'N/A')[:200]}")
+                    print(f"Short Description: {vd.get('shortDescription', 'N/A')[:200]}")
                     
+                    # Full description in microformat
+                    micro = data.get("microformat", {}).get("playerMicroformatRenderer", {})
+                    full_desc = micro.get("description", {}).get("simpleText", "")
+                    print(f"Full Description length: {len(full_desc)}")
+                    if full_desc:
+                        print(f"Full Description start: {full_desc[:200]}")
+
                     # Check for captions
                     captions = data.get("captions", {})
                     player_captions = captions.get("playerCaptionsTracklistRenderer", {})
@@ -76,12 +82,12 @@ if player_match2:
                     
                     if tracks:
                         first_track = tracks[0]
-                        # Try to get JSON format
-                        transcript_url = first_track.get('baseUrl') + "&fmt=json3"
-                        print(f"\nFetching transcript from: {transcript_url[:100]}...")
+                        # Try to get VTT format
+                        transcript_url = first_track.get('baseUrl') + "&fmt=vtt"
+                        print(f"\nFetching VTT transcript from: {transcript_url[:100]}...")
                         t_resp = requests.get(transcript_url, cookies=cookies, headers=headers)
                         print(f"Transcript status: {t_resp.status_code}")
-                        print(f"Transcript body preview: {t_resp.text[:200]}")
+                        print(f"Transcript body preview (first 500): {t_resp.text[:500]}")
                         if t_resp.ok:
                             try:
                                 t_data = t_resp.json()
@@ -99,8 +105,85 @@ if player_match2:
     else:
         print("Could not find closing brace")
 
-# Show what's around the ytInitialPlayerResponse if it exists
-idx = html.find('ytInitialPlayerResponse')
-if idx >= 0:
-    print(f"\n--- Context around ytInitialPlayerResponse (position {idx}) ---")
-    print(html[max(0,idx-20):idx+200])
+try:
+    from youtube_transcript_api import YouTubeTranscriptApi
+    transcript_list = YouTubeTranscriptApi.list_transcripts("88-q3TIwdnA")
+    print(f"List Transcripts success!")
+    # Try to find 'en'
+    try:
+        t = transcript_list.find_transcript(['en'])
+        print(f"Found en transcript: {t.language_code}")
+        data = t.fetch()
+        print(f"Fetch success! Lines: {len(data)}")
+    except:
+        print("Could not find en, trying any...")
+        t = next(iter(transcript_list))
+        print(f"Found any transcript: {t.language_code}")
+        data = t.fetch()
+        print(f"Fetch success! Lines: {len(data)}")
+except Exception as e:
+    print(f"List Transcripts failed: {e}")
+
+# Check ytInitialData for full description
+print(f"\nytInitialData in HTML: {'ytInitialData' in html}")
+data_match = re.search(r'var ytInitialData\s*=\s*(\{.+?\});', html)
+if data_match:
+    print("ytInitialData regex match: True")
+    start = data_match.start()
+    eq_pos = html.index('=', start) + 1
+    brace_start = html.find('{', eq_pos)
+    brace_count = 0
+    for i in range(brace_start, min(brace_start + 1000000, len(html))):
+        if html[i] == '{':
+            brace_count += 1
+        elif html[i] == '}':
+            brace_count -= 1
+            if brace_count == 0:
+                try:
+                    data = json.loads(html[brace_start:i+1])
+                    
+                    # Search for chapters
+                    def find_chapters(obj):
+                        if isinstance(obj, dict):
+                            if "macroMarkersListItemRenderer" in obj:
+                                return obj
+                            for k, v in obj.items():
+                                if k == "chapters": return v
+                                res = find_chapters(v)
+                                if res: return res
+                        elif isinstance(obj, list):
+                            for item in obj:
+                                res = find_chapters(item)
+                                if res: return res
+                        return None
+                    
+                    chapters = find_chapters(data)
+                    print(f"Chapters found: {bool(chapters)}")
+                    if chapters:
+                         print(f"Chapters count: {len(chapters)}")
+                except Exception as e:
+                    print(f"ytInitialData parse failed: {e}")
+                break
+
+# Last resort: find "description":{"simpleText":...} or similar anywhere in the HTML
+desc_match = re.finditer(r'"description":\s*\{\s*"simpleText":\s*"([^"]+)"', html)
+for m in desc_match:
+    d = m.group(1).replace('\\n', '\n')
+    if len(d) > 200:
+        print(f"\nFound long simpleText description (len {len(d)}): {d[:200]}...")
+
+runs_match = re.finditer(r'"description":\s*\{\s*"runs":\s*\[(.+?)\]\s*\}', html)
+for m in runs_match:
+    try:
+        runs_json = "[" + m.group(1) + "]"
+        runs = json.loads(runs_json)
+        d = "".join([r.get("text", "") for r in runs])
+        if len(d) > 200:
+            print(f"\nFound long runs description (len {len(d)}): {d[:200]}...")
+    except:
+        pass
+else:
+    # Try more lenient find
+    d_idx = html.find('ytInitialData =')
+    if d_idx >= 0:
+        print(f"ytInitialData found at {d_idx}")
