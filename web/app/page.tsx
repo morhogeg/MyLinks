@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useState } from 'react';
+import { useAuth } from '@/components/AuthProvider';
 import Feed from "@/components/Feed";
 import AddLinkForm from "@/components/AddLinkForm";
 import InstallPWA from "@/components/InstallPWA";
@@ -14,32 +13,27 @@ import ThemeToggle from "@/components/ThemeToggle";
  * Main dashboard page
  */
 export default function Home() {
+  const { uid, loading } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [uid, setUid] = useState<string | null>(null);
-
-  // Find the user (Mock Auth)
-  useEffect(() => {
-    async function findUser() {
-      try {
-        const usersRef = collection(db, 'users');
-        // Using the default test phone number for now
-        const q = query(usersRef, where('phone_number', '==', '+16462440305'));
-        const snapshot = await getDocs(q);
-
-        if (!snapshot.empty) {
-          setUid(snapshot.docs[0].id);
-        }
-      } catch (err) {
-        console.error("Error finding user:", err);
-      }
-    }
-    findUser();
-  }, []);
 
   const handleLinkAdded = () => {
     setRefreshKey(prev => prev + 1);
   };
+
+  // Loading state while auth resolves
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20 animate-pulse">
+            <Brain className="w-6 h-6 text-white" />
+          </div>
+          <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-text transition-colors duration-200">

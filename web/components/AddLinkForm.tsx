@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, FormEvent } from 'react';
 import { Link, Plus, Loader2, X, Image as ImageIcon, Upload } from 'lucide-react';
 import { saveLink, getUserTags } from '@/lib/storage';
-import { db, storage } from '@/lib/firebase';
+import { storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { useAuth } from '@/components/AuthProvider';
 
 interface AddLinkFormProps {
     onLinkAdded: () => void;
@@ -25,6 +25,7 @@ const formatUrl = (input: string) => {
  * This replaces WhatsApp ingestion for local testing
  */
 export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
+    const { uid } = useAuth();
     const [url, setUrl] = useState('');
     const [activeTab, setActiveTab] = useState<'link' | 'image'>('link');
     const [imageFile, setImageFile] = useState<File | null>(null);
@@ -32,41 +33,6 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
-    const [uid, setUid] = useState<string | null>(null);
-
-    // Get UID on mount
-    useEffect(() => {
-        async function fetchUid() {
-            try {
-                const phone = '+16462440305';
-                const q = query(collection(db, 'users'), where('phone_number', '==', phone), limit(1));
-                const snap = await getDocs(q);
-
-                if (!snap.empty) {
-                    setUid(snap.docs[0].id);
-                } else {
-                    // In development/emulator, auto-create the user if they don't exist
-                    if (window.location.hostname === 'localhost') {
-                        console.log('Test user not found, creating one...');
-                        const { addDoc, collection } = await import('firebase/firestore');
-                        const docRef = await addDoc(collection(db, 'users'), {
-                            phone_number: phone,
-                            createdAt: Date.now(),
-                            settings: {
-                                theme: 'dark',
-                                reminders_enabled: true
-                            }
-                        });
-                        setUid(docRef.id);
-                        console.log('Created test user with ID:', docRef.id);
-                    }
-                }
-            } catch (err) {
-                console.error('Failed to fetch/create UID:', err);
-            }
-        }
-        fetchUid();
-    }, []);
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();

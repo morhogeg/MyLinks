@@ -24,7 +24,7 @@ export const storage = getStorage(app);
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 export const functions = getFunctions(app);
 
-// Initialize Firestore Emulator if on localhost
+// Connect to emulators on localhost
 import { connectFirestoreEmulator } from "firebase/firestore";
 
 if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {

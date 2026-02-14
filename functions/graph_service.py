@@ -4,14 +4,14 @@ from typing import List, Dict, Optional
 from firebase_admin import firestore
 from google.cloud.firestore_v1.vector import Vector
 from models import LinkDocument, RelatedLink
-from ai_service import ClaudeService
+from ai_service import GeminiService
 
 logger = logging.getLogger(__name__)
 
 class GraphService:
     def __init__(self, db):
         self.db = db
-        self.ai = ClaudeService()
+        self.ai = GeminiService()
 
     def find_related_links(self, 
                           new_link_id: str, 
@@ -144,7 +144,6 @@ If no strong connections, return [].
                 config={'response_mime_type': 'application/json'}
             )
             
-            import json
             return json.loads(response.text)
         except Exception as e:
             logger.error(f"LLM verification failed: {e}")

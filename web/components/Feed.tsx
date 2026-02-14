@@ -7,8 +7,9 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus } from '@/lib/storage';
-import { collection, query, orderBy, onSnapshot, where, getDocs, limit, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase';
+import { useAuth } from '@/components/AuthProvider';
 import { httpsCallable } from 'firebase/functions';
 import Card from './Card';
 import CompactCard from './CompactCard';
@@ -35,8 +36,8 @@ type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
  */
 function FeedContent() {
     const searchParams = useSearchParams();
+    const { uid } = useAuth();
     const [links, setLinks] = useState<Link[]>([]);
-    const [uid, setUid] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [filter, setFilter] = useState<FilterType>('all');
     const [selectedCategory, setSelectedCategory] = useState<Set<string>>(new Set());
@@ -116,21 +117,7 @@ function FeedContent() {
         localStorage.setItem('tag-explorer-collapsed', String(newState));
     };
 
-    // 1. Find the user by phone number (mocking auth for now)
-    useEffect(() => {
-        async function findUser() {
-            const usersRef = collection(db, 'users');
-            const q = query(usersRef, where('phone_number', '==', '+16462440305'), limit(1));
-            const snapshot = await getDocs(q);
-            if (!snapshot.empty) {
-                setUid(snapshot.docs[0].id);
-            } else {
-                console.error("User not found in Firestore. Please add a document to 'users' collection with phone_number: +16462440305");
-                setIsLoading(false);
-            }
-        }
-        findUser();
-    }, []);
+    // uid comes from AuthProvider — no mock lookup needed
 
     // 2. Real-time sync from Firestore
     useEffect(() => {

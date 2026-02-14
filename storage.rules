@@ -1,8 +1,16 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+
+    // Screenshots: users can read their own; only Cloud Functions write
+    match /screenshots/{uid}/{allPaths=**} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false; // Only admin SDK (Cloud Functions) writes here
+    }
+
+    // Deny everything else
     match /{allPaths=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

@@ -1,8 +1,11 @@
 import os
 import json
+import logging
 from typing import List
 from google import genai
 from models import AIAnalysis
+
+logger = logging.getLogger(__name__)
 
 # Professional system prompt
 SYSTEM_PROMPT = """You are a professional knowledge extraction assistant for a "Second Brain" system.
@@ -20,13 +23,13 @@ Requirements for the analysis:
 3. summary: Write 2 to 4 concise, information-dense sentences for a card preview. 
    - **LANGUAGE**: Write the summary in the SAME language as the input content.
    - **SCANNABILITY**: Use **bolding** (double asterisks) for key terms, dates, or names to make them pop.
-   - **STRUCTURE**: Add a line break (\\n) between each sentence to create visual separation.
+   - **STRUCTURE**: Add a line break (\\\\n) between each sentence to create visual separation.
    - Summarize ONLY what the content explicitly states.
    - NO opinions, NO value judgments.
    - Each sentence must end with a period.
    - You MAY use a single bullet point if it makes a critical finding clearer.
    
-   GOOD: "Researchers at **MIT** found that **intermittent fasting** reduced inflammation markers by **40%** in a 12-week trial.\n\nThe study showed benefits appeared after just **2 weeks**."
+   GOOD: "Researchers at **MIT** found that **intermittent fasting** reduced inflammation markers by **40%** in a 12-week trial.\\n\\nThe study showed benefits appeared after just **2 weeks**."
 
 
 4. detailedSummary: Write a well-structured, professional summary using markdown formatting:
@@ -67,32 +70,27 @@ CRITICAL RULES:
    - Max 5 concepts."""
 
 
-class ClaudeService: # Kept name for compatibility with main.py
+class GeminiService:
     """
-    Wrapper for Google Gemini AI
-    Uses gemini-3-flash-preview as requested
+    Wrapper for Google Gemini AI.
+    Handles text analysis, image analysis, and embedding generation.
     """
     
     def __init__(self):
         self.api_key = os.environ.get("GEMINI_API_KEY")
         if not self.api_key:
-            # Fallback to check if we can load it from a sibling .env manually if needed
-            # but usually Firebase handles this. Let's just log it.
-            print("CRITICAL: GEMINI_API_KEY is empty")
+            logger.critical("GEMINI_API_KEY is empty")
             
         self.client = genai.Client(api_key=self.api_key) if self.api_key else None
-        self.model = "gemini-2.0-flash" # Use latest stable model name
+        self.model = "gemini-2.0-flash"
         
     def analyze_text(self, text: str, existing_tags: list = None) -> dict:
-        """
-        Analyze text content using Gemini 3.0 Flash
-        """
+        """Analyze text content using Gemini."""
         if not self.client:
-            print("Gemini client not initialized, using mock")
+            logger.warning("Gemini client not initialized, using mock")
             return self._mock_analysis(text)
         
         try:
-            # Clean up the text to avoid too much noise
             clean_text = text[:30000]
             
             tags_context = f"\n\nExisting Tags in Brain (Reuse these if possible):\n{', '.join(existing_tags)}" if existing_tags else ""
@@ -110,15 +108,13 @@ class ClaudeService: # Kept name for compatibility with main.py
                 
             return json.loads(response.text)
         except Exception as e:
-            print(f"Gemini analysis failed: {str(e)}")
+            logger.error(f"Gemini analysis failed: {str(e)}")
             return self._mock_analysis(text)
 
     def analyze_image(self, image_bytes: bytes, mime_type: str, existing_tags: list = None) -> dict:
-        """
-        Analyze image content using Gemini 3.0 Flash
-        """
+        """Analyze image content using Gemini."""
         if not self.client:
-            print("Gemini client not initialized, using mock")
+            logger.warning("Gemini client not initialized, using mock")
             return self._mock_analysis("Image content")
         
         try:
@@ -131,7 +127,6 @@ class ClaudeService: # Kept name for compatibility with main.py
             If the image is an article, extract the headline and body.
             """
             
-            # Use 'types' from the creating the Part object to handle binary data
             from google.genai import types
             
             response = self.client.models.generate_content(
@@ -150,31 +145,28 @@ class ClaudeService: # Kept name for compatibility with main.py
                 
             return json.loads(response.text)
         except Exception as e:
-            print(f"Gemini image analysis failed: {str(e)}")
+            logger.error(f"Gemini image analysis failed: {str(e)}")
             return self._mock_analysis("Image content")
 
     def embed_text(self, text: str) -> List[float]:
-        """
-        Generate vector embedding for text using Gemini
-        """
+        """Generate vector embedding for text using Gemini."""
         if not self.client:
-            print("Gemini client not initialized, returning mock embedding")
+            logger.warning("Gemini client not initialized, returning mock embedding")
             return [0.0] * 768
             
         try:
-            # Fallback to older model as text-embedding-004 is not available
             result = self.client.models.embed_content(
                 model="models/gemini-embedding-001",
-                contents=text[:9000], # Limit to avoid token errors
+                contents=text[:9000],
                 config={"output_dimensionality": 768}
             )
             return result.embeddings[0].values
         except Exception as e:
-            print(f"Embedding generation failed: {str(e)}")
+            logger.error(f"Embedding generation failed: {str(e)}")
             return [0.0] * 768
 
     def _mock_analysis(self, text: str) -> dict:
-        """Fallback mock logic"""
+        """Fallback mock logic when AI is unavailable."""
         return {
             "title": "Untitled (Analysis Failed)",
             "summary": "Processing of this link failed or Gemini API was unavailable. Please check original.",
@@ -183,3 +175,7 @@ class ClaudeService: # Kept name for compatibility with main.py
             "tags": ["failed"],
             "actionableTakeaway": "None"
         }
+
+
+# Backward compatibility alias
+ClaudeService = GeminiService
