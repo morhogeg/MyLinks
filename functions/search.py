@@ -30,7 +30,7 @@ class EmbeddingService:
         """Generate 768-dim embedding for text."""
         if not self.client:
             logger.warning("Gemini client not initialized, returning mock embedding")
-            return [0.0] * 768
+            return [1e-9] * 768
 
         try:
             result = self.client.models.embed_content(

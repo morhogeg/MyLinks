@@ -394,14 +394,18 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
 
 
 def _scrape_youtube_url(url: str) -> dict:
-    """Scrape YouTube video metadata and transcript."""
+    """Scrape YouTube video metadata and transcript with rich context."""
     logger.info(f"Analyzing YouTube URL: {url}")
 
+    import json as _json
+
     try:
-        # 1. Extract Video ID
+        # 1. Extract Video ID — support youtube.com/watch, youtu.be, and /shorts/
         video_id = None
         if "youtu.be" in url:
             video_id = url.split("/")[-1].split("?")[0]
+        elif "/shorts/" in url:
+            video_id = url.split("/shorts/")[1].split("?")[0].split("/")[0]
         elif "v=" in url:
             video_id = url.split("v=")[1].split("&")[0]
 
@@ -411,66 +415,168 @@ def _scrape_youtube_url(url: str) -> dict:
 
         logger.info(f"Video ID: {video_id}")
 
-        # 2. Get Metadata via lightweight scrape
+        # 2. Fetch page HTML with robust consent bypass cookies
+        canonical_url = f"https://www.youtube.com/watch?v={video_id}"
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept-Language": "en-US,en;q=0.9",
+            "Referer": "https://www.google.com/",
+        }
+        # SOCS and CONSENT are key to bypassing the EU/Global consent walls on GCP IPs
+        cookies = {
+            "CONSENT": "YES+cb.20210328-17-p0.en+FX+299",
+            "SOCS": "CAESEwgDEgk0ODE3Nzk3MjQaAmVuIAEaBgiA_LyaBg",
         }
 
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(canonical_url, headers=headers, cookies=cookies, timeout=10)
         html = response.text
+        logger.info(f"YouTube HTML fetched, length: {len(html)}")
 
+        # 3. Extract rich metadata from ytInitialPlayerResponse
         title = "YouTube Video"
         author = "Unknown Channel"
         description = ""
+        duration_seconds = 0
+        view_count = 0
+        keywords = []
 
-        t_match = re.search(r'<meta name="title" content="([^"]+)">', html)
-        if t_match:
-            title = t_match.group(1)
+        # Use balanced-brace extraction for robust JSON parsing
+        player_idx = html.find('ytInitialPlayerResponse')
+        if player_idx >= 0:
+            # Find the opening brace after the = sign
+            eq_idx = html.find('=', player_idx)
+            if eq_idx >= 0:
+                brace_start = html.find('{', eq_idx)
+                if brace_start >= 0:
+                    brace_count = 0
+                    for i in range(brace_start, min(brace_start + 500000, len(html))):
+                        if html[i] == '{':
+                            brace_count += 1
+                        elif html[i] == '}':
+                            brace_count -= 1
+                            if brace_count == 0:
+                                try:
+                                    player_data = _json.loads(html[brace_start:i+1])
+                                    vd = player_data.get("videoDetails", {})
+                                    title = vd.get("title", title)
+                                    author = vd.get("author", author)
+                                    description = vd.get("shortDescription", "")
+                                    duration_seconds = int(vd.get("lengthSeconds", 0))
+                                    view_count = int(vd.get("viewCount", 0))
+                                    keywords = vd.get("keywords", [])
+                                    logger.info(f"ytInitialPlayerResponse parsed: {title} by {author}, {duration_seconds}s, {view_count} views")
+                                except Exception as e:
+                                    logger.warning(f"Failed to parse ytInitialPlayerResponse JSON: {e}")
+                                break
+        else:
+            logger.warning("ytInitialPlayerResponse not found in HTML")
 
-        d_match = re.search(r'<meta name="description" content="([^"]+)">', html)
-        if d_match:
-            description = d_match.group(1)
+        # 4. Fallback to meta tags
+        if title == "YouTube Video":
+            t_match = re.search(r'<meta name="title" content="([^"]+)">', html)
+            if t_match:
+                title = t_match.group(1)
+        if author == "Unknown Channel":
+            a_match = re.search(r'<link itemprop="name" content="([^"]+)">', html)
+            if a_match:
+                author = a_match.group(1)
+        if not description:
+            d_match = re.search(r'<meta name="description" content="([^"]+)">', html)
+            if d_match:
+                description = d_match.group(1)
 
-        a_match = re.search(r'<link itemprop="name" content="([^"]+)">', html)
-        if a_match:
-            author = a_match.group(1)
+        # 5. Final fallback: oEmbed API (always works, even from cloud IPs)
+        if title == "YouTube Video" or author == "Unknown Channel":
+            try:
+                oembed_url = f"https://www.youtube.com/oembed?url={canonical_url}&format=json"
+                oembed_resp = requests.get(oembed_url, timeout=5)
+                if oembed_resp.ok:
+                    oembed = oembed_resp.json()
+                    if title == "YouTube Video":
+                        title = oembed.get("title", title)
+                    if author == "Unknown Channel":
+                        author = oembed.get("author_name", author)
+                    logger.info(f"oEmbed fallback: {title} by {author}")
+            except Exception as e:
+                logger.warning(f"oEmbed fallback failed: {e}")
 
         logger.info(f"Metadata found: {title} by {author}")
 
-        # 3. Get Transcript
+        # 6. Get Transcript with corrected library usage and better fallback
         transcript_text = ""
+        has_transcript = False
         try:
-            yt_api = YouTubeTranscriptApi()
-            transcript_list = yt_api.fetch(video_id)
-            lines = [t.text for t in transcript_list]
-            transcript_text = " ".join(lines)
+            # Note: YouTubeTranscriptApi.get_transcript is the correct static method
+            transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'iw', 'he'])
+            # Include timestamps for AI to generate key moments
+            lines = []
+            for t in transcript_list:
+                timestamp = int(float(t['start']))
+                mins, secs = divmod(timestamp, 60)
+                lines.append(f"[{mins}:{secs:02d}] {t['text']}")
+            transcript_text = "\n".join(lines)
+            has_transcript = True
             logger.info(f"Transcript found, length: {len(transcript_text)}")
         except TranscriptsDisabled:
             logger.info("Transcripts are disabled for this video")
             transcript_text = "[Transcript disabled by uploader]"
         except Exception as e:
             logger.warning(f"Transcript extraction failed: {e}")
-            transcript_text = "[Transcript unavailable]"
+            transcript_text = f"[Transcript unavailable: {str(e)[:100]}]"
 
-        # 4. Format for AI Analysis
-        formatted_text = f"""
-VIDEO METADATA:
+        # 7. Format duration for display
+        duration_display = ""
+        if duration_seconds > 0:
+            hours, remainder = divmod(duration_seconds, 3600)
+            mins, secs = divmod(remainder, 60)
+            if hours > 0:
+                duration_display = f"{hours}h {mins}m"
+            else:
+                duration_display = f"{mins}m {secs}s"
+
+        # 8. Format view count for display
+        view_display = ""
+        if view_count > 0:
+            if view_count >= 1_000_000:
+                view_display = f"{view_count / 1_000_000:.1f}M views"
+            elif view_count >= 1_000:
+                view_display = f"{view_count / 1_000:.1f}K views"
+            else:
+                view_display = f"{view_count} views"
+
+        # 9. Build formatted text for AI analysis
+        formatted_text = f"""YOUTUBE VIDEO ANALYSIS:
 Title: {title}
 Channel: {author}
-Description: {description}
+Duration: {duration_display or 'Unknown'}
+Views: {view_display or 'Unknown'}
+Keywords: {', '.join(keywords[:10]) if keywords else 'None'}
+
+DESCRIPTION:
+{description[:3000]}
 
 ---
-TRANSCRIPT:
+TRANSCRIPT {'(with timestamps)' if has_transcript else ''}:
 {transcript_text[:25000]}
 """
 
         return {
             "html": formatted_text,
             "title": title,
-            "text": formatted_text
+            "text": formatted_text,
+            "content_type": "youtube",
+            "youtube_metadata": {
+                "channel": author,
+                "duration_seconds": duration_seconds,
+                "duration_display": duration_display,
+                "view_count": view_count,
+                "view_display": view_display,
+                "has_transcript": has_transcript,
+                "keywords": keywords[:10],
+            }
         }
 
     except Exception as e:
         logger.error(f"YouTube scrape error: {e}")
         return {"html": "", "title": "YouTube Video", "text": ""}
+

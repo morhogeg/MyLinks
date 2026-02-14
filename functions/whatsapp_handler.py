@@ -48,14 +48,17 @@ def format_success_message(
     """
     Format a rich success message using the final link data structure.
     Supports English ("en") and Hebrew ("he").
+    Detects YouTube content and formats with video-specific fields.
     """
     title = link_data.get("title", "Untitled")
     category = link_data.get("category", "General")
     tags = link_data.get("tags", [])
+    source_type = link_data.get("sourceType", "web")
 
     meta = link_data.get("metadata", {})
-    read_time = meta.get("estimatedReadTime", 1)
     takeaway = meta.get("actionableTakeaway")
+
+    is_youtube = source_type == "youtube"
 
     # Emojis for categories
     cat_emoji = "📂"
@@ -69,8 +72,6 @@ def format_success_message(
 
     lbl_saved = "✅ *נשמר למוח השני*" if is_he else "✅ *Saved to Second Brain*"
     lbl_category = "קטגוריה" if is_he else "Category"
-    lbl_read_time = "זמן קריאה" if is_he else "Read Time"
-    lbl_min = "דק׳" if is_he else "min"
     lbl_tags = "תגיות" if is_he else "Tags"
     lbl_insight = "💡 *תובנה מרכזית:*" if is_he else "💡 *Key Insight:*"
     lbl_reminder_set = "⏰ *התזכורת נקבעה:*" if is_he else "⏰ *Reminder Set:*"
@@ -82,10 +83,46 @@ def format_success_message(
         f"",
         f"📄 *{title}*",
         f"",
-        f"{cat_emoji} *{lbl_category}:* {category}",
-        f"⏱️ *{lbl_read_time}:* {read_time} {lbl_min}",
-        f"🏷️ *{lbl_tags}:* {', '.join([f'#{t}' for t in tags[:3]])}"
     ]
+
+    if is_youtube:
+        # YouTube-specific fields
+        channel = meta.get("youtubeChannel", "")
+        duration = meta.get("durationDisplay", "")
+        views = meta.get("viewDisplay", "")
+
+        lbl_channel = "ערוץ" if is_he else "Channel"
+        lbl_duration = "משך" if is_he else "Duration"
+        lbl_views = "צפיות" if is_he else "Views"
+
+        if channel:
+            lines.append(f"🎬 *{lbl_channel}:* {channel}")
+        if duration:
+            lines.append(f"⏱️ *{lbl_duration}:* {duration}")
+        if views:
+            lines.append(f"👁️ *{lbl_views}:* {views}")
+    else:
+        # Standard web link fields
+        read_time = meta.get("estimatedReadTime", 1)
+        lbl_read_time = "זמן קריאה" if is_he else "Read Time"
+        lbl_min = "דק׳" if is_he else "min"
+        lines.append(f"⏱️ *{lbl_read_time}:* {read_time} {lbl_min}")
+
+    lines.append(f"{cat_emoji} *{lbl_category}:* {category}")
+    lines.append(f"🏷️ *{lbl_tags}:* {', '.join([f'#{t}' for t in tags[:3]])}")
+
+    # Video highlights (key moments)
+    if is_youtube:
+        highlights = meta.get("videoHighlights", [])
+        if highlights:
+            lbl_moments = "🔑 *רגעים מרכזיים:*" if is_he else "🔑 *Key Moments:*"
+            lines.append(f"")
+            lines.append(lbl_moments)
+            for h in highlights[:4]:
+                ts = h.get("timestamp", "")
+                desc = h.get("description", "")
+                if ts and desc:
+                    lines.append(f"• {ts} — {desc}")
 
     if takeaway:
         lines.append(f"")

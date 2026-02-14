@@ -166,25 +166,24 @@ function FeedContent() {
         }
     }, [searchParams, links]);
 
-    // Filter and sort links
-    const linksToDisplay = debouncedQuery.trim() ? searchResults : links;
-
-    const filteredLinks = linksToDisplay
+    // 4. Hybrid Search Logic
+    const filteredLinks = links
         .filter((link) => {
-            if (debouncedQuery.trim()) return true; // Skip keyword filtering if using semantic search
-            if (filter === 'all') return true;
+            // Apply status filters
             if (filter === 'reminders') return link.reminderStatus === 'pending';
             if (filter === 'unread') return !link.isRead;
             if (filter === 'read') return !!link.isRead;
-            return link.status === filter;
+            if (filter !== 'all') return link.status === filter;
+            return true;
         })
         .filter((link) => {
+            // Apply category filters
             if (selectedCategory.size === 0) return true;
             return selectedCategory.has(link.category);
         })
         .filter((link) => {
+            // Apply tag filters
             if (selectedTags.size === 0) return true;
-            // Hierarchical matching: if any link tag matches or is a child of any selected tag
             return link.tags.some(tag => {
                 return Array.from(selectedTags).some(selected => {
                     return tag === selected || tag.startsWith(`${selected}/`);
@@ -192,9 +191,16 @@ function FeedContent() {
             });
         })
         .filter((link) => {
-            if (debouncedQuery.trim()) return true; // Skip local keyword search if doing semantic
-            if (!searchQuery.trim()) return true;
-            const query = searchQuery.toLowerCase();
+            // Apply search (Hybrid: keyword OR semantic result)
+            if (!debouncedQuery.trim()) return true;
+
+            const query = debouncedQuery.toLowerCase();
+
+            // If it's in the semantic search results, it's a match
+            const isSemanticMatch = searchResults.some(r => r.id === link.id);
+            if (isSemanticMatch) return true;
+
+            // Otherwise check keyword matching
             return (
                 link.title.toLowerCase().includes(query) ||
                 link.summary.toLowerCase().includes(query) ||
@@ -203,8 +209,17 @@ function FeedContent() {
             );
         })
         .sort((a, b) => {
+            // Prioritize semantic matches at the top if they exist
+            if (debouncedQuery.trim()) {
+                const aIdx = searchResults.findIndex(r => r.id === a.id);
+                const bIdx = searchResults.findIndex(r => r.id === b.id);
+
+                if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+                if (aIdx !== -1) return -1;
+                if (bIdx !== -1) return 1;
+            }
+
             if (filter === 'reminders') {
-                // specific sort for reminders: soonest first
                 const timeA = a.nextReminderAt || Number.MAX_SAFE_INTEGER;
                 const timeB = b.nextReminderAt || Number.MAX_SAFE_INTEGER;
                 return timeA - timeB;

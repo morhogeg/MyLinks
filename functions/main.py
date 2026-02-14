@@ -158,7 +158,8 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
 
         # 2. Analyze with AI
         ai = GeminiService()
-        analysis = ai.analyze_text(scraped["text"] or scraped["html"], existing_tags=existing_tags)
+        content_type = scraped.get("content_type")
+        analysis = ai.analyze_text(scraped["text"] or scraped["html"], existing_tags=existing_tags, content_type=content_type)
 
         # 3. Generate Embedding & Find Connections
         embedding_text = f"{analysis.get('title', '')}\n{analysis.get('summary', '')}"
@@ -494,7 +495,8 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         else:
             log_to_firestore(task_id, "Starting AI text analysis", data={"scrapedTitle": scraped.get("title")})
             ref.update({"status": "analyzing", "scrapedTitle": scraped.get("title", "")})
-            analysis = ai.analyze_text(scraped["text"] or scraped["html"], existing_tags=existing_tags)
+            content_type = scraped.get("content_type")  # e.g. "youtube"
+            analysis = ai.analyze_text(scraped["text"] or scraped["html"], existing_tags=existing_tags, content_type=content_type)
 
         # VALIDATION: Ensure analysis is a dict
         if not isinstance(analysis, dict):
@@ -523,6 +525,18 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         log_to_firestore(task_id, "Saving processed link to brain", data={"finalTitle": final_title})
         ref.update({"status": "saving"})
 
+        # Determine source type
+        is_youtube = scraped.get("content_type") == "youtube"
+        yt_meta = scraped.get("youtube_metadata", {})
+
+        # Compute read/watch time
+        if is_youtube and yt_meta.get("duration_seconds"):
+            estimated_time = max(1, yt_meta["duration_seconds"] // 60)
+        elif is_image:
+            estimated_time = 1
+        else:
+            estimated_time = max(1, len(scraped.get("text", "")) // 1500)
+
         link_data = {
             "url": url,
             "title": final_title,
@@ -534,16 +548,27 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             "relatedLinks": related_links,
             "category": analysis.get("category", "General"),
             "sourceName": analysis.get("sourceName") or ("Screenshot" if is_image else None),
-            "sourceType": "image" if is_image else "web",
+            "sourceType": "youtube" if is_youtube else ("image" if is_image else "web"),
             "language": analysis.get("language", "en"),
             "status": LinkStatus.UNREAD.value,
             "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
             "metadata": {
                 "originalTitle": scraped.get("title", "Image Upload" if is_image else ""),
-                "estimatedReadTime": 1 if is_image else max(1, len(scraped.get("text", "")) // 1500),
+                "estimatedReadTime": estimated_time,
                 "actionableTakeaway": analysis.get("actionableTakeaway")
             }
         }
+
+        # Add YouTube-specific metadata
+        if is_youtube:
+            link_data["metadata"]["youtubeChannel"] = yt_meta.get("channel")
+            link_data["metadata"]["durationDisplay"] = yt_meta.get("duration_display")
+            link_data["metadata"]["durationSeconds"] = yt_meta.get("duration_seconds")
+            link_data["metadata"]["viewCount"] = yt_meta.get("view_count")
+            link_data["metadata"]["viewDisplay"] = yt_meta.get("view_display")
+            link_data["metadata"]["hasTranscript"] = yt_meta.get("has_transcript")
+            link_data["metadata"]["videoHighlights"] = analysis.get("videoHighlights", [])
+            link_data["metadata"]["speakers"] = analysis.get("speakers", [])
 
         # 5. Save to Firestore
         link_id = save_link_to_firestore(uid, link_data)
@@ -603,4 +628,3 @@ def force_check_reminders(req: https_fn.Request) -> https_fn.Response:
     except Exception as e:
         logger.error(f"Manual trigger failed: {e}")
         return https_fn.Response(f"Error: {e}", status=500)
-# force redeploy

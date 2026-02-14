@@ -69,6 +69,25 @@ CRITICAL RULES:
    - Example: "Spaced Repetition", "Pareto Principle", "Stoicism", "Network Effects", "Opportunity Cost".
    - Max 5 concepts."""
 
+YOUTUBE_PROMPT_ADDENDUM = """
+
+IMPORTANT: You are analyzing a **YouTube video** (transcript + metadata), NOT a web article. Your analysis must be **deep, insightful, and professional**. Avoid shallow or generic summaries.
+
+Additional instructions for video content:
+- **Depth Requirement**: Do not just state "The video discusses X". Instead, analyze the *arguments*, *logic*, and *evidence* presented. If the transcript is missing or "unavailable", use the video description, title, and keywords as proxies to reconstruct the most likely core message and value proposition. Do NOT mention that the transcript is missing in your final output.
+- **Source Context**: The sourceName should be the YouTube channel name.
+- **Timing**: The "estimatedReadTime" should represent the video's watch duration in minutes (use the Duration provided in metadata text).
+- **Video-Specific Fields**:
+  - "videoHighlights": An array of 3-5 key moments. If the transcript HAS timestamps (e.g. [2:30]), include the timestamp and a one-sentence description. If no timestamps are available, provide the 3 most important THEMES from the video (using "0:00" as a placeholder or omitting the timestamp if your schema allows, but try to infer from description if possible).
+  - "speakers": Identify the host/creator (e.g., from the channel name) and any guests mentioned.
+- **Structure**:
+  - **detailedSummary**: Use a multi-section markdown structure:
+    - `## Core Thesis`: The main argument or "why" of the video.
+    - `## Key Lessons & Frameworks`: Detailed breakdown of instructions, tips, or mental models shared.
+    - `## Context & Critique`: Who is this for? How does it fit into a broader conversation?
+  - **summary**: Focus on the **Transformation** — what will the viewer KNOW or be able to DO after watching this that they couldn't before?
+"""
+
 
 class GeminiService:
     """
@@ -84,7 +103,7 @@ class GeminiService:
         self.client = genai.Client(api_key=self.api_key) if self.api_key else None
         self.model = "gemini-2.0-flash"
         
-    def analyze_text(self, text: str, existing_tags: list = None) -> dict:
+    def analyze_text(self, text: str, existing_tags: list = None, content_type: str = None) -> dict:
         """Analyze text content using Gemini."""
         if not self.client:
             logger.warning("Gemini client not initialized, using mock")
@@ -95,9 +114,14 @@ class GeminiService:
             
             tags_context = f"\n\nExisting Tags in Brain (Reuse these if possible):\n{', '.join(existing_tags)}" if existing_tags else ""
             
+            # Add content-type-specific prompt additions
+            type_addendum = ""
+            if content_type == "youtube":
+                type_addendum = YOUTUBE_PROMPT_ADDENDUM
+            
             response = self.client.models.generate_content(
                 model=self.model,
-                contents=[f"{SYSTEM_PROMPT}{tags_context}\n\nContent to analyze:\n{clean_text}"],
+                contents=[f"{SYSTEM_PROMPT}{type_addendum}{tags_context}\n\nContent to analyze:\n{clean_text}"],
                 config={
                     'response_mime_type': 'application/json',
                 }
@@ -152,7 +176,7 @@ class GeminiService:
         """Generate vector embedding for text using Gemini."""
         if not self.client:
             logger.warning("Gemini client not initialized, returning mock embedding")
-            return [0.0] * 768
+            return [1e-9] * 768
             
         try:
             result = self.client.models.embed_content(
@@ -163,7 +187,7 @@ class GeminiService:
             return result.embeddings[0].values
         except Exception as e:
             logger.error(f"Embedding generation failed: {str(e)}")
-            return [0.0] * 768
+            return [1e-9] * 768
 
     def _mock_analysis(self, text: str) -> dict:
         """Fallback mock logic when AI is unavailable."""
