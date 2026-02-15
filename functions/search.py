@@ -22,15 +22,22 @@ logger = logging.getLogger(__name__)
 class EmbeddingService:
     def __init__(self):
         self.api_key = os.environ.get("GEMINI_API_KEY")
-        self.client = genai.Client(api_key=self.api_key) if self.api_key else None
+        self.client = None
+        if self.api_key:
+            try:
+                self.client = genai.Client(api_key=self.api_key)
+            except Exception as e:
+                logger.error(f"Failed to initialize Gemini client: {e}")
+        else:
+            logger.warning("GEMINI_API_KEY environment variable not set!")
         self.model = "models/gemini-embedding-001"
-        logger.info(f"EmbeddingService initialized with model: {self.model}")
+        logger.info(f"EmbeddingService initialized with model: {self.model}, client initialized: {self.client is not None}")
 
     def generate_embedding(self, text: str) -> List[float]:
         """Generate 768-dim embedding for text."""
         if not self.client:
-            logger.warning("Gemini client not initialized, returning mock embedding")
-            return [1e-9] * 768
+            logger.error("Gemini client not initialized - cannot generate embeddings! Set GEMINI_API_KEY environment variable.")
+            raise Exception("GEMINI_API_KEY not configured. Please set the GEMINI_API_KEY environment variable in Firebase Cloud Functions.")
 
         try:
             result = self.client.models.embed_content(
@@ -86,7 +93,16 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
     logger.info(f"Searching for '{query_text}' for user {uid}")
 
     service = EmbeddingService()
-    query_vector = service.generate_embedding(query_text)
+    
+    # Check if API key is configured
+    if not service.api_key:
+        raise Exception("SEMANTIC_SEARCH_NOT_CONFIGURED: GEMINI_API_KEY environment variable not set. Please configure the API key in Firebase Cloud Functions.")
+    
+    try:
+        query_vector = service.generate_embedding(query_text)
+    except Exception as e:
+        logger.error(f"Failed to generate query embedding: {e}")
+        raise Exception(f"SEMANTIC_SEARCH_ERROR: Failed to generate query embedding - {str(e)}")
 
     if not query_vector:
         raise Exception("Failed to generate query embedding")
@@ -94,15 +110,33 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
     db = get_db()
     links_ref = db.collection("users").document(uid).collection("links")
 
-    vector_query = links_ref.find_nearest(
-        vector_field="embedding_vector",
-        query_vector=Vector(query_vector),
-        distance_measure=DistanceMeasure.COSINE,
-        limit=limit,
-        distance_result_field="vector_distance"
-    )
+    # First, check if any links have embeddings
+    # This helps diagnose if the issue is missing embeddings vs. other problems
+    all_links = list(links_ref.limit(1).stream())
+    has_any_embeddings = False
+    if all_links:
+        sample_doc = all_links[0].to_dict()
+        has_any_embeddings = "embedding_vector" in sample_doc
+    
+    if not has_any_embeddings:
+        logger.warning(f"No embeddings found for user {uid}. Run backfill_embeddings.py to generate embeddings for existing links.")
+        # Don't fail the search, just return empty results with a helpful message
+        return []
 
-    results = vector_query.get()
+    try:
+        vector_query = links_ref.find_nearest(
+            vector_field="embedding_vector",
+            query_vector=Vector(query_vector),
+            distance_measure=DistanceMeasure.COSINE,
+            limit=limit,
+            distance_result_field="vector_distance"
+        )
+
+        results = vector_query.get()
+    except Exception as e:
+        logger.error(f"Vector search query failed: {e}")
+        # If the vector index isn't ready, return empty with message
+        raise Exception(f"VECTOR_SEARCH_ERROR: {str(e)}. Make sure the vector index is deployed in Firestore.")
 
     links = []
     for doc in results:
