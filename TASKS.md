@@ -37,16 +37,23 @@ images + reminder commands, EN/HE), YouTube deep analysis.
 
 ## 1. The North Star (new direction)
 
-**Active, automatic ingestion of saved content from external services.**
+**Get content the user saves elsewhere into MyLinks automatically.**
 
-The user saves something inside Instagram / Facebook / YouTube (likes a video,
-saves a reel, bookmarks a post). MyLinks detects it and **pulls it in
-automatically** — analyzes and files it like any other link, with zero manual
-forwarding. The integration layer is envisioned via **MCP connectors** plus
-per-service OAuth, driven by a scheduled sync engine.
+### Reality check (researched June 2026) — pull vs. push
+We investigated *pulling* saved items from services and hit a wall: most personal
+"saved" collections are **not exposed by any legitimate API**:
+- ❌ **Instagram / Facebook saved** — not in the Graph API (only ToS-violating scraping).
+- ❌ **YouTube "Watch Later"** — dead via API since 2016 (only Likes/playlists readable).
+- ❌ **Safari bookmarks / Reading List** — iOS sandbox, no third-party read API.
+- ❌ **Google Maps saved places** — no API; only a manual Google Takeout CSV export.
+- ✅ Only **Reddit (free)**, **X/Twitter (paid since 2026)**, **Mastodon** expose "saved".
 
-This is captured as **Epic E1** below. It is the strategic goal; the P0/P1 items
-are the foundation that has to exist first for it to be safe and maintainable.
+So the universal path is **push (share-to-app)**, not pull. Since an iOS PWA cannot be a
+share-sheet target, we ship an **iOS Shortcut** that posts shared links into the existing
+pipeline — covering Safari, Maps, Instagram, X, anything with a Share button. See **T14**.
+
+**Pull connectors** (Reddit/X/Mastodon) remain a *possible future add-on* (Epic E1 below)
+for the narrow case of "saved inside an app you'd never bother to share from."
 
 ---
 
@@ -54,20 +61,37 @@ are the foundation that has to exist first for it to be safe and maintainable.
 
 | ID | Title | Priority | Status |
 |----|-------|----------|--------|
+| T14 | Universal share capture (iOS Shortcut → share_ingest) | P1 | ◐ Implemented, pending deploy/test |
 | T1 | Real authentication (Firebase Auth + locked Firestore rules) | P0 | ☐ Not started |
 | T2 | Consolidate analysis pipeline to one source of truth | P0 | ☐ Not started |
 | T3 | Test harness for scrape + analyze + search | P1 | ☐ Not started |
 | T4 | Multi-user data model & isolation | P1 | ☐ Not started |
 | E1 | Active bookmark sync from external services (MCP) | P1 (epic) | ☐ Not started |
 | T5 | Connector framework + sync engine (E1 foundation) | P1 | ☐ Not started |
-| T6 | YouTube saved/liked sync (first connector) | P2 | ☐ Not started |
-| T7 | Instagram saved sync | P2 | ☐ Blocked (API) |
-| T8 | Facebook saved sync | P2 | ☐ Blocked (API) |
+| T6 | YouTube saved/liked sync | P2 | ☒ Won't do (Watch Later dead via API) |
+| T7 | Instagram saved sync | P2 | ☒ Won't do (no legitimate API) |
+| T8 | Facebook saved sync | P2 | ☒ Won't do (no legitimate API) |
 | T9 | Browser extension capture | P2 | ☐ Not started |
 | T10 | Reading view + export (MD/PDF/HTML) | P3 | ☐ Not started |
 | T11 | Highlights & annotations | P3 | ☐ Not started |
 | T12 | README ↔ reality reconciliation | P3 | ☐ Not started |
 | T13 | Code-debt TODOs cleanup | P3 | ☐ Ongoing |
+
+---
+
+## 2.5 T14 — Universal share capture (◐ implemented, pending deploy)
+
+First shipped capture path for the North Star. An iOS Shortcut posts shared links to a new
+`share_ingest` endpoint, which queues them into the existing `process_link_background` pipeline.
+- [x] `functions/link_service.py`: `ensure_ingest_token`, `find_user_by_ingest_token`,
+      `link_exists_for_url`, `pending_exists_for_url` (dedup).
+- [x] `functions/main.py`: `share_ingest` (token-auth HTTP), `get_share_config` (callable),
+      and a guard so non-WhatsApp items skip the WhatsApp reply.
+- [x] `firebase.json`: rewrite `/api/share` → `share_ingest`.
+- [x] `web/components/SettingsModal.tsx`: "Share to Second Brain" section (endpoint + token).
+- [x] `SHORTCUT_SETUP.md`: iOS Shortcut build guide.
+- [ ] Deploy (`firebase deploy`) and run the end-to-end test (share from Safari + Maps).
+- Hardening later: token currently lives on the (open-rules) user doc — tightens with T1.
 
 ---
 

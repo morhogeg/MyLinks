@@ -30,7 +30,11 @@ from db import get_db
 from models import WebhookPayload, LinkStatus, ReminderStatus
 from ai_service import GeminiService
 from scraper import scrape_url
-from link_service import find_user_by_phone, save_link_to_firestore, get_user_tags, is_hebrew
+from link_service import (
+    find_user_by_phone, save_link_to_firestore, get_user_tags, is_hebrew,
+    ensure_ingest_token, find_user_by_ingest_token, link_exists_for_url,
+    pending_exists_for_url,
+)
 from reminder_service import handle_reminder_intent, set_reminder, calculate_next_reminder, run_reminder_check
 from whatsapp_handler import send_whatsapp_message, format_success_message
 from graph_service import GraphService
@@ -275,6 +279,111 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
     except Exception as e:
         logger.error(f"Image analysis failed: {e}")
         return _error_response(str(e), 500, headers)
+
+
+# ─────────────────────────────────────────────
+# Share Ingestion (iOS Shortcut / share sheet)
+# ─────────────────────────────────────────────
+
+def _extract_url(*candidates: str) -> str:
+    """Return the first http(s) URL found across the candidate strings."""
+    for candidate in candidates:
+        if not candidate:
+            continue
+        match = re.search(r'https?://[^\s]+', candidate)
+        if match:
+            return match.group(0)
+    return ""
+
+
+@https_fn.on_request()
+def share_ingest(req: https_fn.Request) -> https_fn.Response:
+    """
+    HTTP endpoint for the iOS share Shortcut (and any share-sheet client).
+    Authenticates with a per-user ingest token, then queues the shared URL
+    into the existing background processing pipeline.
+
+    Accepts JSON: { "url" | "text" | "shared": <string>, "token"?: <string> }
+    Token may also be provided via the 'X-Ingest-Token' header.
+    """
+    if req.method == 'OPTIONS':
+        headers = {
+            'Access-Control-Allow-Origin': CORS_ORIGIN,
+            'Access-Control-Allow-Methods': 'POST',
+            'Access-Control-Allow-Headers': 'Content-Type, X-Ingest-Token',
+            'Access-Control-Max-Age': '3600'
+        }
+        return https_fn.Response('', status=204, headers=headers)
+
+    headers = _cors_headers()
+
+    try:
+        data = req.get_json(silent=True) or {}
+
+        token = req.headers.get('X-Ingest-Token') or data.get('token')
+        if not token:
+            return _error_response("Missing ingest token", 401, headers)
+
+        uid = find_user_by_ingest_token(token)
+        if not uid:
+            return _error_response("Invalid ingest token", 403, headers)
+
+        url = _extract_url(data.get('url'), data.get('text'), data.get('shared'))
+        if not url:
+            return _error_response("No URL found in shared content", 400, headers)
+
+        # Dedup: skip if already saved or already queued for this user.
+        if link_exists_for_url(uid, url) or pending_exists_for_url(uid, url):
+            logger.info(f"Share ingest skipped (duplicate): {url}")
+            return https_fn.Response(
+                json.dumps({"success": True, "duplicate": True, "url": url}),
+                status=200, headers=headers, mimetype='application/json'
+            )
+
+        db = get_db()
+        process_ref = db.collection('pending_processing').document()
+        process_ref.set({
+            "uid": uid,
+            "url": url,
+            "source": "share",
+            "body": data.get('note', ''),
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+            "status": "queued",
+            "attempts": 0
+        })
+
+        logger.info(f"Share ingest queued: {url} for user {uid}")
+        return https_fn.Response(
+            json.dumps({"success": True, "queued": True, "id": process_ref.id, "url": url}),
+            status=200, headers=headers, mimetype='application/json'
+        )
+
+    except Exception as e:
+        logger.error(f"Share ingest failed: {e}", exc_info=True)
+        return _error_response(str(e), 500, headers)
+
+
+@https_fn.on_call()
+def get_share_config(req: https_fn.CallableRequest) -> dict:
+    """
+    Returns the share-ingest endpoint and the caller's personal ingest token
+    (generating one on first use). Used by Settings to configure the Shortcut.
+    """
+    uid = req.auth.uid if req.auth else None
+    if not uid and req.data:
+        uid = req.data.get("uid") or req.data.get("test_uid")
+
+    if not uid:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="User must be identified"
+        )
+
+    token = ensure_ingest_token(uid)
+    return {
+        "endpoint": f"{APP_URL}/api/share",
+        "token": token
+    }
 
 
 # ─────────────────────────────────────────────
@@ -585,10 +694,14 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             profile = "spaced" if "2" in original_body else "smart"
             set_reminder(uid, link_id, reminder_time, profile=profile)
 
-        msg = format_success_message(link_data, reminder_time, language=analysis.get("language", "en"), link_id=link_id)
-
-        logger.info(f"Processing complete, sending message to {from_number}")
-        send_whatsapp_message(from_number, msg)
+        # Notify via WhatsApp only when the item came from WhatsApp.
+        # Share-sheet / connector items have no phone number and must not trigger a reply.
+        if from_number:
+            msg = format_success_message(link_data, reminder_time, language=analysis.get("language", "en"), link_id=link_id)
+            logger.info(f"Processing complete, sending message to {from_number}")
+            send_whatsapp_message(from_number, msg)
+        else:
+            logger.info(f"Processing complete for {data.get('source', 'unknown')} item (no WhatsApp notification)")
 
         # Successful cleanup
         ref.delete()
@@ -611,7 +724,8 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             }
         }
         save_link_to_firestore(uid, fallback_data)
-        send_whatsapp_message(from_number, f"⚠️ Saved: {url}\n\nNote: Detailed AI analysis encountered an issue ({str(e)[:50]}...).")
+        if from_number:
+            send_whatsapp_message(from_number, f"⚠️ Saved: {url}\n\nNote: Detailed AI analysis encountered an issue ({str(e)[:50]}...).")
 
 
 # ─────────────────────────────────────────────

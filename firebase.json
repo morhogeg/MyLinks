@@ -38,6 +38,10 @@
         "function": "analyze_image"
       },
       {
+        "source": "/api/share",
+        "function": "share_ingest"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

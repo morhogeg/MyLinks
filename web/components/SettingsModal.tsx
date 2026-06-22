@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import { User } from '@/lib/types';
 
-import { X, Bell, BellOff, Sun, Moon, Phone, Sparkles } from 'lucide-react';
+import { X, Bell, BellOff, Sun, Moon, Phone, Sparkles, Share2, Copy, Check } from 'lucide-react';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '@/lib/firebase';
 import { updateUserSettings, getUserSettings } from '@/lib/storage';
 
 interface SettingsModalProps {
@@ -21,11 +23,40 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
     });
     const [isLoading, setIsLoading] = useState(true);
 
+    // Share-to-app (iOS Shortcut) config
+    const [shareConfig, setShareConfig] = useState<{ endpoint: string; token: string } | null>(null);
+    const [shareLoading, setShareLoading] = useState(false);
+    const [copied, setCopied] = useState<'endpoint' | 'token' | null>(null);
+
     useEffect(() => {
         if (isOpen && uid) {
             loadSettings();
+            loadShareConfig();
         }
     }, [isOpen, uid]);
+
+    const loadShareConfig = async () => {
+        setShareLoading(true);
+        try {
+            const fn = httpsCallable(functions, 'get_share_config');
+            const result = await fn({ uid });
+            setShareConfig(result.data as { endpoint: string; token: string });
+        } catch (error) {
+            console.error('Failed to load share config:', error);
+        } finally {
+            setShareLoading(false);
+        }
+    };
+
+    const handleCopy = async (value: string, which: 'endpoint' | 'token') => {
+        try {
+            await navigator.clipboard.writeText(value);
+            setCopied(which);
+            setTimeout(() => setCopied(null), 1500);
+        } catch (error) {
+            console.error('Copy failed:', error);
+        }
+    };
 
     const loadSettings = async () => {
         setIsLoading(true);
@@ -147,6 +178,54 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                                 </div>
                             )}
                         </div>
+                    </section>
+
+                    {/* Share to Second Brain (iOS Shortcut) */}
+                    <section className="pt-2 border-t border-white/5">
+                        <h3 className="text-sm font-bold text-text-muted uppercase tracking-wider mb-4">Share to Second Brain</h3>
+
+                        <div className="flex items-start gap-3 mb-4">
+                            <div className="p-2.5 rounded-xl bg-accent/10 text-accent">
+                                <Share2 className="w-5 h-5" />
+                            </div>
+                            <p className="text-xs text-text-muted leading-relaxed">
+                                Save links from any app (Safari, Maps, Instagram…) with an iOS Shortcut.
+                                Paste the values below into the Shortcut once. See{' '}
+                                <span className="font-medium text-text">SHORTCUT_SETUP.md</span> for steps.
+                            </p>
+                        </div>
+
+                        {shareLoading && (
+                            <div className="text-xs text-text-muted">Loading your endpoint…</div>
+                        )}
+
+                        {shareConfig && (
+                            <div className="space-y-3">
+                                {([
+                                    { label: 'Endpoint URL', value: shareConfig.endpoint, key: 'endpoint' as const },
+                                    { label: 'Ingest Token (X-Ingest-Token)', value: shareConfig.token, key: 'token' as const },
+                                ]).map(({ label, value, key }) => (
+                                    <div key={key}>
+                                        <label className="text-[11px] text-text-muted block mb-1">{label}</label>
+                                        <div className="flex items-center gap-2">
+                                            <code className="flex-1 min-w-0 truncate px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-text font-mono">
+                                                {value}
+                                            </code>
+                                            <button
+                                                onClick={() => handleCopy(value, key)}
+                                                className="shrink-0 p-2 rounded-xl bg-white/5 border border-white/10 text-text-muted hover:bg-white/10 hover:text-text transition-all"
+                                                aria-label={`Copy ${label}`}
+                                            >
+                                                {copied === key ? <Check className="w-4 h-4 text-accent" /> : <Copy className="w-4 h-4" />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                                <p className="text-[11px] text-text-muted leading-relaxed">
+                                    Keep your token private — anyone with it can save links to your brain.
+                                </p>
+                            </div>
+                        )}
                     </section>
 
                     {/* App Version / Maintenance */}
