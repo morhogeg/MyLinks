@@ -51,7 +51,7 @@ class EmbeddingService:
             raise Exception(f"Gemini Embedding failed: {str(e)}")
 
 
-@firestore_fn.on_document_created(document="users/{uid}/links/{linkId}")
+@firestore_fn.on_document_created(document="users/{uid}/links/{linkId}", secrets=["GEMINI_API_KEY"])
 def sync_link_embedding(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
     """Trigger: When a new link is created, generate its embedding."""
     try:
@@ -154,7 +154,7 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
     return links
 
 
-@https_fn.on_call()
+@https_fn.on_call(secrets=["GEMINI_API_KEY"])
 def search_links(req: https_fn.CallableRequest) -> Any:
     """
     Callable Function: Perform semantic search.
