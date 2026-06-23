@@ -1,0 +1,20 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "next build",
+  "outputDirectory": "out",
+  "framework": "nextjs",
+  "rewrites": [
+    {
+      "source": "/api/analyze",
+      "destination": "https://secondbrain-app-94da2.web.app/api/analyze"
+    },
+    {
+      "source": "/api/analyze-image",
+      "destination": "https://secondbrain-app-94da2.web.app/api/analyze-image"
+    },
+    {
+      "source": "/api/share",
+      "destination": "https://secondbrain-app-94da2.web.app/api/share"
+    }
+  ]
+}

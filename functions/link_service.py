@@ -4,6 +4,7 @@ Handles Firestore operations for links and users.
 """
 
 import re
+import secrets
 import logging
 from typing import Optional
 
@@ -65,3 +66,63 @@ def get_user_tags(uid: str) -> list:
 def is_hebrew(text: str) -> bool:
     """Check if text contains Hebrew characters."""
     return any("\u0590" <= char <= "\u05FF" for char in text)
+
+
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+# Share Ingestion (iOS Shortcut / share sheet)
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
+def ensure_ingest_token(uid: str) -> str:
+    """
+    Return the user's personal ingest token, generating and persisting one
+    on first use. This token authenticates share-sheet POSTs to share_ingest.
+    """
+    db = get_db()
+    user_ref = db.collection('users').document(uid)
+    snapshot = user_ref.get()
+
+    if snapshot.exists:
+        token = snapshot.to_dict().get('ingestToken')
+        if token:
+            return token
+
+    token = secrets.token_urlsafe(24)
+    user_ref.set({'ingestToken': token}, merge=True)
+    logger.info(f"Generated new ingest token for user {uid}")
+    return token
+
+
+def find_user_by_ingest_token(token: str) -> Optional[str]:
+    """Look up a user UID by their ingest token."""
+    if not token:
+        return None
+    db = get_db()
+    docs = db.collection('users').where('ingestToken', '==', token).limit(1).get()
+    if docs:
+        return docs[0].id
+    return None
+
+
+def link_exists_for_url(uid: str, url: str) -> bool:
+    """Return True if the user already has a saved link with this exact URL."""
+    if not url:
+        return False
+    db = get_db()
+    links_ref = db.collection('users').document(uid).collection('links')
+    docs = links_ref.where('url', '==', url).limit(1).get()
+    return len(docs) > 0
+
+
+def pending_exists_for_url(uid: str, url: str) -> bool:
+    """Return True if there's already a queued/processing item for this URL."""
+    if not url:
+        return False
+    db = get_db()
+    docs = (
+        db.collection('pending_processing')
+        .where('uid', '==', uid)
+        .where('url', '==', url)
+        .limit(1)
+        .get()
+    )
+    return len(docs) > 0
