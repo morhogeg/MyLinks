@@ -5,12 +5,66 @@
 > the box and note the commit/PR. Keep this file in sync — it is the map we
 > drive from.
 
-**Last reviewed:** 2026-06-23
+**Last reviewed:** 2026-06-23 (session b — polish pass shipped & deployed)
 **Active branch:** `main` (Vercel auto-deploys this branch)
 
 ---
 
 ## 0.5 Deployment status & session handoff (2026-06-23)
+
+### Session 2026-06-23 (b) — production polish + live deploy ✅
+Branch `claude/codebase-production-polish-q90zhk`, merged to `main` (tip `80aac6d`).
+
+**Shipped (code, on `main`):**
+- **Analysis quality:** Gemini model centralized in one constant
+  `GEMINI_ANALYSIS_MODEL = "gemini-3.1-flash-lite"` (`functions/ai_service.py`) —
+  flows to text, image vision, and `graph_service`. Structured `response_schema`
+  (AIAnalysis) + one retry. Failures now raise `AnalysisError` and surface a real
+  error instead of silently saving an "Analysis Failed" card. Web-added YouTube
+  links get full metadata; read-time is word-count based.
+- **Image OCR speed + UX:** client-side downscale/compress (`web/lib/image.ts`),
+  upload + analyze run in parallel with inline bytes (no upload→re-download hop;
+  `analyze_image` accepts `imageBytes`/`mimeType`). New `ImageScanProgress.tsx`
+  scan-line + simulated-progress indicator (anchored to the real upload milestone).
+- **UX feedback:** new `Toast.tsx` system (success/error on add/edit/archive/
+  delete/reminder), skeleton loaders, dialog a11y roles, ReminderModal effect-bug
+  fix, ~25 debug logs + dead localStorage helpers removed.
+- **Pipeline consolidation (partial T2):** TS `/api/analyze` + new
+  `/api/analyze-image` are now **thin proxies** to the canonical Python backend;
+  the drifted TS analysis logic in `web/lib/ai-service.ts` was deleted (only
+  `chatWithContent` remains).
+
+**Deployed this session (live in `secondbrain-app-94da2`, us-central1):**
+- Redeployed Python 3.13 functions: `analyze_link`, `analyze_image`,
+  `debug_status`, `search_links`, `sync_link_embedding` — now on
+  `gemini-3.1-flash-lite`. Confirmed working end-to-end by the user.
+- **NOT redeployed on purpose:** `process_link_background` and `whatsapp_webhook`
+  (and other Twilio-touching fns). They still run the OLD model/code. Reason: their
+  Twilio config (`TWILIO_*`) lives only as plain env vars not present in this repo
+  clone, so a redeploy from a clean checkout could blank them. **Follow-up:** once
+  `TWILIO_*` values are in hand (put them in `functions/.env`), redeploy these so
+  WhatsApp/share captures also use the new model.
+
+**⚠️ Deploy gotchas (read before next backend deploy):**
+- **`GEMINI_API_KEY` is a PLAIN env var** on the Cloud Run services, NOT a secret.
+  Do not add `secrets=["GEMINI_API_KEY"]` to decorators — Cloud Run rejects a name
+  that is both a plain var and a secret ("overlaps non secret environment variable").
+  Supply it via **`functions/.env`** (`GEMINI_API_KEY=...`, gitignored). An unused
+  Secret Manager entry `GEMINI_API_KEY` exists from a first attempt — harmless,
+  ignore or `firebase functions:secrets:destroy GEMINI_API_KEY`.
+- Deploy needs a local venv (firebase-tools imports the source to discover fns):
+  `cd functions && python3.13 -m venv venv && venv/bin/pip install -r requirements.txt`.
+  Both `functions/.env` and `functions/venv/` are gitignored and absent in a fresh
+  container — recreate them.
+- Deploy command used:
+  `firebase deploy --only "functions:analyze_link,functions:analyze_image,functions:debug_status,functions:search_links,functions:sync_link_embedding" --project secondbrain-app-94da2`.
+- **Claude Code web sessions:** egress allowlist permits `googleapis.com` (deploy
+  works) but blocks the `*.run.app` function URLs, so you can't curl deployed
+  functions to verify from a web session — verify via the app instead.
+- **Rotate the Gemini key:** it was shared in chat during this session. Regenerate
+  at aistudio.google.com, update `functions/.env`, redeploy.
+
+---
 
 **Frontend is LIVE on Vercel.** The app is publicly reachable.
 - Vercel project builds **`morhogeg/MyLinks`**, branch **`main`**, **Root Directory = `web`**.
@@ -40,9 +94,10 @@ A working-but-fragile MVP. Core loop works in production: capture a link/image
 (web UI or WhatsApp) → Python Cloud Function scrapes + Gemini analyzes →
 structured card saved to Firestore → real-time feed, semantic search, reminders.
 
-**Stack:** Next.js 15 static export (PWA) on Firebase Hosting · Python 3.13
-Firebase Cloud Functions · Firestore (+ vector index) · Gemini (analysis +
-`gemini-embedding-001`) · Twilio (WhatsApp).
+**Stack:** Next.js 16 (PWA) on Vercel (+ Firebase Hosting static export) · Python 3.13
+Firebase Cloud Functions · Firestore (+ vector index) · Gemini
+(`gemini-3.1-flash-lite` for analysis/vision, `gemini-embedding-001` for search)
+· Twilio (WhatsApp).
 
 **Capture channels live:** Web add-link, web image upload, WhatsApp (links +
 images + reminder commands, EN/HE), YouTube deep analysis.
@@ -50,10 +105,13 @@ images + reminder commands, EN/HE), YouTube deep analysis.
 **Known structural facts that shape the backlog:**
 - **No real auth.** `AuthProvider` loads the first user doc; Firestore rules are
   `allow read, write: if true`. Effectively single-user.
-- **Duplicated analysis logic.** TypeScript (`web/lib/ai-service.ts` +
-  `app/api/analyze/route.ts`) reimplements what the Python functions do. In
-  production, `firebase.json` rewrites `/api/analyze` and `/api/analyze-image`
-  to the Python functions — so the TS path is dev-only/parallel and drifts.
+- **Analysis pipeline consolidated (2026-06-23 session b).** Python Cloud Functions
+  are the single source of truth. `web/app/api/analyze/route.ts` and
+  `web/app/api/analyze-image/route.ts` are now thin proxies to the Python backend;
+  the duplicated TS analysis logic was removed. Remaining T2 nit: web-saved links
+  store `embedding_vector` as a plain array (not a Firestore `Vector`), so
+  web-added links aren't vector-searchable until the `sync_link_embedding` trigger
+  re-embeds them — verify this path or normalize on save.
 - **Thin tests.** Only `functions/test_yt_scrape.py`. The AI/scrape pipeline has
   needed repeated regression fixes.
 
@@ -87,7 +145,8 @@ for the narrow case of "saved inside an app you'd never bother to share from."
 |----|-------|----------|--------|
 | T1 | Real authentication (Firebase Auth + locked Firestore rules) | P0 🔴 URGENT (app is public) | ☐ Not started |
 | T14 | Universal share capture (iOS Shortcut → share_ingest) | P1 | ◐ Code done + frontend live; needs `firebase deploy` + e2e test |
-| T2 | Consolidate analysis pipeline to one source of truth | P0 | ☐ Not started |
+| T2 | Consolidate analysis pipeline to one source of truth | P0 | ◐ Mostly done (session b): Python canonical, TS routes are thin proxies, TS dup removed. Left: embedding_vector array-vs-Vector on web-saved links |
+| T15 | Polish pass: analysis quality, image OCR speed + scan UX, toasts | — | ☒ Done (session b, deployed) |
 | T3 | Test harness for scrape + analyze + search | P1 | ☐ Not started |
 | T4 | Multi-user data model & isolation | P1 | ☐ Not started |
 | E1 | Active bookmark sync from external services (MCP) | P1 (epic) | ☐ Not started |
@@ -99,7 +158,7 @@ for the narrow case of "saved inside an app you'd never bother to share from."
 | T10 | Reading view + export (MD/PDF/HTML) | P3 | ☐ Not started |
 | T11 | Highlights & annotations | P3 | ☐ Not started |
 | T12 | README ↔ reality reconciliation | P3 | ☐ Not started |
-| T13 | Code-debt TODOs cleanup | P3 | ☐ Ongoing |
+| T13 | Code-debt TODOs cleanup | P3 | ◐ Ongoing (session b: removed debug logs, dead localStorage helpers, fixed Feed stale comment + ReminderModal effect bug) |
 
 ---
 
@@ -241,9 +300,11 @@ Inline TODOs found in the codebase:
 - [ ] `firestore.rules:6` — lock down with real auth (folded into **T1**).
 - [ ] `web/lib/types.ts:82` — replace placeholder `User` type with Firebase Auth user.
 - [ ] `web/components/AuthProvider.tsx:28` — real Firebase Auth (**T1**).
-- [ ] `web/components/Feed.tsx:31` — stale comment ("localStorage polling");
-      it already uses Firestore `onSnapshot`. Fix the comment.
-- [ ] `web/lib/storage.ts:130` — Firestore ID generation note; verify/clean.
+- [x] `web/components/Feed.tsx:31` — stale "localStorage polling" comment fixed (session b).
+- [x] `web/lib/storage.ts:130` — dead localStorage helpers (`getLinks`, `searchLinks`,
+      `filterByStatus`, `generateId`, `STORAGE_KEY`) removed (session b).
+- [x] Debug `console.log`s stripped from `AddLinkForm`, `Feed`, `ReminderModal` (session b).
+- [x] `web/components/ReminderModal.tsx` — fixed `useState`-as-effect init bug (session b).
 
 ---
 
