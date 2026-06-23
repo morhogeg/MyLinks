@@ -5,8 +5,32 @@
 > the box and note the commit/PR. Keep this file in sync — it is the map we
 > drive from.
 
-**Last reviewed:** 2026-06-22
-**Active branch:** `claude/multi-platform-auto-save-44qkmq`
+**Last reviewed:** 2026-06-23
+**Active branch:** `main` (Vercel auto-deploys this branch)
+
+---
+
+## 0.5 Deployment status & session handoff (2026-06-23)
+
+**Frontend is LIVE on Vercel.** The app is publicly reachable.
+- Vercel project builds **`morhogeg/MyLinks`**, branch **`main`**, **Root Directory = `web`**.
+- `web/next.config.ts` disables Next static export when `VERCEL=1` (Vercel builds Next
+  natively; static `export` broke its routing). Firebase Hosting still gets the static export.
+- `web/vercel.json` proxies `/api/analyze`, `/api/analyze-image`, `/api/share` to the Firebase
+  backend (`*.web.app`).
+- Six `NEXT_PUBLIC_FIREBASE_*` env vars are set in Vercel (entered **without** quotes).
+- Setup gotchas that cost us time (avoid re-hitting): app lives in `web/` subfolder so Root
+  Directory MUST be `web`; Vercel's "clone" flow created a stray `mylinksnew` repo — always use
+  **Import** on the existing repo, not clone.
+
+**Backend NOT fully deployed.** The new `share_ingest` / `get_share_config` Cloud Functions
+exist in code but need a **`firebase deploy`** (from a machine with Firebase auth) before the
+iOS Shortcut works end-to-end. The feed/search/existing capture already work (they hit the
+already-deployed functions + Firestore directly).
+
+**⚠️ Security now urgent:** the app is public but Firestore rules are still
+`allow read, write: if true` and there's no login. Anyone with the Vercel link can read/write
+all data. **T1 is now the top priority** (was P0; now also time-sensitive).
 
 ---
 
@@ -61,8 +85,8 @@ for the narrow case of "saved inside an app you'd never bother to share from."
 
 | ID | Title | Priority | Status |
 |----|-------|----------|--------|
-| T14 | Universal share capture (iOS Shortcut → share_ingest) | P1 | ◐ Implemented, pending deploy/test |
-| T1 | Real authentication (Firebase Auth + locked Firestore rules) | P0 | ☐ Not started |
+| T1 | Real authentication (Firebase Auth + locked Firestore rules) | P0 🔴 URGENT (app is public) | ☐ Not started |
+| T14 | Universal share capture (iOS Shortcut → share_ingest) | P1 | ◐ Code done + frontend live; needs `firebase deploy` + e2e test |
 | T2 | Consolidate analysis pipeline to one source of truth | P0 | ☐ Not started |
 | T3 | Test harness for scrape + analyze + search | P1 | ☐ Not started |
 | T4 | Multi-user data model & isolation | P1 | ☐ Not started |
