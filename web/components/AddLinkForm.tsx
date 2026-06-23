@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, FormEvent } from 'react';
-import { Link, Plus, Loader2, X, Image as ImageIcon, Upload } from 'lucide-react';
+import { Link, Plus, Loader2, X, Upload } from 'lucide-react';
 import { saveLink, getUserTags } from '@/lib/storage';
 import { storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/components/AuthProvider';
+import { useToast } from '@/components/Toast';
+import { compressImage } from '@/lib/image';
 
 interface AddLinkFormProps {
     onLinkAdded: () => void;
@@ -26,6 +28,7 @@ const formatUrl = (input: string) => {
  */
 export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
     const { uid } = useAuth();
+    const toast = useToast();
     const [url, setUrl] = useState('');
     const [activeTab, setActiveTab] = useState<'link' | 'image'>('link');
     const [imageFile, setImageFile] = useState<File | null>(null);
@@ -34,15 +37,31 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
     const [error, setError] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
 
+    const parseResponse = async (response: Response) => {
+        const responseText = await response.text();
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch {
+            throw new Error('The analysis service returned an unexpected response. Please try again.');
+        }
+        if (!response.ok || !data.success) {
+            throw new Error(data?.error || 'Failed to analyze. Please try again.');
+        }
+        return data;
+    };
+
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
-        console.log('Submit triggered with URL:', url); // DEBUG
 
         const formattedUrl = formatUrl(url);
-        console.log('Formatted URL:', formattedUrl); // DEBUG
 
         if ((activeTab === 'link' && !formattedUrl) || (activeTab === 'image' && !imageFile) || isLoading) {
-            console.log('Validation failed or already loading'); // DEBUG
+            return;
+        }
+
+        if (!uid) {
+            setError('User not ready yet. Please wait a moment and try again.');
             return;
         }
 
@@ -50,100 +69,67 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
         setError(null);
 
         try {
-            // Stage 1: Analysis
-            // Fetch existing tags to pass to AI for reuse
+            // Fetch existing tags to pass to AI for reuse (non-critical).
             let existingTags: string[] = [];
             try {
-                if (uid) {
-                    existingTags = await getUserTags(uid);
-                }
-            } catch (tagErr) {
-                console.warn('Failed to fetch existing tags (proceeding without):', tagErr);
-                // Continue without tags - this is non-critical optimization
+                existingTags = await getUserTags(uid);
+            } catch {
+                // Proceed without tag context — purely an optimization.
             }
 
-            let response;
+            let data;
 
             if (activeTab === 'link') {
-                // LINK MODE
-                console.log('Calling /api/analyze...'); // DEBUG
+                // LINK MODE — analysis happens in the canonical Python backend.
+                let response;
                 try {
                     response = await fetch('/api/analyze', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            url: formattedUrl,
-                            existingTags
-                        }),
+                        body: JSON.stringify({ url: formattedUrl, existingTags, uid }),
                     });
                 } catch (netErr) {
-                    console.error('Network request failed:', netErr);
-                    throw new Error(`Network Error: ${netErr instanceof Error ? netErr.message : String(netErr)}`);
+                    throw new Error(`Network error: ${netErr instanceof Error ? netErr.message : String(netErr)}`);
                 }
+                data = await parseResponse(response);
             } else {
-                // IMAGE MODE
-                console.log('Current UID before upload:', uid); // DEBUG
-                if (!imageFile || !uid) {
-                    const msg = !uid ? "User ID not found. Please ensure you are logged in or the test user exists." : "No image selected.";
-                    throw new Error(msg);
-                }
+                // IMAGE MODE — compress client-side, then upload to storage and
+                // analyze the inline bytes IN PARALLEL (no upload→re-download hop).
+                const compressed = await compressImage(imageFile!);
 
-                // 1. Upload to Firebase Storage
-                const storagePath = `users/${uid}/uploads/${Date.now()}_${imageFile.name}`;
-                console.log('Uploading to path:', storagePath); // DEBUG
+                const storagePath = `users/${uid}/uploads/${Date.now()}.jpg`;
                 const storageRef = ref(storage, storagePath);
-                await uploadBytes(storageRef, imageFile);
-                const downloadURL = await getDownloadURL(storageRef);
 
-                // 2. Call Analyze Image API
-                console.log('Calling /api/analyze-image...'); // DEBUG
+                const uploadPromise = uploadBytes(storageRef, compressed.blob)
+                    .then(() => getDownloadURL(storageRef));
+
+                const analyzePromise = fetch('/api/analyze-image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        imageBytes: compressed.base64,
+                        mimeType: compressed.mimeType,
+                        existingTags,
+                    }),
+                }).then(parseResponse);
+
+                let downloadURL: string;
+                let analyzed;
                 try {
-                    response = await fetch('/api/analyze-image', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            imageUrl: downloadURL,
-                            existingTags
-                        }),
-                    });
-                } catch (netErr) {
-                    console.error('Network request failed:', netErr);
-                    throw new Error(`Network Error: ${netErr instanceof Error ? netErr.message : String(netErr)}`);
+                    [downloadURL, analyzed] = await Promise.all([uploadPromise, analyzePromise]);
+                } catch (err) {
+                    throw new Error(err instanceof Error ? err.message : String(err));
                 }
+
+                data = analyzed;
+                // The link's URL is the stored image, used to display it later.
+                data.link.url = downloadURL;
             }
 
-            console.log('Response status:', response.status); // DEBUG
-
-            let responseText = '';
-            try {
-                responseText = await response.text();
-                console.log('Raw server response body:', responseText); // DEBUG
-            } catch (textErr) {
-                console.error('Failed to read response text:', textErr);
-                throw new Error('Failed to read server response');
-            }
-
-            let data;
-            try {
-                data = JSON.parse(responseText);
-            } catch (jsonErr) {
-                console.error('JSON parse failed:', jsonErr);
-                throw new Error(`Invalid Server Response (Not JSON): ${jsonErr instanceof Error ? jsonErr.message : String(jsonErr)}`);
-            }
-
-            console.log('Analysis data:', data); // DEBUG
-
-            if (!data.success) {
-                throw new Error(`Analysis Error: ${data.error || 'Failed to analyze URL'}`);
-            }
-
-            // Stage 2: Save
-            // Save to Firestore
-            if (!uid) throw new Error("User not registered in database");
-
+            // Save to Firestore.
             try {
                 await saveLink(uid, {
-                    url: data.link.url, // For images, this will be the storage URL
+                    url: data.link.url,
                     title: data.link.title,
                     summary: data.link.summary,
                     detailedSummary: data.link.detailedSummary,
@@ -153,33 +139,28 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                     metadata: {
                         originalTitle: data.link.metadata.originalTitle,
                         estimatedReadTime: data.link.metadata.estimatedReadTime,
-                        actionableTakeaway: data.link.metadata.actionableTakeaway
+                        actionableTakeaway: data.link.metadata.actionableTakeaway,
                     },
-                    // Add source type info if available
-                    sourceType: activeTab === 'image' ? 'image' : 'web',
+                    sourceType: activeTab === 'image' ? 'image' : (data.link.sourceType || 'web'),
                     sourceName: data.link.sourceName,
-                    // Fields for semantic search and knowledge graph (Issue #2 fix)
                     embedding_vector: data.link.embedding_vector,
                     concepts: data.link.concepts,
-                    relatedLinks: data.link.relatedLinks
+                    relatedLinks: data.link.relatedLinks,
                 });
             } catch (saveErr) {
-                throw new Error(`Firestore Save Error: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
+                throw new Error(`Could not save to your brain: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
             }
 
             setUrl('');
             setImageFile(null);
             setImagePreview(null);
             setIsExpanded(false);
+            toast.success('Saved to your brain');
             onLinkAdded();
         } catch (err) {
-            console.error('AddLinkForm Error Details:', err);
-            // Check if it's a DOMException or other weird browser error
-            if (err instanceof DOMException) {
-                console.error('DOMException name:', err.name);
-                console.error('DOMException message:', err.message);
-            }
-            setError(err instanceof Error ? err.message : `Unknown error: ${String(err)}`);
+            const message = err instanceof Error ? err.message : `Unknown error: ${String(err)}`;
+            setError(message);
+            toast.error(message);
         } finally {
             setIsLoading(false);
         }

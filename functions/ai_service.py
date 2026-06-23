@@ -1,11 +1,24 @@
 import os
 import json
 import logging
+import time
 from typing import List
 from google import genai
 from models import AIAnalysis
 
 logger = logging.getLogger(__name__)
+
+# Single source of truth for the analysis/generation model. `gemini-1.5-flash`
+# is being retired; `gemini-2.5-flash` is the current GA flash tier (faster and
+# more capable for both text and vision). Change here to swap tiers everywhere.
+GEMINI_ANALYSIS_MODEL = "gemini-2.5-flash"
+EMBEDDING_MODEL = "models/gemini-embedding-001"
+EMBEDDING_DIMENSIONS = 768
+
+
+class AnalysisError(Exception):
+    """Raised when AI analysis genuinely fails so callers can surface a real
+    error instead of silently saving a junk 'Analysis Failed' card."""
 
 # Professional system prompt
 SYSTEM_PROMPT = """You are a professional knowledge extraction assistant for a "Second Brain" system.
@@ -63,7 +76,7 @@ CRITICAL RULES:
 - Avoid subjective phrases like: "offers valuable insights", "provides a comprehensive overview", "explores interesting ideas", "is a must-read", "excellently explains".
 - Use factual language: "The article discusses...", "The author argues...", "The research shows...", "Key topics include...".
 
-8. concepts: Identify 3-5 "Philosophical Anchors" or "Abstract Concepts".
+9. concepts: Identify 3-5 "Philosophical Anchors" or "Abstract Concepts".
    - **LANGUAGE**: English (always).
    - These should be high-level mental models or themes, not just keywords.
    - Example: "Spaced Repetition", "Pareto Principle", "Stoicism", "Network Effects", "Opportunity Cost".
@@ -108,129 +121,114 @@ class GeminiService:
         self.api_key = os.environ.get("GEMINI_API_KEY")
         if not self.api_key:
             logger.critical("GEMINI_API_KEY is empty")
-            
-        self.client = genai.Client(api_key=self.api_key) if self.api_key else None
-        self.model = "gemini-2.0-flash"
-        
-    def analyze_text(self, text: str, existing_tags: list = None, content_type: str = None) -> dict:
-        """Analyze text content using Gemini."""
-        if not self.client:
-            logger.warning("Gemini client not initialized, using mock")
-            return self._mock_analysis(text)
-        
-        try:
-            clean_text = text[:30000]
-            
-            tags_context = f"\n\nExisting Tags in Brain (Reuse these if possible):\n{', '.join(existing_tags)}" if existing_tags else ""
-            
-            # Add content-type-specific prompt additions
-            type_addendum = ""
-            if content_type == "youtube":
-                type_addendum = YOUTUBE_PROMPT_ADDENDUM
-            
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=[f"{SYSTEM_PROMPT}{type_addendum}{tags_context}\n\nContent to analyze:\n{clean_text}"],
-                config={
-                    'response_mime_type': 'application/json',
-                }
-            )
-            
-            if not response or not response.text:
-                raise Exception("Empty response from Gemini")
-                
-            data = json.loads(response.text)
-            if isinstance(data, str):
-                try: data = json.loads(data)
-                except: pass
-            if isinstance(data, list) and len(data) > 0:
-                data = data[0]
-            
-            if isinstance(data, dict):
-                return data
-            else:
-                return self._mock_analysis(text)
-        except Exception as e:
-            logger.error(f"Gemini analysis failed: {str(e)}")
-            return self._mock_analysis(text)
 
-    def analyze_image(self, image_bytes: bytes, mime_type: str, existing_tags: list = None) -> dict:
-        """Analyze image content using Gemini."""
+        self.client = genai.Client(api_key=self.api_key) if self.api_key else None
+        self.model = GEMINI_ANALYSIS_MODEL
+
+    def _generate_json(self, contents: list, what: str) -> dict:
+        """Call Gemini with a structured-output (response_schema) config and
+        return a parsed dict. Retries once on transient failures, then raises
+        AnalysisError so the caller can surface a real error.
+        """
         if not self.client:
-            logger.warning("Gemini client not initialized, using mock")
-            return self._mock_analysis("Image content")
-        
-        try:
-            tags_context = f"\n\nExisting Tags in Brain (Reuse these if possible):\n{', '.join(existing_tags)}" if existing_tags else ""
-            
-            prompt = f"""{SYSTEM_PROMPT}{tags_context}
-            
-            Based on the image provided, extract the text and analyze it according to the instructions above.
-            If the image contains a tweet or social media post, extract the content as if it were the text.
-            If the image is an article, extract the headline and body.
-            """
-            
-            from google.genai import types
-            
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=[
-                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-                    prompt
-                ],
-                config={
-                    'response_mime_type': 'application/json',
-                }
-            )
-            
-            if not response or not response.text:
-                raise Exception("Empty response from Gemini")
-                
+            raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
+
+        config = {
+            "response_mime_type": "application/json",
+            # Schema-constrained output makes the model return valid, complete
+            # JSON instead of free-form text we have to defensively unwrap.
+            "response_schema": AIAnalysis,
+        }
+
+        last_error = None
+        for attempt in range(2):
             try:
+                response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=contents,
+                    config=config,
+                )
+                if not response or not response.text:
+                    raise AnalysisError("Empty response from Gemini")
+
                 data = json.loads(response.text)
+                # Defensive unwrapping kept as a safety net.
                 if isinstance(data, str):
-                    try: data = json.loads(data)
-                    except: pass
-                if isinstance(data, list) and len(data) > 0:
+                    try:
+                        data = json.loads(data)
+                    except Exception:
+                        pass
+                if isinstance(data, list) and data:
                     data = data[0]
-                
+
                 if isinstance(data, dict):
                     return data
-                return self._mock_analysis("Image content")
+                raise AnalysisError("Gemini returned an unexpected JSON shape")
             except Exception as e:
-                logger.error(f"Failed to parse Gemini image JSON: {e}")
-                return self._mock_analysis("Image content")
-        except Exception as e:
-            logger.error(f"Gemini image analysis failed: {str(e)}")
-            return self._mock_analysis("Image content")
+                last_error = e
+                logger.warning(f"Gemini {what} attempt {attempt + 1} failed: {e}")
+                if attempt == 0:
+                    time.sleep(0.75)  # brief backoff before the single retry
+
+        logger.error(f"Gemini {what} failed after retries: {last_error}")
+        raise AnalysisError(f"AI {what} failed: {last_error}")
+
+    def analyze_text(self, text: str, existing_tags: list = None, content_type: str = None) -> dict:
+        """Analyze text content using Gemini. Raises AnalysisError on failure."""
+        clean_text = text[:30000]
+        tags_context = (
+            f"\n\nExisting Tags in Brain (Reuse these if possible):\n{', '.join(existing_tags)}"
+            if existing_tags else ""
+        )
+
+        # Add content-type-specific prompt additions
+        type_addendum = YOUTUBE_PROMPT_ADDENDUM if content_type == "youtube" else ""
+
+        prompt = f"{SYSTEM_PROMPT}{type_addendum}{tags_context}\n\nContent to analyze:\n{clean_text}"
+        return self._generate_json([prompt], "text analysis")
+
+    def analyze_image(self, image_bytes: bytes, mime_type: str, existing_tags: list = None) -> dict:
+        """Analyze image content using Gemini vision. Raises AnalysisError on failure."""
+        tags_context = (
+            f"\n\nExisting Tags in Brain (Reuse these if possible):\n{', '.join(existing_tags)}"
+            if existing_tags else ""
+        )
+
+        prompt = f"""{SYSTEM_PROMPT}{tags_context}
+
+Based on the image provided, extract the text and analyze it according to the instructions above.
+If the image contains a tweet or social media post, extract the content as if it were the text.
+If the image is an article, extract the headline and body."""
+
+        from google.genai import types
+
+        contents = [
+            types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+            prompt,
+        ]
+        return self._generate_json(contents, "image analysis")
 
     def embed_text(self, text: str) -> List[float]:
-        """Generate vector embedding for text using Gemini."""
+        """Generate vector embedding for text using Gemini.
+
+        Embeddings are non-critical (semantic search / related links degrade
+        gracefully), so a zero-ish vector is returned on failure rather than
+        raising — that keeps a good analysis from being thrown away.
+        """
         if not self.client:
             logger.warning("Gemini client not initialized, returning mock embedding")
-            return [1e-9] * 768
-            
+            return [1e-9] * EMBEDDING_DIMENSIONS
+
         try:
             result = self.client.models.embed_content(
-                model="models/gemini-embedding-001",
+                model=EMBEDDING_MODEL,
                 contents=text[:9000],
-                config={"output_dimensionality": 768}
+                config={"output_dimensionality": EMBEDDING_DIMENSIONS}
             )
             return result.embeddings[0].values
         except Exception as e:
             logger.error(f"Embedding generation failed: {str(e)}")
-            return [1e-9] * 768
-
-    def _mock_analysis(self, text: str) -> dict:
-        """Fallback mock logic when AI is unavailable."""
-        return {
-            "title": "Untitled (Analysis Failed)",
-            "summary": "Processing of this link failed or Gemini API was unavailable. Please check original.",
-            "category": "General",
-            "sourceName": "Unknown",
-            "tags": ["failed"],
-            "actionableTakeaway": "None"
-        }
+            return [1e-9] * EMBEDDING_DIMENSIONS
 
 
 # Backward compatibility alias

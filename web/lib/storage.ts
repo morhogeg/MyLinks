@@ -3,8 +3,6 @@ import { db } from './firebase';
 
 import { Link, LinkStatus, User } from './types';
 
-const STORAGE_KEY = 'secondbrain_links';
-
 /**
  * Get all links from Firestore (one-time fetch)
  * Note: Use Feed.tsx's onSnapshot for real-time updates
@@ -34,11 +32,6 @@ export async function getUserTags(uid: string): Promise<string[]> {
     });
 
     return Array.from(tags).sort();
-}
-
-// Keeping getLinks as a placeholder for legacy compatibility if needed
-export function getLinks(): Link[] {
-    return []; // No longer using localStorage
 }
 
 /**
@@ -101,36 +94,6 @@ export async function updateLinkCategory(uid: string, id: string, category: stri
 export async function deleteLink(uid: string, id: string): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', id);
     await deleteDoc(linkRef);
-}
-
-/**
- * Search links by title, summary, or tags
- */
-export function searchLinks(query: string): Link[] {
-    const links = getLinks();
-    const lowerQuery = query.toLowerCase();
-
-    return links.filter(link =>
-        link.title.toLowerCase().includes(lowerQuery) ||
-        link.summary.toLowerCase().includes(lowerQuery) ||
-        link.tags.some(tag => tag.toLowerCase().includes(lowerQuery)) ||
-        link.category.toLowerCase().includes(lowerQuery)
-    );
-}
-
-/**
- * Filter links by status
- */
-export function filterByStatus(status: LinkStatus): Link[] {
-    return getLinks().filter(link => link.status === status);
-}
-
-/**
- * Generate a unique ID
- * TODO: Firestore auto-generates IDs
- */
-export function generateId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
 /**

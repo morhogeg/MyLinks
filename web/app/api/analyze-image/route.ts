@@ -1,11 +1,9 @@
-// Thin proxy to the canonical Python analysis backend.
+// Thin proxy to the canonical Python image-analysis backend.
 //
-// The Python Cloud Functions are the single source of truth for analysis
-// (scrape + Gemini + embedding + related-links). In production the
-// vercel.json / firebase.json rewrites send /api/analyze straight to the
-// backend, so this route only runs during local `next dev` — here it forwards
-// the request so dev behaves identically to prod (no separate, drifting TS
-// implementation).
+// Mirrors app/api/analyze: production rewrites bypass this route, so it only
+// runs during local `next dev` to give dev/prod parity. Forwards the request
+// body (inline base64 `imageBytes` + `mimeType`, or legacy `imageUrl`) to the
+// Python `analyze_image` function.
 
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -21,7 +19,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     try {
-        const upstream = await fetch(`${BACKEND_BASE}/api/analyze`, {
+        const upstream = await fetch(`${BACKEND_BASE}/api/analyze-image`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),

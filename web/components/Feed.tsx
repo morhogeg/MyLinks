@@ -10,6 +10,7 @@ import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updat
 import { collection, query, orderBy, onSnapshot, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
+import { useToast } from '@/components/Toast';
 import { httpsCallable } from 'firebase/functions';
 import Card from './Card';
 import CompactCard from './CompactCard';
@@ -28,15 +29,16 @@ type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
 /**
  * Main feed component displaying saved links
  * Features:
- * - Real-time updates (via localStorage polling - TODO: Replace with Firestore onSnapshot)
- * - Search functionality
- * - Filter by status
- * - Infinite scroll / load more
+ * - Real-time updates via Firestore onSnapshot
+ * - Keyword + semantic search
+ * - Filter by status, category, and tags
+ * - Multiple view modes (grid / compact / table / insights)
  * - Deep linking to specific links via URL params
  */
 function FeedContent() {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
+    const toast = useToast();
     const [links, setLinks] = useState<Link[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [filter, setFilter] = useState<FilterType>('all');
@@ -142,7 +144,6 @@ function FeedContent() {
     useEffect(() => {
         if (!uid) return;
 
-        console.log("Starting real-time sync for user:", uid);
         const linksRef = collection(db, 'users', uid, 'links');
         const q = query(linksRef, orderBy('createdAt', 'desc'));
 
@@ -155,11 +156,12 @@ function FeedContent() {
             setIsLoading(false);
         }, (error: Error) => {
             console.error("Firestore sync error:", error);
+            toast.error("Lost connection to your library. Reconnecting…");
             setIsLoading(false);
         });
 
         return () => unsubscribe();
-    }, [uid]);
+    }, [uid, toast]);
 
     // Helper to get consistent number for timestamps (handles number, string, or Firestore Timestamp)
     const getTimestampNumber = (val: any): number => {
@@ -286,36 +288,71 @@ function FeedContent() {
 
 
 
+    // Firestore's onSnapshot applies writes optimistically (latency
+    // compensation) and reverts them if the write fails, so the UI updates
+    // instantly. We just surface failures and confirm meaningful actions.
     const handleStatusChange = async (id: string, status: LinkStatus) => {
         if (!uid) return;
-        await updateLinkStatus(uid, id, status);
+        try {
+            await updateLinkStatus(uid, id, status);
+            const labels: Record<string, string> = {
+                archived: 'Archived',
+                favorite: 'Added to favorites',
+                unread: 'Marked as unread',
+            };
+            if (labels[status]) toast.success(labels[status]);
+        } catch {
+            toast.error("Couldn't update the link. Please try again.");
+        }
     };
 
     const handleReadStatusChange = async (id: string, isRead: boolean) => {
         if (!uid) return;
-        await updateLinkReadStatus(uid, id, isRead);
+        try {
+            await updateLinkReadStatus(uid, id, isRead);
+        } catch {
+            toast.error("Couldn't update read status. Please try again.");
+        }
     };
 
     const handleUpdateTags = async (id: string, tags: string[]) => {
         if (!uid) return;
-        await updateLinkTags(uid, id, tags);
+        try {
+            await updateLinkTags(uid, id, tags);
+        } catch {
+            toast.error("Couldn't save tags. Please try again.");
+        }
     };
 
     const handleUpdateCategory = async (id: string, category: string) => {
         if (!uid) return;
-        await updateLinkCategory(uid, id, category);
+        try {
+            await updateLinkCategory(uid, id, category);
+        } catch {
+            toast.error("Couldn't change category. Please try again.");
+        }
     };
 
     const handleDelete = async (id: string) => {
         if (!uid) return;
         if (window.confirm('Delete this link?')) {
-            await deleteLink(uid, id);
+            try {
+                await deleteLink(uid, id);
+                toast.success('Link deleted');
+            } catch {
+                toast.error("Couldn't delete the link. Please try again.");
+            }
         }
     };
 
     const handleBulkArchive = async () => {
         if (!uid) return;
-        await Promise.all(Array.from(selectedIds).map(id => updateLinkStatus(uid, id, 'archived')));
+        try {
+            await Promise.all(Array.from(selectedIds).map(id => updateLinkStatus(uid, id, 'archived')));
+            toast.success(`Archived ${selectedIds.size} link${selectedIds.size === 1 ? '' : 's'}`);
+        } catch {
+            toast.error("Couldn't archive some links. Please try again.");
+        }
         setSelectedIds(new Set());
         setIsSelectionMode(false);
     };
@@ -323,7 +360,12 @@ function FeedContent() {
     const handleBulkDelete = async () => {
         if (!uid) return;
         if (window.confirm(`Delete ${selectedIds.size} links forever?`)) {
-            await Promise.all(Array.from(selectedIds).map(id => deleteLink(uid, id)));
+            try {
+                await Promise.all(Array.from(selectedIds).map(id => deleteLink(uid, id)));
+                toast.success(`Deleted ${selectedIds.size} link${selectedIds.size === 1 ? '' : 's'}`);
+            } catch {
+                toast.error("Couldn't delete some links. Please try again.");
+            }
             setSelectedIds(new Set());
             setIsSelectionMode(false);
         }
@@ -351,8 +393,28 @@ function FeedContent() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+            <div className="space-y-4" aria-busy="true" aria-label="Loading your links">
+                <div className="h-11 rounded-xl bg-card border border-white/5 animate-pulse" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <div
+                            key={i}
+                            className="bg-card border border-white/5 rounded-2xl p-5 animate-pulse"
+                        >
+                            <div className="h-3 w-20 bg-white/10 rounded-full mb-4" />
+                            <div className="h-5 w-3/4 bg-white/10 rounded mb-3" />
+                            <div className="space-y-2 mb-5">
+                                <div className="h-3 w-full bg-white/5 rounded" />
+                                <div className="h-3 w-5/6 bg-white/5 rounded" />
+                                <div className="h-3 w-2/3 bg-white/5 rounded" />
+                            </div>
+                            <div className="flex gap-2">
+                                <div className="h-5 w-14 bg-white/5 rounded-full" />
+                                <div className="h-5 w-16 bg-white/5 rounded-full" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
         );
     }

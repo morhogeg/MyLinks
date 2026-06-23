@@ -75,6 +75,18 @@ def _error_response(message: str, status: int = 400, headers: dict = None) -> ht
     )
 
 
+def _estimate_read_time(text: str, words_per_minute: int = 200) -> int:
+    """Estimate read time in minutes from word count.
+
+    Counts words rather than characters so the estimate holds for non-Latin
+    scripts (e.g. Hebrew), where the old `len(text) // 1500` heuristic was off.
+    """
+    if not text:
+        return 1
+    words = len(text.split())
+    return max(1, round(words / words_per_minute))
+
+
 # ─────────────────────────────────────────────
 # HTTP Endpoints
 # ─────────────────────────────────────────────
@@ -183,6 +195,14 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             )
 
         # 4. Construct Link Object
+        is_youtube = content_type == "youtube"
+        yt_meta = scraped.get("youtube_metadata", {})
+
+        if is_youtube and yt_meta.get("duration_seconds"):
+            estimated_time = max(1, yt_meta["duration_seconds"] // 60)
+        else:
+            estimated_time = _estimate_read_time(scraped.get("text", ""))
+
         link_data = {
             "url": url,
             "title": analysis.get("title", scraped.get("title", "Untitled")),
@@ -192,19 +212,32 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             "category": analysis.get("category", "General"),
             "status": LinkStatus.UNREAD.value,
             "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+            "language": analysis.get("language", "en"),
             "metadata": {
                 "originalTitle": scraped.get("title", ""),
-                "estimatedReadTime": max(1, len(scraped.get("text", "")) // 1500),
+                "estimatedReadTime": estimated_time,
                 "actionableTakeaway": analysis.get("actionableTakeaway")
             },
             "concepts": analysis.get("concepts", []),
             "embedding_vector": embedding,
             "relatedLinks": related_links,
-            "sourceType": "web",
+            "sourceType": "youtube" if is_youtube else "web",
             "sourceName": analysis.get("sourceName"),
             "confidence": 0.8,
             "keyEntities": []
         }
+
+        # Mirror the background pipeline's YouTube enrichment so web-added
+        # videos get the same rich metadata (channel, duration, highlights).
+        if is_youtube:
+            link_data["metadata"]["youtubeChannel"] = yt_meta.get("channel")
+            link_data["metadata"]["durationDisplay"] = yt_meta.get("duration_display")
+            link_data["metadata"]["durationSeconds"] = yt_meta.get("duration_seconds")
+            link_data["metadata"]["viewCount"] = yt_meta.get("view_count")
+            link_data["metadata"]["viewDisplay"] = yt_meta.get("view_display")
+            link_data["metadata"]["hasTranscript"] = yt_meta.get("has_transcript")
+            link_data["metadata"]["videoHighlights"] = analysis.get("videoHighlights", [])
+            link_data["metadata"]["speakers"] = analysis.get("speakers", [])
 
         return https_fn.Response(
             json.dumps({"success": True, "link": link_data}),
@@ -229,30 +262,40 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
             return _error_response("Invalid JSON body", 400, headers)
 
         image_url = data.get('imageUrl')
+        image_b64 = data.get('imageBytes')
         existing_tags = data.get('existingTags', [])
 
-        if not image_url:
-            return _error_response("Image URL is required", 400, headers)
+        if not image_url and not image_b64:
+            return _error_response("imageBytes or imageUrl is required", 400, headers)
 
-        logger.info(f"Analyzing Image: {image_url}")
-
-        # 1. Download Image
-        try:
-            img_response = requests.get(image_url, timeout=20)
-            img_response.raise_for_status()
-            image_bytes = img_response.content
-            mime_type = img_response.headers.get('Content-Type', 'image/jpeg')
-        except Exception as e:
-            return _error_response(f"Failed to download image: {str(e)}", 500, headers)
+        # 1. Obtain image bytes.
+        # Preferred path: the client sends the (already compressed) bytes inline,
+        # so we skip the slow upload→re-download round trip entirely.
+        if image_b64:
+            try:
+                import base64
+                image_bytes = base64.b64decode(image_b64)
+                mime_type = data.get('mimeType', 'image/jpeg')
+                logger.info(f"Analyzing inline image ({len(image_bytes)} bytes)")
+            except Exception as e:
+                return _error_response(f"Invalid image bytes: {str(e)}", 400, headers)
+        else:
+            logger.info(f"Analyzing Image by URL: {image_url}")
+            try:
+                img_response = requests.get(image_url, timeout=20)
+                img_response.raise_for_status()
+                image_bytes = img_response.content
+                mime_type = img_response.headers.get('Content-Type', 'image/jpeg')
+            except Exception as e:
+                return _error_response(f"Failed to download image: {str(e)}", 500, headers)
 
         # 2. Analyze with AI
         ai = GeminiService()
         analysis = ai.analyze_image(image_bytes, mime_type, existing_tags=existing_tags)
 
-
         # 3. Construct Link Object
         link_data = {
-            "url": image_url,
+            "url": image_url or "",
             "title": analysis.get("title", "Image Analysis"),
             "summary": analysis.get("summary", ""),
             "detailedSummary": analysis.get("detailedSummary", ""),
@@ -260,13 +303,15 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
             "category": analysis.get("category", "General"),
             "status": LinkStatus.UNREAD.value,
             "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+            "language": analysis.get("language", "en"),
             "metadata": {
                 "originalTitle": "Image Upload",
                 "estimatedReadTime": 1,
                 "actionableTakeaway": analysis.get("actionableTakeaway")
             },
+            "concepts": analysis.get("concepts", []),
             "sourceType": "image",
-            "sourceName": "Screenshot",
+            "sourceName": analysis.get("sourceName") or "Screenshot",
             "confidence": 0.9,
             "keyEntities": []
         }
@@ -649,7 +694,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         elif is_image:
             estimated_time = 1
         else:
-            estimated_time = max(1, len(scraped.get("text", "")) // 1500)
+            estimated_time = _estimate_read_time(scraped.get("text", ""))
 
         link_data = {
             "url": url,

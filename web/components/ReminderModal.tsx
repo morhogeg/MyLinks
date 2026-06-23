@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from '@/lib/types';
 import { X, Sparkles, Calendar, Clock, Bell, BellOff, Loader2, Check } from 'lucide-react';
 import { updateLinkReminder } from '@/lib/storage';
+import { useToast } from '@/components/Toast';
 
 interface ReminderModalProps {
     uid: string;
@@ -16,14 +17,15 @@ interface ReminderModalProps {
 type ReminderOption = 'smart' | 'tomorrow' | 'next-week' | 'spaced' | 'custom' | 'off';
 
 export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: ReminderModalProps) {
+    const toast = useToast();
     const [selectedOption, setSelectedOption] = useState<ReminderOption | null>(null);
     const [spacedInterval, setSpacedInterval] = useState<number>(3);
     const [customDate, setCustomDate] = useState('');
     const [customTime, setCustomTime] = useState('09:00');
     const [isSaving, setIsSaving] = useState(false);
 
-    // Effect to initialize state when modal opens
-    useState(() => {
+    // Pre-select the link's current reminder option whenever the modal opens.
+    useEffect(() => {
         if (!isOpen) return;
 
         if (link.reminderStatus === 'pending' && link.reminderProfile) {
@@ -48,14 +50,13 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                 setSelectedOption('smart');
             }
         }
-    });
+    }, [isOpen, link]);
 
     if (!isOpen) return null;
 
     const handleSave = async () => {
         if (!selectedOption) return;
 
-        console.log('Saving reminder option:', selectedOption);
         setIsSaving(true);
 
         try {
@@ -96,13 +97,13 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     break;
                 case 'off':
                     await updateLinkReminder(uid, link.id, false);
+                    toast.success('Reminder turned off');
                     onClose();
                     if (onUpdate) onUpdate();
                     return;
             }
 
             if (nextReminderTime) {
-                console.log('Setting reminder for:', new Date(nextReminderTime).toLocaleString());
                 await updateLinkReminder(
                     uid,
                     link.id,
@@ -110,13 +111,13 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     nextReminderTime,
                     selectedOption === 'spaced' ? `spaced-${spacedInterval}` : selectedOption
                 );
+                toast.success(`Reminder set for ${new Date(nextReminderTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}`);
                 onClose();
                 if (onUpdate) onUpdate();
             }
 
         } catch (error) {
-            console.error("Failed to set reminder:", error);
-            alert(`Failed to set reminder: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            toast.error(`Couldn't set the reminder: ${error instanceof Error ? error.message : 'please try again.'}`);
         } finally {
             setIsSaving(false);
         }
@@ -124,7 +125,6 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
 
     const handleSelectOption = (option: ReminderOption) => {
         setSelectedOption(option);
-        console.log('Selected option:', option);
     };
 
     const isReminderActive = link.reminderStatus === 'pending';
@@ -189,7 +189,12 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                 onClick={isSaving ? undefined : onClose}
             />
 
-            <div className="relative bg-card border border-white/10 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 safe-pt">
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Set reminder"
+                className="relative bg-card border border-white/10 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 safe-pt"
+            >
                 <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
                     <h2 className="text-lg font-bold text-text flex items-center gap-2">
                         <Bell className="w-5 h-5 text-accent" />

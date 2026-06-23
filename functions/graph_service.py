@@ -4,7 +4,7 @@ from typing import List, Dict, Optional
 from firebase_admin import firestore
 from google.cloud.firestore_v1.vector import Vector
 from models import LinkDocument, RelatedLink
-from ai_service import GeminiService
+from ai_service import GeminiService, GEMINI_ANALYSIS_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +139,7 @@ If no strong connections, return [].
                  return []
             
             response = self.ai.client.models.generate_content(
-                model="gemini-1.5-flash", # Use fast/stable model
+                model=GEMINI_ANALYSIS_MODEL,  # Single source of truth (see ai_service)
                 contents=prompt,
                 config={'response_mime_type': 'application/json'}
             )

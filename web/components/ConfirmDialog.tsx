@@ -54,7 +54,11 @@ export default function ConfirmDialog({
             />
 
             {/* Dialog */}
-            <div className="relative bg-card w-full max-w-md rounded-2xl border border-white/5 shadow-2xl p-6 overflow-hidden animate-scale-up">
+            <div
+                role="alertdialog"
+                aria-modal="true"
+                className="relative bg-card w-full max-w-md rounded-2xl border border-white/5 shadow-2xl p-6 overflow-hidden animate-scale-up"
+            >
                 {/* Header */}
                 <div className="flex items-start gap-4 mb-4">
                     <div className={`mt-1 p-2 rounded-xl flex-shrink-0 ${variant === 'danger' ? 'bg-red-500/10 text-red-400' : 'bg-purple-500/10 text-purple-400'

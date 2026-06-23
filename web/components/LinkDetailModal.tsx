@@ -117,7 +117,12 @@ export default function LinkDetailModal({
                 onClick={onClose}
             />
 
-            <div className="relative bg-card border-0 sm:border border-white/10 w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Link details"
+                className="relative bg-card border-0 sm:border border-white/10 w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300"
+            >
                 {/* Header Actions */}
                 <div className="flex items-center justify-between p-3 sm:p-4 safe-pt">
                     <div className="flex gap-1.5 sm:gap-2">
