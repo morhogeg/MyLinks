@@ -97,7 +97,7 @@ def ping(req: https_fn.Request) -> https_fn.Response:
     return https_fn.Response("pong")
 
 
-@https_fn.on_request(secrets=["GEMINI_API_KEY"])
+@https_fn.on_request()
 def debug_status(req: https_fn.Request) -> https_fn.Response:
     """Debug endpoint to inspect system state."""
     try:
@@ -143,7 +143,7 @@ def debug_status(req: https_fn.Request) -> https_fn.Response:
         return https_fn.Response(f"Debug failed: {str(e)}", status=500)
 
 
-@https_fn.on_request(secrets=["GEMINI_API_KEY"])
+@https_fn.on_request()
 def analyze_link(req: https_fn.Request) -> https_fn.Response:
     """
     HTTP endpoint for analyzing URLs immediately (Synchronous).
@@ -248,7 +248,7 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         return _error_response(str(e), 500, headers)
 
 
-@https_fn.on_request(secrets=["GEMINI_API_KEY"])
+@https_fn.on_request()
 def analyze_image(req: https_fn.Request) -> https_fn.Response:
     """HTTP endpoint for analyzing Images immediately (Synchronous)."""
     if req.method == 'OPTIONS':
@@ -581,8 +581,7 @@ def log_to_firestore(task_id: str, message: str, level: str = "INFO", data: dict
 @firestore_fn.on_document_created(
     document="pending_processing/{doc_id}",
     memory=1024,
-    timeout_sec=300,
-    secrets=["GEMINI_API_KEY"]
+    timeout_sec=300
 )
 def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
     """
