@@ -153,6 +153,21 @@ html {
   animation: pulse-subtle 3s ease-in-out infinite;
 }
 
+/* OCR-style scan line sweeping over an image while it's being analyzed */
+@keyframes scan-sweep {
+  0% {
+    transform: translateY(-110%);
+  }
+
+  100% {
+    transform: translateY(820%);
+  }
+}
+
+.animate-scan-sweep {
+  animation: scan-sweep 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
 /* Safe area insets for iOS */
 @supports (padding: max(0px)) {
   body {

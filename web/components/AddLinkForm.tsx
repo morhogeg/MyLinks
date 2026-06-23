@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { Link, Plus, Loader2, X, Upload } from 'lucide-react';
 import { saveLink, getUserTags } from '@/lib/storage';
 import { storage } from '@/lib/firebase';
@@ -8,6 +8,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { compressImage } from '@/lib/image';
+import ImageScanProgress from '@/components/ImageScanProgress';
 
 interface AddLinkFormProps {
     onLinkAdded: () => void;
@@ -36,6 +37,30 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // Simulated-but-motion-forward progress for image analysis. We can't read
+    // real progress from Gemini, so ease toward a cap (~92%) — always moving,
+    // never completing early. A real milestone (upload done) is blended in from
+    // handleSubmit, and success snaps it to 100%.
+    useEffect(() => {
+        if (isLoading && activeTab === 'image') {
+            setProgress((p) => (p < 8 ? 8 : p));
+            progressTimer.current = setInterval(() => {
+                setProgress((p) => {
+                    const CAP = 92;
+                    return p >= CAP ? p : p + (CAP - p) * 0.07;
+                });
+            }, 180);
+        }
+        return () => {
+            if (progressTimer.current) {
+                clearInterval(progressTimer.current);
+                progressTimer.current = null;
+            }
+        };
+    }, [isLoading, activeTab]);
 
     const parseResponse = async (response: Response) => {
         const responseText = await response.text();
@@ -67,6 +92,7 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
 
         setIsLoading(true);
         setError(null);
+        setProgress(0);
 
         try {
             // Fetch existing tags to pass to AI for reuse (non-critical).
@@ -101,7 +127,11 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                 const storageRef = ref(storage, storagePath);
 
                 const uploadPromise = uploadBytes(storageRef, compressed.blob)
-                    .then(() => getDownloadURL(storageRef));
+                    .then(() => {
+                        // Real milestone: upload finished — jump past "scanning".
+                        setProgress((p) => Math.max(p, 45));
+                        return getDownloadURL(storageRef);
+                    });
 
                 const analyzePromise = fetch('/api/analyze-image', {
                     method: 'POST',
@@ -149,6 +179,12 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                 });
             } catch (saveErr) {
                 throw new Error(`Could not save to your brain: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
+            }
+
+            // Let the image progress land on "Done!" before closing.
+            if (activeTab === 'image') {
+                setProgress(100);
+                await new Promise((r) => setTimeout(r, 550));
             }
 
             setUrl('');
@@ -246,6 +282,8 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                                         autoFocus
                                     />
                                 </div>
+                            ) : isLoading && imagePreview ? (
+                                <ImageScanProgress imageSrc={imagePreview} progress={progress} />
                             ) : (
                                 <div className="relative">
                                     <input
@@ -295,20 +333,24 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                                 </div>
                             )}
 
-                            <button
-                                type="submit"
-                                disabled={isLoading || (activeTab === 'link' ? !url.trim() : !imageFile)}
-                                className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-100 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
-                            >
-                                {isLoading ? (
-                                    <>
-                                        <Loader2 className="w-5 h-5 animate-spin" />
-                                        <span>{activeTab === 'link' ? 'Analyzing...' : 'Processing Image...'}</span>
-                                    </>
-                                ) : (
-                                    'Save'
-                                )}
-                            </button>
+                            {/* The image scan view shows its own progress, so the
+                                button is only needed otherwise. */}
+                            {!(isLoading && activeTab === 'image') && (
+                                <button
+                                    type="submit"
+                                    disabled={isLoading || (activeTab === 'link' ? !url.trim() : !imageFile)}
+                                    className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-100 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                            <span>Analyzing...</span>
+                                        </>
+                                    ) : (
+                                        'Save'
+                                    )}
+                                </button>
+                            )}
                         </div>
 
                         {error && (

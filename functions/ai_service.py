@@ -8,10 +8,9 @@ from models import AIAnalysis
 
 logger = logging.getLogger(__name__)
 
-# Single source of truth for the analysis/generation model. `gemini-1.5-flash`
-# is being retired; `gemini-2.5-flash` is the current GA flash tier (faster and
-# more capable for both text and vision). Change here to swap tiers everywhere.
-GEMINI_ANALYSIS_MODEL = "gemini-2.5-flash"
+# Single source of truth for the analysis/generation model. Flows to text
+# analysis, image vision, and graph_service. Change here to swap tiers everywhere.
+GEMINI_ANALYSIS_MODEL = "gemini-3.1-flash-lite"
 EMBEDDING_MODEL = "models/gemini-embedding-001"
 EMBEDDING_DIMENSIONS = 768
 
