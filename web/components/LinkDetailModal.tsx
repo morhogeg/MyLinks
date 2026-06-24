@@ -2,13 +2,29 @@
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network } from 'lucide-react';
+import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import TagInput from './TagInput';
 import { hasHebrew } from '@/lib/rtl';
+
+/**
+ * Split a "M:SS — description" (or "H:MM:SS …") video highlight into its
+ * timestamp-in-seconds and the human label. Returns seconds=null when no
+ * leading timestamp is present so the entry still renders as plain text.
+ */
+function parseHighlight(entry: string): { seconds: number | null; label: string } {
+    const match = entry.match(/^\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*[—\-–:]*\s*(.*)$/);
+    if (!match) return { seconds: null, label: entry.trim() };
+    const [, a, b, c, rest] = match;
+    const seconds = c
+        ? parseInt(a) * 3600 + parseInt(b) * 60 + parseInt(c)
+        : parseInt(a) * 60 + parseInt(b);
+    const stamp = c ? `${a}:${b}:${c}` : `${a}:${b}`;
+    return { seconds, label: rest?.trim() || stamp };
+}
 
 interface LinkDetailModalProps {
     link: Link;
@@ -46,11 +62,18 @@ export default function LinkDetailModal({
     const [editedCategory, setEditedCategory] = useState(link.category);
     const [now, setNow] = useState<number>(0);
     const [isAddingTag, setIsAddingTag] = useState(false);
+    // Timestamp (seconds) to seek the embedded video player to; null = start.
+    const [videoStart, setVideoStart] = useState<number | null>(null);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         setEditedCategory(link.category);
     }, [link.category]);
+
+    // Reset the player seek when switching to a different link (related-link nav).
+    useEffect(() => {
+        setVideoStart(null);
+    }, [link.id]);
 
     useEffect(() => {
         const initialTimer = setTimeout(() => setNow(Date.now()), 0);
@@ -215,6 +238,64 @@ export default function LinkDetailModal({
                                     Click to View Original
                                 </span>
                             </div>
+                        </div>
+                    )}
+
+                    {/* YouTube: embedded player + clickable key moments + speakers */}
+                    {link.sourceType === 'youtube' && link.metadata?.videoId && (
+                        <div className="mb-6 space-y-4">
+                            <div className="rounded-2xl overflow-hidden border border-white/10 bg-black aspect-video">
+                                <iframe
+                                    key={videoStart ?? 'start'}
+                                    src={`https://www.youtube-nocookie.com/embed/${link.metadata.videoId}?rel=0${videoStart != null ? `&start=${videoStart}&autoplay=1` : ''}`}
+                                    title={link.title}
+                                    className="w-full h-full"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                    allowFullScreen
+                                />
+                            </div>
+
+                            {!!link.metadata.videoHighlights?.length && (
+                                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                                    <h4 className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-text-muted mb-3">
+                                        <Play className="w-3.5 h-3.5 text-accent" /> Key moments
+                                    </h4>
+                                    <ul className="space-y-1">
+                                        {link.metadata.videoHighlights.map((entry, i) => {
+                                            const { seconds, label } = parseHighlight(entry);
+                                            return (
+                                                <li key={i}>
+                                                    <button
+                                                        onClick={() => seconds != null && setVideoStart(seconds)}
+                                                        disabled={seconds == null}
+                                                        className={`w-full text-start flex items-start gap-3 rounded-lg px-2 py-1.5 transition-colors ${seconds != null ? 'hover:bg-white/5 cursor-pointer' : 'cursor-default'}`}
+                                                    >
+                                                        {seconds != null && (
+                                                            <span className="shrink-0 mt-0.5 text-[11px] font-bold text-accent tabular-nums bg-accent/10 px-1.5 py-0.5 rounded">
+                                                                {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
+                                                            </span>
+                                                        )}
+                                                        <span className="text-sm text-text-secondary leading-snug">{label}</span>
+                                                    </button>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {!!link.metadata.speakers?.length && (
+                                <div className="flex items-center flex-wrap gap-2">
+                                    <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-text-muted">
+                                        <Users className="w-3.5 h-3.5" /> Speakers
+                                    </span>
+                                    {link.metadata.speakers.map((s, i) => (
+                                        <span key={i} className="text-xs font-medium text-text-secondary bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
+                                            {s}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 

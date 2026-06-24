@@ -3,7 +3,7 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal } from 'lucide-react';
+import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Play } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -95,6 +95,28 @@ export default function Card({
                 }
             }}
         >
+            {/* Video thumbnail header — gives YouTube cards a real video shape. */}
+            {link.sourceType === 'youtube' && link.metadata?.thumbnailUrl && (
+                <div className="relative w-full aspect-video bg-black/40 overflow-hidden">
+                    <img
+                        src={link.metadata.thumbnailUrl}
+                        alt=""
+                        loading="lazy"
+                        className="w-full h-full object-cover transition-transform duration-300 [@media(hover:hover)]:group-hover:scale-[1.03]"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-full bg-black/55 backdrop-blur-sm flex items-center justify-center transition-transform duration-200 [@media(hover:hover)]:group-hover:scale-110">
+                            <Play className="w-5 h-5 text-white fill-white ms-0.5" />
+                        </div>
+                    </div>
+                    {link.metadata.durationDisplay && (
+                        <span className="absolute bottom-2 end-2 text-[10px] font-bold text-white bg-black/75 px-1.5 py-0.5 rounded-md tracking-wide">
+                            {link.metadata.durationDisplay}
+                        </span>
+                    )}
+                </div>
+            )}
             <div
                 className="p-4 sm:p-5 flex flex-col h-full space-y-3 sm:space-y-4"
                 dir={isRtl ? "rtl" : "ltr"}

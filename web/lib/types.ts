@@ -7,6 +7,14 @@ export interface LinkMetadata {
   originalTitle: string;
   estimatedReadTime: number; // in minutes
   actionableTakeaway?: string;
+  // YouTube-specific (populated only for video links)
+  videoId?: string;
+  watchUrl?: string;
+  thumbnailUrl?: string;
+  youtubeChannel?: string;
+  durationDisplay?: string;
+  videoHighlights?: string[]; // each entry prefixed with an "M:SS" timestamp
+  speakers?: string[];
 }
 
 export interface AIAnalysis {

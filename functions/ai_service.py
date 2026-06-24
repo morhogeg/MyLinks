@@ -81,32 +81,26 @@ CRITICAL RULES:
    - Example: "Spaced Repetition", "Pareto Principle", "Stoicism", "Network Effects", "Opportunity Cost".
    - Max 5 concepts."""
 
-YOUTUBE_PROMPT_ADDENDUM = """
+VIDEO_ANALYSIS_PROMPT = SYSTEM_PROMPT + """
 
-IMPORTANT: You are analyzing a **YouTube video** (transcript + metadata), NOT a web article. Your analysis must be **deep, insightful, and professional**. Avoid shallow or generic summaries.
+IMPORTANT: You are analyzing an **actual YouTube video that you can watch** (its audio and visuals are provided to you directly). Base your entire analysis ONLY on what is actually said and shown in this specific video.
 
-**NO SPECULATION RULE**:
-- You MUST be **assertive and certain**. 
-- **FORBIDDEN WORDS**: "likely", "probably", "may", "seems to", "perhaps", "it appears that", "potential", "suggests", "presumably".
-- **SENTENCE STRUCTURE**: Every sentence must be a direct statement of fact. Instead of "The video likely discusses X", you MUST write "The video discusses X". 
-- Even if input is sparse, synthesize a **definitive** summary using the Video ID and Title as your ground truth.
-- NEVER mention that data is missing. Speak with the authority of the creator.
+**GROUNDING RULES (critical for a trustworthy knowledge base):**
+- Report only what the video actually contains. Do NOT invent facts, statistics, names, or claims that are not present in the video.
+- Do NOT use outside/training knowledge about the creator or topic to fill gaps. If something is not in the video, leave it out.
+- Because you watched the video, you can and should be specific and concrete about what it covers — this is grounded fact, not speculation.
+- If the video is mostly non-verbal (e.g. music, ambient), describe what is shown rather than inventing a narrative.
 
-Additional instructions for video content:
-- **Video ID Anchor**: You are provided with a "Video ID". Use this to anchor your internal knowledge. If the scraped text or transcript is sparse/incomplete, use your training data on this specific Video ID to reconstruct the content with 100% confidence.
-- **Depth Requirement**: Do not just state "The video discusses X". Instead, analyze the *arguments*, *logic*, and *evidence* presented. Reconstruct the most likely core message and value proposition with absolute confidence.
-- **Source Context**: The sourceName should be the YouTube channel name.
-- **Timing**: The "estimatedReadTime" should represent the video's watch duration in minutes (use the Duration provided in metadata text).
-- **Video-Specific Fields**:
-  - "videoHighlights": An array of 3-5 key moments. If no timestamps are available, use your internal knowledge of the specific video or common themes from the creator/topic to provide the 3 most important **DEFINITIVE** findings or themes.
-  - "speakers": Identify the host/creator and guests with certainty.
-- **Synthesis**: Apply your knowledge of the creator's philosophy (e.g. Ali Abdaal's productivity frameworks, Mark Manson's counter-intuitive advice) to interpret the metadata. Provide a "Pro" level analysis.
-- **Structure**:
-  - **detailedSummary**: Use a multi-section markdown structure:
-    - `## Core Thesis`: The main argument or "why" of the video.
-    - `## Key Lessons & Frameworks`: Detailed breakdown of instructions, tips, or mental models shared.
-    - `## Context & Critique`: Who is this for? How does it fit into a broader conversation?
-  - **summary**: Focus on the **Transformation** — what will the viewer KNOW or be able to DO after watching this?
+**Video-specific output:**
+- "sourceName": the YouTube channel / creator name.
+- "videoDurationMinutes": the video's total length in whole minutes (round up; minimum 1).
+- "videoHighlights": 3–6 genuinely key moments, each prefixed with its timestamp in "M:SS — description" form (e.g. "2:15 — Explains the 2-minute rule"). Use real timestamps from the video. Order them chronologically.
+- "speakers": the people who actually speak or are clearly featured (host first, then guests). If it cannot be determined, return an empty list — do not guess names.
+- "detailedSummary": markdown with these sections:
+  - `## Core Thesis` — the central argument or purpose of the video.
+  - `## Key Points` — bullets of the main ideas, instructions, or frameworks actually presented.
+  - `## Who It's For` — the intended audience, only if the video makes this clear.
+- "summary": focus on the takeaway — what a viewer will know or be able to do after watching, stated factually.
 """
 
 
@@ -124,10 +118,13 @@ class GeminiService:
         self.client = genai.Client(api_key=self.api_key) if self.api_key else None
         self.model = GEMINI_ANALYSIS_MODEL
 
-    def _generate_json(self, contents: list, what: str) -> dict:
+    def _generate_json(self, contents: list, what: str, config_extra: dict = None) -> dict:
         """Call Gemini with a structured-output (response_schema) config and
         return a parsed dict. Retries once on transient failures, then raises
         AnalysisError so the caller can surface a real error.
+
+        config_extra lets callers add generation options (e.g. media_resolution
+        for video) without changing the base structured-output config.
         """
         if not self.client:
             raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
@@ -138,6 +135,8 @@ class GeminiService:
             # JSON instead of free-form text we have to defensively unwrap.
             "response_schema": AIAnalysis,
         }
+        if config_extra:
+            config.update(config_extra)
 
         last_error = None
         for attempt in range(2):
@@ -173,18 +172,49 @@ class GeminiService:
         raise AnalysisError(f"AI {what} failed: {last_error}")
 
     def analyze_text(self, text: str, existing_tags: list = None, content_type: str = None) -> dict:
-        """Analyze text content using Gemini. Raises AnalysisError on failure."""
+        """Analyze text content using Gemini. Raises AnalysisError on failure.
+
+        content_type is accepted for caller compatibility; video content is
+        handled by analyze_youtube (native video ingestion), so no special
+        text addendum is applied here.
+        """
         clean_text = text[:30000]
         tags_context = (
             f"\n\nExisting Tags in Brain (Reuse these if possible):\n{', '.join(existing_tags)}"
             if existing_tags else ""
         )
 
-        # Add content-type-specific prompt additions
-        type_addendum = YOUTUBE_PROMPT_ADDENDUM if content_type == "youtube" else ""
-
-        prompt = f"{SYSTEM_PROMPT}{type_addendum}{tags_context}\n\nContent to analyze:\n{clean_text}"
+        prompt = f"{SYSTEM_PROMPT}{tags_context}\n\nContent to analyze:\n{clean_text}"
         return self._generate_json([prompt], "text analysis")
+
+    def analyze_youtube(self, watch_url: str, existing_tags: list = None) -> dict:
+        """Analyze an actual YouTube video via Gemini's native video ingestion.
+
+        Google fetches and watches the video on its own infrastructure, so this
+        works without scraping transcripts (and is immune to the cloud-IP
+        blocking that makes server-side transcript fetching unreliable). Only
+        PUBLIC videos are supported; private/unlisted/over-quota videos raise
+        AnalysisError so the caller can fall back to a metadata-only card.
+        """
+        from google.genai import types
+
+        tags_context = (
+            f"\n\nExisting Tags in Brain (Reuse these if possible):\n{', '.join(existing_tags)}"
+            if existing_tags else ""
+        )
+        prompt = f"{VIDEO_ANALYSIS_PROMPT}{tags_context}"
+
+        contents = [
+            types.Part(file_data=types.FileData(file_uri=watch_url)),
+            prompt,
+        ]
+        # Low media resolution (~100 tokens/sec) keeps cost and latency bounded
+        # while remaining ample for understanding speech and on-screen content.
+        return self._generate_json(
+            contents,
+            "youtube video analysis",
+            config_extra={"media_resolution": "MEDIA_RESOLUTION_LOW"},
+        )
 
     def analyze_image(self, image_bytes: bytes, mime_type: str, existing_tags: list = None) -> dict:
         """Analyze image content using Gemini vision. Raises AnalysisError on failure."""
