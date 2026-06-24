@@ -4,14 +4,10 @@ Handles content extraction from URLs including special handling
 for Twitter/X, Instagram, and YouTube.
 """
 
-import os
 import re
 import requests
 import logging
-import json
 from typing import Optional
-
-from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
 
 logger = logging.getLogger(__name__)
 
@@ -395,255 +391,84 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
     }
 
 
+def _extract_youtube_id(url: str) -> Optional[str]:
+    """Extract the 11-char video ID from any common YouTube URL shape
+    (watch?v=, youtu.be/, /shorts/, /embed/, /live/)."""
+    patterns = [
+        r"youtu\.be/([A-Za-z0-9_-]{11})",
+        r"[?&]v=([A-Za-z0-9_-]{11})",
+        r"/shorts/([A-Za-z0-9_-]{11})",
+        r"/embed/([A-Za-z0-9_-]{11})",
+        r"/live/([A-Za-z0-9_-]{11})",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
+
+
 def _scrape_youtube_url(url: str, message_body: Optional[str] = None) -> dict:
     """
-    Scrape YouTube video metadata and transcript.
+    Resolve a YouTube URL to lightweight, reliable metadata only.
+
+    Deep content understanding is handled separately by Gemini's native video
+    ingestion (see ai_service.GeminiService.analyze_youtube), which fetches and
+    watches the video on Google's own infrastructure. We deliberately do NOT
+    scrape transcripts here: YouTube blocks cloud/datacenter IPs (Cloud
+    Functions), so server-side transcript fetching is unreliable and the old
+    approach fell back to fabricated summaries. oEmbed + the deterministic
+    thumbnail URL are not IP-blocked and need no API key.
     """
-    logger.info(f"Analyzing YouTube URL: {url}")
-    
-    # Try to extract title from message body if provided (shared from mobile app)
-    inferred_title = ""
+    logger.info(f"Resolving YouTube URL: {url}")
+
+    video_id = _extract_youtube_id(url)
+    if not video_id:
+        logger.warning("Could not extract YouTube video ID")
+        return {"html": "", "title": "YouTube Video", "text": ""}
+
+    watch_url = f"https://www.youtube.com/watch?v={video_id}"
+    title = "YouTube Video"
+    channel = "YouTube"
+    # hqdefault always exists; oEmbed may upgrade this to the real thumbnail.
+    thumbnail_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+
+    # oEmbed: title + channel + thumbnail (no API key, not IP-blocked).
+    try:
+        oembed_url = f"https://www.youtube.com/oembed?url={watch_url}&format=json"
+        resp = requests.get(oembed_url, timeout=8)
+        if resp.ok:
+            data = resp.json()
+            title = data.get("title") or title
+            channel = data.get("author_name") or channel
+            thumbnail_url = data.get("thumbnail_url") or thumbnail_url
+    except Exception as e:
+        logger.warning(f"YouTube oEmbed failed: {e}")
+
+    # A caption shared alongside the link (e.g. via WhatsApp) is useful context.
+    shared_note = ""
     if message_body:
-        # Many shared messages look like: "Check out this video: Title - URL"
         body_clean = message_body.replace(url, "").strip()
         if body_clean:
-            # Take the first line or first 100 characters
-            inferred_title = body_clean.split('\n')[0].strip(" -:\"")
-            if len(inferred_title) > 100: inferred_title = inferred_title[:100] + "..."
-    
-    try:
-        # 1. Extract Video ID — support youtube.com/watch, youtu.be, and /shorts/
-        video_id = None
-        if "youtu.be" in url:
-            video_id = url.split("/")[-1].split("?")[0]
-        elif "/shorts/" in url:
-            video_id = url.split("/shorts/")[1].split("?")[0].split("/")[0]
-        elif "v=" in url:
-            video_id = url.split("v=")[1].split("&")[0]
+            shared_note = body_clean.split("\n")[0].strip(" -:\"")[:200]
 
-        if not video_id:
-            logger.warning("Could not extract video ID")
-            return {"html": "", "title": inferred_title or "YouTube Video", "text": ""}
+    # Minimal text — used only for embeddings and the honest metadata-only
+    # fallback when native video analysis is unavailable (private/over-quota).
+    formatted_text = (
+        f"YOUTUBE VIDEO\nTitle: {title}\nChannel: {channel}\nURL: {watch_url}"
+        + (f"\nShared note: {shared_note}" if shared_note else "")
+    )
 
-        logger.info(f"Video ID: {video_id}")
-
-        # 2. Fetch page HTML with robust consent bypass cookies
-        canonical_url = f"https://www.youtube.com/watch?v={video_id}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9",
-        }
-        cookies = {
-            "CONSENT": "YES+cb.20210328-17-p0.en+FX+299",
-            "SOCS": "CAESEwgDEgk0ODE3Nzk3MjQaAmVuIAEaBgiA_LyaBg",
-        }
-
-        resp = requests.get(canonical_url, headers=headers, cookies=cookies, timeout=15)
-        html = resp.text
-        logger.info(f"YouTube HTML fetched, length: {len(html)}")
-
-        # 3. Extract rich metadata
-        title = inferred_title or "YouTube Video"
-        author = "Unknown Channel"
-        description = ""
-        duration_seconds = 0
-        view_count = 0
-        keywords = []
-        full_description = ""
-        chapters_text = ""
-        transcript_text = ""
-        has_transcript = False
-
-        # Phase A: ytInitialPlayerResponse (Primary source for metadata)
-        player_data = {}
-        player_match = re.search(r'var ytInitialPlayerResponse\s*=\s*({.+?});', html)
-        if player_match:
-            try:
-                # Use standard json library
-                player_data = json.loads(player_match.group(1))
-                vd = player_data.get("videoDetails", {})
-                
-                # Scavenge if empty (common on regional/bot-detected responses)
-                if not vd:
-                    def find_key(obj, key):
-                        if isinstance(obj, dict):
-                            if key in obj: return obj[key]
-                            for v in obj.values():
-                                res = find_key(v, key)
-                                if res: return res
-                        elif isinstance(obj, list):
-                            for i in obj:
-                                res = find_key(i, key)
-                                if res: return res
-                        return None
-                    vd = find_key(player_data, "videoDetails") or {}
-                
-                title = vd.get("title", title)
-                author = vd.get("author", author)
-                duration_seconds = int(vd.get("lengthSeconds", 0))
-                view_count = int(vd.get("viewCount", 0))
-                keywords = vd.get("keywords", [])
-                full_description = vd.get("shortDescription", "")
-
-                # Extra check for full description in microformat
-                micro = player_data.get("microformat", {}).get("playerMicroformatRenderer", {})
-                micro_desc = micro.get("description", {}).get("simpleText", "")
-                if micro_desc and len(micro_desc) > len(full_description):
-                    full_description = micro_desc
-            except Exception as e:
-                logger.warning(f"Error parsing ytInitialPlayerResponse: {e}")
-
-        # Phase B: ytInitialData (Deep dive for full description and chapters)
-        try:
-            data_match = re.search(r'var ytInitialData\s*=\s*({.+?});', html)
-            if data_match:
-                data = json.loads(data_match.group(1))
-                def scavenger(obj):
-                    desc, chaps = None, None
-                    if isinstance(obj, dict):
-                        if "videoSecondaryInfoRenderer" in obj:
-                            r = obj["videoSecondaryInfoRenderer"].get("description", {}).get("runs", [])
-                            desc = "".join([i.get("text", "") if isinstance(i, dict) else str(i) for i in r])
-                        for v in obj.values():
-                            d, c = scavenger(v)
-                            if d and not desc: desc = d
-                            if c and not chaps: chaps = c
-                    elif isinstance(obj, list):
-                        for item in obj:
-                            d, c = scavenger(item)
-                            if d and not desc: desc = d
-                            if c and not chaps: chaps = c
-                    return desc, chaps
-
-                d, c = scavenger(data)
-                if d and len(d) > len(full_description): 
-                    full_description = d
-                
-                # If title/author still unknown, try finding it here
-                if title == "YouTube Video":
-                    def find_title(obj):
-                        if isinstance(obj, dict):
-                            if "videoPrimaryInfoRenderer" in obj:
-                                t_obj = obj["videoPrimaryInfoRenderer"].get("title", {}).get("runs", [{}])[0]
-                                if t_obj.get("text"): return t_obj["text"]
-                            for v in obj.values():
-                                res = find_title(v)
-                                if res: return res
-                        elif isinstance(obj, list):
-                            for i in obj:
-                                res = find_title(i)
-                                if res: return res
-                        return None
-                    title = find_title(data) or title
-        except Exception as e:
-            logger.warning(f"Error parsing ytInitialData: {e}")
-
-        # Phase C: Final Metadata Fallbacks
-        if title == "YouTube Video":
-            t_match = re.search(r'<meta name="title" content="([^"]+)">', html)
-            if t_match: title = t_match.group(1)
-        if author == "Unknown Channel":
-            a_match = re.search(r'<link itemprop="name" content="([^"]+)">', html)
-            if a_match: author = a_match.group(1)
-        
-        # oEmbed fallback as last resort
-        if title == "YouTube Video" or author == "Unknown Channel":
-            try:
-                oembed_url = f"https://www.youtube.com/oembed?url={canonical_url}&format=json"
-                oembed_resp = requests.get(oembed_url, timeout=5)
-                if oembed_resp.ok:
-                    oembed = oembed_resp.json()
-                    if title == "YouTube Video": title = oembed.get("title", title)
-                    if author == "Unknown Channel": author = oembed.get("author_name", author)
-            except Exception: pass
-
-        # Phase D: Multi-Layered Transcript Fetching with Cookies
-        import tempfile
-        import time
-        
-        cookie_file = None
-        try:
-            # Create a temporary Netscape-format cookie file
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
-                f.write("# Netscape HTTP Cookie File\n")
-                expiry = int(time.time() + 3600*24*365)
-                for name, value in cookies.items():
-                    f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expiry}\t{name}\t{value}\n")
-                cookie_file = f.name
-            
-            # Try library with cookies
-            transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'iw', 'he'], cookies=cookie_file)
-            lines = []
-            for t in transcript_list:
-                ts = int(float(t['start']))
-                mins, secs = divmod(ts, 60)
-                lines.append(f"[{mins}:{secs:02d}] {t['text']}")
-            transcript_text = "\n".join(lines)
-            has_transcript = True
-        except Exception as e:
-            logger.info(f"Transcript library attempt failed: {str(e)[:100]}")
-            # Manual XML Fallback
-            try:
-                captions = player_data.get("captions", {})
-                tracks = captions.get("playerCaptionsTracklistRenderer", {}).get("captionTracks", [])
-                if tracks:
-                    t_url = tracks[0].get("baseUrl")
-                    t_resp = requests.get(t_url, headers=headers, cookies=cookies, timeout=10)
-                    if t_resp.ok and len(t_resp.text) > 50:
-                        import html as html_lib
-                        clean_text = re.sub(r'<[^>]+>', ' ', t_resp.text)
-                        transcript_text = html_lib.unescape(clean_text)
-                        has_transcript = True
-            except Exception: pass
-        finally:
-            if cookie_file and os.path.exists(cookie_file):
-                try: os.unlink(cookie_file)
-                except: pass
-
-        if not transcript_text:
-            transcript_text = "[Full transcript unavailable. Base analysis on Title and Description.]"
-
-        # 4. Format for display
-        duration_display = ""
-        if duration_seconds > 0:
-            mins, secs = divmod(duration_seconds, 60)
-            duration_display = f"{mins}m {secs:02d}s"
-        
-        view_display = f"{view_count:,} views" if view_count > 0 else "N/A"
-        
-        formatted_text = f"""YOUTUBE VIDEO ANALYSIS:
-Title: {title}
-Channel: {author}
-Video ID: {video_id}
-Duration: {duration_display}
-Views: {view_display}
-Keywords: {", ".join(keywords)}
-
-DESCRIPTION:
-{full_description or "No description available."}
-
----
-TRANSCRIPT {'(with timestamps)' if has_transcript else ''}:
-{transcript_text[:25000]}
-"""
-
-        return {
-            "html": formatted_text,
-            "title": title,
-            "text": formatted_text,
-            "content_type": "youtube",
-            "youtube_metadata": {
-                "video_id": video_id,
-                "channel": author,
-                "duration_display": duration_display,
-                "view_count": view_count,
-                "view_display": view_display,
-                "has_transcript": has_transcript,
-                "keywords": keywords[:10],
-            }
-        }
-
-    except Exception as e:
-        logger.error(f"YouTube scrape error: {e}")
-        return {"html": "", "title": "YouTube Video", "text": ""}
+    return {
+        "html": formatted_text,
+        "title": title,
+        "text": formatted_text,
+        "content_type": "youtube",
+        "youtube_metadata": {
+            "video_id": video_id,
+            "watch_url": watch_url,
+            "channel": channel,
+            "thumbnail_url": thumbnail_url,
+        },
+    }
 

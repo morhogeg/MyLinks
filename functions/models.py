@@ -44,8 +44,9 @@ class AIAnalysis(BaseModel):
     sourceName: Optional[str] = Field(None, description="Name of the source/publisher (e.g., CNN, X)")
     concepts: List[str] = Field(default_factory=list, description="3-5 abstract concepts or mental models")
     # YouTube-specific fields (populated only when analyzing video content)
-    videoHighlights: List[str] = Field(default_factory=list, description="3-5 key moments/findings from a video")
-    speakers: List[str] = Field(default_factory=list, description="Host/creator and guests identified in a video")
+    videoHighlights: List[str] = Field(default_factory=list, description="3-6 key moments from a video, each prefixed with its 'M:SS' timestamp")
+    speakers: List[str] = Field(default_factory=list, description="Host/creator and guests who actually speak in a video")
+    videoDurationMinutes: Optional[int] = Field(None, description="Observed length of the video in whole minutes")
 
 
 class LinkDocument(BaseModel):

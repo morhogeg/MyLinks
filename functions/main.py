@@ -28,7 +28,7 @@ from google.cloud.firestore_v1.vector import Vector
 # Internal modules
 from db import get_db
 from models import WebhookPayload, LinkStatus, ReminderStatus
-from ai_service import GeminiService
+from ai_service import GeminiService, AnalysisError
 from link_service import (
     find_user_by_phone, save_link_to_firestore, get_user_tags, is_hebrew,
     ensure_ingest_token, find_user_by_ingest_token, link_exists_for_url,
@@ -87,6 +87,50 @@ def _estimate_read_time(text: str, words_per_minute: int = 200) -> int:
         return 1
     words = len(text.split())
     return max(1, round(words / words_per_minute))
+
+
+def _analyze_scraped(ai, scraped: dict, existing_tags: list):
+    """Run the right analysis for scraped content.
+
+    For YouTube, use Gemini native video ingestion; if that fails (private /
+    unlisted / over-quota / region-blocked), fall back to an honest
+    metadata-only text analysis rather than fabricating a summary.
+    """
+    content_type = scraped.get("content_type")
+    if content_type == "youtube":
+        watch_url = scraped.get("youtube_metadata", {}).get("watch_url")
+        if watch_url:
+            try:
+                return ai.analyze_youtube(watch_url, existing_tags=existing_tags)
+            except AnalysisError as e:
+                logger.warning(f"Native YouTube analysis failed, using metadata-only fallback: {e}")
+        # Fallback: analyze the lightweight oEmbed metadata text honestly.
+        return ai.analyze_text(scraped.get("text") or scraped.get("html", ""), existing_tags=existing_tags)
+
+    return ai.analyze_text(scraped.get("text") or scraped.get("html", ""), existing_tags=existing_tags, content_type=content_type)
+
+
+def _format_duration(minutes: int) -> str:
+    """Render a watch-time label, e.g. 12 -> '12 min', 75 -> '1h 15m'."""
+    if not minutes or minutes < 1:
+        return ""
+    if minutes < 60:
+        return f"{minutes} min"
+    hours, mins = divmod(minutes, 60)
+    return f"{hours}h {mins:02d}m"
+
+
+def _apply_youtube_metadata(link_data: dict, yt_meta: dict, analysis: dict, minutes: int):
+    """Attach video-shaped metadata (thumbnail, channel, highlights, speakers)
+    to a link document so the frontend can render a proper video card."""
+    meta = link_data["metadata"]
+    meta["videoId"] = yt_meta.get("video_id")
+    meta["watchUrl"] = yt_meta.get("watch_url")
+    meta["thumbnailUrl"] = yt_meta.get("thumbnail_url")
+    meta["youtubeChannel"] = analysis.get("sourceName") or yt_meta.get("channel")
+    meta["durationDisplay"] = _format_duration(minutes)
+    meta["videoHighlights"] = analysis.get("videoHighlights", [])
+    meta["speakers"] = analysis.get("speakers", [])
 
 
 # ─────────────────────────────────────────────
@@ -175,10 +219,10 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         if not scraped.get("text") and not scraped.get("html"):
             return _error_response("Failed to scrape content", 500, headers)
 
-        # 2. Analyze with AI
+        # 2. Analyze with AI (YouTube → native video ingestion w/ fallback)
         ai = GeminiService()
         content_type = scraped.get("content_type")
-        analysis = ai.analyze_text(scraped["text"] or scraped["html"], existing_tags=existing_tags, content_type=content_type)
+        analysis = _analyze_scraped(ai, scraped, existing_tags)
 
         # 3. Generate Embedding & Find Connections
         embedding_text = f"{analysis.get('title', '')}\n{analysis.get('summary', '')}"
@@ -201,8 +245,8 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         is_youtube = content_type == "youtube"
         yt_meta = scraped.get("youtube_metadata", {})
 
-        if is_youtube and yt_meta.get("duration_seconds"):
-            estimated_time = max(1, yt_meta["duration_seconds"] // 60)
+        if is_youtube and analysis.get("videoDurationMinutes"):
+            estimated_time = max(1, int(analysis["videoDurationMinutes"]))
         else:
             estimated_time = _estimate_read_time(scraped.get("text", ""))
 
@@ -231,16 +275,9 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         }
 
         # Mirror the background pipeline's YouTube enrichment so web-added
-        # videos get the same rich metadata (channel, duration, highlights).
+        # videos get the same rich metadata (channel, thumbnail, highlights).
         if is_youtube:
-            link_data["metadata"]["youtubeChannel"] = yt_meta.get("channel")
-            link_data["metadata"]["durationDisplay"] = yt_meta.get("duration_display")
-            link_data["metadata"]["durationSeconds"] = yt_meta.get("duration_seconds")
-            link_data["metadata"]["viewCount"] = yt_meta.get("view_count")
-            link_data["metadata"]["viewDisplay"] = yt_meta.get("view_display")
-            link_data["metadata"]["hasTranscript"] = yt_meta.get("has_transcript")
-            link_data["metadata"]["videoHighlights"] = analysis.get("videoHighlights", [])
-            link_data["metadata"]["speakers"] = analysis.get("speakers", [])
+            _apply_youtube_metadata(link_data, yt_meta, analysis, estimated_time)
 
         return https_fn.Response(
             json.dumps({"success": True, "link": link_data}),
@@ -684,10 +721,9 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             ref.update({"status": "analyzing_image", "storageUrl": public_url})
             analysis = ai.analyze_image(image_bytes, mime_type, existing_tags=existing_tags)
         else:
-            # Analyze with AI
-            content_type = scraped.get("content_type")  # e.g. "youtube"
-            analysis = ai.analyze_text(scraped.get("text") or scraped.get("html", ""), existing_tags=existing_tags, content_type=content_type)
-        
+            # Analyze with AI (YouTube → native video ingestion w/ fallback)
+            analysis = _analyze_scraped(ai, scraped, existing_tags)
+
         # Final Defensive check for analysis
         if not isinstance(analysis, dict):
             logger.warning(f"Final analysis check failed. Type: {type(analysis)}")
@@ -717,8 +753,8 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         yt_meta = scraped.get("youtube_metadata", {})
 
         # Compute read/watch time
-        if is_youtube and yt_meta.get("duration_seconds"):
-            estimated_time = max(1, yt_meta["duration_seconds"] // 60)
+        if is_youtube and analysis.get("videoDurationMinutes"):
+            estimated_time = max(1, int(analysis["videoDurationMinutes"]))
         elif is_image:
             estimated_time = 1
         else:
@@ -748,14 +784,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
 
         # Add YouTube-specific metadata
         if is_youtube:
-            link_data["metadata"]["youtubeChannel"] = yt_meta.get("channel")
-            link_data["metadata"]["durationDisplay"] = yt_meta.get("duration_display")
-            link_data["metadata"]["durationSeconds"] = yt_meta.get("duration_seconds")
-            link_data["metadata"]["viewCount"] = yt_meta.get("view_count")
-            link_data["metadata"]["viewDisplay"] = yt_meta.get("view_display")
-            link_data["metadata"]["hasTranscript"] = yt_meta.get("has_transcript")
-            link_data["metadata"]["videoHighlights"] = analysis.get("videoHighlights", [])
-            link_data["metadata"]["speakers"] = analysis.get("speakers", [])
+            _apply_youtube_metadata(link_data, yt_meta, analysis, estimated_time)
 
         # 5. Save to Firestore
         link_id = save_link_to_firestore(uid, link_data)
