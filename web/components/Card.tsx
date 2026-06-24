@@ -58,6 +58,11 @@ export default function Card({
 
     const platform = getPlatform(link.url);
     const sourceIcon = platform ? platformIcon(platform, 'w-3 h-3 shrink-0 opacity-80') : null;
+    // Detect YouTube by URL (reliable) or stored type, since newer items don't
+    // always populate metadata.youtubeChannel. The channel name falls back to
+    // the generic sourceName so every video gets the red byline treatment.
+    const isYouTube = platform === 'youtube' || link.sourceType === 'youtube';
+    const youtubeChannel = link.metadata?.youtubeChannel || link.sourceName;
 
     useEffect(() => {
         const initialTimer = setTimeout(() => setNow(Date.now()), 0);
@@ -277,7 +282,7 @@ export default function Card({
                         cards that already credit the channel via the red byline
                         below the title, so the source shows only once. */}
                     <div className="flex items-center gap-1.5 min-w-0 z-10 ms-auto transition-opacity duration-200 group-hover:opacity-0">
-                        {link.sourceName && link.sourceName !== 'Screenshot' && link.sourceType !== 'image' && !(link.sourceType === 'youtube' && link.metadata?.youtubeChannel) && (
+                        {link.sourceName && link.sourceName !== 'Screenshot' && link.sourceType !== 'image' && !isYouTube && (
                             <span
                                 className="flex items-center gap-1 text-[9px] font-bold text-text-muted/60 bg-black/5 border border-black/10 px-2 py-1 rounded-lg dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all max-w-[220px]"
                                 title={link.sourceName}
@@ -316,10 +321,10 @@ export default function Card({
                 </h3>
 
                 {/* Creator byline — videos should clearly credit the channel. */}
-                {link.sourceType === 'youtube' && link.metadata?.youtubeChannel && (
+                {isYouTube && youtubeChannel && (
                     <p className="flex items-center gap-1.5 -mt-1.5 text-xs font-semibold text-text-secondary">
                         <Youtube className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                        <span className="truncate">{link.metadata.youtubeChannel}</span>
+                        <span className="truncate">{youtubeChannel}</span>
                     </p>
                 )}
 

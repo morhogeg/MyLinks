@@ -748,14 +748,21 @@ function FeedContent() {
                         <span className="text-[10px] font-bold text-accent uppercase tracking-wider">Filtered By:</span>
                     </div>
                     {Array.from(selectedTags).map(tag => (
-                        <button
+                        <div
                             key={tag}
-                            onClick={() => handleToggleTag(tag)}
-                            className="group flex items-center gap-1.5 px-2 py-1 rounded-full bg-card border border-border-subtle hover:border-accent/30 text-text-muted hover:text-accent transition-all text-xs font-semibold shadow-sm"
+                            className="group flex items-center gap-1 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm"
                         >
                             <span>{tag.split('/').pop()}</span>
-                            <X className="w-3.5 h-3.5 text-text-muted group-hover:text-accent transition-colors" />
-                        </button>
+                            <button
+                                type="button"
+                                onClick={() => handleToggleTag(tag)}
+                                aria-label={`Remove ${tag.split('/').pop()} filter`}
+                                title="Remove filter"
+                                className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
                     ))}
                     <button
                         onClick={() => setSelectedTags(new Set())}
