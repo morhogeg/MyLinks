@@ -273,9 +273,11 @@ export default function Card({
                         </div>
                     </div>
 
-                    {/* Source Tag (End) - Fades out on hover */}
+                    {/* Source Tag (End) - Fades out on hover. Hidden for YouTube
+                        cards that already credit the channel via the red byline
+                        below the title, so the source shows only once. */}
                     <div className="flex items-center gap-1.5 min-w-0 z-10 ms-auto transition-opacity duration-200 group-hover:opacity-0">
-                        {link.sourceName && link.sourceName !== 'Screenshot' && link.sourceType !== 'image' && (
+                        {link.sourceName && link.sourceName !== 'Screenshot' && link.sourceType !== 'image' && !(link.sourceType === 'youtube' && link.metadata?.youtubeChannel) && (
                             <span
                                 className="flex items-center gap-1 text-[9px] font-bold text-text-muted/60 bg-black/5 border border-black/10 px-2 py-1 rounded-lg dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all max-w-[220px]"
                                 title={link.sourceName}
