@@ -21,7 +21,7 @@ import TableView from './TableView';
 import InsightsFeed from './InsightsFeed';
 import LinkDetailModal from './LinkDetailModal';
 import ConfirmDialog from './ConfirmDialog';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2 } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, ChevronDown, CheckSquare } from 'lucide-react';
 import TagExplorer from './TagExplorer';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -420,6 +420,21 @@ function FeedContent() {
         { key: 'archived', label: 'Archived', icon: <Archive className="w-4 h-4" /> },
     ];
 
+    // Shared styling so every toolbar control is the same height, weight, and
+    // clearly interactive (consistent 36px target, readable text, real cursor).
+    const ctrlBase =
+        'h-9 inline-flex items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold cursor-pointer select-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40';
+    const ctrlIdle =
+        'bg-card border border-border-subtle text-text-secondary hover:bg-card-hover hover:text-text hover:border-text-muted/40';
+
+    // View modes, in a single source of truth so the switcher stays in sync.
+    const viewModes: { key: typeof viewMode; label: string; icon: React.ReactNode; hint: string }[] = [
+        { key: 'grid', label: 'Cards', icon: <LayoutGrid className="w-4 h-4" />, hint: 'Card view' },
+        { key: 'compact', label: 'Compact', icon: <Grid2X2 className="w-4 h-4" />, hint: 'Compact grid' },
+        { key: 'table', label: 'Table', icon: <List className="w-4 h-4" />, hint: 'Table view' },
+        { key: 'insights', label: 'Insights', icon: <Sparkles className="w-4 h-4" />, hint: 'AI insights' },
+    ];
+
     if (isLoading) {
         return (
             <div className="space-y-4" aria-busy="true" aria-label="Loading your links">
@@ -561,65 +576,71 @@ function FeedContent() {
                     </div>
                 </div>
 
-                {/* Row 2: Combined Controls - Status, Sort, View, Select (DRASTICALLY SUBTLE) */}
-                <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-1 -mx-2 px-2 sm:mx-0 sm:px-0 py-0 mt-0">
-                    <div className="flex items-center gap-1">
+                {/* Row 2: Toolbar — filter / sort / source on the left, view & actions on the right */}
+                <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-2 -mx-2 px-2 sm:mx-0 sm:px-0">
+                    <div className="flex items-center gap-2">
                         {/* Status Filter Dropdown */}
-                        <div className="relative group">
+                        <div className="relative">
                             <select
                                 value={filter}
                                 onChange={(e) => setFilter(e.target.value as FilterType)}
-                                className="appearance-none bg-card/30 border border-transparent rounded-full pl-8 pr-3 py-0.5 text-[10px] font-medium text-text-muted/60 hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/10 min-h-[36px] sm:min-h-[28px]"
+                                aria-label="Filter by status"
+                                className={`${ctrlBase} ${ctrlIdle} appearance-none pl-9 pr-8`}
                             >
                                 {filterButtons.filter(btn => btn.key !== 'reminders').map(btn => (
                                     <option key={btn.key} value={btn.key}>{btn.label}</option>
                                 ))}
                             </select>
-                            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-40">
-                                {filter === 'all' && <Inbox className="w-3 h-3 text-text-muted" />}
-                                {filter === 'unread' && <Inbox className="w-3 h-3 text-accent" />}
-                                {filter === 'read' && <CheckCircle2 className="w-3 h-3 text-green-500" />}
-                                {filter === 'favorite' && <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
-                                {filter === 'archived' && <Archive className="w-3 h-3 text-text-muted" />}
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                {filter === 'all' && <Inbox className="w-4 h-4 text-text-secondary" />}
+                                {filter === 'unread' && <Inbox className="w-4 h-4 text-accent" />}
+                                {filter === 'read' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                                {filter === 'favorite' && <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />}
+                                {filter === 'archived' && <Archive className="w-4 h-4 text-text-secondary" />}
                             </div>
+                            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
                         </div>
-
-                        {/* Reminders Toggle */}
-                        <button
-                            onClick={() => setFilter(filter === 'reminders' ? 'all' : 'reminders')}
-                            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium transition-all min-h-[36px] sm:min-h-[28px] ${filter === 'reminders'
-                                ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
-                                : 'bg-card/30 text-text-muted/60 hover:text-blue-500 border border-transparent'
-                                }`}
-                        >
-                            <Bell className={`w-3 h-3 ${filter === 'reminders' ? 'fill-current' : ''}`} />
-                            <span>Reminders</span>
-                            {reminderCount > 0 && (
-                                <span className={`flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold ${filter === 'reminders' ? 'bg-blue-500 text-white' : 'bg-blue-500/10 text-blue-500'
-                                    }`}>
-                                    {reminderCount}
-                                </span>
-                            )}
-                        </button>
 
                         {/* Sort Dropdown */}
                         <div className="relative">
                             <select
                                 value={sortBy}
                                 onChange={(e) => setSortBy(e.target.value as SortType)}
-                                className="appearance-none bg-card/30 border border-transparent rounded-full pl-2 pr-6 py-0.5 text-[10px] font-medium text-text-muted/60 hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/10 min-h-[36px] sm:min-h-[28px]"
+                                aria-label="Sort order"
+                                className={`${ctrlBase} ${ctrlIdle} appearance-none pl-9 pr-8`}
                             >
                                 <option value="date-desc">Newest</option>
                                 <option value="date-asc">Oldest</option>
-                                <option value="title-asc">A-Z</option>
+                                <option value="title-asc">A–Z</option>
                                 <option value="category">Category</option>
                             </select>
-                            <ArrowUpDown className="absolute right-2 top-1/2 -translate-y-1/2 w-2.5 h-2.5 text-text-muted pointer-events-none opacity-40" />
+                            <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary pointer-events-none" />
+                            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
                         </div>
+
+                        {/* Reminders Toggle */}
+                        <button
+                            onClick={() => setFilter(filter === 'reminders' ? 'all' : 'reminders')}
+                            aria-pressed={filter === 'reminders'}
+                            title="Show items with reminders"
+                            className={`${ctrlBase} px-3.5 ${filter === 'reminders'
+                                ? 'bg-blue-500 text-white border border-blue-500 shadow-sm'
+                                : ctrlIdle + ' hover:text-blue-500 hover:border-blue-500/40'
+                                }`}
+                        >
+                            <Bell className={`w-4 h-4 ${filter === 'reminders' ? 'fill-current' : ''}`} />
+                            <span className="hidden sm:inline">Reminders</span>
+                            {reminderCount > 0 && (
+                                <span className={`flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${filter === 'reminders' ? 'bg-white/25 text-white' : 'bg-blue-500/15 text-blue-500'
+                                    }`}>
+                                    {reminderCount}
+                                </span>
+                            )}
+                        </button>
 
                         {/* Source / platform filter — toggle icons for platforms present in the library */}
                         {availablePlatforms.length > 0 && (
-                            <div className="flex items-center gap-0.5 ms-1 ps-1 border-s border-border-subtle">
+                            <div className="flex items-center gap-1 ps-2 border-s border-border-subtle">
                                 {availablePlatforms.map(p => {
                                     const active = selectedPlatforms.has(p);
                                     return (
@@ -629,12 +650,12 @@ function FeedContent() {
                                             title={`${PLATFORM_LABELS[p]} (${platformCounts[p]})`}
                                             aria-label={`Filter by ${PLATFORM_LABELS[p]}`}
                                             aria-pressed={active}
-                                            className={`rounded-full transition-all min-h-[36px] min-w-[36px] sm:min-h-[28px] sm:min-w-[28px] flex items-center justify-center border ${active
-                                                ? 'bg-accent/10 text-accent border-accent/20'
-                                                : 'bg-card/30 text-text-muted/50 border-transparent hover:text-text-secondary'
+                                            className={`${ctrlBase} w-9 px-0 ${active
+                                                ? 'bg-accent text-white border border-accent shadow-sm'
+                                                : ctrlIdle
                                                 }`}
                                         >
-                                            {platformIcon(p, 'w-3.5 h-3.5')}
+                                            {platformIcon(p, 'w-4 h-4')}
                                         </button>
                                     );
                                 })}
@@ -642,92 +663,84 @@ function FeedContent() {
                         )}
                     </div>
 
-                    <div className="flex items-center gap-1">
-                        {/* View Mode Switcher */}
-                        <div className="flex items-center bg-card/30 rounded-full p-0.5 border border-transparent shadow-sm">
-                            <button
-                                onClick={() => setViewMode('grid')}
-                                className={`p-1.5 rounded-full transition-all min-h-[34px] min-w-[34px] sm:min-h-[26px] sm:min-w-[26px] flex items-center justify-center ${viewMode === 'grid' ? 'bg-accent/80 text-white shadow-sm' : 'text-text-muted/40 hover:text-text-secondary'}`}
-                                title="Grid View"
-                            >
-                                <LayoutGrid className="w-3 h-3" />
-                            </button>
-                            <button
-                                onClick={() => setViewMode('table')}
-                                className={`p-1.5 rounded-full transition-all min-h-[34px] min-w-[34px] sm:min-h-[26px] sm:min-w-[26px] flex items-center justify-center ${viewMode === 'table' ? 'bg-accent/80 text-white shadow-sm' : 'text-text-muted/40 hover:text-text-secondary'}`}
-                                title="Table View"
-                            >
-                                <List className="w-3 h-3" />
-                            </button>
-                            <button
-                                onClick={() => setViewMode('compact')}
-                                className={`p-1.5 rounded-full transition-all min-h-[34px] min-w-[34px] sm:min-h-[26px] sm:min-w-[26px] flex items-center justify-center ${viewMode === 'compact' ? 'bg-accent/80 text-white shadow-sm' : 'text-text-muted/40 hover:text-text-secondary'}`}
-                                title="Compact View"
-                            >
-                                <Grid2X2 className="w-3 h-3" />
-                            </button>
-                            <button
-                                onClick={() => setViewMode('insights')}
-                                className={`p-1.5 rounded-full transition-all min-h-[34px] min-w-[34px] sm:min-h-[26px] sm:min-w-[26px] flex items-center justify-center ${viewMode === 'insights' ? 'bg-accent/80 text-white shadow-sm' : 'text-text-muted/40 hover:text-text-secondary'}`}
-                                title="Insights View"
-                            >
-                                <Sparkles className="w-3 h-3" />
-                            </button>
+                    <div className="flex items-center gap-2">
+                        {/* View Mode Switcher — labeled segmented control */}
+                        <div className="inline-flex items-center gap-0.5 p-1 rounded-full bg-card border border-border-subtle">
+                            {viewModes.map(vm => {
+                                const active = viewMode === vm.key;
+                                return (
+                                    <button
+                                        key={vm.key}
+                                        onClick={() => setViewMode(vm.key)}
+                                        title={vm.hint}
+                                        aria-pressed={active}
+                                        aria-label={vm.hint}
+                                        className={`h-7 inline-flex items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${active
+                                            ? 'bg-accent text-white shadow-sm px-3'
+                                            : 'w-7 text-text-muted hover:text-text hover:bg-card-hover'
+                                            }`}
+                                    >
+                                        {vm.icon}
+                                        {active && <span>{vm.label}</span>}
+                                    </button>
+                                );
+                            })}
                         </div>
 
                         {/* Tag Explorer Toggle (Mobile) */}
                         <button
                             onClick={() => setIsTagExplorerOpen(!isTagExplorerOpen)}
-                            className={`lg:hidden h-[36px] sm:h-[28px] px-2.5 sm:px-2 rounded-full text-[11px] sm:text-[10px] font-bold transition-all flex items-center gap-1 border ${selectedTags.size > 0
-                                ? 'bg-accent/10 border-accent/20 text-accent'
-                                : 'bg-card/30 border-transparent text-text-muted/40'
+                            title="Filter by tags"
+                            className={`${ctrlBase} lg:hidden px-3.5 ${selectedTags.size > 0
+                                ? 'bg-accent text-white border border-accent shadow-sm'
+                                : ctrlIdle
                                 }`}
                         >
-                            <TagIcon className="w-3 h-3" />
-                            <span>Tags {selectedTags.size > 0 && `(${selectedTags.size})`}</span>
+                            <TagIcon className="w-4 h-4" />
+                            <span>Tags{selectedTags.size > 0 && ` (${selectedTags.size})`}</span>
                         </button>
 
                         {/* Selection Control */}
-                        <div className="flex items-center">
-                            {isSelectionMode ? (
-                                <div className="flex items-center gap-1 animate-slide-up bg-accent/5 px-1 py-0.5 rounded-full border border-accent/10 min-h-[36px] sm:min-h-[28px]">
-                                    <span className="text-[9px] font-bold text-accent px-1">{selectedIds.size}</span>
-                                    <button
-                                        onClick={handleBulkArchive}
-                                        disabled={selectedIds.size === 0}
-                                        title="Archive selected"
-                                        className="p-1.5 sm:p-1 rounded-full bg-accent/10 text-accent hover:bg-accent hover:text-white transition-all disabled:opacity-30"
-                                    >
-                                        <Archive className="w-3 h-3" />
-                                    </button>
-                                    <button
-                                        onClick={() => setConfirmBulkDelete(true)}
-                                        disabled={selectedIds.size === 0}
-                                        title="Delete selected"
-                                        className="p-1.5 sm:p-1 rounded-full text-text-muted hover:bg-red-500 hover:text-white transition-all disabled:opacity-30"
-                                    >
-                                        <Trash2 className="w-3 h-3" />
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setIsSelectionMode(false);
-                                            setSelectedIds(new Set());
-                                        }}
-                                        className="p-1.5 sm:p-1 rounded-full text-text-muted hover:text-text transition-all"
-                                    >
-                                        <X className="w-3 h-3" />
-                                    </button>
-                                </div>
-                            ) : (
+                        {isSelectionMode ? (
+                            <div className="flex items-center gap-1 h-9 px-1.5 rounded-full bg-accent/10 border border-accent/20 animate-slide-up">
+                                <span className="text-xs font-bold text-accent px-1.5 tabular-nums">{selectedIds.size}</span>
                                 <button
-                                    onClick={() => setIsSelectionMode(true)}
-                                    title="Select multiple"
-                                    className="h-[36px] w-[36px] sm:h-[28px] sm:w-[28px] rounded-full text-text-muted/40 hover:text-accent transition-all flex items-center justify-center bg-card/30 border border-transparent"
+                                    onClick={handleBulkArchive}
+                                    disabled={selectedIds.size === 0}
+                                    title="Archive selected"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                 >
-                                    <LayoutGrid className="w-3 h-3" />
+                                    <Archive className="w-4 h-4" />
                                 </button>
-                            )}
-                        </div>
+                                <button
+                                    onClick={() => setConfirmBulkDelete(true)}
+                                    disabled={selectedIds.size === 0}
+                                    title="Delete selected"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-red-500 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setIsSelectionMode(false);
+                                        setSelectedIds(new Set());
+                                    }}
+                                    title="Cancel selection"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-card-hover hover:text-text transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setIsSelectionMode(true)}
+                                title="Select multiple"
+                                aria-label="Select multiple"
+                                className={`${ctrlBase} w-9 px-0 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
+                            >
+                                <CheckSquare className="w-4 h-4" />
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
