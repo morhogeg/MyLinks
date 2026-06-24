@@ -355,6 +355,7 @@ export default function LinkDetailModal({
                                     </div>
                                     {isYouTube && youtubeChannel ? (
                                         <span
+                                            dir="ltr"
                                             className="flex items-center gap-1.5 min-w-0 text-sm font-semibold text-text-secondary whitespace-nowrap max-w-[240px]"
                                             title={youtubeChannel}
                                         >
@@ -363,6 +364,7 @@ export default function LinkDetailModal({
                                         </span>
                                     ) : xAuthor ? (
                                         <span
+                                            dir="ltr"
                                             className="flex items-center gap-1.5 min-w-0 text-sm font-semibold text-text-secondary whitespace-nowrap max-w-[240px]"
                                             title={`@${xAuthor}`}
                                         >

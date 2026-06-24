@@ -288,6 +288,7 @@ export default function Card({
                     <div className="flex items-center gap-1.5 min-w-0 z-10 ms-auto transition-opacity duration-200 group-hover:opacity-0">
                         {isYouTube && youtubeChannel && (
                             <span
+                                dir="ltr"
                                 className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-text-secondary whitespace-nowrap max-w-[220px]"
                                 title={youtubeChannel}
                             >
@@ -297,6 +298,7 @@ export default function Card({
                         )}
                         {!isYouTube && xAuthor && (
                             <span
+                                dir="ltr"
                                 className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-text-secondary whitespace-nowrap max-w-[220px]"
                                 title={`@${xAuthor}`}
                             >
