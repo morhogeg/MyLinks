@@ -1,7 +1,7 @@
 'use client';
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Bell, Trash2, Circle, Check, X } from 'lucide-react';
+import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink } from 'lucide-react';
 import { useEffect } from 'react';
 
 interface CardActionSheetProps {
@@ -61,6 +61,12 @@ export default function CardActionSheet({
         danger?: boolean;
         active?: boolean;
     }[] = [
+        {
+            key: 'source',
+            label: 'Open source',
+            icon: <ExternalLink className="w-5 h-5" />,
+            onClick: () => window.open(link.url, '_blank', 'noopener,noreferrer'),
+        },
         {
             key: 'read',
             label: link.isRead ? 'Mark as unread' : 'Mark as read',

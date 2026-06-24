@@ -873,6 +873,7 @@ function FeedContent() {
                                     isSelectionMode={isSelectionMode}
                                     isSelected={selectedIds.has(link.id)}
                                     onToggleSelection={toggleSelection}
+                                    onTagClick={handleToggleTag}
                                 />
                             ))}
                         </div>
