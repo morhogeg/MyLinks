@@ -905,10 +905,10 @@ function FeedContent() {
                             onToggleSelection={toggleSelection}
                         />
                     ) : viewMode === 'grid' ? (
-                        <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))' }}>
+                        <div className="[column-width:340px] [column-gap:1rem]">
                             {filteredLinks.map((link, idx) => (
+                                <div key={link.id} className="mb-4 break-inside-avoid [-webkit-column-break-inside:avoid]">
                                 <Card
-                                    key={link.id}
                                     index={idx}
                                     link={link}
                                     onOpenDetails={(link) => setActiveLinkId(link.id)}
@@ -923,6 +923,7 @@ function FeedContent() {
                                     onToggleSelection={toggleSelection}
                                     onTagClick={handleToggleTag}
                                 />
+                                </div>
                             ))}
                         </div>
                     ) : (
