@@ -57,7 +57,7 @@ export default function CompactCard({
         <>
         <article
             style={{ ['--enter-delay' as string]: enterDelay }}
-            className={`group surface-card animate-card-enter bg-card rounded-xl border transition-all duration-200 cursor-pointer relative flex flex-col items-stretch aspect-square [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] ${isSelected
+            className={`group surface-card animate-card-enter bg-card rounded-xl border shadow-[var(--shadow-card)] transition-all duration-300 ease-[var(--ease-spring)] cursor-pointer relative flex flex-col items-stretch aspect-square [@media(hover:hover)]:hover:-translate-y-1 [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] ${isSelected
                 ? 'border-accent bg-accent/5 ring-1 ring-accent'
                 : 'border-white/5 hover:border-accent/30'
                 } ${link.isRead ? 'opacity-60 grayscale-[0.3]' : ''} ${isEditingCategory ? 'overflow-visible z-50' : 'overflow-hidden'}`}
