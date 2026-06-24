@@ -5,7 +5,7 @@
 import { Link, LinkStatus } from '@/lib/types';
 import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Play, Youtube, ExternalLink } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { getPlatform, platformIcon } from '@/lib/platform';
+import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
@@ -63,6 +63,10 @@ export default function Card({
     // the generic sourceName so every video gets the red byline treatment.
     const isYouTube = platform === 'youtube' || link.sourceType === 'youtube';
     const youtubeChannel = link.metadata?.youtubeChannel || link.sourceName;
+    // X posts carry the author in the URL (x.com/<handle>/status/...), so we
+    // can credit them in the same byline style as YouTube — handle in the X
+    // brand color from the source filter.
+    const xAuthor = platform === 'x' ? xHandle(link.url) : null;
 
     useEffect(() => {
         const initialTimer = setTimeout(() => setNow(Date.now()), 0);
@@ -278,9 +282,9 @@ export default function Card({
                         </div>
                     </div>
 
-                    {/* Source Tag (End) - Fades out on hover. YouTube uses the red
-                        channel style right here in place of the muted chip; every
-                        other source keeps the muted uppercase chip. */}
+                    {/* Source Tag (End) - Fades out on hover. YouTube and X use the
+                        branded byline style right here in place of the muted chip;
+                        every other source keeps the muted uppercase chip. */}
                     <div className="flex items-center gap-1.5 min-w-0 z-10 ms-auto transition-opacity duration-200 group-hover:opacity-0">
                         {isYouTube && youtubeChannel && (
                             <span
@@ -291,7 +295,18 @@ export default function Card({
                                 <span className="truncate">{youtubeChannel}</span>
                             </span>
                         )}
-                        {!isYouTube && link.sourceName && link.sourceName !== 'Screenshot' && link.sourceType !== 'image' && (
+                        {!isYouTube && xAuthor && (
+                            <span
+                                className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-text-secondary whitespace-nowrap max-w-[220px]"
+                                title={`@${xAuthor}`}
+                            >
+                                <span className="shrink-0 inline-flex" style={{ color: platformColor('x') }}>
+                                    {platformIcon('x', 'w-3.5 h-3.5')}
+                                </span>
+                                <span className="truncate">@{xAuthor}</span>
+                            </span>
+                        )}
+                        {!isYouTube && !xAuthor && link.sourceName && link.sourceName !== 'Screenshot' && link.sourceType !== 'image' && (
                             <span
                                 className="flex items-center gap-1 text-[9px] font-bold text-text-muted/60 bg-black/5 border border-black/10 px-2 py-1 rounded-lg dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all max-w-[220px]"
                                 title={link.sourceName}

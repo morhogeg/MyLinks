@@ -72,6 +72,42 @@ const PLATFORM_RGB: Record<PlatformKey, string> = {
     github: '139, 148, 158',
 };
 
+/** Solid brand color for a platform, e.g. for tinting an icon. */
+export function platformColor(key: PlatformKey): string {
+    return `rgb(${PLATFORM_RGB[key]})`;
+}
+
+/** Non-username path segments on x.com / twitter.com that aren't post authors. */
+const X_RESERVED = new Set([
+    'home', 'explore', 'notifications', 'messages', 'search', 'settings',
+    'compose', 'hashtag', 'i', 'intent', 'login', 'signup', 'about',
+]);
+
+/**
+ * Extract the author's @handle from an X / Twitter post URL
+ * (e.g. https://x.com/naval/status/123 → "naval"). Returns null when the URL
+ * isn't an X post or points at a reserved route rather than a user.
+ */
+export function xHandle(url?: string): string | null {
+    if (!url) return null;
+    try {
+        const u = new URL(url);
+        const host = u.hostname.replace(/^www\./, '').toLowerCase();
+        const isX = host === 'x.com' || host.endsWith('.x.com')
+            || host === 'twitter.com' || host.endsWith('.twitter.com');
+        if (!isX) return null;
+        const seg = u.pathname.split('/').filter(Boolean)[0];
+        if (!seg) return null;
+        const handle = seg.replace(/^@/, '');
+        if (X_RESERVED.has(handle.toLowerCase())) return null;
+        // X usernames are 1–15 chars, letters/numbers/underscore only.
+        if (!/^[A-Za-z0-9_]{1,15}$/.test(handle)) return null;
+        return handle;
+    } catch {
+        return null;
+    }
+}
+
 /** Inline style for an *active* platform filter chip, tinted in its brand color. */
 export function platformActiveStyle(key: PlatformKey): {
     backgroundColor: string;
