@@ -404,7 +404,7 @@ function FeedContent() {
                     {Array.from({ length: 6 }).map((_, i) => (
                         <div
                             key={i}
-                            className="bg-card border border-white/5 rounded-2xl p-5 relative overflow-hidden skeleton-shimmer surface-card"
+                            className="bg-card border border-white/5 rounded-2xl p-5 relative overflow-hidden skeleton-shimmer surface-card shadow-[var(--shadow-card)]"
                         >
                             <div className="h-3 w-20 bg-white/10 rounded-full mb-4" />
                             <div className="h-5 w-3/4 bg-white/10 rounded mb-3" />
