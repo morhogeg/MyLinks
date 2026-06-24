@@ -3,8 +3,6 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { Link, Plus, Loader2, X, Upload } from 'lucide-react';
 import { saveLink, getUserTags } from '@/lib/storage';
-import { storage } from '@/lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { compressImage } from '@/lib/image';
@@ -21,6 +19,26 @@ const formatUrl = (input: string) => {
         formatted = `https://${formatted}`;
     }
     return formatted;
+};
+
+// Analysis can be slow on a cold function start, but it must never hang
+// forever. Abort the request after a generous ceiling and surface a clear
+// message instead of an indefinite spinner.
+const ANALYZE_TIMEOUT_MS = 60_000;
+
+const fetchWithTimeout = async (input: string, init: RequestInit) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
+    try {
+        return await fetch(input, { ...init, signal: controller.signal });
+    } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+            throw new Error('Analysis is taking longer than expected. It may still finish in the background — check your feed in a moment.');
+        }
+        throw err;
+    } finally {
+        clearTimeout(timer);
+    }
 };
 
 /**
@@ -41,16 +59,19 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
     const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
     // Simulated-but-motion-forward progress for image analysis. We can't read
-    // real progress from Gemini, so ease toward a cap (~92%) — always moving,
-    // never completing early. A real milestone (upload done) is blended in from
-    // handleSubmit, and success snaps it to 100%.
+    // real progress from Gemini, so ease toward a high cap (~99%) — always
+    // inching forward so it never looks frozen, but never completing early. A
+    // real milestone (image compressed/sent) is blended in from handleSubmit,
+    // and success snaps it to 100%.
     useEffect(() => {
         if (isLoading && activeTab === 'image') {
             setProgress((p) => (p < 8 ? 8 : p));
             progressTimer.current = setInterval(() => {
                 setProgress((p) => {
-                    const CAP = 92;
-                    return p >= CAP ? p : p + (CAP - p) * 0.07;
+                    const CAP = 99;
+                    // Slow the creep as it approaches the cap so the final
+                    // stretch always shows subtle movement instead of sticking.
+                    return p >= CAP ? p : p + (CAP - p) * 0.04;
                 });
             }, 180);
         }
@@ -109,51 +130,41 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                 // LINK MODE — analysis happens in the canonical Python backend.
                 let response;
                 try {
-                    response = await fetch('/api/analyze', {
+                    response = await fetchWithTimeout('/api/analyze', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ url: formattedUrl, existingTags, uid }),
                     });
                 } catch (netErr) {
-                    throw new Error(`Network error: ${netErr instanceof Error ? netErr.message : String(netErr)}`);
+                    throw new Error(netErr instanceof Error ? netErr.message : `Network error: ${String(netErr)}`);
                 }
                 data = await parseResponse(response);
             } else {
-                // IMAGE MODE — compress client-side, then upload to storage and
-                // analyze the inline bytes IN PARALLEL (no upload→re-download hop).
+                // IMAGE MODE — compress client-side, then send the inline bytes to
+                // the backend, which both analyzes AND stores the image (via the
+                // admin SDK, bypassing storage.rules that block client writes).
                 const compressed = await compressImage(imageFile!);
+                // Real milestone: the image is compressed and on its way — push
+                // past the "scanning" phase into "reading text".
+                setProgress((p) => Math.max(p, 45));
 
-                const storagePath = `users/${uid}/uploads/${Date.now()}.jpg`;
-                const storageRef = ref(storage, storagePath);
-
-                const uploadPromise = uploadBytes(storageRef, compressed.blob)
-                    .then(() => {
-                        // Real milestone: upload finished — jump past "scanning".
-                        setProgress((p) => Math.max(p, 45));
-                        return getDownloadURL(storageRef);
-                    });
-
-                const analyzePromise = fetch('/api/analyze-image', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        imageBytes: compressed.base64,
-                        mimeType: compressed.mimeType,
-                        existingTags,
-                    }),
-                }).then(parseResponse);
-
-                let downloadURL: string;
-                let analyzed;
+                let response;
                 try {
-                    [downloadURL, analyzed] = await Promise.all([uploadPromise, analyzePromise]);
-                } catch (err) {
-                    throw new Error(err instanceof Error ? err.message : String(err));
+                    response = await fetchWithTimeout('/api/analyze-image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            imageBytes: compressed.base64,
+                            mimeType: compressed.mimeType,
+                            existingTags,
+                            uid,
+                        }),
+                    });
+                } catch (netErr) {
+                    throw new Error(netErr instanceof Error ? netErr.message : `Network error: ${String(netErr)}`);
                 }
-
-                data = analyzed;
-                // The link's URL is the stored image, used to display it later.
-                data.link.url = downloadURL;
+                data = await parseResponse(response);
+                // The backend returns the stored image's public URL as link.url.
             }
 
             // Save to Firestore.
@@ -362,7 +373,22 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                 </div>
             )}
 
-            <div className="fixed bottom-6 right-4 sm:right-6 z-40" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+            <div className="fixed bottom-6 right-4 sm:right-6 z-40 flex flex-col items-end gap-3" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+                {/* Persistent "still working" chip: the in-flight analysis promise
+                    survives closing the panel, so show the user it's running and
+                    let them reopen the scan view by tapping it. */}
+                {isLoading && !isExpanded && (
+                    <button
+                        type="button"
+                        onClick={() => setIsExpanded(true)}
+                        className="flex items-center gap-2 pl-3 pr-4 py-2 rounded-full bg-card border border-white/10 shadow-lg text-sm font-medium text-text hover:bg-white/5 active:scale-95 transition-all animate-slide-up"
+                        aria-label="Analysis in progress — tap to view"
+                    >
+                        <Loader2 className="w-4 h-4 animate-spin text-accent" />
+                        <span>Analyzing…</span>
+                    </button>
+                )}
+
                 {/* FAB Button */}
                 <button
                     onClick={() => setIsExpanded(!isExpanded)}
