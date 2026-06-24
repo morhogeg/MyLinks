@@ -12,8 +12,9 @@ interface ImageScanProgressProps {
 // Phase label derived purely from progress, so this component stays stateless.
 function phaseFor(progress: number): string {
     if (progress >= 100) return 'Done!';
-    if (progress >= 90) return 'Organizing & tagging…';
-    if (progress >= 70) return 'Understanding content…';
+    if (progress >= 95) return 'Finishing up…';
+    if (progress >= 80) return 'Organizing & tagging…';
+    if (progress >= 60) return 'Understanding content…';
     if (progress >= 45) return 'Reading text…';
     if (progress >= 20) return 'Scanning image…';
     return 'Uploading…';
@@ -75,6 +76,13 @@ export default function ImageScanProgress({ imageSrc, progress }: ImageScanProgr
                     style={{ width: `${clamped}%` }}
                 />
             </div>
+
+            {/* Reassure the user they aren't trapped waiting on this. */}
+            {!done && (
+                <p className="text-xs text-text-muted text-center">
+                    You can close this — we&apos;ll keep analyzing in the background.
+                </p>
+            )}
         </div>
     );
 }

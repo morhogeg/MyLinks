@@ -29,15 +29,17 @@ from google.cloud.firestore_v1.vector import Vector
 from db import get_db
 from models import WebhookPayload, LinkStatus, ReminderStatus
 from ai_service import GeminiService
-from scraper import scrape_url
 from link_service import (
     find_user_by_phone, save_link_to_firestore, get_user_tags, is_hebrew,
     ensure_ingest_token, find_user_by_ingest_token, link_exists_for_url,
     pending_exists_for_url,
 )
 from reminder_service import handle_reminder_intent, set_reminder, calculate_next_reminder, run_reminder_check
-from whatsapp_handler import send_whatsapp_message, format_success_message
 from graph_service import GraphService
+# NOTE: `scraper` (pulls youtube_transcript_api) and `whatsapp_handler` (pulls
+# the Twilio SDK) are imported lazily inside the functions that use them. Both
+# are heavy and irrelevant to the hot image-analysis path, so deferring them
+# keeps cold starts lighter for functions like analyze_image.
 from search import sync_link_embedding, search_links
 
 # Configure logging
@@ -167,7 +169,8 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
 
         logger.info(f"Analyzing URL synchronously: {url}")
 
-        # 1. Scrape content
+        # 1. Scrape content (scraper imported lazily — see top-of-file note).
+        from scraper import scrape_url
         scraped = scrape_url(url)
         if not scraped.get("text") and not scraped.get("html"):
             return _error_response("Failed to scrape content", 500, headers)
@@ -264,6 +267,7 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
         image_url = data.get('imageUrl')
         image_b64 = data.get('imageBytes')
         existing_tags = data.get('existingTags', [])
+        uid = data.get('uid')
 
         if not image_url and not image_b64:
             return _error_response("imageBytes or imageUrl is required", 400, headers)
@@ -293,9 +297,28 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
         ai = GeminiService()
         analysis = ai.analyze_image(image_bytes, mime_type, existing_tags=existing_tags)
 
+        # 2b. Persist the image via the admin SDK (bypasses storage.rules, which
+        # denies client writes). This is how screenshots are stored elsewhere
+        # (see process_link_background). The public URL becomes the link's url
+        # so the card can display the image later.
+        stored_url = image_url or ""
+        if image_b64 and uid:
+            try:
+                import uuid
+                bucket = storage.bucket()
+                blob_path = f"screenshots/{uid}/{uuid.uuid4().hex}.jpg"
+                blob = bucket.blob(blob_path)
+                blob.upload_from_string(image_bytes, content_type=mime_type)
+                blob.make_public()
+                stored_url = blob.public_url
+                logger.info(f"Stored screenshot at {stored_url}")
+            except Exception as e:
+                # Non-fatal: analysis still succeeds, card just won't show the image.
+                logger.error(f"Failed to store screenshot: {e}")
+
         # 3. Construct Link Object
         link_data = {
-            "url": image_url or "",
+            "url": stored_url,
             "title": analysis.get("title", "Image Analysis"),
             "summary": analysis.get("summary", ""),
             "detailedSummary": analysis.get("detailedSummary", ""),
@@ -441,6 +464,8 @@ def whatsapp_webhook(request):
     WhatsApp webhook endpoint.
     Respond-First Pattern: Saves to pending_processing and returns 200 immediately.
     """
+    # whatsapp_handler pulls the Twilio SDK — imported lazily (see top-of-file note).
+    from whatsapp_handler import send_whatsapp_message
     try:
         if request.content_type == 'application/x-www-form-urlencoded':
             data = request.form.to_dict()
@@ -587,6 +612,9 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     """
     Background Task: Scrapes URL, runs AI analysis, and saves final link.
     """
+    # Heavy/external deps imported lazily (see top-of-file note).
+    from scraper import scrape_url
+    from whatsapp_handler import send_whatsapp_message, format_success_message
     snapshot = event.data
     if not snapshot:
         logger.error("No snapshot in background trigger")
