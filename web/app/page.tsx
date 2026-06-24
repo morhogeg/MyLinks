@@ -39,7 +39,7 @@ export default function Home() {
     <div className="min-h-screen bg-background text-text transition-colors duration-200">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border-subtle shadow-[0_4px_20px_-12px_rgba(0,0,0,0.6)] h-[56px] sm:h-[64px] flex items-center">
-        <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between">
+        <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-purple-500/20">
               <Brain className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
@@ -64,7 +64,7 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-2 sm:py-4 pb-24 sm:pb-20">
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-2 sm:py-4 pb-24 sm:pb-20">
         <Feed key={refreshKey} />
       </main>
 

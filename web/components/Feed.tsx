@@ -400,7 +400,7 @@ function FeedContent() {
         return (
             <div className="space-y-4" aria-busy="true" aria-label="Loading your links">
                 <div className="h-11 rounded-xl bg-card border border-white/5 relative overflow-hidden skeleton-shimmer" />
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
                     {Array.from({ length: 6 }).map((_, i) => (
                         <div
                             key={i}
@@ -425,11 +425,11 @@ function FeedContent() {
     }
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 lg:space-y-6">
             {/* Header Section (Not Sticky) */}
-            <div className="pb-3 pt-2 -mx-4 px-4 sm:mx-0 sm:px-0 transition-all duration-300">
+            <div className="pb-3 pt-2 -mx-4 px-4 sm:mx-0 sm:px-0 transition-all duration-300 space-y-3 sm:space-y-4">
                 {/* Search Bar */}
-                <div className="relative mb-2">
+                <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                     <input
                         type="text"
@@ -449,7 +449,7 @@ function FeedContent() {
                 </div>
 
                 {/* Row 1: Category Navigator (Primary) - DRASTICALLY BIGGER */}
-                <div className="relative -mx-4 px-4 sm:mx-0 sm:px-0 mb-2 group/category-nav">
+                <div className="relative -mx-4 px-4 sm:mx-0 sm:px-0 group/category-nav">
                     {/* Left/Right Fades for Scrollability Cue */}
                     <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none opacity-0 group-hover/category-nav:opacity-100 transition-opacity duration-300 sm:left-0 sm:from-background" />
                     <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none opacity-0 group-hover/category-nav:opacity-100 transition-opacity duration-300 sm:right-0 sm:from-background" />
@@ -712,23 +712,24 @@ function FeedContent() {
             )}
 
             {/* Main Content with Tag Sidebar */}
-            <div className="flex flex-col lg:flex-row gap-6 relative">
+            <div className="flex flex-col lg:flex-row gap-6 xl:gap-8 relative">
                 {/* Tag Explorer Sidebar (Desktop) */}
                 <aside
-                    className={`hidden lg:block flex-shrink-0 transition-all duration-300 ease-in-out ${isTagExplorerCollapsed ? 'w-10' : 'w-64'
+                    className={`hidden lg:block flex-shrink-0 transition-all duration-300 ease-in-out ${isTagExplorerCollapsed ? 'w-10' : 'w-64 xl:w-72'
                         }`}
                 >
-                    <div className={`sticky top-[72px] h-[calc(100vh-88px)] flex flex-col ${isTagExplorerCollapsed ? '' : 'min-w-[256px]'}`}>
+                    <div className={`sticky top-[72px] h-[calc(100vh-88px)] flex flex-col ${isTagExplorerCollapsed ? '' : 'min-w-[256px] surface-card rounded-2xl border border-border-subtle shadow-[var(--shadow-card)] p-4'}`}>
                         {isTagExplorerCollapsed ? (
                             <button
                                 onClick={toggleTagExplorer}
                                 className="w-10 h-10 rounded-xl bg-card border border-border-subtle flex items-center justify-center text-text-muted hover:text-accent hover:border-accent/30 transition-all shadow-sm"
                                 title="Expand Tags Explorer"
+                                aria-label="Expand Tags Explorer"
                             >
                                 <TagIcon className="w-5 h-5 transition-transform hover:scale-110" />
                             </button>
                         ) : (
-                            <div className="overflow-hidden">
+                            <div className="overflow-hidden h-full">
                                 <TagExplorer
                                     tags={allTags}
                                     tagCounts={tagCounts}
@@ -856,7 +857,7 @@ function FeedContent() {
                             onToggleSelection={toggleSelection}
                         />
                     ) : viewMode === 'grid' ? (
-                        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+                        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                             {filteredLinks.map((link, idx) => (
                                 <Card
                                     key={link.id}
