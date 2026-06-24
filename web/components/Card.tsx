@@ -3,7 +3,7 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Play, Youtube } from 'lucide-react';
+import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Play, Youtube, ExternalLink } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -25,6 +25,8 @@ interface CardProps {
     onToggleSelection?: (id: string) => void;
     /** Position in the feed, used to stagger the entrance animation. */
     index?: number;
+    /** Tapping a footer tag filters the feed by that tag. */
+    onTagClick?: (tag: string) => void;
 }
 
 /**
@@ -42,7 +44,8 @@ export default function Card({
     isSelectionMode = false,
     isSelected = false,
     onToggleSelection,
-    index = 0
+    index = 0,
+    onTagClick
 }: CardProps) {
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
@@ -121,7 +124,10 @@ export default function Card({
                 className="p-4 sm:p-5 flex flex-col h-full space-y-3 sm:space-y-4"
                 dir={isRtl ? "rtl" : "ltr"}
             >
-                {/* Header Row: Category and Source Badge (Fade Toggle) */}
+                {/* Header Row: Category (start) and Source Badge (end). Inherits
+                    the card's direction so the category chip sits on the same
+                    edge the title starts from — right for Hebrew, left for
+                    English — keeping each card internally coherent. */}
                 <div className="relative flex items-center justify-between w-full h-7 mb-1">
                     {/* Category Section (Start) - Fades out on hover */}
                     <div className="flex items-center min-w-0 z-10 transition-opacity duration-200 group-hover:opacity-0">
@@ -177,6 +183,16 @@ export default function Card({
                     {/* Action Buttons (Absolute Center) - Fades in on hover */}
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none group-hover:pointer-events-auto">
                         <div className="flex items-center gap-1 bg-card/90 backdrop-blur-md border border-white/10 p-1 rounded-full shadow-xl">
+                            <a
+                                href={link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                title="Open source"
+                                className="p-1.5 rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center"
+                            >
+                                <ExternalLink className="w-3 h-3" />
+                            </a>
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -257,7 +273,7 @@ export default function Card({
                     <div className="flex items-center gap-2 min-w-0 z-10 ms-auto transition-opacity duration-200 group-hover:opacity-0">
                         {link.sourceName && link.sourceName !== 'Screenshot' && link.sourceType !== 'image' && (
                             <span
-                                className="text-[9px] font-bold text-text-muted/60 bg-black/5 border border-black/10 px-2 py-1 rounded-lg dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all max-w-[100px] truncate"
+                                className="text-[9px] font-bold text-text-muted/60 bg-black/5 border border-black/10 px-2 py-1 rounded-lg dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all max-w-[220px] truncate"
                                 title={link.sourceName}
                             >
                                 {link.sourceName}
@@ -318,14 +334,19 @@ export default function Card({
                             const parents = parts.slice(0, -1).join('/');
 
                             return (
-                                <span
+                                <button
                                     key={tag}
-                                    title={tag}
-                                    className="inline-flex items-center text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-white/5 text-text-muted/60 group-hover:text-accent group-hover:bg-accent/10 transition-all border border-transparent group-hover:border-accent/10"
+                                    type="button"
+                                    title={`Filter by ${tag}`}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onTagClick?.(tag);
+                                    }}
+                                    className="inline-flex items-center text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-white/5 text-text-muted/60 group-hover:text-accent group-hover:bg-accent/10 hover:!bg-accent/20 hover:!text-accent active:scale-95 transition-all border border-transparent group-hover:border-accent/10 cursor-pointer"
                                 >
                                     {parents && <span className="opacity-40 font-normal mr-0.5">{parents}/</span>}
                                     {leaf}
-                                </span>
+                                </button>
                             );
                         })}
                     </div>
