@@ -18,6 +18,7 @@ import ReminderModal from './ReminderModal';
 import TableView from './TableView';
 import InsightsFeed from './InsightsFeed';
 import LinkDetailModal from './LinkDetailModal';
+import ConfirmDialog from './ConfirmDialog';
 import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2 } from 'lucide-react';
 import TagExplorer from './TagExplorer';
 import { useSearchParams } from 'next/navigation';
@@ -59,6 +60,8 @@ function FeedContent() {
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isTagExplorerCollapsed, setIsTagExplorerCollapsed] = useState(false);
     const [reminderModalLink, setReminderModalLink] = useState<Link | null>(null);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
     // Semantic Search State
     const [isSearching, setIsSearching] = useState(false);
@@ -333,15 +336,19 @@ function FeedContent() {
         }
     };
 
-    const handleDelete = async (id: string) => {
+    // Open the branded confirm dialog instead of a native window.confirm. The
+    // card/sheet/table all call this; actual deletion happens on confirm.
+    const handleDelete = (id: string) => {
+        setConfirmDeleteId(id);
+    };
+
+    const performDelete = async (id: string) => {
         if (!uid) return;
-        if (window.confirm('Delete this link?')) {
-            try {
-                await deleteLink(uid, id);
-                toast.success('Link deleted');
-            } catch {
-                toast.error("Couldn't delete the link. Please try again.");
-            }
+        try {
+            await deleteLink(uid, id);
+            toast.success('Link deleted');
+        } catch {
+            toast.error("Couldn't delete the link. Please try again.");
         }
     };
 
@@ -357,18 +364,16 @@ function FeedContent() {
         setIsSelectionMode(false);
     };
 
-    const handleBulkDelete = async () => {
+    const performBulkDelete = async () => {
         if (!uid) return;
-        if (window.confirm(`Delete ${selectedIds.size} links forever?`)) {
-            try {
-                await Promise.all(Array.from(selectedIds).map(id => deleteLink(uid, id)));
-                toast.success(`Deleted ${selectedIds.size} link${selectedIds.size === 1 ? '' : 's'}`);
-            } catch {
-                toast.error("Couldn't delete some links. Please try again.");
-            }
-            setSelectedIds(new Set());
-            setIsSelectionMode(false);
+        try {
+            await Promise.all(Array.from(selectedIds).map(id => deleteLink(uid, id)));
+            toast.success(`Deleted ${selectedIds.size} link${selectedIds.size === 1 ? '' : 's'}`);
+        } catch {
+            toast.error("Couldn't delete some links. Please try again.");
         }
+        setSelectedIds(new Set());
+        setIsSelectionMode(false);
     };
 
     const handleOpenReminderModal = (link: Link) => {
@@ -394,12 +399,12 @@ function FeedContent() {
     if (isLoading) {
         return (
             <div className="space-y-4" aria-busy="true" aria-label="Loading your links">
-                <div className="h-11 rounded-xl bg-card border border-white/5 animate-pulse" />
+                <div className="h-11 rounded-xl bg-card border border-white/5 relative overflow-hidden skeleton-shimmer" />
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {Array.from({ length: 6 }).map((_, i) => (
                         <div
                             key={i}
-                            className="bg-card border border-white/5 rounded-2xl p-5 animate-pulse"
+                            className="bg-card border border-white/5 rounded-2xl p-5 relative overflow-hidden skeleton-shimmer surface-card"
                         >
                             <div className="h-3 w-20 bg-white/10 rounded-full mb-4" />
                             <div className="h-5 w-3/4 bg-white/10 rounded mb-3" />
@@ -540,7 +545,7 @@ function FeedContent() {
                             <select
                                 value={filter}
                                 onChange={(e) => setFilter(e.target.value as FilterType)}
-                                className="appearance-none bg-card/30 border border-transparent rounded-full pl-8 pr-3 py-0.5 text-[10px] font-medium text-text-muted/60 hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/10 min-h-[28px]"
+                                className="appearance-none bg-card/30 border border-transparent rounded-full pl-8 pr-3 py-0.5 text-[10px] font-medium text-text-muted/60 hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/10 min-h-[36px] sm:min-h-[28px]"
                             >
                                 {filterButtons.filter(btn => btn.key !== 'reminders').map(btn => (
                                     <option key={btn.key} value={btn.key}>{btn.label}</option>
@@ -558,7 +563,7 @@ function FeedContent() {
                         {/* Reminders Toggle */}
                         <button
                             onClick={() => setFilter(filter === 'reminders' ? 'all' : 'reminders')}
-                            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium transition-all min-h-[28px] ${filter === 'reminders'
+                            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium transition-all min-h-[36px] sm:min-h-[28px] ${filter === 'reminders'
                                 ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
                                 : 'bg-card/30 text-text-muted/60 hover:text-blue-500 border border-transparent'
                                 }`}
@@ -578,7 +583,7 @@ function FeedContent() {
                             <select
                                 value={sortBy}
                                 onChange={(e) => setSortBy(e.target.value as SortType)}
-                                className="appearance-none bg-card/30 border border-transparent rounded-full pl-2 pr-6 py-0.5 text-[10px] font-medium text-text-muted/60 hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/10 min-h-[28px]"
+                                className="appearance-none bg-card/30 border border-transparent rounded-full pl-2 pr-6 py-0.5 text-[10px] font-medium text-text-muted/60 hover:bg-card-hover transition-all cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/10 min-h-[36px] sm:min-h-[28px]"
                             >
                                 <option value="date-desc">Newest</option>
                                 <option value="date-asc">Oldest</option>
@@ -594,28 +599,28 @@ function FeedContent() {
                         <div className="flex items-center bg-card/30 rounded-full p-0.5 border border-transparent shadow-sm">
                             <button
                                 onClick={() => setViewMode('grid')}
-                                className={`p-1.5 rounded-full transition-all min-h-[26px] min-w-[26px] flex items-center justify-center ${viewMode === 'grid' ? 'bg-accent/80 text-white shadow-sm' : 'text-text-muted/40 hover:text-text-secondary'}`}
+                                className={`p-1.5 rounded-full transition-all min-h-[34px] min-w-[34px] sm:min-h-[26px] sm:min-w-[26px] flex items-center justify-center ${viewMode === 'grid' ? 'bg-accent/80 text-white shadow-sm' : 'text-text-muted/40 hover:text-text-secondary'}`}
                                 title="Grid View"
                             >
                                 <LayoutGrid className="w-3 h-3" />
                             </button>
                             <button
                                 onClick={() => setViewMode('table')}
-                                className={`p-1.5 rounded-full transition-all min-h-[26px] min-w-[26px] flex items-center justify-center ${viewMode === 'table' ? 'bg-accent/80 text-white shadow-sm' : 'text-text-muted/40 hover:text-text-secondary'}`}
+                                className={`p-1.5 rounded-full transition-all min-h-[34px] min-w-[34px] sm:min-h-[26px] sm:min-w-[26px] flex items-center justify-center ${viewMode === 'table' ? 'bg-accent/80 text-white shadow-sm' : 'text-text-muted/40 hover:text-text-secondary'}`}
                                 title="Table View"
                             >
                                 <List className="w-3 h-3" />
                             </button>
                             <button
                                 onClick={() => setViewMode('compact')}
-                                className={`p-1.5 rounded-full transition-all min-h-[26px] min-w-[26px] flex items-center justify-center ${viewMode === 'compact' ? 'bg-accent/80 text-white shadow-sm' : 'text-text-muted/40 hover:text-text-secondary'}`}
+                                className={`p-1.5 rounded-full transition-all min-h-[34px] min-w-[34px] sm:min-h-[26px] sm:min-w-[26px] flex items-center justify-center ${viewMode === 'compact' ? 'bg-accent/80 text-white shadow-sm' : 'text-text-muted/40 hover:text-text-secondary'}`}
                                 title="Compact View"
                             >
                                 <Grid2X2 className="w-3 h-3" />
                             </button>
                             <button
                                 onClick={() => setViewMode('insights')}
-                                className={`p-1.5 rounded-full transition-all min-h-[26px] min-w-[26px] flex items-center justify-center ${viewMode === 'insights' ? 'bg-accent/80 text-white shadow-sm' : 'text-text-muted/40 hover:text-text-secondary'}`}
+                                className={`p-1.5 rounded-full transition-all min-h-[34px] min-w-[34px] sm:min-h-[26px] sm:min-w-[26px] flex items-center justify-center ${viewMode === 'insights' ? 'bg-accent/80 text-white shadow-sm' : 'text-text-muted/40 hover:text-text-secondary'}`}
                                 title="Insights View"
                             >
                                 <Sparkles className="w-3 h-3" />
@@ -625,7 +630,7 @@ function FeedContent() {
                         {/* Tag Explorer Toggle (Mobile) */}
                         <button
                             onClick={() => setIsTagExplorerOpen(!isTagExplorerOpen)}
-                            className={`lg:hidden h-[28px] px-2 rounded-full text-[10px] font-bold transition-all flex items-center gap-1 border ${selectedTags.size > 0
+                            className={`lg:hidden h-[36px] sm:h-[28px] px-2.5 sm:px-2 rounded-full text-[11px] sm:text-[10px] font-bold transition-all flex items-center gap-1 border ${selectedTags.size > 0
                                 ? 'bg-accent/10 border-accent/20 text-accent'
                                 : 'bg-card/30 border-transparent text-text-muted/40'
                                 }`}
@@ -637,21 +642,30 @@ function FeedContent() {
                         {/* Selection Control */}
                         <div className="flex items-center">
                             {isSelectionMode ? (
-                                <div className="flex items-center gap-1 animate-slide-up bg-accent/5 px-1 py-0.5 rounded-full border border-accent/10 min-h-[28px]">
+                                <div className="flex items-center gap-1 animate-slide-up bg-accent/5 px-1 py-0.5 rounded-full border border-accent/10 min-h-[36px] sm:min-h-[28px]">
                                     <span className="text-[9px] font-bold text-accent px-1">{selectedIds.size}</span>
                                     <button
                                         onClick={handleBulkArchive}
                                         disabled={selectedIds.size === 0}
-                                        className="p-1 rounded-full bg-accent/10 text-accent hover:bg-accent hover:text-white transition-all disabled:opacity-30"
+                                        title="Archive selected"
+                                        className="p-1.5 sm:p-1 rounded-full bg-accent/10 text-accent hover:bg-accent hover:text-white transition-all disabled:opacity-30"
                                     >
                                         <Archive className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                        onClick={() => setConfirmBulkDelete(true)}
+                                        disabled={selectedIds.size === 0}
+                                        title="Delete selected"
+                                        className="p-1.5 sm:p-1 rounded-full text-text-muted hover:bg-red-500 hover:text-white transition-all disabled:opacity-30"
+                                    >
+                                        <Trash2 className="w-3 h-3" />
                                     </button>
                                     <button
                                         onClick={() => {
                                             setIsSelectionMode(false);
                                             setSelectedIds(new Set());
                                         }}
-                                        className="p-1 rounded-full text-text-muted hover:text-text transition-all"
+                                        className="p-1.5 sm:p-1 rounded-full text-text-muted hover:text-text transition-all"
                                     >
                                         <X className="w-3 h-3" />
                                     </button>
@@ -659,7 +673,8 @@ function FeedContent() {
                             ) : (
                                 <button
                                     onClick={() => setIsSelectionMode(true)}
-                                    className="h-[28px] w-[28px] rounded-full text-text-muted/40 hover:text-accent transition-all flex items-center justify-center bg-card/30 border border-transparent"
+                                    title="Select multiple"
+                                    className="h-[36px] w-[36px] sm:h-[28px] sm:w-[28px] rounded-full text-text-muted/40 hover:text-accent transition-all flex items-center justify-center bg-card/30 border border-transparent"
                                 >
                                     <LayoutGrid className="w-3 h-3" />
                                 </button>
@@ -764,16 +779,16 @@ function FeedContent() {
                 {/* Links Grid/Table */}
                 <div className="flex-grow min-w-0">
                     {filteredLinks.length === 0 ? (
-                        <div className="text-center py-16">
-                            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-card flex items-center justify-center">
+                        <div className="text-center py-16 animate-fade-in">
+                            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-accent/20">
                                 {filter === 'favorite' ? (
-                                    <Star className="w-8 h-8 text-text-muted" />
+                                    <Star className="w-8 h-8 text-white" />
                                 ) : filter === 'archived' ? (
-                                    <Archive className="w-8 h-8 text-text-muted" />
+                                    <Archive className="w-8 h-8 text-white" />
                                 ) : filter === 'reminders' ? (
-                                    <Bell className="w-8 h-8 text-text-muted" />
+                                    <Bell className="w-8 h-8 text-white" />
                                 ) : (
-                                    <Inbox className="w-8 h-8 text-text-muted" />
+                                    <Inbox className="w-8 h-8 text-white" />
                                 )}
                             </div>
                             <h3 className="text-lg font-medium text-text mb-2">
@@ -842,9 +857,10 @@ function FeedContent() {
                         />
                     ) : viewMode === 'grid' ? (
                         <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
-                            {filteredLinks.map((link) => (
+                            {filteredLinks.map((link, idx) => (
                                 <Card
                                     key={link.id}
+                                    index={idx}
                                     link={link}
                                     onOpenDetails={(link) => setActiveLinkId(link.id)}
                                     onStatusChange={handleStatusChange}
@@ -864,9 +880,10 @@ function FeedContent() {
                             className="grid gap-2 sm:gap-3"
                             style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}
                         >
-                            {filteredLinks.map((link) => (
+                            {filteredLinks.map((link, idx) => (
                                 <CompactCard
                                     key={link.id}
+                                    index={idx}
                                     link={link}
                                     onOpenDetails={(link) => setActiveLinkId(link.id)}
                                     onStatusChange={handleStatusChange}
@@ -914,6 +931,30 @@ function FeedContent() {
                     onUpdate={() => setReminderModalLink(null)}
                 />
             )}
+
+            {/* Delete confirmation (single) — branded, replaces window.confirm */}
+            <ConfirmDialog
+                isOpen={confirmDeleteId !== null}
+                onClose={() => setConfirmDeleteId(null)}
+                onConfirm={() => {
+                    if (confirmDeleteId) performDelete(confirmDeleteId);
+                }}
+                title="Delete this link?"
+                message="This permanently removes it from your second brain. This can't be undone."
+                confirmLabel="Delete"
+                variant="danger"
+            />
+
+            {/* Delete confirmation (bulk) */}
+            <ConfirmDialog
+                isOpen={confirmBulkDelete}
+                onClose={() => setConfirmBulkDelete(false)}
+                onConfirm={performBulkDelete}
+                title={`Delete ${selectedIds.size} link${selectedIds.size === 1 ? '' : 's'}?`}
+                message="These will be permanently removed from your second brain. This can't be undone."
+                confirmLabel="Delete"
+                variant="danger"
+            />
         </div>
     );
 }

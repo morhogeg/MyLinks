@@ -26,7 +26,7 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20 animate-pulse">
+          <div className="w-12 h-12 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-purple-500/20 animate-pulse">
             <Brain className="w-6 h-6 text-white" />
           </div>
           <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
@@ -38,10 +38,10 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background text-text transition-colors duration-200">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border-subtle h-[56px] sm:h-[64px] flex items-center">
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border-subtle shadow-[0_4px_20px_-12px_rgba(0,0,0,0.6)] h-[56px] sm:h-[64px] flex items-center">
         <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-purple-500/20">
               <Brain className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div>
