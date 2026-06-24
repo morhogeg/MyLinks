@@ -8,6 +8,7 @@ import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
 import CategoryInput from './CategoryInput';
 import { hasHebrew } from '@/lib/rtl';
+import { prettyHost } from '@/lib/platform';
 
 interface TableViewProps {
     links: Link[];
@@ -100,7 +101,7 @@ export default function TableView({ links, onOpenDetails, onStatusChange, onRead
                                                 }}
                                             >
                                                 <span className="truncate italic max-w-[200px]">
-                                                    {new URL(link.url).hostname.replace('www.', '')}
+                                                    {prettyHost(link.url)}
                                                 </span>
                                                 <ExternalLink className="w-2.5 h-2.5 opacity-40 group-hover/link:opacity-100" />
                                             </div>

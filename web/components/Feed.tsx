@@ -6,7 +6,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { getPlatform, PLATFORM_LABELS, platformIcon, type PlatformKey } from '@/lib/platform';
+import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, type PlatformKey } from '@/lib/platform';
+import Dropdown from './Dropdown';
 import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus } from '@/lib/storage';
 import { collection, query, orderBy, onSnapshot, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase';
@@ -21,7 +22,7 @@ import TableView from './TableView';
 import InsightsFeed from './InsightsFeed';
 import LinkDetailModal from './LinkDetailModal';
 import ConfirmDialog from './ConfirmDialog';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, ChevronDown, CheckSquare } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare } from 'lucide-react';
 import TagExplorer from './TagExplorer';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -427,6 +428,23 @@ function FeedContent() {
     const ctrlIdle =
         'bg-card border border-border-subtle text-text-secondary hover:bg-card-hover hover:text-text hover:border-text-muted/40';
 
+    // Status filter options for the custom dropdown (Reminders has its own toggle).
+    const statusOptions = [
+        { value: 'all', label: 'All', icon: <Inbox className="w-4 h-4 text-text-secondary" /> },
+        { value: 'unread', label: 'Unread', icon: <Inbox className="w-4 h-4 text-accent" /> },
+        { value: 'read', label: 'Read', icon: <CheckCircle2 className="w-4 h-4 text-green-500" /> },
+        { value: 'favorite', label: 'Favorites', icon: <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" /> },
+        { value: 'archived', label: 'Archived', icon: <Archive className="w-4 h-4 text-text-secondary" /> },
+    ];
+    const statusTriggerIcon = (statusOptions.find(o => o.value === filter) ?? statusOptions[0]).icon;
+
+    const sortOptions = [
+        { value: 'date-desc', label: 'Newest' },
+        { value: 'date-asc', label: 'Oldest' },
+        { value: 'title-asc', label: 'A–Z' },
+        { value: 'category', label: 'Category' },
+    ];
+
     // View modes, in a single source of truth so the switcher stays in sync.
     const viewModes: { key: typeof viewMode; label: string; icon: React.ReactNode; hint: string }[] = [
         { key: 'grid', label: 'Cards', icon: <LayoutGrid className="w-4 h-4" />, hint: 'Card view' },
@@ -579,44 +597,23 @@ function FeedContent() {
                 {/* Row 2: Toolbar — filter / sort / source on the left, view & actions on the right */}
                 <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-2 -mx-2 px-2 sm:mx-0 sm:px-0">
                     <div className="flex items-center gap-2">
-                        {/* Status Filter Dropdown */}
-                        <div className="relative">
-                            <select
-                                value={filter}
-                                onChange={(e) => setFilter(e.target.value as FilterType)}
-                                aria-label="Filter by status"
-                                className={`${ctrlBase} ${ctrlIdle} appearance-none pl-9 pr-8`}
-                            >
-                                {filterButtons.filter(btn => btn.key !== 'reminders').map(btn => (
-                                    <option key={btn.key} value={btn.key}>{btn.label}</option>
-                                ))}
-                            </select>
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                {filter === 'all' && <Inbox className="w-4 h-4 text-text-secondary" />}
-                                {filter === 'unread' && <Inbox className="w-4 h-4 text-accent" />}
-                                {filter === 'read' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
-                                {filter === 'favorite' && <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />}
-                                {filter === 'archived' && <Archive className="w-4 h-4 text-text-secondary" />}
-                            </div>
-                            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
-                        </div>
+                        {/* Status Filter — accent-themed dropdown (no native OS blue) */}
+                        <Dropdown
+                            ariaLabel="Filter by status"
+                            value={filter === 'reminders' ? 'all' : filter}
+                            onChange={(v) => setFilter(v as FilterType)}
+                            leadingIcon={statusTriggerIcon}
+                            options={statusOptions}
+                        />
 
-                        {/* Sort Dropdown */}
-                        <div className="relative">
-                            <select
-                                value={sortBy}
-                                onChange={(e) => setSortBy(e.target.value as SortType)}
-                                aria-label="Sort order"
-                                className={`${ctrlBase} ${ctrlIdle} appearance-none pl-9 pr-8`}
-                            >
-                                <option value="date-desc">Newest</option>
-                                <option value="date-asc">Oldest</option>
-                                <option value="title-asc">A–Z</option>
-                                <option value="category">Category</option>
-                            </select>
-                            <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary pointer-events-none" />
-                            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
-                        </div>
+                        {/* Sort — accent-themed dropdown */}
+                        <Dropdown
+                            ariaLabel="Sort order"
+                            value={sortBy}
+                            onChange={(v) => setSortBy(v as SortType)}
+                            leadingIcon={<ArrowUpDown className="w-4 h-4 text-text-secondary" />}
+                            options={sortOptions}
+                        />
 
                         {/* Reminders Toggle */}
                         <button
@@ -650,10 +647,8 @@ function FeedContent() {
                                             title={`${PLATFORM_LABELS[p]} (${platformCounts[p]})`}
                                             aria-label={`Filter by ${PLATFORM_LABELS[p]}`}
                                             aria-pressed={active}
-                                            className={`${ctrlBase} w-9 px-0 ${active
-                                                ? 'bg-accent text-white border border-accent shadow-sm'
-                                                : ctrlIdle
-                                                }`}
+                                            style={active ? platformActiveStyle(p) : undefined}
+                                            className={`${ctrlBase} w-9 px-0 border ${active ? 'shadow-sm' : ctrlIdle}`}
                                         >
                                             {platformIcon(p, 'w-4 h-4')}
                                         </button>
@@ -745,10 +740,9 @@ function FeedContent() {
                 </div>
             </div>
 
-            {/* Active Tag Filters (Visible when sidebar is collapsed or on mobile) */}
+            {/* Active Tag Filters — always shown above the cards as tappable chips */}
             {selectedTags.size > 0 && (
-                <div className={`flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300 ${!isTagExplorerCollapsed ? 'lg:hidden' : ''
-                    }`}>
+                <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
                     <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent/5 border border-accent/10">
                         <TagIcon className="w-3 h-3 text-accent" />
                         <span className="text-[10px] font-bold text-accent uppercase tracking-wider">Filtered By:</span>

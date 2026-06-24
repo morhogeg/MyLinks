@@ -1,7 +1,16 @@
 'use client';
 
-import { Youtube, Twitter, Instagram, Linkedin, Github } from 'lucide-react';
+import { Youtube, Instagram, Linkedin, Github } from 'lucide-react';
 import type { ReactNode } from 'react';
+
+/** Up-to-date X (formerly Twitter) wordmark — lucide still ships the old bird. */
+function XLogo({ className = 'w-3 h-3' }: { className?: string }) {
+    return (
+        <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24h-6.66l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117l11.966 15.644Z" />
+        </svg>
+    );
+}
 
 /**
  * Recognized content platforms we can detect from a link's URL. Generic web
@@ -44,12 +53,49 @@ export function platformIcon(key: PlatformKey, className = 'w-3 h-3'): ReactNode
         case 'youtube':
             return <Youtube className={className} />;
         case 'x':
-            return <Twitter className={className} />;
+            return <XLogo className={className} />;
         case 'instagram':
             return <Instagram className={className} />;
         case 'linkedin':
             return <Linkedin className={className} />;
         case 'github':
             return <Github className={className} />;
+    }
+}
+
+/** Brand RGB per platform, so each source filter lights up its own color. */
+const PLATFORM_RGB: Record<PlatformKey, string> = {
+    youtube: '255, 0, 0',
+    x: '113, 118, 123',
+    instagram: '225, 48, 108',
+    linkedin: '10, 102, 194',
+    github: '139, 148, 158',
+};
+
+/** Inline style for an *active* platform filter chip, tinted in its brand color. */
+export function platformActiveStyle(key: PlatformKey): {
+    backgroundColor: string;
+    color: string;
+    borderColor: string;
+} {
+    const rgb = PLATFORM_RGB[key];
+    return {
+        backgroundColor: `rgba(${rgb}, 0.16)`,
+        color: `rgb(${rgb})`,
+        borderColor: `rgba(${rgb}, 0.40)`,
+    };
+}
+
+/**
+ * Human-friendly hostname for display, e.g. "youtube.com". Never throws — a
+ * malformed or empty URL returns a safe fallback instead of crashing render.
+ */
+export function prettyHost(url?: string): string {
+    if (!url) return 'link';
+    try {
+        return new URL(url).hostname.replace(/^www\./, '');
+    } catch {
+        // Best-effort: strip scheme/path from a non-URL string.
+        return url.replace(/^https?:\/\//, '').split('/')[0] || 'link';
     }
 }
