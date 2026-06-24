@@ -6,6 +6,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
+import { getPlatform, PLATFORM_LABELS, platformIcon, type PlatformKey } from '@/lib/platform';
 import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus } from '@/lib/storage';
 import { collection, query, orderBy, onSnapshot, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase';
@@ -57,6 +58,7 @@ function FeedContent() {
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
     const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
+    const [selectedPlatforms, setSelectedPlatforms] = useState<Set<PlatformKey>>(new Set());
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isTagExplorerCollapsed, setIsTagExplorerCollapsed] = useState(false);
     const [reminderModalLink, setReminderModalLink] = useState<Link | null>(null);
@@ -215,6 +217,12 @@ function FeedContent() {
             });
         })
         .filter((link) => {
+            // Apply source/platform filters
+            if (selectedPlatforms.size === 0) return true;
+            const platform = getPlatform(link.url);
+            return platform != null && selectedPlatforms.has(platform);
+        })
+        .filter((link) => {
             // Apply search (Hybrid: keyword OR semantic result)
             if (!debouncedQuery.trim()) return true;
 
@@ -285,6 +293,21 @@ function FeedContent() {
         if (next.has(tag)) next.delete(tag);
         else next.add(tag);
         setSelectedTags(next);
+    };
+
+    // Source/platform filter: only surface platforms actually present in the library.
+    const platformCounts = links.reduce((acc, link) => {
+        const p = getPlatform(link.url);
+        if (p) acc[p] = (acc[p] || 0) + 1;
+        return acc;
+    }, {} as Record<PlatformKey, number>);
+    const availablePlatforms = (Object.keys(PLATFORM_LABELS) as PlatformKey[]).filter(p => platformCounts[p]);
+
+    const handleTogglePlatform = (p: PlatformKey) => {
+        const next = new Set(selectedPlatforms);
+        if (next.has(p)) next.delete(p);
+        else next.add(p);
+        setSelectedPlatforms(next);
     };
 
     const reminderCount = links.filter(l => l.reminderStatus === 'pending').length;
@@ -592,6 +615,30 @@ function FeedContent() {
                             </select>
                             <ArrowUpDown className="absolute right-2 top-1/2 -translate-y-1/2 w-2.5 h-2.5 text-text-muted pointer-events-none opacity-40" />
                         </div>
+
+                        {/* Source / platform filter — toggle icons for platforms present in the library */}
+                        {availablePlatforms.length > 0 && (
+                            <div className="flex items-center gap-0.5 ms-1 ps-1 border-s border-border-subtle">
+                                {availablePlatforms.map(p => {
+                                    const active = selectedPlatforms.has(p);
+                                    return (
+                                        <button
+                                            key={p}
+                                            onClick={() => handleTogglePlatform(p)}
+                                            title={`${PLATFORM_LABELS[p]} (${platformCounts[p]})`}
+                                            aria-label={`Filter by ${PLATFORM_LABELS[p]}`}
+                                            aria-pressed={active}
+                                            className={`rounded-full transition-all min-h-[36px] min-w-[36px] sm:min-h-[28px] sm:min-w-[28px] flex items-center justify-center border ${active
+                                                ? 'bg-accent/10 text-accent border-accent/20'
+                                                : 'bg-card/30 text-text-muted/50 border-transparent hover:text-text-secondary'
+                                                }`}
+                                        >
+                                            {platformIcon(p, 'w-3.5 h-3.5')}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-1">
@@ -818,10 +865,11 @@ function FeedContent() {
                                                         selectedTags.size > 0 ? 'Try clearing some tag filters' :
                                                             'Add your first link using the + button below'}
                             </p>
-                            {(selectedTags.size > 0 || searchQuery) && (
+                            {(selectedTags.size > 0 || selectedPlatforms.size > 0 || searchQuery) && (
                                 <button
                                     onClick={() => {
                                         setSelectedTags(new Set());
+                                        setSelectedPlatforms(new Set());
                                         setSearchQuery('');
                                     }}
                                     className="mt-4 px-4 py-2 bg-accent text-white rounded-xl text-sm font-bold hover:bg-accent-hover transition-all"
