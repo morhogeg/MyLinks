@@ -15,6 +15,7 @@ import { useToast } from '@/components/Toast';
 import { httpsCallable } from 'firebase/functions';
 import Card from './Card';
 import CompactCard from './CompactCard';
+import Masonry from './Masonry';
 import ReminderModal from './ReminderModal';
 import TableView from './TableView';
 import InsightsFeed from './InsightsFeed';
@@ -905,10 +906,10 @@ function FeedContent() {
                             onToggleSelection={toggleSelection}
                         />
                     ) : viewMode === 'grid' ? (
-                        <div className="[column-width:340px] [column-gap:1rem]">
+                        <Masonry columnWidth={340} gap={16}>
                             {filteredLinks.map((link, idx) => (
-                                <div key={link.id} className="mb-4 break-inside-avoid [-webkit-column-break-inside:avoid]">
                                 <Card
+                                    key={link.id}
                                     index={idx}
                                     link={link}
                                     onOpenDetails={(link) => setActiveLinkId(link.id)}
@@ -923,9 +924,8 @@ function FeedContent() {
                                     onToggleSelection={toggleSelection}
                                     onTagClick={handleToggleTag}
                                 />
-                                </div>
                             ))}
-                        </div>
+                        </Masonry>
                     ) : (
                         <div
                             className="grid gap-2 sm:gap-3"
