@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users } from 'lucide-react';
+import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube } from 'lucide-react';
+import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -107,6 +108,13 @@ export default function LinkDetailModal({
 
     const relatedLinks = getRelatedLinks();
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary) || (link.detailedSummary ? hasHebrew(link.detailedSummary) : false);
+
+    // Branded source credit, matching the card: YouTube channel in red, X
+    // author (@handle from the URL) in the X grey, everything else muted.
+    const platform = getPlatform(link.url);
+    const isYouTube = platform === 'youtube' || link.sourceType === 'youtube';
+    const youtubeChannel = link.metadata?.youtubeChannel || link.sourceName;
+    const xAuthor = platform === 'x' ? xHandle(link.url) : null;
 
     const getTimeAgo = (timestamp: any, now: number): string => {
         if (!timestamp || !now) return '...';
@@ -345,14 +353,32 @@ export default function LinkDetailModal({
                                             </>
                                         )}
                                     </div>
-                                    {link.sourceName && (
+                                    {isYouTube && youtubeChannel ? (
+                                        <span
+                                            className="flex items-center gap-1.5 min-w-0 text-sm font-semibold text-text-secondary whitespace-nowrap max-w-[240px]"
+                                            title={youtubeChannel}
+                                        >
+                                            <Youtube className="w-4 h-4 text-red-500 shrink-0" />
+                                            <span className="truncate">{youtubeChannel}</span>
+                                        </span>
+                                    ) : xAuthor ? (
+                                        <span
+                                            className="flex items-center gap-1.5 min-w-0 text-sm font-semibold text-text-secondary whitespace-nowrap max-w-[240px]"
+                                            title={`@${xAuthor}`}
+                                        >
+                                            <span className="shrink-0 inline-flex" style={{ color: platformColor('x') }}>
+                                                {platformIcon('x', 'w-4 h-4')}
+                                            </span>
+                                            <span className="truncate">@{xAuthor}</span>
+                                        </span>
+                                    ) : link.sourceName ? (
                                         <span
                                             className="text-[10px] font-black text-text-muted/60 bg-black/5 border border-black/10 dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest px-2.5 py-1.5 rounded-lg shadow-lg shadow-black/5 transition-all"
                                             title={link.sourceName}
                                         >
                                             {link.sourceName}
                                         </span>
-                                    )}
+                                    ) : null}
                                 </div>
                             );
                         })()}
