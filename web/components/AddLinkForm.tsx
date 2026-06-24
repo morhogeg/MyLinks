@@ -7,6 +7,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { compressImage } from '@/lib/image';
 import ImageScanProgress from '@/components/ImageScanProgress';
+import VideoScanProgress from '@/components/VideoScanProgress';
 
 interface AddLinkFormProps {
     onLinkAdded: () => void;
@@ -19,6 +20,15 @@ const formatUrl = (input: string) => {
         formatted = `https://${formatted}`;
     }
     return formatted;
+};
+
+// Detect a YouTube link and pull its 11-char video ID, so we can show the
+// "watching the video" progress (analysis is much slower than a normal page).
+const youTubeId = (input: string): string | null => {
+    const match = input.match(
+        /(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/
+    );
+    return match ? match[1] : null;
 };
 
 // Analysis can be slow on a cold function start, but it must never hang
@@ -58,20 +68,27 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
     const [progress, setProgress] = useState(0);
     const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    // Simulated-but-motion-forward progress for image analysis. We can't read
-    // real progress from Gemini, so ease toward a high cap (~99%) — always
-    // inching forward so it never looks frozen, but never completing early. A
-    // real milestone (image compressed/sent) is blended in from handleSubmit,
-    // and success snaps it to 100%.
+    // A YouTube link gets the "watching the video" progress treatment, since
+    // native video analysis takes ~1 minute vs. a few seconds for a page.
+    const videoId = activeTab === 'link' ? youTubeId(formatUrl(url)) : null;
+    const isVideo = !!videoId;
+
+    // Simulated-but-motion-forward progress for the slow analyses (image OCR and
+    // YouTube video). We can't read real progress from Gemini, so ease toward a
+    // high cap (~99%) — always inching forward so it never looks frozen, but
+    // never completing early. Video creeps slower (it really does take ~1 min);
+    // success snaps it to 100%.
     useEffect(() => {
-        if (isLoading && activeTab === 'image') {
+        const animated = isLoading && (activeTab === 'image' || isVideo);
+        if (animated) {
             setProgress((p) => (p < 8 ? 8 : p));
+            // Smaller factor = slower climb. Tuned so video reaches ~97% over a
+            // minute while images fill in a few seconds.
+            const factor = isVideo ? 0.012 : 0.04;
             progressTimer.current = setInterval(() => {
                 setProgress((p) => {
                     const CAP = 99;
-                    // Slow the creep as it approaches the cap so the final
-                    // stretch always shows subtle movement instead of sticking.
-                    return p >= CAP ? p : p + (CAP - p) * 0.04;
+                    return p >= CAP ? p : p + (CAP - p) * factor;
                 });
             }, 180);
         }
@@ -81,7 +98,7 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                 progressTimer.current = null;
             }
         };
-    }, [isLoading, activeTab]);
+    }, [isLoading, activeTab, isVideo]);
 
     const parseResponse = async (response: Response) => {
         const responseText = await response.text();
@@ -192,8 +209,8 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                 throw new Error(`Could not save to your brain: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
             }
 
-            // Let the image progress land on "Done!" before closing.
-            if (activeTab === 'image') {
+            // Let the scan progress (image or video) land on "Done!" before closing.
+            if (activeTab === 'image' || isVideo) {
                 setProgress(100);
                 await new Promise((r) => setTimeout(r, 550));
             }
@@ -277,22 +294,29 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
 
                         <div className="space-y-4">
                             {activeTab === 'link' ? (
-                                <div className="relative">
-                                    <input
-                                        id="url"
-                                        type="text"
-                                        autoComplete="off"
-                                        autoCorrect="off"
-                                        autoCapitalize="off"
-                                        spellCheck={false}
-                                        value={url || ''}
-                                        onChange={(e) => setUrl(e.target.value)}
-                                        placeholder="example.com or https://..."
-                                        className="w-full px-4 py-4 bg-background border border-white/5 rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-base"
-                                        disabled={isLoading}
-                                        autoFocus
+                                isLoading && isVideo ? (
+                                    <VideoScanProgress
+                                        thumbnailSrc={videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null}
+                                        progress={progress}
                                     />
-                                </div>
+                                ) : (
+                                    <div className="relative">
+                                        <input
+                                            id="url"
+                                            type="text"
+                                            autoComplete="off"
+                                            autoCorrect="off"
+                                            autoCapitalize="off"
+                                            spellCheck={false}
+                                            value={url || ''}
+                                            onChange={(e) => setUrl(e.target.value)}
+                                            placeholder="example.com or https://..."
+                                            className="w-full px-4 py-4 bg-background border border-white/5 rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-base"
+                                            disabled={isLoading}
+                                            autoFocus
+                                        />
+                                    </div>
+                                )
                             ) : isLoading && imagePreview ? (
                                 <ImageScanProgress imageSrc={imagePreview} progress={progress} />
                             ) : (
@@ -344,9 +368,9 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                                 </div>
                             )}
 
-                            {/* The image scan view shows its own progress, so the
-                                button is only needed otherwise. */}
-                            {!(isLoading && activeTab === 'image') && (
+                            {/* The scan views (image/video) show their own progress,
+                                so the button is only needed otherwise. */}
+                            {!(isLoading && (activeTab === 'image' || isVideo)) && (
                                 <button
                                     type="submit"
                                     disabled={isLoading || (activeTab === 'link' ? !url.trim() : !imageFile)}

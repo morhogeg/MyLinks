@@ -3,7 +3,7 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Play } from 'lucide-react';
+import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Play, Youtube } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -291,6 +291,14 @@ export default function Card({
                 >
                     {link.title}
                 </h3>
+
+                {/* Creator byline — videos should clearly credit the channel. */}
+                {link.sourceType === 'youtube' && link.metadata?.youtubeChannel && (
+                    <p className="flex items-center gap-1.5 -mt-1.5 text-xs font-semibold text-text-secondary">
+                        <Youtube className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                        <span className="truncate">{link.metadata.youtubeChannel}</span>
+                    </p>
+                )}
 
                 {/* Summary - Structured display */}
                 <SimpleMarkdown
