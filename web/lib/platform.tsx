@@ -66,7 +66,7 @@ export function platformIcon(key: PlatformKey, className = 'w-3 h-3'): ReactNode
 /** Brand RGB per platform, so each source filter lights up its own color. */
 const PLATFORM_RGB: Record<PlatformKey, string> = {
     youtube: '255, 0, 0',
-    x: '113, 118, 123',
+    x: '191, 201, 214',
     instagram: '225, 48, 108',
     linkedin: '10, 102, 194',
     github: '139, 148, 158',
