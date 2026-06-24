@@ -400,7 +400,7 @@ function FeedContent() {
         return (
             <div className="space-y-4" aria-busy="true" aria-label="Loading your links">
                 <div className="h-11 rounded-xl bg-card border border-white/5 relative overflow-hidden skeleton-shimmer" />
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))' }}>
                     {Array.from({ length: 6 }).map((_, i) => (
                         <div
                             key={i}
@@ -857,7 +857,7 @@ function FeedContent() {
                             onToggleSelection={toggleSelection}
                         />
                     ) : viewMode === 'grid' ? (
-                        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                        <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))' }}>
                             {filteredLinks.map((link, idx) => (
                                 <Card
                                     key={link.id}

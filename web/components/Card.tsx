@@ -3,8 +3,31 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Play, Youtube, ExternalLink } from 'lucide-react';
+import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Play, Youtube, ExternalLink, Twitter, Instagram, Linkedin, Github } from 'lucide-react';
 import { useState, useEffect } from 'react';
+
+/**
+ * Map a link's URL to a recognizable platform icon, so the source's origin
+ * (YouTube / X / Instagram / …) is clear at a glance. Returns null for generic
+ * web pages — the publisher name already conveys those, so no icon avoids noise.
+ */
+function platformIconFor(url?: string) {
+    if (!url) return null;
+    let host = '';
+    try {
+        host = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+    } catch {
+        return null;
+    }
+    const is = (d: string) => host === d || host.endsWith(`.${d}`);
+    const cls = 'w-3 h-3 shrink-0 opacity-80';
+    if (is('youtube.com') || is('youtu.be')) return <Youtube className={cls} />;
+    if (is('twitter.com') || is('x.com')) return <Twitter className={cls} />;
+    if (is('instagram.com')) return <Instagram className={cls} />;
+    if (is('linkedin.com')) return <Linkedin className={cls} />;
+    if (is('github.com')) return <Github className={cls} />;
+    return null;
+}
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
@@ -54,6 +77,8 @@ export default function Card({
 
     // Cap the stagger so long feeds still finish assembling quickly.
     const enterDelay = `${Math.min(index, 12) * 30}ms`;
+
+    const platformIcon = platformIconFor(link.url);
 
     useEffect(() => {
         const initialTimer = setTimeout(() => setNow(Date.now()), 0);
@@ -270,13 +295,14 @@ export default function Card({
                     </div>
 
                     {/* Source Tag (End) - Fades out on hover */}
-                    <div className="flex items-center gap-2 min-w-0 z-10 ms-auto transition-opacity duration-200 group-hover:opacity-0">
+                    <div className="flex items-center gap-1.5 min-w-0 z-10 ms-auto transition-opacity duration-200 group-hover:opacity-0">
                         {link.sourceName && link.sourceName !== 'Screenshot' && link.sourceType !== 'image' && (
                             <span
-                                className="text-[9px] font-bold text-text-muted/60 bg-black/5 border border-black/10 px-2 py-1 rounded-lg dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all max-w-[220px] truncate"
+                                className="flex items-center gap-1 text-[9px] font-bold text-text-muted/60 bg-black/5 border border-black/10 px-2 py-1 rounded-lg dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all max-w-[220px]"
                                 title={link.sourceName}
                             >
-                                {link.sourceName}
+                                {platformIcon}
+                                <span className="truncate">{link.sourceName}</span>
                             </span>
                         )}
                         {link.sourceType === 'image' && link.url && (
