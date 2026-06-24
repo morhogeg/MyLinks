@@ -2,9 +2,10 @@
 
 import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { Archive, Star, Bell, Trash2, Pencil, Circle, Check } from 'lucide-react';
+import { Archive, Star, Bell, Trash2, Pencil, Circle, Check, MoreHorizontal } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import CategoryInput from './CategoryInput';
+import CardActionSheet from './CardActionSheet';
 
 interface CompactCardProps {
     link: Link;
@@ -18,6 +19,8 @@ interface CompactCardProps {
     isSelectionMode?: boolean;
     isSelected?: boolean;
     onToggleSelection?: (id: string) => void;
+    /** Position in the feed, used to stagger the entrance animation. */
+    index?: number;
 }
 
 /**
@@ -34,10 +37,14 @@ export default function CompactCard({
     onUpdateReminder,
     isSelectionMode = false,
     isSelected = false,
-    onToggleSelection
+    onToggleSelection,
+    index = 0
 }: CompactCardProps) {
     const [isEditingCategory, setIsEditingCategory] = useState(false);
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [editedCategory, setEditedCategory] = useState(link.category);
+
+    const enterDelay = `${Math.min(index, 12) * 30}ms`;
 
     useEffect(() => {
         setEditedCategory(link.category);
@@ -47,10 +54,12 @@ export default function CompactCard({
     const isRtl = link.language === 'he';
 
     return (
+        <>
         <article
-            className={`group bg-card rounded-xl border transition-all cursor-pointer relative flex flex-col items-stretch aspect-square ${isSelected
+            style={{ ['--enter-delay' as string]: enterDelay }}
+            className={`group surface-card animate-card-enter bg-card rounded-xl border transition-all duration-200 cursor-pointer relative flex flex-col items-stretch aspect-square [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] ${isSelected
                 ? 'border-accent bg-accent/5 ring-1 ring-accent'
-                : 'border-white/5 hover:border-accent/30 hover:bg-white/5'
+                : 'border-white/5 hover:border-accent/30'
                 } ${link.isRead ? 'opacity-60 grayscale-[0.3]' : ''} ${isEditingCategory ? 'overflow-visible z-50' : 'overflow-hidden'}`}
             onClick={() => {
                 if (isSelectionMode && onToggleSelection) {
@@ -114,16 +123,29 @@ export default function CompactCard({
                         )}
                     </div>
 
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite');
-                        }}
-                        className={`p-1 rounded-md transition-all ${link.status === 'favorite' ? 'text-yellow-500' : 'text-text-muted/40 hover:text-accent'
-                            }`}
-                    >
-                        <Star className={`w-3 h-3 ${link.status === 'favorite' ? 'fill-yellow-500' : ''}`} />
-                    </button>
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite');
+                            }}
+                            className={`p-1 rounded-md transition-all ${link.status === 'favorite' ? 'text-yellow-500' : 'text-text-muted/40 hover:text-accent'
+                                }`}
+                        >
+                            <Star className={`w-3 h-3 ${link.status === 'favorite' ? 'fill-yellow-500' : ''}`} />
+                        </button>
+                        {/* Touch-only actions trigger (hover overlay is unreachable on phones). */}
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsSheetOpen(true);
+                            }}
+                            aria-label="Actions"
+                            className="hidden [@media(hover:none)]:flex items-center justify-center p-1 rounded-md text-text-muted/60 hover:text-text active:bg-white/10"
+                        >
+                            <MoreHorizontal className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Title Container: Centered vertically and horizontally */}
@@ -193,5 +215,16 @@ export default function CompactCard({
                 </div>
             </div>
         </article>
+
+        <CardActionSheet
+            link={link}
+            isOpen={isSheetOpen}
+            onClose={() => setIsSheetOpen(false)}
+            onStatusChange={onStatusChange}
+            onReadStatusChange={onReadStatusChange}
+            onUpdateReminder={onUpdateReminder}
+            onDelete={onDelete}
+        />
+        </>
     );
 }

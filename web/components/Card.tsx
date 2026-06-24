@@ -3,11 +3,12 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon } from 'lucide-react';
+import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
+import CardActionSheet from './CardActionSheet';
 import { hasHebrew } from '@/lib/rtl';
 
 interface CardProps {
@@ -22,6 +23,8 @@ interface CardProps {
     isSelectionMode?: boolean;
     isSelected?: boolean;
     onToggleSelection?: (id: string) => void;
+    /** Position in the feed, used to stagger the entrance animation. */
+    index?: number;
 }
 
 /**
@@ -38,11 +41,16 @@ export default function Card({
     onUpdateReminder,
     isSelectionMode = false,
     isSelected = false,
-    onToggleSelection
+    onToggleSelection,
+    index = 0
 }: CardProps) {
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [now, setNow] = useState<number>(0);
+
+    // Cap the stagger so long feeds still finish assembling quickly.
+    const enterDelay = `${Math.min(index, 12) * 30}ms`;
 
     useEffect(() => {
         const initialTimer = setTimeout(() => setNow(Date.now()), 0);
@@ -72,10 +80,12 @@ export default function Card({
     };
 
     return (
+        <>
         <article
-            className={`group bg-card rounded-2xl border transition-all cursor-pointer relative flex flex-col items-stretch h-full ${isSelected
+            style={{ ['--enter-delay' as string]: enterDelay }}
+            className={`group surface-card animate-card-enter bg-card rounded-2xl border transition-all duration-200 cursor-pointer relative flex flex-col items-stretch h-full [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] ${isSelected
                 ? 'border-accent bg-accent/5 ring-1 ring-accent'
-                : 'border-white/5 hover:border-accent/30 hover:bg-white/5'
+                : 'border-white/5 hover:border-accent/30'
                 } ${link.isRead ? 'opacity-60 grayscale-[0.3]' : ''} ${isEditingCategory ? 'overflow-visible z-50' : 'overflow-hidden'}`}
             onClick={() => {
                 if (isSelectionMode && onToggleSelection) {
@@ -237,6 +247,19 @@ export default function Card({
                             </div>
                         )}
                     </div>
+
+                    {/* Touch-only actions trigger: hover actions are unreachable on a
+                        phone, so coarse-pointer devices get a persistent menu button. */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setIsSheetOpen(true);
+                        }}
+                        aria-label="Actions"
+                        className="hidden [@media(hover:none)]:flex items-center justify-center p-1.5 -me-1 ms-1 rounded-full text-text-muted hover:text-text active:bg-white/10 z-20 flex-shrink-0"
+                    >
+                        <MoreHorizontal className="w-4 h-4" />
+                    </button>
                 </div>
 
                 {/* Title - NO LINE CLAMP */}
@@ -290,5 +313,16 @@ export default function Card({
                 </div>
             </div>
         </article >
+
+        <CardActionSheet
+            link={link}
+            isOpen={isSheetOpen}
+            onClose={() => setIsSheetOpen(false)}
+            onStatusChange={onStatusChange}
+            onReadStatusChange={onReadStatusChange}
+            onUpdateReminder={onUpdateReminder}
+            onDelete={onDelete}
+        />
+        </>
     );
 }
