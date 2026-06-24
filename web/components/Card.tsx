@@ -124,11 +124,11 @@ export default function Card({
                 className="p-4 sm:p-5 flex flex-col h-full space-y-3 sm:space-y-4"
                 dir={isRtl ? "rtl" : "ltr"}
             >
-                {/* Header Row: Category and Source Badge (Fade Toggle).
-                    Forced LTR so the category chip is always on the left and the
-                    source/author on the right — consistent across the mixed
-                    Hebrew/English grid (both chips hold LTR/brand text anyway). */}
-                <div dir="ltr" className="relative flex items-center justify-between w-full h-7 mb-1">
+                {/* Header Row: Category (start) and Source Badge (end). Inherits
+                    the card's direction so the category chip sits on the same
+                    edge the title starts from — right for Hebrew, left for
+                    English — keeping each card internally coherent. */}
+                <div className="relative flex items-center justify-between w-full h-7 mb-1">
                     {/* Category Section (Start) - Fades out on hover */}
                     <div className="flex items-center min-w-0 z-10 transition-opacity duration-200 group-hover:opacity-0">
                         {(() => {
