@@ -428,23 +428,24 @@ export default function LinkDetailModal({
                     </h2>
 
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        {/* Summary — lead with the same highlighted gist shown on
-                            the card (key terms in bold), then the full breakdown. */}
+                        {/* Lead straight into the full write-up (its own OVERVIEW /
+                            KEY POINTS sections). The short gist is already shown on
+                            the collapsed card, so repeating it here is redundant —
+                            fall back to it only when there's no detailed summary. */}
                         <div className="mb-6">
-                            {link.summary && (
+                            {link.detailedSummary ? (
+                                <SimpleMarkdown
+                                    content={link.detailedSummary}
+                                    isRtl={isRtl}
+                                    className="text-base"
+                                />
+                            ) : link.summary ? (
                                 <SimpleMarkdown
                                     content={link.summary}
                                     isRtl={isRtl}
                                     className="text-lg"
                                 />
-                            )}
-                            {link.detailedSummary && (
-                                <SimpleMarkdown
-                                    content={link.detailedSummary}
-                                    isRtl={isRtl}
-                                    className={`text-base ${link.summary ? 'mt-6 pt-6 border-t border-border-subtle' : ''}`}
-                                />
-                            )}
+                            ) : null}
                         </div>
 
 
