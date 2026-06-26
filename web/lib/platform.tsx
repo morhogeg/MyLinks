@@ -108,6 +108,35 @@ export function xHandle(url?: string): string | null {
     }
 }
 
+/**
+ * Extract the author/profile name from a LinkedIn URL
+ * (linkedin.com/posts/<slug>_…, /in/<slug>, /company/<slug>). LinkedIn stores
+ * no author field, but the slug carries it — e.g.
+ * "omri-zerachovitz-699331b7" → "Omri Zerachovitz". Returns null when no
+ * usable name is present.
+ */
+export function linkedinAuthor(url?: string): string | null {
+    if (!url) return null;
+    try {
+        const u = new URL(url);
+        const host = u.hostname.replace(/^www\./, '').toLowerCase();
+        if (!(host === 'linkedin.com' || host.endsWith('.linkedin.com'))) return null;
+        const parts = u.pathname.split('/').filter(Boolean);
+        if (!(parts[0] === 'posts' || parts[0] === 'in' || parts[0] === 'company') || !parts[1]) return null;
+        const tokens = parts[1].split('_')[0].split('-');
+        // Drop the trailing LinkedIn id hash (tokens containing a digit).
+        while (tokens.length > 1 && /\d/.test(tokens[tokens.length - 1])) tokens.pop();
+        const name = tokens
+            .filter(Boolean)
+            .map((t) => t.charAt(0).toUpperCase() + t.slice(1))
+            .join(' ')
+            .trim();
+        return name || null;
+    } catch {
+        return null;
+    }
+}
+
 /** Inline style for an *active* platform filter chip, tinted in its brand color. */
 export function platformActiveStyle(key: PlatformKey): {
     backgroundColor: string;

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
 import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube } from 'lucide-react';
-import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
+import { getPlatform, platformIcon, platformColor, xHandle, linkedinAuthor } from '@/lib/platform';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -115,6 +115,7 @@ export default function LinkDetailModal({
     const isYouTube = platform === 'youtube' || link.sourceType === 'youtube';
     const youtubeChannel = link.metadata?.youtubeChannel || link.sourceName;
     const xAuthor = platform === 'x' ? xHandle(link.url) : null;
+    const linkedinName = platform === 'linkedin' ? linkedinAuthor(link.url) : null;
 
     const getTimeAgo = (timestamp: any, now: number): string => {
         if (!timestamp || !now) return '...';
@@ -373,7 +374,18 @@ export default function LinkDetailModal({
                                             </span>
                                             <span className="truncate">@{xAuthor}</span>
                                         </span>
-                                    ) : link.sourceName ? (
+                                    ) : linkedinName ? (
+                                        <span
+                                            dir="ltr"
+                                            className="flex items-center gap-1.5 min-w-0 text-sm font-semibold text-text-secondary whitespace-nowrap max-w-[240px]"
+                                            title={linkedinName}
+                                        >
+                                            <span className="shrink-0 inline-flex" style={{ color: platformColor('linkedin') }}>
+                                                {platformIcon('linkedin', 'w-4 h-4')}
+                                            </span>
+                                            <span className="truncate">{linkedinName}</span>
+                                        </span>
+                                    ) : link.sourceName && link.sourceName !== 'None' ? (
                                         <span
                                             className="text-[10px] font-black text-text-muted/60 bg-black/5 border border-black/10 dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest px-2.5 py-1.5 rounded-lg shadow-lg shadow-black/5 transition-all"
                                             title={link.sourceName}
