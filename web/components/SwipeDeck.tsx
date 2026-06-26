@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getPlatform, platformIcon, platformColor, xHandle, linkedinAuthor } from '@/lib/platform';
@@ -38,6 +38,21 @@ export default function SwipeDeck({ links, onFavorite, onArchive, onRemind, onOp
     const start = useRef({ x: 0, y: 0 });
     const moved = useRef(false);
     const exitDir = useRef<SwipeDir | null>(null);
+
+    // Size the deck to the space between its top and the viewport bottom so the
+    // whole thing (card + action buttons) fits without scrolling.
+    const rootRef = useRef<HTMLDivElement>(null);
+    const [maxH, setMaxH] = useState(0);
+    useEffect(() => {
+        const update = () => {
+            if (!rootRef.current) return;
+            const top = rootRef.current.getBoundingClientRect().top;
+            setMaxH(Math.max(380, Math.min(window.innerHeight - top - 16, 660)));
+        };
+        update();
+        window.addEventListener('resize', update);
+        return () => window.removeEventListener('resize', update);
+    }, [index]);
 
     const current = deck[index];
     const remaining = deck.length - index;
@@ -133,13 +148,17 @@ export default function SwipeDeck({ links, onFavorite, onArchive, onRemind, onOp
     }
 
     return (
-        <div className="flex flex-col items-center gap-5 select-none">
-            <div className="text-xs font-semibold text-text-muted tabular-nums">
+        <div
+            ref={rootRef}
+            className="flex flex-col items-center gap-3 select-none"
+            style={{ height: maxH ? maxH : undefined }}
+        >
+            <div className="text-xs font-semibold text-text-muted tabular-nums shrink-0">
                 {index + 1} of {deck.length} · {remaining} left
             </div>
 
-            {/* Card stack */}
-            <div className="relative w-full max-w-[440px] h-[64vh] min-h-[460px]">
+            {/* Card stack — flexes to fill the space above the buttons */}
+            <div className="relative w-full max-w-[440px] flex-1 min-h-0">
                 {[2, 1, 0].map((depth) => {
                     const link = deck[index + depth];
                     if (!link) return null;
@@ -178,7 +197,7 @@ export default function SwipeDeck({ links, onFavorite, onArchive, onRemind, onOp
             </div>
 
             {/* Action buttons — swipe alternative + Undo */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 shrink-0">
                 <DeckButton title="Undo" onClick={undo} disabled={!lastAction} className="text-text-muted hover:text-text">
                     <RotateCcw className="w-5 h-5" />
                 </DeckButton>
@@ -193,7 +212,7 @@ export default function SwipeDeck({ links, onFavorite, onArchive, onRemind, onOp
                 </DeckButton>
             </div>
 
-            <p className="text-[11px] text-text-muted/70 text-center max-w-xs">
+            <p className="text-[11px] text-text-muted/70 text-center max-w-xs shrink-0">
                 Swipe or use the buttons · tap a card to open it
             </p>
         </div>

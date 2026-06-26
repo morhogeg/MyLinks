@@ -38,27 +38,37 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background text-text transition-colors duration-200">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border-subtle shadow-[0_4px_20px_-12px_rgba(0,0,0,0.6)] h-[56px] sm:h-[64px] flex items-center">
+      <header className="sticky top-0 z-50 bg-background/70 backdrop-blur-xl border-b border-border-subtle h-[60px] sm:h-[68px] flex items-center">
+        {/* hairline accent glow under the bar */}
+        <div className="absolute inset-x-0 bottom-0 h-px bg-[image:var(--accent-gradient)] opacity-30" />
         <div className="w-full max-w-[2200px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 flex items-center justify-between">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-purple-500/20">
-              <Brain className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+          {/* Brand */}
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-purple-500/25 ring-1 ring-white/15">
+              <Brain className="w-[18px] h-[18px] sm:w-5 sm:h-5 text-white" />
+              <span className="absolute -inset-1 rounded-2xl bg-[image:var(--accent-gradient)] opacity-20 blur-md -z-10" />
             </div>
-            <div>
-              <h1 className="text-base sm:text-lg font-bold text-text">Second Brain</h1>
-              <p className="text-[9px] sm:text-[10px] text-text-muted">Your knowledge, organized</p>
+            <div className="leading-none">
+              <h1 className="text-lg sm:text-xl font-extrabold tracking-tight bg-[image:var(--accent-gradient)] bg-clip-text text-transparent">
+                Second Brain
+              </h1>
+              <p className="mt-1 text-[10px] sm:text-[11px] font-medium text-text-muted tracking-wide">
+                Your knowledge, organized
+              </p>
             </div>
           </div>
 
+          {/* Controls — one cohesive cluster */}
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <button
               onClick={() => setIsSettingsOpen(true)}
-              className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-text-muted hover:text-text"
+              className="h-9 w-9 rounded-full bg-card border border-border-subtle text-text-secondary hover:text-text hover:bg-card-hover transition-colors flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               aria-label="Settings"
+              title="Settings"
             >
-              <Settings className="w-5 h-5" />
+              <Settings className="w-[18px] h-[18px]" />
             </button>
-            <ThemeToggle />
           </div>
         </div>
       </header>
