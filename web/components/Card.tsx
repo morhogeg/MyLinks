@@ -28,6 +28,10 @@ interface CardProps {
     index?: number;
     /** Tapping a footer tag filters the feed by that tag. */
     onTagClick?: (tag: string) => void;
+    /** Tapping the "Screenshot" source badge toggles the screenshot filter. */
+    onScreenshotClick?: () => void;
+    /** Whether the screenshot filter is currently active (for badge highlight). */
+    isScreenshotActive?: boolean;
 }
 
 /**
@@ -46,7 +50,9 @@ export default function Card({
     isSelected = false,
     onToggleSelection,
     index = 0,
-    onTagClick
+    onTagClick,
+    onScreenshotClick,
+    isScreenshotActive = false
 }: CardProps) {
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
@@ -322,13 +328,16 @@ export default function Card({
                             </span>
                         )}
                         {!isYouTube && !xAuthor && !linkedinName && link.sourceType === 'image' && (
-                            <span
-                                className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-accent whitespace-nowrap"
-                                title="Screenshot"
+                            <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); onScreenshotClick?.(); }}
+                                title={isScreenshotActive ? 'Clear screenshot filter' : 'Filter by screenshots'}
+                                aria-pressed={isScreenshotActive}
+                                className={`flex items-center gap-1.5 min-w-0 text-xs font-semibold whitespace-nowrap rounded-full px-2 py-0.5 -me-1 transition-colors cursor-pointer ${isScreenshotActive ? 'bg-accent/15 text-accent' : 'text-accent hover:bg-accent/10'}`}
                             >
                                 <ImageIcon className="w-3.5 h-3.5 shrink-0" />
                                 <span>Screenshot</span>
-                            </span>
+                            </button>
                         )}
                         {!isYouTube && !xAuthor && !linkedinName && link.sourceType !== 'image' && link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None' && (
                             <span

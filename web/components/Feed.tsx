@@ -964,6 +964,8 @@ function FeedContent() {
                                     isSelected={selectedIds.has(link.id)}
                                     onToggleSelection={toggleSelection}
                                     onTagClick={handleToggleTag}
+                                    onScreenshotClick={() => setScreenshotOnly(v => !v)}
+                                    isScreenshotActive={screenshotOnly}
                                 />
                             ))}
                         </Masonry>
