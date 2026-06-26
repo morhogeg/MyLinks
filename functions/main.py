@@ -562,9 +562,9 @@ def whatsapp_webhook(request):
         if msg_lower == "reminder" or msg_lower == "תזכורת":
             is_he = (msg_lower == "תזכורת") or user_msg_is_hebrew
             if is_he:
-                menu = "מתי להזכיר לך?\n1. מחר\n2. בעוד 3 ימים\n3. בעוד שבוע"
+                menu = "מתי להזכיר לך?\nהשב/י עם מספר הימים — *1*, *2*, *3* או *7*\nאו *S* לחזרה מרווחת (spaced repetition)"
             else:
-                menu = "When should I remind you?\n1. Tomorrow\n2. In 3 days\n3. In 1 week"
+                menu = "When should I remind you?\nReply with the number of days — *1*, *2*, *3* or *7*\nOr *S* for spaced repetition"
             send_whatsapp_message(payload.from_number, menu)
             return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
 
@@ -576,7 +576,9 @@ def whatsapp_webhook(request):
             if last_link_id:
                 link_doc = db.collection('users').document(uid).collection('links').document(last_link_id).get()
                 if link_doc.exists:
-                    profile = "spaced" if payload.body.strip() == "2" else "smart"
+                    reply = payload.body.strip().lower()
+                    is_spaced = reply in ("s", "spaced")
+                    profile = "spaced" if is_spaced else "once"
                     set_reminder(uid, last_link_id, reminder_time, profile=profile)
 
                     link_data = link_doc.to_dict()
@@ -586,9 +588,11 @@ def whatsapp_webhook(request):
                     date_str = reminder_time.strftime('%d/%m %H:%M') if user_msg_is_hebrew else reminder_time.strftime('%b %d at %I:%M %p')
 
                     if user_msg_is_hebrew:
-                        msg = f"⏰ *התזכורת נקבעה*\n\n📄 *{title}*\n📂 {category}\n📅 {date_str}"
+                        extra = "\n🔁 חזרה מרווחת — אזכיר שוב בהמשך" if is_spaced else ""
+                        msg = f"⏰ *התזכורת נקבעה*\n\n📄 *{title}*\n📂 {category}\n📅 {date_str}{extra}"
                     else:
-                        msg = f"⏰ *Reminder Set*\n\n📄 *{title}*\n📂 {category}\n📅 {date_str}"
+                        extra = "\n🔁 Spaced repetition — I'll keep nudging you" if is_spaced else ""
+                        msg = f"⏰ *Reminder Set*\n\n📄 *{title}*\n📂 {category}\n📅 {date_str}{extra}"
 
                     send_whatsapp_message(payload.from_number, msg)
                     return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
@@ -793,7 +797,8 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # 6. Check for reminder intent
         reminder_time = handle_reminder_intent(original_body)
         if reminder_time:
-            profile = "spaced" if "2" in original_body else "smart"
+            reply = original_body.strip().lower()
+            profile = "spaced" if ("spaced" in reply or reply == "s") else "once"
             set_reminder(uid, link_id, reminder_time, profile=profile)
 
         # Notify via WhatsApp only when the item came from WhatsApp.

@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 
 APP_URL = os.environ.get("APP_URL", "https://secondbrain-app-94da2.web.app")
 
+# Initial interval (in days) for the "S" spaced-repetition quick reply.
+SPACED_START_DAYS = 3
+
 
 def handle_reminder_intent(text: str) -> Optional[datetime]:
     """Parse text for reminder commands (English and Hebrew)."""
@@ -41,14 +44,17 @@ def handle_reminder_intent(text: str) -> Optional[datetime]:
     if match_he:
         return now + timedelta(days=int(match_he.group(1)))
 
-    # Numeric shortcuts from menu (exact match only)
+    # Quick-reply menu: a bare number means "remind me in that many days"
+    # (1 -> 1 day, 2 -> 2 days, 7 -> 7 days …). "S" starts spaced repetition,
+    # whose initial interval is SPACED_START_DAYS; run_reminder_check carries
+    # the schedule on from there.
     stripped = text.strip()
-    if stripped == '1':
-        return now + timedelta(days=1)
-    if stripped == '2':
-        return now + timedelta(days=3)
-    if stripped == '3':
-        return now + timedelta(days=7)
+    if stripped in ('s', 'spaced'):
+        return now + timedelta(days=SPACED_START_DAYS)
+    if stripped.isdigit():
+        days = int(stripped)
+        if 1 <= days <= 365:
+            return now + timedelta(days=days)
 
     return None
 
@@ -78,7 +84,7 @@ def calculate_next_reminder(reminder_count: int, profile: str = "smart") -> date
     now = datetime.now(timezone.utc)
 
     if profile.startswith("spaced"):
-        start_days = 3
+        start_days = SPACED_START_DAYS
         if "-" in profile:
             try:
                 start_days = int(profile.split("-")[1])
@@ -204,16 +210,19 @@ def run_reminder_check() -> dict:
 
                 new_reminder_count = reminder_count + 1
                 profile = link_data.get('reminderProfile', 'smart')
-                next_reminder = calculate_next_reminder(new_reminder_count, profile=profile)
-                next_reminder_ms = int(next_reminder.timestamp() * 1000)
 
-                if new_reminder_count >= 3:
+                # "once" = a numbered quick-reply ("remind me in N days"); it
+                # fires a single time and completes. Other profiles recur up to
+                # 3 times via the spaced-repetition schedule.
+                if profile == "once" or new_reminder_count >= 3:
                     link_doc.reference.update({
                         'reminderStatus': ReminderStatus.COMPLETED.value,
                         'reminderCount': new_reminder_count,
                         'nextReminderAt': None
                     })
                 else:
+                    next_reminder = calculate_next_reminder(new_reminder_count, profile=profile)
+                    next_reminder_ms = int(next_reminder.timestamp() * 1000)
                     link_doc.reference.update({
                         'reminderCount': new_reminder_count,
                         'nextReminderAt': next_reminder_ms
