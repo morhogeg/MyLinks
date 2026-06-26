@@ -394,21 +394,22 @@ export default function LinkDetailModal({
                     </h2>
 
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        {/* Summary */}
+                        {/* Summary — lead with the same highlighted gist shown on
+                            the card (key terms in bold), then the full breakdown. */}
                         <div className="mb-6">
-                            {link.detailedSummary ? (
+                            {link.summary && (
+                                <SimpleMarkdown
+                                    content={link.summary}
+                                    isRtl={isRtl}
+                                    className="text-lg"
+                                />
+                            )}
+                            {link.detailedSummary && (
                                 <SimpleMarkdown
                                     content={link.detailedSummary}
                                     isRtl={isRtl}
-                                    className="mb-6 text-base"
+                                    className={`text-base ${link.summary ? 'mt-6 pt-6 border-t border-border-subtle' : ''}`}
                                 />
-                            ) : (
-                                <p
-                                    dir="auto"
-                                    className={`text-text-secondary mb-6 leading-relaxed text-lg ${isRtl ? 'text-right' : ''}`}
-                                >
-                                    {link.summary}
-                                </p>
                             )}
                         </div>
 
