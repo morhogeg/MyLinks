@@ -2,18 +2,17 @@ import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth, connectAuthEmulator } from "firebase/auth";
 
-// Firebase web config is NOT secret — it ships in the client bundle by design
-// (security is enforced by Firestore/Storage rules, not by hiding these values).
-// Env vars take precedence (so any environment can override), but we fall back
-// to the project's public config so a build never fails when .env.local is
-// absent — e.g. the static export built by deploy-hosting.sh on a fresh machine.
+// Firebase web config comes from NEXT_PUBLIC_* env vars (Vercel has them; local
+// builds read web/.env.local). These values aren't secret — they ship in the
+// client bundle — but we keep them out of source so GitHub secret scanning
+// doesn't flag the apiKey pattern.
 const firebaseConfig = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyD4Mu3eIQ6QL-nBPfcef-vQhB5yNOyxbnQ",
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "secondbrain-app-94da2.firebaseapp.com",
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "secondbrain-app-94da2",
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "secondbrain-app-94da2.firebasestorage.app",
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "436841308497",
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:436841308497:web:fc17a945da8e6af38c7370"
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
 // Initialize Firebase
