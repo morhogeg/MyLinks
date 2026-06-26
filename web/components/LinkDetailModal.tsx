@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube, ImageOff } from 'lucide-react';
+import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube, ImageOff, Image as ImageIcon } from 'lucide-react';
 import { getPlatform, platformIcon, platformColor, xHandle, linkedinDisplayName } from '@/lib/platform';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
@@ -401,6 +401,11 @@ export default function LinkDetailModal({
                                                 {platformIcon('linkedin', 'w-4 h-4')}
                                             </span>
                                             <span className="truncate">{linkedinName}</span>
+                                        </span>
+                                    ) : link.sourceType === 'image' ? (
+                                        <span className="flex items-center gap-1.5 text-sm font-semibold text-accent whitespace-nowrap" title="Screenshot">
+                                            <ImageIcon className="w-4 h-4 shrink-0" />
+                                            <span>Screenshot</span>
                                         </span>
                                     ) : link.sourceName && link.sourceName !== 'None' ? (
                                         <span

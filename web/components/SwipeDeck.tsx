@@ -6,7 +6,7 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import { getPlatform, platformIcon, platformColor, xHandle, linkedinDisplayName } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import { hasHebrew } from '@/lib/rtl';
-import { Star, Archive, Bell, RotateCcw, Youtube, Sparkles } from 'lucide-react';
+import { Star, Archive, Bell, RotateCcw, Youtube, Sparkles, Image as ImageIcon } from 'lucide-react';
 
 type SwipeDir = 'left' | 'right' | 'up';
 
@@ -286,6 +286,11 @@ function CardFace({ link }: { link: Link }) {
                     <span dir="ltr" className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-text-secondary whitespace-nowrap max-w-[200px]">
                         <span className="shrink-0 inline-flex" style={{ color: platformColor('linkedin') }}>{platformIcon('linkedin', 'w-3.5 h-3.5')}</span>
                         <span className="truncate">{linkedinName}</span>
+                    </span>
+                ) : link.sourceType === 'image' ? (
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-accent whitespace-nowrap">
+                        <ImageIcon className="w-3.5 h-3.5 shrink-0" />
+                        <span>Screenshot</span>
                     </span>
                 ) : link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None' ? (
                     <span className="text-[10px] font-bold text-text-muted/60 uppercase tracking-widest truncate max-w-[160px]">{link.sourceName}</span>

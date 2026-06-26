@@ -321,7 +321,16 @@ export default function Card({
                                 <span className="truncate">{linkedinName}</span>
                             </span>
                         )}
-                        {!isYouTube && !xAuthor && !linkedinName && link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None' && link.sourceType !== 'image' && (
+                        {!isYouTube && !xAuthor && !linkedinName && link.sourceType === 'image' && (
+                            <span
+                                className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-accent whitespace-nowrap"
+                                title="Screenshot"
+                            >
+                                <ImageIcon className="w-3.5 h-3.5 shrink-0" />
+                                <span>Screenshot</span>
+                            </span>
+                        )}
+                        {!isYouTube && !xAuthor && !linkedinName && link.sourceType !== 'image' && link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None' && (
                             <span
                                 className="flex items-center gap-1 text-[9px] font-bold text-text-muted/60 bg-black/5 border border-black/10 px-2 py-1 rounded-lg dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all max-w-[220px]"
                                 title={link.sourceName}
@@ -329,11 +338,6 @@ export default function Card({
                                 {sourceIcon}
                                 <span className="truncate">{link.sourceName}</span>
                             </span>
-                        )}
-                        {link.sourceType === 'image' && link.url && (
-                            <div className="w-8 h-8 rounded-md overflow-hidden border border-white/10 bg-white/5 flex-shrink-0">
-                                <img src={link.url} alt="Thumbnail" className="w-full h-full object-cover" />
-                            </div>
                         )}
                     </div>
 
