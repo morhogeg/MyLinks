@@ -87,16 +87,31 @@ export interface RelatedLink {
   commonConcepts: string[];
 }
 
+export type DigestFrequency = 'daily' | 'weekly';
+export type DigestChannel = 'email' | 'whatsapp';
+export type DigestMode = 'smart' | 'random' | 'topic' | 'unread' | 'favorites' | 'rediscover';
+
 // TODO: Replace with Firebase Auth user type
 export interface User {
   id: string;
   phoneNumber: string; // E.164 format
+  email?: string;
   createdAt: number;
   settings: {
     theme: 'dark' | 'light';
     daily_digest: boolean;
     reminders_enabled: boolean;
     reminder_frequency: 'smart' | 'daily' | 'weekly' | 'off';
+    // Curated digest delivery
+    digest_enabled: boolean;
+    digest_frequency: DigestFrequency;
+    digest_channels: DigestChannel[];
+    digest_mode: DigestMode;
+    digest_topic?: string | null;
+    digest_count: number;
+    digest_hour: number; // 0-23, local time
+    digest_day: number;  // 0=Mon … 6=Sun (weekly)
+    digest_skip_empty: boolean;
   };
 }
 

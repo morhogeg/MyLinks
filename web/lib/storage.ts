@@ -155,3 +155,19 @@ export async function updateUserSettings(uid: string, settings: Partial<User['se
     });
     await updateDoc(userRef, updates);
 }
+
+/**
+ * Update a top-level field on the user document (e.g. the digest email address).
+ */
+export async function updateUserEmail(uid: string, email: string): Promise<void> {
+    const userRef = doc(db, 'users', uid);
+    await updateDoc(userRef, { email });
+}
+
+/**
+ * Read the user's top-level email (used to prefill the digest form).
+ */
+export async function getUserEmail(uid: string): Promise<string | null> {
+    const snapshot = await getDoc(doc(db, 'users', uid));
+    return snapshot.exists() ? (snapshot.data().email ?? null) : null;
+}
