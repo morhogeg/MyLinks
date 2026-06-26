@@ -219,37 +219,72 @@ def _link_url(link_id: str) -> str:
     return f"{APP_URL}?linkId={link_id}"
 
 
-def format_digest_whatsapp(cards: List[dict], mode: str, topic: Optional[str], frequency: str) -> str:
-    """Render the curated cards as a WhatsApp message."""
+# Twilio caps a WhatsApp message body at 1600 chars; stay safely under it and
+# split a long digest across multiple messages rather than have Twilio reject it.
+WHATSAPP_LIMIT = 1500
+
+
+def _whatsapp_card_block(index: int, c: dict) -> str:
+    """Render a single card as an atomic WhatsApp block (never split)."""
+    title = (c.get("title") or "Untitled").strip()
+    category = c.get("category") or "General"
+    emoji = _cat_emoji(category)
+    read = (c.get("metadata") or {}).get("estimatedReadTime")
+    meta = f"{emoji} {category}"
+    if read:
+        meta += f" · ⏱️ {read} min"
+    summary = (c.get("summary") or "").strip()
+    if len(summary) > 140:
+        summary = summary[:137].rstrip() + "…"
+
+    parts = [f"*{index}. {title}*", meta]
+    if summary:
+        parts.append(summary)
+    parts.append(_link_url(c["id"]))
+    return "\n".join(parts)
+
+
+def format_digest_whatsapp_messages(cards: List[dict], mode: str, topic: Optional[str], frequency: str) -> List[str]:
+    """
+    Render the curated cards as one or more WhatsApp messages, each kept under
+    Twilio's length limit. Card blocks are packed greedily; the header rides on
+    the first message and the footer on the last.
+    """
     period = "Daily" if frequency == "daily" else "Weekly"
     blurb = MODE_BLURB.get(mode, MODE_BLURB["smart"]).format(topic=topic or "your library")
+    header = f"🧠 *Your {period} Brew* — {len(cards)} cards\n_{blurb}_"
+    footer = (f"📲 Open Second Brain:\n{APP_URL}\n\n"
+              "_Reply DIGEST for a fresh one • STOP DIGEST to pause_")
 
-    lines = [f"🧠 *Your {period} Brew* — {len(cards)} cards", f"_{blurb}_", ""]
+    blocks = [_whatsapp_card_block(i, c) for i, c in enumerate(cards, 1)]
 
-    for i, c in enumerate(cards, 1):
-        title = (c.get("title") or "Untitled").strip()
-        category = c.get("category") or "General"
-        emoji = _cat_emoji(category)
-        read = (c.get("metadata") or {}).get("estimatedReadTime")
-        meta = f"{emoji} {category}"
-        if read:
-            meta += f" · ⏱️ {read} min"
-        summary = (c.get("summary") or "").strip()
-        if len(summary) > 160:
-            summary = summary[:157].rstrip() + "…"
+    messages: List[str] = []
+    current = header
+    for block in blocks:
+        candidate = f"{current}\n\n{block}"
+        if len(candidate) > WHATSAPP_LIMIT:
+            messages.append(current)
+            current = block
+        else:
+            current = candidate
 
-        lines.append(f"*{i}. {title}*")
-        lines.append(meta)
-        if summary:
-            lines.append(summary)
-        lines.append(_link_url(c["id"]))
-        lines.append("")
+    candidate = f"{current}\n\n{footer}"
+    if len(candidate) > WHATSAPP_LIMIT:
+        messages.append(current)
+        messages.append(footer)
+    else:
+        messages.append(candidate)
 
-    lines.append("📲 Open Second Brain:")
-    lines.append(APP_URL)
-    lines.append("")
-    lines.append("_Reply STOP DIGEST to pause • change anything in Settings_")
-    return "\n".join(lines)
+    # Tag parts when there's more than one message.
+    if len(messages) > 1:
+        total = len(messages)
+        messages = [f"{m}\n\n_({i}/{total})_" for i, m in enumerate(messages, 1)]
+    return messages
+
+
+def format_digest_whatsapp(cards: List[dict], mode: str, topic: Optional[str], frequency: str) -> str:
+    """Convenience: the full digest as a single string (joins all parts)."""
+    return "\n\n".join(format_digest_whatsapp_messages(cards, mode, topic, frequency))
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -454,9 +489,11 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
         phone = user_data.get("phone_number") or user_data.get("phoneNumber")
         if phone:
             try:
-                body = format_digest_whatsapp(cards, mode, topic, frequency)
-                send_whatsapp_message(f"whatsapp:{phone}", body)
+                messages = format_digest_whatsapp_messages(cards, mode, topic, frequency)
+                for body in messages:
+                    send_whatsapp_message(f"whatsapp:{phone}", body)
                 result["channels"].append("whatsapp")
+                result["whatsapp_parts"] = len(messages)
                 delivered_any = True
             except Exception as e:
                 logger.error(f"Digest WhatsApp send failed for {uid}: {e}")

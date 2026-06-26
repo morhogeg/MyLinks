@@ -583,12 +583,16 @@ def whatsapp_webhook(request):
             return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
 
         if msg_lower in ("digest", "digest now", "דייג'סט"):
-            # Send an on-demand digest right now.
+            # On-demand digest. Since the request came over WhatsApp, always
+            # reply over WhatsApp regardless of the user's configured channels.
             from digest_service import build_and_send_digest
             user_doc = db.collection('users').document(uid).get()
-            res = build_and_send_digest(uid, user_doc.to_dict() or {}, force=True)
+            user_data = user_doc.to_dict() or {}
+            user_data["settings"] = {**user_data.get("settings", {}), "digest_channels": ["whatsapp"]}
+            res = build_and_send_digest(uid, user_data, force=True)
             if not res.get("sent"):
-                msg = "📭 Nothing to curate yet — save a few links first!"
+                msg = ("📭 אין עדיין מה לאסוף — שמור/י כמה לינקים קודם!" if user_msg_is_hebrew
+                       else "📭 Nothing to curate yet — save a few links first!")
                 send_whatsapp_message(payload.from_number, msg)
             return https_fn.Response(json.dumps({"success": True, **res}), status=200, mimetype="application/json")
 
