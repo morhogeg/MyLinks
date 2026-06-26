@@ -61,6 +61,15 @@ You save hundreds of links every month — articles, videos, resources — with 
 - **Favorites** — Star your most important content
 - **Archive** — Keep your library clean
 
+### 📬 Curated Digest
+- **Scheduled delivery** — Get a hand-picked set of cards **daily or weekly**
+- **Email and/or WhatsApp** — Choose one or both channels
+- **Curation modes** — *Smart mix*, *Surprise me* (random), *By topic*, *Backlog* (oldest unread), *Favorites*, or *Rediscover* (resurface old saves you forgot)
+- **Your schedule** — Pick the day/hour in your own timezone
+- **Send one now** — Preview your digest instantly from Settings
+- **Skip-when-empty** — Never sends a hollow digest
+- **WhatsApp controls** — Reply `DIGEST` for an on-demand batch, or `STOP DIGEST` / `START DIGEST` to pause and resume
+
 ---
 
 ## 🏆 What Makes MyLinks Different?
@@ -220,7 +229,7 @@ Based on competitor analysis (Pocket, Instapaper, Notion, Obsidian, Readwise, Ra
 ### Lower Priority
 - [ ] **API Access** — Third-party integrations
 - [ ] **RSS Feed Import** — Import from feed readers
-- [ ] **Daily Digest** — Email summary of saved articles
+- [x] **Curated Digest** — Scheduled email/WhatsApp digest of curated cards (random, by topic, backlog, rediscover & more)
 - [ ] **Social Sharing** — Share to Twitter, LinkedIn
 
 ---

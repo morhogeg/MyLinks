@@ -115,6 +115,33 @@ class UserSettings(BaseModel):
     reminders_enabled: bool = True
     reminder_frequency: str = "smart"  # "smart", "daily", "weekly", "off"
 
+    # ── Curated Digest delivery ──────────────────────────────────────────
+    # A scheduled, curated set of saved cards delivered to email and/or
+    # WhatsApp. See digest_service.py for the curation + delivery logic.
+    digest_enabled: bool = False
+    # How often to deliver: "daily" | "weekly"
+    digest_frequency: str = "weekly"
+    # Delivery channels — any subset of ["email", "whatsapp"]
+    digest_channels: List[str] = Field(default_factory=lambda: ["whatsapp"])
+    # Curation strategy:
+    #   "smart"      – a balanced mix of backlog + rediscovery (default)
+    #   "random"     – surprise me: a random sample across the library
+    #   "topic"      – only cards from a chosen category/tag (see digest_topic)
+    #   "unread"     – chip away at the backlog (oldest unread first)
+    #   "favorites"  – revisit starred cards
+    #   "rediscover" – "on this day": older saves you haven't opened recently
+    digest_mode: str = "smart"
+    # Category or tag to focus on when digest_mode == "topic".
+    digest_topic: Optional[str] = None
+    # How many cards per digest.
+    digest_count: int = 5
+    # Preferred local delivery hour (0–23) in the user's timezone.
+    digest_hour: int = 9
+    # Preferred weekday for weekly digests (0=Mon … 6=Sun).
+    digest_day: int = 0
+    # Don't send a digest if there's nothing fresh to show.
+    digest_skip_empty: bool = True
+
 
 class UserDocument(BaseModel):
     """
@@ -125,3 +152,6 @@ class UserDocument(BaseModel):
     createdAt: datetime = Field(default_factory=datetime.now)
     settings: UserSettings = Field(default_factory=UserSettings)
     last_saved_link_id: Optional[str] = Field(None, description="ID of the last saved link for context")
+    email: Optional[str] = Field(None, description="Email address for digest delivery")
+    timezone: Optional[str] = Field(None, description="IANA timezone, e.g. 'America/New_York'")
+    lastDigestSentAt: Optional[int] = Field(None, description="Unix ms timestamp of the last digest delivered")

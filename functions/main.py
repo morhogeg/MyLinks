@@ -559,6 +559,43 @@ def whatsapp_webhook(request):
         logger.info("No URL found, checking for commands")
 
         msg_lower = payload.body.lower().strip()
+
+        # Digest controls over WhatsApp: pause / resume the curated digest.
+        if msg_lower in ("stop digest", "pause digest", "digest off"):
+            db.collection('users').document(uid).set(
+                {"settings": {"digest_enabled": False}}, merge=True
+            )
+            msg = ("✅ Digest paused. Reply *START DIGEST* to turn it back on, "
+                   "or manage it anytime in Settings.")
+            if user_msg_is_hebrew:
+                msg = "✅ הדייג'סט הושהה. השב/י *START DIGEST* כדי להפעיל מחדש."
+            send_whatsapp_message(payload.from_number, msg)
+            return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
+
+        if msg_lower in ("start digest", "resume digest", "digest on"):
+            db.collection('users').document(uid).set(
+                {"settings": {"digest_enabled": True}}, merge=True
+            )
+            msg = "✅ Digest resumed. You'll get your curated cards on schedule."
+            if user_msg_is_hebrew:
+                msg = "✅ הדייג'סט חזר לפעול. תקבל/י כרטיסים נבחרים לפי לוח הזמנים."
+            send_whatsapp_message(payload.from_number, msg)
+            return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
+
+        if msg_lower in ("digest", "digest now", "דייג'סט"):
+            # On-demand digest. Since the request came over WhatsApp, always
+            # reply over WhatsApp regardless of the user's configured channels.
+            from digest_service import build_and_send_digest
+            user_doc = db.collection('users').document(uid).get()
+            user_data = user_doc.to_dict() or {}
+            user_data["settings"] = {**user_data.get("settings", {}), "digest_channels": ["whatsapp"]}
+            res = build_and_send_digest(uid, user_data, force=True)
+            if not res.get("sent"):
+                msg = ("📭 אין עדיין מה לאסוף — שמור/י כמה לינקים קודם!" if user_msg_is_hebrew
+                       else "📭 Nothing to curate yet — save a few links first!")
+                send_whatsapp_message(payload.from_number, msg)
+            return https_fn.Response(json.dumps({"success": True, **res}), status=200, mimetype="application/json")
+
         if msg_lower == "reminder" or msg_lower == "תזכורת":
             is_he = (msg_lower == "תזכורת") or user_msg_is_hebrew
             if is_he:
@@ -863,3 +900,73 @@ def force_check_reminders(req: https_fn.Request) -> https_fn.Response:
     except Exception as e:
         logger.error(f"Manual trigger failed: {e}")
         return https_fn.Response(f"Error: {e}", status=500)
+
+
+# ─────────────────────────────────────────────
+# Curated Digest (email + WhatsApp)
+# ─────────────────────────────────────────────
+
+@scheduler_fn.on_schedule(schedule="every 60 minutes")
+def send_digests(event: scheduler_fn.ScheduledEvent) -> None:
+    """Hourly: deliver curated digests to users whose schedule is due now."""
+    from digest_service import run_digest_check
+    run_digest_check()
+
+
+@https_fn.on_request()
+def force_send_digests(req: https_fn.Request) -> https_fn.Response:
+    """Manual trigger for the digest sweep (debug, ignores nothing-due skips)."""
+    from digest_service import run_digest_check
+    try:
+        report = run_digest_check()
+        return https_fn.Response(json.dumps(report, indent=2), status=200, mimetype="application/json")
+    except Exception as e:
+        logger.error(f"Manual digest trigger failed: {e}")
+        return https_fn.Response(f"Error: {e}", status=500)
+
+
+@https_fn.on_call()
+def send_digest_now(req: https_fn.CallableRequest) -> dict:
+    """
+    Build and deliver a digest immediately, using the user's saved (or
+    just-edited) preferences. Powers the "Send one now" / preview button in
+    Settings. Optional req.data overrides: mode, topic, count, channels,
+    frequency — so the UI can preview a config before saving it.
+    """
+    from digest_service import build_and_send_digest
+
+    uid = req.auth.uid if req.auth else None
+    if not uid and req.data:
+        uid = req.data.get("uid") or req.data.get("test_uid")
+    if not uid:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="User must be identified",
+        )
+
+    db = get_db()
+    snap = db.collection("users").document(uid).get()
+    if not snap.exists:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.NOT_FOUND, message="User not found"
+        )
+    user_data = snap.to_dict() or {}
+
+    # Allow the caller to preview an unsaved configuration.
+    overrides = {}
+    for key in ("digest_mode", "digest_topic", "digest_count", "digest_channels", "digest_frequency"):
+        short = key.replace("digest_", "")
+        if req.data and short in req.data:
+            overrides[key] = req.data[short]
+    if req.data and req.data.get("email"):
+        user_data["email"] = req.data["email"]
+    if overrides:
+        user_data.setdefault("settings", {})
+        user_data["settings"] = {**user_data.get("settings", {}), **overrides}
+
+    try:
+        result = build_and_send_digest(uid, user_data, force=True)
+        return result
+    except Exception as e:
+        logger.error(f"send_digest_now failed for {uid}: {e}")
+        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=str(e))
