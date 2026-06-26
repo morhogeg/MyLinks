@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { User, DigestMode, DigestChannel } from '@/lib/types';
-import { X, Bell, Sparkles, Share2, Copy, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, ShieldCheck, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '@/lib/firebase';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
@@ -69,15 +69,10 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
     const [sendingNow, setSendingNow] = useState(false);
     const [sendResult, setSendResult] = useState<string | null>(null);
 
-    const [shareConfig, setShareConfig] = useState<{ endpoint: string; token: string } | null>(null);
-    const [shareLoading, setShareLoading] = useState(false);
-    const [copied, setCopied] = useState<'endpoint' | 'token' | null>(null);
-
     useEffect(() => {
         if (isOpen && uid) {
             setView('main');
             loadSettings();
-            loadShareConfig();
             loadDigestExtras();
         }
     }, [isOpen, uid]);
@@ -98,29 +93,6 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
             setTopics(Array.from(set).sort((a, b) => a.localeCompare(b)));
         } catch (error) {
             console.error('Failed to load digest extras:', error);
-        }
-    };
-
-    const loadShareConfig = async () => {
-        setShareLoading(true);
-        try {
-            const fn = httpsCallable(functions, 'get_share_config');
-            const result = await fn({ uid });
-            setShareConfig(result.data as { endpoint: string; token: string });
-        } catch (error) {
-            console.error('Failed to load share config:', error);
-        } finally {
-            setShareLoading(false);
-        }
-    };
-
-    const handleCopy = async (value: string, which: 'endpoint' | 'token') => {
-        try {
-            await navigator.clipboard.writeText(value);
-            setCopied(which);
-            setTimeout(() => setCopied(null), 1500);
-        } catch (error) {
-            console.error('Copy failed:', error);
         }
     };
 
@@ -378,50 +350,6 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                             title="WhatsApp"
                             subtitle="Send any link to the bot — it's saved, summarized, and tagged automatically."
                         />
-
-                        <div className="h-px bg-border-subtle" />
-
-                        <div className="space-y-3">
-                            <div className="flex items-start gap-3">
-                                <div className="mt-0.5 shrink-0 text-accent"><Share2 className="w-5 h-5" /></div>
-                                <p className="text-[12px] text-text-secondary leading-relaxed">
-                                    <span className="font-semibold text-text">iOS Shortcut</span> — save from any app
-                                    (Safari, Maps, Instagram…). Paste these into the Shortcut once; see{' '}
-                                    <span className="font-medium text-text">SHORTCUT_SETUP.md</span>.
-                                </p>
-                            </div>
-
-                            {shareLoading && <div className="text-xs text-text-muted pl-8">Loading your endpoint…</div>}
-
-                            {shareConfig && (
-                                <div className="space-y-2.5 pl-8">
-                                    {[
-                                        { label: 'Endpoint URL', value: shareConfig.endpoint, key: 'endpoint' as const },
-                                        { label: 'Ingest Token', value: shareConfig.token, key: 'token' as const },
-                                    ].map(({ label, value, key }) => (
-                                        <div key={key}>
-                                            <label className="text-[11px] font-medium text-text-muted block mb-1">{label}</label>
-                                            <div className="flex items-center gap-2">
-                                                <code className="flex-1 min-w-0 truncate px-3 py-2 rounded-xl bg-card-hover border border-border-subtle text-xs text-text-secondary font-mono">
-                                                    {value}
-                                                </code>
-                                                <button
-                                                    onClick={() => handleCopy(value, key)}
-                                                    className="shrink-0 h-9 w-9 rounded-xl bg-card-hover border border-border-subtle text-text-muted hover:text-text hover:border-accent/40 transition-all flex items-center justify-center cursor-pointer"
-                                                    aria-label={`Copy ${label}`}
-                                                >
-                                                    {copied === key ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
-                                        <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                                        Keep your token private — anyone with it can save to your brain.
-                                    </div>
-                                </div>
-                            )}
-                        </div>
                     </Section>
 
                     {/* About */}
