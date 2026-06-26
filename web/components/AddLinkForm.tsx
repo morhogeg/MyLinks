@@ -8,6 +8,7 @@ import { useToast } from '@/components/Toast';
 import { compressImage } from '@/lib/image';
 import ImageScanProgress from '@/components/ImageScanProgress';
 import VideoScanProgress from '@/components/VideoScanProgress';
+import LinkScanProgress from '@/components/LinkScanProgress';
 
 interface AddLinkFormProps {
     onLinkAdded: () => void;
@@ -78,13 +79,17 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
     // high cap (~99%) — always inching forward so it never looks frozen, but
     // never completing early. Video creeps slower (it really does take ~1 min);
     // success snaps it to 100%.
+    // A normal web link/article also gets the phased scan treatment now.
+    const isPlainLink = activeTab === 'link' && !isVideo;
+
     useEffect(() => {
-        const animated = isLoading && (activeTab === 'image' || isVideo);
+        const animated = isLoading && (activeTab === 'image' || isVideo || isPlainLink);
         if (animated) {
             setProgress((p) => (p < 8 ? 8 : p));
             // Smaller factor = slower climb. Tuned so video reaches ~97% over a
-            // minute while images fill in a few seconds.
-            const factor = isVideo ? 0.012 : 0.04;
+            // minute, images fill in a few seconds, and a normal page lands in
+            // between (a handful of seconds, slower on a cold start).
+            const factor = isVideo ? 0.012 : activeTab === 'image' ? 0.04 : 0.03;
             progressTimer.current = setInterval(() => {
                 setProgress((p) => {
                     const CAP = 99;
@@ -98,7 +103,7 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                 progressTimer.current = null;
             }
         };
-    }, [isLoading, activeTab, isVideo]);
+    }, [isLoading, activeTab, isVideo, isPlainLink]);
 
     const parseResponse = async (response: Response) => {
         const responseText = await response.text();
@@ -156,6 +161,8 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                     throw new Error(netErr instanceof Error ? netErr.message : `Network error: ${String(netErr)}`);
                 }
                 data = await parseResponse(response);
+                // Real milestone: analysis came back — jump ahead to "saving".
+                setProgress((p) => Math.max(p, 90));
             } else {
                 // IMAGE MODE — compress client-side, then send the inline bytes to
                 // the backend, which both analyzes AND stores the image (via the
@@ -209,11 +216,9 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                 throw new Error(`Could not save to your brain: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
             }
 
-            // Let the scan progress (image or video) land on "Done!" before closing.
-            if (activeTab === 'image' || isVideo) {
-                setProgress(100);
-                await new Promise((r) => setTimeout(r, 550));
-            }
+            // Let the scan progress (link, image, or video) land on "Done!" first.
+            setProgress(100);
+            await new Promise((r) => setTimeout(r, 550));
 
             setUrl('');
             setImageFile(null);
@@ -299,6 +304,8 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                                         thumbnailSrc={videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null}
                                         progress={progress}
                                     />
+                                ) : isLoading && isPlainLink ? (
+                                    <LinkScanProgress url={formatUrl(url)} progress={progress} />
                                 ) : (
                                     <div className="relative">
                                         <input
@@ -368,22 +375,15 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                                 </div>
                             )}
 
-                            {/* The scan views (image/video) show their own progress,
-                                so the button is only needed otherwise. */}
-                            {!(isLoading && (activeTab === 'image' || isVideo)) && (
+                            {/* The scan views (link/image/video) show their own
+                                progress, so the button is only needed when idle. */}
+                            {!isLoading && (
                                 <button
                                     type="submit"
-                                    disabled={isLoading || (activeTab === 'link' ? !url.trim() : !imageFile)}
+                                    disabled={activeTab === 'link' ? !url.trim() : !imageFile}
                                     className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-100 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
                                 >
-                                    {isLoading ? (
-                                        <>
-                                            <Loader2 className="w-5 h-5 animate-spin" />
-                                            <span>Analyzing...</span>
-                                        </>
-                                    ) : (
-                                        'Save'
-                                    )}
+                                    Save
                                 </button>
                             )}
                         </div>

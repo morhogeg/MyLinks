@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
 import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube, ImageOff, Image as ImageIcon } from 'lucide-react';
-import { getPlatform, platformIcon, platformColor, xHandle, linkedinDisplayName } from '@/lib/platform';
+import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -118,7 +118,7 @@ export default function LinkDetailModal({
     const isYouTube = platform === 'youtube' || link.sourceType === 'youtube';
     const youtubeChannel = link.metadata?.youtubeChannel || link.sourceName;
     const xAuthor = platform === 'x' ? xHandle(link.url) : null;
-    const linkedinName = platform === 'linkedin' ? linkedinDisplayName(link.url, link.sourceName) : null;
+    const isLinkedIn = platform === 'linkedin';
 
     const getTimeAgo = (timestamp: any, now: number): string => {
         if (!timestamp || !now) return '...';
@@ -391,16 +391,16 @@ export default function LinkDetailModal({
                                             </span>
                                             <span className="truncate">@{xAuthor}</span>
                                         </span>
-                                    ) : linkedinName ? (
+                                    ) : isLinkedIn ? (
                                         <span
                                             dir="ltr"
-                                            className="flex items-center gap-1.5 min-w-0 text-sm font-semibold text-text-secondary whitespace-nowrap max-w-[240px]"
-                                            title={linkedinName}
+                                            className="flex items-center gap-1.5 min-w-0 text-sm font-semibold whitespace-nowrap"
+                                            title="LinkedIn"
+                                            aria-label="LinkedIn"
                                         >
                                             <span className="shrink-0 inline-flex" style={{ color: platformColor('linkedin') }}>
                                                 {platformIcon('linkedin', 'w-4 h-4')}
                                             </span>
-                                            <span className="truncate">{linkedinName}</span>
                                         </span>
                                     ) : link.sourceType === 'image' ? (
                                         <span className="flex items-center gap-1.5 text-sm font-semibold text-accent whitespace-nowrap" title="Screenshot">

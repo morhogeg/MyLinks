@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { getPlatform, platformIcon, platformColor, xHandle, linkedinDisplayName } from '@/lib/platform';
+import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import { hasHebrew } from '@/lib/rtl';
 import { Star, Archive, Bell, RotateCcw, Youtube, Sparkles, Image as ImageIcon } from 'lucide-react';
@@ -260,7 +260,7 @@ function CardFace({ link }: { link: Link }) {
     const isYouTube = platform === 'youtube' || link.sourceType === 'youtube';
     const youtubeChannel = link.metadata?.youtubeChannel || link.sourceName;
     const xAuthor = platform === 'x' ? xHandle(link.url) : null;
-    const linkedinName = platform === 'linkedin' ? linkedinDisplayName(link.url, link.sourceName) : null;
+    const isLinkedIn = platform === 'linkedin';
 
     return (
         <div className="h-full w-full surface-card bg-card rounded-2xl border border-border-subtle shadow-[var(--shadow-card)] p-5 sm:p-6 flex flex-col overflow-hidden">
@@ -282,10 +282,9 @@ function CardFace({ link }: { link: Link }) {
                         <span className="shrink-0 inline-flex" style={{ color: platformColor('x') }}>{platformIcon('x', 'w-3.5 h-3.5')}</span>
                         <span className="truncate">@{xAuthor}</span>
                     </span>
-                ) : linkedinName ? (
-                    <span dir="ltr" className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-text-secondary whitespace-nowrap max-w-[200px]">
-                        <span className="shrink-0 inline-flex" style={{ color: platformColor('linkedin') }}>{platformIcon('linkedin', 'w-3.5 h-3.5')}</span>
-                        <span className="truncate">{linkedinName}</span>
+                ) : isLinkedIn ? (
+                    <span dir="ltr" className="flex items-center gap-1.5 min-w-0 text-xs font-semibold whitespace-nowrap" title="LinkedIn" aria-label="LinkedIn">
+                        <span className="shrink-0 inline-flex" style={{ color: platformColor('linkedin') }}>{platformIcon('linkedin', 'w-4 h-4')}</span>
                     </span>
                 ) : link.sourceType === 'image' ? (
                     <span className="flex items-center gap-1.5 text-xs font-semibold text-accent whitespace-nowrap">
