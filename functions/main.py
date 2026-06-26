@@ -120,6 +120,26 @@ def _format_duration(minutes: int) -> str:
     return f"{hours}h {mins:02d}m"
 
 
+def _store_image(blob_path: str, image_bytes: bytes, mime_type: str) -> str:
+    """Upload an image to Storage and return a public Firebase download URL.
+
+    Uses a Firebase download token (firebaseStorageDownloadTokens) rather than
+    blob.make_public(): make_public() sets a legacy object ACL, which raises on
+    buckets with uniform bucket-level access enabled. The token URL is served
+    publicly by Firebase regardless of ACL mode — the same format the web SDK's
+    getDownloadURL() returns.
+    """
+    import uuid
+    from urllib.parse import quote
+    bucket = storage.bucket()
+    blob = bucket.blob(blob_path)
+    token = uuid.uuid4().hex
+    blob.metadata = {"firebaseStorageDownloadTokens": token}
+    blob.upload_from_string(image_bytes, content_type=mime_type)
+    encoded = quote(blob_path, safe="")
+    return f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/{encoded}?alt=media&token={token}"
+
+
 def _apply_youtube_metadata(link_data: dict, yt_meta: dict, analysis: dict, minutes: int):
     """Attach video-shaped metadata (thumbnail, channel, highlights, speakers)
     to a link document so the frontend can render a proper video card."""
@@ -342,12 +362,7 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
         if image_b64 and uid:
             try:
                 import uuid
-                bucket = storage.bucket()
-                blob_path = f"screenshots/{uid}/{uuid.uuid4().hex}.jpg"
-                blob = bucket.blob(blob_path)
-                blob.upload_from_string(image_bytes, content_type=mime_type)
-                blob.make_public()
-                stored_url = blob.public_url
+                stored_url = _store_image(f"screenshots/{uid}/{uuid.uuid4().hex}.jpg", image_bytes, mime_type)
                 logger.info(f"Stored screenshot at {stored_url}")
             except Exception as e:
                 # Non-fatal: analysis still succeeds, card just won't show the image.
@@ -752,12 +767,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
 
             # Upload to Firebase Storage
             log_to_firestore(task_id, "Uploading image to Firebase Storage")
-            bucket = storage.bucket()
-            blob_path = f"screenshots/{uid}/{task_id}.jpg"
-            blob = bucket.blob(blob_path)
-            blob.upload_from_string(image_bytes, content_type=mime_type)
-            blob.make_public()
-            public_url = blob.public_url
+            public_url = _store_image(f"screenshots/{uid}/{task_id}.jpg", image_bytes, mime_type)
 
             url = public_url
 
