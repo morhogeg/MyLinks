@@ -104,6 +104,18 @@ Frontend is **merged to `main` and live on Vercel** (`https://my-links-sable.ver
 ### Frontend (automatic)
 Push to `main` → Vercel rebuilds. All this session's web changes are **live**.
 
+### Firebase Hosting (manual — easy to forget, serves a SEPARATE build)
+`secondbrain-app-94da2.web.app` (used by the iOS Shortcut / share deep-links / `APP_URL`)
+is a **separate** deployment from Vercel and does **not** auto-update. If left stale it
+serves an old `web/out` — which caused iPhone image uploads to fail with
+`storage/unauthorized` (the old build wrote images client-side to `users/<uid>/uploads/`;
+the app has **no Firebase Auth** so `request.auth` is null and `storage.rules` deny it).
+The current build uploads via the backend, so redeploying fixes it:
+```bash
+cd ~/MyLinks && git pull && ./deploy-hosting.sh     # build static export + firebase deploy --only hosting
+```
+Re-run whenever the web app changes and mobile must stay current.
+
 ### Functions (manual — PENDING, and deploy ALL functions this time)
 The user's local `~/MyLinks` was found **stale** mid-session (still on the original commit), so
 an earlier `firebase deploy` shipped OLD code — that's why the new WhatsApp message "didn't
