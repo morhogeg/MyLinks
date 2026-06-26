@@ -19,10 +19,11 @@ import CompactCard from './CompactCard';
 import Masonry from './Masonry';
 import ReminderModal from './ReminderModal';
 import TableView from './TableView';
+import SwipeDeck from './SwipeDeck';
 import InsightsFeed from './InsightsFeed';
 import LinkDetailModal from './LinkDetailModal';
 import ConfirmDialog from './ConfirmDialog';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers } from 'lucide-react';
 import TagExplorer from './TagExplorer';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -55,7 +56,7 @@ function FeedContent() {
     const [scrollLeft, setScrollLeft] = useState(0);
     const activeLink = links.find(l => l.id === activeLinkId) || null;
     const [isLoading, setIsLoading] = useState(true);
-    const [viewMode, setViewMode] = useState<'grid' | 'table' | 'insights' | 'compact'>('grid');
+    const [viewMode, setViewMode] = useState<'grid' | 'table' | 'insights' | 'compact' | 'review'>('grid');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
@@ -450,6 +451,7 @@ function FeedContent() {
         { key: 'grid', label: 'Cards', icon: <LayoutGrid className="w-4 h-4" />, hint: 'Card view' },
         { key: 'compact', label: 'Compact', icon: <Grid2X2 className="w-4 h-4" />, hint: 'Compact grid' },
         { key: 'table', label: 'Table', icon: <List className="w-4 h-4" />, hint: 'Table view' },
+        { key: 'review', label: 'Review', icon: <Layers className="w-4 h-4" />, hint: 'Swipe to review' },
         { key: 'insights', label: 'Insights', icon: <Sparkles className="w-4 h-4" />, hint: 'AI insights' },
     ];
 
@@ -918,6 +920,15 @@ function FeedContent() {
                             selectedIds={selectedIds}
                             allCategories={categories}
                             onToggleSelection={toggleSelection}
+                        />
+                    ) : viewMode === 'review' ? (
+                        <SwipeDeck
+                            links={filteredLinks}
+                            onFavorite={(link) => handleStatusChange(link.id, 'favorite')}
+                            onArchive={(link) => handleStatusChange(link.id, 'archived')}
+                            onRemind={(link) => handleOpenReminderModal(link)}
+                            onOpen={(link) => setActiveLinkId(link.id)}
+                            onResetStatus={(link) => handleStatusChange(link.id, 'unread')}
                         />
                     ) : viewMode === 'grid' ? (
                         <Masonry columnWidth={340} gap={16}>
