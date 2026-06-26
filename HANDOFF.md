@@ -1,132 +1,151 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-25. Branch worked on: `claude/codebase-production-polish-q90zhk` (merged to `main` throughout)._
+_Last updated: 2026-06-26. Branch worked on: `claude/elated-easley-47baa3` (merged to `main` throughout, commits `9eba77c…9a18563`)._
 
 ## TL;DR
-This session delivered a **YouTube understanding overhaul** (grounded Gemini native
-video analysis + real video cards) and a **design pass** on the feed (depth/motion,
-wider layout, masonry, source filtering, card refinements). Everything below is
-**merged to `main` and live on Vercel** (`https://my-links-sable.vercel.app`).
-The **Cloud Functions changes require a manual deploy** (see Deploy section) — the
-frontend deploys automatically on push to `main`.
+This session was a broad **UX / design + product pass**:
+- **Toolbar overhaul** (Feed controls): consistent sizing/contrast/cursor, labeled view
+  switcher, a custom accent-themed **Dropdown** (replaces native `<select>` so there's no
+  OS-blue menu), per-source filter colors, real **X logo**.
+- **Branded source bylines** for YouTube (red channel), **X** (`@handle`), and **LinkedIn**
+  (author name) — on cards, the detail modal, and the review deck, replacing the muted tag.
+- New **Tinder-style "Review" view** (`SwipeDeck`) — swipe right=Favorite, left=Archive,
+  up=Remind, tap=Open; non-destructive with Undo; fits one viewport.
+- **Detail modal** now leads with the same **highlighted** summary as the card.
+- **WhatsApp save message rebuilt** + **reminder quick-replies = days** (1/2/3/7, `S`=spaced).
+- **Header redesign** (gradient wordmark + cohesive circular controls) and a **full Settings
+  modal redesign** (theme-aware, in-modal theme switch, restructured sections).
+
+Frontend is **merged to `main` and live on Vercel** (`https://my-links-sable.vercel.app`).
+⚠️ **Cloud Functions changes are NOT deployed yet** — see Deploy (must deploy **all** functions this time).
 
 ---
 
-## Project shape (orientation for next session)
-- **Frontend:** Next.js 16 + React 19 in `web/`. Deployed on **Vercel** (production
-  branch `main`, auto-deploys on push). Tailwind v4. Firebase Web SDK for Firestore
-  realtime (`web/lib/firebase.ts`, config from `NEXT_PUBLIC_FIREBASE_*` env vars).
-- **Backend:** Python Firebase Cloud Functions in `functions/` (Gemini via
-  `google-genai`, Firestore, Storage). Model = single constant
-  `GEMINI_ANALYSIS_MODEL = "gemini-3.1-flash-lite"` in `functions/ai_service.py`.
-- **Firebase project (IMPORTANT):** the app lives in **`secondbrain-app-94da2`**.
-  The Gemini API key's Google Cloud project (`gen-lang-client-…`) is a *different*
-  thing — do NOT deploy functions there. `web/vercel.json` routes the live site's
-  `/api/*` calls to `https://secondbrain-app-94da2.web.app`.
+## Project shape (orientation)
+- **Frontend:** Next.js 16 + React 19 in `web/`. **Vercel** auto-deploys on push to `main`.
+  Tailwind v4 (theme tokens: `text-text`, `text-text-secondary`, `text-text-muted`,
+  `bg-card`, `bg-card-hover`, `border-border-subtle`, `bg-accent`, `var(--accent-gradient)`,
+  `var(--shadow-card)`). **Always use these tokens, not hardcoded white/black** (the old
+  Settings modal broke in light mode because of that).
+- **Backend:** Python Firebase Cloud Functions in `functions/` (Gemini, Firestore, Storage).
+- **Firebase project:** **`secondbrain-app-94da2`**. `web/vercel.json` routes `/api/*` there.
+  Firestore data: `users/{uid}/links/{id}` (uid is the phone number, e.g. `+16462440305`).
 
 ---
 
 ## What changed this session (newest first)
 
-### Feed layout & cards (design pass)
-- **Masonry feed** (`web/components/Masonry.tsx`, used in `Feed.tsx` grid view):
-  flexbox masonry — column count derived from container width via `ResizeObserver`
-  (340px target), cards distributed **round-robin** so the top row reads
-  **newest→oldest left-to-right** and cards hug their content (no dead space).
-  - We tried CSS multi-column first; it mis-painted transformed cards in Safari
-    (invisible cards) and was column-major. Flexbox masonry replaced it. Don't go
-    back to CSS columns.
-- **Source/platform filter:** `web/lib/platform.tsx` (`getPlatform(url)`,
-  `platformIcon()`, `PLATFORM_LABELS`). `Feed.tsx` shows toggle icons for platforms
-  present in the library (YouTube/X/Instagram/LinkedIn/GitHub) and filters by them
-  (`selectedPlatforms` state). `Card.tsx` shows the same icon next to the source.
-- **Card refinements (`Card.tsx`):** full source name (no premature truncation),
-  an **Open-source** ↗ button in the hover cluster + the mobile `CardActionSheet`,
-  category/source meta row mirrors per card language (category on the title's
-  starting edge — right for Hebrew), and **footer tags are clickable** → filter the
-  feed (wired to `handleToggleTag`).
-- **Detail modal (`LinkDetailModal.tsx`):** source name no longer truncated.
-- **Wider layout (`web/app/page.tsx`):** container `max-w-[2200px]`. Persistent
-  collapsible Tag Explorer sidebar on `lg+` (state/localStorage already in `Feed.tsx`).
-- **Depth & motion (`web/app/globals.css`):** elevation tokens tuned to read on the
-  dark near-black bg (lit top edge + accent-glow hover) and on light bg; base shadow
-  is a `shadow-[var(--shadow-card)]` utility so the `hover:` variant wins. Card
-  entrance stagger, `prefers-reduced-motion` guard.
+### Settings modal — full redesign (`web/components/SettingsModal.tsx`)
+- Rebuilt on theme tokens (fixes light-mode breakage). Branded header; grouped sections
+  (Appearance / Reminders / Capture / About) from reusable `Row`/`Toggle`/`Segmented`
+  primitives; scrollable body.
+- **New:** in-modal **theme switch** (Light/Auto/Dark via `useTheme`, applies instantly).
+  Frequency now shows a per-mode description. Capture section shows WhatsApp + iOS Shortcut.
 
-### YouTube overhaul
-- **Grounded native video analysis.** `functions/scraper.py` no longer scrapes
-  transcripts (YouTube blocks datacenter IPs and the old prompt fabricated
-  summaries). It now returns lightweight **oEmbed** metadata only (title, channel,
-  thumbnail) + URL normalization (`_extract_youtube_id`). `youtube-transcript-api`
-  removed from `requirements.txt`; `google-genai>=1.0`.
-- `functions/ai_service.py` → **`analyze_youtube(watch_url)`** uses Gemini native
-  video ingestion (`types.Part(file_data=FileData(file_uri=…))`, low media
-  resolution). Google watches the actual video server-side. The old hallucination
-  prompt is replaced by a grounded `VIDEO_ANALYSIS_PROMPT` (timestamped
-  `videoHighlights`, real `speakers`, observed `videoDurationMinutes`).
-- `functions/main.py` → `_analyze_scraped()` routes YouTube to native analysis with
-  an honest **metadata-only fallback** (private/over-quota); `_apply_youtube_metadata()`
-  stores `videoId`, `watchUrl`, `thumbnailUrl`, `youtubeChannel`, `durationDisplay`,
-  `videoHighlights`, `speakers`.
-- **Video cards:** `Card.tsx` shows a 16:9 thumbnail + play overlay + duration badge
-  and a **creator byline** (channel). `LinkDetailModal.tsx` embeds a
-  `youtube-nocookie` player with **clickable "Key moments"** timestamps and a
-  speakers row. `web/lib/types.ts` `LinkMetadata` carries the video fields.
-- **Video loading UX:** `web/components/VideoScanProgress.tsx` (mirrors
-  `ImageScanProgress`) — thumbnail + scan-line sweep + video-flavored phases, slow
-  progress creep tuned for the ~1-minute analysis. `AddLinkForm.tsx` detects YouTube
-  URLs (`youTubeId`) and drives it; reuses the dismiss-and-continue chip.
+### Header (`web/app/page.tsx`, `web/components/ThemeToggle.tsx`)
+- Gradient brain mark with glow, **gradient "Second Brain" wordmark**, accent hairline.
+- Theme toggle + Settings are now matching **circular** controls; theme toggle is icon-only
+  (still cycles light→system→dark). Header height 56/64 → 60/68px.
 
-### Ops
-- **`deploy-functions.sh`** (repo root): always deploys with
-  `--project secondbrain-app-94da2`, so a stray `firebase use` can't send a deploy
-  to the wrong project (it had been going to `travelistai-production`).
+### Tinder "Review" view (`web/components/SwipeDeck.tsx`, wired in `Feed.tsx`)
+- New `viewMode === 'review'`; switcher item with `Layers` icon.
+- Swipe right=Favorite, left=Archive, up=Remind (opens reminder modal), tap=Open. Buttons
+  mirror gestures. **Undo** (favorite/archive → unread). No delete on swipe by design.
+- Deck **snapshots links on mount** (no reshuffle mid-session). **Fits one viewport**: a
+  `useEffect` measures the deck's top and sizes height to the viewport (card stack flexes,
+  buttons pinned). Live drag hints, 3-deep stack, progress, "all caught up" state.
+
+### Source bylines (`web/lib/platform.tsx` + `Card.tsx`, `LinkDetailModal.tsx`, `SwipeDeck.tsx`)
+- `platform.tsx` gained: **`XLogo`** (real X mark; lucide only ships the bird),
+  `platformColor`, `platformActiveStyle` (per-platform filter tint),
+  `xHandle(url)` (X `@handle` from URL), `linkedinAuthor(url)` (slug → "Omri Zerachovitz"),
+  `linkedinDisplayName(url, sourceName)` (prefers real stored name), `prettyHost(url)` (safe).
+- Each card's top-right slot renders a **branded byline** instead of the muted chip:
+  YouTube=red channel, X=`@handle` (X grey `191,201,214`), LinkedIn=author (brand blue).
+  Detection is **URL-based** (reliable). Bylines forced `dir="ltr"` so they read correctly
+  on Hebrew/RTL cards. "None"/"Screenshot" source tags suppressed.
+
+### Toolbar (`web/components/Feed.tsx`, `web/components/Dropdown.tsx` [new])
+- Unified control sizing (h-9, 16px icons, cursor-pointer), labeled segmented **view switcher**
+  (Cards/Compact/Table/**Review**/Insights), distinct icons, `CheckSquare` for select-multiple.
+- **`Dropdown.tsx`**: accent-themed select replacement for Status + Sort (kills OS-blue menu).
+- Source-filter buttons tint to each platform's brand color when active.
+- **Selected tag chips** always render above the cards; only the **X** removes a chip.
+- **`TableView` crash fixed**: it did `new URL(link.url)` unguarded → any bad/empty URL blew
+  up the whole table. Now uses `prettyHost()`.
+
+### Detail modal highlights (`web/components/LinkDetailModal.tsx`)
+- Leads with the highlighted `summary` (same `**bold**` key terms as the card), then the
+  `detailedSummary` below. (The AI bolds `summary` but not `detailedSummary`, so the open
+  state previously looked flat.)
+
+### Backend — WhatsApp message + reminders + LinkedIn author (NOT deployed yet)
+- **`functions/whatsapp_handler.py` → `format_success_message` rebuilt**: title + one context
+  line + **📌 In one line** (from `summary`) + **🔑 Worth knowing** (bullets parsed from
+  `detailedSummary`; timestamped **Key moments** for video). Markdown `**bold**`→WhatsApp
+  `*bold*`. A **connections block is implemented but gated** behind
+  `INCLUDE_CONNECTIONS = False` (flip to enable once related-links quality is ready).
+- **Reminder quick-replies now map number→days** (`functions/reminder_service.py`
+  `handle_reminder_intent`): `1`=1d, `2`=2d, `3`=3d, `7`=7d, `S`=spaced repetition (carries on).
+  Numbered replies use a new **`"once"`** profile (fire once, don't recur) handled in
+  `run_reminder_check`; `S` uses `"spaced"`. `SPACED_START_DAYS = 3`. Menu + confirmation
+  text updated in `functions/main.py` (`whatsapp_webhook`) and the inline save-time path.
+- **LinkedIn author capture** (`functions/scraper.py`): `_scrape_linkedin_url` +
+  `_extract_linkedin_author` pull the real name from the `"<Author> on LinkedIn:"` og:title
+  and store it as `sourceName` (both `link_data` builds in `main.py` now do
+  `scraped.get("source_name") or analysis.get("sourceName")`). Frontend `linkedinDisplayName`
+  prefers it. **Only affects newly-saved LinkedIn posts**; existing cards fall back to the
+  URL-derived name.
 
 ---
 
 ## Deploy
 
 ### Frontend (automatic)
-Push to `main` → Vercel rebuilds `https://my-links-sable.vercel.app`. Nothing to do.
+Push to `main` → Vercel rebuilds. All this session's web changes are **live**.
 
-### Functions (manual — needs the user's local creds)
-The remote/agent container has no `GEMINI_API_KEY`/Firebase creds, so functions
-must be deployed from the user's machine:
+### Functions (manual — PENDING, and deploy ALL functions this time)
+The user's local `~/MyLinks` was found **stale** mid-session (still on the original commit), so
+an earlier `firebase deploy` shipped OLD code — that's why the new WhatsApp message "didn't
+change". Local was fast-forwarded, but **more functions changes landed after** (LinkedIn author),
+and the WhatsApp/reminder code still isn't live. Also note: the reminder changes live in the
+**`whatsapp_webhook`** and **`check_reminders`** functions, which are NOT in
+`deploy-functions.sh`'s default 3 targets — so deploy **everything**:
 ```bash
 cd ~/MyLinks
-git checkout main && git pull origin main
-firebase use secondbrain-app-94da2     # once, clears any stale active-project override
-./deploy-functions.sh                  # deploys analyze_link, analyze_image, process_link_background
+git checkout main && git pull origin main      # get 5a95c87 (LinkedIn) + 9a18563 (settings)
+firebase use secondbrain-app-94da2
+firebase deploy --only functions --project secondbrain-app-94da2   # ALL functions
+# (./deploy-functions.sh only does analyze_link/analyze_image/process_link_background)
 ```
-The YouTube backend changes are deployed (user confirmed working). Re-run after any
-`functions/` change.
+After this: new WhatsApp message format, day-based reminders, and LinkedIn author capture go live.
 
 ---
 
-## Verification notes
-- `cd web && npx tsc --noEmit` is the source of truth for the frontend (must be clean).
-- `npx eslint <files>`: the repo has **pre-existing** `@typescript-eslint/no-explicit-any`
-  errors (`getTimeAgo` in Card/Modal, `catch (err: any)` in Feed) and `<img>`
-  `no-img-element` warnings — these are NOT ours; just don't add new ones.
-- `VERCEL=1 npm run build` **fails in the sandbox** only on
-  "Failed to fetch Geist from Google Fonts" (proxy blocks Google Fonts). This is
-  environmental; Vercel builds fonts fine. Treat any *other* build error as real.
-- Functions: `cd functions && python -m py_compile *.py`.
+## Verification
+- Frontend source of truth: `cd web && npx tsc --noEmit` (kept clean every commit this session).
+- `npm run build` compiles clean; the only failure is the prerender step needing Firebase env
+  locally (environmental — Vercel has the env). Treat other build errors as real.
+- Functions: `cd functions && python -m py_compile *.py`. Logic spot-checked by importing the
+  pure helpers with heavy deps stubbed (message render + day-mapping verified this way).
 
 ---
 
 ## Open items / suggested next steps
-- **Source-filter icons** in the controls row are subtle/easy to miss — consider
-  making them more prominent or labelled.
-- **"Untitled (Analysis Failed)" cards**: failed analyses still save a junk-looking
-  card; consider a distinct failed-state treatment or a retry affordance.
-- **Extend platform treatment** to compact cards / detail modal for full consistency
-  (currently the platform icon is on the main grid Card + filter).
-- **Masonry order on resize/filter:** changing column count or filters redistributes
-  cards (they re-animate). Fine, but note it if tuning.
-- Twitter/X & Instagram analysis still go through the generic web scraper in
-  `scraper.py` (bridge APIs) — quality is lower than YouTube's native path; a future
-  pass could improve these.
+- **Deploy the functions** (above) — highest priority; backend UX changes are written but dark.
+- **Enable WhatsApp "connections"** block: flip `INCLUDE_CONNECTIONS = True` in
+  `whatsapp_handler.py` once related-links quality is trusted (data already on `relatedLinks`).
+- **LinkedIn backfill:** existing LinkedIn cards still show the URL-derived name ("Markmanson");
+  a one-off re-scrape backfill would populate real names. Vanity slugs with no separators can't
+  be split from the URL alone (hence the backend og:title capture).
+- **Swipe-up = reminder** opens the reminder modal mid-deck; consider an instant default
+  (e.g. spaced) for a smoother flow.
+- **Settings features** offered but not built: library stats (links saved / top categories),
+  data export (JSON), show connected WhatsApp number.
+- **`sourceName: "None"`** still produced by the backend for some web pages (frontend now hides
+  it); could fix at the source (AI prompt / `analyze`).
+- Older open items still stand: "Untitled (Analysis Failed)" cards need a distinct failed state;
+  X/Instagram analysis still uses the generic scraper (lower quality than YouTube's native path).
 
 ## Out of scope (per user, earlier rounds)
-Auth/multi-user isolation (T1/T4), connectors/sync, export/highlights — not touched.
+Auth/multi-user isolation, connectors/sync beyond the iOS Shortcut, export/highlights.
