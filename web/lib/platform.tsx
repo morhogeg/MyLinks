@@ -137,6 +137,19 @@ export function linkedinAuthor(url?: string): string | null {
     }
 }
 
+/**
+ * Best display name for a LinkedIn source: the stored author name when the
+ * backend captured a real one, otherwise the name recovered from the URL slug.
+ */
+export function linkedinDisplayName(url?: string, sourceName?: string | null): string | null {
+    if (sourceName) {
+        const s = sourceName.trim();
+        const lower = s.toLowerCase();
+        if (s && lower !== 'linkedin' && lower !== 'none' && lower !== 'screenshot') return s;
+    }
+    return linkedinAuthor(url);
+}
+
 /** Inline style for an *active* platform filter chip, tinted in its brand color. */
 export function platformActiveStyle(key: PlatformKey): {
     backgroundColor: string;

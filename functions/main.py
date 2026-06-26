@@ -269,7 +269,7 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             "embedding_vector": embedding,
             "relatedLinks": related_links,
             "sourceType": "youtube" if is_youtube else "web",
-            "sourceName": analysis.get("sourceName"),
+            "sourceName": scraped.get("source_name") or analysis.get("sourceName"),
             "confidence": 0.8,
             "keyEntities": []
         }
@@ -774,7 +774,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             "embedding_vector": Vector(embedding),
             "relatedLinks": related_links,
             "category": analysis.get("category", "General"),
-            "sourceName": analysis.get("sourceName") or ("Screenshot" if is_image else None),
+            "sourceName": scraped.get("source_name") or analysis.get("sourceName") or ("Screenshot" if is_image else None),
             "sourceType": "youtube" if is_youtube else ("image" if is_image else "web"),
             "language": analysis.get("language", "en"),
             "status": LinkStatus.UNREAD.value,

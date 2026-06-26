@@ -5,7 +5,7 @@
 import { Link, LinkStatus } from '@/lib/types';
 import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Play, Youtube, ExternalLink } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { getPlatform, platformIcon, platformColor, xHandle, linkedinAuthor } from '@/lib/platform';
+import { getPlatform, platformIcon, platformColor, xHandle, linkedinDisplayName } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
@@ -67,7 +67,7 @@ export default function Card({
     // can credit them in the same byline style as YouTube — handle in the X
     // brand color from the source filter.
     const xAuthor = platform === 'x' ? xHandle(link.url) : null;
-    const linkedinName = platform === 'linkedin' ? linkedinAuthor(link.url) : null;
+    const linkedinName = platform === 'linkedin' ? linkedinDisplayName(link.url, link.sourceName) : null;
 
     useEffect(() => {
         const initialTimer = setTimeout(() => setNow(Date.now()), 0);

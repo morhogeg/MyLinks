@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { getPlatform, platformIcon, platformColor, xHandle, linkedinAuthor } from '@/lib/platform';
+import { getPlatform, platformIcon, platformColor, xHandle, linkedinDisplayName } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import { hasHebrew } from '@/lib/rtl';
 import { Star, Archive, Bell, RotateCcw, Youtube, Sparkles } from 'lucide-react';
@@ -260,7 +260,7 @@ function CardFace({ link }: { link: Link }) {
     const isYouTube = platform === 'youtube' || link.sourceType === 'youtube';
     const youtubeChannel = link.metadata?.youtubeChannel || link.sourceName;
     const xAuthor = platform === 'x' ? xHandle(link.url) : null;
-    const linkedinName = platform === 'linkedin' ? linkedinAuthor(link.url) : null;
+    const linkedinName = platform === 'linkedin' ? linkedinDisplayName(link.url, link.sourceName) : null;
 
     return (
         <div className="h-full w-full surface-card bg-card rounded-2xl border border-border-subtle shadow-[var(--shadow-card)] p-5 sm:p-6 flex flex-col overflow-hidden">

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
 import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube } from 'lucide-react';
-import { getPlatform, platformIcon, platformColor, xHandle, linkedinAuthor } from '@/lib/platform';
+import { getPlatform, platformIcon, platformColor, xHandle, linkedinDisplayName } from '@/lib/platform';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -115,7 +115,7 @@ export default function LinkDetailModal({
     const isYouTube = platform === 'youtube' || link.sourceType === 'youtube';
     const youtubeChannel = link.metadata?.youtubeChannel || link.sourceName;
     const xAuthor = platform === 'x' ? xHandle(link.url) : null;
-    const linkedinName = platform === 'linkedin' ? linkedinAuthor(link.url) : null;
+    const linkedinName = platform === 'linkedin' ? linkedinDisplayName(link.url, link.sourceName) : null;
 
     const getTimeAgo = (timestamp: any, now: number): string => {
         if (!timestamp || !now) return '...';

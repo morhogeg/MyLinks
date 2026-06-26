@@ -33,6 +33,10 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         if 'youtube.com' in url or 'youtu.be' in url:
             return _scrape_youtube_url(url, message_body=message_body)
 
+        # Special handling for LinkedIn URLs (capture the post author's name)
+        if 'linkedin.com' in url:
+            return _scrape_linkedin_url(url)
+
         # General URL scraping with BeautifulSoup
         headers = {
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
@@ -70,6 +74,71 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
 
     except Exception as e:
         logger.error(f"Scrape error for {url}: {e}")
+        return {"html": "", "title": "", "text": ""}
+
+
+def _extract_linkedin_author(html: str) -> Optional[str]:
+    """Pull the post author's display name from LinkedIn meta tags.
+
+    LinkedIn post previews title as "<Author> on LinkedIn: …", which gives us
+    the real name (e.g. "Mark Manson") that the URL slug can't always recover.
+    """
+    import html as html_lib
+
+    candidates = []
+    for prop in ('og:title', 'twitter:title'):
+        m = re.search(
+            r'<meta[^>]+(?:property|name)=["\']' + prop + r'["\'][^>]+content=["\']([^"\']*)',
+            html, re.I,
+        )
+        if m:
+            candidates.append(m.group(1))
+    tm = re.search(r'<title[^>]*>([^<]+)</title>', html, re.I)
+    if tm:
+        candidates.append(tm.group(1))
+
+    for c in candidates:
+        c = html_lib.unescape(c).strip()
+        m = re.match(r'^(.{2,60}?)\s+on LinkedIn\b', c, re.I)
+        if m:
+            author = m.group(1).strip(' :-|')
+            if author and author.lower() != 'linkedin':
+                return author
+    return None
+
+
+def _scrape_linkedin_url(url: str) -> dict:
+    """Scrape a LinkedIn URL and capture the author's display name."""
+    logger.info(f"Analyzing LinkedIn URL: {url}")
+    headers = {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
+    }
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        html = response.text
+
+        from bs4 import BeautifulSoup
+        import html as html_lib
+        soup = BeautifulSoup(html, 'html.parser')
+
+        title = soup.title.string.strip() if soup.title and soup.title.string else ""
+
+        text_parts = []
+        og_desc = re.search(r'<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']*)', html, re.I)
+        if og_desc:
+            text_parts.append(html_lib.unescape(og_desc.group(1)))
+        for p in soup.find_all('p'):
+            text_parts.append(p.get_text().strip())
+        text = " ".join([t for t in text_parts if t])[:5000]
+
+        return {
+            "html": html,
+            "title": title,
+            "text": text or html[:5000],
+            "source_name": _extract_linkedin_author(html),
+        }
+    except Exception as e:
+        logger.error(f"LinkedIn scrape error for {url}: {e}")
         return {"html": "", "title": "", "text": ""}
 
 
