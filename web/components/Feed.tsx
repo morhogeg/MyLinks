@@ -23,7 +23,7 @@ import SwipeDeck from './SwipeDeck';
 import InsightsFeed from './InsightsFeed';
 import LinkDetailModal from './LinkDetailModal';
 import ConfirmDialog from './ConfirmDialog';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, Image as ImageIcon } from 'lucide-react';
 import TagExplorer from './TagExplorer';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -62,6 +62,7 @@ function FeedContent() {
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
     const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
     const [selectedPlatforms, setSelectedPlatforms] = useState<Set<PlatformKey>>(new Set());
+    const [screenshotOnly, setScreenshotOnly] = useState(false);
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isTagExplorerCollapsed, setIsTagExplorerCollapsed] = useState(false);
     const [reminderModalLink, setReminderModalLink] = useState<Link | null>(null);
@@ -220,10 +221,12 @@ function FeedContent() {
             });
         })
         .filter((link) => {
-            // Apply source/platform filters
-            if (selectedPlatforms.size === 0) return true;
+            // Apply source filters (platforms + screenshots), OR across selections
+            if (selectedPlatforms.size === 0 && !screenshotOnly) return true;
             const platform = getPlatform(link.url);
-            return platform != null && selectedPlatforms.has(platform);
+            const matchesPlatform = platform != null && selectedPlatforms.has(platform);
+            const matchesScreenshot = screenshotOnly && link.sourceType === 'image';
+            return matchesPlatform || matchesScreenshot;
         })
         .filter((link) => {
             // Apply search (Hybrid: keyword OR semantic result)
@@ -305,6 +308,7 @@ function FeedContent() {
         return acc;
     }, {} as Record<PlatformKey, number>);
     const availablePlatforms = (Object.keys(PLATFORM_LABELS) as PlatformKey[]).filter(p => platformCounts[p]);
+    const screenshotCount = links.filter(l => l.sourceType === 'image').length;
 
     const handleTogglePlatform = (p: PlatformKey) => {
         const next = new Set(selectedPlatforms);
@@ -637,8 +641,8 @@ function FeedContent() {
                             )}
                         </button>
 
-                        {/* Source / platform filter — toggle icons for platforms present in the library */}
-                        {availablePlatforms.length > 0 && (
+                        {/* Source filter — toggle icons for platforms + screenshots present in the library */}
+                        {(availablePlatforms.length > 0 || screenshotCount > 0) && (
                             <div className="flex items-center gap-1 ps-2 border-s border-border-subtle">
                                 {availablePlatforms.map(p => {
                                     const active = selectedPlatforms.has(p);
@@ -656,6 +660,17 @@ function FeedContent() {
                                         </button>
                                     );
                                 })}
+                                {screenshotCount > 0 && (
+                                    <button
+                                        onClick={() => setScreenshotOnly(v => !v)}
+                                        title={`Screenshots (${screenshotCount})`}
+                                        aria-label="Filter by screenshots"
+                                        aria-pressed={screenshotOnly}
+                                        className={`${ctrlBase} w-9 px-0 border ${screenshotOnly ? 'bg-accent text-white border-accent shadow-sm' : ctrlIdle}`}
+                                    >
+                                        <ImageIcon className="w-4 h-4" />
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>
@@ -882,11 +897,12 @@ function FeedContent() {
                                                         selectedTags.size > 0 ? 'Try clearing some tag filters' :
                                                             'Add your first link using the + button below'}
                             </p>
-                            {(selectedTags.size > 0 || selectedPlatforms.size > 0 || searchQuery) && (
+                            {(selectedTags.size > 0 || selectedPlatforms.size > 0 || screenshotOnly || searchQuery) && (
                                 <button
                                     onClick={() => {
                                         setSelectedTags(new Set());
                                         setSelectedPlatforms(new Set());
+                                        setScreenshotOnly(false);
                                         setSearchQuery('');
                                     }}
                                     className="mt-4 px-4 py-2 bg-accent text-white rounded-xl text-sm font-bold hover:bg-accent-hover transition-all"

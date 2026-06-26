@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube } from 'lucide-react';
+import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube, ImageOff } from 'lucide-react';
 import { getPlatform, platformIcon, platformColor, xHandle, linkedinDisplayName } from '@/lib/platform';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
@@ -65,6 +65,9 @@ export default function LinkDetailModal({
     const [isAddingTag, setIsAddingTag] = useState(false);
     // Timestamp (seconds) to seek the embedded video player to; null = start.
     const [videoStart, setVideoStart] = useState<number | null>(null);
+    const [imgFailed, setImgFailed] = useState(false);
+    useEffect(() => { setImgFailed(false); }, [link.id]);
+    const hasValidImage = !!link.url && /^https?:\/\//.test(link.url);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
@@ -212,14 +215,17 @@ export default function LinkDetailModal({
                     </div>
 
                     <div className="flex gap-1.5 sm:gap-2">
-                        <a
-                            href={link.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:text-accent transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
-                        >
-                            <ExternalLink className="w-4 h-4" />
-                        </a>
+                        {!!link.url && /^https?:\/\//.test(link.url) && (
+                            <a
+                                href={link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={link.sourceType === 'image' ? 'View original image' : 'Open source'}
+                                className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:text-accent transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                            >
+                                <ExternalLink className="w-4 h-4" />
+                            </a>
+                        )}
                         <button
                             onClick={onClose}
                             className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:text-accent transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
@@ -233,21 +239,32 @@ export default function LinkDetailModal({
                     className="flex-1 overflow-y-auto pt-4 px-4 pb-4 sm:px-6 sm:pb-6 md:px-8 md:pb-8 scrollbar-thin scrollbar-thumb-white/10"
                     dir="auto"
                 >
-                    {/* Content Section */}
+                    {/* Content Section — screenshot/image source */}
                     {link.sourceType === 'image' && (
-                        <div className="mb-6 rounded-2xl overflow-hidden border border-white/10 bg-white/5 group/img relative">
-                            <img
-                                src={link.url}
-                                alt="Source Screenshot"
-                                className="w-full h-auto max-h-[400px] object-contain cursor-zoom-in transition-transform duration-500 group-hover/img:scale-105"
-                                onClick={() => window.open(link.url, '_blank')}
-                            />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                                <span className="text-white text-xs font-bold px-3 py-1.5 bg-black/60 rounded-full backdrop-blur-md border border-white/20">
-                                    Click to View Original
-                                </span>
+                        hasValidImage && !imgFailed ? (
+                            <div className="mb-6 rounded-2xl overflow-hidden border border-border-subtle bg-card-hover group/img relative">
+                                <img
+                                    src={link.url}
+                                    alt="Source screenshot"
+                                    onError={() => setImgFailed(true)}
+                                    className="w-full h-auto max-h-[400px] object-contain cursor-zoom-in transition-transform duration-500 group-hover/img:scale-105"
+                                    onClick={() => window.open(link.url, '_blank')}
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                    <span className="text-white text-xs font-bold px-3 py-1.5 bg-black/60 rounded-full backdrop-blur-md border border-white/20">
+                                        Click to View Original
+                                    </span>
+                                </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="mb-6 rounded-2xl border border-dashed border-border-subtle bg-card-hover/50 px-4 py-8 flex flex-col items-center justify-center gap-2 text-center">
+                                <ImageOff className="w-7 h-7 text-text-muted/60" />
+                                <p className="text-sm font-semibold text-text-secondary">Screenshot unavailable</p>
+                                <p className="text-xs text-text-muted max-w-xs">
+                                    The original image isn&apos;t stored for this item. The summary below is still available.
+                                </p>
+                            </div>
+                        )
                     )}
 
                     {/* YouTube: embedded player + clickable key moments + speakers */}

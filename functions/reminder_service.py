@@ -21,6 +21,17 @@ APP_URL = os.environ.get("APP_URL", "https://secondbrain-app-94da2.web.app")
 SPACED_START_DAYS = 3
 
 
+def format_local_time(dt: datetime, tz_name: Optional[str], is_he: bool = False) -> str:
+    """Format a UTC datetime in the user's local timezone (falls back to UTC)."""
+    try:
+        if tz_name:
+            from zoneinfo import ZoneInfo
+            dt = dt.astimezone(ZoneInfo(tz_name))
+    except Exception as e:
+        logger.warning(f"Bad timezone {tz_name!r}: {e}")
+    return dt.strftime('%d/%m %H:%M') if is_he else dt.strftime('%b %d at %I:%M %p')
+
+
 def handle_reminder_intent(text: str) -> Optional[datetime]:
     """Parse text for reminder commands (English and Hebrew)."""
     text = re.sub(r'https?://[^\s]+', '', text).lower().strip()

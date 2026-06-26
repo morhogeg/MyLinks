@@ -34,7 +34,7 @@ from link_service import (
     ensure_ingest_token, find_user_by_ingest_token, link_exists_for_url,
     pending_exists_for_url,
 )
-from reminder_service import handle_reminder_intent, set_reminder, calculate_next_reminder, run_reminder_check
+from reminder_service import handle_reminder_intent, set_reminder, calculate_next_reminder, run_reminder_check, format_local_time
 from graph_service import GraphService
 # NOTE: `scraper` (pulls youtube_transcript_api) and `whatsapp_handler` (pulls
 # the Twilio SDK) are imported lazily inside the functions that use them. Both
@@ -585,14 +585,17 @@ def whatsapp_webhook(request):
                     title = link_data.get('title', 'Unknown Link')
                     category = link_data.get('category', 'General')
 
-                    date_str = reminder_time.strftime('%d/%m %H:%M') if user_msg_is_hebrew else reminder_time.strftime('%b %d at %I:%M %p')
+                    user_tz = user_doc.to_dict().get('timezone')
+                    date_str = format_local_time(reminder_time, user_tz, user_msg_is_hebrew)
 
                     if user_msg_is_hebrew:
                         extra = "\n🔁 חזרה מרווחת — אזכיר שוב בהמשך" if is_spaced else ""
-                        msg = f"⏰ *התזכורת נקבעה*\n\n📄 *{title}*\n📂 {category}\n📅 {date_str}{extra}"
+                        change = "\n\n_טעית במספר? השב/י מספר אחר (1/2/3/7) או S לעדכון._"
+                        msg = f"⏰ *התזכורת נקבעה*\n\n📄 *{title}*\n📂 {category}\n📅 {date_str}{extra}{change}"
                     else:
                         extra = "\n🔁 Spaced repetition — I'll keep nudging you" if is_spaced else ""
-                        msg = f"⏰ *Reminder Set*\n\n📄 *{title}*\n📂 {category}\n📅 {date_str}{extra}"
+                        change = "\n\n_Wrong number? Reply a different one (1/2/3/7) or S to change it._"
+                        msg = f"⏰ *Reminder Set*\n\n📄 *{title}*\n📂 {category}\n📅 {date_str}{extra}{change}"
 
                     send_whatsapp_message(payload.from_number, msg)
                     return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
@@ -804,7 +807,13 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # Notify via WhatsApp only when the item came from WhatsApp.
         # Share-sheet / connector items have no phone number and must not trigger a reply.
         if from_number:
-            msg = format_success_message(link_data, reminder_time, language=analysis.get("language", "en"), link_id=link_id)
+            user_tz = None
+            try:
+                _udoc = db.collection('users').document(uid).get()
+                user_tz = _udoc.to_dict().get('timezone') if _udoc.exists else None
+            except Exception:
+                pass
+            msg = format_success_message(link_data, reminder_time, language=analysis.get("language", "en"), link_id=link_id, tz=user_tz)
             logger.info(f"Processing complete, sending message to {from_number}")
             send_whatsapp_message(from_number, msg)
         else:

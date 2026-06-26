@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { collection, query, getDocs, limit } from 'firebase/firestore';
+import { collection, query, getDocs, limit, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 interface AuthContextType {
@@ -38,7 +38,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 const q = query(usersRef, limit(1));
                 const snapshot = await getDocs(q);
                 if (!snapshot.empty) {
-                    setUid(snapshot.docs[0].id);
+                    const userDoc = snapshot.docs[0];
+                    setUid(userDoc.id);
+                    // Persist the browser timezone so the WhatsApp bot can show
+                    // reminder times in the user's local time (best-effort).
+                    try {
+                        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                        if (tz && userDoc.data().timezone !== tz) {
+                            updateDoc(doc(db, 'users', userDoc.id), { timezone: tz }).catch(() => {});
+                        }
+                    } catch {
+                        // Intl not available — skip.
+                    }
                 } else {
                     console.warn('No user document found in Firestore');
                 }

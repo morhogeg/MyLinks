@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from twilio.rest import Client
 
 from link_service import is_hebrew
+from reminder_service import format_local_time
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,8 @@ def format_success_message(
     link_data: dict,
     reminder_time: Optional[datetime] = None,
     language: str = "en",
-    link_id: Optional[str] = None
+    link_id: Optional[str] = None,
+    tz: Optional[str] = None
 ) -> str:
     """
     Format a rich success message using the final link data structure.
@@ -163,7 +165,7 @@ def format_success_message(
     # Reminder — quick-reply menu (N = days, S = spaced repetition).
     lines.append("")
     if reminder_time:
-        date_str = reminder_time.strftime('%d/%m %H:%M') if is_he else reminder_time.strftime('%b %d at %I:%M %p')
+        date_str = format_local_time(reminder_time, tz, is_he)
         lbl_set = "⏰ *התזכורת נקבעה:*" if is_he else "⏰ *Reminder set:*"
         lines.append(f"{lbl_set} {date_str}")
     elif is_he:
