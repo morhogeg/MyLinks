@@ -376,7 +376,7 @@ function FeedContent() {
         if (!uid) return;
         try {
             await deleteLink(uid, id);
-            toast.success('Link deleted');
+            // No success toast on delete — the card disappearing is feedback enough.
         } catch {
             toast.error("Couldn't delete the link. Please try again.");
         }

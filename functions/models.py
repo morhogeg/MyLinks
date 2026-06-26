@@ -131,7 +131,10 @@ class UserSettings(BaseModel):
     #   "favorites"  – revisit starred cards
     #   "rediscover" – "on this day": older saves you haven't opened recently
     digest_mode: str = "smart"
-    # Category or tag to focus on when digest_mode == "topic".
+    # Categories/tags to focus on when digest_mode == "topic". `digest_topics`
+    # (plural) supports picking several; `digest_topic` (singular) is kept for
+    # backward compatibility and treated as a single-item list.
+    digest_topics: List[str] = Field(default_factory=list)
     digest_topic: Optional[str] = None
     # How many cards per digest.
     digest_count: int = 5

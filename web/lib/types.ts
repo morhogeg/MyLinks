@@ -107,7 +107,8 @@ export interface User {
     digest_frequency: DigestFrequency;
     digest_channels: DigestChannel[];
     digest_mode: DigestMode;
-    digest_topic?: string | null;
+    digest_topics: string[];
+    digest_topic?: string | null; // legacy single-topic (kept for back-compat)
     digest_count: number;
     digest_hour: number; // 0-23, local time
     digest_day: number;  // 0=Mon … 6=Sun (weekly)

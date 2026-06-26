@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { User, DigestMode, DigestChannel } from '@/lib/types';
-import { X, Bell, Sparkles, Share2, Copy, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, ShieldCheck, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper } from 'lucide-react';
+import { X, Bell, Sparkles, Share2, Copy, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, ShieldCheck, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '@/lib/firebase';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
@@ -52,6 +52,7 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
         digest_frequency: 'weekly',
         digest_channels: ['whatsapp'],
         digest_mode: 'smart',
+        digest_topics: [],
         digest_topic: null,
         digest_count: 5,
         digest_hour: 9,
@@ -60,6 +61,8 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
     });
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    // 'main' = the settings list; 'digest' = the curation sub-screen.
+    const [view, setView] = useState<'main' | 'digest'>('main');
 
     const [email, setEmail] = useState('');
     const [topics, setTopics] = useState<string[]>([]);
@@ -72,6 +75,7 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
 
     useEffect(() => {
         if (isOpen && uid) {
+            setView('main');
             loadSettings();
             loadShareConfig();
             loadDigestExtras();
@@ -134,6 +138,9 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                     digest_frequency: userSettings.digest_frequency || 'weekly',
                     digest_channels: userSettings.digest_channels?.length ? userSettings.digest_channels : ['whatsapp'],
                     digest_mode: userSettings.digest_mode || 'smart',
+                    digest_topics: userSettings.digest_topics?.length
+                        ? userSettings.digest_topics
+                        : (userSettings.digest_topic ? [userSettings.digest_topic] : []),
                     digest_topic: userSettings.digest_topic ?? null,
                     digest_count: userSettings.digest_count ?? 5,
                     digest_hour: userSettings.digest_hour ?? 9,
@@ -158,7 +165,7 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                 digest_frequency: settings.digest_frequency,
                 digest_channels: settings.digest_channels,
                 digest_mode: settings.digest_mode,
-                digest_topic: settings.digest_topic ?? null,
+                digest_topics: settings.digest_topics,
                 digest_count: settings.digest_count,
                 digest_hour: settings.digest_hour,
                 digest_day: settings.digest_day,
@@ -185,6 +192,28 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
         });
     };
 
+    const toggleTopic = (topic: string) => {
+        setSettings((p) => {
+            const has = p.digest_topics.includes(topic);
+            const next = has
+                ? p.digest_topics.filter((t) => t !== topic)
+                : [...p.digest_topics, topic];
+            return { ...p, digest_topics: next };
+        });
+    };
+
+    // One-line summary of the current digest config (shown on the main screen).
+    const digestSummary = (() => {
+        const mode = DIGEST_MODES.find((m) => m.value === settings.digest_mode)?.label ?? 'Smart mix';
+        const when = settings.digest_frequency === 'weekly'
+            ? `${DAYS[settings.digest_day]} ${HOUR_OPTIONS[settings.digest_hour].label}`
+            : `Daily ${HOUR_OPTIONS[settings.digest_hour].label}`;
+        const where = settings.digest_channels
+            .map((c) => (c === 'whatsapp' ? 'WhatsApp' : 'Email'))
+            .join(' & ') || 'no channel';
+        return `${mode} · ${settings.digest_count} cards · ${when} · ${where}`;
+    })();
+
     const handleSendNow = async () => {
         setSendingNow(true);
         setSendResult(null);
@@ -192,7 +221,7 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
             // Persist first so the preview reflects exactly what's configured.
             await updateUserSettings(uid, {
                 digest_mode: settings.digest_mode,
-                digest_topic: settings.digest_topic ?? null,
+                digest_topics: settings.digest_topics,
                 digest_count: settings.digest_count,
                 digest_channels: settings.digest_channels,
                 digest_frequency: settings.digest_frequency,
@@ -236,12 +265,22 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                 <div className="relative flex items-center justify-between px-6 py-5 border-b border-border-subtle">
                     <div className="absolute inset-x-0 bottom-0 h-px bg-[image:var(--accent-gradient)] opacity-30" />
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-purple-500/25 ring-1 ring-white/15">
-                            <BrainCircuit className="w-5 h-5 text-white" />
-                        </div>
+                        {view === 'digest' ? (
+                            <button
+                                onClick={() => setView('main')}
+                                className="w-9 h-9 rounded-2xl bg-card-hover border border-border-subtle flex items-center justify-center text-text-secondary hover:text-text transition-colors cursor-pointer"
+                                aria-label="Back to settings"
+                            >
+                                <ChevronLeft className="w-5 h-5" />
+                            </button>
+                        ) : (
+                            <div className="w-9 h-9 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-purple-500/25 ring-1 ring-white/15">
+                                <BrainCircuit className="w-5 h-5 text-white" />
+                            </div>
+                        )}
                         <div className="leading-tight">
-                            <h2 className="text-lg font-bold text-text">Settings</h2>
-                            <p className="text-[11px] text-text-muted">Tune your Second Brain</p>
+                            <h2 className="text-lg font-bold text-text">{view === 'digest' ? 'Curated digest' : 'Settings'}</h2>
+                            <p className="text-[11px] text-text-muted">{view === 'digest' ? 'Choose what, when & where' : 'Tune your Second Brain'}</p>
                         </div>
                     </div>
                     <button
@@ -255,16 +294,19 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
 
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto px-6 py-5 space-y-7">
+                  {view === 'main' && (
+                    <>
                     {/* Appearance */}
                     <Section icon={<Palette className="w-4 h-4" />} title="Appearance">
                         <Row title="Theme" subtitle="Applies instantly across the app">
                             <Segmented
                                 value={theme}
                                 onChange={(v) => setTheme(v as typeof theme)}
+                                iconOnly
                                 options={[
-                                    { value: 'light', label: 'Light', icon: <Sun className="w-4 h-4" /> },
-                                    { value: 'system', label: 'Auto', icon: <Monitor className="w-4 h-4" /> },
-                                    { value: 'dark', label: 'Dark', icon: <Moon className="w-4 h-4" /> },
+                                    { value: 'light', label: 'Light', icon: <Sun className="w-[18px] h-[18px]" /> },
+                                    { value: 'system', label: 'Auto', icon: <Monitor className="w-[18px] h-[18px]" /> },
+                                    { value: 'dark', label: 'Dark', icon: <Moon className="w-[18px] h-[18px]" /> },
                                 ]}
                             />
                         </Row>
@@ -316,150 +358,16 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                         </Row>
 
                         {settings.digest_enabled && (
-                            <div className="space-y-5 animate-in fade-in slide-in-from-top-1 duration-200">
-                                {/* What to curate */}
-                                <div className="space-y-2">
-                                    <div className="text-[12px] font-semibold text-text-secondary">What to send</div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {DIGEST_MODES.map((m) => {
-                                            const active = settings.digest_mode === m.value;
-                                            return (
-                                                <button
-                                                    key={m.value}
-                                                    onClick={() => setSettings((p) => ({ ...p, digest_mode: m.value }))}
-                                                    className={`flex items-center gap-2 px-3 h-11 rounded-xl border text-[13px] font-semibold transition-colors cursor-pointer ${active ? 'bg-accent/10 border-accent/40 text-accent' : 'bg-card-hover border-border-subtle text-text-secondary hover:text-text hover:border-text-muted/40'}`}
-                                                >
-                                                    {m.icon}
-                                                    {m.label}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                    <div className="flex gap-2 p-3 rounded-xl bg-accent/5 border border-accent/10">
-                                        <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-                                        <p className="text-[12px] text-text-secondary leading-relaxed">
-                                            {DIGEST_MODES.find((m) => m.value === settings.digest_mode)?.note}
-                                        </p>
-                                    </div>
+                            <button
+                                onClick={() => setView('digest')}
+                                className="w-full flex items-center justify-between gap-3 p-3 rounded-xl bg-card-hover border border-border-subtle hover:border-accent/40 transition-colors cursor-pointer text-left animate-in fade-in slide-in-from-top-1 duration-200"
+                            >
+                                <div className="min-w-0">
+                                    <div className="text-[13px] font-semibold text-text">Customize digest</div>
+                                    <div className="text-[12px] text-text-muted truncate mt-0.5">{digestSummary}</div>
                                 </div>
-
-                                {/* Topic picker */}
-                                {settings.digest_mode === 'topic' && (
-                                    <Row title="Topic" subtitle={topics.length ? 'Category or tag to focus on' : 'Save some links first to build topics'}>
-                                        {topics.length > 0 && (
-                                            <Dropdown
-                                                ariaLabel="Digest topic"
-                                                align="right"
-                                                value={settings.digest_topic || topics[0]}
-                                                onChange={(v) => setSettings((p) => ({ ...p, digest_topic: v }))}
-                                                options={topics.map((t) => ({ value: t, label: t }))}
-                                            />
-                                        )}
-                                    </Row>
-                                )}
-
-                                {/* How many */}
-                                <Row title="How many" subtitle="Cards per digest">
-                                    <Dropdown
-                                        ariaLabel="Cards per digest"
-                                        align="right"
-                                        value={String(settings.digest_count)}
-                                        onChange={(v) => setSettings((p) => ({ ...p, digest_count: Number(v) }))}
-                                        options={COUNT_OPTIONS}
-                                    />
-                                </Row>
-
-                                {/* Frequency */}
-                                <div className="space-y-2">
-                                    <div className="text-[12px] font-semibold text-text-secondary">How often</div>
-                                    <Segmented
-                                        value={settings.digest_frequency}
-                                        onChange={(v) => setSettings((p) => ({ ...p, digest_frequency: v as 'daily' | 'weekly' }))}
-                                        options={[
-                                            { value: 'daily', label: 'Daily' },
-                                            { value: 'weekly', label: 'Weekly' },
-                                        ]}
-                                    />
-                                </div>
-
-                                {/* When */}
-                                <Row title="Delivery time" subtitle={settings.digest_frequency === 'weekly' ? 'Day & hour (your local time)' : 'Hour (your local time)'}>
-                                    <div className="flex items-center gap-2">
-                                        {settings.digest_frequency === 'weekly' && (
-                                            <Dropdown
-                                                ariaLabel="Digest day"
-                                                align="right"
-                                                value={String(settings.digest_day)}
-                                                onChange={(v) => setSettings((p) => ({ ...p, digest_day: Number(v) }))}
-                                                options={DAYS.map((d, i) => ({ value: String(i), label: d }))}
-                                            />
-                                        )}
-                                        <Dropdown
-                                            ariaLabel="Digest hour"
-                                            align="right"
-                                            value={String(settings.digest_hour)}
-                                            onChange={(v) => setSettings((p) => ({ ...p, digest_hour: Number(v) }))}
-                                            options={HOUR_OPTIONS}
-                                        />
-                                    </div>
-                                </Row>
-
-                                {/* Channels */}
-                                <div className="space-y-2">
-                                    <div className="text-[12px] font-semibold text-text-secondary">Where to send it</div>
-                                    <div className="flex gap-2">
-                                        <ChannelChip
-                                            active={settings.digest_channels.includes('whatsapp')}
-                                            onClick={() => toggleChannel('whatsapp')}
-                                            icon={<MessageCircle className="w-4 h-4" />}
-                                            label="WhatsApp"
-                                        />
-                                        <ChannelChip
-                                            active={settings.digest_channels.includes('email')}
-                                            onClick={() => toggleChannel('email')}
-                                            icon={<Mail className="w-4 h-4" />}
-                                            label="Email"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Email address */}
-                                {settings.digest_channels.includes('email') && (
-                                    <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                                        <label className="text-[12px] font-semibold text-text-secondary">Email address</label>
-                                        <input
-                                            type="email"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            placeholder="you@example.com"
-                                            className="w-full h-10 px-3 rounded-xl bg-card-hover border border-border-subtle text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
-                                        />
-                                    </div>
-                                )}
-
-                                {/* Skip empty */}
-                                <Row title="Skip when empty" subtitle="Don't send if there's nothing fresh to show">
-                                    <Toggle
-                                        on={settings.digest_skip_empty}
-                                        onChange={() => setSettings((p) => ({ ...p, digest_skip_empty: !p.digest_skip_empty }))}
-                                    />
-                                </Row>
-
-                                {/* Send one now */}
-                                <div className="space-y-2">
-                                    <button
-                                        onClick={handleSendNow}
-                                        disabled={sendingNow || settings.digest_channels.length === 0}
-                                        className="w-full h-11 rounded-xl bg-card-hover border border-accent/30 text-[13px] font-semibold text-accent hover:bg-accent/10 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <Send className="w-4 h-4" />
-                                        {sendingNow ? 'Sending…' : 'Send one now'}
-                                    </button>
-                                    {sendResult && (
-                                        <p className="text-[12px] text-text-secondary text-center animate-in fade-in duration-200">{sendResult}</p>
-                                    )}
-                                </div>
-                            </div>
+                                <ChevronRight className="w-5 h-5 text-text-muted shrink-0" />
+                            </button>
                         )}
                     </Section>
 
@@ -528,6 +436,179 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                             </button>
                         </Row>
                     </Section>
+                    </>
+                  )}
+
+                  {view === 'digest' && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-200">
+                        {/* What to send */}
+                        <div className="space-y-2">
+                            <div className="text-[12px] font-semibold text-text-secondary">What to send</div>
+                            <div className="grid grid-cols-2 gap-2">
+                                {DIGEST_MODES.map((m) => {
+                                    const active = settings.digest_mode === m.value;
+                                    return (
+                                        <button
+                                            key={m.value}
+                                            onClick={() => setSettings((p) => ({ ...p, digest_mode: m.value }))}
+                                            className={`flex items-center gap-2 px-3 h-11 rounded-xl border text-[13px] font-semibold transition-colors cursor-pointer ${active ? 'bg-accent/10 border-accent/40 text-accent' : 'bg-card-hover border-border-subtle text-text-secondary hover:text-text hover:border-text-muted/40'}`}
+                                        >
+                                            {m.icon}
+                                            {m.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <div className="flex gap-2 p-3 rounded-xl bg-accent/5 border border-accent/10">
+                                <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                                <p className="text-[12px] text-text-secondary leading-relaxed">
+                                    {DIGEST_MODES.find((m) => m.value === settings.digest_mode)?.note}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Topic picker — multi-select */}
+                        {settings.digest_mode === 'topic' && (
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <div className="text-[12px] font-semibold text-text-secondary">Topics</div>
+                                    {settings.digest_topics.length > 0 && (
+                                        <button
+                                            onClick={() => setSettings((p) => ({ ...p, digest_topics: [] }))}
+                                            className="text-[11px] font-medium text-text-muted hover:text-text transition-colors cursor-pointer"
+                                        >
+                                            Clear
+                                        </button>
+                                    )}
+                                </div>
+                                {topics.length === 0 ? (
+                                    <p className="text-[12px] text-text-muted">Save some links first to build topics.</p>
+                                ) : (
+                                    <>
+                                        <p className="text-[12px] text-text-muted">Pick one or more categories/tags to focus on.</p>
+                                        <div className="flex flex-wrap gap-2 max-h-44 overflow-y-auto p-0.5">
+                                            {topics.map((t) => {
+                                                const active = settings.digest_topics.includes(t);
+                                                return (
+                                                    <button
+                                                        key={t}
+                                                        onClick={() => toggleTopic(t)}
+                                                        className={`inline-flex items-center gap-1.5 px-3 h-8 rounded-full border text-[12px] font-semibold transition-colors cursor-pointer ${active ? 'bg-accent/10 border-accent/40 text-accent' : 'bg-card-hover border-border-subtle text-text-secondary hover:text-text hover:border-text-muted/40'}`}
+                                                    >
+                                                        {active && <Check className="w-3 h-3" />}
+                                                        {t}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
+
+                        {/* How many */}
+                        <Row title="How many" subtitle="Cards per digest">
+                            <Dropdown
+                                ariaLabel="Cards per digest"
+                                align="right"
+                                value={String(settings.digest_count)}
+                                onChange={(v) => setSettings((p) => ({ ...p, digest_count: Number(v) }))}
+                                options={COUNT_OPTIONS}
+                            />
+                        </Row>
+
+                        {/* Frequency */}
+                        <div className="space-y-2">
+                            <div className="text-[12px] font-semibold text-text-secondary">How often</div>
+                            <Segmented
+                                value={settings.digest_frequency}
+                                onChange={(v) => setSettings((p) => ({ ...p, digest_frequency: v as 'daily' | 'weekly' }))}
+                                options={[
+                                    { value: 'daily', label: 'Daily' },
+                                    { value: 'weekly', label: 'Weekly' },
+                                ]}
+                            />
+                        </div>
+
+                        {/* When */}
+                        <Row title="Delivery time" subtitle={settings.digest_frequency === 'weekly' ? 'Day & hour (your local time)' : 'Hour (your local time)'}>
+                            <div className="flex items-center gap-2">
+                                {settings.digest_frequency === 'weekly' && (
+                                    <Dropdown
+                                        ariaLabel="Digest day"
+                                        align="right"
+                                        value={String(settings.digest_day)}
+                                        onChange={(v) => setSettings((p) => ({ ...p, digest_day: Number(v) }))}
+                                        options={DAYS.map((d, i) => ({ value: String(i), label: d }))}
+                                    />
+                                )}
+                                <Dropdown
+                                    ariaLabel="Digest hour"
+                                    align="right"
+                                    value={String(settings.digest_hour)}
+                                    onChange={(v) => setSettings((p) => ({ ...p, digest_hour: Number(v) }))}
+                                    options={HOUR_OPTIONS}
+                                />
+                            </div>
+                        </Row>
+
+                        {/* Channels */}
+                        <div className="space-y-2">
+                            <div className="text-[12px] font-semibold text-text-secondary">Where to send it</div>
+                            <div className="flex gap-2">
+                                <ChannelChip
+                                    active={settings.digest_channels.includes('whatsapp')}
+                                    onClick={() => toggleChannel('whatsapp')}
+                                    icon={<MessageCircle className="w-4 h-4" />}
+                                    label="WhatsApp"
+                                />
+                                <ChannelChip
+                                    active={settings.digest_channels.includes('email')}
+                                    onClick={() => toggleChannel('email')}
+                                    icon={<Mail className="w-4 h-4" />}
+                                    label="Email"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Email address */}
+                        {settings.digest_channels.includes('email') && (
+                            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <label className="text-[12px] font-semibold text-text-secondary">Email address</label>
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="you@example.com"
+                                    className="w-full h-10 px-3 rounded-xl bg-card-hover border border-border-subtle text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
+                                />
+                            </div>
+                        )}
+
+                        {/* Skip empty */}
+                        <Row title="Skip when empty" subtitle="Don't send if there's nothing fresh to show">
+                            <Toggle
+                                on={settings.digest_skip_empty}
+                                onChange={() => setSettings((p) => ({ ...p, digest_skip_empty: !p.digest_skip_empty }))}
+                            />
+                        </Row>
+
+                        {/* Send one now */}
+                        <div className="space-y-2">
+                            <button
+                                onClick={handleSendNow}
+                                disabled={sendingNow || settings.digest_channels.length === 0}
+                                className="w-full h-11 rounded-xl bg-card-hover border border-accent/30 text-[13px] font-semibold text-accent hover:bg-accent/10 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Send className="w-4 h-4" />
+                                {sendingNow ? 'Sending…' : 'Send one now'}
+                            </button>
+                            {sendResult && (
+                                <p className="text-[12px] text-text-secondary text-center animate-in fade-in duration-200">{sendResult}</p>
+                            )}
+                        </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Footer */}
@@ -608,19 +689,21 @@ function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
     );
 }
 
-function Segmented<T extends string>({ value, options, onChange }: { value: T; options: { value: T; label: string; icon?: ReactNode }[]; onChange: (v: T) => void }) {
+function Segmented<T extends string>({ value, options, onChange, iconOnly = false }: { value: T; options: { value: T; label: string; icon?: ReactNode }[]; onChange: (v: T) => void; iconOnly?: boolean }) {
     return (
-        <div className="flex items-center gap-1 p-1 rounded-2xl bg-card-hover border border-border-subtle w-full">
+        <div className={`flex items-center gap-1.5 p-1 rounded-2xl bg-card-hover border border-border-subtle ${iconOnly ? '' : 'w-full'}`}>
             {options.map((o) => {
                 const active = o.value === value;
                 return (
                     <button
                         key={o.value}
                         onClick={() => onChange(o.value)}
-                        className={`flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-xl text-[13px] font-semibold transition-colors cursor-pointer ${active ? 'bg-accent text-white shadow-sm' : 'text-text-secondary hover:text-text'}`}
+                        aria-label={iconOnly ? o.label : undefined}
+                        title={iconOnly ? o.label : undefined}
+                        className={`inline-flex items-center justify-center gap-1.5 h-9 rounded-xl text-[13px] font-semibold transition-colors cursor-pointer ${iconOnly ? 'w-10' : 'flex-1'} ${active ? 'bg-accent text-white shadow-sm' : 'text-text-secondary hover:text-text'}`}
                     >
                         {o.icon}
-                        {o.label}
+                        {!iconOnly && o.label}
                     </button>
                 );
             })}

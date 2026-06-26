@@ -114,14 +114,31 @@ def fetch_candidate_links(uid: str) -> List[dict]:
     return links
 
 
-def curate(links: List[dict], mode: str, count: int, topic: Optional[str] = None) -> List[dict]:
+def _normalize_topics(topics) -> List[str]:
+    """Accept a str, list, or None and return a lowercased, de-duped list."""
+    if not topics:
+        return []
+    if isinstance(topics, str):
+        topics = [topics]
+    seen, out = set(), []
+    for t in topics:
+        key = (t or "").strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            out.append(key)
+    return out
+
+
+def curate(links: List[dict], mode: str, count: int, topics=None) -> List[dict]:
     """
     Pick `count` cards out of `links` according to `mode`.
 
-    Pure function (no I/O) so it can be unit-tested in isolation.
+    `topics` may be a single string or a list of categories/tags (used when
+    mode == "topic"). Pure function (no I/O) so it can be unit-tested.
     """
     mode = mode if mode in VALID_MODES else "smart"
     count = max(1, min(int(count or 5), 20))
+    topic_set = set(_normalize_topics(topics))
     # Defense in depth: never surface archived cards even if they slip in.
     links = [l for l in links if l.get("status") != "archived"]
     if not links:
@@ -142,12 +159,11 @@ def curate(links: List[dict], mode: str, count: int, topic: Optional[str] = None
         return pool[:count]
 
     if mode == "topic":
-        t = (topic or "").strip().lower()
         pool = [
             l for l in links
-            if t and (
-                t == (l.get("category") or "").lower()
-                or t in [tag.lower() for tag in (l.get("tags") or [])]
+            if topic_set and (
+                (l.get("category") or "").lower() in topic_set
+                or any(tag.lower() in topic_set for tag in (l.get("tags") or []))
             )
         ]
         random.shuffle(pool)
@@ -244,14 +260,24 @@ def _whatsapp_card_block(index: int, c: dict) -> str:
     return "\n".join(parts)
 
 
-def format_digest_whatsapp_messages(cards: List[dict], mode: str, topic: Optional[str], frequency: str) -> List[str]:
+def _topics_label(topics) -> str:
+    """Human-readable, original-case join of topics for headers/blurbs."""
+    if not topics:
+        return "your library"
+    if isinstance(topics, str):
+        topics = [topics]
+    items = [t.strip() for t in topics if t and t.strip()]
+    return ", ".join(items) if items else "your library"
+
+
+def format_digest_whatsapp_messages(cards: List[dict], mode: str, topics, frequency: str) -> List[str]:
     """
     Render the curated cards as one or more WhatsApp messages, each kept under
     Twilio's length limit. Card blocks are packed greedily; the header rides on
     the first message and the footer on the last.
     """
     period = "Daily" if frequency == "daily" else "Weekly"
-    blurb = MODE_BLURB.get(mode, MODE_BLURB["smart"]).format(topic=topic or "your library")
+    blurb = MODE_BLURB.get(mode, MODE_BLURB["smart"]).format(topic=_topics_label(topics))
     header = f"🧠 *Your {period} Brew* — {len(cards)} cards\n_{blurb}_"
     footer = (f"📲 Open Second Brain:\n{APP_URL}\n\n"
               "_Reply DIGEST for a fresh one • STOP DIGEST to pause_")
@@ -282,19 +308,19 @@ def format_digest_whatsapp_messages(cards: List[dict], mode: str, topic: Optiona
     return messages
 
 
-def format_digest_whatsapp(cards: List[dict], mode: str, topic: Optional[str], frequency: str) -> str:
+def format_digest_whatsapp(cards: List[dict], mode: str, topics, frequency: str) -> str:
     """Convenience: the full digest as a single string (joins all parts)."""
-    return "\n\n".join(format_digest_whatsapp_messages(cards, mode, topic, frequency))
+    return "\n\n".join(format_digest_whatsapp_messages(cards, mode, topics, frequency))
 
 
 # ─────────────────────────────────────────────────────────────────────────
 # Formatting — Email (HTML + plain-text fallback)
 # ─────────────────────────────────────────────────────────────────────────
 
-def format_digest_email(cards: List[dict], mode: str, topic: Optional[str], frequency: str) -> tuple:
+def format_digest_email(cards: List[dict], mode: str, topics, frequency: str) -> tuple:
     """Return (subject, html_body, text_body)."""
     period = "Daily" if frequency == "daily" else "Weekly"
-    blurb = MODE_BLURB.get(mode, MODE_BLURB["smart"]).format(topic=topic or "your library")
+    blurb = MODE_BLURB.get(mode, MODE_BLURB["smart"]).format(topic=_topics_label(topics))
     subject = f"🧠 Your {period} Brew — {len(cards)} cards to revisit"
 
     # ── HTML ──
@@ -464,14 +490,17 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
     result = {"uid": uid, "sent": False, "channels": [], "card_count": 0, "skipped": None}
 
     mode = settings.get("digest_mode", "smart")
-    topic = settings.get("digest_topic")
+    # Support multi-topic (digest_topics) with single-topic (digest_topic) fallback.
+    topics = settings.get("digest_topics") or []
+    if not topics and settings.get("digest_topic"):
+        topics = [settings["digest_topic"]]
     count = settings.get("digest_count", 5)
     frequency = settings.get("digest_frequency", "weekly")
     channels = settings.get("digest_channels", ["whatsapp"]) or []
     skip_empty = settings.get("digest_skip_empty", True)
 
     links = fetch_candidate_links(uid)
-    cards = curate(links, mode, count, topic)
+    cards = curate(links, mode, count, topics)
 
     if not cards and skip_empty and not force:
         result["skipped"] = "no_cards"
@@ -489,7 +518,7 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
         phone = user_data.get("phone_number") or user_data.get("phoneNumber")
         if phone:
             try:
-                messages = format_digest_whatsapp_messages(cards, mode, topic, frequency)
+                messages = format_digest_whatsapp_messages(cards, mode, topics, frequency)
                 for body in messages:
                     send_whatsapp_message(f"whatsapp:{phone}", body)
                 result["channels"].append("whatsapp")
@@ -505,7 +534,7 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
         email_addr = user_data.get("email") or settings.get("email")
         if email_addr:
             try:
-                subject, html_body, text_body = format_digest_email(cards, mode, topic, frequency)
+                subject, html_body, text_body = format_digest_email(cards, mode, topics, frequency)
                 if send_email(email_addr, subject, html_body, text_body):
                     result["channels"].append("email")
                     delivered_any = True
