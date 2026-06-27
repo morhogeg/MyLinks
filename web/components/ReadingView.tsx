@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Minus, Plus, Volume2, Pause, Play, ExternalLink, BookOpen } from 'lucide-react';
+import { ArrowLeft, Minus, Plus, Volume2, Pause, Play, ExternalLink, BookOpen, Loader2 } from 'lucide-react';
 import { Link } from '@/lib/types';
 import { getDirection } from '@/lib/rtl';
 
@@ -214,13 +214,21 @@ export default function ReadingView({ link, onClose }: ReadingViewProps) {
             <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto">
                 <article className="max-w-[44rem] mx-auto px-5 sm:px-8 py-8 sm:py-12 safe-pb" style={{ fontSize }}>
                     {loading ? (
-                        <div className="space-y-4 animate-pulse" aria-busy="true">
-                            <div className="h-9 w-3/4 bg-card-hover rounded-lg" />
-                            <div className="h-4 w-32 bg-card-hover rounded" />
-                            <div className="pt-4 space-y-3">
-                                {Array.from({ length: 8 }).map((_, i) => (
-                                    <div key={i} className="h-4 bg-card-hover rounded" style={{ width: `${70 + ((i * 7) % 30)}%` }} />
-                                ))}
+                        <div aria-busy="true">
+                            {/* Status message — the reader fetches + cleans the page on demand,
+                                which can take a moment, so say what's happening. */}
+                            <div className="flex items-center gap-2.5 text-text-secondary text-sm mb-7" style={{ fontSize: '0.8em' }}>
+                                <Loader2 className="w-4 h-4 animate-spin text-accent shrink-0" />
+                                <span>Fetching the original article and tidying it up for reading…</span>
+                            </div>
+                            <div className="space-y-4 animate-pulse">
+                                <div className="h-9 w-3/4 bg-card-hover rounded-lg" />
+                                <div className="h-4 w-32 bg-card-hover rounded" />
+                                <div className="pt-4 space-y-3">
+                                    {Array.from({ length: 8 }).map((_, i) => (
+                                        <div key={i} className="h-4 bg-card-hover rounded" style={{ width: `${70 + ((i * 7) % 30)}%` }} />
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     ) : error ? (
