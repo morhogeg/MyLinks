@@ -22,7 +22,7 @@ import SwipeDeck from './SwipeDeck';
 import AskBrain from './AskBrain';
 import LinkDetailModal from './LinkDetailModal';
 import ConfirmDialog from './ConfirmDialog';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessageCircleQuestion, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, Image as ImageIcon } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessageCircleQuestion, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, Image as ImageIcon, ChevronDown } from 'lucide-react';
 import TagExplorer from './TagExplorer';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -64,6 +64,7 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
     const [screenshotOnly, setScreenshotOnly] = useState(false);
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+    const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
     const [isTagExplorerCollapsed, setIsTagExplorerCollapsed] = useState(false);
     const [reminderModalLink, setReminderModalLink] = useState<Link | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -526,9 +527,10 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                     )}
                 </div>
 
-                {/* Row 1: Category Navigator — only relevant when browsing the grid. */}
-                {viewMode !== 'ask' && (
-                <div className="relative -mx-4 px-4 sm:mx-0 sm:px-0 group/category-nav">
+                {/* Row 1: Category Navigator — only relevant when browsing the grid.
+                    Desktop shows scrollable chips; mobile collapses them into one button. */}
+                {viewMode !== 'ask' && (<>
+                <div className="relative hidden sm:block -mx-4 px-4 sm:mx-0 sm:px-0 group/category-nav">
                     {/* Left/Right Fades for Scrollability Cue */}
                     <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none opacity-0 group-hover/category-nav:opacity-100 transition-opacity duration-300 sm:left-0 sm:from-background" />
                     <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none opacity-0 group-hover/category-nav:opacity-100 transition-opacity duration-300 sm:right-0 sm:from-background" />
@@ -615,7 +617,25 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                         })}
                     </div>
                 </div>
-                )}
+
+                {/* Mobile: collapse the category chips into one button that opens a sheet. */}
+                <button
+                    onClick={() => setIsCategoriesOpen(true)}
+                    aria-label="Filter by category"
+                    className={`${ctrlBase} sm:hidden w-full justify-between px-3.5 ${selectedCategory.size > 0
+                        ? 'bg-accent text-white border border-accent shadow-sm'
+                        : ctrlIdle
+                        }`}
+                >
+                    <span className="inline-flex items-center gap-1.5">
+                        <LayoutGrid className="w-4 h-4" />
+                        {selectedCategory.size === 0
+                            ? 'All Categories'
+                            : `${selectedCategory.size} ${selectedCategory.size === 1 ? 'category' : 'categories'}`}
+                    </span>
+                    <ChevronDown className="w-4 h-4 opacity-60" />
+                </button>
+                </>)}
 
                 {/* Row 2: Toolbar — filter / sort / source on the left, view & actions on the right */}
                 <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-2 -mx-2 px-2 sm:mx-0 sm:px-0">
@@ -1024,6 +1044,82 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                     </div>
                 )}
 
+                {/* Categories Sheet (Mobile) — the collapsed category chips. */}
+                {isCategoriesOpen && (
+                    <div className="sm:hidden fixed inset-0 z-50 flex flex-col justify-end isolate">
+                        <div
+                            className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+                            onClick={() => setIsCategoriesOpen(false)}
+                        />
+                        <div className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
+                            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-text-muted/30" />
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-base font-bold text-text">Categories</h3>
+                                <button
+                                    onClick={() => setIsCategoriesOpen(false)}
+                                    aria-label="Close categories"
+                                    className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    onClick={() => setSelectedCategory(new Set())}
+                                    className={`px-3 py-1.5 rounded-full text-[13px] font-bold border transition-all ${selectedCategory.size === 0
+                                        ? 'bg-accent text-white border-accent shadow-sm'
+                                        : 'bg-card border-border-subtle text-text-muted'
+                                        }`}
+                                >
+                                    All Categories
+                                </button>
+                                {categories.map(cat => {
+                                    const isSelected = selectedCategory.has(cat);
+                                    const colorStyle = getCategoryColorStyle(cat);
+                                    return (
+                                        <button
+                                            key={cat}
+                                            onClick={() => {
+                                                const next = new Set(selectedCategory);
+                                                if (isSelected) next.delete(cat); else next.add(cat);
+                                                setSelectedCategory(next);
+                                            }}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-bold border transition-all ${isSelected
+                                                ? ''
+                                                : 'bg-card border-border-subtle text-text-muted'
+                                                }`}
+                                            style={isSelected ? {
+                                                backgroundColor: colorStyle.backgroundColor,
+                                                color: colorStyle.color,
+                                                borderColor: colorStyle.backgroundColor,
+                                            } : undefined}
+                                        >
+                                            {cat}
+                                            <span className="opacity-60 font-medium">({categoryCounts[cat]})</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <div className="flex items-center gap-3 pt-5">
+                                {selectedCategory.size > 0 && (
+                                    <button
+                                        onClick={() => setSelectedCategory(new Set())}
+                                        className="text-sm font-semibold text-text-muted hover:text-accent transition-colors"
+                                    >
+                                        Clear
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => setIsCategoriesOpen(false)}
+                                    className="ms-auto px-6 h-10 rounded-full bg-accent text-white font-semibold text-sm shadow-sm hover:bg-accent-hover transition-colors"
+                                >
+                                    Done
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Tag Explorer Drawer (Mobile) */}
                 {isTagExplorerOpen && (
                     <div className="lg:hidden fixed inset-0 z-50 flex justify-end isolate">
@@ -1066,6 +1162,7 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                             totalLinks={links.length}
                             onOpenLink={(id) => setActiveLinkId(id)}
                             onExit={() => setViewMode(lastLayout.current)}
+                            categories={[...categories].sort((a, b) => (categoryCounts[b] || 0) - (categoryCounts[a] || 0))}
                         />
                     ) : filteredLinks.length === 0 ? (
                         <div className="text-center py-16 animate-fade-in">

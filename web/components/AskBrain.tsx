@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { MessageCircleQuestion, ArrowUp, FileText, Brain, RotateCcw, ChevronLeft } from 'lucide-react';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS } from '@/lib/platform';
+import ConfirmDialog from './ConfirmDialog';
 
 interface Source {
     id: string;
@@ -39,24 +40,34 @@ interface AskBrainProps {
     onOpenLink: (id: string) => void;
     /** Leave Ask mode (mobile shows a back button; desktop exits via the toolbar). */
     onExit?: () => void;
+    /** The user's saved categories (most-saved first) — seeds relevant prompts. */
+    categories?: string[];
 }
 
-const SUGGESTIONS = [
-    'What have I saved about productivity?',
-    'Summarize the key ideas from my recent saves',
-    'What did I save about AI?',
-    'Find that article about habits',
-];
-
-export default function AskBrain({ uid, totalLinks, onOpenLink, onExit }: AskBrainProps) {
+export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categories }: AskBrainProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
+    const [confirmClear, setConfirmClear] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     // Gate persistence until after we've loaded any saved chat, so the first
     // (empty) render doesn't clobber what's in storage.
     const hydratedRef = useRef(false);
+
+    // Suggested prompts built from the user's own categories so they're always
+    // relevant to what's actually saved. Rotated by a per-open random offset for
+    // light variety — all client-side, no extra tokens.
+    const rotation = useRef(Math.floor(Math.random() * 997)).current;
+    const suggestions = useMemo(() => {
+        const cats = (categories ?? []).filter(Boolean);
+        if (!cats.length) return [] as string[];
+        const start = rotation % cats.length;
+        const rotated = [...cats.slice(start), ...cats.slice(0, start)];
+        const picks = rotated.slice(0, 3).map(c => `What have I saved about ${c}?`);
+        return [...picks, 'Summarize the key ideas from my recent saves'];
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [categories?.join('|'), rotation]);
 
     // On phones the Ask view is a full-screen chat pinned to the *visual* viewport
     // so the composer rides the keyboard (like a native chat app). On desktop it
@@ -125,6 +136,20 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit }: AskBra
     const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
         const el = scrollRef.current;
         if (el) el.scrollTo({ top: el.scrollHeight, behavior });
+    };
+
+    // When the keyboard is dismissed, iOS reports the new (taller) visual viewport
+    // only after the close animation finishes, leaving a white gap above the
+    // descending keyboard. Grow to full height immediately on blur so the surface
+    // fills the screen as the keyboard slides away, then reconcile to the exact
+    // visual viewport once it settles.
+    const handleBlur = () => {
+        if (window.matchMedia('(min-width: 640px)').matches) return;
+        setVp({ height: window.innerHeight, offsetTop: 0 });
+        setTimeout(() => {
+            const vvObj = window.visualViewport;
+            setVp({ height: vvObj ? vvObj.height : window.innerHeight, offsetTop: vvObj ? vvObj.offsetTop : 0 });
+        }, 350);
     };
 
     // Keep the latest message in view as the conversation grows or the keyboard
@@ -221,7 +246,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit }: AskBra
                     <span className="font-semibold text-text">Ask your brain</span>
                     {!isEmpty && (
                         <button
-                            onClick={clearChat}
+                            onClick={() => setConfirmClear(true)}
                             className="ms-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-text-muted text-xs font-medium hover:text-text active:bg-card-hover transition-colors"
                         >
                             <RotateCcw className="w-3 h-3" />
@@ -244,7 +269,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit }: AskBra
                             Answers come only from your library, with sources you can open.
                         </p>
                         <div className="flex flex-wrap items-center justify-center gap-2 max-w-xl">
-                            {SUGGESTIONS.map(s => (
+                            {suggestions.map(s => (
                                 <button
                                     key={s}
                                     onClick={() => send(s)}
@@ -260,7 +285,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit }: AskBra
                         {/* Clear — desktop only; mobile uses the top-bar Clear. */}
                         <div className="hidden sm:flex sticky top-0 z-10 justify-end mb-2">
                             <button
-                                onClick={clearChat}
+                                onClick={() => setConfirmClear(true)}
                                 title="Clear conversation"
                                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-card/80 backdrop-blur border border-border-subtle text-text-muted text-xs font-medium hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
                             >
@@ -351,8 +376,9 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit }: AskBra
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
                         onFocus={() => setTimeout(() => scrollToBottom('auto'), 300)}
+                        onBlur={handleBlur}
                         rows={1}
-                        placeholder={uid ? 'Ask your brain anything…' : 'Loading your brain…'}
+                        placeholder={uid ? 'Ask about anything you’ve saved…' : 'Loading your library…'}
                         disabled={!uid || isThinking}
                         dir={getDirection(input)}
                         className="flex-1 resize-none bg-transparent px-2 py-1.5 text-[15px] text-text placeholder:text-text-muted focus:outline-none max-h-32 disabled:opacity-60"
@@ -370,6 +396,17 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit }: AskBra
                     Answers are grounded only in what you&apos;ve saved.
                 </p>
             </div>
+
+            <ConfirmDialog
+                isOpen={confirmClear}
+                onClose={() => setConfirmClear(false)}
+                onConfirm={clearChat}
+                title="Clear this chat?"
+                message="This removes the whole conversation. Your saved cards aren’t affected."
+                confirmLabel="Clear chat"
+                cancelLabel="Keep it"
+                variant="danger"
+            />
         </div>
     );
 }
