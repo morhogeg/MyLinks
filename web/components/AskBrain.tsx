@@ -158,6 +158,19 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         setTimeout(() => scrollToBottom('auto'), 350);
     };
 
+    // Scroll-to-dismiss: dragging the conversation collapses the keyboard (like
+    // the iOS Messages/Claude chat), leaving just the input field. Use a real
+    // touch drag past a small threshold so taps — and the programmatic scroll
+    // after sending — don't dismiss it.
+    const touchStartY = useRef(0);
+    const onConvTouchStart = (e: React.TouchEvent) => { touchStartY.current = e.touches[0].clientY; };
+    const onConvTouchMove = (e: React.TouchEvent) => {
+        if (!isMobile || document.activeElement !== textareaRef.current) return;
+        if (Math.abs(e.touches[0].clientY - touchStartY.current) > 12) {
+            textareaRef.current?.blur();
+        }
+    };
+
     // Keep the latest message in view as the conversation grows.
     useEffect(() => { scrollToBottom(); }, [messages, isThinking]);
 
@@ -259,7 +272,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
             )}
 
             {/* Conversation */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-1 pb-4 overscroll-contain">
+            <div
+                ref={scrollRef}
+                onTouchStart={onConvTouchStart}
+                onTouchMove={onConvTouchMove}
+                className="flex-1 overflow-y-auto px-3 sm:px-1 pb-4 overscroll-contain"
+            >
                 {isEmpty ? (
                     <div className="h-full flex flex-col items-center justify-center text-center px-4">
                         <div className="w-14 h-14 mb-4 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-accent/20">
