@@ -1065,6 +1065,7 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                             uid={uid}
                             totalLinks={links.length}
                             onOpenLink={(id) => setActiveLinkId(id)}
+                            onExit={() => setViewMode(lastLayout.current)}
                         />
                     ) : filteredLinks.length === 0 ? (
                         <div className="text-center py-16 animate-fade-in">

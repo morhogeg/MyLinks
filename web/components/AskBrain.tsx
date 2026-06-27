@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { MessageCircleQuestion, ArrowUp, FileText, Brain, RotateCcw } from 'lucide-react';
+import { MessageCircleQuestion, ArrowUp, FileText, Brain, RotateCcw, ChevronLeft } from 'lucide-react';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS } from '@/lib/platform';
 
@@ -37,6 +37,8 @@ interface AskBrainProps {
     uid: string | null;
     totalLinks: number;
     onOpenLink: (id: string) => void;
+    /** Leave Ask mode (mobile shows a back button; desktop exits via the toolbar). */
+    onExit?: () => void;
 }
 
 const SUGGESTIONS = [
@@ -46,55 +48,51 @@ const SUGGESTIONS = [
     'Find that article about habits',
 ];
 
-export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps) {
+export default function AskBrain({ uid, totalLinks, onOpenLink, onExit }: AskBrainProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const rootRef = useRef<HTMLDivElement>(null);
-    // On mobile the chrome above this view is much shorter than on desktop, so a
-    // fixed height leaves the composer floating mid-screen. Measure our top edge
-    // and fill to the bottom of the (dynamic) viewport instead. Desktop keeps its
-    // CSS height (null = no inline override).
-    const [mobileHeight, setMobileHeight] = useState<number | null>(null);
     // Gate persistence until after we've loaded any saved chat, so the first
     // (empty) render doesn't clobber what's in storage.
     const hydratedRef = useRef(false);
 
+    // On phones the Ask view is a full-screen chat pinned to the *visual* viewport
+    // so the composer rides the keyboard (like a native chat app). On desktop it
+    // stays an inline panel. `vp` holds the live visual-viewport metrics on mobile.
+    const [isMobile, setIsMobile] = useState(false);
+    const [vp, setVp] = useState<{ height: number; offsetTop: number } | null>(null);
+
     useEffect(() => {
-        const vv = window.visualViewport;
-        const measure = () => {
-            // sm breakpoint — desktop/tablet keep the CSS-defined height.
-            if (window.matchMedia('(min-width: 640px)').matches) {
-                setMobileHeight(null);
-                return;
-            }
-            const el = rootRef.current;
-            if (!el) return;
-            const rectTop = el.getBoundingClientRect().top;
-            // Size to the *visual* viewport so the composer tracks the keyboard: when
-            // it opens, visualViewport.height shrinks and the box shrinks with it,
-            // keeping the input just above the keyboard. getBoundingClientRect is
-            // relative to the layout viewport, so subtract the visual viewport's
-            // offset to get our top within the visible area.
-            const viewportH = vv ? vv.height : window.innerHeight;
-            const offsetTop = vv ? vv.offsetTop : 0;
-            setMobileHeight(Math.max(viewportH - (rectTop - offsetTop) - 8, 240));
+        const vvObj = window.visualViewport;
+        const update = () => {
+            const mobile = !window.matchMedia('(min-width: 640px)').matches;
+            setIsMobile(mobile);
+            setVp(mobile
+                ? { height: vvObj ? vvObj.height : window.innerHeight, offsetTop: vvObj ? vvObj.offsetTop : 0 }
+                : null);
         };
-        measure();
-        window.addEventListener('resize', measure);
-        window.addEventListener('orientationchange', measure);
-        vv?.addEventListener('resize', measure);
-        vv?.addEventListener('scroll', measure);
+        update();
+        window.addEventListener('resize', update);
+        window.addEventListener('orientationchange', update);
+        vvObj?.addEventListener('resize', update);
+        vvObj?.addEventListener('scroll', update);
         return () => {
-            window.removeEventListener('resize', measure);
-            window.removeEventListener('orientationchange', measure);
-            vv?.removeEventListener('resize', measure);
-            vv?.removeEventListener('scroll', measure);
+            window.removeEventListener('resize', update);
+            window.removeEventListener('orientationchange', update);
+            vvObj?.removeEventListener('resize', update);
+            vvObj?.removeEventListener('scroll', update);
         };
-        // Re-measure once links load (empty state has no root ref to measure).
-    }, [totalLinks]);
+    }, []);
+
+    // Lock the page behind the full-screen mobile chat so it can't scroll.
+    useEffect(() => {
+        if (!isMobile) return;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = prev; };
+    }, [isMobile]);
 
     const storageKey = uid ? `askbrain:chat:${uid}` : null;
 
@@ -124,10 +122,15 @@ export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps)
         textareaRef.current?.focus();
     };
 
-    // Keep the latest message in view as the conversation grows.
-    useEffect(() => {
-        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-    }, [messages, isThinking]);
+    const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+        const el = scrollRef.current;
+        if (el) el.scrollTo({ top: el.scrollHeight, behavior });
+    };
+
+    // Keep the latest message in view as the conversation grows or the keyboard
+    // resizes the viewport.
+    useEffect(() => { scrollToBottom(); }, [messages, isThinking]);
+    useEffect(() => { scrollToBottom('auto'); }, [vp?.height]);
 
     const send = async (text: string) => {
         const question = text.trim();
@@ -197,12 +200,39 @@ export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps)
 
     return (
         <div
-            ref={rootRef}
-            style={mobileHeight != null ? { height: mobileHeight } : undefined}
-            className="flex flex-col min-h-[340px] animate-fade-in -mb-24 sm:mb-0 sm:h-[calc(100dvh-320px)]"
+            style={isMobile && vp
+                ? { position: 'fixed', left: 0, right: 0, top: 0, height: vp.height, transform: `translateY(${vp.offsetTop}px)` }
+                : undefined}
+            className={`flex flex-col animate-fade-in ${isMobile
+                ? 'z-50 bg-background'
+                : 'min-h-[340px] sm:h-[calc(100dvh-320px)]'
+                }`}
         >
+            {/* Mobile-only top bar: back to exit + Clear (desktop exits via the toolbar). */}
+            {isMobile && (
+                <div className="flex items-center gap-1 px-2 h-12 shrink-0 border-b border-border-subtle">
+                    <button
+                        onClick={onExit}
+                        aria-label="Back"
+                        className="p-2 -ms-1 rounded-full text-text-secondary hover:text-text active:bg-card-hover transition-colors"
+                    >
+                        <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <span className="font-semibold text-text">Ask your brain</span>
+                    {!isEmpty && (
+                        <button
+                            onClick={clearChat}
+                            className="ms-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-text-muted text-xs font-medium hover:text-text active:bg-card-hover transition-colors"
+                        >
+                            <RotateCcw className="w-3 h-3" />
+                            Clear
+                        </button>
+                    )}
+                </div>
+            )}
+
             {/* Conversation */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-1 pb-4">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-1 pb-4 overscroll-contain">
                 {isEmpty ? (
                     <div className="h-full flex flex-col items-center justify-center text-center px-4">
                         <div className="w-14 h-14 mb-4 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-accent/20">
@@ -227,8 +257,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps)
                     </div>
                 ) : (
                     <div className="max-w-2xl mx-auto py-2">
-                        {/* Clear — the chat persists across tabs/reloads until cleared here. */}
-                        <div className="sticky top-0 z-10 flex justify-end mb-2">
+                        {/* Clear — desktop only; mobile uses the top-bar Clear. */}
+                        <div className="hidden sm:flex sticky top-0 z-10 justify-end mb-2">
                             <button
                                 onClick={clearChat}
                                 title="Clear conversation"
@@ -313,13 +343,14 @@ export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps)
             </div>
 
             {/* Composer */}
-            <div className="max-w-2xl mx-auto w-full">
+            <div className="shrink-0 w-full max-w-2xl mx-auto px-3 sm:px-0 pt-2 sm:pt-0 pb-3 sm:pb-0" style={isMobile ? { paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' } : undefined}>
                 <div className="flex items-end gap-2 p-2 rounded-2xl bg-card border border-border-subtle shadow-[var(--shadow-card)] focus-within:border-accent/50 transition-colors">
                     <textarea
                         ref={textareaRef}
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
+                        onFocus={() => setTimeout(() => scrollToBottom('auto'), 300)}
                         rows={1}
                         placeholder={uid ? 'Ask your brain anything…' : 'Loading your brain…'}
                         disabled={!uid || isThinking}
@@ -335,7 +366,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps)
                         <ArrowUp className="w-5 h-5" />
                     </button>
                 </div>
-                <p className="text-center text-[11px] text-text-muted mt-2">
+                <p className="hidden sm:block text-center text-[11px] text-text-muted mt-2">
                     Answers are grounded only in what you&apos;ve saved.
                 </p>
             </div>
