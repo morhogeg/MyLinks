@@ -154,18 +154,25 @@ export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps)
                                         {m.content}
                                     </div>
 
-                                    {/* Citations — clickable chips back to the source cards */}
+                                    {/* Citations — clickable proof cards back to the source links */}
                                     {m.role === 'assistant' && m.sources && m.sources.length > 0 && (
-                                        <div className="mt-2 flex flex-wrap gap-1.5">
+                                        <div className="mt-2.5 flex flex-wrap gap-2">
                                             {m.sources.map(s => (
                                                 <button
                                                     key={s.id}
                                                     onClick={() => onOpenLink(s.id)}
                                                     title={s.title}
-                                                    className="group inline-flex items-center gap-1.5 max-w-[260px] ps-2 pe-2.5 py-1 rounded-full bg-card-hover border border-border-subtle text-text-secondary text-xs font-medium hover:border-accent/50 hover:text-text transition-colors cursor-pointer"
+                                                    className="group flex items-center gap-2.5 max-w-[340px] ps-2.5 pe-3.5 py-2 rounded-xl bg-card border border-border-subtle shadow-sm hover:border-accent/50 hover:bg-card-hover transition-colors cursor-pointer text-start"
                                                 >
-                                                    <FileText className="w-3 h-3 shrink-0 text-accent" />
-                                                    <span className="truncate">{s.title}</span>
+                                                    <span className="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-lg bg-accent/10 text-accent group-hover:bg-accent/15 transition-colors">
+                                                        <FileText className="w-3.5 h-3.5" />
+                                                    </span>
+                                                    <span className="min-w-0 flex flex-col">
+                                                        <span className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+                                                            Source{s.category ? ` · ${s.category}` : ''}
+                                                        </span>
+                                                        <span className="truncate text-[13px] font-medium text-text">{s.title}</span>
+                                                    </span>
                                                 </button>
                                             ))}
                                         </div>
