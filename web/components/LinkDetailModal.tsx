@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube, ImageOff, Image as ImageIcon } from 'lucide-react';
+import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube, ImageOff, Image as ImageIcon, BookOpen } from 'lucide-react';
 import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
+import ReadingView from './ReadingView';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import TagInput from './TagInput';
@@ -59,6 +60,7 @@ export default function LinkDetailModal({
     onOpenOtherLink
 }: LinkDetailModalProps) {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [isReading, setIsReading] = useState(false);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
     const [editedCategory, setEditedCategory] = useState(link.category);
     const [now, setNow] = useState<number>(0);
@@ -116,6 +118,8 @@ export default function LinkDetailModal({
     // author (@handle from the URL) in the X grey, everything else muted.
     const platform = getPlatform(link.url);
     const isYouTube = platform === 'youtube' || link.sourceType === 'youtube';
+    // Reading mode is for text articles — not videos or screenshots.
+    const canRead = !!link.url && /^https?:\/\//.test(link.url) && !isYouTube && link.sourceType !== 'image';
     const youtubeChannel = link.metadata?.youtubeChannel || link.sourceName;
     const xAuthor = platform === 'x' ? xHandle(link.url) : null;
     const isLinkedIn = platform === 'linkedin';
@@ -147,6 +151,8 @@ export default function LinkDetailModal({
     const allTags = Array.from(new Set(allLinks.flatMap(l => l.tags))).sort();
 
     return (
+        <>
+        {isReading && <ReadingView link={link} onClose={() => setIsReading(false)} />}
         <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4">
             <div
                 className="absolute inset-0 bg-background/80 backdrop-blur-sm animate-in fade-in duration-300"
@@ -216,6 +222,16 @@ export default function LinkDetailModal({
                     </div>
 
                     <div className="flex gap-1.5 sm:gap-2">
+                        {canRead && (
+                            <button
+                                onClick={() => setIsReading(true)}
+                                title="Read in distraction-free mode"
+                                aria-label="Read article"
+                                className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:text-accent transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                            >
+                                <BookOpen className="w-4 h-4" />
+                            </button>
+                        )}
                         {!!link.url && /^https?:\/\//.test(link.url) && (
                             <a
                                 href={link.url}
@@ -609,5 +625,6 @@ export default function LinkDetailModal({
                 onClose={() => setShowDeleteConfirm(false)}
             />
         </div>
+        </>
     );
 }

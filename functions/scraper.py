@@ -77,6 +77,66 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         return {"html": "", "title": "", "text": ""}
 
 
+def extract_readable_article(url: str) -> dict:
+    """Extract clean, paragraph-structured article text for in-app reading.
+
+    Unlike `scrape_url` (which space-joins paragraphs and truncates hard for AI
+    analysis), this preserves block structure and keeps the full body so the
+    reader renders like a real article. Returns:
+        { "title": str, "paragraphs": [{"type": "p|h2|h3|li|blockquote", "text": str}] }
+    """
+    headers = {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) "
+                      "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
+    }
+    response = requests.get(url, headers=headers, timeout=12)
+    response.raise_for_status()
+
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    # Strip non-content noise so the reader isn't polluted with menus/scripts.
+    for tag in soup(["script", "style", "noscript", "nav", "footer",
+                     "aside", "header", "form", "svg", "button"]):
+        tag.decompose()
+
+    # Title: prefer og:title, fall back to <title>.
+    title = ""
+    og = soup.find("meta", attrs={"property": "og:title"})
+    if og and og.get("content"):
+        title = og["content"].strip()
+    elif soup.title and soup.title.string:
+        title = soup.title.string.strip()
+
+    # Prefer the semantic <article>/<main> region; otherwise the whole body.
+    root = soup.find("article") or soup.find("main") or soup.body or soup
+
+    paragraphs = []
+    seen = set()
+    for el in root.find_all(["p", "h2", "h3", "li", "blockquote"]):
+        text = el.get_text(" ", strip=True)
+        if len(text) < 2:
+            continue
+        # Drop exact duplicates (sites often repeat content blocks).
+        if text in seen:
+            continue
+        seen.add(text)
+        paragraphs.append({"type": el.name, "text": text})
+
+    # Trim leading nav-ish list items (e.g. "Article / Talk" tabs) that appear
+    # before the first real paragraph — in-article lists always follow prose.
+    first_p = next((i for i, p in enumerate(paragraphs)
+                    if p["type"] in ("p", "blockquote")), None)
+    if first_p:
+        paragraphs = [p for i, p in enumerate(paragraphs)
+                      if not (i < first_p and p["type"] == "li")]
+
+    return {
+        "title": title,
+        "paragraphs": paragraphs[:400],  # bound pathologically long pages
+    }
+
+
 def _extract_linkedin_author(html: str) -> Optional[str]:
     """Pull the post author's display name from LinkedIn meta tags.
 

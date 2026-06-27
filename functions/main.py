@@ -386,6 +386,42 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
 
 
 @https_fn.on_request()
+def get_article(req: https_fn.Request) -> https_fn.Response:
+    """HTTP endpoint: extract a clean, readable version of an article for the
+    in-app reading mode. Body: { url }. Returns { success, title, paragraphs }.
+
+    Fetched on demand so it works for every saved link (including old ones)
+    without a schema migration or backfill.
+    """
+    if req.method == 'OPTIONS':
+        return _cors_preflight()
+
+    headers = _cors_headers()
+
+    try:
+        data = req.get_json()
+        url = (data or {}).get('url')
+        if not url:
+            return _error_response("url is required", 400, headers)
+
+        from scraper import extract_readable_article
+        article = extract_readable_article(url)
+
+        if not article.get("paragraphs"):
+            return _error_response(
+                "Couldn't extract readable text from this page.", 422, headers
+            )
+
+        return https_fn.Response(
+            json.dumps({"success": True, **article}),
+            status=200, headers=headers, mimetype='application/json'
+        )
+
+    except Exception as e:
+        return _error_response(str(e), 500, headers)
+
+
+@https_fn.on_request()
 def analyze_image(req: https_fn.Request) -> https_fn.Response:
     """HTTP endpoint for analyzing Images immediately (Synchronous)."""
     if req.method == 'OPTIONS':
