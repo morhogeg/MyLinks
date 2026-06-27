@@ -86,6 +86,16 @@ Implemented from the roadmap in `~/.claude/plans/you-are-an-expert-prancy-origam
   click the icon on an article → card appears in the app within seconds. See `extension/README.md`.
 - **Distribution:** load-unpacked only for now (documented in the README); Chrome Web Store is a
   later optional step.
+- **Follow-ups this session:** (1) added a **system-notification** confirmation on save
+  (`chrome.notifications`, with the page title) on top of the badge — graceful no-op where
+  unsupported. (2) Confirmed the web app **already auto-loads** new cards via Feed.tsx's Firestore
+  `onSnapshot` — no refresh needed; the only delay is the async analysis pipeline. (3) Added a
+  **Safari** build: same `/extension` code wrapped via `safari-web-extension-converter`. New
+  **`/safari`** folder = `build-safari.sh` (regenerates the Xcode project into gitignored
+  `safari/build/`, keeping `/extension` the single source of truth) + `README.md` (Xcode build +
+  Safari enable steps). Verified it generates and compiles (only the final code-sign/validate step
+  needs the user's Apple ID in Xcode). Safari caveats: no `chrome.notifications` (badge fallback)
+  and `options_ui` opens as a tab — both degrade gracefully, no code changes.
 
 **Next up (per plan):** Sessions 3 (Highlights & Notes) and 4 (Proactive Resurfacing) remain;
 Session 0 (auth, P0) is still the launch blocker.

@@ -60,3 +60,5 @@ A toolbar **badge** mirrors the result for a couple of seconds:
   (the browser doesn't expose them) — you'll see a red ✗.
 - This extension targets Chromium browsers (Chrome / Edge / Brave). A Firefox port is
   a later tweak.
+- **Safari:** the same code runs in Safari via a native wrapper built in Xcode — see
+  [`../safari/README.md`](../safari/README.md).
