@@ -70,39 +70,55 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
     }, [categories?.join('|'), rotation]);
 
     // On phones the Ask view is a full-screen chat pinned to the *visual* viewport
-    // so the composer rides the keyboard (like a native chat app). On desktop it
-    // stays an inline panel. `vp` holds the live visual-viewport metrics on mobile.
+    // so the composer rides the keyboard like a native chat app. On desktop it
+    // stays an inline panel.
     const [isMobile, setIsMobile] = useState(false);
-    const [vp, setVp] = useState<{ height: number; offsetTop: number } | null>(null);
+    const rootRef = useRef<HTMLDivElement>(null);
+    // While the keyboard dismisses, iOS keeps emitting "shrunk" visual-viewport
+    // events for a beat; ignore them briefly so the surface doesn't lag or leave a gap.
+    const suppressShrinkUntil = useRef(0);
+    const syncViewportRef = useRef<() => void>(() => {});
 
+    // Breakpoint only — changes rarely, so React state is fine here.
     useEffect(() => {
-        const vvObj = window.visualViewport;
-        const update = () => {
-            const mobile = !window.matchMedia('(min-width: 640px)').matches;
-            setIsMobile(mobile);
-            setVp(mobile
-                ? { height: vvObj ? vvObj.height : window.innerHeight, offsetTop: vvObj ? vvObj.offsetTop : 0 }
-                : null);
-        };
-        update();
-        window.addEventListener('resize', update);
-        window.addEventListener('orientationchange', update);
-        vvObj?.addEventListener('resize', update);
-        vvObj?.addEventListener('scroll', update);
-        return () => {
-            window.removeEventListener('resize', update);
-            window.removeEventListener('orientationchange', update);
-            vvObj?.removeEventListener('resize', update);
-            vvObj?.removeEventListener('scroll', update);
-        };
+        const mq = window.matchMedia('(min-width: 640px)');
+        const onChange = () => setIsMobile(!mq.matches);
+        onChange();
+        mq.addEventListener('change', onChange);
+        return () => mq.removeEventListener('change', onChange);
     }, []);
 
-    // Lock the page behind the full-screen mobile chat so it can't scroll.
+    // Drive the mobile surface height from the visual viewport with *direct DOM
+    // writes* (no React re-render) so it tracks the keyboard frame-for-frame
+    // instead of lagging. Also locks the page behind the full-screen chat.
     useEffect(() => {
         if (!isMobile) return;
-        const prev = document.body.style.overflow;
+        const el = rootRef.current;
+        const vvObj = window.visualViewport;
+        const sync = () => {
+            if (!el || Date.now() < suppressShrinkUntil.current) return;
+            const h = vvObj ? vvObj.height : window.innerHeight;
+            const offset = vvObj ? vvObj.offsetTop : 0;
+            el.style.height = `${h}px`;
+            el.style.transform = offset ? `translateY(${offset}px)` : '';
+        };
+        syncViewportRef.current = sync;
+        sync();
+        vvObj?.addEventListener('resize', sync);
+        vvObj?.addEventListener('scroll', sync);
+        window.addEventListener('resize', sync);
+        window.addEventListener('orientationchange', sync);
+        const prevOverflow = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = prev; };
+        return () => {
+            vvObj?.removeEventListener('resize', sync);
+            vvObj?.removeEventListener('scroll', sync);
+            window.removeEventListener('resize', sync);
+            window.removeEventListener('orientationchange', sync);
+            document.body.style.overflow = prevOverflow;
+            syncViewportRef.current = () => {};
+            if (el) { el.style.height = ''; el.style.transform = ''; }
+        };
     }, [isMobile]);
 
     const storageKey = uid ? `askbrain:chat:${uid}` : null;
@@ -138,24 +154,27 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         if (el) el.scrollTo({ top: el.scrollHeight, behavior });
     };
 
-    // When the keyboard is dismissed, iOS reports the new (taller) visual viewport
-    // only after the close animation finishes, leaving a white gap above the
-    // descending keyboard. Grow to full height immediately on blur so the surface
-    // fills the screen as the keyboard slides away, then reconcile to the exact
-    // visual viewport once it settles.
+    // Keyboard dismissing: grow to full height *now* and ignore the lagging
+    // "shrunk" visual-viewport events for a moment, so no white gap appears above
+    // the descending keyboard. The later events (and the suppress expiry) reconcile
+    // to the exact viewport.
     const handleBlur = () => {
-        if (window.matchMedia('(min-width: 640px)').matches) return;
-        setVp({ height: window.innerHeight, offsetTop: 0 });
-        setTimeout(() => {
-            const vvObj = window.visualViewport;
-            setVp({ height: vvObj ? vvObj.height : window.innerHeight, offsetTop: vvObj ? vvObj.offsetTop : 0 });
-        }, 350);
+        if (!isMobile) return;
+        const el = rootRef.current;
+        if (el) { el.style.height = `${window.innerHeight}px`; el.style.transform = ''; }
+        suppressShrinkUntil.current = Date.now() + 600;
     };
 
-    // Keep the latest message in view as the conversation grows or the keyboard
-    // resizes the viewport.
+    // Re-focusing: cancel any dismiss-suppression and re-sync as the keyboard opens.
+    const handleFocus = () => {
+        suppressShrinkUntil.current = 0;
+        setTimeout(() => syncViewportRef.current(), 60);
+        setTimeout(() => syncViewportRef.current(), 280);
+        setTimeout(() => scrollToBottom('auto'), 320);
+    };
+
+    // Keep the latest message in view as the conversation grows.
     useEffect(() => { scrollToBottom(); }, [messages, isThinking]);
-    useEffect(() => { scrollToBottom('auto'); }, [vp?.height]);
 
     const send = async (text: string) => {
         const question = text.trim();
@@ -225,11 +244,9 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
 
     return (
         <div
-            style={isMobile && vp
-                ? { position: 'fixed', left: 0, right: 0, top: 0, height: vp.height, transform: `translateY(${vp.offsetTop}px)` }
-                : undefined}
+            ref={rootRef}
             className={`flex flex-col animate-fade-in ${isMobile
-                ? 'z-50 bg-background'
+                ? 'fixed inset-x-0 top-0 z-50 bg-background'
                 : 'min-h-[340px] sm:h-[calc(100dvh-320px)]'
                 }`}
         >
@@ -375,7 +392,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        onFocus={() => setTimeout(() => scrollToBottom('auto'), 300)}
+                        onFocus={handleFocus}
                         onBlur={handleBlur}
                         rows={1}
                         placeholder={uid ? 'Ask about anything you’ve saved…' : 'Loading your library…'}
