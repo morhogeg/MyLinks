@@ -110,7 +110,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps)
     const isEmpty = messages.length === 0;
 
     return (
-        <div className="flex flex-col h-[calc(100vh-220px)] min-h-[420px] animate-fade-in">
+        <div className="flex flex-col h-[calc(100dvh-320px)] min-h-[340px] animate-fade-in">
             {/* Conversation */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto px-1 pb-4">
                 {isEmpty ? (

@@ -4,7 +4,7 @@ import logging
 import time
 from typing import List
 from google import genai
-from models import AIAnalysis
+from models import AIAnalysis, BrainAnswer
 
 logger = logging.getLogger(__name__)
 
@@ -244,9 +244,10 @@ If the image is an article, extract the headline and body."""
         {"answer": str, "citedIds": [str]}. Raises AnalysisError on failure.
 
         The whole point of a "Second Brain" answer is trust: the model must
-        speak only from what the user actually saved, and cite it — so this is a
-        plain grounded-generation call, deliberately NOT using the AIAnalysis
-        schema (that schema is for content extraction, not Q&A).
+        speak only from what the user actually saved, and cite it. Generation is
+        schema-constrained (BrainAnswer) so the model returns valid, fully
+        escaped JSON even when the answer contains quotes or newlines — a plain
+        response_mime_type call breaks on such content (notably Hebrew).
         """
         if not self.client:
             raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
@@ -291,32 +292,14 @@ User question: {question}
 
 Return ONLY a JSON object: {{"answer": string, "citedIds": string[]}} where citedIds are the ids (without brackets) of the sources you relied on."""
 
-        try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=[prompt],
-                config={"response_mime_type": "application/json"},
-            )
-            if not response or not response.text:
-                raise AnalysisError("Empty response from Gemini")
+        data = self._generate_json([prompt], "answer", config_extra={"response_schema": BrainAnswer})
 
-            data = json.loads(response.text)
-            if isinstance(data, list) and data:
-                data = data[0]
-            if not isinstance(data, dict):
-                raise AnalysisError("Gemini returned an unexpected answer shape")
-
-            answer = data.get("answer") or ""
-            cited = data.get("citedIds") or []
-            # Guard against hallucinated ids — keep only ones we actually supplied.
-            valid_ids = {c.get("id") for c in cards}
-            cited = [cid for cid in cited if cid in valid_ids]
-            return {"answer": answer, "citedIds": cited}
-        except AnalysisError:
-            raise
-        except Exception as e:
-            logger.error(f"Answer generation failed: {e}")
-            raise AnalysisError(f"AI answer failed: {e}")
+        answer = data.get("answer") or ""
+        cited = data.get("citedIds") or []
+        # Guard against hallucinated ids — keep only ones we actually supplied.
+        valid_ids = {c.get("id") for c in cards}
+        cited = [cid for cid in cited if cid in valid_ids]
+        return {"answer": answer, "citedIds": cited}
 
     def embed_text(self, text: str) -> List[float]:
         """Generate vector embedding for text using Gemini.
