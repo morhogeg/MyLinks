@@ -42,6 +42,10 @@
         "function": "share_ingest"
       },
       {
+        "source": "/api/chat",
+        "function": "ask_brain"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

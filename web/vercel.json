@@ -13,6 +13,10 @@
     {
       "source": "/api/share",
       "destination": "https://secondbrain-app-94da2.web.app/api/share"
+    },
+    {
+      "source": "/api/chat",
+      "destination": "https://secondbrain-app-94da2.web.app/api/chat"
     }
   ]
 }

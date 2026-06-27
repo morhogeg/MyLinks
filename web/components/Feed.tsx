@@ -18,12 +18,11 @@ import Card from './Card';
 import CompactCard from './CompactCard';
 import Masonry from './Masonry';
 import ReminderModal from './ReminderModal';
-import TableView from './TableView';
 import SwipeDeck from './SwipeDeck';
-import InsightsFeed from './InsightsFeed';
+import AskBrain from './AskBrain';
 import LinkDetailModal from './LinkDetailModal';
 import ConfirmDialog from './ConfirmDialog';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, List, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, Image as ImageIcon } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, Image as ImageIcon } from 'lucide-react';
 import TagExplorer from './TagExplorer';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -56,7 +55,7 @@ function FeedContent() {
     const [scrollLeft, setScrollLeft] = useState(0);
     const activeLink = links.find(l => l.id === activeLinkId) || null;
     const [isLoading, setIsLoading] = useState(true);
-    const [viewMode, setViewMode] = useState<'grid' | 'table' | 'insights' | 'compact' | 'review'>('grid');
+    const [viewMode, setViewMode] = useState<'grid' | 'compact' | 'review' | 'ask'>('grid');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
@@ -454,9 +453,8 @@ function FeedContent() {
     const viewModes: { key: typeof viewMode; label: string; icon: React.ReactNode; hint: string }[] = [
         { key: 'grid', label: 'Cards', icon: <LayoutGrid className="w-4 h-4" />, hint: 'Card view' },
         { key: 'compact', label: 'Compact', icon: <Grid2X2 className="w-4 h-4" />, hint: 'Compact grid' },
-        { key: 'table', label: 'Table', icon: <List className="w-4 h-4" />, hint: 'Table view' },
         { key: 'review', label: 'Review', icon: <Layers className="w-4 h-4" />, hint: 'Swipe to review' },
-        { key: 'insights', label: 'Insights', icon: <Sparkles className="w-4 h-4" />, hint: 'AI insights' },
+        { key: 'ask', label: 'Ask', icon: <Sparkles className="w-4 h-4" />, hint: 'Ask your brain' },
     ];
 
     if (isLoading) {
@@ -856,9 +854,15 @@ function FeedContent() {
                     </div>
                 )}
 
-                {/* Links Grid/Table */}
+                {/* Links Grid / Ask */}
                 <div className="flex-grow min-w-0">
-                    {filteredLinks.length === 0 ? (
+                    {viewMode === 'ask' ? (
+                        <AskBrain
+                            uid={uid}
+                            totalLinks={links.length}
+                            onOpenLink={(id) => setActiveLinkId(id)}
+                        />
+                    ) : filteredLinks.length === 0 ? (
                         <div className="text-center py-16 animate-fade-in">
                             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-accent/20">
                                 {filter === 'favorite' ? (
@@ -911,32 +915,6 @@ function FeedContent() {
                                 </button>
                             )}
                         </div>
-                    ) : viewMode === 'table' ? (
-                        <TableView
-                            links={filteredLinks}
-                            onOpenDetails={(link) => setActiveLinkId(link.id)}
-                            onStatusChange={handleStatusChange}
-                            onReadStatusChange={handleReadStatusChange}
-                            onUpdateTags={handleUpdateTags}
-                            onUpdateCategory={handleUpdateCategory}
-                            allCategories={categories}
-                            onDelete={handleDelete}
-                            onUpdateReminder={(link) => handleOpenReminderModal(link)}
-                            isSelectionMode={isSelectionMode}
-                            selectedIds={selectedIds}
-                            onToggleSelection={toggleSelection}
-                        />
-                    ) : viewMode === 'insights' ? (
-                        <InsightsFeed
-                            links={filteredLinks}
-                            onOpenDetails={(link) => setActiveLinkId(link.id)}
-                            onUpdateCategory={handleUpdateCategory}
-                            onReadStatusChange={handleReadStatusChange}
-                            isSelectionMode={isSelectionMode}
-                            selectedIds={selectedIds}
-                            allCategories={categories}
-                            onToggleSelection={toggleSelection}
-                        />
                     ) : viewMode === 'review' ? (
                         <SwipeDeck
                             links={filteredLinks}

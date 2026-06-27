@@ -40,7 +40,7 @@ from graph_service import GraphService
 # the Twilio SDK) are imported lazily inside the functions that use them. Both
 # are heavy and irrelevant to the hot image-analysis path, so deferring them
 # keeps cold starts lighter for functions like analyze_image.
-from search import sync_link_embedding, search_links
+from search import sync_link_embedding, search_links, perform_search_logic
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -301,6 +301,83 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
 
         return https_fn.Response(
             json.dumps({"success": True, "link": link_data}),
+            status=200, headers=headers, mimetype='application/json'
+        )
+
+    except Exception as e:
+        return _error_response(str(e), 500, headers)
+
+
+@https_fn.on_request()
+def ask_brain(req: https_fn.Request) -> https_fn.Response:
+    """HTTP endpoint: conversational RAG over the user's saved links.
+
+    "Ask Your Brain" — retrieves the most relevant saved cards via semantic
+    search, then has Gemini answer the question grounded ONLY in those cards,
+    returning the source ids it cited so the UI can link straight back to them.
+
+    Body: { uid, question, history?: [{role, content}] }
+    Returns: { success, answer, citedIds, sources: [{id, title, category, sourceName}] }
+    """
+    if req.method == 'OPTIONS':
+        return _cors_preflight()
+
+    headers = _cors_headers()
+
+    try:
+        data = req.get_json()
+        if not data:
+            return _error_response("Invalid JSON body", 400, headers)
+
+        uid = data.get('uid')
+        question = (data.get('question') or '').strip()
+        history = data.get('history') or []
+
+        if not uid:
+            return _error_response("uid is required", 400, headers)
+        if not question:
+            return _error_response("question is required", 400, headers)
+
+        # 1. Retrieve the most relevant saved cards (reuses the vector search
+        #    that already powers the search bar). Degrade gracefully: if
+        #    retrieval fails, answer_from_context returns a friendly "nothing
+        #    saved yet" reply rather than erroring the whole request.
+        try:
+            cards = perform_search_logic(uid, question, limit=8)
+        except Exception as e:
+            logger.error(f"ask_brain retrieval failed: {e}")
+            cards = []
+
+        # 2. Slim the cards to just what the model needs (bounded tokens/cost).
+        slim = [{
+            "id": c.get("id"),
+            "title": c.get("title", "Untitled"),
+            "summary": c.get("summary", ""),
+            "category": c.get("category", "General"),
+            "tags": c.get("tags", []),
+        } for c in cards]
+
+        # 3. Generate a grounded answer with citations.
+        ai = GeminiService()
+        result = ai.answer_from_context(question, slim, history)
+
+        # 4. Return only the cited sources for the UI (clickable chips).
+        cited_ids = result.get("citedIds", [])
+        by_id = {c.get("id"): c for c in cards}
+        sources = [{
+            "id": cid,
+            "title": by_id[cid].get("title", "Untitled"),
+            "category": by_id[cid].get("category", "General"),
+            "sourceName": by_id[cid].get("sourceName"),
+        } for cid in cited_ids if cid in by_id]
+
+        return https_fn.Response(
+            json.dumps({
+                "success": True,
+                "answer": result.get("answer", ""),
+                "citedIds": cited_ids,
+                "sources": sources,
+            }),
             status=200, headers=headers, mimetype='application/json'
         )
 
