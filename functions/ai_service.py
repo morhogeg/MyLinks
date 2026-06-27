@@ -43,6 +43,8 @@ Requirements for the analysis:
    
    GOOD: "Researchers at **MIT** found that **intermittent fasting** reduced inflammation markers by **40%** in a 12-week trial.\\n\\nThe study showed benefits appeared after just **2 weeks**."
 
+   - **RECIPE FOCUS**: If the content is a recipe or cooking video, the title and summary MUST center on the dish itself — what it is, its key ingredients, and how it is made. Treat the author's personal or dietary framing (e.g. "since I went keto…", "I make these for my kids") as secondary background, NOT the headline. Lead with the food, not the lifestyle commentary.
+
 
 4. detailedSummary: Write a well-structured, professional summary using markdown formatting:
    - **LANGUAGE**: Write the detailed summary in the SAME language as the input content.

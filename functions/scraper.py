@@ -37,6 +37,10 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         if 'linkedin.com' in url:
             return _scrape_linkedin_url(url)
 
+        # Special handling for Facebook URLs (full caption, not just og intro)
+        if 'facebook.com' in url or 'fb.watch' in url or 'fb.com' in url:
+            return _scrape_facebook_url(url, message_body)
+
         # General URL scraping with BeautifulSoup
         headers = {
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
@@ -65,6 +69,15 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
             text_parts.append(article.get_text().strip())
 
         text = " ".join(text_parts)[:5000]
+
+        # Fold in any caption/text the share carried. For JS-gated pages the
+        # on-page extraction is often empty, and this shared text is the only
+        # real signal — don't throw it away (the special-cased platforms above
+        # already use it; the generic branch historically ignored it).
+        if message_body:
+            caption_guess = message_body.replace(url, '').strip()
+            if caption_guess and len(caption_guess) > 5 and caption_guess not in text:
+                text = (f"SHARED CAPTION:\n{caption_guess}\n\n---\n\n{text}").strip()
 
         return {
             "html": html,
@@ -518,6 +531,75 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
         "title": best_title,
         "text": final_text
     }
+
+
+def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
+    """Scrape Facebook post/reel/video URLs.
+
+    Facebook serves a JS-only login wall to server-side requests, so the
+    generic article path comes up empty and falls back to raw HTML — which
+    only surfaces the truncated og:description (the caption's first line). For
+    a recipe post that first line is usually the author's personal framing
+    ("since I went keto…"), not the dish, so we pull the FULL og:description
+    caption and fold in any shared caption text from the message body. The
+    actual recipe (ingredients/steps) typically lives lower in that caption.
+    """
+    logger.info(f"Analyzing Facebook URL: {url}")
+
+    MOBILE_USER_AGENT = ("Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) "
+                         "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1")
+    generic_titles = ["Facebook", "Log in or sign up to view", "Log into Facebook",
+                      "Facebook Watch", "Facebook - log in or sign up"]
+
+    metadata_lines = []
+    best_title = "Facebook Post"
+    best_desc = ""
+
+    try:
+        headers = {
+            "User-Agent": MOBILE_USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.ok:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            def _meta(*names):
+                for name in names:
+                    tag = soup.find('meta', property=name) or soup.find('meta', attrs={'name': name})
+                    if tag and tag.get('content'):
+                        return tag['content'].strip()
+                return ""
+
+            d_title = _meta('og:title', 'twitter:title', 'title')
+            d_desc = _meta('og:description', 'twitter:description', 'description')
+
+            if d_title and d_title.split('|')[0].strip() not in generic_titles:
+                best_title = d_title.split('|')[0].strip()
+            if d_desc and len(d_desc) > 20:
+                best_desc = d_desc
+                metadata_lines.append(f"POST CAPTION:\n{d_desc}")
+    except Exception as e:
+        logger.warning(f"Facebook scrape failed: {e}")
+
+    # Fold in the shared caption from the message body — for recipe/video posts
+    # this is often the most complete text (the on-page caption is gated).
+    if message_body and url in message_body:
+        caption_guess = message_body.replace(url, '').strip()
+        if caption_guess and len(caption_guess) > 5:
+            metadata_lines.append(f"WHATSAPP SHARED CAPTION:\n{caption_guess}")
+            if len(caption_guess) > len(best_desc):
+                best_desc = caption_guess
+            if best_title in generic_titles or best_title == "Facebook Post":
+                best_title = caption_guess[:100].split('\n')[0]
+
+    if not metadata_lines and not best_desc:
+        return {"html": "", "title": "Facebook Link", "text": "Facebook content (metadata extraction failed)"}
+
+    final_text = "\n\n---\n\n".join(metadata_lines)
+    return {"html": final_text, "title": best_title, "text": final_text}
 
 
 def _extract_youtube_id(url: str) -> Optional[str]:
