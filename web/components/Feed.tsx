@@ -498,7 +498,12 @@ function FeedContent() {
                     <input
                         type="text"
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            // Search results render in the grid, not Ask — so typing a
+                            // query drops out of Ask into the last layout to show them.
+                            if (e.target.value && viewMode === 'ask') setViewMode(lastLayout.current);
+                        }}
                         placeholder="Search your brain..."
                         className="w-full pl-9 pr-10 py-2 bg-card rounded-xl text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent/30 transition-all"
                     />
