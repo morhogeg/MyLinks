@@ -512,7 +512,8 @@ function FeedContent() {
                     )}
                 </div>
 
-                {/* Row 1: Category Navigator (Primary) - DRASTICALLY BIGGER */}
+                {/* Row 1: Category Navigator — only relevant when browsing the grid. */}
+                {viewMode !== 'ask' && (
                 <div className="relative -mx-4 px-4 sm:mx-0 sm:px-0 group/category-nav">
                     {/* Left/Right Fades for Scrollability Cue */}
                     <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none opacity-0 group-hover/category-nav:opacity-100 transition-opacity duration-300 sm:left-0 sm:from-background" />
@@ -600,10 +601,13 @@ function FeedContent() {
                         })}
                     </div>
                 </div>
+                )}
 
                 {/* Row 2: Toolbar — filter / sort / source on the left, view & actions on the right */}
                 <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-2 -mx-2 px-2 sm:mx-0 sm:px-0">
+                    {/* Grid filters — hidden in Ask mode, where there's no grid to filter. */}
                     <div className="flex items-center gap-2">
+                        {viewMode !== 'ask' && (<>
                         {/* Status Filter — accent-themed dropdown (no native OS blue) */}
                         <Dropdown
                             ariaLabel="Filter by status"
@@ -674,6 +678,7 @@ function FeedContent() {
                                 )}
                             </div>
                         )}
+                        </>)}
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -716,6 +721,8 @@ function FeedContent() {
                             })}
                         </div>
 
+                        {/* Tag filter + bulk selection act on the grid — hide them in Ask mode. */}
+                        {viewMode !== 'ask' && (<>
                         {/* Tag Explorer Toggle (Mobile) */}
                         <button
                             onClick={() => setIsTagExplorerOpen(!isTagExplorerOpen)}
@@ -770,12 +777,13 @@ function FeedContent() {
                                 <CheckSquare className="w-4 h-4" />
                             </button>
                         )}
+                        </>)}
                     </div>
                 </div>
             </div>
 
-            {/* Active Tag Filters — always shown above the cards as tappable chips */}
-            {selectedTags.size > 0 && (
+            {/* Active Tag Filters — shown above the cards (not in Ask mode). */}
+            {viewMode !== 'ask' && selectedTags.size > 0 && (
                 <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
                     <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent/5 border border-accent/10">
                         <TagIcon className="w-3 h-3 text-accent" />
@@ -809,7 +817,8 @@ function FeedContent() {
 
             {/* Main Content with Tag Sidebar */}
             <div className="flex flex-col lg:flex-row gap-6 xl:gap-8 relative">
-                {/* Tag Explorer Sidebar (Desktop) */}
+                {/* Tag Explorer Sidebar (Desktop) — irrelevant in Ask mode. */}
+                {viewMode !== 'ask' && (
                 <aside
                     className={`hidden lg:block flex-shrink-0 transition-all duration-300 ease-in-out ${isTagExplorerCollapsed ? 'w-10' : 'w-64 xl:w-72'
                         }`}
@@ -838,6 +847,7 @@ function FeedContent() {
                         )}
                     </div>
                 </aside>
+                )}
 
                 {/* Tag Explorer Drawer (Mobile) */}
                 {isTagExplorerOpen && (
