@@ -16,6 +16,7 @@ export default function Home() {
   const { uid, loading } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAskMode, setIsAskMode] = useState(false);
 
   const handleLinkAdded = () => {
     setRefreshKey(prev => prev + 1);
@@ -75,11 +76,11 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="max-w-[2200px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-2 sm:py-4 pb-24 sm:pb-20">
-        <Feed key={refreshKey} />
+        <Feed key={refreshKey} onAskModeChange={setIsAskMode} />
       </main>
 
-      {/* Add Link FAB */}
-      <AddLinkForm onLinkAdded={handleLinkAdded} />
+      {/* Add Link FAB — hidden in Ask mode (the composer is the primary action there) */}
+      <AddLinkForm onLinkAdded={handleLinkAdded} hidden={isAskMode} />
 
       {/* Settings Modal */}
       {uid && (

@@ -63,6 +63,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps)
     const hydratedRef = useRef(false);
 
     useEffect(() => {
+        const vv = window.visualViewport;
         const measure = () => {
             // sm breakpoint — desktop/tablet keep the CSS-defined height.
             if (window.matchMedia('(min-width: 640px)').matches) {
@@ -71,16 +72,26 @@ export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps)
             }
             const el = rootRef.current;
             if (!el) return;
-            const top = el.getBoundingClientRect().top;
-            // Small gap so the composer isn't flush against the very bottom edge.
-            setMobileHeight(Math.max(window.innerHeight - top - 8, 340));
+            const rectTop = el.getBoundingClientRect().top;
+            // Size to the *visual* viewport so the composer tracks the keyboard: when
+            // it opens, visualViewport.height shrinks and the box shrinks with it,
+            // keeping the input just above the keyboard. getBoundingClientRect is
+            // relative to the layout viewport, so subtract the visual viewport's
+            // offset to get our top within the visible area.
+            const viewportH = vv ? vv.height : window.innerHeight;
+            const offsetTop = vv ? vv.offsetTop : 0;
+            setMobileHeight(Math.max(viewportH - (rectTop - offsetTop) - 8, 240));
         };
         measure();
         window.addEventListener('resize', measure);
         window.addEventListener('orientationchange', measure);
+        vv?.addEventListener('resize', measure);
+        vv?.addEventListener('scroll', measure);
         return () => {
             window.removeEventListener('resize', measure);
             window.removeEventListener('orientationchange', measure);
+            vv?.removeEventListener('resize', measure);
+            vv?.removeEventListener('scroll', measure);
         };
         // Re-measure once links load (empty state has no root ref to measure).
     }, [totalLinks]);

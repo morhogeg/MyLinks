@@ -12,6 +12,8 @@ import LinkScanProgress from '@/components/LinkScanProgress';
 
 interface AddLinkFormProps {
     onLinkAdded: () => void;
+    /** Hide the floating button (e.g. in Ask mode, where it's irrelevant). */
+    hidden?: boolean;
 }
 
 const formatUrl = (input: string) => {
@@ -56,7 +58,7 @@ const fetchWithTimeout = async (input: string, init: RequestInit) => {
  * Form for manually adding URLs
  * This replaces WhatsApp ingestion for local testing
  */
-export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
+export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkFormProps) {
     const { uid } = useAuth();
     const toast = useToast();
     const [url, setUrl] = useState('');
@@ -397,7 +399,7 @@ export default function AddLinkForm({ onLinkAdded }: AddLinkFormProps) {
                 </div>
             )}
 
-            <div className="fixed bottom-6 right-4 sm:right-6 z-40 flex flex-col items-end gap-3" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+            <div className={`fixed bottom-6 right-4 sm:right-6 z-40 ${hidden ? 'hidden' : 'flex'} flex-col items-end gap-3`} style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
                 {/* Persistent "still working" chip: the in-flight analysis promise
                     survives closing the panel, so show the user it's running and
                     let them reopen the scan view by tapping it. */}

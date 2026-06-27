@@ -39,7 +39,7 @@ type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
  * - Multiple view modes (grid / compact / table / insights)
  * - Deep linking to specific links via URL params
  */
-function FeedContent() {
+function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) => void }) {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
@@ -464,6 +464,11 @@ function FeedContent() {
     const activeMobileFilters =
         (filter !== 'all' ? 1 : 0) + selectedPlatforms.size + (screenshotOnly ? 1 : 0) + selectedTags.size;
 
+    // Tell the page when we're in Ask mode so it can hide the add-link FAB.
+    useEffect(() => {
+        onAskModeChange?.(viewMode === 'ask');
+    }, [viewMode, onAskModeChange]);
+
     if (isLoading) {
         return (
             <div className="space-y-4" aria-busy="true" aria-label="Loading your links">
@@ -724,7 +729,9 @@ function FeedContent() {
                             <span>Ask</span>
                         </button>
 
-                        {/* View Mode Switcher — labeled segmented control */}
+                        {/* View Mode Switcher — layouts only; hidden in Ask mode (tap the
+                            highlighted Ask button to exit back to your last layout). */}
+                        {viewMode !== 'ask' && (
                         <div className="inline-flex items-center gap-0.5 p-1 rounded-full bg-card border border-border-subtle">
                             {viewModes.map(vm => {
                                 const active = viewMode === vm.key;
@@ -746,6 +753,7 @@ function FeedContent() {
                                 );
                             })}
                         </div>
+                        )}
 
                         {/* Tag filter + bulk selection act on the grid — hide them in Ask mode. */}
                         {viewMode !== 'ask' && (<>
@@ -1225,14 +1233,14 @@ function FeedContent() {
     );
 }
 
-export default function Feed() {
+export default function Feed({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) => void }) {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
             </div>
         }>
-            <FeedContent />
+            <FeedContent onAskModeChange={onAskModeChange} />
         </Suspense>
     );
 }
