@@ -261,6 +261,7 @@ function CardFace({ link }: { link: Link }) {
     const youtubeChannel = link.metadata?.youtubeChannel || link.sourceName;
     const xAuthor = platform === 'x' ? xHandle(link.url) : null;
     const isLinkedIn = platform === 'linkedin';
+    const isFacebook = platform === 'facebook';
 
     return (
         <div className="h-full w-full surface-card bg-card rounded-2xl border border-border-subtle shadow-[var(--shadow-card)] p-5 sm:p-6 flex flex-col overflow-hidden">
@@ -285,6 +286,10 @@ function CardFace({ link }: { link: Link }) {
                 ) : isLinkedIn ? (
                     <span dir="ltr" className="flex items-center gap-1.5 min-w-0 text-xs font-semibold whitespace-nowrap" title="LinkedIn" aria-label="LinkedIn">
                         <span className="shrink-0 inline-flex" style={{ color: platformColor('linkedin') }}>{platformIcon('linkedin', 'w-4 h-4')}</span>
+                    </span>
+                ) : isFacebook ? (
+                    <span dir="ltr" className="flex items-center gap-1.5 min-w-0 text-xs font-semibold whitespace-nowrap" title="Facebook" aria-label="Facebook">
+                        <span className="shrink-0 inline-flex" style={{ color: platformColor('facebook') }}>{platformIcon('facebook', 'w-4 h-4')}</span>
                     </span>
                 ) : link.sourceType === 'image' ? (
                     <span className="flex items-center gap-1.5 text-xs font-semibold text-accent whitespace-nowrap">

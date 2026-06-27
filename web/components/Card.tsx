@@ -70,6 +70,8 @@ export default function Card({
     // LinkedIn: show only the brand logo. Author/source name from scraping is
     // unreliable (often the first words of the post), so we don't render text.
     const isLinkedIn = platform === 'linkedin';
+    // Facebook: same treatment as LinkedIn — brand logo only, no scraped name.
+    const isFacebook = platform === 'facebook';
 
     useEffect(() => {
         const initialTimer = setTimeout(() => setNow(Date.now()), 0);
@@ -323,7 +325,19 @@ export default function Card({
                                 </span>
                             </span>
                         )}
-                        {!isYouTube && !xAuthor && !isLinkedIn && link.sourceType === 'image' && (
+                        {!isYouTube && !xAuthor && !isLinkedIn && isFacebook && (
+                            <span
+                                dir="ltr"
+                                className="flex items-center gap-1.5 min-w-0 text-xs font-semibold whitespace-nowrap"
+                                title="Facebook"
+                                aria-label="Facebook"
+                            >
+                                <span className="shrink-0 inline-flex" style={{ color: platformColor('facebook') }}>
+                                    {platformIcon('facebook', 'w-4 h-4')}
+                                </span>
+                            </span>
+                        )}
+                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && link.sourceType === 'image' && (
                             <span
                                 className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-accent whitespace-nowrap"
                                 title="Screenshot"
@@ -332,7 +346,7 @@ export default function Card({
                                 <span>Screenshot</span>
                             </span>
                         )}
-                        {!isYouTube && !xAuthor && !isLinkedIn && link.sourceType !== 'image' && link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None' && (
+                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && link.sourceType !== 'image' && link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None' && (
                             <span
                                 className="flex items-center gap-1 text-[9px] font-bold text-text-muted/60 bg-black/5 border border-black/10 px-2 py-1 rounded-lg dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all max-w-[220px]"
                                 title={link.sourceName}
