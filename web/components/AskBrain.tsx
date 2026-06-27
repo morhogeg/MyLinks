@@ -220,7 +220,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps)
                                                     key={s.id}
                                                     onClick={() => onOpenLink(s.id)}
                                                     title={s.title}
-                                                    className="group flex items-center gap-2.5 max-w-[340px] ps-2.5 pe-3.5 py-2 rounded-xl bg-card border border-border-subtle shadow-sm hover:border-accent/50 hover:bg-card-hover transition-colors cursor-pointer text-start"
+                                                    className="group flex items-center gap-2.5 max-w-full ps-2.5 pe-3.5 py-2 rounded-xl bg-card border border-border-subtle shadow-sm hover:border-accent/50 hover:bg-card-hover transition-colors cursor-pointer text-start"
                                                 >
                                                     {(() => {
                                                         const tag = sourceTag(s);
@@ -241,7 +241,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps)
                                                                             {tag.label}
                                                                         </span>
                                                                     )}
-                                                                    <span className="truncate text-[13px] font-medium text-text">{s.title}</span>
+                                                                    <span className="text-[13px] font-medium text-text leading-snug">{s.title}</span>
                                                                 </span>
                                                             </>
                                                         );
