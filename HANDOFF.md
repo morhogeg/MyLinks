@@ -1,8 +1,59 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-27. Branch: `claude/amazing-northcutt-c017b5` (merged to `main`)._
+_Last updated: 2026-06-27. Branch: `claude/vibrant-leakey-694fc3` (merged to `main`)._
 
-## Latest session — Feature 5: Browser extension (one-click desktop capture)
+## Latest session — Facebook platform + Ask Your Brain polish & RAG fixes
+
+Frontend changes are **live on Vercel** (auto-deploy on push to `main`). Backend changes
+were **deployed** this session via `./deploy-functions.sh functions:ask_brain` (the only
+function touched) — Ask Your Brain is fully live.
+
+**Facebook platform** (`web/lib/platform.tsx`, `Card.tsx`, `SwipeDeck.tsx`, `LinkDetailModal.tsx`):
+- New `FacebookLogo` (solid brand "f" SVG, `currentColor`), `'facebook'` added to `PlatformKey`,
+  `PLATFORM_LABELS`, `getPlatform` (`facebook.com`/`fb.com`/`fb.watch`), `platformIcon`, and
+  `PLATFORM_RGB` (`24, 119, 242`). Cards/detail/review show the brand logo in place of the muted
+  source chip (same "logo only" treatment as LinkedIn). Source filter/sort chip is automatic
+  (derived from `PLATFORM_LABELS`).
+
+**Ask Your Brain — bug fixes (the important ones):**
+- **Hebrew answers crashed** with `AI answer failed: Expecting ',' delimiter`. Cause: the RAG call
+  used a bare `response_mime_type` so Gemini emitted unescaped quotes/newlines → invalid JSON.
+  Fix: `answer_from_context` now routes through `_generate_json` with a **`BrainAnswer`
+  response_schema** (`functions/ai_service.py`, `functions/models.py`) — schema-constrained,
+  always-valid JSON, plus the existing retry.
+- **"CNN fact-check" not found / "fact check" in the title not found** — two distinct bugs:
+  1. The model never saw the **publisher**: card context was only title/summary/category/tags, and
+     "CNN" isn't in that text. Fix: `ask_brain` passes `sourceName`/`url` through, and each card
+     block in the prompt now includes `source: <publisher>` (falls back to URL host).
+     (`functions/main.py`, `functions/ai_service.py`)
+  2. Retrieval was **vector-only**, which can drop a card whose title literally matches (ranking,
+     or no embedding yet). Fix: **hybrid retrieval** — `_keyword_fallback_cards` in `main.py` scans
+     the user's links for the question's keywords (title weighted highest) and merges the best hits
+     into the vector results.
+
+**Ask Your Brain — UX/polish** (`web/components/AskBrain.tsx`, `Feed.tsx`):
+- **Elevated Ask from a view toggle to its own button.** Removed `'ask'` from the Cards/Compact/
+  Review segmented control (those are layouts); Ask is now a standalone toolbar button — solid
+  accent when active, white bg + accent text when idle, icon `MessageCircleQuestion` (replaced the
+  generic Sparkles, also in the empty state). Toggling Ask off returns to your last layout
+  (`lastLayout` ref).
+- **Ask mode hides grid-only chrome** — category chips, status/sort/source filters, active-tag
+  chips, tag explorer (sidebar + mobile), bulk-selection. Kept: search bar + mode switcher.
+- **Search from Ask mode** drops you back into the grid (results only render there).
+- **Composer fits one viewport**: `h-[calc(100dvh-320px)] min-h-[340px]` (was `100vh-220px`, which
+  pushed the input below the fold).
+- **Citations are now "proof cards"** — accent icon tile + branded source tag (platform logo/brand,
+  e.g. YouTube red, or publisher name like CNN) + **full title** (no truncation). Needs the `url`
+  the backend now returns per source.
+- **Chat persists** across tab switches and reloads (`localStorage`, keyed `askbrain:chat:<uid>`),
+  cleared only via a new **Clear** button.
+
+**Next up (per plan):** Sessions 3 (Highlights & Notes) and 4 (Proactive Resurfacing) remain;
+Session 0 (auth, P0) is still the launch blocker.
+
+---
+
+## Earlier — Feature 5: Browser extension (one-click desktop capture)
 
 Implemented from the roadmap in `~/.claude/plans/you-are-an-expert-prancy-origami.md` (Session 5).
 **No web-app or backend changes** — a new, self-contained top-level **`/extension`** folder.
@@ -35,6 +86,16 @@ Implemented from the roadmap in `~/.claude/plans/you-are-an-expert-prancy-origam
   click the icon on an article → card appears in the app within seconds. See `extension/README.md`.
 - **Distribution:** load-unpacked only for now (documented in the README); Chrome Web Store is a
   later optional step.
+- **Follow-ups this session:** (1) added a **system-notification** confirmation on save
+  (`chrome.notifications`, with the page title) on top of the badge — graceful no-op where
+  unsupported. (2) Confirmed the web app **already auto-loads** new cards via Feed.tsx's Firestore
+  `onSnapshot` — no refresh needed; the only delay is the async analysis pipeline. (3) Added a
+  **Safari** build: same `/extension` code wrapped via `safari-web-extension-converter`. New
+  **`/safari`** folder = `build-safari.sh` (regenerates the Xcode project into gitignored
+  `safari/build/`, keeping `/extension` the single source of truth) + `README.md` (Xcode build +
+  Safari enable steps). Verified it generates and compiles (only the final code-sign/validate step
+  needs the user's Apple ID in Xcode). Safari caveats: no `chrome.notifications` (badge fallback)
+  and `options_ui` opens as a tab — both degrade gracefully, no code changes.
 
 **Next up (per plan):** Sessions 3 (Highlights & Notes) and 4 (Proactive Resurfacing) remain;
 Session 0 (auth, P0) is still the launch blocker.
