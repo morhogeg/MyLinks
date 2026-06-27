@@ -119,6 +119,7 @@ export default function LinkDetailModal({
     const youtubeChannel = link.metadata?.youtubeChannel || link.sourceName;
     const xAuthor = platform === 'x' ? xHandle(link.url) : null;
     const isLinkedIn = platform === 'linkedin';
+    const isFacebook = platform === 'facebook';
 
     const getTimeAgo = (timestamp: any, now: number): string => {
         if (!timestamp || !now) return '...';
@@ -400,6 +401,17 @@ export default function LinkDetailModal({
                                         >
                                             <span className="shrink-0 inline-flex" style={{ color: platformColor('linkedin') }}>
                                                 {platformIcon('linkedin', 'w-4 h-4')}
+                                            </span>
+                                        </span>
+                                    ) : isFacebook ? (
+                                        <span
+                                            dir="ltr"
+                                            className="flex items-center gap-1.5 min-w-0 text-sm font-semibold whitespace-nowrap"
+                                            title="Facebook"
+                                            aria-label="Facebook"
+                                        >
+                                            <span className="shrink-0 inline-flex" style={{ color: platformColor('facebook') }}>
+                                                {platformIcon('facebook', 'w-4 h-4')}
                                             </span>
                                         </span>
                                     ) : link.sourceType === 'image' ? (
