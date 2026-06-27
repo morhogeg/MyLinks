@@ -308,6 +308,58 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         return _error_response(str(e), 500, headers)
 
 
+# Words to ignore when keyword-matching a question against saved cards.
+_ASK_STOPWORDS = {
+    "the", "a", "an", "of", "to", "in", "on", "at", "by", "for", "and", "or",
+    "is", "are", "was", "were", "be", "been", "this", "that", "these", "those",
+    "what", "whats", "which", "who", "whom", "how", "why", "when", "where",
+    "do", "does", "did", "done", "can", "could", "would", "should", "will",
+    "i", "me", "my", "you", "your", "it", "its", "they", "them", "their",
+    "about", "with", "from", "into", "as", "any", "some", "all", "have", "has",
+}
+
+
+def _keyword_fallback_cards(uid: str, question: str, exclude_ids: set, limit: int = 5) -> list:
+    """Lexical retrieval to back up vector search.
+
+    Vector search can miss a card whose text literally contains the query's
+    keywords (ranking, or a card with no embedding yet). This scans the user's
+    links for the question's keywords across title/summary/tags/source/category
+    and returns the best matches not already retrieved — so an obvious title
+    hit like "fact check" is never dropped.
+    """
+    tokens = {
+        t for t in re.split(r"[^a-z0-9]+", question.lower())
+        if len(t) >= 3 and t not in _ASK_STOPWORDS
+    }
+    if not tokens:
+        return []
+
+    db = get_db()
+    links_ref = db.collection("users").document(uid).collection("links")
+
+    scored = []
+    for doc in links_ref.limit(300).stream():
+        if doc.id in exclude_ids:
+            continue
+        data = doc.to_dict() or {}
+        haystack = " ".join(str(x) for x in [
+            data.get("title", ""), data.get("summary", ""),
+            " ".join(data.get("tags", []) or []),
+            data.get("sourceName", ""), data.get("category", ""),
+        ]).lower()
+        # Weight title hits higher so a keyword in the title wins.
+        title_l = str(data.get("title", "")).lower()
+        score = sum((2 if t in title_l else 0) + (1 if t in haystack else 0) for t in tokens)
+        if score > 0:
+            data.pop("embedding_vector", None)
+            data["id"] = doc.id
+            scored.append((score, data))
+
+    scored.sort(key=lambda s: s[0], reverse=True)
+    return [d for _, d in scored[:limit]]
+
+
 @https_fn.on_request()
 def ask_brain(req: https_fn.Request) -> https_fn.Response:
     """HTTP endpoint: conversational RAG over the user's saved links.
@@ -347,6 +399,15 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         except Exception as e:
             logger.error(f"ask_brain retrieval failed: {e}")
             cards = []
+
+        # 1b. Hybrid retrieval: add lexical keyword matches vector search may
+        #     have missed (e.g. a word literally in a card's title). Merge,
+        #     keeping vector results first, then keyword hits, deduped.
+        try:
+            have = {c.get("id") for c in cards}
+            cards = cards + _keyword_fallback_cards(uid, question, have, limit=5)
+        except Exception as e:
+            logger.error(f"ask_brain keyword fallback failed: {e}")
 
         # 2. Slim the cards to just what the model needs (bounded tokens/cost).
         slim = [{
