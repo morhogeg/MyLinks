@@ -1,8 +1,39 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-27. Branch: `claude/vibrant-leakey-694fc3` (merged to `main`)._
+_Last updated: 2026-06-27. Branch: `claude/serene-einstein-4ac847` (merged to `main`)._
 
-## Latest session — Facebook platform + Ask Your Brain polish & RAG fixes
+## Latest session — Recipe/Facebook summary focus (deployed)
+
+**Problem:** a shared Facebook recipe video produced a card + WhatsApp summary about the
+author's **keto/dietary framing** instead of the **recipe**. Root cause was bad *input*, not a
+bad summarizer: Facebook had no special scraper, so it fell to the generic path, which on FB's
+JS/login-walled HTML only surfaced the truncated `og:description` (the personal preamble) —
+the actual dish lived in the video/lower caption and was never seen.
+
+**Three server-side fixes (all in `functions/`, no client changes):**
+- **Recipe-aware prompt** (`ai_service.py`, in `SYSTEM_PROMPT` summary rules): for recipes/cooking
+  content the title + summary must lead with the **dish** (what it is, ingredients, method) and
+  treat personal/dietary framing as secondary. Flows into both text and YouTube-video analysis.
+- **Facebook scraper** (`scraper.py`, new `_scrape_facebook_url`, routed for `facebook.com` /
+  `fb.watch` / `fb.com`): pulls the **full** `og:description` caption instead of losing it in
+  `html[:5000]`, and folds in any shared caption from the message body. (Complements main's
+  earlier Facebook **UI** support — logo + `getPlatform` — added the same day.)
+- **Generic branch no longer discards `message_body`** (`scraper.py`): shared caption text is now
+  prepended as `SHARED CAPTION:` for JS-gated pages where on-page extraction is empty.
+
+**Both clients covered by one deploy:** the desktop web app / extension hit `analyze_link`
+(HTTP) and the iPhone share / WhatsApp hit `process_link_background` (Firestore trigger); both
+call the same `scrape_url` + `_analyze_scraped`, and both were in the `./deploy-functions.sh`
+run. **Deployed this session** by the user.
+
+**Result:** card now leads with "מתכון למאפינס…" and recipe-focused key points. **Known
+ceiling (accepted, not a bug):** exact ingredients/quantities spoken only in a Facebook video
+can't be captured — FB video isn't transcribable server-side like YouTube. Closing that gap
+would need video-audio → speech-to-text (a much larger feature; deferred).
+
+---
+
+## Earlier same day — Facebook platform + Ask Your Brain polish & RAG fixes
 
 Frontend changes are **live on Vercel** (auto-deploy on push to `main`). Backend changes
 were **deployed** this session via `./deploy-functions.sh functions:ask_brain` (the only
