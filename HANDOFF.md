@@ -2,7 +2,21 @@
 
 _Last updated: 2026-06-27. Branch: `claude/affectionate-raman-9b994c` (merged to `main`)._
 
-## Latest session — Feature 1: "Ask Your Brain" (RAG) + view-mode cleanup
+## Latest session — Feature 2: Clean Reading Mode + Text-to-Speech
+
+Implemented from the roadmap in `~/.claude/plans/you-are-an-expert-prancy-origami.md` (Session 2).
+
+- **Backend extractor:** `extract_readable_article(url)` in `functions/scraper.py` — fetches the page and returns paragraph-structured blocks (`{type: p|h2|h3|li|blockquote, text}`), stripping script/nav/footer/aside and trimming leading nav-tab list items. Distinct from `scrape_url` (which space-joins + hard-truncates for AI). New HTTP function **`get_article`** in `functions/main.py` wraps it.
+- **Routing:** `/api/article` → `get_article` in `firebase.json` + `web/vercel.json`; dev proxy `web/app/api/article/route.ts`. Fetched **on demand** so it works for every saved link with no schema migration/backfill.
+- **UI:** new **`web/components/ReadingView.tsx`** — full-screen distraction-free reader: scroll **progress bar**, **font-size** controls (persisted to `localStorage` `reader-font-size`), **Listen (TTS)** via Web Speech API (`SpeechSynthesis`, one utterance per paragraph, play/pause/resume, `he-IL` for Hebrew), RTL-aware, serif-ish prose column, graceful loading/error states.
+- **Entry point:** a **"Read"** button (BookOpen) in `LinkDetailModal.tsx` header, shown only for text articles (`canRead`: http(s) URL, not YouTube, not image). Opens `ReadingView` as a `z-[60]` overlay.
+- Verify: open a web-article card → **Read** → clean reader loads; A−/A+ resize and persist; scrolling moves the progress bar; **Listen** reads aloud (pause/resume); a Hebrew article renders RTL. (Extractor already smoke-tested locally against a real Wikipedia article — 104 clean blocks.)
+
+**Next up (per plan):** Session 3 = Highlights & Personal Notes.
+
+---
+
+## Previous — Feature 1: "Ask Your Brain" (RAG) + view-mode cleanup
 
 Implemented from the roadmap in `~/.claude/plans/you-are-an-expert-prancy-origami.md` (Session 1). **Deployed this session** (hosting by user; functions via `firebase deploy --only functions`).
 
