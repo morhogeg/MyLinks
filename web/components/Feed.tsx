@@ -450,12 +450,15 @@ function FeedContent() {
     ];
 
     // View modes, in a single source of truth so the switcher stays in sync.
+    // Layout views only — Ask is a distinct mode, surfaced as its own button.
     const viewModes: { key: typeof viewMode; label: string; icon: React.ReactNode; hint: string }[] = [
         { key: 'grid', label: 'Cards', icon: <LayoutGrid className="w-4 h-4" />, hint: 'Card view' },
         { key: 'compact', label: 'Compact', icon: <Grid2X2 className="w-4 h-4" />, hint: 'Compact grid' },
         { key: 'review', label: 'Review', icon: <Layers className="w-4 h-4" />, hint: 'Swipe to review' },
-        { key: 'ask', label: 'Ask', icon: <Sparkles className="w-4 h-4" />, hint: 'Ask your brain' },
     ];
+    // The layout the Ask button returns you to when you toggle it off.
+    const lastLayout = useRef<typeof viewMode>('grid');
+    if (viewMode !== 'ask') lastLayout.current = viewMode;
 
     if (isLoading) {
         return (
@@ -674,6 +677,22 @@ function FeedContent() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {/* Ask — a distinct AI mode, set apart from the layout toggles so it
+                            reads as its own thing, not just another view. */}
+                        <button
+                            onClick={() => setViewMode(viewMode === 'ask' ? lastLayout.current : 'ask')}
+                            title="Ask your brain"
+                            aria-label="Ask your brain"
+                            aria-pressed={viewMode === 'ask'}
+                            className={`${ctrlBase} px-3.5 ${viewMode === 'ask'
+                                ? 'text-white border border-transparent shadow-sm shadow-accent/30 bg-[image:var(--accent-gradient)]'
+                                : 'text-accent border border-accent/30 bg-accent/10 hover:bg-accent/15 hover:border-accent/50'
+                                }`}
+                        >
+                            <Sparkles className="w-4 h-4" />
+                            <span>Ask</span>
+                        </button>
+
                         {/* View Mode Switcher — labeled segmented control */}
                         <div className="inline-flex items-center gap-0.5 p-1 rounded-full bg-card border border-border-subtle">
                             {viewModes.map(vm => {
