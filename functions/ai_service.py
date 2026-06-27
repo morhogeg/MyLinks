@@ -259,13 +259,32 @@ If the image is an article, extract the headline and body."""
                 "citedIds": [],
             }
 
-        sources_text = "\n\n".join(
-            f"[{c.get('id')}] {c.get('title', 'Untitled')} "
-            f"(category: {c.get('category', 'General')}; "
-            f"tags: {', '.join(c.get('tags', []) or [])})\n"
-            f"{c.get('summary', '')}"
-            for c in cards
-        )
+        def _source_label(c: dict) -> str:
+            """Publisher name for the card — explicit sourceName, else the URL's
+            host. Lets the model answer questions that name the source (e.g.
+            'the CNN fact-check'), which the title/summary alone don't contain."""
+            name = (c.get("sourceName") or "").strip()
+            if name and name.lower() not in ("none", "screenshot", "unknown"):
+                return name
+            url = c.get("url") or ""
+            try:
+                from urllib.parse import urlparse
+                host = urlparse(url).hostname or ""
+                return host[4:] if host.startswith("www.") else host
+            except Exception:
+                return ""
+
+        def _card_block(c: dict) -> str:
+            src = _source_label(c)
+            meta = [f"source: {src}"] if src else []
+            meta.append(f"category: {c.get('category', 'General')}")
+            meta.append(f"tags: {', '.join(c.get('tags', []) or [])}")
+            return (
+                f"[{c.get('id')}] {c.get('title', 'Untitled')} "
+                f"({'; '.join(meta)})\n{c.get('summary', '')}"
+            )
+
+        sources_text = "\n\n".join(_card_block(c) for c in cards)
 
         history_text = ""
         if history:

@@ -355,6 +355,10 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             "summary": c.get("summary", ""),
             "category": c.get("category", "General"),
             "tags": c.get("tags", []),
+            # Publisher/source so the model can answer questions that name it
+            # (e.g. "the CNN fact-check") — it's not in the title/summary text.
+            "sourceName": c.get("sourceName"),
+            "url": c.get("url"),
         } for c in cards]
 
         # 3. Generate a grounded answer with citations.
