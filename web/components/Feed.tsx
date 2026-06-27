@@ -685,7 +685,7 @@ function FeedContent() {
                             aria-label="Ask your brain"
                             aria-pressed={viewMode === 'ask'}
                             className={`${ctrlBase} px-3.5 ${viewMode === 'ask'
-                                ? 'text-white border border-transparent shadow-sm shadow-accent/30 bg-[image:var(--accent-gradient)]'
+                                ? 'bg-accent text-white border border-accent shadow-sm'
                                 : 'bg-card border border-border-subtle text-accent hover:bg-card-hover hover:border-accent/40'
                                 }`}
                         >

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Sparkles, ArrowUp, FileText, Brain, RotateCcw } from 'lucide-react';
+import { MessageCircleQuestion, ArrowUp, FileText, Brain, RotateCcw } from 'lucide-react';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS } from '@/lib/platform';
 
@@ -162,7 +162,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps)
                 {isEmpty ? (
                     <div className="h-full flex flex-col items-center justify-center text-center px-4">
                         <div className="w-14 h-14 mb-4 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-accent/20">
-                            <Sparkles className="w-7 h-7 text-white" />
+                            <MessageCircleQuestion className="w-7 h-7 text-white" />
                         </div>
                         <h2 className="text-xl font-semibold text-text mb-1.5">Ask your brain</h2>
                         <p className="text-text-secondary text-sm max-w-md mb-6">
