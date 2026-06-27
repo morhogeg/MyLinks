@@ -74,9 +74,6 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
     // stays an inline panel.
     const [isMobile, setIsMobile] = useState(false);
     const rootRef = useRef<HTMLDivElement>(null);
-    // While the keyboard dismisses, iOS keeps emitting "shrunk" visual-viewport
-    // events for a beat; ignore them briefly so the surface doesn't lag or leave a gap.
-    const suppressShrinkUntil = useRef(0);
     const syncViewportRef = useRef<() => void>(() => {});
 
     // Breakpoint only — changes rarely, so React state is fine here.
@@ -96,7 +93,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         const el = rootRef.current;
         const vvObj = window.visualViewport;
         const sync = () => {
-            if (!el || Date.now() < suppressShrinkUntil.current) return;
+            if (!el) return;
             const h = vvObj ? vvObj.height : window.innerHeight;
             const offset = vvObj ? vvObj.offsetTop : 0;
             el.style.height = `${h}px`;
@@ -154,23 +151,11 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         if (el) el.scrollTo({ top: el.scrollHeight, behavior });
     };
 
-    // Keyboard dismissing: grow to full height *now* and ignore the lagging
-    // "shrunk" visual-viewport events for a moment, so no white gap appears above
-    // the descending keyboard. The later events (and the suppress expiry) reconcile
-    // to the exact viewport.
-    const handleBlur = () => {
-        if (!isMobile) return;
-        const el = rootRef.current;
-        if (el) { el.style.height = `${window.innerHeight}px`; el.style.transform = ''; }
-        suppressShrinkUntil.current = Date.now() + 600;
-    };
-
-    // Re-focusing: cancel any dismiss-suppression and re-sync as the keyboard opens.
+    // When the input gains focus (keyboard opening), keep the latest message in
+    // view. Height tracking is handled by the visual-viewport listeners above.
     const handleFocus = () => {
-        suppressShrinkUntil.current = 0;
-        setTimeout(() => syncViewportRef.current(), 60);
-        setTimeout(() => syncViewportRef.current(), 280);
-        setTimeout(() => scrollToBottom('auto'), 320);
+        setTimeout(() => { syncViewportRef.current(); scrollToBottom('auto'); }, 120);
+        setTimeout(() => scrollToBottom('auto'), 350);
     };
 
     // Keep the latest message in view as the conversation grows.
@@ -393,14 +378,16 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
                         onFocus={handleFocus}
-                        onBlur={handleBlur}
                         rows={1}
                         placeholder={uid ? 'Ask about anything you’ve saved…' : 'Loading your library…'}
-                        disabled={!uid || isThinking}
+                        disabled={!uid}
                         dir={getDirection(input)}
                         className="flex-1 resize-none bg-transparent px-2 py-1.5 text-[15px] text-text placeholder:text-text-muted focus:outline-none max-h-32 disabled:opacity-60"
                     />
                     <button
+                        // Don't steal focus from the textarea — keeps the keyboard open
+                        // and lets the click land reliably (no layout shift mid-tap).
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => send(input)}
                         disabled={!uid || isThinking || !input.trim()}
                         aria-label="Send"
