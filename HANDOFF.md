@@ -1,6 +1,28 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-26. Branch worked on: `claude/elated-easley-47baa3` (merged to `main` throughout, commits `9eba77c…9a18563`)._
+_Last updated: 2026-06-27. Branch worked on: `claude/affectionate-raman-9b994c`._
+
+## Latest session — Feature 1: "Ask Your Brain" (RAG) + view-mode cleanup
+
+Implemented from the roadmap in `~/.claude/plans/you-are-an-expert-prancy-origami.md` (Session 1).
+
+**Part A — cleanup (done):**
+- View modes consolidated **5 → 4**: removed **Table** and the dead **Insights** tab; kept Cards / Compact / Review; added **Ask**. (`web/components/Feed.tsx`)
+- Deleted dead components: `SmartPulse.tsx` (called a non-existent `/api/chat`), `InsightsFeed.tsx`, `TableView.tsx`.
+  - _Note:_ `globals.css:325` still has a now-orphan "sticky columns in TableView" rule — harmless, clean later. The plan's "merge Compact into Cards as a density toggle" was **deferred** (kept Compact as its own mode for now).
+
+**Part B — Ask Your Brain RAG (done, NOT deployed):**
+- Backend: new HTTP function **`ask_brain`** in `functions/main.py` — embeds the question, reuses `perform_search_logic` (`functions/search.py`, vector search), then `GeminiService.answer_from_context` (new, in `functions/ai_service.py`) answers grounded ONLY in retrieved cards and returns cited source ids. Hallucinated ids are filtered out.
+- Routing: `/api/chat` → `ask_brain` added to **`firebase.json`** (hosting rewrite) and **`web/vercel.json`** (prod rewrite); thin dev proxy at **`web/app/api/chat/route.ts`** (mirrors `/api/analyze`).
+- UI: new **`web/components/AskBrain.tsx`** — chat thread, suggested prompts, thinking indicator, RTL-aware (`getDirection`), and **citation chips that open the source card** via `onOpenLink` → `setActiveLinkId`. Empty-library state included. Wired into Feed's `ask` view (ignores list filters; queries the whole brain).
+
+**⚠️ To finish/verify:** `ask_brain` is a **new** Cloud Function — it must be **deployed** (`firebase deploy --only functions,hosting`) before `/api/chat` resolves in prod or via `next dev` (the dev proxy forwards to the deployed backend). Requires `GEMINI_API_KEY` + the existing Firestore vector index. Not deployed pending user confirmation. Verify: open **Ask** tab → ask something only your saved cards could answer → confirm grounded answer + citation chips open the right cards.
+
+**Next up (per plan):** Session 2 = Clean Reading Mode + TTS.
+
+---
+
+_Earlier session — 2026-06-26. Branch: `claude/elated-easley-47baa3` (merged to `main`, commits `9eba77c…9a18563`)._
 
 ## TL;DR
 This session was a broad **UX / design + product pass**:
