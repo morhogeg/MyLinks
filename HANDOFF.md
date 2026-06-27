@@ -1,8 +1,38 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-27. Branch: `claude/serene-einstein-4ac847` (merged to `main`)._
+_Last updated: 2026-06-27. Branch: `claude/vibrant-leakey-694fc3` (merged to `main`)._
 
-## Latest session — Recipe/Facebook summary focus (deployed)
+## Latest session — Mobile UX + Ask Your Brain native chat (deployed)
+
+All frontend; shipped to **both** Vercel (desktop) and Firebase Hosting (iPhone, via
+`./deploy-hosting.sh`). A new **`/ship`** skill (`.claude/skills/ship/SKILL.md`) encodes the
+release flow; a memory rule reminds to always run `deploy-hosting.sh` for frontend changes.
+
+- **Facebook platform** (`web/lib/platform.tsx`, cards/detail/swipe): brand "f" logo in place of
+  the muted tag, plus a source filter/sort chip (auto from `PLATFORM_LABELS`).
+- **Ask Your Brain — backend fixes** (deployed `ask_brain`): Hebrew answers crashed on invalid
+  JSON → now schema-constrained via `_generate_json` + `BrainAnswer` (`models.py`). Questions
+  naming the publisher ("the CNN fact-check") failed → card context now includes `source:
+  <publisher>`; retrieval is **hybrid** (vector + keyword fallback `_keyword_fallback_cards`).
+- **Ask Your Brain — UX:** elevated from a view-toggle to its own toolbar button
+  (`MessageCircleQuestion`); citations are branded "proof cards" with full titles; chat persists
+  in `localStorage`; **Clear** now confirms via `ConfirmDialog`; placeholder reworded; suggestion
+  chips are built from the user's **own categories** (passed from Feed, rotated client-side).
+- **Ask mobile = native full-screen chat** (`AskBrain.tsx`): `position: fixed` sized to the
+  **VisualViewport** so the composer rides the keyboard (no covered input, no white gap on
+  dismiss); top bar with back button; body scroll locked; safe-area padding. **Desktop unchanged**
+  (all gated `<sm`). View switcher + add-link FAB hidden in Ask mode.
+- **Mobile toolbar declutter** (`Feed.tsx`): grid filters (status/sort/source/reminders/tags/
+  select) collapsed into a **Filters bottom sheet**; category chips collapsed into a **Categories
+  bottom sheet**; both `sm:hidden`, desktop keeps everything inline.
+- **ReadingView:** loading message ("Fetching the original article…") while the reader fetches.
+
+**Deploy note:** frontend needs BOTH Vercel (auto on push) and `./deploy-hosting.sh` (iPhone);
+backend changes need `./deploy-functions.sh functions:<name>`. See the `/ship` skill.
+
+---
+
+## Earlier — Recipe/Facebook summary focus (deployed)
 
 **Problem:** a shared Facebook recipe video produced a card + WhatsApp summary about the
 author's **keto/dietary framing** instead of the **recipe**. Root cause was bad *input*, not a
