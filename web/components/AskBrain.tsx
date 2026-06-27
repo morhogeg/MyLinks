@@ -52,9 +52,38 @@ export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps)
     const [isThinking, setIsThinking] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const rootRef = useRef<HTMLDivElement>(null);
+    // On mobile the chrome above this view is much shorter than on desktop, so a
+    // fixed height leaves the composer floating mid-screen. Measure our top edge
+    // and fill to the bottom of the (dynamic) viewport instead. Desktop keeps its
+    // CSS height (null = no inline override).
+    const [mobileHeight, setMobileHeight] = useState<number | null>(null);
     // Gate persistence until after we've loaded any saved chat, so the first
     // (empty) render doesn't clobber what's in storage.
     const hydratedRef = useRef(false);
+
+    useEffect(() => {
+        const measure = () => {
+            // sm breakpoint — desktop/tablet keep the CSS-defined height.
+            if (window.matchMedia('(min-width: 640px)').matches) {
+                setMobileHeight(null);
+                return;
+            }
+            const el = rootRef.current;
+            if (!el) return;
+            const top = el.getBoundingClientRect().top;
+            // Small gap so the composer isn't flush against the very bottom edge.
+            setMobileHeight(Math.max(window.innerHeight - top - 8, 340));
+        };
+        measure();
+        window.addEventListener('resize', measure);
+        window.addEventListener('orientationchange', measure);
+        return () => {
+            window.removeEventListener('resize', measure);
+            window.removeEventListener('orientationchange', measure);
+        };
+        // Re-measure once links load (empty state has no root ref to measure).
+    }, [totalLinks]);
 
     const storageKey = uid ? `askbrain:chat:${uid}` : null;
 
@@ -156,7 +185,11 @@ export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps)
     const isEmpty = messages.length === 0;
 
     return (
-        <div className="flex flex-col h-[calc(100dvh-320px)] min-h-[340px] animate-fade-in">
+        <div
+            ref={rootRef}
+            style={mobileHeight != null ? { height: mobileHeight } : undefined}
+            className="flex flex-col min-h-[340px] animate-fade-in -mb-24 sm:mb-0 sm:h-[calc(100dvh-320px)]"
+        >
             {/* Conversation */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto px-1 pb-4">
                 {isEmpty ? (
