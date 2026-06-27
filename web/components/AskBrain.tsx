@@ -1,14 +1,29 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Sparkles, ArrowUp, FileText, Brain } from 'lucide-react';
+import { Sparkles, ArrowUp, FileText, Brain, RotateCcw } from 'lucide-react';
 import { getDirection } from '@/lib/rtl';
+import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS } from '@/lib/platform';
 
 interface Source {
     id: string;
     title: string;
     category?: string;
     sourceName?: string | null;
+    url?: string | null;
+}
+
+/** The branded tag shown on a citation card: a platform (YouTube/X/…) when the
+ *  URL reveals one, otherwise the publisher name (e.g. CNN), otherwise null. */
+function sourceTag(s: Source): { label: string; platform: ReturnType<typeof getPlatform> } | null {
+    const platform = getPlatform(s.url || undefined);
+    if (platform) return { label: PLATFORM_LABELS[platform], platform };
+    const name = s.sourceName?.trim();
+    if (name && !['none', 'screenshot', 'unknown'].includes(name.toLowerCase())) {
+        return { label: name, platform: null };
+    }
+    if (s.category) return { label: s.category, platform: null };
+    return null;
 }
 
 interface ChatMessage {
@@ -37,6 +52,37 @@ export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps)
     const [isThinking, setIsThinking] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    // Gate persistence until after we've loaded any saved chat, so the first
+    // (empty) render doesn't clobber what's in storage.
+    const hydratedRef = useRef(false);
+
+    const storageKey = uid ? `askbrain:chat:${uid}` : null;
+
+    // Restore the conversation on mount (survives tab switches and reloads).
+    useEffect(() => {
+        if (!storageKey || hydratedRef.current) return;
+        try {
+            const raw = localStorage.getItem(storageKey);
+            if (raw) setMessages(JSON.parse(raw));
+        } catch { /* ignore corrupt/blocked storage */ }
+        hydratedRef.current = true;
+    }, [storageKey]);
+
+    // Persist as the conversation grows; only an explicit Clear wipes storage.
+    useEffect(() => {
+        if (!storageKey || !hydratedRef.current || messages.length === 0) return;
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(messages));
+        } catch { /* ignore quota/blocked storage */ }
+    }, [messages, storageKey]);
+
+    const clearChat = () => {
+        setMessages([]);
+        if (storageKey) {
+            try { localStorage.removeItem(storageKey); } catch { /* ignore */ }
+        }
+        textareaRef.current?.focus();
+    };
 
     // Keep the latest message in view as the conversation grows.
     useEffect(() => {
@@ -136,7 +182,19 @@ export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps)
                         </div>
                     </div>
                 ) : (
-                    <div className="max-w-2xl mx-auto space-y-5 py-2">
+                    <div className="max-w-2xl mx-auto py-2">
+                        {/* Clear — the chat persists across tabs/reloads until cleared here. */}
+                        <div className="sticky top-0 z-10 flex justify-end mb-2">
+                            <button
+                                onClick={clearChat}
+                                title="Clear conversation"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-card/80 backdrop-blur border border-border-subtle text-text-muted text-xs font-medium hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
+                            >
+                                <RotateCcw className="w-3 h-3" />
+                                Clear
+                            </button>
+                        </div>
+                        <div className="space-y-5">
                         {messages.map((m, i) => (
                             <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
                                 <div className={m.role === 'user' ? 'max-w-[85%]' : 'max-w-[90%] w-full'}>
@@ -164,15 +222,30 @@ export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps)
                                                     title={s.title}
                                                     className="group flex items-center gap-2.5 max-w-[340px] ps-2.5 pe-3.5 py-2 rounded-xl bg-card border border-border-subtle shadow-sm hover:border-accent/50 hover:bg-card-hover transition-colors cursor-pointer text-start"
                                                 >
-                                                    <span className="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-lg bg-accent/10 text-accent group-hover:bg-accent/15 transition-colors">
-                                                        <FileText className="w-3.5 h-3.5" />
-                                                    </span>
-                                                    <span className="min-w-0 flex flex-col">
-                                                        <span className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">
-                                                            Source{s.category ? ` · ${s.category}` : ''}
-                                                        </span>
-                                                        <span className="truncate text-[13px] font-medium text-text">{s.title}</span>
-                                                    </span>
+                                                    {(() => {
+                                                        const tag = sourceTag(s);
+                                                        return (
+                                                            <>
+                                                                <span
+                                                                    className="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-lg bg-accent/10 text-accent group-hover:bg-accent/15 transition-colors"
+                                                                    style={tag?.platform ? platformActiveStyle(tag.platform) : undefined}
+                                                                >
+                                                                    {tag?.platform ? platformIcon(tag.platform, 'w-3.5 h-3.5') : <FileText className="w-3.5 h-3.5" />}
+                                                                </span>
+                                                                <span className="min-w-0 flex flex-col">
+                                                                    {tag && (
+                                                                        <span
+                                                                            className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted"
+                                                                            style={tag.platform ? { color: platformColor(tag.platform) } : undefined}
+                                                                        >
+                                                                            {tag.label}
+                                                                        </span>
+                                                                    )}
+                                                                    <span className="truncate text-[13px] font-medium text-text">{s.title}</span>
+                                                                </span>
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </button>
                                             ))}
                                         </div>
@@ -190,6 +263,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink }: AskBrainProps)
                                 </div>
                             </div>
                         )}
+                        </div>
                     </div>
                 )}
             </div>
