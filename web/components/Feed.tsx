@@ -22,7 +22,7 @@ import SwipeDeck from './SwipeDeck';
 import AskBrain from './AskBrain';
 import LinkDetailModal from './LinkDetailModal';
 import ConfirmDialog from './ConfirmDialog';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, Sparkles, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, Image as ImageIcon } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessageCircleQuestion, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, Image as ImageIcon } from 'lucide-react';
 import TagExplorer from './TagExplorer';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -686,10 +686,10 @@ function FeedContent() {
                             aria-pressed={viewMode === 'ask'}
                             className={`${ctrlBase} px-3.5 ${viewMode === 'ask'
                                 ? 'text-white border border-transparent shadow-sm shadow-accent/30 bg-[image:var(--accent-gradient)]'
-                                : 'text-accent border border-accent/30 bg-accent/10 hover:bg-accent/15 hover:border-accent/50'
+                                : 'bg-card border border-border-subtle text-accent hover:bg-card-hover hover:border-accent/40'
                                 }`}
                         >
-                            <Sparkles className="w-4 h-4" />
+                            <MessageCircleQuestion className="w-4 h-4" />
                             <span>Ask</span>
                         </button>
 
