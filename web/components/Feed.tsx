@@ -63,6 +63,7 @@ function FeedContent() {
     const [selectedPlatforms, setSelectedPlatforms] = useState<Set<PlatformKey>>(new Set());
     const [screenshotOnly, setScreenshotOnly] = useState(false);
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
+    const [isFiltersOpen, setIsFiltersOpen] = useState(false);
     const [isTagExplorerCollapsed, setIsTagExplorerCollapsed] = useState(false);
     const [reminderModalLink, setReminderModalLink] = useState<Link | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -459,6 +460,9 @@ function FeedContent() {
     // The layout the Ask button returns you to when you toggle it off.
     const lastLayout = useRef<typeof viewMode>('grid');
     if (viewMode !== 'ask') lastLayout.current = viewMode;
+    // Count of active grid filters — badges the mobile "Filters" button.
+    const activeMobileFilters =
+        (filter !== 'all' ? 1 : 0) + selectedPlatforms.size + (screenshotOnly ? 1 : 0) + selectedTags.size;
 
     if (isLoading) {
         return (
@@ -610,8 +614,9 @@ function FeedContent() {
 
                 {/* Row 2: Toolbar — filter / sort / source on the left, view & actions on the right */}
                 <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-2 -mx-2 px-2 sm:mx-0 sm:px-0">
-                    {/* Grid filters — hidden in Ask mode, where there's no grid to filter. */}
-                    <div className="flex items-center gap-2">
+                    {/* Grid filters — inline on desktop/tablet; on mobile they move into the
+                        Filters sheet. Hidden entirely in Ask mode (no grid to filter). */}
+                    <div className="hidden sm:flex items-center gap-2">
                         {viewMode !== 'ask' && (<>
                         {/* Status Filter — accent-themed dropdown (no native OS blue) */}
                         <Dropdown
@@ -686,6 +691,22 @@ function FeedContent() {
                         </>)}
                     </div>
 
+                    {/* Mobile: a single Filters entry opens the sheet (desktop shows the
+                        controls inline above). Hidden in Ask mode. */}
+                    {viewMode !== 'ask' && (
+                        <button
+                            onClick={() => setIsFiltersOpen(true)}
+                            aria-label="Filters"
+                            className={`${ctrlBase} sm:hidden px-3.5 ${activeMobileFilters > 0
+                                ? 'bg-accent text-white border border-accent shadow-sm'
+                                : ctrlIdle
+                                }`}
+                        >
+                            <Filter className="w-4 h-4" />
+                            <span>Filters{activeMobileFilters > 0 ? ` (${activeMobileFilters})` : ''}</span>
+                        </button>
+                    )}
+
                     <div className="flex items-center gap-2">
                         {/* Ask — a distinct AI mode, set apart from the layout toggles so it
                             reads as its own thing, not just another view. */}
@@ -728,11 +749,13 @@ function FeedContent() {
 
                         {/* Tag filter + bulk selection act on the grid — hide them in Ask mode. */}
                         {viewMode !== 'ask' && (<>
-                        {/* Tag Explorer Toggle (Mobile) */}
+                        {/* Tag toggle — tablet only (mobile uses the Filters sheet; desktop
+                            ≥lg has the persistent sidebar). */}
+                        <div className="hidden sm:block lg:hidden">
                         <button
                             onClick={() => setIsTagExplorerOpen(!isTagExplorerOpen)}
                             title="Filter by tags"
-                            className={`${ctrlBase} lg:hidden px-3.5 ${selectedTags.size > 0
+                            className={`${ctrlBase} px-3.5 ${selectedTags.size > 0
                                 ? 'bg-accent text-white border border-accent shadow-sm'
                                 : ctrlIdle
                                 }`}
@@ -740,6 +763,7 @@ function FeedContent() {
                             <TagIcon className="w-4 h-4" />
                             <span>Tags{selectedTags.size > 0 && ` (${selectedTags.size})`}</span>
                         </button>
+                        </div>
 
                         {/* Selection Control */}
                         {isSelectionMode ? (
@@ -773,6 +797,7 @@ function FeedContent() {
                                 </button>
                             </div>
                         ) : (
+                            <div className="hidden sm:block">
                             <button
                                 onClick={() => setIsSelectionMode(true)}
                                 title="Select multiple"
@@ -781,6 +806,7 @@ function FeedContent() {
                             >
                                 <CheckSquare className="w-4 h-4" />
                             </button>
+                            </div>
                         )}
                         </>)}
                     </div>
@@ -852,6 +878,142 @@ function FeedContent() {
                         )}
                     </div>
                 </aside>
+                )}
+
+                {/* Filters Sheet (Mobile) — consolidates the grid controls behind one tap,
+                    keeping the mobile toolbar to a single tidy row. Desktop is untouched. */}
+                {isFiltersOpen && (
+                    <div className="sm:hidden fixed inset-0 z-50 flex flex-col justify-end isolate">
+                        <div
+                            className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+                            onClick={() => setIsFiltersOpen(false)}
+                        />
+                        <div className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
+                            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-text-muted/30" />
+                            <div className="flex items-center justify-between mb-5">
+                                <h3 className="text-base font-bold text-text">Filters</h3>
+                                <button
+                                    onClick={() => setIsFiltersOpen(false)}
+                                    aria-label="Close filters"
+                                    className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="space-y-5">
+                                {/* Status + Sort */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">Show</label>
+                                        <Dropdown
+                                            ariaLabel="Filter by status"
+                                            value={filter === 'reminders' ? 'all' : filter}
+                                            onChange={(v) => setFilter(v as FilterType)}
+                                            leadingIcon={statusTriggerIcon}
+                                            options={statusOptions}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">Sort</label>
+                                        <Dropdown
+                                            ariaLabel="Sort order"
+                                            value={sortBy}
+                                            onChange={(v) => setSortBy(v as SortType)}
+                                            leadingIcon={<ArrowUpDown className="w-4 h-4 text-text-secondary" />}
+                                            options={sortOptions}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Reminders */}
+                                <button
+                                    onClick={() => setFilter(filter === 'reminders' ? 'all' : 'reminders')}
+                                    aria-pressed={filter === 'reminders'}
+                                    className={`${ctrlBase} w-full justify-start px-3.5 ${filter === 'reminders'
+                                        ? 'bg-blue-500 text-white border border-blue-500 shadow-sm'
+                                        : ctrlIdle
+                                        }`}
+                                >
+                                    <Bell className={`w-4 h-4 ${filter === 'reminders' ? 'fill-current' : ''}`} />
+                                    <span>Reminders{reminderCount > 0 ? ` (${reminderCount})` : ''}</span>
+                                </button>
+
+                                {/* Source */}
+                                {(availablePlatforms.length > 0 || screenshotCount > 0) && (
+                                    <div>
+                                        <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">Source</label>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {availablePlatforms.map(p => {
+                                                const active = selectedPlatforms.has(p);
+                                                return (
+                                                    <button
+                                                        key={p}
+                                                        onClick={() => handleTogglePlatform(p)}
+                                                        aria-pressed={active}
+                                                        title={`${PLATFORM_LABELS[p]} (${platformCounts[p]})`}
+                                                        style={active ? platformActiveStyle(p) : undefined}
+                                                        className={`${ctrlBase} w-10 px-0 border ${active ? 'shadow-sm' : ctrlIdle}`}
+                                                    >
+                                                        {platformIcon(p, 'w-4 h-4')}
+                                                    </button>
+                                                );
+                                            })}
+                                            {screenshotCount > 0 && (
+                                                <button
+                                                    onClick={() => setScreenshotOnly(v => !v)}
+                                                    aria-pressed={screenshotOnly}
+                                                    title={`Screenshots (${screenshotCount})`}
+                                                    className={`${ctrlBase} w-10 px-0 border ${screenshotOnly ? 'bg-accent text-white border-accent shadow-sm' : ctrlIdle}`}
+                                                >
+                                                    <ImageIcon className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Tags + Select multiple */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() => { setIsFiltersOpen(false); setIsTagExplorerOpen(true); }}
+                                        className={`${ctrlBase} px-3.5 ${selectedTags.size > 0
+                                            ? 'bg-accent text-white border border-accent shadow-sm'
+                                            : ctrlIdle
+                                            }`}
+                                    >
+                                        <TagIcon className="w-4 h-4" />
+                                        <span>Tags{selectedTags.size > 0 ? ` (${selectedTags.size})` : ''}</span>
+                                    </button>
+                                    <button
+                                        onClick={() => { setIsFiltersOpen(false); setIsSelectionMode(true); }}
+                                        className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
+                                    >
+                                        <CheckSquare className="w-4 h-4" />
+                                        <span>Select</span>
+                                    </button>
+                                </div>
+
+                                {/* Footer */}
+                                <div className="flex items-center gap-3 pt-1">
+                                    {activeMobileFilters > 0 && (
+                                        <button
+                                            onClick={() => { setFilter('all'); setSelectedPlatforms(new Set()); setScreenshotOnly(false); setSelectedTags(new Set()); }}
+                                            className="text-sm font-semibold text-text-muted hover:text-accent transition-colors"
+                                        >
+                                            Clear all
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setIsFiltersOpen(false)}
+                                        className="ms-auto px-6 h-10 rounded-full bg-accent text-white font-semibold text-sm shadow-sm hover:bg-accent-hover transition-colors"
+                                    >
+                                        Done
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 )}
 
                 {/* Tag Explorer Drawer (Mobile) */}
