@@ -1,8 +1,47 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-27. Branch: `claude/affectionate-raman-9b994c` (merged to `main`)._
+_Last updated: 2026-06-27. Branch: `claude/amazing-northcutt-c017b5` (merged to `main`)._
 
-## Latest session — Feature 2: Clean Reading Mode + Text-to-Speech
+## Latest session — Feature 5: Browser extension (one-click desktop capture)
+
+Implemented from the roadmap in `~/.claude/plans/you-are-an-expert-prancy-origami.md` (Session 5).
+**No web-app or backend changes** — a new, self-contained top-level **`/extension`** folder.
+
+- **What it is:** a Manifest V3 Chromium extension (Chrome/Edge/Brave), vanilla JS/HTML/CSS,
+  **no build step, no dependencies**. It's a *thin client* over the already-deployed
+  `share_ingest` Cloud Function (`POST /api/share`, header `X-Ingest-Token`, body
+  `{url, note?}`) — the same endpoint the iOS Share Shortcut uses. No new backend code.
+- **Capture paths (all in the service worker, `background.js`):**
+  - **Toolbar click** → save current tab. **Keyboard** `Ctrl/⌘+Shift+S` → same.
+  - **Context menu "Save to MyLinks"** — on a **link** saves `info.linkUrl`; on a **selection**
+    saves the page URL with the selection as `note` (stored as the link body); on the **page**
+    saves the tab URL.
+  - **Badge feedback** (clears after ~2s): **✓ purple** = queued, **✓ grey** = duplicate
+    ("Already saved"), **✗ red** = error (no/invalid token or unsavable `chrome://`-type URL).
+- **Settings** (`popup.html`/`popup.css`/`popup.js`, registered as `options_ui` so it renders as
+  a popup window; auto-opens when no token is set): paste **ingest token** + optional **backend
+  URL** (default `https://secondbrain-app-94da2.web.app`), persisted in `chrome.storage.sync`.
+  **"Test connection"** posts a tokens-only request that **saves nothing** (share_ingest checks
+  the token before the URL → 400 = valid, 401/403 = token problem). Also a "Save this page now"
+  button. Friendly empty state: "Paste your MyLinks token to start saving."
+- **Icons:** purple→pink brain mark, 16/48/128 (rendered from `icons/icon.svg`).
+- **Permissions:** `contextMenus`, `activeTab`, `storage`; `host_permissions` for
+  `https://secondbrain-app-94da2.web.app/*`. (`scripting` not needed.)
+- **Note on highlights:** selected text is saved as the link **body/note**, not a structured
+  highlight — structured highlights are the deferred Session 3 (Highlights & Notes) feature.
+- **Verified:** manifest JSON + JS syntax check; live endpoint contract re-confirmed via curl
+  (OPTIONS→204, no-token→401, bad-token→403). **Final end-to-end check is the user's:** load
+  unpacked (`chrome://extensions` → Developer mode → Load unpacked → `/extension`), paste token,
+  click the icon on an article → card appears in the app within seconds. See `extension/README.md`.
+- **Distribution:** load-unpacked only for now (documented in the README); Chrome Web Store is a
+  later optional step.
+
+**Next up (per plan):** Sessions 3 (Highlights & Notes) and 4 (Proactive Resurfacing) remain;
+Session 0 (auth, P0) is still the launch blocker.
+
+---
+
+## Earlier — Feature 2: Clean Reading Mode + Text-to-Speech
 
 Implemented from the roadmap in `~/.claude/plans/you-are-an-expert-prancy-origami.md` (Session 2).
 
