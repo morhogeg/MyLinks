@@ -49,6 +49,17 @@ class AIAnalysis(BaseModel):
     videoDurationMinutes: Optional[int] = Field(None, description="Observed length of the video in whole minutes")
 
 
+class BrainAnswer(BaseModel):
+    """Structured output for the "Ask Your Brain" RAG endpoint.
+
+    Schema-constrained generation guarantees valid, fully-escaped JSON even when
+    the answer contains quotes or newlines (e.g. Hebrew text), which a free-form
+    response_mime_type call does not.
+    """
+    answer: str = Field(description="The grounded answer, in the same language as the question")
+    citedIds: List[str] = Field(default_factory=list, description="Ids of the saved sources actually used")
+
+
 class LinkDocument(BaseModel):
     """
     Firestore document schema for a saved link
