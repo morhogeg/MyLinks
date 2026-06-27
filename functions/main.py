@@ -369,6 +369,8 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             "title": by_id[cid].get("title", "Untitled"),
             "category": by_id[cid].get("category", "General"),
             "sourceName": by_id[cid].get("sourceName"),
+            # url lets the UI brand each citation by platform (YouTube, X, …).
+            "url": by_id[cid].get("url"),
         } for cid in cited_ids if cid in by_id]
 
         return https_fn.Response(
