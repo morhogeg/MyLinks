@@ -39,13 +39,19 @@ Settings are stored in `chrome.storage.sync`, so they follow your Chrome profile
 | **Right-click the page** → Save to MyLinks | the current tab's URL |
 | **Save this page now** (in settings popup) | the current tab's URL |
 
-### Badge feedback
+### Confirmation
+
+Every save shows a **system notification** confirming what happened — e.g.
+*"Saved to MyLinks ✓ — &lt;page title&gt; — analyzing now, it'll appear in your app
+shortly."*, *"Already in MyLinks"*, or a clear error. The card then appears in the
+MyLinks app **automatically** (real-time sync — no refresh) within a few seconds,
+once the backend finishes scraping + analyzing it.
+
+A toolbar **badge** mirrors the result for a couple of seconds:
 
 - **✓ purple** — saved (queued for processing).
 - **✓ grey** — already saved (duplicate; no error).
 - **✗ red** — something went wrong (no/invalid token, or the page can't be saved).
-
-The badge clears after ~2 seconds.
 
 ## Notes
 

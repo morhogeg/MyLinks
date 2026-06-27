@@ -37,6 +37,32 @@ const badgeSaved = () => setBadge("✓", "#7c3aed"); // ✓ purple
 const badgeDuplicate = () => setBadge("✓", "#64748b"); // ✓ muted (already saved)
 const badgeError = () => setBadge("✗", "#ef4444"); // ✗ red
 
+// ── Notification feedback ────────────────────────────────────────────────────
+// A persistent toast confirms the save with the page title — sturdier than the
+// 2s badge. A stable id means each new save replaces the previous toast.
+
+const NOTIF_ID = "mylinks-save";
+
+function notify(title, message) {
+  try {
+    chrome.notifications.create(NOTIF_ID, {
+      type: "basic",
+      iconUrl: chrome.runtime.getURL("icons/icon128.png"),
+      title,
+      message: message || "",
+      priority: 0,
+    });
+  } catch (_) {
+    // notifications can be unavailable in some contexts; the badge still fired.
+  }
+}
+
+// Trim a URL/title to something readable in a toast line.
+function shorten(text, max = 80) {
+  if (!text) return "";
+  return text.length > max ? text.slice(0, max - 1) + "…" : text;
+}
+
 // ── Core: POST to the existing share_ingest endpoint ─────────────────────────
 
 // Returns { ok, status, body } where body is the parsed JSON (or null).
@@ -72,10 +98,15 @@ async function postShare({ url, note }) {
   return { ok: res.ok, status: res.status, body };
 }
 
-// Save and surface result via the badge. Returns the postShare result.
-async function saveAndReport({ url, note }) {
+// Save and surface result via the badge + a notification. `label` is a
+// human-friendly name for the saved item (page title, or the URL). Returns the
+// postShare result.
+async function saveAndReport({ url, note, label }) {
+  const name = shorten(label || url);
+
   if (!url || !/^https?:\/\//i.test(url)) {
     await badgeError();
+    notify("Can't save this page", "Only http(s) pages can be saved — not browser or store pages.");
     return { ok: false, status: 0, error: "bad-url" };
   }
 
@@ -83,14 +114,26 @@ async function saveAndReport({ url, note }) {
 
   if (result.error === "no-token") {
     await badgeError();
+    notify("Set your token first", "Click to open MyLinks settings and paste your ingest token.");
     chrome.runtime.openOptionsPage().catch(() => {});
     return result;
   }
   if (result.ok && result.body) {
-    if (result.body.duplicate) await badgeDuplicate();
-    else await badgeSaved();
+    if (result.body.duplicate) {
+      await badgeDuplicate();
+      notify("Already in MyLinks", name);
+    } else {
+      await badgeSaved();
+      const extra = note ? " (with your selection)" : "";
+      notify("Saved to MyLinks ✓", `${name}${extra} — analyzing now, it'll appear in your app shortly.`);
+    }
   } else {
     await badgeError();
+    const reason =
+      result.status === 403 ? "Invalid token — check it in settings." :
+      result.status === 401 ? "No token sent — check it in settings." :
+      "Couldn't reach MyLinks. Check your connection.";
+    notify("Couldn't save", reason);
   }
   return result;
 }
@@ -104,7 +147,7 @@ chrome.action.onClicked.addListener(async (tab) => {
     return;
   }
   if (tab && tab.url) {
-    await saveAndReport({ url: tab.url });
+    await saveAndReport({ url: tab.url, label: tab.title });
   } else {
     await badgeError();
   }
@@ -120,7 +163,7 @@ chrome.commands.onCommand.addListener(async (command) => {
     chrome.runtime.openOptionsPage().catch(() => {});
     return;
   }
-  if (tab && tab.url) await saveAndReport({ url: tab.url });
+  if (tab && tab.url) await saveAndReport({ url: tab.url, label: tab.title });
 });
 
 // ── Context menus ────────────────────────────────────────────────────────────
@@ -154,11 +197,15 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   // Otherwise, if text is selected → save the page with the selection as the note.
   // Otherwise → save the page.
   if (info.linkUrl) {
-    await saveAndReport({ url: info.linkUrl });
+    await saveAndReport({ url: info.linkUrl, label: info.linkUrl });
   } else if (info.selectionText && (info.pageUrl || (tab && tab.url))) {
-    await saveAndReport({ url: info.pageUrl || tab.url, note: info.selectionText });
+    await saveAndReport({
+      url: info.pageUrl || tab.url,
+      note: info.selectionText,
+      label: (tab && tab.title) || info.pageUrl || tab.url,
+    });
   } else if (info.pageUrl || (tab && tab.url)) {
-    await saveAndReport({ url: info.pageUrl || tab.url });
+    await saveAndReport({ url: info.pageUrl || tab.url, label: (tab && tab.title) || info.pageUrl || tab.url });
   } else {
     await badgeError();
   }
@@ -200,7 +247,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === "save-current-tab") {
     (async () => {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      const result = await saveAndReport({ url: tab && tab.url });
+      const result = await saveAndReport({ url: tab && tab.url, label: tab && tab.title });
       sendResponse(result);
     })();
     return true;
