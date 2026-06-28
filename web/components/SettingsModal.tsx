@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { User, DigestMode, DigestChannel } from '@/lib/types';
-import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Bell, Sparkles, Share2, Copy, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, ShieldCheck, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight, Smartphone, Puzzle } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '@/lib/firebase';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
@@ -69,13 +69,41 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
     const [sendingNow, setSendingNow] = useState(false);
     const [sendResult, setSendResult] = useState<string | null>(null);
 
+    const [shareConfig, setShareConfig] = useState<{ endpoint: string; token: string; whatsapp_number?: string } | null>(null);
+    const [shareLoading, setShareLoading] = useState(false);
+    const [copied, setCopied] = useState<'endpoint' | 'token' | 'whatsapp' | null>(null);
+
     useEffect(() => {
         if (isOpen && uid) {
             setView('main');
             loadSettings();
+            loadShareConfig();
             loadDigestExtras();
         }
     }, [isOpen, uid]);
+
+    const loadShareConfig = async () => {
+        setShareLoading(true);
+        try {
+            const fn = httpsCallable(functions, 'get_share_config');
+            const result = await fn({ uid });
+            setShareConfig(result.data as { endpoint: string; token: string; whatsapp_number?: string });
+        } catch (error) {
+            console.error('Failed to load share config:', error);
+        } finally {
+            setShareLoading(false);
+        }
+    };
+
+    const handleCopy = async (value: string, which: 'endpoint' | 'token' | 'whatsapp') => {
+        try {
+            await navigator.clipboard.writeText(value);
+            setCopied(which);
+            setTimeout(() => setCopied(null), 1500);
+        } catch (error) {
+            console.error('Copy failed:', error);
+        }
+    };
 
     const loadDigestExtras = async () => {
         try {
@@ -345,11 +373,59 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
 
                     {/* Capture */}
                     <Section icon={<Share2 className="w-4 h-4" />} title="Capture links">
+                        {/* WhatsApp */}
                         <Row
                             icon={<MessageCircle className="w-5 h-5 text-green-500" />}
                             title="WhatsApp"
                             subtitle="Send any link to the bot — it's saved, summarized, and tagged automatically."
                         />
+                        {shareConfig?.whatsapp_number && (
+                            <CopyField
+                                label="WhatsApp bot number"
+                                value={shareConfig.whatsapp_number}
+                                copied={copied === 'whatsapp'}
+                                onCopy={() => handleCopy(shareConfig.whatsapp_number!, 'whatsapp')}
+                            />
+                        )}
+
+                        <div className="h-px bg-border-subtle" />
+
+                        {/* iOS Shortcut + browser extension (share-ingest token) */}
+                        <Row
+                            icon={<Smartphone className="w-5 h-5 text-accent" />}
+                            title="iOS Shortcut & browser extension"
+                            subtitle="Save from any app (Safari, Maps, Instagram…) or browser. Paste these two values into the Shortcut or the extension once."
+                        />
+
+                        {shareLoading && <div className="text-xs text-text-muted">Loading your endpoint…</div>}
+
+                        {shareConfig && (
+                            <div className="space-y-2.5">
+                                <CopyField
+                                    label="Endpoint URL"
+                                    value={shareConfig.endpoint}
+                                    copied={copied === 'endpoint'}
+                                    onCopy={() => handleCopy(shareConfig.endpoint, 'endpoint')}
+                                />
+                                <CopyField
+                                    label="Ingest Token"
+                                    value={shareConfig.token}
+                                    copied={copied === 'token'}
+                                    onCopy={() => handleCopy(shareConfig.token, 'token')}
+                                />
+                                <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
+                                    <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                                    Keep your token private — anyone with it can save to your brain.
+                                </div>
+                                <div className="flex items-start gap-2 text-[11px] text-text-muted">
+                                    <Puzzle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                                    <span>
+                                        Step-by-step setup is in <span className="font-medium text-text-secondary">SHORTCUT_SETUP.md</span> (iOS)
+                                        and <span className="font-medium text-text-secondary">extension/README.md</span> (Chrome/Edge/Brave).
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                     </Section>
 
                     {/* About */}
@@ -585,6 +661,26 @@ function Row({ icon, title, subtitle, children }: { icon?: ReactNode; title: str
                 </div>
             </div>
             {children && <div className="shrink-0">{children}</div>}
+        </div>
+    );
+}
+
+function CopyField({ label, value, copied, onCopy }: { label: string; value: string; copied: boolean; onCopy: () => void }) {
+    return (
+        <div>
+            <label className="text-[11px] font-medium text-text-muted block mb-1">{label}</label>
+            <div className="flex items-center gap-2">
+                <code className="flex-1 min-w-0 truncate px-3 py-2 rounded-xl bg-card-hover border border-border-subtle text-xs text-text-secondary font-mono">
+                    {value}
+                </code>
+                <button
+                    onClick={onCopy}
+                    className="shrink-0 h-9 w-9 rounded-xl bg-card-hover border border-border-subtle text-text-muted hover:text-text hover:border-accent/40 transition-all flex items-center justify-center cursor-pointer"
+                    aria-label={`Copy ${label}`}
+                >
+                    {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                </button>
+            </div>
         </div>
     );
 }

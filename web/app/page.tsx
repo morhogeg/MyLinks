@@ -76,7 +76,7 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="max-w-[2200px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-2 sm:py-4 pb-24 sm:pb-20">
-        <Feed key={refreshKey} onAskModeChange={setIsAskMode} />
+        <Feed key={refreshKey} onAskModeChange={setIsAskMode} onOpenSettings={() => setIsSettingsOpen(true)} />
       </main>
 
       {/* Add Link FAB — hidden in Ask mode (the composer is the primary action there) */}

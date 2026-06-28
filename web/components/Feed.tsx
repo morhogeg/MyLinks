@@ -22,7 +22,7 @@ import SwipeDeck from './SwipeDeck';
 import AskBrain from './AskBrain';
 import LinkDetailModal from './LinkDetailModal';
 import ConfirmDialog from './ConfirmDialog';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessageCircleQuestion, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, Image as ImageIcon, ChevronDown } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessageCircleQuestion, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, Image as ImageIcon, ChevronDown, Share2 } from 'lucide-react';
 import TagExplorer from './TagExplorer';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -39,7 +39,7 @@ type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
  * - Multiple view modes (grid / compact / table / insights)
  * - Deep linking to specific links via URL params
  */
-function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) => void }) {
+function FeedContent({ onAskModeChange, onOpenSettings }: { onAskModeChange?: (isAsk: boolean) => void; onOpenSettings?: () => void }) {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
@@ -1216,6 +1216,35 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                                     Reset Filters
                                 </button>
                             )}
+
+                            {/* Brand-new brain: point users at every way to capture, not just the + button. */}
+                            {links.length === 0 && !searchQuery && (
+                                <div className="mt-8 max-w-md mx-auto text-left rounded-2xl border border-border-subtle bg-card p-5">
+                                    <div className="text-sm font-semibold text-text mb-3">Three ways to fill your brain</div>
+                                    <ul className="space-y-2.5 text-[13px] text-text-secondary">
+                                        <li className="flex items-start gap-2.5">
+                                            <span className="mt-0.5 shrink-0 w-5 h-5 rounded-md bg-accent/10 text-accent flex items-center justify-center text-[11px] font-bold">+</span>
+                                            <span>Tap the <span className="font-semibold text-text">+</span> button to paste a link or upload a screenshot.</span>
+                                        </li>
+                                        <li className="flex items-start gap-2.5">
+                                            <MessageCircleQuestion className="mt-0.5 shrink-0 w-5 h-5 text-green-500" />
+                                            <span>Forward links to the <span className="font-semibold text-text">WhatsApp bot</span> — find its number in Settings.</span>
+                                        </li>
+                                        <li className="flex items-start gap-2.5">
+                                            <Share2 className="mt-0.5 shrink-0 w-5 h-5 text-accent" />
+                                            <span>Add the <span className="font-semibold text-text">iOS Shortcut</span> or <span className="font-semibold text-text">browser extension</span> with your ingest token.</span>
+                                        </li>
+                                    </ul>
+                                    {onOpenSettings && (
+                                        <button
+                                            onClick={onOpenSettings}
+                                            className="mt-4 w-full px-4 py-2.5 bg-accent text-white rounded-xl text-sm font-bold hover:bg-accent-hover transition-all"
+                                        >
+                                            Set up capture
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     ) : viewMode === 'review' ? (
                         <SwipeDeck
@@ -1331,14 +1360,14 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
     );
 }
 
-export default function Feed({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) => void }) {
+export default function Feed({ onAskModeChange, onOpenSettings }: { onAskModeChange?: (isAsk: boolean) => void; onOpenSettings?: () => void }) {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
             </div>
         }>
-            <FeedContent onAskModeChange={onAskModeChange} />
+            <FeedContent onAskModeChange={onAskModeChange} onOpenSettings={onOpenSettings} />
         </Suspense>
     );
 }

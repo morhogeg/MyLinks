@@ -680,9 +680,15 @@ def get_share_config(req: https_fn.CallableRequest) -> dict:
         )
 
     token = ensure_ingest_token(uid)
+    # Surface the WhatsApp bot number so Settings can show users where to text.
+    # Stored as e.g. "whatsapp:+14155238886"; strip the channel prefix for display.
+    whatsapp_number = os.environ.get(
+        "TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238886"
+    ).replace("whatsapp:", "").strip()
     return {
         "endpoint": f"{APP_URL}/api/share",
-        "token": token
+        "token": token,
+        "whatsapp_number": whatsapp_number,
     }
 
 
