@@ -116,6 +116,32 @@ export interface User {
   };
 }
 
+// ── Ask-your-brain chat ──────────────────────────────────────────────────────
+// A citation chip pointing back at a saved link the answer was grounded in.
+export interface ChatSource {
+  id: string;
+  title: string;
+  category?: string;
+  sourceName?: string | null;
+  url?: string | null;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  sources?: ChatSource[];
+  error?: boolean;
+}
+
+/** A saved conversation in the Ask history sidebar (users/{uid}/chats/{id}). */
+export interface ChatSession {
+  id: string;
+  title: string;          // auto-derived from the first user message, editable
+  messages: ChatMessage[];
+  createdAt: number;      // Date.now()
+  updatedAt: number;      // Date.now() — drives sidebar sort (most recent first)
+}
+
 // Request/Response types for API routes
 export interface AnalyzeRequest {
   url: string;
