@@ -18,8 +18,13 @@ set -euo pipefail
 PROJECT="secondbrain-app-94da2"
 
 # Default to the functions touched by the link/video pipeline. Override by
-# passing your own --only target as the first argument.
-TARGETS="${1:-functions:analyze_link,functions:analyze_image,functions:process_link_background}"
+# passing your own comma-separated target(s) as the first argument.
+RAW="${1:-functions:analyze_link,functions:analyze_image,functions:process_link_background}"
+
+# Normalize: `firebase deploy --only` needs EVERY function prefixed with
+# "functions:". A list like "functions:a,b,c" silently deploys ONLY "a" (b/c are
+# read as unknown target types), so prefix any bare names automatically.
+TARGETS=$(printf '%s' "$RAW" | awk -F, 'BEGIN{OFS=","}{for(i=1;i<=NF;i++){gsub(/^[ \t]+|[ \t]+$/,"",$i); if($i!~/^functions:/)$i="functions:"$i}; $1=$1; print}')
 
 echo "Deploying [$TARGETS] to project: $PROJECT"
 firebase deploy --only "$TARGETS" --project "$PROJECT"
