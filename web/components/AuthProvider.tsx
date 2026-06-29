@@ -73,14 +73,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         (async () => {
             try {
                 const snapshot = await getDocs(query(collection(db, 'users'), limit(1)));
-                if (!cancelled && !snapshot.empty) {
+                if (cancelled) return;
+                if (snapshot.empty) {
+                    console.warn('No user document found in Firestore');
+                } else {
                     const userDoc = snapshot.docs[0];
                     setUid(userDoc.id);
                     persistTimezone(userDoc.id, userDoc.data().timezone);
-                } else if (!snapshot.empty) {
-                    // no-op
-                } else {
-                    console.warn('No user document found in Firestore');
                 }
             } catch (err) {
                 console.error('Failed to look up user:', err);
