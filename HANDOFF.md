@@ -1,8 +1,73 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-29. Branch: `claude/security-audit-baseline-ul4hec` (merged to `main`)._
+_Last updated: 2026-06-29. Branch: `claude/chat-history-sidebar-fgldj7` (merged to `main`)._
 
-## Latest session — Production security baseline (frontend + backend)
+## Latest session — Ask Your Brain: chat history + UI overhaul + streaming + i18n
+
+Large multi-part session on the **Ask** page. All frontend is on `main` (Vercel auto-deploys
+desktop). Backend (`ask_brain`) prompt/streaming changes need `./deploy-functions.sh
+functions:ask_brain` — the user **already redeployed mid-session** (streaming + answer-language
+confirmed live); only the final "don't announce counts" prompt tweak awaits one more redeploy.
+**iPhone (Firebase Hosting) still needs `./deploy-hosting.sh`** for all the frontend changes.
+
+**Key files:** `web/components/AskBrain.tsx`, `web/components/ChatHistorySidebar.tsx` (new),
+`web/lib/chats.ts` (new), `web/lib/types.ts`, `web/app/page.tsx`, `web/components/Feed.tsx`,
+`web/app/globals.css`, `web/components/LinkDetailModal.tsx`, `web/app/api/chat/route.ts`,
+`web/vercel.json`, `functions/main.py`, `functions/ai_service.py`, `firestore.rules`.
+
+**1. Saved chat history (Firestore `users/{uid}/chats/{chatId}`).** New `web/lib/chats.ts`
+(CRUD + live `onSnapshot`, mirrors `lib/storage.ts`); `ChatMessage`/`ChatSource`/`ChatSession`
+in `web/lib/types.ts`. `AskBrain` is multi-session: auto-saves on the first assistant reply
+(debounced), legacy `askbrain:chat:{uid}` localStorage migrated into history once. New
+`ChatHistorySidebar` — full-height desktop panel + mobile slide-over drawer; New chat / rename /
+delete (delete via `ConfirmDialog`). `firestore.rules` gained a `users/{uid}/chats` block (open,
+consistent with the documented residual-risk model). **On load/refresh the view starts on a fresh
+New chat**; past chats stay in the sidebar.
+
+**2. Desktop layout overhaul.** Ask view fills the viewport: `AskBrain` measures its top
+(`getBoundingClientRect`) and sets an inline height to the window bottom, composer pinned at the
+bottom, conversation scrolls. `page.tsx` drops `main`'s bottom padding in Ask mode. **Search bar
+removed in Ask mode**, replaced by a **Back** button beside it; the **Ask pill is hidden in Ask
+mode** so its toolbar row collapses (this killed the big top gap). New chat lives in the sidebar
+(Gemini-style). New `scrollbar-soft` utility (`globals.css`) on the chat, history list, and the
+card modal. Active history row = neutral highlight + accent bar (good in light & dark). Sidebar
+widened (`w-72`/`xl:w-80`); row actions overlay on hover so titles get full width.
+
+**3. AI message style.** Assistant answers render as **plain text on the page** (no bubble),
+Markdown via `react-markdown` + `remark-gfm` + `remark-breaks`; the user message stays an accent
+pill; errors keep a subtle container. Copy button under answers. Short chats bottom-anchored.
+Mixed-language fix: `dir="auto"` on the bubble and each markdown block so each line aligns by its
+own first strong character (English answer citing a Hebrew title no longer flips RTL).
+
+**4. Streaming (SSE), opt-in + backward compatible.** Backend `ai_service.answer_from_context_stream`
+(Gemini streaming; a `[[CITED: ids]]` marker is buffered out of the visible text → becomes the
+source chips). `main.py` `ask_brain` streams only when the body has `stream:true` (the JSON path is
+byte-for-byte unchanged). Frontend `send()` reads SSE with a JSON fallback. **Routing matters:**
+Firebase Hosting buffers SSE, so `/api/chat` was **removed from `web/vercel.json` rewrites** and now
+runs through `web/app/api/chat/route.ts`, which calls the function's **direct URL**
+(`CHAT_BACKEND_URL`, default `https://us-central1-secondbrain-app-94da2.cloudfunctions.net/ask_brain`).
+Desktop streams; iPhone (static export → Hosting rewrite) degrades to one buffered response.
+
+**5. Answer quality (`ai_service.py`, both JSON + stream prompts).** Answer in the **user's question
+language** regardless of the sources' language; **don't announce item counts** (or make any stated
+number match the list). Suggestion chips reworked into varied, standalone prompts from the user's
+categories (dropped the nonsense "how do X and Y connect" cross-topic chip).
+
+**Process note:** the four "improvements" (bottom-anchor, copy, markdown, streaming) were built by
+**two parallel subagents** in worktrees (frontend + backend), merged cleanly (disjoint files).
+
+**Verification each step:** `tsc --noEmit` exit 0; eslint clean on changed files; `py_compile` OK.
+Full `next build` can't run in the cloud session (Google Fonts offline) — unrelated.
+
+**Pending follow-ups:**
+1. `./deploy-functions.sh functions:ask_brain` — picks up the final "don't announce counts" prompt.
+2. `./deploy-hosting.sh` — iPhone build for every frontend change this session.
+3. Optional: set `CHAT_BACKEND_URL` on Vercel to the exact `ask_brain` `run.app` URL if the default
+   `cloudfunctions.net` URL ever misbehaves (wrong region / POST-redirect).
+
+---
+
+## Earlier — Production security baseline (frontend + backend)
 
 Adapted a generic security checklist to this Firebase + Next.js + Python-Functions stack and
 implemented a **code-only, secure-by-default baseline** that keeps the current single-user model
@@ -40,45 +105,6 @@ unrelated to the diff.
    sensible defaults already cover the app's own origins).
 3. Deferred: real Firebase Auth (Google Sign-In + ID-token verification + locked rules) is the
    complete fix for cross-user data isolation.
-
----
-
-## Earlier — Ask Your Brain: saved chat history sidebar (frontend)
-
-All frontend. Merged to `main` (Vercel/desktop auto-deploys on push). **iPhone (Firebase
-Hosting) still needs `./deploy-hosting.sh` from a machine with `firebase login`** — it could not
-be run from the cloud session (no firebase CLI/credentials there). No backend change.
-
-**Problem:** the Ask chat kept a single rolling conversation in `localStorage` and **Clear**
-destroyed it permanently — no way to revisit a past chat.
-
-**What changed:**
-- **Auto-saved, multi-session chats in Firestore** (`users/{uid}/chats/{chatId}`): new
-  `web/lib/chats.ts` (CRUD + live `onSnapshot` subscription, mirrors `lib/storage.ts`).
-  `ChatMessage`/`ChatSource`/`ChatSession` moved to `web/lib/types.ts` for reuse.
-- **`AskBrain.tsx` is now multi-session:** auto-saves on the first assistant reply, then debounced
-  updates; **Clear → non-destructive "New chat"**; one-time migration of any legacy
-  `askbrain:chat:{uid}` localStorage conversation into Firestore; reopens the most recent chat on
-  load for continuity.
-- **New `web/components/ChatHistorySidebar.tsx`:** collapsible desktop panel (mirrors the Tag
-  Explorer) + mobile slide-over drawer triggered from the top bar; select / rename / delete
-  (delete routed through `ConfirmDialog`). Drawer layers above the keyboard-tracking chat surface
-  (z-60 > z-50) and respects safe-area insets.
-- **`web/app/globals.css`:** added `slide-in-left` animation (+ reduced-motion entry) for the
-  mobile drawer.
-
-**Verification:** `tsc --noEmit` exit 0; the four changed files lint clean. Full `next build`
-couldn't complete in the cloud session (can't fetch Google Fonts offline) — unrelated to the diff.
-
-**Desktop layout fix (follow-up commit):** the desktop Ask view now fills the full viewport
-height — `AskBrain` measures its top (`getBoundingClientRect`) and sets an inline height down to
-the window bottom, so the composer is pinned at the bottom and the conversation scrolls above it;
-`page.tsx` drops `main`'s tall bottom padding in Ask mode; the history sidebar
-(`ChatHistorySidebar` desktop variant) is now a full-height panel with a right-edge divider
-(part of the page) instead of a short floating card. CSP `style-src` already allows `'unsafe-inline'`.
-
-**Follow-ups:** (1) run `./deploy-hosting.sh` locally for the iPhone build; (2) Firestore rules now
-include a `users/{uid}/chats` block (still open, consistent with the documented residual-risk model).
 
 ---
 
