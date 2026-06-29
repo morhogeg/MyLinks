@@ -41,3 +41,6 @@ firebaserc
 firebase-debug.log*
 firestore-debug.log*
 ui-debug.log*
+
+# Claude Code agent worktrees (transient, auto-cleaned)
+.claude/worktrees/
