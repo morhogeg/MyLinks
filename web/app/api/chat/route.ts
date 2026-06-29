@@ -1,15 +1,18 @@
-// Thin proxy to the canonical Python "Ask Your Brain" RAG backend.
+// Proxy to the canonical Python "Ask Your Brain" RAG backend (`ask_brain`).
 //
-// The Python Cloud Function `ask_brain` is the single source of truth (vector
-// retrieval + grounded Gemini answer). In production the vercel.json /
-// firebase.json rewrites send /api/chat straight to the backend, so this route
-// only runs during local `next dev` — it forwards the request so dev behaves
-// identically to prod (mirrors /api/analyze).
+// Unlike the other endpoints, /api/chat is intentionally NOT a vercel.json
+// rewrite: it runs through this route so we can stream SSE token-by-token.
+// Firebase Hosting buffers responses (it won't pass SSE through incrementally),
+// so we call the Cloud Function's direct URL here instead of the Hosting domain.
+// Override with CHAT_BACKEND_URL if the function lives in another region.
+// (On the Firebase-Hosting / iPhone surface /api/chat still rewrites straight
+// to the function and simply degrades to one buffered response.)
 
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_BASE =
-    process.env.ANALYZE_BACKEND_URL || 'https://secondbrain-app-94da2.web.app';
+const CHAT_BACKEND_URL =
+    process.env.CHAT_BACKEND_URL ||
+    'https://us-central1-secondbrain-app-94da2.cloudfunctions.net/ask_brain';
 
 export async function POST(request: NextRequest): Promise<NextResponse | Response> {
     let body: unknown;
@@ -28,7 +31,7 @@ export async function POST(request: NextRequest): Promise<NextResponse | Respons
     fwdHeaders['Accept'] = request.headers.get('Accept') || 'application/json';
 
     try {
-        const upstream = await fetch(`${BACKEND_BASE}/api/chat`, {
+        const upstream = await fetch(CHAT_BACKEND_URL, {
             method: 'POST',
             headers: fwdHeaders,
             body: JSON.stringify(body),

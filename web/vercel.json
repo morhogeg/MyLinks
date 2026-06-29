@@ -46,10 +46,6 @@
       "destination": "https://secondbrain-app-94da2.web.app/api/share"
     },
     {
-      "source": "/api/chat",
-      "destination": "https://secondbrain-app-94da2.web.app/api/chat"
-    },
-    {
       "source": "/api/article",
       "destination": "https://secondbrain-app-94da2.web.app/api/article"
     }
