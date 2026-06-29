@@ -322,6 +322,163 @@ Return ONLY a JSON object: {{"answer": string, "citedIds": string[]}} where cite
         cited = [cid for cid in cited if cid in valid_ids]
         return {"answer": answer, "citedIds": cited}
 
+    def answer_from_context_stream(self, question: str, cards: list, history: list = None):
+        """Streaming variant of `answer_from_context` (RAG over saved cards).
+
+        Yields ("token", text) tuples as the answer streams in, then a final
+        ("citedIds", [str]) tuple with the ids the model used. Reuses the same
+        grounding/system instructions as `answer_from_context` so answer quality
+        and Hebrew handling are preserved.
+
+        Because schema-constrained JSON cannot be streamed token-by-token, the
+        model instead writes a plain-text answer and ends with a machine-readable
+        marker line `[[CITED: id1, id2]]`. We buffer the tail of the stream so the
+        marker is never surfaced to the user, and parse it at the end to derive
+        citations. If the marker is missing/unparseable we fall back to citing all
+        supplied card ids (so sources are never empty when cards exist).
+
+        On mid-stream failure this raises AnalysisError; callers should wrap the
+        consumption in a try/except and emit a sanitized error to the client.
+        """
+        if not self.client:
+            raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
+
+        valid_ids = [c.get("id") for c in cards if c.get("id")]
+
+        if not cards:
+            yield ("token",
+                   "I couldn't find anything in your library about that yet. "
+                   "Try saving a few links on the topic, then ask me again.")
+            yield ("citedIds", [])
+            return
+
+        # Reuse the exact source/history framing from answer_from_context so the
+        # grounded answer is identical in quality to the non-streaming path.
+        def _source_label(c: dict) -> str:
+            name = (c.get("sourceName") or "").strip()
+            if name and name.lower() not in ("none", "screenshot", "unknown"):
+                return name
+            url = c.get("url") or ""
+            try:
+                from urllib.parse import urlparse
+                host = urlparse(url).hostname or ""
+                return host[4:] if host.startswith("www.") else host
+            except Exception:
+                return ""
+
+        def _card_block(c: dict) -> str:
+            src = _source_label(c)
+            meta = [f"source: {src}"] if src else []
+            meta.append(f"category: {c.get('category', 'General')}")
+            meta.append(f"tags: {', '.join(c.get('tags', []) or [])}")
+            return (
+                f"[{c.get('id')}] {c.get('title', 'Untitled')} "
+                f"({'; '.join(meta)})\n{c.get('summary', '')}"
+            )
+
+        sources_text = "\n\n".join(_card_block(c) for c in cards)
+
+        history_text = ""
+        if history:
+            turns = []
+            for h in history[-6:]:  # keep the prompt bounded
+                role = "User" if h.get("role") == "user" else "Assistant"
+                turns.append(f"{role}: {h.get('content', '')}")
+            history_text = "\n\nEarlier in this conversation:\n" + "\n".join(turns)
+
+        prompt = f"""You are the user's "Second Brain" assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved.
+
+Rules:
+- Ground every claim in the provided sources. Do NOT use outside knowledge or invent facts.
+- If the sources don't contain the answer, say so plainly and suggest what they could save.
+- Be concise and direct (2-5 sentences, or a short list when that's clearer).
+- Reply in the same language as the question.
+- Only cite sources you actually used.
+
+Saved sources:
+{sources_text}
+{history_text}
+
+User question: {question}
+
+Write the answer as plain text (no JSON). Then, on a NEW LINE after the answer, output a citation marker listing the ids (without brackets) of the sources you relied on, in exactly this format:
+[[CITED: id1, id2]]
+Output the marker exactly once, as the very last line, and nothing after it."""
+
+        # Tail buffer: hold back the trailing characters that could be the start
+        # of the "[[CITED: ...]]" marker so it is never streamed as visible text.
+        # We keep at least the marker's full prefix length buffered at all times.
+        MARKER = "[[CITED:"
+        # Once we see the marker open we stop emitting and accumulate the rest.
+        buffer = ""
+        full_text = ""
+        marker_seen = False
+
+        def _safe_emit_point(buf: str) -> int:
+            """Return how many leading chars of `buf` are safe to emit now —
+            i.e. cannot be part of an as-yet-incomplete marker at the tail."""
+            # If the marker is fully present, caller handles it separately.
+            idx = buf.find(MARKER)
+            if idx != -1:
+                return idx
+            # Otherwise withhold any suffix that could be the start of the marker.
+            for keep in range(min(len(MARKER) - 1, len(buf)), 0, -1):
+                if buf.endswith(MARKER[:keep]):
+                    return len(buf) - keep
+            return len(buf)
+
+        try:
+            stream = self.client.models.generate_content_stream(
+                model=self.model,
+                contents=[prompt],
+            )
+            for chunk in stream:
+                piece = getattr(chunk, "text", None)
+                if not piece:
+                    continue
+                full_text += piece
+                if marker_seen:
+                    # Past the marker — accumulate into full_text only, emit nothing.
+                    continue
+                buffer += piece
+                marker_idx = buffer.find(MARKER)
+                if marker_idx != -1:
+                    # Emit everything before the marker, then stop emitting.
+                    head = buffer[:marker_idx]
+                    if head:
+                        yield ("token", head)
+                    marker_seen = True
+                    buffer = ""
+                    continue
+                emit_to = _safe_emit_point(buffer)
+                if emit_to > 0:
+                    yield ("token", buffer[:emit_to])
+                    buffer = buffer[emit_to:]
+            # Flush any remaining buffered text that turned out not to be a marker.
+            if not marker_seen and buffer:
+                yield ("token", buffer)
+        except Exception as e:
+            logger.error(f"Gemini answer stream failed: {e}")
+            raise AnalysisError(f"AI answer failed: {e}")
+
+        # Parse the citation marker out of the accumulated full text.
+        cited = []
+        try:
+            import re as _re
+            m = _re.search(r"\[\[CITED:(.*?)\]\]", full_text, _re.DOTALL)
+            if m:
+                raw = m.group(1)
+                cited = [t.strip() for t in raw.split(",") if t.strip()]
+        except Exception:
+            cited = []
+
+        valid_set = set(valid_ids)
+        cited = [cid for cid in cited if cid in valid_set]
+        # Never leave sources empty when we did have cards to ground on.
+        if not cited:
+            cited = list(valid_ids)
+        yield ("citedIds", cited)
+
     def embed_text(self, text: str) -> List[float]:
         """Generate vector embedding for text using Gemini.
 

@@ -503,6 +503,9 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         uid = data.get('uid')
         question = (data.get('question') or '').strip()
         history = data.get('history') or []
+        # Opt-in token streaming (SSE). Only honored for POST so the JSON path is
+        # 100% unchanged when not explicitly requested.
+        want_stream = bool(data.get('stream')) and req.method == 'POST'
 
         if not uid:
             return _error_response("uid is required", 400, headers)
@@ -545,6 +548,48 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
 
         # 3. Generate a grounded answer with citations.
         ai = GeminiService()
+
+        # 3a. Opt-in streaming branch (SSE). Same retrieval/slimming as above —
+        #     only generation + response shape differ. The non-streaming JSON
+        #     path below is left completely untouched.
+        if want_stream:
+            by_id = {c.get("id"): c for c in cards}
+
+            def _event_stream():
+                try:
+                    for kind, payload in ai.answer_from_context_stream(question, slim, history):
+                        if kind == "token":
+                            yield "data: " + json.dumps(
+                                {"type": "token", "text": payload}
+                            ) + "\n\n"
+                        elif kind == "citedIds":
+                            sources = [{
+                                "id": cid,
+                                "title": by_id[cid].get("title", "Untitled"),
+                                "category": by_id[cid].get("category", "General"),
+                                "sourceName": by_id[cid].get("sourceName"),
+                                "url": by_id[cid].get("url"),
+                            } for cid in payload if cid in by_id]
+                            yield "data: " + json.dumps(
+                                {"type": "sources", "sources": sources}
+                            ) + "\n\n"
+                    yield "data: " + json.dumps({"type": "done"}) + "\n\n"
+                except Exception as stream_exc:
+                    # Mirror _server_error: log full detail, emit a sanitized message.
+                    logger.error("ask_brain stream error: %s", stream_exc, exc_info=True)
+                    yield "data: " + json.dumps(
+                        {"type": "error", "error": "Internal server error"}
+                    ) + "\n\n"
+
+            stream_headers = dict(headers)
+            stream_headers["Cache-Control"] = "no-cache"
+            return https_fn.Response(
+                _event_stream(),
+                status=200,
+                headers=stream_headers,
+                mimetype="text/event-stream",
+            )
+
         result = ai.answer_from_context(question, slim, history)
 
         # 4. Return only the cited sources for the UI (clickable chips).
