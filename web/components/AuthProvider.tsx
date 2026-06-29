@@ -1,70 +1,106 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { User, onAuthStateChanged } from 'firebase/auth';
 import { collection, query, getDocs, limit, doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db, REQUIRE_AUTH, signOutUser } from '@/lib/firebase';
+import SignIn from './SignIn';
 
 interface AuthContextType {
-    /** Firestore user document ID */
+    /** The authenticated user's uid (real auth) or the prototype user doc id. */
     uid: string | null;
-    /** True while user doc is being resolved */
+    /** The Firebase Auth user, when real auth is active. */
+    user: User | null;
+    /** True while the user/uid is being resolved. */
     loading: boolean;
+    /** Sign out (no-op in prototype mode). */
+    signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
     uid: null,
+    user: null,
     loading: true,
+    signOut: async () => {},
 });
 
 export function useAuth() {
     return useContext(AuthContext);
 }
 
+/** Persist the browser timezone so the WhatsApp bot can localize reminder times. */
+function persistTimezone(uid: string, currentTz?: string) {
+    try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (tz && currentTz !== tz) {
+            updateDoc(doc(db, 'users', uid), { timezone: tz }).catch(() => {});
+        }
+    } catch {
+        // Intl not available — skip.
+    }
+}
+
 /**
- * Lightweight auth provider — looks up the first user doc in Firestore.
- * This centralizes the user lookup that was previously duplicated
- * across page.tsx, Feed.tsx, and AddLinkForm.tsx.
+ * Auth provider with two modes, selected by NEXT_PUBLIC_REQUIRE_AUTH:
  *
- * TODO: Replace with real Firebase Auth (Google Sign-In) when ready.
+ *  - REQUIRE_AUTH=true  → real Firebase Auth. Tracks the signed-in user and
+ *    renders the <SignIn> screen until the user logs in. `uid` is the auth uid.
+ *  - otherwise (default) → legacy single-user prototype: loads the first user
+ *    doc in Firestore and uses its id as `uid`. No login. This keeps the live
+ *    app working until auth is rolled out end-to-end (see docs/AUTH_AND_IOS_SPEC).
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [uid, setUid] = useState<string | null>(null);
+    const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
 
+    // ── Real auth mode ──
     useEffect(() => {
-        async function findUser() {
+        if (!REQUIRE_AUTH) return;
+        const unsub = onAuthStateChanged(auth, (u) => {
+            setUser(u);
+            setUid(u?.uid ?? null);
+            setLoading(false);
+            if (u) persistTimezone(u.uid);
+        });
+        return () => unsub();
+    }, []);
+
+    // ── Prototype mode (no real auth) ──
+    useEffect(() => {
+        if (REQUIRE_AUTH) return;
+        let cancelled = false;
+        (async () => {
             try {
-                const usersRef = collection(db, 'users');
-                const q = query(usersRef, limit(1));
-                const snapshot = await getDocs(q);
-                if (!snapshot.empty) {
+                const snapshot = await getDocs(query(collection(db, 'users'), limit(1)));
+                if (!cancelled && !snapshot.empty) {
                     const userDoc = snapshot.docs[0];
                     setUid(userDoc.id);
-                    // Persist the browser timezone so the WhatsApp bot can show
-                    // reminder times in the user's local time (best-effort).
-                    try {
-                        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                        if (tz && userDoc.data().timezone !== tz) {
-                            updateDoc(doc(db, 'users', userDoc.id), { timezone: tz }).catch(() => {});
-                        }
-                    } catch {
-                        // Intl not available — skip.
-                    }
+                    persistTimezone(userDoc.id, userDoc.data().timezone);
+                } else if (!snapshot.empty) {
+                    // no-op
                 } else {
                     console.warn('No user document found in Firestore');
                 }
             } catch (err) {
                 console.error('Failed to look up user:', err);
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
-        }
-        findUser();
+        })();
+        return () => { cancelled = true; };
     }, []);
 
-    return (
-        <AuthContext.Provider value={{ uid, loading }}>
-            {children}
-        </AuthContext.Provider>
-    );
+    const value: AuthContextType = { uid, user, loading, signOut: signOutUser };
+
+    // In real-auth mode, gate the app behind the login screen.
+    if (REQUIRE_AUTH && !loading && !uid) {
+        return (
+            <AuthContext.Provider value={value}>
+                <SignIn />
+            </AuthContext.Provider>
+        );
+    }
+
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

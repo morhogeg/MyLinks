@@ -11,6 +11,16 @@ import { NextRequest, NextResponse } from 'next/server';
 const BACKEND_BASE =
     process.env.ANALYZE_BACKEND_URL || 'https://secondbrain-app-94da2.web.app';
 
+/** Forward Content-Type plus the auth + App Check headers to the backend. */
+function forwardHeaders(request: NextRequest): Record<string, string> {
+    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    const auth = request.headers.get('authorization');
+    const appCheck = request.headers.get('x-firebase-appcheck');
+    if (auth) h['Authorization'] = auth;
+    if (appCheck) h['X-Firebase-AppCheck'] = appCheck;
+    return h;
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
     let body: unknown;
     try {
@@ -22,7 +32,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
         const upstream = await fetch(`${BACKEND_BASE}/api/chat`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: forwardHeaders(request),
             body: JSON.stringify(body),
         });
 

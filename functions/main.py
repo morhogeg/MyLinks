@@ -180,6 +180,46 @@ def _require_app_check(req, headers: dict = None) -> bool:
         return not APPCHECK_ENFORCE
 
 
+# When true, endpoints reject any request without a verified Firebase ID token
+# and derive the uid from it. When false (default), the uid is still taken from
+# a verified token if present, but falls back to the client-supplied uid so the
+# current single-user app keeps working until auth is rolled out end-to-end.
+REQUIRE_AUTH = os.environ.get("REQUIRE_AUTH", "").lower() in ("1", "true", "yes")
+
+
+def _verified_uid(req):
+    """Return the uid from a verified Firebase ID token, or None.
+
+    Reads `Authorization: Bearer <idToken>`. The token is the single source of
+    truth for identity — never trust a client-supplied uid once REQUIRE_AUTH is
+    on.
+    """
+    hdr = req.headers.get("Authorization", "")
+    if not hdr.startswith("Bearer "):
+        return None
+    try:
+        from firebase_admin import auth as fb_auth
+        return fb_auth.verify_id_token(hdr.split(" ", 1)[1]).get("uid")
+    except Exception as e:
+        logger.warning("ID token verification failed: %s", e)
+        return None
+
+
+def _resolve_uid(req, data, headers):
+    """Resolve the caller's uid, honoring REQUIRE_AUTH.
+
+    Returns (uid, error_response). On success error_response is None. When
+    REQUIRE_AUTH is off, falls back to the legacy client-supplied uid so nothing
+    breaks during rollout.
+    """
+    uid = _verified_uid(req)
+    if uid:
+        return uid, None
+    if REQUIRE_AUTH:
+        return None, _error_response("Authentication required", 401, headers)
+    return (data or {}).get("uid"), None
+
+
 def _estimate_read_time(text: str, words_per_minute: int = 200) -> int:
     """Estimate read time in minutes from word count.
 
@@ -360,7 +400,9 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         embedding_text = f"{analysis.get('title', '')}\n{analysis.get('summary', '')}"
         embedding = ai.embed_text(embedding_text)
 
-        uid = data.get('uid')
+        uid, auth_err = _resolve_uid(req, data, headers)
+        if auth_err:
+            return auth_err
         related_links = []
         if uid:
             graph_service = GraphService(get_db())
@@ -500,7 +542,9 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         if not data:
             return _error_response("Invalid JSON body", 400, headers)
 
-        uid = data.get('uid')
+        uid, auth_err = _resolve_uid(req, data, headers)
+        if auth_err:
+            return auth_err
         question = (data.get('question') or '').strip()
         history = data.get('history') or []
 
@@ -641,7 +685,9 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
         image_url = data.get('imageUrl')
         image_b64 = data.get('imageBytes')
         existing_tags = data.get('existingTags', [])
-        uid = data.get('uid')
+        uid, auth_err = _resolve_uid(req, data, headers)
+        if auth_err:
+            return auth_err
 
         if not image_url and not image_b64:
             return _error_response("imageBytes or imageUrl is required", 400, headers)
@@ -818,7 +864,9 @@ def get_share_config(req: https_fn.CallableRequest) -> dict:
     (generating one on first use). Used by Settings to configure the Shortcut.
     """
     uid = req.auth.uid if req.auth else None
-    if not uid and req.data:
+    # Legacy fallback only while auth isn't enforced; never trust a client uid
+    # once REQUIRE_AUTH is on.
+    if not uid and not REQUIRE_AUTH and req.data:
         uid = req.data.get("uid") or req.data.get("test_uid")
 
     if not uid:
@@ -1316,7 +1364,9 @@ def send_digest_now(req: https_fn.CallableRequest) -> dict:
     from digest_service import build_and_send_digest
 
     uid = req.auth.uid if req.auth else None
-    if not uid and req.data:
+    # Legacy fallback only while auth isn't enforced; never trust a client uid
+    # once REQUIRE_AUTH is on.
+    if not uid and not REQUIRE_AUTH and req.data:
         uid = req.data.get("uid") or req.data.get("test_uid")
     if not uid:
         raise https_fn.HttpsError(

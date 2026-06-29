@@ -1,6 +1,13 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth, connectAuthEmulator } from "firebase/auth";
+import {
+    getAuth,
+    connectAuthEmulator,
+    GoogleAuthProvider,
+    OAuthProvider,
+    signInWithPopup,
+    signOut as fbSignOut,
+} from "firebase/auth";
 
 // Firebase web config comes from NEXT_PUBLIC_* env vars (Vercel has them; local
 // builds read web/.env.local). These values aren't secret — they ship in the
@@ -67,6 +74,43 @@ export async function getAppCheckToken(): Promise<string | null> {
 export async function appCheckHeaders(): Promise<Record<string, string>> {
     const token = await getAppCheckToken();
     return token ? { 'X-Firebase-AppCheck': token } : {};
+}
+
+// ── Authentication ─────────────────────────────────────────────────────────
+// True once real auth is being enforced. Until then the app keeps its
+// single-user prototype behavior (see AuthProvider). Backed by the same
+// NEXT_PUBLIC_REQUIRE_AUTH flag so client + server flip together.
+export const REQUIRE_AUTH = process.env.NEXT_PUBLIC_REQUIRE_AUTH === 'true';
+
+/** Sign in with Google (popup). */
+export async function signInWithGoogle(): Promise<void> {
+    await signInWithPopup(auth, new GoogleAuthProvider());
+}
+
+/** Sign in with Apple (popup). Required by the App Store for the future iOS app. */
+export async function signInWithApple(): Promise<void> {
+    await signInWithPopup(auth, new OAuthProvider('apple.com'));
+}
+
+/** Sign the current user out. */
+export async function signOutUser(): Promise<void> {
+    await fbSignOut(auth);
+}
+
+/**
+ * Headers carrying the current user's Firebase ID token (empty when signed
+ * out). The backend derives the uid from this verified token. Safe to include
+ * on every API call — it's a no-op when there's no signed-in user.
+ */
+export async function authHeaders(): Promise<Record<string, string>> {
+    const user = auth.currentUser;
+    if (!user) return {};
+    try {
+        return { Authorization: `Bearer ${await user.getIdToken()}` };
+    } catch (e) {
+        console.warn('ID token fetch failed', e);
+        return {};
+    }
 }
 
 // Connect to emulators on localhost

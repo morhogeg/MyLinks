@@ -43,3 +43,23 @@ The backend can require a Firebase App Check token on `/api/analyze`,
    env `APPCHECK_ENFORCE` unset — the backend verifies and logs but doesn't
    reject. Once logs show valid tokens arriving, set `APPCHECK_ENFORCE=true` on
    the functions to start returning `401` for unattested requests.
+
+## Real authentication (Google + Apple sign-in)
+
+The code for real per-user auth is shipped but **dormant behind flags** so the
+single-user prototype keeps working. Full design + rationale:
+`docs/AUTH_AND_IOS_SPEC.md`. Activation is phased so nothing breaks:
+
+1. Firebase Console → Authentication → enable **Google** and **Apple** providers
+   (Apple needs an Apple Developer Service ID + key; it's required for the future
+   iOS app per App Store rules).
+2. Deploy the code with flags **off**. Confirm sign-in works and ID tokens reach
+   the backend (logs).
+3. **Back up** (`gcloud firestore export gs://<bucket>/pre-auth-backup`), then run
+   the one-time migration to re-home your existing data onto your real auth uid:
+   `cd functions && python migrate_user.py --old <prototypeDocId> --new <authUid> --commit`.
+4. Flip both flags and redeploy: `NEXT_PUBLIC_REQUIRE_AUTH=true` (Vercel + iPhone
+   build) and `REQUIRE_AUTH=true` (Cloud Functions env).
+5. **Last**, deploy the locked rules:
+   `cp firestore.rules.locked firestore.rules && firebase deploy --only firestore:rules`.
+   - Rollback: set both flags back to false and redeploy the previous open rules.

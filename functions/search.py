@@ -161,8 +161,10 @@ def search_links(req: https_fn.CallableRequest) -> Any:
     Input: { query: string, limit?: number }
     """
     try:
+        # Legacy test_uid fallback only while auth isn't enforced.
+        require_auth = os.environ.get("REQUIRE_AUTH", "").lower() in ("1", "true", "yes")
         uid = req.auth.uid if req.auth else None
-        if not uid and req.data and "test_uid" in req.data:
+        if not uid and not require_auth and req.data and "test_uid" in req.data:
             uid = req.data["test_uid"]
 
         if not uid:

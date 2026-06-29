@@ -1,0 +1,37 @@
+// LOCKED Firestore rules — the secure target once real Firebase Auth is live.
+//
+// DO NOT deploy these until the web/iOS clients are reliably authenticated AND
+// existing data has been migrated to the real auth uid (see
+// docs/AUTH_AND_IOS_SPEC.md, "Data migration"). Deploying early locks you out
+// of your own data because the prototype client has no request.auth.
+//
+// To activate at cutover:
+//   1. Confirm REQUIRE_AUTH is on (client + functions) and sign-in works.
+//   2. Back up:  gcloud firestore export gs://<bucket>/pre-auth-backup
+//   3. Run the data migration (functions/migrate_user.py).
+//   4. cp firestore.rules.locked firestore.rules && firebase deploy --only firestore:rules
+//
+// The recursive `{document=**}` rule under /users/{uid} covers links, chats,
+// and any future per-user subcollection in one place (Firestore rules do not
+// cascade, so each subcollection must be matched).
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // A user may read/write only their own document tree.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      // links, chats, and anything else under the user (recursive).
+      match /{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    // Server-only collections (Admin SDK bypasses rules).
+    match /pending_processing/{docId} { allow read, write: if false; }
+    match /task_logs/{docId}         { allow read, write: if false; }
+    match /rate_limits/{docId}       { allow read, write: if false; }
+  }
+}

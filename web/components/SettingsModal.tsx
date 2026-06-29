@@ -5,7 +5,8 @@ import type { ReactNode } from 'react';
 import { User, DigestMode, DigestChannel } from '@/lib/types';
 import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '@/lib/firebase';
+import { LogOut } from 'lucide-react';
+import { functions, REQUIRE_AUTH, signOutUser } from '@/lib/firebase';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
 import { useTheme } from './ThemeProvider';
 import Dropdown from './Dropdown';
@@ -540,7 +541,17 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-border-subtle flex items-center justify-end gap-2 bg-card">
+                <div className="px-6 py-4 border-t border-border-subtle flex items-center justify-between gap-2 bg-card">
+                    {REQUIRE_AUTH ? (
+                        <button
+                            onClick={() => { signOutUser().catch(() => {}); }}
+                            className="h-10 px-4 rounded-full text-sm font-semibold text-text-muted hover:text-red-400 hover:bg-card-hover transition-colors cursor-pointer inline-flex items-center gap-2"
+                        >
+                            <LogOut className="w-4 h-4" />
+                            Sign out
+                        </button>
+                    ) : <span />}
+                    <div className="flex items-center gap-2">
                     <button
                         onClick={onClose}
                         className="h-10 px-4 rounded-full text-sm font-semibold text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
@@ -554,6 +565,7 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                     >
                         {isSaving ? 'Saving…' : 'Save changes'}
                     </button>
+                    </div>
                 </div>
             </div>
         </div>
