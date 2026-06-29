@@ -543,11 +543,13 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                                         dir={getDirection(m.content)}
                                         className={
                                             m.role === 'user'
+                                                // User message: a compact accent pill.
                                                 ? 'px-4 py-2.5 rounded-2xl rounded-br-md bg-accent text-white text-[15px] leading-relaxed'
-                                                : `px-4 py-3 rounded-2xl rounded-bl-md text-[15px] leading-relaxed ${m.error
-                                                    ? 'bg-red-500/10 border border-red-500/20 text-text whitespace-pre-wrap'
-                                                    : 'bg-card border border-border-subtle text-text'
-                                                }`
+                                                : m.error
+                                                    // Errors keep a subtle container so they stand out.
+                                                    ? 'px-4 py-3 rounded-2xl rounded-bl-md text-[15px] leading-relaxed bg-red-500/10 border border-red-500/20 text-text whitespace-pre-wrap'
+                                                    // AI answer: plain text on the page (no bubble), like Gemini.
+                                                    : 'px-1 text-[15px] leading-relaxed text-text'
                                         }
                                     >
                                         {/* User and error bubbles stay plain text; assistant answers render Markdown. */}
@@ -605,7 +607,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
 
                         {isThinking && (
                             <div className="flex justify-start">
-                                <div className="px-4 py-3 rounded-2xl rounded-bl-md bg-card border border-border-subtle inline-flex items-center gap-1.5">
+                                <div className="px-1 py-1 inline-flex items-center gap-1.5">
                                     <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce [animation-delay:-0.3s]" />
                                     <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce [animation-delay:-0.15s]" />
                                     <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce" />
