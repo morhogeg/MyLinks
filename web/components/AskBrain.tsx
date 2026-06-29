@@ -34,10 +34,13 @@ function MarkdownMessage({ content }: { content: string }) {
         <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}
             components={{
-                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                ul: ({ children }) => <ul className="list-disc ps-5 mb-2 last:mb-0 space-y-1">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal ps-5 mb-2 last:mb-0 space-y-1">{children}</ol>,
-                li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                // dir="auto" per block so each line/item aligns by its own first
+                // strong character — an English answer that cites a Hebrew title
+                // stays left-aligned, while a Hebrew line renders RTL.
+                p: ({ children }) => <p dir="auto" className="mb-2 last:mb-0">{children}</p>,
+                ul: ({ children }) => <ul dir="auto" className="list-disc ps-5 mb-2 last:mb-0 space-y-1">{children}</ul>,
+                ol: ({ children }) => <ol dir="auto" className="list-decimal ps-5 mb-2 last:mb-0 space-y-1">{children}</ol>,
+                li: ({ children }) => <li dir="auto" className="leading-relaxed">{children}</li>,
                 strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
                 a: ({ children, href }) => (
                     <a href={href} target="_blank" rel="noopener noreferrer" className="text-accent underline underline-offset-2 hover:text-accent-hover">
@@ -532,7 +535,9 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                             <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start group'}>
                                 <div className={m.role === 'user' ? 'max-w-[85%]' : 'max-w-[90%] w-full'}>
                                     <div
-                                        dir={getDirection(m.content)}
+                                        // Assistant answers can mix languages → let each
+                                        // line auto-detect; user/error stay single-direction.
+                                        dir={m.role === 'assistant' && !m.error ? 'auto' : getDirection(m.content)}
                                         className={
                                             m.role === 'user'
                                                 // User message: a compact accent pill.
