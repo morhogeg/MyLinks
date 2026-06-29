@@ -22,6 +22,9 @@ set -euo pipefail
 PROJECT="secondbrain-app-94da2"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 
+echo "Installing web deps (so new packages are present before the build)…"
+( cd "$ROOT/web" && npm install )
+
 echo "Building static export (web/out)…"
 ( cd "$ROOT/web" && npm run build )   # next.config emits `output: export` when VERCEL is unset
 
