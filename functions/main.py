@@ -256,6 +256,14 @@ def _apply_youtube_metadata(link_data: dict, yt_meta: dict, analysis: dict, minu
     meta["speakers"] = analysis.get("speakers", [])
 
 
+def _card_source_name(c: dict):
+    """Best byline for a card: the YouTube channel when present, else the stored
+    publisher/source name. Mirrors the web card so Ask citations show the same
+    identity (e.g. the channel name, not just 'YouTube')."""
+    meta = c.get("metadata") or {}
+    return meta.get("youtubeChannel") or c.get("sourceName")
+
+
 # ─────────────────────────────────────────────
 # HTTP Endpoints
 # ─────────────────────────────────────────────
@@ -542,7 +550,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             "tags": c.get("tags", []),
             # Publisher/source so the model can answer questions that name it
             # (e.g. "the CNN fact-check") — it's not in the title/summary text.
-            "sourceName": c.get("sourceName"),
+            "sourceName": _card_source_name(c),
             "url": c.get("url"),
         } for c in cards]
 
@@ -567,7 +575,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                                 "id": cid,
                                 "title": by_id[cid].get("title", "Untitled"),
                                 "category": by_id[cid].get("category", "General"),
-                                "sourceName": by_id[cid].get("sourceName"),
+                                "sourceName": _card_source_name(by_id[cid]),
                                 "url": by_id[cid].get("url"),
                             } for cid in payload if cid in by_id]
                             yield "data: " + json.dumps(
@@ -599,7 +607,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             "id": cid,
             "title": by_id[cid].get("title", "Untitled"),
             "category": by_id[cid].get("category", "General"),
-            "sourceName": by_id[cid].get("sourceName"),
+            "sourceName": _card_source_name(by_id[cid]),
             # url lets the UI brand each citation by platform (YouTube, X, …).
             "url": by_id[cid].get("url"),
         } for cid in cited_ids if cid in by_id]
