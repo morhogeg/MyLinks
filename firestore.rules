@@ -10,6 +10,11 @@ service cloud.firestore {
       match /links/{linkId} {
         allow read, write: if true;
       }
+
+      // Ask-your-brain saved conversations
+      match /chats/{chatId} {
+        allow read, write: if true;
+      }
     }
 
     // pending_processing: only Cloud Functions (admin SDK)
