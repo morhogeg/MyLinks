@@ -2,8 +2,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users can access their own document
-    // TODO: Lock down with proper Firebase Auth (request.auth.uid == uid)
+    // Users can access their own document.
+    //
+    // SECURITY — ACCEPTED RESIDUAL RISK (single-user prototype):
+    // These rules are intentionally open because the web client has no real
+    // authentication yet (AuthProvider just loads the first user doc; there is
+    // no login, so request.auth is always null). Requiring auth here today would
+    // break all reads/writes. The practical write path goes through the Cloud
+    // Functions, which are now hardened with App Check + pinned CORS + rate
+    // limiting, so the realistic abuse surface is reduced — but direct client
+    // access to this collection remains open until real auth lands.
+    //
+    // WHEN FIREBASE AUTH IS ADDED (see deferred plan), replace the `if true`
+    // lines below with:  allow read, write: if request.auth != null && request.auth.uid == uid;
     match /users/{uid} {
       allow read, write: if true;
 

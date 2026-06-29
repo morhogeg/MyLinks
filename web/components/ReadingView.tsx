@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, Minus, Plus, Volume2, Pause, Play, ExternalLink, BookOpen, Loader2 } from 'lucide-react';
 import { Link } from '@/lib/types';
 import { getDirection } from '@/lib/rtl';
+import { appCheckHeaders } from '@/lib/firebase';
 
 interface Paragraph {
     type: 'p' | 'h2' | 'h3' | 'li' | 'blockquote';
@@ -49,7 +50,7 @@ export default function ReadingView({ link, onClose }: ReadingViewProps) {
             try {
                 const res = await fetch('/api/article', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()) },
                     body: JSON.stringify({ url: link.url }),
                 });
                 const data = await res.json();
