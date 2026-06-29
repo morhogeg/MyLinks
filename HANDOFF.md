@@ -1,8 +1,40 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-27. Branch: `claude/vibrant-leakey-694fc3` (merged to `main`)._
+_Last updated: 2026-06-29. Branch: `claude/chat-history-sidebar-fgldj7` (merged to `main`)._
 
-## Latest session — Mobile UX + Ask Your Brain native chat (deployed)
+## Latest session — Ask Your Brain: saved chat history sidebar (frontend)
+
+All frontend. Merged to `main` (Vercel/desktop auto-deploys on push). **iPhone (Firebase
+Hosting) still needs `./deploy-hosting.sh` from a machine with `firebase login`** — it could not
+be run from the cloud session (no firebase CLI/credentials there). No backend change.
+
+**Problem:** the Ask chat kept a single rolling conversation in `localStorage` and **Clear**
+destroyed it permanently — no way to revisit a past chat.
+
+**What changed:**
+- **Auto-saved, multi-session chats in Firestore** (`users/{uid}/chats/{chatId}`): new
+  `web/lib/chats.ts` (CRUD + live `onSnapshot` subscription, mirrors `lib/storage.ts`).
+  `ChatMessage`/`ChatSource`/`ChatSession` moved to `web/lib/types.ts` for reuse.
+- **`AskBrain.tsx` is now multi-session:** auto-saves on the first assistant reply, then debounced
+  updates; **Clear → non-destructive "New chat"**; one-time migration of any legacy
+  `askbrain:chat:{uid}` localStorage conversation into Firestore; reopens the most recent chat on
+  load for continuity.
+- **New `web/components/ChatHistorySidebar.tsx`:** collapsible desktop panel (mirrors the Tag
+  Explorer) + mobile slide-over drawer triggered from the top bar; select / rename / delete
+  (delete routed through `ConfirmDialog`). Drawer layers above the keyboard-tracking chat surface
+  (z-60 > z-50) and respects safe-area insets.
+- **`web/app/globals.css`:** added `slide-in-left` animation (+ reduced-motion entry) for the
+  mobile drawer.
+
+**Verification:** `tsc --noEmit` exit 0; the four changed files lint clean. Full `next build`
+couldn't complete in the cloud session (can't fetch Google Fonts offline) — unrelated to the diff.
+
+**Follow-ups:** (1) run `./deploy-hosting.sh` locally for the iPhone build; (2) confirm Firestore
+security rules cover `users/{uid}/chats/**` like `links` before real use.
+
+---
+
+## Earlier — Mobile UX + Ask Your Brain native chat (deployed)
 
 All frontend; shipped to **both** Vercel (desktop) and Firebase Hosting (iPhone, via
 `./deploy-hosting.sh`). A new **`/ship`** skill (`.claude/skills/ship/SKILL.md`) encodes the
