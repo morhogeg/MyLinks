@@ -390,12 +390,29 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                 </div>
             )}
 
+            {/* Desktop New chat — a calm header action aligned to the conversation,
+                not a pill floating over the messages. Mobile uses the top-bar button. */}
+            {!isMobile && !isEmpty && (
+                <div className="shrink-0 px-3 sm:px-1 pt-0.5 pb-2">
+                    <div className="max-w-2xl mx-auto flex justify-end">
+                        <button
+                            onClick={newChat}
+                            title="Start a new chat"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border-subtle text-text-secondary text-xs font-medium hover:text-text hover:border-accent/40 hover:bg-card-hover transition-colors cursor-pointer"
+                        >
+                            <Plus className="w-3.5 h-3.5" />
+                            New chat
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Conversation */}
             <div
                 ref={scrollRef}
                 onTouchStart={onConvTouchStart}
                 onTouchMove={onConvTouchMove}
-                className="flex-1 overflow-y-auto px-3 sm:px-1 pb-4 overscroll-contain"
+                className="flex-1 overflow-y-auto px-3 sm:px-1 pb-4 overscroll-contain scrollbar-subtle"
             >
                 {isEmpty ? (
                     <div className="h-full flex flex-col items-center justify-center text-center px-4">
@@ -421,17 +438,6 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                     </div>
                 ) : (
                     <div className="max-w-2xl mx-auto py-2">
-                        {/* New chat — desktop quick action; mobile uses the top-bar button. */}
-                        <div className="hidden sm:flex sticky top-0 z-10 justify-end mb-2">
-                            <button
-                                onClick={newChat}
-                                title="Start a new chat"
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-card/80 backdrop-blur border border-border-subtle text-text-muted text-xs font-medium hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
-                            >
-                                <Plus className="w-3 h-3" />
-                                New chat
-                            </button>
-                        </div>
                         <div className="space-y-5">
                         {messages.map((m, i) => (
                             <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
@@ -556,7 +562,6 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                     chats={chats}
                     activeChatId={activeChatId}
                     onSelect={selectChat}
-                    onNewChat={newChat}
                     onRename={renameChat}
                     onRequestDelete={(id) => setChatToDelete(id)}
                     collapsed={sidebarCollapsed}
@@ -573,7 +578,6 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                     chats={chats}
                     activeChatId={activeChatId}
                     onSelect={selectChat}
-                    onNewChat={newChat}
                     onRename={renameChat}
                     onRequestDelete={(id) => setChatToDelete(id)}
                     open={historyOpen}

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import {
-    Plus,
     Pencil,
     Trash2,
     X,
@@ -17,7 +16,6 @@ interface ChatHistorySidebarProps {
     chats: ChatSession[];
     activeChatId: string | null;
     onSelect: (id: string) => void;
-    onNewChat: () => void;
     onRename: (id: string, title: string) => void;
     /** Routed through the parent's branded ConfirmDialog — we never delete directly. */
     onRequestDelete: (id: string) => void;
@@ -135,26 +133,17 @@ function ChatRow({
     );
 }
 
-/** Shared inner content: New chat button + the scrollable list of conversations. */
+/** Shared inner content: the scrollable list of conversations. */
 function SidebarBody({
     chats,
     activeChatId,
     onSelect,
-    onNewChat,
     onRename,
     onRequestDelete,
-}: Pick<ChatHistorySidebarProps, 'chats' | 'activeChatId' | 'onSelect' | 'onNewChat' | 'onRename' | 'onRequestDelete'>) {
+}: Pick<ChatHistorySidebarProps, 'chats' | 'activeChatId' | 'onSelect' | 'onRename' | 'onRequestDelete'>) {
     return (
         <>
-            <button
-                onClick={onNewChat}
-                className="shrink-0 w-full inline-flex items-center gap-2 px-3 py-2.5 rounded-xl bg-card border border-border-subtle text-text text-sm font-medium hover:border-accent/40 transition-colors cursor-pointer"
-            >
-                <Plus className="w-4 h-4 text-accent" />
-                New chat
-            </button>
-
-            <div className="flex-1 overflow-y-auto -mx-1 px-1 mt-2 space-y-0.5 overscroll-contain">
+            <div className="flex-1 overflow-y-auto -mx-1 px-1 space-y-0.5 overscroll-contain scrollbar-subtle">
                 {chats.length === 0 ? (
                     <div className="flex flex-col items-center justify-center text-center px-3 py-10 text-text-muted">
                         <MessagesSquare className="w-6 h-6 mb-2 opacity-50" />
@@ -258,7 +247,6 @@ export default function ChatHistorySidebar(props: ChatHistorySidebarProps) {
                 <div className="flex-1 flex flex-col p-3 min-h-0">
                     <SidebarBody
                         {...props}
-                        onNewChat={closeAfter(props.onNewChat)}
                         onSelect={closeAfter(props.onSelect)}
                     />
                 </div>
