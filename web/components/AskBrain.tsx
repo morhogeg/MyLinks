@@ -119,11 +119,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         const start = rotation % cats.length;
         const [a, b, c] = [...cats.slice(start), ...cats.slice(0, start)];
         // Varied, action-oriented prompts (not the same "What have I saved about X?"
-        // each time) so the empty state feels less generic. All client-side.
+        // each time) — but each must stand on its own, so no forced cross-topic
+        // links between unrelated categories. All client-side.
         const out: string[] = [`What are the key takeaways from my ${a} saves?`];
         if (b) out.push(`Summarize what I've saved on ${b}`);
         if (c && c !== a) out.push(`What's the latest I saved about ${c}?`);
-        out.push(b ? `How do my ${a} and ${b} saves connect?` : 'Give me a quick recap of my recent saves');
+        out.push('Give me a quick recap of my recent saves');
         return out.slice(0, 4);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [categories?.join('|'), rotation]);
