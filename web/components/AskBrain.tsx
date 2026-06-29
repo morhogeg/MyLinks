@@ -1,7 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { MessageCircleQuestion, ArrowUp, FileText, Brain, Plus, ChevronLeft, MessagesSquare } from 'lucide-react';
+import { MessageCircleQuestion, ArrowUp, FileText, Brain, Plus, ChevronLeft, MessagesSquare, Copy, Check } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
@@ -21,6 +24,54 @@ function sourceTag(s: ChatSource): { label: string; platform: ReturnType<typeof 
     }
     if (s.category) return { label: s.category, platform: null };
     return null;
+}
+
+/** Renders an assistant answer as Markdown, styled to match the chat. GFM gives
+ *  us tables/strikethrough; remark-breaks turns single newlines into <br> so the
+ *  model's line breaks survive (like the old whitespace-pre-wrap). */
+function MarkdownMessage({ content }: { content: string }) {
+    return (
+        <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkBreaks]}
+            components={{
+                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                ul: ({ children }) => <ul className="list-disc ps-5 mb-2 last:mb-0 space-y-1">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal ps-5 mb-2 last:mb-0 space-y-1">{children}</ol>,
+                li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                a: ({ children, href }) => (
+                    <a href={href} target="_blank" rel="noopener noreferrer" className="text-accent underline underline-offset-2 hover:text-accent-hover">
+                        {children}
+                    </a>
+                ),
+                code: ({ children }) => <code className="px-1 py-0.5 rounded bg-card-hover text-[13px] font-mono">{children}</code>,
+            }}
+        >
+            {content}
+        </ReactMarkdown>
+    );
+}
+
+/** Subtle "copy this answer" affordance shown under each assistant bubble. */
+function CopyButton({ text }: { text: string }) {
+    const [copied, setCopied] = useState(false);
+    const onCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        } catch { /* clipboard unavailable — silently no-op */ }
+    };
+    return (
+        <button
+            onClick={onCopy}
+            aria-label={copied ? 'Copied' : 'Copy answer'}
+            className="mt-1.5 inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-text-muted text-xs hover:text-text transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
+        >
+            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? 'Copied' : 'Copy'}
+        </button>
+    );
 }
 
 interface AskBrainProps {
@@ -304,9 +355,72 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         try {
             const res = await fetch('/api/chat', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()) },
-                body: JSON.stringify({ uid, question, history }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'text/event-stream',
+                    ...(await appCheckHeaders()),
+                },
+                body: JSON.stringify({ uid, question, history, stream: true }),
             });
+
+            const contentType = res.headers.get('content-type') || '';
+            if (contentType.includes('text/event-stream') && res.body) {
+                // Streaming backend: drop an empty in-progress bubble, then fold each
+                // SSE event into it. We mutate the *last* message (this assistant turn)
+                // immutably so React re-renders as tokens land.
+                setMessages(prev => [...prev, { role: 'assistant', content: '', sources: [] }]);
+                const patchLast = (patch: Partial<ChatMessage>) =>
+                    setMessages(prev => {
+                        const next = [...prev];
+                        const last = next[next.length - 1];
+                        next[next.length - 1] = { ...last, ...patch };
+                        return next;
+                    });
+                const appendText = (text: string) =>
+                    setMessages(prev => {
+                        const next = [...prev];
+                        const last = next[next.length - 1];
+                        next[next.length - 1] = { ...last, content: last.content + text };
+                        return next;
+                    });
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let firstToken = true;
+                let done = false;
+                while (!done) {
+                    const { value, done: streamDone } = await reader.read();
+                    if (streamDone) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    // Events are separated by a blank line; keep the trailing partial.
+                    const chunks = buffer.split('\n\n');
+                    buffer = chunks.pop() ?? '';
+                    for (const chunk of chunks) {
+                        const line = chunk.split('\n').find(l => l.startsWith('data:'));
+                        if (!line) continue;
+                        let evt: { type?: string; text?: string; sources?: ChatSource[]; error?: string };
+                        try {
+                            evt = JSON.parse(line.slice(line.indexOf(':') + 1).trim());
+                        } catch { continue; }
+                        if (evt.type === 'token') {
+                            if (firstToken) { setIsThinking(false); firstToken = false; }
+                            appendText(evt.text || '');
+                        } else if (evt.type === 'sources') {
+                            patchLast({ sources: evt.sources || [] });
+                        } else if (evt.type === 'error') {
+                            setIsThinking(false);
+                            patchLast({ content: evt.error || 'Something went wrong reaching your brain. Please try again.', error: true });
+                            done = true;
+                        } else if (evt.type === 'done') {
+                            done = true;
+                        }
+                    }
+                }
+                return;
+            }
+
+            // Non-streaming backend (current prod): existing JSON behavior unchanged.
             const data = await res.json();
 
             if (data.success) {
@@ -395,7 +509,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                 ref={scrollRef}
                 onTouchStart={onConvTouchStart}
                 onTouchMove={onConvTouchMove}
-                className="flex-1 overflow-y-auto px-3 sm:px-1 pt-1 pb-4 overscroll-contain scrollbar-soft"
+                className="flex-1 flex flex-col overflow-y-auto px-3 sm:px-1 pt-1 pb-4 overscroll-contain scrollbar-soft"
             >
                 {isEmpty ? (
                     <div className="h-full flex flex-col items-center justify-center text-center px-4">
@@ -420,24 +534,32 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                         </div>
                     </div>
                 ) : (
-                    <div className="max-w-2xl mx-auto py-2">
+                    <div className="w-full max-w-2xl mx-auto mt-auto py-2">
                         <div className="space-y-5">
                         {messages.map((m, i) => (
-                            <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
+                            <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start group'}>
                                 <div className={m.role === 'user' ? 'max-w-[85%]' : 'max-w-[90%] w-full'}>
                                     <div
                                         dir={getDirection(m.content)}
                                         className={
                                             m.role === 'user'
                                                 ? 'px-4 py-2.5 rounded-2xl rounded-br-md bg-accent text-white text-[15px] leading-relaxed'
-                                                : `px-4 py-3 rounded-2xl rounded-bl-md text-[15px] leading-relaxed whitespace-pre-wrap ${m.error
-                                                    ? 'bg-red-500/10 border border-red-500/20 text-text'
+                                                : `px-4 py-3 rounded-2xl rounded-bl-md text-[15px] leading-relaxed ${m.error
+                                                    ? 'bg-red-500/10 border border-red-500/20 text-text whitespace-pre-wrap'
                                                     : 'bg-card border border-border-subtle text-text'
                                                 }`
                                         }
                                     >
-                                        {m.content}
+                                        {/* User and error bubbles stay plain text; assistant answers render Markdown. */}
+                                        {m.role === 'assistant' && !m.error
+                                            ? <MarkdownMessage content={m.content} />
+                                            : m.content}
                                     </div>
+
+                                    {/* Copy affordance — subtle, under non-error assistant answers. */}
+                                    {m.role === 'assistant' && !m.error && m.content && (
+                                        <CopyButton text={m.content} />
+                                    )}
 
                                     {/* Citations — clickable proof cards back to the source links */}
                                     {m.role === 'assistant' && m.sources && m.sources.length > 0 && (
