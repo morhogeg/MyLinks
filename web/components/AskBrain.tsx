@@ -1,23 +1,18 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
-import { MessageCircleQuestion, ArrowUp, FileText, Brain, RotateCcw, ChevronLeft } from 'lucide-react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { MessageCircleQuestion, ArrowUp, FileText, Brain, Plus, ChevronLeft, MessagesSquare } from 'lucide-react';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
+import { ChatMessage, ChatSource, ChatSession } from '@/lib/types';
+import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
 import ConfirmDialog from './ConfirmDialog';
-
-interface Source {
-    id: string;
-    title: string;
-    category?: string;
-    sourceName?: string | null;
-    url?: string | null;
-}
+import ChatHistorySidebar from './ChatHistorySidebar';
 
 /** The branded tag shown on a citation card: a platform (YouTube/X/…) when the
  *  URL reveals one, otherwise the publisher name (e.g. CNN), otherwise null. */
-function sourceTag(s: Source): { label: string; platform: ReturnType<typeof getPlatform> } | null {
+function sourceTag(s: ChatSource): { label: string; platform: ReturnType<typeof getPlatform> } | null {
     const platform = getPlatform(s.url || undefined);
     if (platform) return { label: PLATFORM_LABELS[platform], platform };
     const name = s.sourceName?.trim();
@@ -26,13 +21,6 @@ function sourceTag(s: Source): { label: string; platform: ReturnType<typeof getP
     }
     if (s.category) return { label: s.category, platform: null };
     return null;
-}
-
-interface ChatMessage {
-    role: 'user' | 'assistant';
-    content: string;
-    sources?: Source[];
-    error?: boolean;
 }
 
 interface AskBrainProps {
@@ -45,15 +33,29 @@ interface AskBrainProps {
     categories?: string[];
 }
 
+const HISTORY_COLLAPSE_KEY = 'askbrain:histcollapsed';
+
 export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categories }: AskBrainProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
-    const [confirmClear, setConfirmClear] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    // Gate persistence until after we've loaded any saved chat, so the first
-    // (empty) render doesn't clobber what's in storage.
+
+    // ── Saved conversations (Firestore: users/{uid}/chats) ────────────────────
+    const [chats, setChats] = useState<ChatSession[]>([]);
+    const [chatsLoaded, setChatsLoaded] = useState(false);
+    const [activeChatId, setActiveChatId] = useState<string | null>(null);
+    const [chatToDelete, setChatToDelete] = useState<string | null>(null);
+    const [historyOpen, setHistoryOpen] = useState(false);          // mobile drawer
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // desktop panel
+
+    // Mirrors of state for use inside async/debounced closures without re-subscribing.
+    const activeChatIdRef = useRef<string | null>(null);
+    const lastSavedRef = useRef<string>('');   // signature of the last persisted messages
+    const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Gate persistence until the initial load/migration has run, so the first
+    // (empty) render doesn't create a stray chat.
     const hydratedRef = useRef(false);
 
     // Suggested prompts built from the user's own categories so they're always
@@ -72,7 +74,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
 
     // On phones the Ask view is a full-screen chat pinned to the *visual* viewport
     // so the composer rides the keyboard like a native chat app. On desktop it
-    // stays an inline panel.
+    // stays an inline panel beside the history sidebar.
     const [isMobile, setIsMobile] = useState(false);
     const rootRef = useRef<HTMLDivElement>(null);
     const syncViewportRef = useRef<() => void>(() => {});
@@ -119,32 +121,125 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         };
     }, [isMobile]);
 
-    const storageKey = uid ? `askbrain:chat:${uid}` : null;
-
-    // Restore the conversation on mount (survives tab switches and reloads).
+    // Restore the desktop sidebar's collapsed preference.
     useEffect(() => {
-        if (!storageKey || hydratedRef.current) return;
         try {
-            const raw = localStorage.getItem(storageKey);
-            if (raw) setMessages(JSON.parse(raw));
-        } catch { /* ignore corrupt/blocked storage */ }
+            if (localStorage.getItem(HISTORY_COLLAPSE_KEY) === '1') setSidebarCollapsed(true);
+        } catch { /* ignore blocked storage */ }
+    }, []);
+    const toggleSidebar = () => {
+        setSidebarCollapsed(prev => {
+            const next = !prev;
+            try { localStorage.setItem(HISTORY_COLLAPSE_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+            return next;
+        });
+    };
+
+    // Live-subscribe to the saved conversations so the history list stays in sync
+    // across devices (mirrors how Feed.tsx subscribes to links).
+    useEffect(() => {
+        if (!uid) return;
+        const unsub = subscribeChats(uid, next => { setChats(next); setChatsLoaded(true); });
+        return () => { unsub(); setChatsLoaded(false); };
+    }, [uid]);
+
+    // One-time init after the first chats snapshot: migrate any legacy
+    // single-conversation localStorage, otherwise reopen the most recent chat.
+    useEffect(() => {
+        if (!uid || !chatsLoaded || hydratedRef.current) return;
         hydratedRef.current = true;
-    }, [storageKey]);
-
-    // Persist as the conversation grows; only an explicit Clear wipes storage.
-    useEffect(() => {
-        if (!storageKey || !hydratedRef.current || messages.length === 0) return;
+        const legacyKey = `askbrain:chat:${uid}`;
+        let legacy: ChatMessage[] | null = null;
         try {
-            localStorage.setItem(storageKey, JSON.stringify(messages));
-        } catch { /* ignore quota/blocked storage */ }
-    }, [messages, storageKey]);
+            const raw = localStorage.getItem(legacyKey);
+            if (raw) legacy = JSON.parse(raw);
+        } catch { /* ignore corrupt/blocked storage */ }
 
-    const clearChat = () => {
+        (async () => {
+            if (legacy && legacy.length > 0 && chats.length === 0) {
+                try {
+                    const id = await createChat(uid, legacy);
+                    activeChatIdRef.current = id;
+                    setActiveChatId(id);
+                    setMessages(legacy);
+                    lastSavedRef.current = JSON.stringify(legacy);
+                } catch { /* leave conversation empty on failure */ }
+                try { localStorage.removeItem(legacyKey); } catch { /* ignore */ }
+                return;
+            }
+            if (legacy) { try { localStorage.removeItem(legacyKey); } catch { /* ignore */ } }
+            // Reopen the most recent saved chat (sorted updatedAt desc) for continuity.
+            if (chats.length > 0) {
+                const latest = chats[0];
+                setActiveChatId(latest.id);
+                activeChatIdRef.current = latest.id;
+                setMessages(latest.messages);
+                lastSavedRef.current = JSON.stringify(latest.messages);
+            }
+        })();
+    }, [uid, chatsLoaded, chats]);
+
+    // Persist the working conversation: create on the first assistant reply,
+    // then update in place. Skips writes when content is unchanged.
+    const persistConversation = useCallback(async (msgs: ChatMessage[]) => {
+        if (!uid) return;
+        if (!msgs.some(m => m.role === 'assistant')) return; // wait for a real exchange
+        const sig = JSON.stringify(msgs);
+        if (sig === lastSavedRef.current) return;
+        try {
+            if (activeChatIdRef.current) {
+                await updateChat(uid, activeChatIdRef.current, { messages: msgs });
+            } else {
+                const id = await createChat(uid, msgs);
+                activeChatIdRef.current = id;
+                setActiveChatId(id);
+            }
+            lastSavedRef.current = sig;
+        } catch { /* transient write error; snapshot keeps the list consistent */ }
+    }, [uid]);
+
+    // Debounced auto-save as the conversation grows.
+    useEffect(() => {
+        if (!uid || !hydratedRef.current || messages.length === 0) return;
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        const snapshot = messages;
+        saveTimer.current = setTimeout(() => persistConversation(snapshot), 600);
+        return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+    }, [messages, uid, persistConversation]);
+
+    // ── Conversation actions ──────────────────────────────────────────────────
+    const newChat = () => {
+        setActiveChatId(null);
+        activeChatIdRef.current = null;
         setMessages([]);
-        if (storageKey) {
-            try { localStorage.removeItem(storageKey); } catch { /* ignore */ }
-        }
+        lastSavedRef.current = '';
+        setInput('');
         textareaRef.current?.focus();
+    };
+
+    const selectChat = (id: string) => {
+        const chat = chats.find(c => c.id === id);
+        if (!chat) return;
+        setActiveChatId(id);
+        activeChatIdRef.current = id;
+        setMessages(chat.messages);
+        lastSavedRef.current = JSON.stringify(chat.messages);
+        setInput('');
+    };
+
+    const renameChat = (id: string, title: string) => {
+        if (!uid) return;
+        const chat = chats.find(c => c.id === id);
+        // Preserve list ordering — a rename shouldn't resurface the chat.
+        updateChat(uid, id, { title, updatedAt: chat?.updatedAt }).catch(() => {});
+    };
+
+    const confirmDeleteChat = () => {
+        if (!uid || !chatToDelete) return;
+        const id = chatToDelete;
+        deleteChat(uid, id).catch(() => {});
+        if (id === activeChatId) newChat();
+        setChatToDelete(null);
     };
 
     const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
@@ -241,15 +336,11 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
 
     const isEmpty = messages.length === 0;
 
-    return (
-        <div
-            ref={rootRef}
-            className={`flex flex-col animate-fade-in ${isMobile
-                ? 'fixed inset-x-0 top-0 z-50 bg-background'
-                : 'min-h-[340px] sm:h-[calc(100dvh-320px)]'
-                }`}
-        >
-            {/* Mobile-only top bar: back to exit + Clear (desktop exits via the toolbar). */}
+    // The chat column (top bar on mobile + conversation + composer) is shared by
+    // both layouts; the desktop layout wraps it next to the history sidebar.
+    const chatColumn = (
+        <div className={isMobile ? 'flex flex-col flex-1 min-h-0' : 'flex flex-col flex-1 min-w-0 h-full'}>
+            {/* Mobile-only top bar: back, history, title, New chat. */}
             {isMobile && (
                 <div className="flex items-center gap-1 px-2 h-12 shrink-0 border-b border-border-subtle">
                     <button
@@ -259,14 +350,21 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                     >
                         <ChevronLeft className="w-5 h-5" />
                     </button>
-                    <span className="font-semibold text-text">Ask your brain</span>
+                    <button
+                        onClick={() => setHistoryOpen(true)}
+                        aria-label="Chat history"
+                        className="p-2 rounded-full text-text-secondary hover:text-text active:bg-card-hover transition-colors"
+                    >
+                        <MessagesSquare className="w-5 h-5" />
+                    </button>
+                    <span className="font-semibold text-text truncate">Ask your brain</span>
                     {!isEmpty && (
                         <button
-                            onClick={() => setConfirmClear(true)}
+                            onClick={newChat}
                             className="ms-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-text-muted text-xs font-medium hover:text-text active:bg-card-hover transition-colors"
                         >
-                            <RotateCcw className="w-3 h-3" />
-                            Clear
+                            <Plus className="w-3.5 h-3.5" />
+                            New
                         </button>
                     )}
                 </div>
@@ -303,15 +401,15 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                     </div>
                 ) : (
                     <div className="max-w-2xl mx-auto py-2">
-                        {/* Clear — desktop only; mobile uses the top-bar Clear. */}
+                        {/* New chat — desktop quick action; mobile uses the top-bar button. */}
                         <div className="hidden sm:flex sticky top-0 z-10 justify-end mb-2">
                             <button
-                                onClick={() => setConfirmClear(true)}
-                                title="Clear conversation"
+                                onClick={newChat}
+                                title="Start a new chat"
                                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-card/80 backdrop-blur border border-border-subtle text-text-muted text-xs font-medium hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
                             >
-                                <RotateCcw className="w-3 h-3" />
-                                Clear
+                                <Plus className="w-3 h-3" />
+                                New chat
                             </button>
                         </div>
                         <div className="space-y-5">
@@ -419,14 +517,56 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                     Answers are grounded only in what you&apos;ve saved.
                 </p>
             </div>
+        </div>
+    );
+
+    return (
+        <div
+            ref={rootRef}
+            className={`animate-fade-in ${isMobile
+                ? 'fixed inset-x-0 top-0 z-50 bg-background flex flex-col'
+                : 'flex gap-4 sm:gap-5 min-h-[340px] sm:h-[calc(100dvh-320px)]'
+                }`}
+        >
+            {/* Desktop: persistent history panel beside the chat. */}
+            {!isMobile && (
+                <ChatHistorySidebar
+                    variant="desktop"
+                    chats={chats}
+                    activeChatId={activeChatId}
+                    onSelect={selectChat}
+                    onNewChat={newChat}
+                    onRename={renameChat}
+                    onRequestDelete={(id) => setChatToDelete(id)}
+                    collapsed={sidebarCollapsed}
+                    onToggleCollapse={toggleSidebar}
+                />
+            )}
+
+            {chatColumn}
+
+            {/* Mobile: history as a slide-over drawer above the chat. */}
+            {isMobile && (
+                <ChatHistorySidebar
+                    variant="mobile"
+                    chats={chats}
+                    activeChatId={activeChatId}
+                    onSelect={selectChat}
+                    onNewChat={newChat}
+                    onRename={renameChat}
+                    onRequestDelete={(id) => setChatToDelete(id)}
+                    open={historyOpen}
+                    onClose={() => setHistoryOpen(false)}
+                />
+            )}
 
             <ConfirmDialog
-                isOpen={confirmClear}
-                onClose={() => setConfirmClear(false)}
-                onConfirm={clearChat}
-                title="Clear this chat?"
-                message="This removes the whole conversation. Your saved cards aren’t affected."
-                confirmLabel="Clear chat"
+                isOpen={chatToDelete !== null}
+                onClose={() => setChatToDelete(null)}
+                onConfirm={confirmDeleteChat}
+                title="Delete this chat?"
+                message="This permanently removes the conversation from your history. Your saved cards aren’t affected."
+                confirmLabel="Delete"
                 cancelLabel="Keep it"
                 variant="danger"
             />
