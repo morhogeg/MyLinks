@@ -1,8 +1,49 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-29. Branch: `claude/chat-history-sidebar-fgldj7` (merged to `main`)._
+_Last updated: 2026-06-29. Branch: `claude/security-audit-baseline-ul4hec` (merged to `main`)._
 
-## Latest session — Ask Your Brain: saved chat history sidebar (frontend)
+## Latest session — Production security baseline (frontend + backend)
+
+Adapted a generic security checklist to this Firebase + Next.js + Python-Functions stack and
+implemented a **code-only, secure-by-default baseline** that keeps the current single-user model
+(real Firebase Auth deferred). Shipped to `main`; functions + hosting redeployed.
+
+**What changed:**
+- **Security headers** (`firebase.json` hosting + `web/vercel.json`): CSP, HSTS, X-Frame-Options,
+  X-Content-Type-Options, Referrer-Policy, Permissions-Policy. *Watch the CSP* — first one for this
+  app; check the browser console for blocked resources and loosen if needed.
+- **Error sanitization** (`functions/main.py`, `search.py`): new `_server_error` helper logs full
+  traces server-side and returns generic messages — removed all `str(e)` leakage to clients.
+- **Removed dead client Gemini path:** deleted `web/lib/ai-service.ts` (`chatWithContent`, unused)
+  and the `@google/generative-ai` dep so no Gemini key can be bundled client-side.
+- **CORS pinned** (`functions/main.py`): origin allowlist instead of `*` default (both the Vercel
+  and Firebase Hosting paths are same-origin via rewrites, so this doesn't affect normal use).
+- **WhatsApp webhook** now verifies the Twilio `X-Twilio-Signature` (rejects spoofed senders).
+- **Rate limiting** (new `functions/rate_limit.py`): Firestore-backed fixed-window limiter on all
+  public endpoints → `429` on abuse (fails open on backend error).
+- **Input caps + SSRF guard:** URL/question/image size limits; `validate_public_url` in
+  `functions/scraper.py` blocks private/loopback/metadata targets before server-side fetches.
+- **Firebase App Check:** server `_require_app_check` (soft-rollout via `APPCHECK_ENFORCE`) on the
+  paid endpoints; client init (reCAPTCHA v3) + `X-Firebase-AppCheck` header on `/api/*` calls.
+- **`firestore.rules`:** documented the accepted residual risk + the exact `request.auth.uid == uid`
+  change to apply once real auth lands (rules still open by necessity until then).
+
+**Verification:** `py_compile` OK on all functions; `tsc --noEmit` exit 0; JSON configs valid.
+Full `next build` couldn't complete in the cloud session (can't fetch Google Fonts offline) —
+unrelated to the diff.
+
+**Manual follow-ups (require web consoles — not doable from the session):**
+1. Firebase Console → App Check → register reCAPTCHA v3; set `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`
+   (Vercel + `web/.env.local`), then set functions env `APPCHECK_ENFORCE=true` once logs show
+   valid tokens arriving. Steps documented in `web/VERCEL.md`.
+2. Optionally set `CORS_ORIGIN` on the functions to add the Vercel domain (not required —
+   sensible defaults already cover the app's own origins).
+3. Deferred: real Firebase Auth (Google Sign-In + ID-token verification + locked rules) is the
+   complete fix for cross-user data isolation.
+
+---
+
+## Earlier — Ask Your Brain: saved chat history sidebar (frontend)
 
 All frontend. Merged to `main` (Vercel/desktop auto-deploys on push). **iPhone (Firebase
 Hosting) still needs `./deploy-hosting.sh` from a machine with `firebase login`** — it could not
