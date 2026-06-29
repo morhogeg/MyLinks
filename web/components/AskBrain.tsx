@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { MessageCircleQuestion, ArrowUp, FileText, Brain, RotateCcw, ChevronLeft } from 'lucide-react';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS } from '@/lib/platform';
+import { appCheckHeaders } from '@/lib/firebase';
 import ConfirmDialog from './ConfirmDialog';
 
 interface Source {
@@ -188,7 +189,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         try {
             const res = await fetch('/api/chat', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()) },
                 body: JSON.stringify({ uid, question, history }),
             });
             const data = await res.json();

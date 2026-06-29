@@ -181,5 +181,5 @@ def search_links(req: https_fn.CallableRequest) -> Any:
         raise
     except Exception as e:
         logger.error(f"Search failed: {e}", exc_info=True)
-        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=str(e))
+        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message="Search failed")
 

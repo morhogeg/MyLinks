@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { Link, Plus, Loader2, X, Upload } from 'lucide-react';
 import { saveLink, getUserTags } from '@/lib/storage';
+import { appCheckHeaders } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { compressImage } from '@/lib/image';
@@ -156,7 +157,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
                 try {
                     response = await fetchWithTimeout('/api/analyze', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()) },
                         body: JSON.stringify({ url: formattedUrl, existingTags, uid }),
                     });
                 } catch (netErr) {
@@ -178,7 +179,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
                 try {
                     response = await fetchWithTimeout('/api/analyze-image', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()) },
                         body: JSON.stringify({
                             imageBytes: compressed.base64,
                             mimeType: compressed.mimeType,
