@@ -502,9 +502,10 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
         <div className={viewMode === 'ask' ? 'space-y-2' : 'space-y-4 lg:space-y-6'}>
             {/* Header Section (Not Sticky) */}
             <div className={`pt-2 -mx-4 px-4 sm:mx-0 sm:px-0 transition-all duration-300 ${viewMode === 'ask' ? 'space-y-2 pb-0' : 'space-y-3 sm:space-y-4 pb-3'}`}>
-                {/* Search Bar — in Ask mode a Back button sits beside it to leave Ask. */}
-                <div className={viewMode === 'ask' ? 'flex items-center gap-2' : ''}>
-                    {viewMode === 'ask' && (
+                {/* Ask mode drops the search bar entirely (typing there just exits Ask)
+                    and shows only a Back button, so the chat gets the full height. */}
+                {viewMode === 'ask' ? (
+                    <div className="flex items-center">
                         <button
                             onClick={() => setViewMode(lastLayout.current)}
                             title="Back to your library"
@@ -514,18 +515,14 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                             <ChevronLeft className="w-4 h-4" />
                             Back
                         </button>
-                    )}
-                    <div className="relative flex-1">
+                    </div>
+                ) : (
+                    <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                         <input
                             type="text"
                             value={searchQuery}
-                            onChange={(e) => {
-                                setSearchQuery(e.target.value);
-                                // Search results render in the grid, not Ask — so typing a
-                                // query drops out of Ask into the last layout to show them.
-                                if (e.target.value && viewMode === 'ask') setViewMode(lastLayout.current);
-                            }}
+                            onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Search your brain..."
                             className="w-full pl-9 pr-10 py-2 bg-card rounded-xl text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent/30 transition-all"
                         />
@@ -538,7 +535,7 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                             </button>
                         )}
                     </div>
-                </div>
+                )}
 
                 {/* Row 1: Category Navigator — only relevant when browsing the grid.
                     Desktop shows scrollable chips; mobile collapses them into one button. */}
