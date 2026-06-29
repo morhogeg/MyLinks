@@ -117,9 +117,14 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         const cats = (categories ?? []).filter(Boolean);
         if (!cats.length) return [] as string[];
         const start = rotation % cats.length;
-        const rotated = [...cats.slice(start), ...cats.slice(0, start)];
-        const picks = rotated.slice(0, 3).map(c => `What have I saved about ${c}?`);
-        return [...picks, 'Summarize the key ideas from my recent saves'];
+        const [a, b, c] = [...cats.slice(start), ...cats.slice(0, start)];
+        // Varied, action-oriented prompts (not the same "What have I saved about X?"
+        // each time) so the empty state feels less generic. All client-side.
+        const out: string[] = [`What are the key takeaways from my ${a} saves?`];
+        if (b) out.push(`Summarize what I've saved on ${b}`);
+        if (c && c !== a) out.push(`What's the latest I saved about ${c}?`);
+        out.push(b ? `How do my ${a} and ${b} saves connect?` : 'Give me a quick recap of my recent saves');
+        return out.slice(0, 4);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [categories?.join('|'), rotation]);
 
@@ -214,8 +219,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         return () => { unsub(); setChatsLoaded(false); };
     }, [uid]);
 
-    // One-time init after the first chats snapshot: migrate any legacy
-    // single-conversation localStorage, otherwise reopen the most recent chat.
+    // One-time init after the first chats snapshot. We deliberately start on a
+    // fresh, empty New chat after every load/refresh — past conversations stay in
+    // the sidebar and can be reopened explicitly. We only migrate any legacy
+    // single-conversation localStorage into saved history so it isn't lost.
     useEffect(() => {
         if (!uid || !chatsLoaded || hydratedRef.current) return;
         hydratedRef.current = true;
@@ -228,25 +235,9 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
 
         (async () => {
             if (legacy && legacy.length > 0 && chats.length === 0) {
-                try {
-                    const id = await createChat(uid, legacy);
-                    activeChatIdRef.current = id;
-                    setActiveChatId(id);
-                    setMessages(legacy);
-                    lastSavedRef.current = JSON.stringify(legacy);
-                } catch { /* leave conversation empty on failure */ }
-                try { localStorage.removeItem(legacyKey); } catch { /* ignore */ }
-                return;
+                try { await createChat(uid, legacy); } catch { /* ignore */ }
             }
             if (legacy) { try { localStorage.removeItem(legacyKey); } catch { /* ignore */ } }
-            // Reopen the most recent saved chat (sorted updatedAt desc) for continuity.
-            if (chats.length > 0) {
-                const latest = chats[0];
-                setActiveChatId(latest.id);
-                activeChatIdRef.current = latest.id;
-                setMessages(latest.messages);
-                lastSavedRef.current = JSON.stringify(latest.messages);
-            }
         })();
     }, [uid, chatsLoaded, chats]);
 
