@@ -6,22 +6,39 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { getDirection } from '@/lib/rtl';
-import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS } from '@/lib/platform';
+import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS, xHandle, linkedinDisplayName } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
 import { ChatMessage, ChatSource, ChatSession } from '@/lib/types';
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
 import ConfirmDialog from './ConfirmDialog';
 import ChatHistorySidebar from './ChatHistorySidebar';
 
-/** The branded tag shown on a citation card: a platform (YouTube/X/…) when the
- *  URL reveals one, otherwise the publisher name (e.g. CNN), otherwise null. */
+/** A usable source name, or null for placeholders the backend stores. */
+function meaningfulName(name?: string | null): string | null {
+    const s = name?.trim();
+    if (s && !['none', 'screenshot', 'unknown', 'linkedin'].includes(s.toLowerCase())) return s;
+    return null;
+}
+
+/** The byline shown on a citation card: the *specific* source identity when we
+ *  can resolve one — an X @handle, a LinkedIn author, a channel/page or
+ *  publisher name — otherwise the platform label, otherwise the category. The
+ *  returned platform drives the brand icon/color. */
 function sourceTag(s: ChatSource): { label: string; platform: ReturnType<typeof getPlatform> } | null {
     const platform = getPlatform(s.url || undefined);
-    if (platform) return { label: PLATFORM_LABELS[platform], platform };
-    const name = s.sourceName?.trim();
-    if (name && !['none', 'screenshot', 'unknown'].includes(name.toLowerCase())) {
-        return { label: name, platform: null };
+    const name = meaningfulName(s.sourceName);
+    if (platform === 'x') {
+        const h = xHandle(s.url || undefined);
+        return { label: h ? `@${h}` : (name || PLATFORM_LABELS[platform]), platform };
     }
+    if (platform === 'linkedin') {
+        return { label: linkedinDisplayName(s.url || undefined, s.sourceName) || PLATFORM_LABELS[platform], platform };
+    }
+    if (platform) {
+        // YouTube channel / Facebook page / etc.: prefer the captured name.
+        return { label: name || PLATFORM_LABELS[platform], platform };
+    }
+    if (name) return { label: name, platform: null };
     if (s.category) return { label: s.category, platform: null };
     return null;
 }
@@ -583,7 +600,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                                                                 <span className="min-w-0 flex flex-col">
                                                                     {tag && (
                                                                         <span
-                                                                            className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted"
+                                                                            className="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wide text-text-muted"
                                                                             style={tag.platform ? { color: platformColor(tag.platform) } : undefined}
                                                                         >
                                                                             {tag.label}
