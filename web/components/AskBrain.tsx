@@ -75,6 +75,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
     // so the composer rides the keyboard like a native chat app. On desktop it
     // stays an inline panel beside the history sidebar.
     const [isMobile, setIsMobile] = useState(false);
+    const [deskHeight, setDeskHeight] = useState<number | null>(null);
     const rootRef = useRef<HTMLDivElement>(null);
     const syncViewportRef = useRef<() => void>(() => {});
 
@@ -119,6 +120,25 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
             if (el) { el.style.height = ''; el.style.transform = ''; }
         };
     }, [isMobile]);
+
+    // Desktop: fill from the panel's top down to the viewport bottom so the
+    // composer sits at the very bottom and the sidebar spans the full height —
+    // no dead space, no guessed offset. Recomputed on resize.
+    useEffect(() => {
+        if (isMobile) return;
+        const el = rootRef.current;
+        if (!el) return;
+        const measure = () => {
+            // Viewport-relative top → fill to the bottom of the window. In Ask mode
+            // the view fills the viewport so the page doesn't scroll and this stays put.
+            const top = el.getBoundingClientRect().top;
+            setDeskHeight(Math.max(360, window.innerHeight - top - 12));
+        };
+        measure();
+        const raf = requestAnimationFrame(measure);
+        window.addEventListener('resize', measure);
+        return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', measure); };
+    }, [isMobile, totalLinks]);
 
     // Restore the desktop sidebar's collapsed preference.
     useEffect(() => {
@@ -338,7 +358,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
     // The chat column (top bar on mobile + conversation + composer) is shared by
     // both layouts; the desktop layout wraps it next to the history sidebar.
     const chatColumn = (
-        <div className={isMobile ? 'flex flex-col flex-1 min-h-0' : 'flex flex-col flex-1 min-w-0 h-full'}>
+        <div className={isMobile ? 'flex flex-col flex-1 min-h-0' : 'flex flex-col flex-1 min-w-0 min-h-0 h-full sm:ps-5'}>
             {/* Mobile-only top bar: back, history, title, New chat. */}
             {isMobile && (
                 <div className="flex items-center gap-1 px-2 h-12 shrink-0 border-b border-border-subtle">
@@ -522,9 +542,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
     return (
         <div
             ref={rootRef}
+            style={!isMobile && deskHeight ? { height: deskHeight } : undefined}
             className={`animate-fade-in ${isMobile
                 ? 'fixed inset-x-0 top-0 z-50 bg-background flex flex-col'
-                : 'flex gap-4 sm:gap-5 min-h-[340px] sm:h-[calc(100dvh-320px)]'
+                : 'flex min-h-[360px]'
                 }`}
         >
             {/* Desktop: persistent history panel beside the chat. */}

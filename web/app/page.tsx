@@ -74,8 +74,9 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-[2200px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-2 sm:py-4 pb-24 sm:pb-20">
+      {/* Main Content — Ask mode fills to the viewport bottom, so it drops the
+          tall bottom padding the grid uses for the FAB. */}
+      <main className={`max-w-[2200px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-2 sm:py-4 ${isAskMode ? 'pb-0 sm:pb-0' : 'pb-24 sm:pb-20'}`}>
         <Feed key={refreshKey} onAskModeChange={setIsAskMode} />
       </main>
 

@@ -198,45 +198,39 @@ export default function ChatHistorySidebar(props: ChatHistorySidebarProps) {
 
     if (variant === 'desktop') {
         const { collapsed, onToggleCollapse } = props;
+        // A full-height panel that's part of the page: a right-edge divider rather
+        // than a floating card, spanning the whole Ask view height.
         return (
             <aside
-                className={`hidden sm:block shrink-0 transition-all duration-300 ease-in-out ${
-                    collapsed ? 'w-10' : 'w-60 xl:w-72'
+                className={`hidden sm:flex flex-col shrink-0 h-full min-h-0 border-e border-border-subtle transition-[width] duration-300 ease-in-out ${
+                    collapsed ? 'w-12 items-center pe-0' : 'w-60 xl:w-72 pe-4'
                 }`}
             >
-                <div
-                    className={`sticky top-0 h-full max-h-[calc(100dvh-340px)] sm:max-h-[calc(100dvh-320px)] flex flex-col ${
-                        collapsed
-                            ? 'items-center'
-                            : 'surface-card rounded-2xl border border-border-subtle shadow-[var(--shadow-card)] p-3'
-                    }`}
-                >
-                    {collapsed ? (
-                        <button
-                            onClick={onToggleCollapse}
-                            aria-label="Show chat history"
-                            title="Show chat history"
-                            className="p-2 rounded-xl text-text-secondary hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
-                        >
-                            <PanelLeftOpen className="w-5 h-5" />
-                        </button>
-                    ) : (
-                        <>
-                            <div className="shrink-0 flex items-center justify-between mb-2 ps-1">
-                                <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">History</span>
-                                <button
-                                    onClick={onToggleCollapse}
-                                    aria-label="Hide chat history"
-                                    title="Hide chat history"
-                                    className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
-                                >
-                                    <PanelLeftClose className="w-4 h-4" />
-                                </button>
-                            </div>
-                            <SidebarBody {...props} />
-                        </>
-                    )}
-                </div>
+                {collapsed ? (
+                    <button
+                        onClick={onToggleCollapse}
+                        aria-label="Show chat history"
+                        title="Show chat history"
+                        className="mt-1 p-2 rounded-xl text-text-secondary hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
+                    >
+                        <PanelLeftOpen className="w-5 h-5" />
+                    </button>
+                ) : (
+                    <>
+                        <div className="shrink-0 flex items-center justify-between mb-2 ps-1">
+                            <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">History</span>
+                            <button
+                                onClick={onToggleCollapse}
+                                aria-label="Hide chat history"
+                                title="Hide chat history"
+                                className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
+                            >
+                                <PanelLeftClose className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <SidebarBody {...props} />
+                    </>
+                )}
             </aside>
         );
     }
