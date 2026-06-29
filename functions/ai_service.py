@@ -302,7 +302,7 @@ Rules:
 - Ground every claim in the provided sources. Do NOT use outside knowledge or invent facts.
 - If the sources don't contain the answer, say so plainly and suggest what they could save.
 - Be concise and direct (2-5 sentences, or a short list when that's clearer).
-- Reply in the same language as the question.
+- CRITICAL — match the user's language: write your ENTIRE answer in the same language as the User question, NOT the language of the sources. If the question is in English, answer in English even when every source is in Hebrew; if the question is in Hebrew, answer in Hebrew. The sources' language must not influence your answer's language.
 - Only cite sources you actually used.
 
 Saved sources:
@@ -392,7 +392,7 @@ Rules:
 - Ground every claim in the provided sources. Do NOT use outside knowledge or invent facts.
 - If the sources don't contain the answer, say so plainly and suggest what they could save.
 - Be concise and direct (2-5 sentences, or a short list when that's clearer).
-- Reply in the same language as the question.
+- CRITICAL — match the user's language: write your ENTIRE answer in the same language as the User question, NOT the language of the sources. If the question is in English, answer in English even when every source is in Hebrew; if the question is in Hebrew, answer in Hebrew. The sources' language must not influence your answer's language.
 - Only cite sources you actually used.
 
 Saved sources:
