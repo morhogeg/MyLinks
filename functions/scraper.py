@@ -5,11 +5,46 @@ for Twitter/X, Instagram, and YouTube.
 """
 
 import re
+import socket
+import ipaddress
 import requests
 import logging
 from typing import Optional
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
+
+
+class UnsafeURLError(ValueError):
+    """Raised when a URL resolves to a private/internal address (SSRF guard)."""
+
+
+def validate_public_url(url: str) -> None:
+    """Reject URLs that point at private, loopback, or cloud-metadata addresses.
+
+    Server-side fetches of user-supplied URLs are an SSRF vector: without this
+    an attacker could make the function request http://169.254.169.254/ (cloud
+    metadata) or internal RFC1918 hosts. We require http(s) and verify every
+    resolved IP is global/public before any request is made.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise UnsafeURLError(f"Unsupported URL scheme: {parsed.scheme!r}")
+
+    host = parsed.hostname
+    if not host:
+        raise UnsafeURLError("URL has no host")
+
+    try:
+        addrinfos = socket.getaddrinfo(host, None)
+    except socket.gaierror as e:
+        raise UnsafeURLError(f"Could not resolve host: {host}") from e
+
+    for family, _, _, _, sockaddr in addrinfos:
+        ip = ipaddress.ip_address(sockaddr[0])
+        if (ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+            raise UnsafeURLError(f"URL resolves to a non-public address: {ip}")
 
 
 def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
@@ -21,6 +56,9 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         dict with 'html', 'title', 'text' keys
     """
     try:
+        # SSRF guard: block private/internal/metadata targets before any fetch.
+        validate_public_url(url)
+
         # Special handling for Twitter/X URLs
         if 'twitter.com' in url or 'x.com' in url:
             return _scrape_twitter_url(url)
@@ -98,6 +136,9 @@ def extract_readable_article(url: str) -> dict:
     reader renders like a real article. Returns:
         { "title": str, "paragraphs": [{"type": "p|h2|h3|li|blockquote", "text": str}] }
     """
+    # SSRF guard: block private/internal/metadata targets before any fetch.
+    validate_public_url(url)
+
     headers = {
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) "
                       "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"

@@ -41,6 +41,7 @@ from graph_service import GraphService
 # are heavy and irrelevant to the hot image-analysis path, so deferring them
 # keeps cold starts lighter for functions like analyze_image.
 from search import sync_link_embedding, search_links, perform_search_logic
+from rate_limit import check_rate_limit, client_ip
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -48,33 +49,135 @@ logger = logging.getLogger(__name__)
 
 APP_URL = os.environ.get("APP_URL", "https://secondbrain-app-94da2.web.app")
 
-CORS_ORIGIN = os.environ.get("CORS_ORIGIN", "*")
+# Comma-separated allowlist of origins permitted to call these endpoints.
+# Defaults to the app's own Firebase Hosting + firebaseapp.com origins when
+# unset. Set CORS_ORIGIN to "*" only for local debugging — never in prod.
+def _allowed_origins() -> list:
+    raw = os.environ.get("CORS_ORIGIN", "").strip()
+    if raw:
+        return [o.strip() for o in raw.split(",") if o.strip()]
+    return [APP_URL, "https://secondbrain-app-94da2.firebaseapp.com"]
 
 
-def _cors_headers() -> dict:
-    """Return standard CORS headers."""
-    return {'Access-Control-Allow-Origin': CORS_ORIGIN}
+def _resolve_origin(req=None) -> str:
+    """Pick the Access-Control-Allow-Origin value.
+
+    Echoes the caller's Origin only if it's on the allowlist; otherwise falls
+    back to the primary app origin. Never reflects an arbitrary/untrusted
+    Origin (which would defeat the point of pinning CORS).
+    """
+    allowed = _allowed_origins()
+    if "*" in allowed:
+        return "*"
+    origin = req.headers.get("Origin") if req is not None else None
+    if origin and origin in allowed:
+        return origin
+    return allowed[0]
 
 
-def _cors_preflight() -> https_fn.Response:
+def _cors_headers(req=None) -> dict:
+    """Return standard CORS headers, pinned to the allowlist."""
+    return {
+        'Access-Control-Allow-Origin': _resolve_origin(req),
+        'Vary': 'Origin',
+    }
+
+
+def _cors_preflight(req=None) -> https_fn.Response:
     """Handle CORS preflight OPTIONS request."""
     headers = {
-        'Access-Control-Allow-Origin': CORS_ORIGIN,
-        'Access-Control-Allow-Methods': 'POST',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Origin': _resolve_origin(req),
+        'Vary': 'Origin',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Ingest-Token, X-Firebase-AppCheck',
         'Access-Control-Max-Age': '3600'
     }
     return https_fn.Response('', status=204, headers=headers)
 
 
 def _error_response(message: str, status: int = 400, headers: dict = None) -> https_fn.Response:
-    """Standardized JSON error response."""
+    """Standardized JSON error response.
+
+    Use this for *intentional* client-facing messages (e.g. validation errors).
+    For unexpected exceptions use `_server_error`, which never echoes the raw
+    exception to the caller.
+    """
     return https_fn.Response(
         json.dumps({"success": False, "error": message}),
         status=status,
         headers=headers or _cors_headers(),
         mimetype='application/json'
     )
+
+
+def _server_error(headers: dict = None, exc: Exception = None,
+                  message: str = "Internal server error",
+                  status: int = 500) -> https_fn.Response:
+    """Log the full exception server-side; return a generic error to the client.
+
+    Prevents leaking stack traces / internal error detail / infrastructure
+    specifics to callers (OWASP A09; fail-safe error handling).
+    """
+    if exc is not None:
+        logger.error("Unhandled error: %s", exc, exc_info=True)
+    return _error_response(message, status, headers)
+
+
+# Input size caps to reject abusive/oversized payloads before any paid work.
+MAX_URL_LENGTH = 2048
+MAX_QUESTION_LENGTH = 2000
+MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+# Per-bucket rate limits: (max_requests, window_seconds). The analyze / image /
+# chat buckets are deliberately tight because each call spends money on Gemini.
+_RATE_LIMITS = {
+    "analyze": (30, 3600),
+    "image": (30, 3600),
+    "chat": (60, 3600),
+    "article": (120, 3600),
+    "share": (120, 3600),
+    "whatsapp": (60, 60),
+}
+
+
+def _rate_limited(bucket: str, identity: str, headers: dict = None):
+    """Return a 429 Response if `identity` exceeds the bucket's limit, else None."""
+    limit, window = _RATE_LIMITS[bucket]
+    if not check_rate_limit(f"{bucket}:{identity}", limit, window):
+        logger.warning("Rate limit exceeded: %s:%s", bucket, identity)
+        return _error_response("Too many requests. Please slow down.", 429, headers)
+    return None
+
+
+# App Check enforcement flag. When falsy, verification is attempted and logged
+# but never blocks (soft rollout) — lets us confirm the web client is sending
+# tokens before flipping APPCHECK_ENFORCE=true to start rejecting.
+APPCHECK_ENFORCE = os.environ.get("APPCHECK_ENFORCE", "").lower() in ("1", "true", "yes")
+
+
+def _require_app_check(req, headers: dict = None) -> bool:
+    """Verify the Firebase App Check token (X-Firebase-AppCheck header).
+
+    Returns True if the request should proceed. Attests that calls to the paid
+    Gemini endpoints come from the real app rather than a script. In soft mode
+    (APPCHECK_ENFORCE off) always allows but logs; in enforce mode rejects a
+    missing/invalid token.
+    """
+    token = req.headers.get("X-Firebase-AppCheck")
+    if not token:
+        if APPCHECK_ENFORCE:
+            logger.warning("App Check token missing — rejecting")
+            return False
+        logger.info("App Check token missing (soft mode — allowing)")
+        return True
+    try:
+        from firebase_admin import app_check
+        app_check.verify_token(token)
+        return True
+    except Exception as e:
+        logger.warning("App Check verification failed: %s", e)
+        return not APPCHECK_ENFORCE
 
 
 def _estimate_read_time(text: str, words_per_minute: int = 200) -> int:
@@ -216,9 +319,16 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
     Used by the frontend "Add Link" form.
     """
     if req.method == 'OPTIONS':
-        return _cors_preflight()
+        return _cors_preflight(req)
 
-    headers = _cors_headers()
+    headers = _cors_headers(req)
+
+    rl = _rate_limited("analyze", client_ip(req), headers)
+    if rl:
+        return rl
+
+    if not _require_app_check(req, headers):
+        return _error_response("App Check verification failed", 401, headers)
 
     try:
         data = req.get_json()
@@ -230,6 +340,8 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
 
         if not url:
             return _error_response("URL is required", 400, headers)
+        if len(url) > MAX_URL_LENGTH:
+            return _error_response("URL is too long", 400, headers)
 
         logger.info(f"Analyzing URL synchronously: {url}")
 
@@ -305,7 +417,7 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         )
 
     except Exception as e:
-        return _error_response(str(e), 500, headers)
+        return _server_error(headers, e)
 
 
 # Words to ignore when keyword-matching a question against saved cards.
@@ -372,9 +484,16 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
     Returns: { success, answer, citedIds, sources: [{id, title, category, sourceName}] }
     """
     if req.method == 'OPTIONS':
-        return _cors_preflight()
+        return _cors_preflight(req)
 
-    headers = _cors_headers()
+    headers = _cors_headers(req)
+
+    rl = _rate_limited("chat", client_ip(req), headers)
+    if rl:
+        return rl
+
+    if not _require_app_check(req, headers):
+        return _error_response("App Check verification failed", 401, headers)
 
     try:
         data = req.get_json()
@@ -389,6 +508,8 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             return _error_response("uid is required", 400, headers)
         if not question:
             return _error_response("question is required", 400, headers)
+        if len(question) > MAX_QUESTION_LENGTH:
+            return _error_response("question is too long", 400, headers)
 
         # 1. Retrieve the most relevant saved cards (reuses the vector search
         #    that already powers the search bar). Degrade gracefully: if
@@ -449,7 +570,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         )
 
     except Exception as e:
-        return _error_response(str(e), 500, headers)
+        return _server_error(headers, e)
 
 
 @https_fn.on_request()
@@ -461,15 +582,24 @@ def get_article(req: https_fn.Request) -> https_fn.Response:
     without a schema migration or backfill.
     """
     if req.method == 'OPTIONS':
-        return _cors_preflight()
+        return _cors_preflight(req)
 
-    headers = _cors_headers()
+    headers = _cors_headers(req)
+
+    rl = _rate_limited("article", client_ip(req), headers)
+    if rl:
+        return rl
+
+    if not _require_app_check(req, headers):
+        return _error_response("App Check verification failed", 401, headers)
 
     try:
         data = req.get_json()
         url = (data or {}).get('url')
         if not url:
             return _error_response("url is required", 400, headers)
+        if len(url) > MAX_URL_LENGTH:
+            return _error_response("URL is too long", 400, headers)
 
         from scraper import extract_readable_article
         article = extract_readable_article(url)
@@ -485,16 +615,23 @@ def get_article(req: https_fn.Request) -> https_fn.Response:
         )
 
     except Exception as e:
-        return _error_response(str(e), 500, headers)
+        return _server_error(headers, e)
 
 
 @https_fn.on_request()
 def analyze_image(req: https_fn.Request) -> https_fn.Response:
     """HTTP endpoint for analyzing Images immediately (Synchronous)."""
     if req.method == 'OPTIONS':
-        return _cors_preflight()
+        return _cors_preflight(req)
 
-    headers = _cors_headers()
+    headers = _cors_headers(req)
+
+    rl = _rate_limited("image", client_ip(req), headers)
+    if rl:
+        return rl
+
+    if not _require_app_check(req, headers):
+        return _error_response("App Check verification failed", 401, headers)
 
     try:
         data = req.get_json()
@@ -519,16 +656,29 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
                 mime_type = data.get('mimeType', 'image/jpeg')
                 logger.info(f"Analyzing inline image ({len(image_bytes)} bytes)")
             except Exception as e:
-                return _error_response(f"Invalid image bytes: {str(e)}", 400, headers)
+                logger.error("Invalid image bytes: %s", e)
+                return _error_response("Invalid image bytes", 400, headers)
         else:
+            if len(image_url) > MAX_URL_LENGTH:
+                return _error_response("URL is too long", 400, headers)
             logger.info(f"Analyzing Image by URL: {image_url}")
+            # SSRF guard: block private/internal/metadata targets before fetch.
+            from scraper import validate_public_url, UnsafeURLError
+            try:
+                validate_public_url(image_url)
+            except UnsafeURLError:
+                return _error_response("Invalid image URL", 400, headers)
             try:
                 img_response = requests.get(image_url, timeout=20)
                 img_response.raise_for_status()
                 image_bytes = img_response.content
                 mime_type = img_response.headers.get('Content-Type', 'image/jpeg')
             except Exception as e:
-                return _error_response(f"Failed to download image: {str(e)}", 500, headers)
+                logger.error("Failed to download image: %s", e)
+                return _error_response("Failed to download image", 502, headers)
+
+        if len(image_bytes) > MAX_IMAGE_BYTES:
+            return _error_response("Image is too large", 413, headers)
 
         # 2. Analyze with AI
         ai = GeminiService()
@@ -607,15 +757,13 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
     Token may also be provided via the 'X-Ingest-Token' header.
     """
     if req.method == 'OPTIONS':
-        headers = {
-            'Access-Control-Allow-Origin': CORS_ORIGIN,
-            'Access-Control-Allow-Methods': 'POST',
-            'Access-Control-Allow-Headers': 'Content-Type, X-Ingest-Token',
-            'Access-Control-Max-Age': '3600'
-        }
-        return https_fn.Response('', status=204, headers=headers)
+        return _cors_preflight(req)
 
-    headers = _cors_headers()
+    headers = _cors_headers(req)
+
+    rl = _rate_limited("share", client_ip(req), headers)
+    if rl:
+        return rl
 
     try:
         data = req.get_json(silent=True) or {}
@@ -660,7 +808,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
 
     except Exception as e:
         logger.error(f"Share ingest failed: {e}", exc_info=True)
-        return _error_response(str(e), 500, headers)
+        return _error_response("Internal server error", 500, headers)
 
 
 @https_fn.on_call()
@@ -690,6 +838,34 @@ def get_share_config(req: https_fn.CallableRequest) -> dict:
 # WhatsApp Webhook
 # ─────────────────────────────────────────────
 
+def _verify_twilio_signature(request) -> bool:
+    """Validate an inbound Twilio webhook via the X-Twilio-Signature header.
+
+    Returns True if the signature is valid, OR if verification is not configured
+    (no TWILIO_AUTH_TOKEN) so local/dev testing still works. Returns False only
+    when a token IS configured and the signature is missing/invalid — which is
+    how we reject spoofed webhooks (anyone could otherwise POST a victim's phone
+    number and act as them).
+    """
+    auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
+    if not auth_token:
+        logger.warning("TWILIO_AUTH_TOKEN not set — skipping webhook signature verification")
+        return True
+
+    from twilio.request_validator import RequestValidator
+    validator = RequestValidator(auth_token)
+
+    signature = request.headers.get("X-Twilio-Signature", "")
+    # Twilio signs against the public HTTPS URL it posted to. Behind Cloud Run /
+    # Hosting the internally-seen scheme can be http, so normalize to https.
+    url = request.url
+    if request.headers.get("X-Forwarded-Proto") == "https" and url.startswith("http://"):
+        url = "https://" + url[len("http://"):]
+
+    params = request.form.to_dict() if request.form else {}
+    return validator.validate(url, params, signature)
+
+
 @https_fn.on_request()
 def whatsapp_webhook(request):
     """
@@ -698,6 +874,20 @@ def whatsapp_webhook(request):
     """
     # whatsapp_handler pulls the Twilio SDK — imported lazily (see top-of-file note).
     from whatsapp_handler import send_whatsapp_message
+
+    # Reject spoofed webhooks before doing any work (phone-number impersonation).
+    if not _verify_twilio_signature(request):
+        logger.warning("Rejected WhatsApp webhook: invalid/missing Twilio signature")
+        return https_fn.Response(
+            json.dumps({"error": "Forbidden"}), status=403, mimetype="application/json"
+        )
+
+    if check_rate_limit(f"whatsapp:{client_ip(request)}", *_RATE_LIMITS["whatsapp"]) is False:
+        logger.warning("Rate limit exceeded: whatsapp:%s", client_ip(request))
+        return https_fn.Response(
+            json.dumps({"error": "Too many requests"}), status=429, mimetype="application/json"
+        )
+
     try:
         if request.content_type == 'application/x-www-form-urlencoded':
             data = request.form.to_dict()
@@ -708,7 +898,7 @@ def whatsapp_webhook(request):
         payload = WebhookPayload(**data)
     except Exception as e:
         logger.error(f"Payload parse error: {e}")
-        return https_fn.Response(json.dumps({"error": f"Invalid payload: {str(e)}"}), status=400, mimetype="application/json")
+        return https_fn.Response(json.dumps({"error": "Invalid payload"}), status=400, mimetype="application/json")
 
     db = get_db()
 
