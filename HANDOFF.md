@@ -70,8 +70,15 @@ destroyed it permanently — no way to revisit a past chat.
 **Verification:** `tsc --noEmit` exit 0; the four changed files lint clean. Full `next build`
 couldn't complete in the cloud session (can't fetch Google Fonts offline) — unrelated to the diff.
 
-**Follow-ups:** (1) run `./deploy-hosting.sh` locally for the iPhone build; (2) confirm Firestore
-security rules cover `users/{uid}/chats/**` like `links` before real use.
+**Desktop layout fix (follow-up commit):** the desktop Ask view now fills the full viewport
+height — `AskBrain` measures its top (`getBoundingClientRect`) and sets an inline height down to
+the window bottom, so the composer is pinned at the bottom and the conversation scrolls above it;
+`page.tsx` drops `main`'s tall bottom padding in Ask mode; the history sidebar
+(`ChatHistorySidebar` desktop variant) is now a full-height panel with a right-edge divider
+(part of the page) instead of a short floating card. CSP `style-src` already allows `'unsafe-inline'`.
+
+**Follow-ups:** (1) run `./deploy-hosting.sh` locally for the iPhone build; (2) Firestore rules now
+include a `users/{uid}/chats` block (still open, consistent with the documented residual-risk model).
 
 ---
 
