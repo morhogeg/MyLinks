@@ -390,27 +390,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                 </div>
             )}
 
-            {/* Desktop top bar: a Back affordance in the app's ghost-button style
-                (New chat lives in the sidebar, like Gemini). */}
-            {!isMobile && (
-                <div className="shrink-0 flex items-center mb-1">
-                    <button
-                        onClick={onExit}
-                        title="Back to your library"
-                        className="inline-flex items-center gap-1 ps-1.5 pe-3 py-1.5 rounded-full text-text-secondary text-sm font-medium hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
-                    >
-                        <ChevronLeft className="w-4 h-4" />
-                        Back
-                    </button>
-                </div>
-            )}
-
             {/* Conversation */}
             <div
                 ref={scrollRef}
                 onTouchStart={onConvTouchStart}
                 onTouchMove={onConvTouchMove}
-                className="flex-1 overflow-y-auto px-3 sm:px-1 pb-4 overscroll-contain scrollbar-subtle"
+                className="flex-1 overflow-y-auto px-3 sm:px-1 pt-1 pb-4 overscroll-contain scrollbar-soft"
             >
                 {isEmpty ? (
                     <div className="h-full flex flex-col items-center justify-center text-center px-4">

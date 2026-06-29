@@ -140,6 +140,39 @@ html {
   scrollbar-width: thin;
 }
 
+/* Soft scrollbar: a slim, rounded, mid-grey thumb — visible but unobtrusive,
+   reads well on both light and dark. Used for chat, sidebar, and card scrolls. */
+.scrollbar-soft::-webkit-scrollbar {
+  width: 10px !important;
+  height: 10px !important;
+}
+
+.scrollbar-soft::-webkit-scrollbar-track,
+.scrollbar-soft::-webkit-scrollbar-track-piece,
+.scrollbar-soft::-webkit-scrollbar-corner {
+  background: transparent !important;
+}
+
+.scrollbar-soft::-webkit-scrollbar-thumb {
+  background-color: rgba(150, 150, 150, 0.35) !important;
+  border-radius: 9999px !important;
+  border: 3px solid transparent !important;
+  background-clip: padding-box !important;
+}
+
+.scrollbar-soft::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(150, 150, 150, 0.55) !important;
+}
+
+.scrollbar-soft::-webkit-scrollbar-button {
+  display: none !important;
+}
+
+.scrollbar-soft {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(150, 150, 150, 0.4) transparent;
+}
+
 /* Animations */
 @keyframes slide-up {
   from {

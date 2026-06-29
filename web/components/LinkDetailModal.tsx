@@ -253,7 +253,7 @@ export default function LinkDetailModal({
                 </div>
 
                 <div
-                    className="flex-1 overflow-y-auto pt-4 px-4 pb-4 sm:px-6 sm:pb-6 md:px-8 md:pb-8 scrollbar-thin scrollbar-thumb-white/10"
+                    className="flex-1 overflow-y-auto pt-4 px-4 pb-4 sm:px-6 sm:pb-6 md:px-8 md:pb-8 scrollbar-soft"
                     dir="auto"
                 >
                     {/* Content Section — screenshot/image source */}

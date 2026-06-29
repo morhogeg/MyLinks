@@ -22,7 +22,7 @@ import SwipeDeck from './SwipeDeck';
 import AskBrain from './AskBrain';
 import LinkDetailModal from './LinkDetailModal';
 import ConfirmDialog from './ConfirmDialog';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessageCircleQuestion, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, Image as ImageIcon, ChevronDown } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessageCircleQuestion, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, Image as ImageIcon, ChevronDown, ChevronLeft } from 'lucide-react';
 import TagExplorer from './TagExplorer';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -502,29 +502,42 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
         <div className={viewMode === 'ask' ? 'space-y-2' : 'space-y-4 lg:space-y-6'}>
             {/* Header Section (Not Sticky) */}
             <div className={`pt-2 -mx-4 px-4 sm:mx-0 sm:px-0 transition-all duration-300 ${viewMode === 'ask' ? 'space-y-2 pb-0' : 'space-y-3 sm:space-y-4 pb-3'}`}>
-                {/* Search Bar */}
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                    <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => {
-                            setSearchQuery(e.target.value);
-                            // Search results render in the grid, not Ask — so typing a
-                            // query drops out of Ask into the last layout to show them.
-                            if (e.target.value && viewMode === 'ask') setViewMode(lastLayout.current);
-                        }}
-                        placeholder="Search your brain..."
-                        className="w-full pl-9 pr-10 py-2 bg-card rounded-xl text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent/30 transition-all"
-                    />
-                    {searchQuery && (
+                {/* Search Bar — in Ask mode a Back button sits beside it to leave Ask. */}
+                <div className={viewMode === 'ask' ? 'flex items-center gap-2' : ''}>
+                    {viewMode === 'ask' && (
                         <button
-                            onClick={() => setSearchQuery('')}
-                            className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-white/10 rounded-full transition-all"
+                            onClick={() => setViewMode(lastLayout.current)}
+                            title="Back to your library"
+                            aria-label="Back to your library"
+                            className="shrink-0 inline-flex items-center gap-1 ps-2 pe-3 py-2 rounded-xl bg-card border border-border-subtle text-text-secondary text-sm font-medium hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
                         >
-                            <X className="w-4 h-4 text-text-muted" />
+                            <ChevronLeft className="w-4 h-4" />
+                            Back
                         </button>
                     )}
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => {
+                                setSearchQuery(e.target.value);
+                                // Search results render in the grid, not Ask — so typing a
+                                // query drops out of Ask into the last layout to show them.
+                                if (e.target.value && viewMode === 'ask') setViewMode(lastLayout.current);
+                            }}
+                            placeholder="Search your brain..."
+                            className="w-full pl-9 pr-10 py-2 bg-card rounded-xl text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent/30 transition-all"
+                        />
+                        {searchQuery && (
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-white/10 rounded-full transition-all"
+                            >
+                                <X className="w-4 h-4 text-text-muted" />
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 {/* Row 1: Category Navigator — only relevant when browsing the grid.
@@ -733,21 +746,20 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                     )}
 
                     <div className="flex items-center gap-2">
-                        {/* Ask — a distinct AI mode, set apart from the layout toggles so it
-                            reads as its own thing, not just another view. */}
+                        {/* Ask — a distinct AI mode. Hidden while in Ask mode (the Back
+                            button beside the search bar leaves it), so the toolbar row
+                            collapses and the chat sits right under the search. */}
+                        {viewMode !== 'ask' && (
                         <button
-                            onClick={() => setViewMode(viewMode === 'ask' ? lastLayout.current : 'ask')}
+                            onClick={() => setViewMode('ask')}
                             title="Ask your brain"
                             aria-label="Ask your brain"
-                            aria-pressed={viewMode === 'ask'}
-                            className={`${ctrlBase} px-3.5 ${viewMode === 'ask'
-                                ? 'bg-accent text-white border border-accent shadow-sm'
-                                : 'bg-card border border-border-subtle text-accent hover:bg-card-hover hover:border-accent/40'
-                                }`}
+                            className={`${ctrlBase} px-3.5 bg-card border border-border-subtle text-accent hover:bg-card-hover hover:border-accent/40`}
                         >
                             <MessageCircleQuestion className="w-4 h-4" />
                             <span>Ask</span>
                         </button>
+                        )}
 
                         {/* View Mode Switcher — layouts only; hidden in Ask mode (tap the
                             highlighted Ask button to exit back to your last layout). */}
