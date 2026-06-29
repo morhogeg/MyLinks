@@ -250,7 +250,12 @@ def _apply_youtube_metadata(link_data: dict, yt_meta: dict, analysis: dict, minu
     meta["videoId"] = yt_meta.get("video_id")
     meta["watchUrl"] = yt_meta.get("watch_url")
     meta["thumbnailUrl"] = yt_meta.get("thumbnail_url")
-    meta["youtubeChannel"] = analysis.get("sourceName") or yt_meta.get("channel")
+    # Prefer the REAL channel from YouTube oEmbed over the AI's guess — the model
+    # sometimes returns a thematic phrase ("It's a mindset") instead of the
+    # creator's channel. Fall back to the AI value, then the generic default.
+    _yt_channel = yt_meta.get("channel")
+    _real_channel = _yt_channel if (_yt_channel and _yt_channel.strip().lower() != "youtube") else None
+    meta["youtubeChannel"] = _real_channel or analysis.get("sourceName") or _yt_channel
     meta["durationDisplay"] = _format_duration(minutes)
     meta["videoHighlights"] = analysis.get("videoHighlights", [])
     meta["speakers"] = analysis.get("speakers", [])
@@ -262,6 +267,55 @@ def _card_source_name(c: dict):
     identity (e.g. the channel name, not just 'YouTube')."""
     meta = c.get("metadata") or {}
     return meta.get("youtubeChannel") or c.get("sourceName")
+
+
+@https_fn.on_request()
+def backfill_youtube_channels(req: https_fn.Request) -> https_fn.Response:
+    """One-off repair: set metadata.youtubeChannel (and sourceName) from YouTube
+    oEmbed for existing YouTube cards that are missing a real channel — older
+    saves stored the AI's guess or the generic 'YouTube'. Optional ?uid=… (or
+    JSON {uid}) limits to one user; otherwise all users. Idempotent; re-runnable.
+    """
+    import re
+    headers = _cors_headers(req)
+    if req.method == "OPTIONS":
+        return https_fn.Response("", status=204, headers=headers)
+    try:
+        uid = req.args.get("uid") or (req.get_json(silent=True) or {}).get("uid")
+        db = get_db()
+        user_refs = ([db.collection("users").document(uid)] if uid
+                     else list(db.collection("users").list_documents()))
+        yt_re = re.compile(
+            r'(?:youtube\.com/(?:watch\?v=|shorts/|embed/|live/)|youtu\.be/)([A-Za-z0-9_-]{11})'
+        )
+        updated = skipped = failed = 0
+        for uref in user_refs:
+            for doc in uref.collection("links").stream():
+                d = doc.to_dict() or {}
+                m = yt_re.search(d.get("url") or "")
+                if not m:
+                    continue
+                cur = ((d.get("metadata") or {}).get("youtubeChannel") or "").strip()
+                if cur and cur.lower() != "youtube":
+                    skipped += 1
+                    continue
+                try:
+                    watch = f"https://www.youtube.com/watch?v={m.group(1)}"
+                    r = requests.get(f"https://www.youtube.com/oembed?url={watch}&format=json", timeout=8)
+                    channel = r.json().get("author_name") if r.ok else None
+                except Exception:
+                    channel = None
+                if channel and channel.strip().lower() != "youtube":
+                    doc.reference.update({"metadata.youtubeChannel": channel, "sourceName": channel})
+                    updated += 1
+                else:
+                    failed += 1
+        return https_fn.Response(
+            json.dumps({"updated": updated, "skipped": skipped, "failed": failed}),
+            status=200, headers=headers, mimetype="application/json",
+        )
+    except Exception as e:
+        return _server_error(headers, e, "Backfill failed")
 
 
 # ─────────────────────────────────────────────
