@@ -390,20 +390,18 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                 </div>
             )}
 
-            {/* Desktop New chat — a calm header action aligned to the conversation,
-                not a pill floating over the messages. Mobile uses the top-bar button. */}
-            {!isMobile && !isEmpty && (
-                <div className="shrink-0 px-3 sm:px-1 pt-0.5 pb-2">
-                    <div className="max-w-2xl mx-auto flex justify-end">
-                        <button
-                            onClick={newChat}
-                            title="Start a new chat"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border-subtle text-text-secondary text-xs font-medium hover:text-text hover:border-accent/40 hover:bg-card-hover transition-colors cursor-pointer"
-                        >
-                            <Plus className="w-3.5 h-3.5" />
-                            New chat
-                        </button>
-                    </div>
+            {/* Desktop top bar: a Back affordance in the app's ghost-button style
+                (New chat lives in the sidebar, like Gemini). */}
+            {!isMobile && (
+                <div className="shrink-0 flex items-center mb-1">
+                    <button
+                        onClick={onExit}
+                        title="Back to your library"
+                        className="inline-flex items-center gap-1 ps-1.5 pe-3 py-1.5 rounded-full text-text-secondary text-sm font-medium hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
+                    >
+                        <ChevronLeft className="w-4 h-4" />
+                        Back
+                    </button>
                 </div>
             )}
 
@@ -562,6 +560,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                     chats={chats}
                     activeChatId={activeChatId}
                     onSelect={selectChat}
+                    onNewChat={newChat}
                     onRename={renameChat}
                     onRequestDelete={(id) => setChatToDelete(id)}
                     collapsed={sidebarCollapsed}
@@ -578,6 +577,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                     chats={chats}
                     activeChatId={activeChatId}
                     onSelect={selectChat}
+                    onNewChat={newChat}
                     onRename={renameChat}
                     onRequestDelete={(id) => setChatToDelete(id)}
                     open={historyOpen}

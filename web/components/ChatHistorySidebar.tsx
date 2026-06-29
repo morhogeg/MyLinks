@@ -9,6 +9,7 @@ import {
     PanelLeftClose,
     PanelLeftOpen,
     MessagesSquare,
+    SquarePen,
 } from 'lucide-react';
 import { ChatSession } from '@/lib/types';
 
@@ -16,6 +17,7 @@ interface ChatHistorySidebarProps {
     chats: ChatSession[];
     activeChatId: string | null;
     onSelect: (id: string) => void;
+    onNewChat: () => void;
     onRename: (id: string, title: string) => void;
     /** Routed through the parent's branded ConfirmDialog — we never delete directly. */
     onRequestDelete: (id: string) => void;
@@ -99,15 +101,17 @@ function ChatRow({
     return (
         <div
             className={`group relative flex items-center rounded-xl transition-colors ${
-                active ? 'bg-accent/10 text-text' : 'hover:bg-card-hover text-text-secondary'
+                active ? 'bg-card-hover' : 'hover:bg-card-hover'
             }`}
         >
+            {/* Selected indicator — a calm accent bar that reads well in light and dark. */}
+            {active && <span className="absolute start-0 inset-y-2 w-[3px] rounded-full bg-accent" />}
             <button
                 onClick={onSelect}
                 title={chat.title}
-                className="flex-1 min-w-0 flex flex-col items-start text-start px-3 py-2 min-h-[44px] justify-center cursor-pointer"
+                className="flex-1 min-w-0 flex flex-col items-start text-start ps-3.5 pe-2 py-2 min-h-[42px] justify-center cursor-pointer"
             >
-                <span className={`w-full truncate text-sm leading-snug ${active ? 'font-medium text-text' : ''}`}>
+                <span className={`w-full truncate text-sm leading-snug ${active ? 'font-medium text-text' : 'text-text-secondary'}`}>
                     {chat.title}
                 </span>
                 <span className="text-[11px] text-text-muted">{relativeTime(chat.updatedAt)}</span>
@@ -129,6 +133,28 @@ function ChatRow({
                     <Trash2 className="w-3.5 h-3.5" />
                 </button>
             </div>
+        </div>
+    );
+}
+
+/** Elegant, borderless "New chat" action (Gemini-style): icon + label, calm hover. */
+function NewChatItem({ onClick }: { onClick: () => void }) {
+    return (
+        <button
+            onClick={onClick}
+            className="shrink-0 w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-text hover:bg-card-hover transition-colors cursor-pointer"
+        >
+            <SquarePen className="w-4 h-4 text-text-secondary" />
+            New chat
+        </button>
+    );
+}
+
+/** Small section heading above the conversation list. */
+function SectionLabel() {
+    return (
+        <div className="shrink-0 px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+            Recent
         </div>
     );
 }
@@ -192,7 +218,7 @@ export default function ChatHistorySidebar(props: ChatHistorySidebarProps) {
         return (
             <aside
                 className={`hidden sm:flex flex-col shrink-0 h-full min-h-0 border-e border-border-subtle transition-[width] duration-300 ease-in-out ${
-                    collapsed ? 'w-12 items-center pe-0' : 'w-60 xl:w-72 pe-4'
+                    collapsed ? 'w-12 items-center pe-0' : 'w-60 xl:w-72 pe-3'
                 }`}
             >
                 {collapsed ? (
@@ -206,8 +232,7 @@ export default function ChatHistorySidebar(props: ChatHistorySidebarProps) {
                     </button>
                 ) : (
                     <>
-                        <div className="shrink-0 flex items-center justify-between mb-2 ps-1">
-                            <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">History</span>
+                        <div className="shrink-0 flex items-center justify-end mb-0.5">
                             <button
                                 onClick={onToggleCollapse}
                                 aria-label="Hide chat history"
@@ -217,6 +242,8 @@ export default function ChatHistorySidebar(props: ChatHistorySidebarProps) {
                                 <PanelLeftClose className="w-4 h-4" />
                             </button>
                         </div>
+                        <NewChatItem onClick={props.onNewChat} />
+                        {props.chats.length > 0 && <SectionLabel />}
                         <SidebarBody {...props} />
                     </>
                 )}
@@ -245,6 +272,8 @@ export default function ChatHistorySidebar(props: ChatHistorySidebarProps) {
                     </button>
                 </div>
                 <div className="flex-1 flex flex-col p-3 min-h-0">
+                    <NewChatItem onClick={closeAfter(props.onNewChat)} />
+                    {props.chats.length > 0 && <SectionLabel />}
                     <SidebarBody
                         {...props}
                         onSelect={closeAfter(props.onSelect)}
