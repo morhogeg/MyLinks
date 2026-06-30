@@ -16,6 +16,7 @@ All business logic is extracted into dedicated modules:
 import os
 import re
 import json
+import html as _html
 import logging
 import requests
 from datetime import datetime, timezone
@@ -1002,6 +1003,216 @@ def get_share_config(req: https_fn.CallableRequest) -> dict:
         "endpoint": f"{APP_URL}/api/share",
         "token": token
     }
+
+
+# ─────────────────────────────────────────────
+# Public share pages (server-rendered OG previews)
+# ─────────────────────────────────────────────
+#
+# The web app is a static export, so a client-rendered /s?id=… page can't give
+# link-preview crawlers (WhatsApp, iMessage, Slack, X…) per-card OpenGraph tags —
+# they don't run JS, so every shared link previewed as the generic app. These
+# functions OWN the /s (single card) and /c (collection) routes via Hosting
+# rewrites and return real HTML: correct og:title/description/image for crawlers,
+# and a readable card for humans with no JS required.
+
+def _esc(value) -> str:
+    """HTML-escape a value for safe interpolation (handles None)."""
+    return _html.escape(str(value), quote=True) if value is not None else ""
+
+
+def _share_card_image(card: dict) -> str:
+    """Best preview image for a card; falls back to the Machina icon."""
+    thumb = card.get("thumbnailUrl")
+    if thumb and str(thumb).startswith("http"):
+        return thumb
+    url = card.get("url") or ""
+    # Image/screenshot cards store the (public) image itself as the url.
+    if card.get("sourceType") == "image" and url.startswith("http"):
+        return url
+    return f"{APP_URL}/icon-512.png"
+
+
+def _share_html_shell(*, title: str, description: str, image: str, url: str, body: str) -> str:
+    """Wrap rendered body in a full HTML doc with OpenGraph + Twitter cards."""
+    t, d = _esc(title), _esc(description)
+    img, u = _esc(image), _esc(url)
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{t} · Machina</title>
+<meta name="description" content="{d}">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Machina">
+<meta property="og:title" content="{t}">
+<meta property="og:description" content="{d}">
+<meta property="og:image" content="{img}">
+<meta property="og:url" content="{u}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{t}">
+<meta name="twitter:description" content="{d}">
+<meta name="twitter:image" content="{img}">
+<link rel="icon" href="{_esc(APP_URL)}/icon-192.png">
+<style>
+  :root {{ color-scheme: dark; }}
+  * {{ box-sizing: border-box; }}
+  body {{ margin:0; background:#070708; color:#ededed;
+         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+         line-height:1.6; }}
+  .wrap {{ max-width:640px; margin:0 auto; padding:32px 20px 64px; }}
+  .brand {{ display:flex; align-items:center; gap:10px; margin-bottom:28px; }}
+  .brand img {{ width:32px; height:32px; border-radius:8px; }}
+  .brand span {{ font-weight:600; letter-spacing:.2px; }}
+  .badge {{ display:inline-block; font-size:12px; font-weight:700; letter-spacing:.6px;
+           text-transform:uppercase; color:#c4b5fd; background:rgba(139,92,246,.14);
+           padding:5px 10px; border-radius:999px; margin-bottom:16px; }}
+  h1 {{ font-size:26px; line-height:1.25; margin:0 0 16px; }}
+  .hero {{ width:100%; border-radius:14px; margin:8px 0 22px; display:block; }}
+  .summary {{ font-size:17px; color:#d4d4d8; }}
+  .detail {{ margin-top:16px; color:#a1a1aa; white-space:pre-wrap; }}
+  .tags {{ margin:22px 0 0; display:flex; flex-wrap:wrap; gap:8px; }}
+  .tag {{ font-size:13px; color:#a1a1aa; background:#161618; border:1px solid #262629;
+         padding:4px 10px; border-radius:999px; }}
+  .actions {{ margin-top:32px; display:flex; flex-wrap:wrap; gap:12px; }}
+  .btn {{ display:inline-block; padding:12px 20px; border-radius:12px; font-weight:600;
+         text-decoration:none; font-size:15px; }}
+  .btn-primary {{ background:linear-gradient(135deg,#8b5cf6,#d946ef); color:#fff; }}
+  .btn-ghost {{ background:#161618; color:#ededed; border:1px solid #262629; }}
+  .card {{ background:#0e0e10; border:1px solid #1c1c1f; border-radius:18px; padding:24px; }}
+  .col-item {{ padding:18px 0; border-top:1px solid #1c1c1f; }}
+  .col-item h3 {{ margin:0 0 6px; font-size:18px; }}
+  .col-item p {{ margin:0; color:#a1a1aa; font-size:15px; }}
+  .foot {{ margin-top:40px; font-size:13px; color:#71717a; text-align:center; }}
+  a {{ color:#c4b5fd; }}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand"><img src="{_esc(APP_URL)}/icon-192.png" alt="Machina"><span>Machina</span></div>
+    {body}
+    <div class="foot">Saved on <a href="{_esc(APP_URL)}">Machina</a> — your AI knowledge base.</div>
+  </div>
+</body>
+</html>"""
+
+
+def _render_shared_card(card: dict, share_url: str) -> str:
+    title = card.get("title") or "Shared card"
+    summary = card.get("summary") or ""
+    detailed = card.get("detailedSummary") or ""
+    source = card.get("sourceName") or card.get("category") or ""
+    image = _share_card_image(card)
+    original = card.get("url") or ""
+    tags = card.get("tags") or []
+
+    has_real_image = image and not image.endswith("/icon-512.png")
+    hero = f'<img class="hero" src="{_esc(image)}" alt="">' if has_real_image else ""
+    badge = f'<div class="badge">{_esc(source)}</div>' if source else ""
+    detail_html = f'<div class="detail" dir="auto">{_esc(detailed)}</div>' if detailed else ""
+    tags_html = ""
+    if tags:
+        chips = "".join(f'<span class="tag">{_esc(t)}</span>' for t in tags[:8])
+        tags_html = f'<div class="tags">{chips}</div>'
+
+    # "View original" only for real external links (not stored screenshot images).
+    original_btn = ""
+    if original.startswith("http") and card.get("sourceType") != "image":
+        original_btn = f'<a class="btn btn-ghost" href="{_esc(original)}" rel="noopener nofollow" target="_blank">View original</a>'
+
+    body = f"""<div class="card">
+      {badge}
+      <h1 dir="auto">{_esc(title)}</h1>
+      {hero}
+      <div class="summary" dir="auto">{_esc(summary)}</div>
+      {detail_html}
+      {tags_html}
+      <div class="actions">
+        <a class="btn btn-primary" href="{_esc(APP_URL)}">Open in Machina</a>
+        {original_btn}
+      </div>
+    </div>"""
+    return _share_html_shell(
+        title=title, description=summary or detailed or "Shared from Machina",
+        image=image, url=share_url, body=body,
+    )
+
+
+def _render_shared_collection(data: dict, share_url: str) -> str:
+    name = data.get("name") or "Shared collection"
+    description = data.get("description") or ""
+    cards = data.get("cards") or []
+    image = _share_card_image(cards[0]) if cards else f"{APP_URL}/icon-512.png"
+
+    items = "".join(
+        f'<div class="col-item"><h3 dir="auto">{_esc(c.get("title"))}</h3>'
+        f'<p dir="auto">{_esc(c.get("summary"))}</p></div>'
+        for c in cards[:50]
+    )
+    desc_html = f'<div class="summary" dir="auto">{_esc(description)}</div>' if description else ""
+    count = len(cards)
+    body = f"""<div class="card">
+      <div class="badge">Collection · {count} card{'s' if count != 1 else ''}</div>
+      <h1 dir="auto">{_esc(name)}</h1>
+      {desc_html}
+      {items}
+      <div class="actions"><a class="btn btn-primary" href="{_esc(APP_URL)}">Open in Machina</a></div>
+    </div>"""
+    return _share_html_shell(
+        title=name, description=description or f"A collection of {count} cards on Machina",
+        image=image, url=share_url, body=body,
+    )
+
+
+def _share_not_found_html() -> str:
+    body = """<div class="card">
+      <h1>This page isn’t available</h1>
+      <div class="summary">The shared card or collection may have been removed.</div>
+      <div class="actions"><a class="btn btn-primary" href="%s">Open Machina</a></div>
+    </div>""" % _esc(APP_URL)
+    return _share_html_shell(
+        title="Not available", description="This shared page may have been removed.",
+        image=f"{APP_URL}/icon-512.png", url=APP_URL, body=body,
+    )
+
+
+@https_fn.on_request()
+def share_page(req: https_fn.Request) -> https_fn.Response:
+    """Server-rendered public page for a shared card (/s) or collection (/c).
+
+    Owns those routes via Hosting rewrites so link-preview crawlers get real
+    per-item OpenGraph tags (the static export can't). Always returns HTML.
+    """
+    html_headers = {
+        "Content-Type": "text/html; charset=utf-8",
+        # Let CDNs/crawlers cache briefly; cards are immutable snapshots.
+        "Cache-Control": "public, max-age=300, s-maxage=600",
+    }
+    try:
+        share_id = (req.args.get("id") or "").strip()
+        is_collection = "/c" in req.path
+        share_url = f"{APP_URL}{'/c' if is_collection else '/s'}?id={share_id}"
+
+        if not share_id:
+            return https_fn.Response(_share_not_found_html(), status=404, headers=html_headers)
+
+        db = get_db()
+        collection = "shared_collections" if is_collection else "shared_cards"
+        snap = db.collection(collection).document(share_id).get()
+        if not snap.exists:
+            return https_fn.Response(_share_not_found_html(), status=404, headers=html_headers)
+
+        data = snap.to_dict() or {}
+        if is_collection:
+            html_out = _render_shared_collection(data, share_url)
+        else:
+            html_out = _render_shared_card(data.get("card", {}) or {}, share_url)
+        return https_fn.Response(html_out, status=200, headers=html_headers)
+
+    except Exception as e:
+        logger.error(f"share_page failed: {e}", exc_info=True)
+        return https_fn.Response(_share_not_found_html(), status=200, headers=html_headers)
 
 
 # ─────────────────────────────────────────────

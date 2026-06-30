@@ -50,6 +50,14 @@
         "function": "get_article"
       },
       {
+        "source": "/s",
+        "function": "share_page"
+      },
+      {
+        "source": "/c",
+        "function": "share_page"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
