@@ -1,6 +1,6 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-30. Branch: `claude/blissful-mayer-275ff0` (committed + pushed to `main`)._
+_Last updated: 2026-06-30. Branch: `claude/elastic-mayer-607c00` (merged + pushed to `main`)._
 
 ## ⚠️ IN-FLIGHT — YouTube channel name + deploys (READ FIRST)
 
@@ -55,7 +55,51 @@ were already deployed and confirmed working.
 
 ---
 
-## Latest session — Ship + archive build 2 (Share Extension + iOS UX polish) (2026-06-30)
+## Latest session — Collections + outbound sharing (2026-06-30)
+
+Shipped to web (Vercel + Firebase Hosting) and built a TestFlight-ready iOS bundle. All on `main`, pushed.
+
+**What this adds:** users can group cards into collections (e.g. "Russian literature", "Tesla"),
+filter the feed by collection, browse a dedicated Collections view, and **share** a whole collection
+or a single card as a public read-only "Machina page."
+
+**Data model:**
+- Membership lives on the card: `collectionIds?: string[]` on `Link` (mirrors `tags`, so the feed
+  filters in memory with no extra reads). See `web/lib/types.ts`.
+- Collection metadata: `users/{uid}/collections/{id}` (`Collection` interface). Card counts are
+  derived client-side, not stored.
+- Public **frozen snapshots** at top-level `shared_collections/{shareId}` and `shared_cards/{shareId}`
+  (denormalized `SharedCard[]`). Re-publishing refreshes the snapshot; "Stop sharing" deletes it.
+
+**Key files (all new unless noted):**
+- `web/lib/collections.ts` — CRUD, add/remove membership (`arrayUnion`/`arrayRemove`), publish/unpublish.
+- `web/lib/share.ts` — `@capacitor/share` (native iOS) → Web Share API → clipboard fallback.
+  Builds **absolute** URLs from `NEXT_PUBLIC_SHARE_BASE` (window.location is `capacitor://` in the app).
+- `web/components/AddToCollectionSheet.tsx`, `CollectionsGallery.tsx`, `CollectionFormModal.tsx`,
+  `PublicShare.tsx`.
+- `web/app/c/page.tsx`, `web/app/s/page.tsx` — public, **client-rendered query-param** pages
+  (`/c?id=`, `/s?id=`). Query params (not `/c/[id]`) because the app is a Next.js **static export**.
+- `web/components/Feed.tsx` (modified) — collections `onSnapshot`, `selectedCollections` filter,
+  new `'collections'` viewMode + toolbar button, scoped-collection banner with Share / Stop sharing.
+- `Card.tsx`, `CardActionSheet.tsx`, `LinkDetailModal.tsx` (modified) — "Add to collection" + "Share".
+- `web/lib/colors.ts` (modified) — exported `COLOR_KEYS` + `getColorStyleByKey` for the color picker.
+
+**Deployed this session:**
+- Vercel (desktop) — pushed to `main` (auto-deploy).
+- Firebase Hosting (iPhone webview) — `./deploy-hosting.sh` ✓.
+- **Firestore rules** — `firebase deploy --only firestore:rules` ✓ (added public read for
+  `shared_collections` + `shared_cards`; **required** or publishing/share pages fail).
+- iOS — `./build-ios.sh` ✓; `cap sync` registered `@capacitor/share@8.0.1` (SPM, no CocoaPods).
+  **Next: open Xcode → Archive → Distribute → TestFlight.**
+
+**Notes / future:** sharing rules are open writes for now (same single-user prototype posture as
+`users/**`); tighten to `request.auth.uid == ownerUid` when real auth lands. Out of scope this round:
+manual card ordering within a collection, live (non-snapshot) shared collections, choosing a
+collection at save time from the iOS Share Extension.
+
+---
+
+## Earlier — Ship + archive build 2 (Share Extension + iOS UX polish) (2026-06-30)
 
 Shipped everything below and produced a TestFlight-ready archive. All on `main`, pushed.
 
