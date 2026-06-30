@@ -50,6 +50,7 @@ Requirements for the analysis:
    - **LANGUAGE**: Write the detailed summary in the SAME language as the input content.
    - Start with a 1-2 sentence overview paragraph.
    - Use "## Key Points" (or "## נקודות עיקריות" for Hebrew) as a subheading, followed by bullet points (use - for bullets).
+   - **FORMATTING**: Every "##" subheading MUST start on its own new line with a blank line before it. NEVER place a "##" heading on the same line as the preceding sentence.
    - Each bullet should be a factual statement from the content.
    - Include 3-6 bullet points covering the main arguments or information.
    - If applicable, add "## Conclusions" (or "## מסקנות" for Hebrew) with the author's stated conclusions.

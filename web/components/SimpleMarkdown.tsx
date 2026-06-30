@@ -13,10 +13,21 @@ interface SimpleMarkdownProps {
  * Simple markdown renderer for AI summaries
  * Handles: ## headings, - bullet points, **bold**
  */
+/**
+ * Repairs markdown that the AI sometimes emits with heading markers glued to
+ * the end of the previous sentence (e.g. "…common. ## Key Points") instead of
+ * on their own line. Without this, the parser below treats the marker as plain
+ * text and the reader sees raw "##" in the summary. We move any inline ## / ###
+ * marker onto its own line so it renders as a heading.
+ */
+function normalizeMarkdown(content: string): string {
+    return content.replace(/([^\n])[ \t]*(#{2,3}[ \t]+)/g, '$1\n\n$2');
+}
+
 export default function SimpleMarkdown({ content, className = '', isCompact = false, isRtl = false }: SimpleMarkdownProps) {
     if (!content) return null;
 
-    const lines = content.split('\n');
+    const lines = normalizeMarkdown(content).split('\n');
     const elements: React.ReactNode[] = [];
     let currentListItems: string[] = [];
     let key = 0;
