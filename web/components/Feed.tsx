@@ -216,16 +216,31 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
     };
 
     // 3. Handle deep linking
+    //
+    // The effect depends on `links`, which Firestore's onSnapshot mutates on every
+    // background change (favorite, read, scan completes). Without a guard, each
+    // such update re-ran this effect and re-opened the modal the user had just
+    // closed — forever. We consume a given linkId exactly once (ref guard) and
+    // strip it from the URL so a refresh doesn't re-trigger it either.
+    const consumedDeepLinkRef = useRef<string | null>(null);
     useEffect(() => {
         const linkId = searchParams.get('linkId');
-        if (linkId && links.length > 0) {
-            const link = links.find(l => l.id === linkId);
-            if (link) {
-                setActiveLinkId(link.id);
-                // Clear the param after opening to avoid re-opening on re-renders
-                // but keep it if the user wants to share the URL. 
-                // For now, just opening it is enough.
-            }
+        if (!linkId || links.length === 0) return;
+        if (consumedDeepLinkRef.current === linkId) return;
+
+        const link = links.find(l => l.id === linkId);
+        if (!link) return;
+
+        consumedDeepLinkRef.current = linkId;
+        setActiveLinkId(link.id);
+
+        // Drop ?linkId from the URL so closing the modal is final and a manual
+        // refresh won't re-open it. history.replaceState avoids a Next navigation
+        // (and the scroll reset that comes with it).
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('linkId');
+            window.history.replaceState(window.history.state, '', url.toString());
         }
     }, [searchParams, links]);
 

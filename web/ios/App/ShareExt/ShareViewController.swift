@@ -67,6 +67,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     private var ceiling: CGFloat = 90             // animation eases toward this while uploading
     private var isImageFlow = false
     private var finished = false
+    private var resultShown = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -400,6 +401,12 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
 
     private func showResult(_ message: String, success: Bool) {
         DispatchQueue.main.async {
+            // Idempotency guard: a real network response and the watchdog can both
+            // call this. Whichever lands first owns the UI; later calls are dropped
+            // so we never flip a shown error into a (false) success or vice-versa.
+            guard !self.resultShown else { return }
+            self.resultShown = true
+
             if self.isImageFlow {
                 if success {
                     // Snap the scan to 100% with the green check, then finish.
@@ -596,7 +603,8 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
 
         // Background session — append a UUID to the identifier so re-invocations of
         // the extension never collide on an already-in-use identifier. The shared
-        // container identifier lets the daemon resume the transfer for our app group.
+        // container identifier lets the daemon resume the transfer for our app group,
+        // so the save completes even after the user taps ✕ to dismiss the HUD.
         let config = URLSessionConfiguration.background(
             withIdentifier: "group.com.morhogeg.machina.share-upload.\(UUID().uuidString)")
         config.sharedContainerIdentifier = Self.appGroup
@@ -605,11 +613,14 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
         backgroundSession = session
 
-        // Watchdog: never hang the share sheet open indefinitely. If we hit this
-        // before the delegate reports back, the upload still proceeds in the
-        // background; we just stop blocking the UI.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 26) { [weak self] in
-            self?.showResult("Saved to Machina", success: true)
+        // Watchdog: never hang the share sheet open indefinitely. Fires 3s after
+        // the 25s request timeout, so the real result (success or error) almost
+        // always lands first and owns the UI via the resultShown guard. The
+        // message is deliberately neutral — we don't know the outcome here, so we
+        // must NOT claim a false "Saved ✓". The upload still proceeds in the
+        // background regardless.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 28) { [weak self] in
+            self?.showResult("Still saving — check Machina", success: false)
         }
 
         let task = session.uploadTask(with: req, fromFile: tmpURL)

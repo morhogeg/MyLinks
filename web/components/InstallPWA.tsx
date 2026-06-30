@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Share, X } from 'lucide-react';
+import { isNativeApp } from '@/lib/api';
 
 /**
  * iOS PWA install banner
@@ -15,6 +16,11 @@ export default function InstallPWA() {
         // Check if we should show the banner
         const isDismissed = localStorage.getItem('pwa_banner_dismissed');
         if (isDismissed) return;
+
+        // Never inside the installed native app: Capacitor's WKWebView matches the
+        // Safari UA and isn't display-mode:standalone, so the checks below would
+        // otherwise fire the "Add to Home Screen" banner inside the real app.
+        if (isNativeApp()) return;
 
         // Check if iOS Safari (not standalone)
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
