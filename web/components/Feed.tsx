@@ -812,16 +812,22 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                 <ChevronDown className="w-4 h-4 opacity-60 shrink-0" />
                             </button>
                         )}
+                        {/* Filters + sort live in the same sheet, so the button just shows
+                            both icons (no label) — keeping it compact so the category
+                            selector can take the rest of the row. */}
                         <button
                             onClick={() => setIsFiltersOpen(true)}
-                            aria-label="Filters"
-                            className={`${ctrlBase} shrink-0 px-3.5 ${activeMobileFilters > 0
+                            aria-label="Filters and sort"
+                            className={`${ctrlBase} shrink-0 px-3 gap-1.5 ${activeMobileFilters > 0
                                 ? 'bg-accent text-white border border-accent shadow-sm'
                                 : ctrlIdle
                                 }`}
                         >
                             <Filter className="w-4 h-4" />
-                            <span>Filters{activeMobileFilters > 0 ? ` (${activeMobileFilters})` : ''}</span>
+                            <ArrowUpDown className="w-4 h-4" />
+                            {activeMobileFilters > 0 && (
+                                <span className="text-xs font-bold tabular-nums">{activeMobileFilters}</span>
+                            )}
                         </button>
                     </div>
                 )}
@@ -909,35 +915,40 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
 
                     {/* (Mobile Filters now lives on the category row above, to save a line.) */}
 
-                    <div className="flex items-center gap-2">
-                        {/* Collections — opens the dedicated Collections gallery. */}
-                        <button
-                            onClick={() => setViewMode('collections')}
-                            title="Browse collections"
-                            aria-label="Browse collections"
-                            className={`${ctrlBase} px-3.5 bg-card border border-border-subtle text-accent hover:bg-card-hover hover:border-accent/40`}
-                        >
-                            <Layers className="w-4 h-4" />
-                            <span className="hidden sm:inline">Collections</span>
-                        </button>
+                    {/* On mobile this row reads Collections (left) · Ask (centered) · View
+                        (right) via three equal columns; on desktop the `sm:contents`
+                        wrappers dissolve back into the normal inline cluster. */}
+                    <div className="flex items-center w-full gap-2 sm:w-auto">
+                        {/* Left zone — Collections */}
+                        <div className="flex-1 flex justify-start sm:contents">
+                            <button
+                                onClick={() => setViewMode('collections')}
+                                title="Browse collections"
+                                aria-label="Browse collections"
+                                className={`${ctrlBase} px-3.5 bg-card border border-border-subtle text-accent hover:bg-card-hover hover:border-accent/40`}
+                            >
+                                <Layers className="w-4 h-4" />
+                                <span className="hidden sm:inline">Collections</span>
+                            </button>
+                        </div>
 
-                        {/* Ask — a distinct AI mode. Hidden while in Ask mode (the Back
-                            button beside the search bar leaves it), so the toolbar row
-                            collapses and the chat sits right under the search. */}
-                        {isLibraryView && (
-                        <button
-                            onClick={() => setViewMode('ask')}
-                            title="Ask your brain"
-                            aria-label="Ask your brain"
-                            className={`${ctrlBase} px-3.5 bg-card border border-border-subtle text-accent hover:bg-card-hover hover:border-accent/40`}
-                        >
-                            <MessageCircleQuestion className="w-4 h-4" />
-                            <span>Ask</span>
-                        </button>
-                        )}
+                        {/* Center zone — Ask (a distinct AI mode). */}
+                        <div className="flex-1 flex justify-center sm:contents">
+                            {isLibraryView && (
+                            <button
+                                onClick={() => setViewMode('ask')}
+                                title="Ask your brain"
+                                aria-label="Ask your brain"
+                                className={`${ctrlBase} px-3.5 bg-card border border-border-subtle text-accent hover:bg-card-hover hover:border-accent/40`}
+                            >
+                                <MessageCircleQuestion className="w-4 h-4" />
+                                <span>Ask</span>
+                            </button>
+                            )}
+                        </div>
 
-                        {/* View Mode Switcher — layouts only; hidden in Ask mode (tap the
-                            highlighted Ask button to exit back to your last layout). */}
+                        {/* Right zone — view switcher (icon-only on mobile) + desktop-only tools. */}
+                        <div className="flex-1 flex justify-end items-center gap-2 sm:contents">
                         {isLibraryView && (
                         <div className="inline-flex items-center gap-0.5 p-1 rounded-full bg-card border border-border-subtle">
                             {viewModes.map(vm => {
@@ -950,12 +961,13 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                         aria-pressed={active}
                                         aria-label={vm.hint}
                                         className={`h-7 inline-flex items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${active
-                                            ? 'bg-accent text-white shadow-sm px-3'
+                                            ? 'bg-accent text-white shadow-sm px-2 sm:px-3'
                                             : 'w-7 text-text-muted hover:text-text hover:bg-card-hover'
                                             }`}
                                     >
                                         {vm.icon}
-                                        {active && <span>{vm.label}</span>}
+                                        {/* Label only on desktop — mobile keeps the pills icon-only. */}
+                                        {active && <span className="hidden sm:inline">{vm.label}</span>}
                                     </button>
                                 );
                             })}
@@ -1024,6 +1036,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                             </div>
                         )}
                         </>)}
+                        </div>{/* /right zone */}
                     </div>
                 </div>
                 )}
