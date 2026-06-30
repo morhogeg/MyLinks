@@ -2,10 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { Collection } from '@/lib/types';
-import { X, Check, Layers } from 'lucide-react';
+import { X, Check, Layers, Shuffle } from 'lucide-react';
 import { COLOR_KEYS, getColorStyleByKey } from '@/lib/colors';
 import { createCollection, updateCollection } from '@/lib/collections';
 import { useToast } from '@/components/Toast';
+
+/** Pick a random palette key — used so users never have to choose a color. */
+function randomColorKey(): string {
+    return COLOR_KEYS[Math.floor(Math.random() * COLOR_KEYS.length)];
+}
 
 interface CollectionFormModalProps {
     uid: string | null;
@@ -40,7 +45,8 @@ export default function CollectionFormModal({
         if (isOpen) {
             setName(collection?.name ?? '');
             setDescription(collection?.description ?? '');
-            setColor(collection?.color ?? COLOR_KEYS[0]);
+            // New collections get a random color so picking one is optional.
+            setColor(collection?.color ?? randomColorKey());
             setBusy(false);
         }
     }, [isOpen, collection]);
@@ -147,9 +153,19 @@ export default function CollectionFormModal({
                     </div>
 
                     <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">
-                            Color
-                        </label>
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
+                                Color <span className="font-medium normal-case text-text-muted/60">(optional)</span>
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => setColor(randomColorKey())}
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent hover:text-accent-hover transition-colors"
+                            >
+                                <Shuffle className="w-3.5 h-3.5" />
+                                Surprise me
+                            </button>
+                        </div>
                         <div className="flex flex-wrap gap-2">
                             {COLOR_KEYS.map((key) => {
                                 const style = getColorStyleByKey(key);
