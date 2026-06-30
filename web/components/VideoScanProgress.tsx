@@ -84,10 +84,12 @@ export default function VideoScanProgress({ thumbnailSrc, progress }: VideoScanP
                 />
             </div>
 
-            {/* Video analysis is slow — reassure the user they aren't trapped. */}
+            {/* Video analysis is slow (~a minute) and runs in the foreground (see
+                AddLinkForm.handleSubmit), so the app must stay open — be honest
+                rather than implying they can leave. */}
             {!done && (
                 <p className="text-xs text-text-muted text-center">
-                    Watching the full video takes a minute — you can close this and keep browsing.
+                    Watching the full video takes a minute — keep Machina open while it runs.
                 </p>
             )}
         </div>

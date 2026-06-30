@@ -77,10 +77,12 @@ export default function ImageScanProgress({ imageSrc, progress }: ImageScanProgr
                 />
             </div>
 
-            {/* Reassure the user they aren't trapped waiting on this. */}
+            {/* Analysis is a single foreground request (see AddLinkForm.handleSubmit)
+                — not a background job. Closing/backgrounding the app suspends the
+                WebView and the save is lost, so be honest and ask them to wait. */}
             {!done && (
                 <p className="text-xs text-text-muted text-center">
-                    You can close this — we&apos;ll keep analyzing in the background.
+                    Keep Machina open — this only takes a few seconds.
                 </p>
             )}
         </div>

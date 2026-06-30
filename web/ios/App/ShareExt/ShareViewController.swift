@@ -57,6 +57,7 @@ class ShareViewController: UIViewController {
     private var ceiling: CGFloat = 90             // animation eases toward this while uploading
     private var isImageFlow = false
     private var finished = false
+    private var resultShown = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -344,6 +345,12 @@ class ShareViewController: UIViewController {
 
     private func showResult(_ message: String, success: Bool) {
         DispatchQueue.main.async {
+            // Idempotency guard: a real network response and the watchdog can both
+            // call this. Whichever lands first owns the UI; later calls are dropped
+            // so we never flip a shown error into a (false) success or vice-versa.
+            guard !self.resultShown else { return }
+            self.resultShown = true
+
             if self.isImageFlow {
                 if success {
                     // Snap the scan to 100% with the green check, then finish.
@@ -520,9 +527,13 @@ class ShareViewController: UIViewController {
         req.timeoutInterval = 25
         req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
 
-        // Watchdog: never hang the share sheet open indefinitely.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 26) { [weak self] in
-            self?.showResult("Saved to Machina", success: true)
+        // Watchdog: never hang the share sheet open indefinitely. Fires 3s after
+        // the 25s request timeout, so the real result (success or error) almost
+        // always lands first and owns the UI via the resultShown guard. The
+        // message is deliberately neutral — we don't know the outcome here, so we
+        // must NOT claim a false "Saved ✓".
+        DispatchQueue.main.asyncAfter(deadline: .now() + 28) { [weak self] in
+            self?.showResult("Still saving — check Machina", success: false)
         }
 
         URLSession.shared.dataTask(with: req) { [weak self] _, response, error in
