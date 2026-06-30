@@ -1,6 +1,6 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-29. Branch: `claude/chat-history-sidebar-fgldj7` (merged to `main`)._
+_Last updated: 2026-06-30. Branch: `claude/xenodochial-cray-830097` (merged to `main`)._
 
 ## ⚠️ IN-FLIGHT — YouTube channel name + deploys (READ FIRST)
 
@@ -55,7 +55,41 @@ were already deployed and confirmed working.
 
 ---
 
-## Latest session — Ask Your Brain: chat history + UI overhaul + streaming + i18n
+## Latest session — Machina: native iOS app (Capacitor) + rebrand + new icon (2026-06-30)
+
+Shipped the whole web app as a **native iOS app** and rebranded the product from "Second Brain"
+to **Machina** (App Store name **"Machina AI"**; in-app/home-screen brand "Machina").
+
+**What changed (all in `web/`, merged to `main`, deployed to Vercel + Firebase Hosting):**
+- **iOS app via Capacitor** — `web/ios/` (SPM, no CocoaPods). Bundles the Next static export,
+  talks to the live Firebase backend. Bundle id `com.morhogeg.machina`, Apple Team `8Y2M94RUHG`,
+  automatic signing. Rebuild the bundle anytime with **`./build-ios.sh`** then `cd web && npx cap open ios`.
+- **`web/lib/api.ts`** (new) — `apiUrl()` prefixes the 4 relative `/api/*` calls with
+  `NEXT_PUBLIC_API_BASE` (set to the live Hosting site) for the bundled app; empty/no-op on web.
+- **`web/lib/firebase.ts`** — three WebView fixes (don't reintroduce): `initializeAuth` *without*
+  the popup/redirect resolver (the gapi iframe crashed under `capacitor://` and blocked React
+  hydration → app stuck on the loading spinner); `experimentalForceLongPolling` for Firestore in
+  Capacitor; emulator guard now also requires `protocol === 'http:'`.
+- **`web/app/globals.css`** — safe-area top inset applied unconditionally (the Capacitor WebView
+  isn't `display-mode: standalone`, so the header was hiding under the notch).
+- **Rebrand** — header/manifest/metadata/install-banner/empty-state now say "Machina"
+  (`page.tsx`, `layout.tsx`, `manifest.json`, `InstallPWA.tsx`, `Feed.tsx`, `SettingsModal.tsx`).
+- **Icon + splash** — custom neural-"M" mark (luminous connecting line, four small satellite
+  glints, soft convergence core), source in `web/assets/` (`icon.svg`, `splash.svg`). Regenerate
+  with `npx @capacitor/assets generate --ios`. `ITSAppUsesNonExemptEncryption=NO` set so TestFlight
+  skips the encryption prompt.
+
+**Deployed:** desktop (Vercel, auto on push) + iPhone PWA (`./deploy-hosting.sh`). No functions changed.
+
+**TODO (user, in Xcode — needs Apple credentials, can't be done from a session):** archive for
+TestFlight — open `web/ios/App/App.xcworkspace` (or `npx cap open ios`), destination **Any iOS
+Device (arm64)** → Product → Archive → Distribute → App Store Connect → Upload into the **Machina AI**
+record (already created in App Store Connect). Icon padding is a slight nit (full-bleed scale of a
+512 source) — fine for TestFlight; regenerate from a cleaner source later if desired.
+
+---
+
+## Earlier — Ask Your Brain: chat history + UI overhaul + streaming + i18n
 
 Large multi-part session on the **Ask** page. All frontend is on `main` (Vercel auto-deploys
 desktop). Backend (`ask_brain`) prompt/streaming changes need `./deploy-functions.sh
