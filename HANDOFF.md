@@ -1,6 +1,6 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-30. Branch: `claude/eloquent-ptolemy-5e56be` (merged + pushed to `main`)._
+_Last updated: 2026-06-30. Branch: `claude/elastic-mayer-607c00` (merged + pushed to `main`)._
 
 ## ⚠️ IN-FLIGHT — YouTube channel name + deploys (READ FIRST)
 
@@ -55,7 +55,37 @@ were already deployed and confirmed working.
 
 ---
 
-## Latest session — iOS "Load failed" CORS fix + app-icon header logo (2026-06-30)
+## Latest session — Collections UX polish (2026-06-30)
+
+Iterated on the Collections feature after first user testing. Shipped to web (Vercel + Hosting) and
+rebuilt the iOS bundle. All on `main`.
+
+**Fixes / additions:**
+1. **Cards show their collections** — subtle accent chips in the card footer (`Card.tsx`,
+   `cardCollections` prop fed from `Feed.tsx`). Inside a scoped collection the chip becomes a one-tap
+   **remove**; also added "Remove from <collection>" to the mobile `CardActionSheet`.
+2. **Manage a collection's cards** — new `web/components/ManageCollectionCardsSheet.tsx`: searchable
+   list of all cards with a membership checkbox (add **and** remove in bulk). Opened from the tile
+   menu ("Manage cards") and from an **"Add cards"** button in the scoped-collection banner.
+3. **Fixed the tile "…" menu** (`CollectionsGallery.tsx`) — it was clipped + flickering because it
+   rendered inside two `overflow-hidden` containers (the cover and the tile). Moved the trigger +
+   menu onto the tile root and stopped the root from clipping; menu now uses `z-50`.
+4. **Removed the decorative Layers icon** from collection covers (plain color/cover only).
+5. **Removed the redundant "New" button** in the Collections header (the gallery's "+ New collection"
+   tile already creates one).
+6. **Hid the category chips while scoped to a collection** (`Feed.tsx`, gated on
+   `selectedCollections.size === 0`).
+
+**Earlier this round (already live):** the collection-save bug — `firestore.rules` was missing a
+`users/{uid}/collections` match (rules don't cascade to subcollections); added + deployed. Color
+picker is now optional (random default + "Surprise me" shuffle).
+
+**Deployed:** Vercel (push), Firebase Hosting (`./deploy-hosting.sh`), iOS bundle (`./build-ios.sh`,
+`@capacitor/share` synced). No functions changed. **Next: Xcode → Archive → TestFlight.**
+
+---
+
+## Earlier — iOS "Load failed" CORS fix + app-icon header logo (2026-06-30)
 
 Shipped end-to-end: pushed to `main` (Vercel desktop), deployed 5 Cloud Functions, and deployed
 Firebase Hosting (iPhone). **Two earlier rounds of iOS UX polish are also already on `main`** —
