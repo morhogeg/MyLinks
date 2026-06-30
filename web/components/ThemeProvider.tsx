@@ -12,25 +12,32 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+/** Saved theme, read synchronously on the client (SSR falls back to 'dark'). */
+function getInitialTheme(): Theme {
+    if (typeof window === 'undefined') return 'dark';
+    return (localStorage.getItem('theme') as Theme | null) ?? 'dark';
+}
+
+function resolveTheme(theme: Theme): 'light' | 'dark' {
+    if (theme === 'system') {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return theme;
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-    const [theme, setThemeState] = useState<Theme>('dark');
+    // Initialize from localStorage synchronously. Previously this defaulted to
+    // 'dark' and read storage in a post-paint effect, so the effect below would
+    // briefly remove the `light` class the head bootstrap script had set —
+    // re-introducing the very dark flash the script exists to prevent.
+    const [theme, setThemeState] = useState<Theme>(getInitialTheme);
     const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('dark');
 
     useEffect(() => {
-        const savedTheme = localStorage.getItem('theme') as Theme | null;
-        if (savedTheme) {
-            setTimeout(() => setThemeState(savedTheme), 0);
-        }
-    }, []);
-
-    useEffect(() => {
         const root = window.document.documentElement;
+        const effectiveTheme = resolveTheme(theme);
 
-        const effectiveTheme: 'light' | 'dark' = theme === 'system'
-            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-            : theme;
-
-        setTimeout(() => setResolvedTheme(effectiveTheme), 0);
+        setResolvedTheme(effectiveTheme);
 
         if (effectiveTheme === 'light') {
             root.classList.add('light');

@@ -47,6 +47,16 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Render-blocking theme bootstrap: the CSS default is dark (:root), so a
+            light-theme user would otherwise get a dark flash (FOUC) every launch
+            because ThemeProvider only applies the saved theme in a post-paint
+            effect. Set the `light` class synchronously before first paint. Mirrors
+            ThemeProvider's resolution ('light' | saved 'system' + OS preference). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme');var isLight=t==='light'||(t==='system'&&!window.matchMedia('(prefers-color-scheme: dark)').matches);if(isLight){document.documentElement.classList.add('light');}}catch(e){}})();`,
+          }}
+        />
         {/* PWA iOS meta tags */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

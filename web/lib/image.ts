@@ -30,6 +30,11 @@ const DEFAULT_QUALITY = 0.82;
 // HEIC; if we blow past this we fall back to the original bytes rather than
 // leaving the user stuck on a frozen progress bar.
 const COMPRESS_TIMEOUT_MS = 20_000;
+// When compression fails we fall back to the original bytes — but only if they're
+// small enough to send inline. Shipping a multi-MB HEIC as base64 JSON (≈+33%)
+// just swaps a frozen progress bar for a near-certain payload-limit / 60s-timeout
+// failure, so above this size we reject with a clear message instead.
+const MAX_FALLBACK_BYTES = 6 * 1024 * 1024;
 
 function loadImage(src: string): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
@@ -108,7 +113,14 @@ export async function compressImage(
     try {
         return await withTimeout(compressToJpeg(file, maxDim, quality), COMPRESS_TIMEOUT_MS);
     } catch {
-        // Graceful fallback: use the original bytes untouched.
+        // Compression failed (unsupported format / iOS decode stall). Only fall
+        // back to the raw bytes when they're small enough to actually go through;
+        // otherwise reject loudly rather than guaranteeing a downstream timeout.
+        if (file.size > MAX_FALLBACK_BYTES) {
+            throw new Error(
+                "This image is too large to analyze. Try a screenshot or a smaller photo."
+            );
+        }
         const base64 = await blobToBase64(file);
         return { blob: file, base64, mimeType: file.type || 'image/jpeg' };
     }

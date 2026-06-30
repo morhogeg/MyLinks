@@ -10,6 +10,7 @@ import {
     createCollection,
 } from '@/lib/collections';
 import { useToast } from '@/components/Toast';
+import { useVisualViewport } from '@/lib/useVisualViewport';
 
 interface AddToCollectionSheetProps {
     uid: string | null;
@@ -39,6 +40,10 @@ export default function AddToCollectionSheet({
     const [creating, setCreating] = useState(false);
     const [newName, setNewName] = useState('');
     const [busy, setBusy] = useState(false);
+    // Ride above the keyboard so the autofocused new-collection input (pinned to
+    // the bottom of the sheet) isn't hidden behind the keys while typing. No-op
+    // on desktop, where visualViewport spans the full window.
+    const vp = useVisualViewport();
 
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
@@ -103,7 +108,10 @@ export default function AddToCollectionSheet({
     };
 
     return (
-        <div className="fixed inset-0 z-[95] flex items-end sm:items-center justify-center animate-fade-in">
+        <div
+            className="fixed inset-x-0 z-[95] flex items-end sm:items-center justify-center animate-fade-in"
+            style={{ top: vp.offsetTop || 0, height: vp.height || '100%', bottom: 'auto' }}
+        >
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
             <div
