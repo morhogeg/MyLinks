@@ -77,6 +77,59 @@ export interface Link {
   concepts?: string[];
   relatedLinks?: RelatedLink[];
   embedding_vector?: number[]; // 768-dim vector for semantic search
+
+  // Collections — ids of the collections this card belongs to. Mirrors `tags`:
+  // membership lives on the card so the already-loaded feed can filter in memory.
+  collectionIds?: string[];
+}
+
+/**
+ * A user-curated group of cards (e.g. "Russian literature", "Tesla").
+ * Metadata only — membership is stored as `collectionIds` on each Link, and the
+ * card count is derived client-side from the loaded feed.
+ * Stored at users/{uid}/collections/{collectionId}.
+ */
+export interface Collection {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;        // a category-color key (see lib/colors.ts)
+  coverLinkId?: string;  // optional: the card whose thumbnail is the cover
+  createdAt: number;
+  updatedAt: number;
+  shareId?: string;      // set when published; key into shared_collections/{shareId}
+  isPublic?: boolean;
+}
+
+/** A frozen, denormalized copy of a card for a public share page. */
+export interface SharedCard {
+  title: string;
+  summary: string;
+  detailedSummary?: string;
+  url: string;
+  category?: string;
+  tags?: string[];
+  thumbnailUrl?: string;
+  sourceName?: string;
+  sourceType?: string;
+}
+
+/** A published collection snapshot — top-level, world-readable. shared_collections/{shareId}. */
+export interface SharedCollection {
+  shareId: string;
+  ownerUid: string;
+  name: string;
+  description?: string;
+  publishedAt: number;
+  cards: SharedCard[];
+}
+
+/** A published single-card snapshot — top-level, world-readable. shared_cards/{shareId}. */
+export interface SharedCardDoc {
+  shareId: string;
+  ownerUid: string;
+  publishedAt: number;
+  card: SharedCard;
 }
 
 export interface RelatedLink {

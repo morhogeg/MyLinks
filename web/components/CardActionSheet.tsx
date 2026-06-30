@@ -1,7 +1,7 @@
 'use client';
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink } from 'lucide-react';
+import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink, Layers, Share2 } from 'lucide-react';
 import { useEffect } from 'react';
 
 interface CardActionSheetProps {
@@ -12,6 +12,8 @@ interface CardActionSheetProps {
     onReadStatusChange: (id: string, isRead: boolean) => void;
     onUpdateReminder: (link: Link) => void;
     onDelete: (id: string) => void;
+    onAddToCollection?: (link: Link) => void;
+    onShare?: (link: Link) => void;
 }
 
 /**
@@ -32,6 +34,8 @@ export default function CardActionSheet({
     onReadStatusChange,
     onUpdateReminder,
     onDelete,
+    onAddToCollection,
+    onShare,
 }: CardActionSheetProps) {
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
@@ -95,6 +99,18 @@ export default function CardActionSheet({
             active: hasReminder,
             onClick: () => onUpdateReminder(link),
         },
+        ...(onAddToCollection ? [{
+            key: 'collection',
+            label: 'Add to collection',
+            icon: <Layers className="w-5 h-5" />,
+            onClick: () => onAddToCollection(link),
+        }] : []),
+        ...(onShare ? [{
+            key: 'share',
+            label: 'Share',
+            icon: <Share2 className="w-5 h-5" />,
+            onClick: () => onShare(link),
+        }] : []),
         {
             key: 'delete',
             label: 'Delete',

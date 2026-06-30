@@ -3,7 +3,7 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Play, Youtube, ExternalLink } from 'lucide-react';
+import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Play, Youtube, ExternalLink, Layers, Share2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
@@ -28,6 +28,10 @@ interface CardProps {
     index?: number;
     /** Tapping a footer tag filters the feed by that tag. */
     onTagClick?: (tag: string) => void;
+    /** Open the "add to collection" sheet for this card. */
+    onAddToCollection?: (link: Link) => void;
+    /** Share this card as a public Machina page. */
+    onShare?: (link: Link) => void;
 }
 
 /**
@@ -46,7 +50,9 @@ export default function Card({
     isSelected = false,
     onToggleSelection,
     index = 0,
-    onTagClick
+    onTagClick,
+    onAddToCollection,
+    onShare,
 }: CardProps) {
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
@@ -274,6 +280,30 @@ export default function Card({
                                     <Bell className="w-3 h-3" />
                                 )}
                             </button>
+                            {onAddToCollection && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onAddToCollection(link);
+                                    }}
+                                    title="Add to collection"
+                                    className="p-1.5 rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center"
+                                >
+                                    <Layers className="w-3 h-3" />
+                                </button>
+                            )}
+                            {onShare && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onShare(link);
+                                    }}
+                                    title="Share"
+                                    className="p-1.5 rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center"
+                                >
+                                    <Share2 className="w-3 h-3" />
+                                </button>
+                            )}
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -436,6 +466,8 @@ export default function Card({
             onReadStatusChange={onReadStatusChange}
             onUpdateReminder={onUpdateReminder}
             onDelete={onDelete}
+            onAddToCollection={onAddToCollection}
+            onShare={onShare}
         />
         </>
     );

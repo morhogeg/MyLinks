@@ -20,8 +20,12 @@ cd "$HERE/web"
 # Cloud Function (see firebase.json). Override with API_BASE=... if it moves.
 API_BASE="${API_BASE:-https://secondbrain-app-94da2.web.app}"
 
+# Public origin used to build shareable links (/c?id=, /s?id=). Must be the real
+# web origin — inside the app window.location is capacitor://localhost.
+SHARE_BASE="${SHARE_BASE:-$API_BASE}"
+
 echo "→ Building Next.js static export (API base: $API_BASE)"
-NEXT_PUBLIC_API_BASE="$API_BASE" npm run build
+NEXT_PUBLIC_API_BASE="$API_BASE" NEXT_PUBLIC_SHARE_BASE="$SHARE_BASE" npm run build
 
 echo "→ Syncing web assets into the iOS project"
 npx cap sync ios
