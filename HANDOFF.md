@@ -2,7 +2,47 @@
 
 _Last updated: 2026-06-30. Branch: `claude/eloquent-austin-00fb8c` (merged + pushed to `main`)._
 
-## Latest session — iOS QA top-4 fixes + build 11 (2026-06-30)
+## Latest session — iOS QA items #5–#10 + build 13 (2026-06-30)
+
+Continued the `ios-qa-report.md` "Top 10" sweep (after the build-11 top-4 round below). Web-only
+changes, but bundled into a new native build per request. **Build 12 belongs to a parallel agent**
+(its commit `53e545a` "iOS UI round: categories/tags redesign, collections header parity, chat
+sidebar, scan HUD close" is on `main`); this round took **build 13** and was merged on top of it
+(one trivial pbxproj build-number conflict, resolved to 13). `tsc --noEmit` clean on the merged
+tree. **Web fully deployed (Vercel + Firebase Hosting).** No backend change.
+
+5. **[High] `useEdgeSwipeBack` hijacked in-overlay horizontal gestures** — `web/lib/useEdgeSwipeBack.ts`.
+   The global left-edge listener fired on the LinkDetailModal action-toolbar scroll and deck
+   swipes. Now bails when the touch starts inside a horizontally scrollable container or a
+   `touch-action:none`/`pan-y` element (`data-no-edge-swipe` to force opt-out).
+6. **[High] Bottom sheets didn't track the keyboard** — applied the `useVisualViewport` treatment
+   (the one `CollectionFormModal` already used) to `AddToCollectionSheet.tsx` so its autofocused
+   new-collection input rides above the keys; lighter `max-h-full` + vp clamp on
+   `ManageCollectionCardsSheet.tsx`.
+8. **[Medium] Light-theme dark flash (FOUC) every launch** — `web/app/layout.tsx` now has a
+   render-blocking `<head>` bootstrap script that adds the `light` class before first paint, and
+   `ThemeProvider.tsx` reads the saved theme synchronously (lazy init) so its post-paint effect no
+   longer strips that class.
+9. **[Medium] HEIC/large-image compression fallback shipped raw multi-MB bytes inline** —
+   `web/lib/image.ts`. Above 6 MB the fallback now rejects with a clear user message instead of
+   guaranteeing the payload-limit/60s-timeout it was meant to avoid.
+10. **[Medium] Toast shared `z-[100]` with modals/sheets** (could render behind an open sheet) —
+   `web/components/Toast.tsx` moved to `z-[200]`.
+
+**#7** (untrue "we'll keep analyzing in the background" copy) was already resolved at the copy
+level in build 11; the alternative — moving in-app capture to a real **server-side job** (reuse
+`share_ingest`/`process_link_background`) — is a deliberate **deferred follow-up** (changes capture
+UX + needs a functions deploy; not bundled into this UI-bugfix batch).
+
+**iOS native:** build bumped **11 → 13** on both targets (App + ShareExt). Archived to
+`~/MyLinks/build/Machina13.xcarchive`, filed in Xcode Organizer (`2026-06-30/Machina13.xcarchive`,
+CFBundleVersion 13). **Remaining: user clicks Organizer → Distribute App → TestFlight** for build 13.
+
+**Still open from the QA report:** F-series mediums/lows not in the Top 10 (e.g. F-16 ref-counted
+scroll locks, F-19 SettingsModal discards edits, F-20 ReminderModal past-times/Date overflow,
+F-25/26 RTL inconsistencies, F-31 Reader "Listen" reliability). See `ios-qa-report.md`.
+
+## Earlier — iOS QA top-4 fixes + build 11 (2026-06-30)
 
 Worked the `ios-qa-report.md` "Top 10 to fix next" list (items #3 raw-markdown and #4 image-HUD
 were already done by other agents, skipped). Fixed the four highest-severity remaining items;
