@@ -9,18 +9,6 @@ import SettingsModal from "@/components/SettingsModal";
 import { Settings } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 
-/** The Machina mark — a luminous "M" drawn as a connecting line that converges
- *  on a central node (a monochrome form of the app icon). Tints via currentColor. */
-function MachinaMark({ className = '' }: { className?: string }) {
-  return (
-    <svg viewBox="15 17 70 70" className={className} fill="none" aria-hidden="true">
-      <path d="M24 74 L24 30 L50 54 L76 30 L76 74" stroke="currentColor"
-        strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="50" cy="54" r="6" fill="currentColor" />
-    </svg>
-  );
-}
-
 /**
  * Main dashboard page
  */
@@ -39,8 +27,9 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-purple-500/20 animate-pulse">
-            <MachinaMark className="w-7 h-7 text-white" />
+          <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg shadow-purple-500/20 animate-pulse ring-1 ring-white/15">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
           </div>
           <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
         </div>
@@ -57,8 +46,10 @@ export default function Home() {
         <div className="w-full max-w-[2200px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 flex items-center justify-between">
           {/* Brand */}
           <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-purple-500/25 ring-1 ring-white/15">
-              <MachinaMark className="w-[19px] h-[19px] sm:w-[22px] sm:h-[22px] text-white" />
+            <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl overflow-hidden shadow-lg shadow-purple-500/25 ring-1 ring-white/15">
+              {/* The exact app icon, so the in-app mark matches the home-screen icon. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
               <span className="absolute -inset-1 rounded-2xl bg-[image:var(--accent-gradient)] opacity-20 blur-md -z-10" />
             </div>
             <div className="leading-none">
