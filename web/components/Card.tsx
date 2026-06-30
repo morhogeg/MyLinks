@@ -3,7 +3,7 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Play, Youtube, ExternalLink, Layers, Share2 } from 'lucide-react';
+import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Play, Youtube, ExternalLink, Layers, Share2, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
@@ -32,6 +32,12 @@ interface CardProps {
     onAddToCollection?: (link: Link) => void;
     /** Share this card as a public Machina page. */
     onShare?: (link: Link) => void;
+    /** Collections this card belongs to — rendered as subtle chips. */
+    cardCollections?: { id: string; name: string }[];
+    /** When the feed is scoped to one collection, its id — enables a quick "remove" action. */
+    activeCollectionId?: string;
+    /** Remove this card from the given collection. */
+    onRemoveFromCollection?: (link: Link, collectionId: string) => void;
 }
 
 /**
@@ -53,6 +59,9 @@ export default function Card({
     onTagClick,
     onAddToCollection,
     onShare,
+    cardCollections,
+    activeCollectionId,
+    onRemoveFromCollection,
 }: CardProps) {
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
@@ -419,6 +428,35 @@ export default function Card({
 
                 {/* Footer Section */}
                 <div className="pt-3 sm:pt-4 border-t border-white/5 flex flex-col space-y-2 sm:space-y-3">
+                    {/* Collection memberships — subtle chips. When viewing inside a
+                        collection, that chip becomes a one-tap "remove from collection". */}
+                    {cardCollections && cardCollections.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                            {cardCollections.map((col) => {
+                                const isActive = col.id === activeCollectionId;
+                                return (
+                                    <span
+                                        key={col.id}
+                                        className="inline-flex items-center gap-1 ps-1.5 pe-1.5 py-0.5 rounded-md bg-accent/10 text-accent text-[10px] font-bold border border-accent/15"
+                                        title={isActive ? `Remove from ${col.name}` : `In collection: ${col.name}`}
+                                    >
+                                        <Layers className="w-2.5 h-2.5" />
+                                        <span className="max-w-[120px] truncate">{col.name}</span>
+                                        {isActive && onRemoveFromCollection && (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => { e.stopPropagation(); onRemoveFromCollection(link, col.id); }}
+                                                aria-label={`Remove from ${col.name}`}
+                                                className="flex items-center justify-center rounded-full -me-0.5 p-0.5 hover:bg-accent/20 transition-colors"
+                                            >
+                                                <X className="w-2.5 h-2.5" />
+                                            </button>
+                                        )}
+                                    </span>
+                                );
+                            })}
+                        </div>
+                    )}
                     {/* Tags */}
                     <div className="flex flex-wrap gap-1.5 min-h-[1.5rem]">
                         {link.tags.map((tag) => {
@@ -468,6 +506,14 @@ export default function Card({
             onDelete={onDelete}
             onAddToCollection={onAddToCollection}
             onShare={onShare}
+            removeFromCollection={
+                activeCollectionId && onRemoveFromCollection
+                    ? {
+                        name: cardCollections?.find((c) => c.id === activeCollectionId)?.name ?? 'collection',
+                        onRemove: () => onRemoveFromCollection(link, activeCollectionId),
+                    }
+                    : undefined
+            }
         />
         </>
     );
