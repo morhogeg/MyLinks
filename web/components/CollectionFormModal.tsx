@@ -6,6 +6,7 @@ import { X, Check, Layers, Shuffle } from 'lucide-react';
 import { COLOR_KEYS, getColorStyleByKey } from '@/lib/colors';
 import { createCollection, updateCollection } from '@/lib/collections';
 import { useToast } from '@/components/Toast';
+import { useVisualViewport } from '@/lib/useVisualViewport';
 
 /** Pick a random palette key — used so users never have to choose a color. */
 function randomColorKey(): string {
@@ -40,6 +41,10 @@ export default function CollectionFormModal({
     const [description, setDescription] = useState('');
     const [color, setColor] = useState<string>(COLOR_KEYS[0]);
     const [busy, setBusy] = useState(false);
+    // Track the visible viewport so the bottom sheet rides *above* the keyboard
+    // instead of being hidden behind it while typing the name. No-op on desktop
+    // (visualViewport == full window there).
+    const vp = useVisualViewport();
 
     useEffect(() => {
         if (isOpen) {
@@ -97,14 +102,17 @@ export default function CollectionFormModal({
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
+        <div
+            className="fixed inset-x-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
+            style={{ top: vp.offsetTop || 0, height: vp.height || '100%', bottom: 'auto' }}
+        >
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
             <div
                 role="dialog"
                 aria-modal="true"
                 aria-label={isEdit ? 'Edit collection' : 'New collection'}
-                className="relative w-full sm:max-w-md bg-card border-t sm:border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up sm:animate-scale-up overflow-hidden safe-pb"
+                className="relative w-full sm:max-w-md max-h-full overflow-y-auto bg-card border-t sm:border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up sm:animate-scale-up safe-pb"
             >
                 <div className="sm:hidden flex justify-center pt-3 pb-1">
                     <div className="h-1.5 w-10 rounded-full bg-white/15" />

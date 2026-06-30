@@ -277,14 +277,15 @@ export default function LinkDetailModal({
                         </button>
                     </div>
 
-                    {/* Close — pinned, always visible, never clipped by the scroll row. */}
+                    {/* Close — pinned right (never clipped by the scroll row), but
+                        styled exactly like the other toolbar icon buttons. */}
                     <button
                         onClick={onClose}
                         aria-label="Close"
                         title="Close"
-                        className="shrink-0 h-10 w-10 rounded-full bg-card-hover border border-border-subtle text-text-secondary hover:text-text hover:bg-card transition-colors flex items-center justify-center"
+                        className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-text hover:bg-card-hover transition-colors"
                     >
-                        <X className="w-5 h-5" />
+                        <X className="w-[18px] h-[18px]" />
                     </button>
                 </div>
 
