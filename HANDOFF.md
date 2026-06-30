@@ -1,8 +1,43 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-30. Branch: `claude/eloquent-austin-00fb8c` (merged + pushed to `main`)._
+_Last updated: 2026-06-30. Branch: `claude/ios-ui-refinements-8pe0s1` (merged + pushed to `main`)._
 
-## Latest session — iOS QA items #5–#10 + build 13 (2026-06-30)
+## Latest session — iOS UI refinements round (2026-06-30)
+
+Six requested UI refinements, all web/native-frontend (no backend change), plus a
+build-resilience fix. `tsc --noEmit` clean; static export builds offline after the font fix.
+
+1. **New vertical List view** — `web/components/ListCard.tsx` (new): full-width, glanceable
+   rows (headline + category colour cue + one tag chip + star) for fast scrolling. Wired into
+   `Feed.tsx` as a new `list` viewMode with its own **List** icon/label in the view switcher
+   (between Cards and Compact).
+2. **Chat-row ••• placement** — `web/components/ChatHistorySidebar.tsx`. The actions button is
+   now a real flex sibling (was an absolute overlay), so long truncated chat names no longer
+   collide with the dots; fixed-width slot reserves space (no hover reflow), dots stay centred.
+3. **Faceted Categories & Tags counts** — `web/components/Feed.tsx`. Category and tag counts now
+   recompute against the *other* facet's selection (each excludes its own), so picking e.g.
+   "Tech" drops a non-overlapping tag to 0. Pure client-side, no extra reads.
+4. **Native link-share scan loader** — `web/ios/App/ShareExt/ShareViewController.swift`. Shared
+   links/text now get a native scan HUD mirroring `LinkScanProgress.tsx` (favicon + host +
+   skeleton page behind the sweep, link glyph, %/phase labels, bar) instead of the plain spinner.
+   Generalised the existing image-scan flow with an `isLinkFlow` path + `presentLinkScan`.
+5. **Delete dialog copy** — `Feed.tsx` / `ConfirmDialog.tsx`: "second brain" → "Machina".
+6. **Settings open animation** — `globals.css` + `SettingsModal.tsx`: replaced the spring
+   overshoot (`--ease-spring`, the "bump") with a no-overshoot iOS push curve
+   (`cubic-bezier(0.32,0.72,0,1)`, new `.animate-ios-push`). Chat drawer left as-is.
+
+**Build resilience:** `web/app/layout.tsx` now self-hosts Geist via the `geist` package instead
+of `next/font/google`, so the build never fetches `fonts.googleapis.com` (same CSS var names;
+globals.css unchanged). Added `geist` to `web/package.json`.
+
+**Deploy status:** Desktop **Vercel deployed** (pushed to `main`, FF). iPhone **Firebase Hosting
+NOT yet deployed** — the cloud session can't run the static build (no `web/.env.local` Firebase
+secrets here) and Google Fonts was firewalled (now moot after the geist switch). **Run
+`./deploy-hosting.sh` locally** to update the iPhone. **iOS native:** no build-number bump this
+round; the Swift Share-Extension change needs a new archive — run `./build-ios.sh`, bump build in
+Xcode, archive, Organizer → Distribute → TestFlight.
+
+## Earlier — iOS QA items #5–#10 + build 13 (2026-06-30)
 
 Continued the `ios-qa-report.md` "Top 10" sweep (after the build-11 top-4 round below). Web-only
 changes, but bundled into a new native build per request. **Build 12 belongs to a parallel agent**
