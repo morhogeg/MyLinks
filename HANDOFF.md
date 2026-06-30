@@ -55,7 +55,39 @@ were already deployed and confirmed working.
 
 ---
 
-## Latest session — Native iOS Share Extension "Save to Machina" (2026-06-30)
+## Latest session — Ship + archive build 2 (Share Extension + iOS UX polish) (2026-06-30)
+
+Shipped everything below and produced a TestFlight-ready archive. All on `main`, pushed.
+
+**Deployed:**
+- Vercel (desktop) — pushed to `main` (auto-deploys).
+- Firebase Hosting (iPhone) — `./deploy-hosting.sh` ✓.
+- Cloud Function `share_ingest` — `./deploy-functions.sh functions:share_ingest` ✓ (image support).
+
+**Folded in from another session** (`claude/eloquent-ptolemy-5e56be`, was uncommitted): iOS UX
+polish — `useEdgeSwipeBack`, `useVisualViewport`, `api.ts isNativeApp()` + buffered-SSE-in-app,
+wired into AddLinkForm/AskBrain/SettingsModal. Committed on its branch, merged to `main` (clean).
+
+**iOS archive (build 2):** bumped `CURRENT_PROJECT_VERSION` 1→2 (App + ShareExt), then via CLI:
+- `xcodebuild … -allowProvisioningUpdates archive` → **ARCHIVE SUCCEEDED**. Automatic signing
+  registered the new `com.morhogeg.machina.ShareExt` App ID + App Group `group.com.morhogeg.machina`
+  on the portal — first-time capability friction is DONE.
+- `xcodebuild -exportArchive` (method app-store-connect) → **distribution-signed `App.ipa`**.
+- Verified: archive bundles `PlugIns/ShareExt.appex`; both app + extension carry the App Group
+  entitlement; version 1.0 (2).
+- Archive: `~/Library/Developer/Xcode/Archives/2026-06-30/Machina-build2.xcarchive` (in Organizer).
+- IPA: `~/Downloads/Machina-build2.ipa`.
+
+**ONLY step left = upload to TestFlight** (needs your App Store Connect credentials):
+- Xcode → Window → Organizer → select the build-2 archive → **Distribute App → TestFlight → Upload**
+  (uses your logged-in account), OR drag `~/Downloads/Machina-build2.ipa` into the **Transporter** app.
+- Then on device: open Machina once (syncs the ingest token into the App Group), and test sharing a
+  link and a photo from Safari/Photos → a card should appear.
+
+**Config:** added project permission rule `.claude/settings.json` → `Bash(git push origin main:*)`
+so `ship` no longer prompts on push.
+
+## Earlier — Native iOS Share Extension "Save to Machina" (2026-06-30)
 
 **What:** a real iOS share-sheet target so you can share any **link, text, or image** from any
 app → it's AI-analyzed → saved as a card. Replaces the manual Shortcut (which still works).
