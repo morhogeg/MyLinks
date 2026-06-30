@@ -1,6 +1,6 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-30. Branch: `claude/xenodochial-cray-830097` (merged to `main`)._
+_Last updated: 2026-06-30. Branch: `claude/blissful-mayer-275ff0` (committed + pushed to `main`)._
 
 ## ⚠️ IN-FLIGHT — YouTube channel name + deploys (READ FIRST)
 
@@ -55,7 +55,46 @@ were already deployed and confirmed working.
 
 ---
 
-## Latest session — Machina: native iOS app (Capacitor) + rebrand + new icon (2026-06-30)
+## Latest session — Native iOS Share Extension "Save to Machina" (2026-06-30)
+
+**What:** a real iOS share-sheet target so you can share any **link, text, or image** from any
+app → it's AI-analyzed → saved as a card. Replaces the manual Shortcut (which still works).
+**Shipped & deployed** (Vercel desktop on push, `share_ingest` function, Firebase Hosting iPhone).
+
+**How it works** (full spec in `SHARE_EXTENSION.md`):
+- The extension runs in its own process and can't see the WebView's Firebase session. So the app
+  pushes `{endpoint, token}` (from the existing `get_share_config` callable) into an **App Group**
+  `group.com.morhogeg.machina` via a tiny custom Capacitor plugin; the extension reads it back to
+  authenticate its POST to `/api/share`.
+- Links/text → `share_ingest` queues the URL (existing path). Images → `share_ingest` now decodes
+  base64, stores to Storage, and queues with `isImage=True`, reusing `process_link_background`
+  (the same path WhatsApp images use). Links/text are deduped; images are not.
+
+**Files:**
+- Backend: `functions/main.py` — image branch added to `share_ingest` (deployed).
+- Native: `web/ios/App/ShareExt/{ShareViewController.swift,Info.plist,ShareExt.entitlements}`,
+  `web/ios/App/App/{App.entitlements,ShareConfigPlugin.swift}`, target wired into
+  `web/ios/App/App.xcodeproj/project.pbxproj` (hand-edited; survives `cap sync`).
+- Web bridge: `web/lib/shareConfig.ts`, called from `web/components/AuthProvider.tsx`.
+- Docs: `SHARE_EXTENSION.md`.
+
+**Verified:** `xcodebuild -list` shows the `ShareExt` target; full App build SUCCEEDS — plugin
+compiles against Capacitor, `ShareExt.appex` builds, embeds into `App.app/PlugIns/`, passes
+embedded-binary validation; `cap sync` preserves the target; web typecheck + Next build pass.
+
+**TODO next session — the one thing not doable headlessly (Xcode signing):**
+1. `cd web && npx cap open ios`. On **both** the `App` and `ShareExt` targets → Signing &
+   Capabilities → set Team `8Y2M94RUHG`, confirm the **App Group** `group.com.morhogeg.machina`
+   is checked. If automatic signing can't register the group, add it once at
+   developer.apple.com → Identifiers → App Groups, then re-sign.
+2. Product → Archive → Distribute → TestFlight (the rebuilt bundle already includes the latest
+   web build from `./build-ios.sh`; re-run it if web changed since).
+3. On device: open Machina once (so the token syncs to the App Group), then test sharing a link
+   and a photo from Safari/Photos → confirm a card appears in the feed.
+   - Sanity-check the **`process_link_background`** function is the latest deploy (the older
+     IN-FLIGHT note flagged a transient 409 on it) — the image-share card is created by it.
+
+## Earlier — Machina: native iOS app (Capacitor) + rebrand + new icon (2026-06-30)
 
 Shipped the whole web app as a **native iOS app** and rebranded the product from "Second Brain"
 to **Machina** (App Store name **"Machina AI"**; in-app/home-screen brand "Machina").
