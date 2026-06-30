@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { MessageCircleQuestion, ArrowUp, FileText, Brain, Plus, ChevronLeft, MessagesSquare, Copy, Check } from 'lucide-react';
+import { MessageCircleQuestion, ArrowUp, FileText, Brain, Plus, MessagesSquare, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -14,6 +14,8 @@ import { ChatMessage, ChatSource, ChatSession } from '@/lib/types';
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
 import ConfirmDialog from './ConfirmDialog';
 import ChatHistorySidebar from './ChatHistorySidebar';
+import MobileSubheader from './MobileSubheader';
+import { IconButton } from './ui/Button';
 
 /** A usable source name, or null for placeholders the backend stores. */
 function meaningfulName(name?: string | null): string | null {
@@ -506,35 +508,29 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                 it ignores the body's safe-area padding), so the bar pads itself
                 down past the status bar / notch. */}
             {isMobile && (
-                <div
-                    className="flex items-center gap-1 px-2 h-12 shrink-0 border-b border-border-subtle"
-                    style={{ paddingTop: 'env(safe-area-inset-top)', boxSizing: 'content-box' }}
+                <MobileSubheader
+                    onBack={() => onExit?.()}
+                    title="Ask Machina"
+                    leading={
+                        <button
+                            onClick={() => setHistoryOpen(true)}
+                            aria-label="Chat history"
+                            className="p-2 rounded-full text-text-secondary hover:text-text active:bg-card-hover transition-colors cursor-pointer"
+                        >
+                            <MessagesSquare className="w-5 h-5" />
+                        </button>
+                    }
                 >
-                    <button
-                        onClick={onExit}
-                        aria-label="Back"
-                        className="p-2 -ms-1 rounded-full text-text-secondary hover:text-text active:bg-card-hover transition-colors"
-                    >
-                        <ChevronLeft className="w-5 h-5" />
-                    </button>
-                    <button
-                        onClick={() => setHistoryOpen(true)}
-                        aria-label="Chat history"
-                        className="p-2 rounded-full text-text-secondary hover:text-text active:bg-card-hover transition-colors"
-                    >
-                        <MessagesSquare className="w-5 h-5" />
-                    </button>
-                    <span className="font-semibold text-text truncate">Ask Machina</span>
                     {!isEmpty && (
                         <button
                             onClick={newChat}
-                            className="ms-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-text-muted text-xs font-medium hover:text-text active:bg-card-hover transition-colors"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-text-muted text-xs font-medium hover:text-text active:bg-card-hover transition-colors cursor-pointer"
                         >
                             <Plus className="w-3.5 h-3.5" />
                             New
                         </button>
                     )}
-                </div>
+                </MobileSubheader>
             )}
 
             {/* Conversation */}
@@ -669,17 +665,18 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                         dir={getDirection(input)}
                         className="flex-1 resize-none bg-transparent px-2 py-1.5 text-[15px] text-text placeholder:text-text-muted focus:outline-none max-h-32 disabled:opacity-60"
                     />
-                    <button
+                    <IconButton
                         // Don't steal focus from the textarea — keeps the keyboard open
                         // and lets the click land reliably (no layout shift mid-tap).
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => send(input)}
                         disabled={!uid || isThinking || !input.trim()}
                         aria-label="Send"
-                        className="shrink-0 w-9 h-9 inline-flex items-center justify-center rounded-xl bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        variant="primary"
+                        className="shrink-0"
                     >
                         <ArrowUp className="w-5 h-5" />
-                    </button>
+                    </IconButton>
                 </div>
                 <p className="hidden sm:block text-center text-[11px] text-text-muted mt-2">
                     Answers are grounded only in what you&apos;ve saved.

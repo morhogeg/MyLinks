@@ -26,7 +26,9 @@ import AddToCollectionSheet from './AddToCollectionSheet';
 import CollectionsGallery from './CollectionsGallery';
 import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessageCircleQuestion, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus } from 'lucide-react';
+import MobileSubheader from './MobileSubheader';
+import { Button, IconButton } from './ui/Button';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessageCircleQuestion, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus } from 'lucide-react';
 import { publishCard, publishCollection, unpublishCollection, deleteCollection, removeLinkFromCollection } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
 import TagExplorer from './TagExplorer';
@@ -578,7 +580,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
     const viewModes: { key: typeof viewMode; label: string; icon: React.ReactNode; hint: string }[] = [
         { key: 'grid', label: 'Cards', icon: <LayoutGrid className="w-4 h-4" />, hint: 'Card view' },
         { key: 'compact', label: 'Compact', icon: <Grid2X2 className="w-4 h-4" />, hint: 'Compact grid' },
-        { key: 'review', label: 'Review', icon: <Layers className="w-4 h-4" />, hint: 'Swipe to review' },
+        { key: 'review', label: 'Review', icon: <GalleryHorizontalEnd className="w-4 h-4" />, hint: 'Swipe to review' },
     ];
     // The layout the Ask/Collections buttons return you to when you leave them.
     const lastLayout = useRef<'grid' | 'compact' | 'review'>('grid');
@@ -638,40 +640,40 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                     and shows only a Back button, so the chat gets the full height. */}
                 {viewMode === 'ask' ? (
                     <div className="flex items-center">
-                        <button
+                        <Button
                             onClick={() => setViewMode(lastLayout.current)}
                             title="Back to your library"
                             aria-label="Back to your library"
-                            className="shrink-0 inline-flex items-center gap-1 ps-2 pe-3 py-2 rounded-xl bg-card border border-border-subtle text-text-secondary text-sm font-medium hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
+                            variant="secondary"
+                            className="shrink-0 ps-2 pe-3 font-medium hover:border-accent/40"
                         >
                             <ChevronLeft className="w-4 h-4" />
                             Back
-                        </button>
+                        </Button>
                     </div>
                 ) : viewMode === 'collections' ? (
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => setViewMode(lastLayout.current)}
-                            title="Back to your library"
-                            aria-label="Back to your library"
-                            className="shrink-0 inline-flex items-center gap-1 ps-2 pe-3 py-2 rounded-xl bg-card border border-border-subtle text-text-secondary text-sm font-medium hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
+                    // Unified mobile-style subheader (matches the Ask page): back
+                    // chevron + Layers icon + title, with the new-collection "+"
+                    // pinned to the trailing slot. Span the full width by undoing
+                    // the section's horizontal padding.
+                    <div className="-mx-4 sm:mx-0">
+                        <MobileSubheader
+                            onBack={() => setViewMode(lastLayout.current)}
+                            backLabel="Back to your library"
+                            icon={<Layers className="w-5 h-5" />}
+                            title="Collections"
                         >
-                            <ChevronLeft className="w-4 h-4" />
-                            Back
-                        </button>
-                        <h2 className="flex items-center gap-2 text-lg font-bold text-text">
-                            <Layers className="w-5 h-5 text-accent" />
-                            Collections
-                        </h2>
-                        {/* Explicit add affordance — the only way to create a collection. */}
-                        <button
-                            onClick={openNewCollectionForm}
-                            title="New collection"
-                            aria-label="New collection"
-                            className="ms-auto shrink-0 inline-flex items-center justify-center h-9 w-9 rounded-full bg-accent text-white shadow-sm shadow-accent/20 hover:bg-accent-hover transition-colors cursor-pointer"
-                        >
-                            <Plus className="w-5 h-5" />
-                        </button>
+                            {/* Explicit add affordance — the only way to create a collection. */}
+                            <IconButton
+                                onClick={openNewCollectionForm}
+                                title="New collection"
+                                aria-label="New collection"
+                                variant="primary"
+                                radius="full"
+                            >
+                                <Plus className="w-5 h-5" />
+                            </IconButton>
+                        </MobileSubheader>
                     </div>
                 ) : (
                     <div className="relative">
@@ -795,18 +797,19 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                         {selectedCollections.size === 0 && (
                             <button
                                 onClick={() => setIsCategoriesOpen(true)}
-                                aria-label="Filter by category"
-                                className={`${ctrlBase} flex-1 min-w-0 justify-between px-3.5 ${selectedCategory.size > 0
+                                aria-label="Filter by categories and tags"
+                                className={`${ctrlBase} flex-1 min-w-0 justify-between px-3.5 ${(selectedCategory.size + selectedTags.size) > 0
                                     ? 'bg-accent text-white border border-accent shadow-sm'
                                     : ctrlIdle
                                     }`}
                             >
                                 <span className="inline-flex items-center gap-1.5 min-w-0">
                                     <LayoutGrid className="w-4 h-4 shrink-0" />
+                                    <TagIcon className="w-4 h-4 shrink-0 -ms-1" />
                                     <span className="truncate">
-                                        {selectedCategory.size === 0
-                                            ? 'All Categories'
-                                            : `${selectedCategory.size} ${selectedCategory.size === 1 ? 'category' : 'categories'}`}
+                                        {(selectedCategory.size + selectedTags.size) === 0
+                                            ? 'Categories & Tags'
+                                            : `${selectedCategory.size + selectedTags.size} selected`}
                                     </span>
                                 </span>
                                 <ChevronDown className="w-4 h-4 opacity-60 shrink-0" />
@@ -925,7 +928,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                 onClick={() => setViewMode('collections')}
                                 title="Browse collections"
                                 aria-label="Browse collections"
-                                className={`${ctrlBase} px-3.5 bg-card border border-border-subtle text-accent hover:bg-card-hover hover:border-accent/40`}
+                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
                             >
                                 <Layers className="w-4 h-4" />
                                 <span className="hidden sm:inline">Collections</span>
@@ -939,7 +942,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                 onClick={() => setViewMode('ask')}
                                 title="Ask your brain"
                                 aria-label="Ask your brain"
-                                className={`${ctrlBase} px-3.5 bg-card border border-border-subtle text-accent hover:bg-card-hover hover:border-accent/40`}
+                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
                             >
                                 <MessageCircleQuestion className="w-4 h-4" />
                                 <span>Ask</span>
@@ -1257,26 +1260,15 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                     </div>
                                 )}
 
-                                {/* Tags + Select multiple */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button
-                                        onClick={() => { setIsFiltersOpen(false); setIsTagExplorerOpen(true); }}
-                                        className={`${ctrlBase} px-3.5 ${selectedTags.size > 0
-                                            ? 'bg-accent text-white border border-accent shadow-sm'
-                                            : ctrlIdle
-                                            }`}
-                                    >
-                                        <TagIcon className="w-4 h-4" />
-                                        <span>Tags{selectedTags.size > 0 ? ` (${selectedTags.size})` : ''}</span>
-                                    </button>
-                                    <button
-                                        onClick={() => { setIsFiltersOpen(false); setIsSelectionMode(true); }}
-                                        className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
-                                    >
-                                        <CheckSquare className="w-4 h-4" />
-                                        <span>Select</span>
-                                    </button>
-                                </div>
+                                {/* Select multiple. (Tags live in the Categories & Tags
+                                    sheet on the main toolbar, so they're not buried here.) */}
+                                <button
+                                    onClick={() => { setIsFiltersOpen(false); setIsSelectionMode(true); }}
+                                    className={`${ctrlBase} w-full justify-start px-3.5 ${ctrlIdle}`}
+                                >
+                                    <CheckSquare className="w-4 h-4" />
+                                    <span>Select multiple</span>
+                                </button>
 
                                 {/* Footer */}
                                 <div className="flex items-center gap-3 pt-1">
@@ -1300,25 +1292,31 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                     </div>
                 )}
 
-                {/* Categories Sheet (Mobile) — the collapsed category chips. */}
+                {/* Categories & Tags Sheet (Mobile) — categories and the full tag
+                    tree live together here, one tap from the home toolbar, so tags
+                    aren't buried inside the Filters sheet. */}
                 {isCategoriesOpen && (
                     <div className="sm:hidden fixed inset-0 z-50 flex flex-col justify-end isolate">
                         <div
                             className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
                             onClick={() => setIsCategoriesOpen(false)}
                         />
-                        <div className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
+                        <div className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 max-h-[88vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
                             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-text-muted/30" />
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-base font-bold text-text">Categories</h3>
+                                <h3 className="text-base font-bold text-text">Categories &amp; Tags</h3>
                                 <button
                                     onClick={() => setIsCategoriesOpen(false)}
-                                    aria-label="Close categories"
+                                    aria-label="Close"
                                     className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors"
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
+
+                            <label className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">
+                                <LayoutGrid className="w-3.5 h-3.5" /> Categories
+                            </label>
                             <div className="flex flex-wrap gap-2">
                                 <button
                                     onClick={() => setSelectedCategory(new Set())}
@@ -1356,13 +1354,35 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                     );
                                 })}
                             </div>
+
+                            {/* Tags — the same explorer used on desktop, embedded inline so
+                                tags are first-class here, not two taps deep. */}
+                            {allTags.length > 0 && (
+                                <div className="mt-5">
+                                    <label className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">
+                                        <TagIcon className="w-3.5 h-3.5" /> Tags
+                                        {selectedTags.size > 0 && <span className="text-accent">· {selectedTags.size} selected</span>}
+                                    </label>
+                                    <div className="max-h-[44vh] overflow-y-auto rounded-2xl border border-border-subtle bg-card/40">
+                                        <TagExplorer
+                                            tags={allTags}
+                                            tagCounts={tagCounts}
+                                            selectedTags={selectedTags}
+                                            onToggleTag={handleToggleTag}
+                                            onClearFilters={() => setSelectedTags(new Set())}
+                                            className="p-3"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="flex items-center gap-3 pt-5">
-                                {selectedCategory.size > 0 && (
+                                {(selectedCategory.size + selectedTags.size) > 0 && (
                                     <button
-                                        onClick={() => setSelectedCategory(new Set())}
+                                        onClick={() => { setSelectedCategory(new Set()); setSelectedTags(new Set()); }}
                                         className="text-sm font-semibold text-text-muted hover:text-accent transition-colors"
                                     >
-                                        Clear
+                                        Clear all
                                     </button>
                                 )}
                                 <button

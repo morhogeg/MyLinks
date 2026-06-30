@@ -8,6 +8,7 @@ import InstallPWA from "@/components/InstallPWA";
 import SettingsModal from "@/components/SettingsModal";
 import { Settings } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
+import { IconButton } from "@/components/ui/Button";
 
 /**
  * Main dashboard page
@@ -64,15 +65,20 @@ export default function Home() {
 
           {/* Controls — one cohesive cluster */}
           <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <button
+            {/* Theme toggle is desktop-only — on mobile/iOS it lives in Settings,
+                so the top bar stays clean. */}
+            <div className="hidden sm:block">
+              <ThemeToggle />
+            </div>
+            <IconButton
               onClick={() => setIsSettingsOpen(true)}
-              className="h-9 w-9 rounded-full bg-card border border-border-subtle text-text-secondary hover:text-text hover:bg-card-hover transition-colors flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              variant="secondary"
+              radius="full"
               aria-label="Settings"
               title="Settings"
             >
               <Settings className="w-[18px] h-[18px]" />
-            </button>
+            </IconButton>
           </div>
         </div>
       </header>

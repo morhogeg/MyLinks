@@ -1021,6 +1021,130 @@ def _esc(value) -> str:
     return _html.escape(str(value), quote=True) if value is not None else ""
 
 
+# Inline markdown patterns, applied AFTER the whole string is HTML-escaped.
+# Order matters: bold (**/__) before italic (*/_) so we don't eat the inner stars.
+_MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^\s)]+)\)")
+_MD_BOLD_RE = re.compile(r"(?<!\*)\*\*(?!\s)(.+?)(?<!\s)\*\*(?!\*)|(?<!_)__(?!\s)(.+?)(?<!\s)__(?!_)")
+# Note: no \w lookbehind on the * form, so emphasis works flush against
+# letters in RTL scripts (e.g. Hebrew "ו*נטוי*"). Bold (**) runs first, and
+# the (?<!\*)/(?!\*) guards keep us from eating bold's leftover stars. The _
+# form keeps word-boundary guards to avoid mangling snake_case identifiers.
+_MD_ITALIC_RE = re.compile(r"(?<!\*)\*(?!\s)([^*]+?)(?<!\s)\*(?!\*)|(?<![_\w])_(?!\s)(.+?)(?<!\s)_(?![_\w])")
+_MD_CODE_RE = re.compile(r"`([^`]+)`")
+
+
+def _md_inline(text: str) -> str:
+    """Render inline markdown for a SINGLE already-HTML-escaped line.
+
+    Input MUST be pre-escaped (see _md_to_html). We only translate a fixed set
+    of markdown markers into a fixed set of safe tags, so no untrusted text ever
+    becomes markup. Links are restricted to http(s) and rel-hardened.
+    """
+    # Inline code first so markers inside backticks aren't reinterpreted.
+    text = _MD_CODE_RE.sub(lambda m: f"<code>{m.group(1)}</code>", text)
+
+    def _link(m):
+        label, href = m.group(1), m.group(2)
+        return f'<a href="{href}" rel="noopener nofollow" target="_blank">{label}</a>'
+
+    text = _MD_LINK_RE.sub(_link, text)
+    text = _MD_BOLD_RE.sub(lambda m: f"<strong>{m.group(1) or m.group(2)}</strong>", text)
+    text = _MD_ITALIC_RE.sub(lambda m: f"<em>{m.group(1) or m.group(2)}</em>", text)
+    return text
+
+
+def _md_to_html(value) -> str:
+    """Convert stored markdown to safe HTML for the public share pages.
+
+    XSS-safe by construction: every character of the user/AI-authored text is
+    HTML-escaped FIRST (via _esc, line-by-line), and only then do we apply a
+    small, fixed grammar (headings, bullet/numbered lists, blockquotes, bold,
+    italic, inline code, http(s) links, paragraphs, line breaks). The escaped
+    text can never reopen a tag, so no markup injection is possible.
+    """
+    if not value:
+        return ""
+    text = str(value).replace("\r\n", "\n").replace("\r", "\n")
+    lines = text.split("\n")
+
+    html_parts: list[str] = []
+    list_stack: list[str] = []  # "ul" or "ol" currently open
+    para: list[str] = []
+
+    def _flush_para():
+        if para:
+            html_parts.append(f'<p dir="auto">{"<br>".join(para)}</p>')
+            para.clear()
+
+    def _close_lists():
+        while list_stack:
+            html_parts.append(f"</{list_stack.pop()}>")
+
+    for raw in lines:
+        line = raw.rstrip()
+        stripped = line.strip()
+
+        if not stripped:
+            _flush_para()
+            _close_lists()
+            continue
+
+        # Headings: ## .. ###### (h1 reserved for the card title).
+        m = re.match(r"^(#{1,6})\s+(.*)$", stripped)
+        if m:
+            _flush_para()
+            _close_lists()
+            level = min(max(len(m.group(1)), 2), 4)  # clamp to h2–h4
+            html_parts.append(
+                f'<h{level} dir="auto">{_md_inline(_esc(m.group(2).strip()))}</h{level}>'
+            )
+            continue
+
+        # Blockquote.
+        m = re.match(r"^>\s?(.*)$", stripped)
+        if m:
+            _flush_para()
+            _close_lists()
+            html_parts.append(
+                f'<blockquote dir="auto">{_md_inline(_esc(m.group(1).strip()))}</blockquote>'
+            )
+            continue
+
+        # Unordered list item: - / * / • bullet.
+        m = re.match(r"^[-*•]\s+(.*)$", stripped)
+        if m:
+            _flush_para()
+            if list_stack[-1:] != ["ul"]:
+                _close_lists()
+                list_stack.append("ul")
+                html_parts.append("<ul>")
+            html_parts.append(
+                f'<li dir="auto">{_md_inline(_esc(m.group(1).strip()))}</li>'
+            )
+            continue
+
+        # Ordered list item: 1. / 1)
+        m = re.match(r"^\d+[.)]\s+(.*)$", stripped)
+        if m:
+            _flush_para()
+            if list_stack[-1:] != ["ol"]:
+                _close_lists()
+                list_stack.append("ol")
+                html_parts.append("<ol>")
+            html_parts.append(
+                f'<li dir="auto">{_md_inline(_esc(m.group(1).strip()))}</li>'
+            )
+            continue
+
+        # Plain text → accumulate into the current paragraph.
+        _close_lists()
+        para.append(_md_inline(_esc(stripped)))
+
+    _flush_para()
+    _close_lists()
+    return "".join(html_parts)
+
+
 def _share_card_image(card: dict) -> str:
     """Best preview image for a card; falls back to the Machina icon."""
     thumb = card.get("thumbnailUrl")
@@ -1071,7 +1195,23 @@ def _share_html_shell(*, title: str, description: str, image: str, url: str, bod
   h1 {{ font-size:26px; line-height:1.25; margin:0 0 16px; }}
   .hero {{ width:100%; border-radius:14px; margin:8px 0 22px; display:block; }}
   .summary {{ font-size:17px; color:#d4d4d8; }}
-  .detail {{ margin-top:16px; color:#a1a1aa; white-space:pre-wrap; }}
+  .detail {{ margin-top:16px; color:#a1a1aa; }}
+  /* Rendered markdown blocks (summary / detailed / collection items). */
+  .md > :first-child {{ margin-top:0; }}
+  .md > :last-child {{ margin-bottom:0; }}
+  .md p {{ margin:0 0 12px; }}
+  .md h2 {{ font-size:20px; line-height:1.3; margin:22px 0 10px; }}
+  .md h3 {{ font-size:17px; line-height:1.3; margin:18px 0 8px; }}
+  .md h4 {{ font-size:15px; line-height:1.3; margin:16px 0 6px; color:#e4e4e7; }}
+  .md ul, .md ol {{ margin:8px 0 14px; padding-inline-start:22px; }}
+  .md li {{ margin:4px 0; }}
+  .md strong {{ color:#fafafa; font-weight:700; }}
+  .md em {{ font-style:italic; }}
+  .md code {{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.9em;
+             background:#161618; border:1px solid #262629; border-radius:6px; padding:1px 5px; }}
+  .md blockquote {{ margin:12px 0; padding:4px 0 4px 14px; border-inline-start:3px solid #3a3a3f;
+                   color:#a1a1aa; }}
+  .md a {{ color:#c4b5fd; }}
   .tags {{ margin:22px 0 0; display:flex; flex-wrap:wrap; gap:8px; }}
   .tag {{ font-size:13px; color:#a1a1aa; background:#161618; border:1px solid #262629;
          padding:4px 10px; border-radius:999px; }}
@@ -1110,7 +1250,7 @@ def _render_shared_card(card: dict, share_url: str) -> str:
     has_real_image = image and not image.endswith("/icon-512.png")
     hero = f'<img class="hero" src="{_esc(image)}" alt="">' if has_real_image else ""
     badge = f'<div class="badge">{_esc(source)}</div>' if source else ""
-    detail_html = f'<div class="detail" dir="auto">{_esc(detailed)}</div>' if detailed else ""
+    detail_html = f'<div class="detail md" dir="auto">{_md_to_html(detailed)}</div>' if detailed else ""
     tags_html = ""
     if tags:
         chips = "".join(f'<span class="tag">{_esc(t)}</span>' for t in tags[:8])
@@ -1125,7 +1265,7 @@ def _render_shared_card(card: dict, share_url: str) -> str:
       {badge}
       <h1 dir="auto">{_esc(title)}</h1>
       {hero}
-      <div class="summary" dir="auto">{_esc(summary)}</div>
+      <div class="summary md" dir="auto">{_md_to_html(summary)}</div>
       {detail_html}
       {tags_html}
       <div class="actions">
@@ -1147,10 +1287,10 @@ def _render_shared_collection(data: dict, share_url: str) -> str:
 
     items = "".join(
         f'<div class="col-item"><h3 dir="auto">{_esc(c.get("title"))}</h3>'
-        f'<p dir="auto">{_esc(c.get("summary"))}</p></div>'
+        f'<div class="md" dir="auto">{_md_to_html(c.get("summary"))}</div></div>'
         for c in cards[:50]
     )
-    desc_html = f'<div class="summary" dir="auto">{_esc(description)}</div>' if description else ""
+    desc_html = f'<div class="summary md" dir="auto">{_md_to_html(description)}</div>' if description else ""
     count = len(cards)
     body = f"""<div class="card">
       <div class="badge">Collection · {count} card{'s' if count != 1 else ''}</div>
