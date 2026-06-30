@@ -1,6 +1,6 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-30. Branch: `claude/elastic-mayer-607c00` (merged + pushed to `main`)._
+_Last updated: 2026-06-30. Branch: `claude/eloquent-ptolemy-5e56be` (merged + pushed to `main`)._
 
 ## ⚠️ IN-FLIGHT — YouTube channel name + deploys (READ FIRST)
 
@@ -55,7 +55,44 @@ were already deployed and confirmed working.
 
 ---
 
-## Latest session — Collections UX polish (2026-06-30)
+## Latest session — Card/Collections/toolbar UX polish + verified in-browser (2026-06-30)
+
+Frontend-only round. Shipped to web (Vercel push + `./deploy-hosting.sh`), rebuilt the iOS bundle,
+and **bumped both targets (App + ShareExt) to build 4**. No functions changed. Each fix was verified
+against **real prod data** in a headless browser (mobile 375px + desktop), not just code review.
+
+**Fixes (all on `main`):**
+1. **Open-card toolbar (`LinkDetailModal.tsx`)** — the two-group header overflowed on iPhone and
+   clipped the close X. Now one compact row that scrolls horizontally if needed (never clips), a
+   divider between status toggles and item actions, and a **pinned, always-visible close** button.
+   Added **edge-swipe-to-close** (`useEdgeSwipeBack`).
+2. **App-logo halo (`page.tsx`)** — removed the pink accent-gradient blur behind the header icon
+   (the `<img>` app icon stands alone now; subtler ring). Desktop + mobile.
+3. **Mobile toolbar density (`Feed.tsx`)** — the "All Categories" selector now shares a row with
+   "Filters" (one fewer row); the old full-width category button + the separate mobile Filters
+   button were merged.
+4. **Add-image copy (`AddLinkForm.tsx`)** — dropped the grey subtext under "Tap to add an image".
+5. **Collections menu (`CollectionsGallery.tsx`)** — the per-tile "…" menu is now a **`document.body`
+   portal** positioned from the trigger's screen rect (flips up near the viewport bottom), so it can
+   never be clipped by a tile's bounds/stacking. Also **removed the dashed "New collection" tile**.
+6. **Collections add affordance (`Feed.tsx`)** — the Collections header has an explicit **"+" button**
+   (the only create entry point now), and the **add FAB is hidden in Collections** (new
+   `onHideAddButton` signal from Feed → page, alongside the existing ask-mode signal).
+7. **`CategoryInput.tsx`** — default value to `''` so the category input never flips
+   controlled→uncontrolled (a React dev warning for links with no category).
+
+**How to preview locally with real data (useful trick):** `firebase.ts` only connects to emulators
+when `hostname === 'localhost' && protocol === 'http:'`. So `npm run dev` then open
+**`http://127.0.0.1:3000`** (not `localhost`) — the IP hostname bypasses the emulator gate and hits
+prod Firestore (reads work with no sign-in; AuthProvider just grabs the first user doc). Needs
+`web/.env.local` (present in the main worktree, gitignored).
+
+**Deployed:** Vercel (push), Firebase Hosting (`./deploy-hosting.sh`), iOS bundle (`./build-ios.sh`).
+Build number = **4** on both targets. **Next: Xcode → Archive → Distribute → TestFlight.**
+
+---
+
+## Earlier — Collections UX polish (2026-06-30)
 
 Iterated on the Collections feature after first user testing. Shipped to web (Vercel + Hosting) and
 rebuilt the iOS bundle. All on `main`.
