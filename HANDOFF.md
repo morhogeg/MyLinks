@@ -79,6 +79,11 @@ to **Machina** (App Store name **"Machina AI"**; in-app/home-screen brand "Machi
   with `npx @capacitor/assets generate --ios`. `ITSAppUsesNonExemptEncryption=NO` set so TestFlight
   skips the encryption prompt.
 
+**Follow-up (same day):** header now shows the Machina "M" mark (`MachinaMark` in `page.tsx`,
+replacing the brain) + title "Machina AI" + tagline "Capture. Connect. Recall." (also in Settings →
+About). `favicon.ico` and the PWA icons (`apple-touch-icon.png`, `icon-192/512.png`) regenerated
+from the app icon. Web redeployed.
+
 **Deployed:** desktop (Vercel, auto on push) + iPhone PWA (`./deploy-hosting.sh`). No functions changed.
 
 **TODO (user, in Xcode — needs Apple credentials, can't be done from a session):** archive for
