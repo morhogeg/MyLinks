@@ -26,6 +26,11 @@ service cloud.firestore {
       match /chats/{chatId} {
         allow read, write: if true;
       }
+
+      // User-curated collections of cards
+      match /collections/{collectionId} {
+        allow read, write: if true;
+      }
     }
 
     // Shared collections & cards: public, read-only snapshots for share links.
