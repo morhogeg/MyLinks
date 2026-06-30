@@ -1,0 +1,171 @@
+import {
+    collection,
+    addDoc,
+    updateDoc,
+    deleteDoc,
+    doc,
+    setDoc,
+    getDocs,
+    query,
+    where,
+    writeBatch,
+    arrayUnion,
+    arrayRemove,
+} from 'firebase/firestore';
+import { db } from './firebase';
+import { Collection, Link, SharedCard } from './types';
+
+/**
+ * Storage layer for Collections — curated groups of cards.
+ *
+ * Mirrors the conventions in storage.ts: strip `undefined` (Firestore rejects
+ * it), stamp timestamps with Date.now(), and lean on Firestore's optimistic
+ * onSnapshot updates for instant UI feedback.
+ *
+ * Membership is stored as `collectionIds` on each Link (see addLinkToCollection),
+ * NOT as a list on the collection doc — so the already-loaded feed filters in
+ * memory with no extra reads.
+ */
+
+const collectionsRef = (uid: string) => collection(db, 'users', uid, 'collections');
+
+/** Drop undefined keys — Firestore can't store them. */
+function clean<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
+    return Object.entries(obj).reduce((acc, [k, v]) => {
+        if (v !== undefined) acc[k] = v;
+        return acc;
+    }, {} as Record<string, unknown>);
+}
+
+/** Create a new collection; returns the new doc id. */
+export async function createCollection(
+    uid: string,
+    data: { name: string; description?: string; color?: string; coverLinkId?: string }
+): Promise<string> {
+    const now = Date.now();
+    const ref = await addDoc(collectionsRef(uid), clean({
+        name: data.name.trim(),
+        description: data.description?.trim() || undefined,
+        color: data.color,
+        coverLinkId: data.coverLinkId,
+        createdAt: now,
+        updatedAt: now,
+    }));
+    return ref.id;
+}
+
+/** Update a collection's metadata (name/description/color/cover). */
+export async function updateCollection(
+    uid: string,
+    id: string,
+    patch: Partial<Pick<Collection, 'name' | 'description' | 'color' | 'coverLinkId'>>
+): Promise<void> {
+    const ref = doc(db, 'users', uid, 'collections', id);
+    await updateDoc(ref, clean({ ...patch, updatedAt: Date.now() }));
+}
+
+/**
+ * Delete a collection. Also strips its id from every member card's
+ * `collectionIds` (batched) and removes the public snapshot if published.
+ */
+export async function deleteCollection(uid: string, id: string, shareId?: string): Promise<void> {
+    // Find all member cards and clear the membership in one batch.
+    const linksRef = collection(db, 'users', uid, 'links');
+    const members = await getDocs(query(linksRef, where('collectionIds', 'array-contains', id)));
+    if (!members.empty) {
+        const batch = writeBatch(db);
+        members.docs.forEach((d) => batch.update(d.ref, { collectionIds: arrayRemove(id) }));
+        await batch.commit();
+    }
+    if (shareId) {
+        await deleteDoc(doc(db, 'shared_collections', shareId)).catch(() => {});
+    }
+    await deleteDoc(doc(db, 'users', uid, 'collections', id));
+}
+
+/** Add a card to a collection (idempotent via arrayUnion). */
+export async function addLinkToCollection(uid: string, linkId: string, collectionId: string): Promise<void> {
+    const ref = doc(db, 'users', uid, 'links', linkId);
+    await updateDoc(ref, { collectionIds: arrayUnion(collectionId) });
+}
+
+/** Remove a card from a collection. */
+export async function removeLinkFromCollection(uid: string, linkId: string, collectionId: string): Promise<void> {
+    const ref = doc(db, 'users', uid, 'links', linkId);
+    await updateDoc(ref, { collectionIds: arrayRemove(collectionId) });
+}
+
+/** Overwrite a card's full collection membership (used by the multi-toggle sheet). */
+export async function setLinkCollections(uid: string, linkId: string, collectionIds: string[]): Promise<void> {
+    const ref = doc(db, 'users', uid, 'links', linkId);
+    await updateDoc(ref, { collectionIds });
+}
+
+/** Build a frozen, denormalized snapshot card from a live Link (no undefined keys). */
+export function toSharedCard(link: Link): SharedCard {
+    const card: SharedCard = { title: link.title, summary: link.summary, url: link.url };
+    if (link.detailedSummary !== undefined) card.detailedSummary = link.detailedSummary;
+    if (link.category !== undefined) card.category = link.category;
+    if (link.tags !== undefined) card.tags = link.tags;
+    if (link.metadata?.thumbnailUrl !== undefined) card.thumbnailUrl = link.metadata.thumbnailUrl;
+    if (link.sourceName !== undefined) card.sourceName = link.sourceName;
+    if (link.sourceType !== undefined) card.sourceType = link.sourceType;
+    return card;
+}
+
+/** Generate an unguessable share id. */
+function newShareId(): string {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID().replace(/-/g, '');
+    return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+}
+
+/**
+ * Publish (or re-publish) a collection as a frozen public snapshot.
+ * Reuses the existing shareId on re-publish so the URL stays stable.
+ * Returns the shareId.
+ */
+export async function publishCollection(
+    uid: string,
+    collectionDoc: Collection,
+    memberLinks: Link[]
+): Promise<string> {
+    const shareId = collectionDoc.shareId || newShareId();
+    await setDoc(doc(db, 'shared_collections', shareId), clean({
+        shareId,
+        ownerUid: uid,
+        name: collectionDoc.name,
+        description: collectionDoc.description,
+        publishedAt: Date.now(),
+        cards: memberLinks.map(toSharedCard),
+    }));
+    await updateDoc(doc(db, 'users', uid, 'collections', collectionDoc.id), {
+        shareId,
+        isPublic: true,
+        updatedAt: Date.now(),
+    });
+    return shareId;
+}
+
+/** Stop sharing a collection: delete the snapshot and clear the share flags. */
+export async function unpublishCollection(uid: string, collectionDoc: Collection): Promise<void> {
+    if (collectionDoc.shareId) {
+        await deleteDoc(doc(db, 'shared_collections', collectionDoc.shareId)).catch(() => {});
+    }
+    await updateDoc(doc(db, 'users', uid, 'collections', collectionDoc.id), {
+        isPublic: false,
+        shareId: null,
+        updatedAt: Date.now(),
+    });
+}
+
+/** Publish a single card as a public Machina page; returns the shareId. */
+export async function publishCard(uid: string, link: Link): Promise<string> {
+    const shareId = newShareId();
+    await setDoc(doc(db, 'shared_cards', shareId), clean({
+        shareId,
+        ownerUid: uid,
+        publishedAt: Date.now(),
+        card: toSharedCard(link),
+    }));
+    return shareId;
+}

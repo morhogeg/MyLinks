@@ -4,7 +4,7 @@
 
 
 import { useState, useEffect, useRef } from 'react';
-import { Link, LinkStatus } from '@/lib/types';
+import { Link, LinkStatus, Collection } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, type PlatformKey } from '@/lib/platform';
 import Dropdown from './Dropdown';
@@ -22,7 +22,12 @@ import SwipeDeck from './SwipeDeck';
 import AskBrain from './AskBrain';
 import LinkDetailModal from './LinkDetailModal';
 import ConfirmDialog from './ConfirmDialog';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessageCircleQuestion, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, Image as ImageIcon, ChevronDown, ChevronLeft } from 'lucide-react';
+import AddToCollectionSheet from './AddToCollectionSheet';
+import CollectionsGallery from './CollectionsGallery';
+import CollectionFormModal from './CollectionFormModal';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessageCircleQuestion, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe } from 'lucide-react';
+import { publishCard, publishCollection, unpublishCollection, deleteCollection } from '@/lib/collections';
+import { shareLink, shareUrlFor } from '@/lib/share';
 import TagExplorer from './TagExplorer';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -55,7 +60,7 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
     const [scrollLeft, setScrollLeft] = useState(0);
     const activeLink = links.find(l => l.id === activeLinkId) || null;
     const [isLoading, setIsLoading] = useState(true);
-    const [viewMode, setViewMode] = useState<'grid' | 'compact' | 'review' | 'ask'>('grid');
+    const [viewMode, setViewMode] = useState<'grid' | 'compact' | 'review' | 'ask' | 'collections'>('grid');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
@@ -69,6 +74,14 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
     const [reminderModalLink, setReminderModalLink] = useState<Link | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+
+    // Collections
+    const [collections, setCollections] = useState<Collection[]>([]);
+    const [selectedCollections, setSelectedCollections] = useState<Set<string>>(new Set());
+    const [addToCollectionLink, setAddToCollectionLink] = useState<Link | null>(null);
+    const [collectionFormOpen, setCollectionFormOpen] = useState(false);
+    const [editingCollection, setEditingCollection] = useState<Collection | null>(null);
+    const [confirmDeleteCollection, setConfirmDeleteCollection] = useState<Collection | null>(null);
 
     // Semantic Search State
     const [isSearching, setIsSearching] = useState(false);
@@ -173,6 +186,21 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
         return () => unsubscribe();
     }, [uid, toast]);
 
+    // 2b. Real-time sync of collections from Firestore
+    useEffect(() => {
+        if (!uid) return;
+        const ref = collection(db, 'users', uid, 'collections');
+        const unsubscribe = onSnapshot(ref, (snapshot: QuerySnapshot<DocumentData>) => {
+            setCollections(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({
+                id: d.id,
+                ...d.data()
+            } as Collection)));
+        }, (error: Error) => {
+            console.error("Collections sync error:", error);
+        });
+        return () => unsubscribe();
+    }, [uid]);
+
     // Helper to get consistent number for timestamps (handles number, string, or Firestore Timestamp)
     const getTimestampNumber = (val: any): number => {
         if (!val) return 0;
@@ -220,6 +248,11 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                     return tag === selected || tag.startsWith(`${selected}/`);
                 });
             });
+        })
+        .filter((link) => {
+            // Apply collection filters — keep cards in ANY selected collection.
+            if (selectedCollections.size === 0) return true;
+            return (link.collectionIds ?? []).some(id => selectedCollections.has(id));
         })
         .filter((link) => {
             // Apply source filters (platforms + screenshots), OR across selections
@@ -411,6 +444,85 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
         setReminderModalLink(link);
     };
 
+    // ── Collections ──────────────────────────────────────────────────────────
+    // Open a collection: scope the feed to it and drop back into the card grid.
+    const openCollection = (collectionId: string) => {
+        setSelectedCollections(new Set([collectionId]));
+        setViewMode('grid');
+    };
+
+    const clearCollectionFilter = () => setSelectedCollections(new Set());
+
+    // Share a single card as a public Machina page.
+    const handleShareCard = async (link: Link) => {
+        if (!uid) return;
+        try {
+            const shareId = await publishCard(uid, link);
+            const outcome = await shareLink(
+                shareUrlFor(`/s?id=${shareId}`),
+                link.title,
+                'Saved on Machina'
+            );
+            if (outcome === 'copied') toast.success('Share link copied to clipboard');
+            else if (outcome === 'failed') toast.error("Couldn't create a share link. Please try again.");
+        } catch {
+            toast.error("Couldn't share this card. Please try again.");
+        }
+    };
+
+    // Publish (or re-publish) a collection snapshot, then open the share sheet.
+    const handleShareCollection = async (col: Collection) => {
+        if (!uid) return;
+        try {
+            const members = links.filter(l => (l.collectionIds ?? []).includes(col.id));
+            const shareId = await publishCollection(uid, col, members);
+            const outcome = await shareLink(
+                shareUrlFor(`/c?id=${shareId}`),
+                col.name,
+                `${col.name} — a collection on Machina`
+            );
+            if (outcome === 'copied') toast.success('Share link copied to clipboard');
+            else if (outcome === 'failed') toast.error("Couldn't create a share link. Please try again.");
+            else toast.success('Collection published');
+        } catch {
+            toast.error("Couldn't share this collection. Please try again.");
+        }
+    };
+
+    const handleUnpublishCollection = async (col: Collection) => {
+        if (!uid) return;
+        try {
+            await unpublishCollection(uid, col);
+            toast.success('Sharing turned off');
+        } catch {
+            toast.error("Couldn't stop sharing. Please try again.");
+        }
+    };
+
+    const performDeleteCollection = async (col: Collection) => {
+        if (!uid) return;
+        try {
+            await deleteCollection(uid, col.id, col.shareId);
+            setSelectedCollections(prev => {
+                const next = new Set(prev);
+                next.delete(col.id);
+                return next;
+            });
+        } catch {
+            toast.error("Couldn't delete the collection. Please try again.");
+        }
+    };
+
+    const openNewCollectionForm = () => {
+        setEditingCollection(null);
+        setCollectionFormOpen(true);
+    };
+
+    const openEditCollectionForm = (col: Collection) => {
+        setEditingCollection(col);
+        setCollectionFormOpen(true);
+    };
+
     const toggleSelection = (id: string) => {
         const next = new Set(selectedIds);
         if (next.has(id)) next.delete(id);
@@ -458,12 +570,15 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
         { key: 'compact', label: 'Compact', icon: <Grid2X2 className="w-4 h-4" />, hint: 'Compact grid' },
         { key: 'review', label: 'Review', icon: <Layers className="w-4 h-4" />, hint: 'Swipe to review' },
     ];
-    // The layout the Ask button returns you to when you toggle it off.
-    const lastLayout = useRef<typeof viewMode>('grid');
-    if (viewMode !== 'ask') lastLayout.current = viewMode;
+    // The layout the Ask/Collections buttons return you to when you leave them.
+    const lastLayout = useRef<'grid' | 'compact' | 'review'>('grid');
+    if (viewMode === 'grid' || viewMode === 'compact' || viewMode === 'review') lastLayout.current = viewMode;
+    // True for the card-browsing layouts (everything except the full-screen
+    // Ask chat and the Collections gallery), which share the search/filter chrome.
+    const isLibraryView = viewMode === 'grid' || viewMode === 'compact' || viewMode === 'review';
     // Count of active grid filters — badges the mobile "Filters" button.
     const activeMobileFilters =
-        (filter !== 'all' ? 1 : 0) + selectedPlatforms.size + (screenshotOnly ? 1 : 0) + selectedTags.size;
+        (filter !== 'all' ? 1 : 0) + selectedPlatforms.size + (screenshotOnly ? 1 : 0) + selectedTags.size + selectedCollections.size;
 
     // Tell the page when we're in Ask mode so it can hide the add-link FAB.
     useEffect(() => {
@@ -516,6 +631,29 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                             Back
                         </button>
                     </div>
+                ) : viewMode === 'collections' ? (
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setViewMode(lastLayout.current)}
+                            title="Back to your library"
+                            aria-label="Back to your library"
+                            className="shrink-0 inline-flex items-center gap-1 ps-2 pe-3 py-2 rounded-xl bg-card border border-border-subtle text-text-secondary text-sm font-medium hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                            Back
+                        </button>
+                        <h2 className="flex items-center gap-2 text-lg font-bold text-text">
+                            <Layers className="w-5 h-5 text-accent" />
+                            Collections
+                        </h2>
+                        <button
+                            onClick={openNewCollectionForm}
+                            className={`${ctrlBase} ms-auto px-3.5 bg-accent text-white border border-accent hover:bg-accent-hover`}
+                        >
+                            <Layers className="w-4 h-4" />
+                            <span>New</span>
+                        </button>
+                    </div>
                 ) : (
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
@@ -539,7 +677,7 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
 
                 {/* Row 1: Category Navigator — only relevant when browsing the grid.
                     Desktop shows scrollable chips; mobile collapses them into one button. */}
-                {viewMode !== 'ask' && (<>
+                {isLibraryView && (<>
                 <div className="relative hidden sm:block -mx-4 px-4 sm:mx-0 sm:px-0 group/category-nav">
                     {/* Left/Right Fades for Scrollability Cue */}
                     <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none opacity-0 group-hover/category-nav:opacity-100 transition-opacity duration-300 sm:left-0 sm:from-background" />
@@ -647,12 +785,14 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                 </button>
                 </>)}
 
-                {/* Row 2: Toolbar — filter / sort / source on the left, view & actions on the right */}
+                {/* Row 2: Toolbar — filter / sort / source on the left, view & actions on the
+                    right. Card-browsing layouts only; Ask and Collections hide it. */}
+                {isLibraryView && (
                 <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-2 -mx-2 px-2 sm:mx-0 sm:px-0">
                     {/* Grid filters — inline on desktop/tablet; on mobile they move into the
                         Filters sheet. Hidden entirely in Ask mode (no grid to filter). */}
                     <div className="hidden sm:flex items-center gap-2">
-                        {viewMode !== 'ask' && (<>
+                        {isLibraryView && (<>
                         {/* Status Filter — accent-themed dropdown (no native OS blue) */}
                         <Dropdown
                             ariaLabel="Filter by status"
@@ -728,7 +868,7 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
 
                     {/* Mobile: a single Filters entry opens the sheet (desktop shows the
                         controls inline above). Hidden in Ask mode. */}
-                    {viewMode !== 'ask' && (
+                    {isLibraryView && (
                         <button
                             onClick={() => setIsFiltersOpen(true)}
                             aria-label="Filters"
@@ -743,10 +883,21 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                     )}
 
                     <div className="flex items-center gap-2">
+                        {/* Collections — opens the dedicated Collections gallery. */}
+                        <button
+                            onClick={() => setViewMode('collections')}
+                            title="Browse collections"
+                            aria-label="Browse collections"
+                            className={`${ctrlBase} px-3.5 bg-card border border-border-subtle text-accent hover:bg-card-hover hover:border-accent/40`}
+                        >
+                            <Layers className="w-4 h-4" />
+                            <span className="hidden sm:inline">Collections</span>
+                        </button>
+
                         {/* Ask — a distinct AI mode. Hidden while in Ask mode (the Back
                             button beside the search bar leaves it), so the toolbar row
                             collapses and the chat sits right under the search. */}
-                        {viewMode !== 'ask' && (
+                        {isLibraryView && (
                         <button
                             onClick={() => setViewMode('ask')}
                             title="Ask your brain"
@@ -760,7 +911,7 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
 
                         {/* View Mode Switcher — layouts only; hidden in Ask mode (tap the
                             highlighted Ask button to exit back to your last layout). */}
-                        {viewMode !== 'ask' && (
+                        {isLibraryView && (
                         <div className="inline-flex items-center gap-0.5 p-1 rounded-full bg-card border border-border-subtle">
                             {viewModes.map(vm => {
                                 const active = viewMode === vm.key;
@@ -785,7 +936,7 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                         )}
 
                         {/* Tag filter + bulk selection act on the grid — hide them in Ask mode. */}
-                        {viewMode !== 'ask' && (<>
+                        {isLibraryView && (<>
                         {/* Tag toggle — tablet only (mobile uses the Filters sheet; desktop
                             ≥lg has the persistent sidebar). */}
                         <div className="hidden sm:block lg:hidden">
@@ -848,10 +999,11 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                         </>)}
                     </div>
                 </div>
+                )}
             </div>
 
             {/* Active Tag Filters — shown above the cards (not in Ask mode). */}
-            {viewMode !== 'ask' && selectedTags.size > 0 && (
+            {isLibraryView && selectedTags.size > 0 && (
                 <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
                     <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent/5 border border-accent/10">
                         <TagIcon className="w-3 h-3 text-accent" />
@@ -883,10 +1035,57 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                 </div>
             )}
 
+            {/* Active Collection — banner shown when the feed is scoped to a collection. */}
+            {isLibraryView && selectedCollections.size > 0 && (
+                <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent/5 border border-accent/10">
+                        <Layers className="w-3 h-3 text-accent" />
+                        <span className="text-[10px] font-bold text-accent uppercase tracking-wider">Collection:</span>
+                    </div>
+                    {Array.from(selectedCollections).map(id => {
+                        const col = collections.find(c => c.id === id);
+                        if (!col) return null;
+                        return (
+                            <div key={id} className="flex items-center gap-2">
+                                <div className="group flex items-center gap-1 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text text-xs font-semibold shadow-sm">
+                                    <span>{col.name}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedCollections(prev => { const n = new Set(prev); n.delete(id); return n; })}
+                                        aria-label={`Remove ${col.name} filter`}
+                                        title="Clear collection filter"
+                                        className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                                <button
+                                    onClick={() => handleShareCollection(col)}
+                                    title={col.isPublic ? 'Re-share (updates the public snapshot)' : 'Share this collection'}
+                                    className={`${ctrlBase} px-2.5 h-7 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
+                                >
+                                    {col.isPublic ? <Globe className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
+                                    <span>Share</span>
+                                </button>
+                                {col.isPublic && (
+                                    <button
+                                        onClick={() => handleUnpublishCollection(col)}
+                                        title="Stop sharing this collection"
+                                        className={`${ctrlBase} px-2.5 h-7 ${ctrlIdle} hover:text-red-400 hover:border-red-400/40`}
+                                    >
+                                        <span>Stop sharing</span>
+                                    </button>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
             {/* Main Content with Tag Sidebar */}
             <div className="flex flex-col lg:flex-row gap-6 xl:gap-8 relative">
-                {/* Tag Explorer Sidebar (Desktop) — irrelevant in Ask mode. */}
-                {viewMode !== 'ask' && (
+                {/* Tag Explorer Sidebar (Desktop) — card-browsing layouts only. */}
+                {isLibraryView && (
                 <aside
                     className={`hidden lg:block flex-shrink-0 transition-all duration-300 ease-in-out ${isTagExplorerCollapsed ? 'w-10' : 'w-64 xl:w-72'
                         }`}
@@ -1165,7 +1364,17 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
 
                 {/* Links Grid / Ask */}
                 <div className="flex-grow min-w-0">
-                    {viewMode === 'ask' ? (
+                    {viewMode === 'collections' ? (
+                        <CollectionsGallery
+                            collections={collections}
+                            links={links}
+                            onOpen={openCollection}
+                            onNew={openNewCollectionForm}
+                            onEdit={openEditCollectionForm}
+                            onShare={handleShareCollection}
+                            onDelete={(col) => setConfirmDeleteCollection(col)}
+                        />
+                    ) : viewMode === 'ask' ? (
                         <AskBrain
                             uid={uid}
                             totalLinks={links.length}
@@ -1253,6 +1462,8 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                                     isSelected={selectedIds.has(link.id)}
                                     onToggleSelection={toggleSelection}
                                     onTagClick={handleToggleTag}
+                                    onAddToCollection={(link) => setAddToCollectionLink(link)}
+                                    onShare={handleShareCard}
                                 />
                             ))}
                         </Masonry>
@@ -1299,8 +1510,40 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                     onUpdateReminder={(link) => handleOpenReminderModal(link)}
                     onDelete={handleDelete}
                     onOpenOtherLink={(link) => setActiveLinkId(link.id)}
+                    onAddToCollection={(link) => setAddToCollectionLink(link)}
+                    onShare={handleShareCard}
                 />
             )}
+
+            {/* Add to collection sheet */}
+            {addToCollectionLink && (
+                <AddToCollectionSheet
+                    uid={uid}
+                    link={links.find(l => l.id === addToCollectionLink.id) ?? addToCollectionLink}
+                    collections={collections}
+                    isOpen={!!addToCollectionLink}
+                    onClose={() => setAddToCollectionLink(null)}
+                />
+            )}
+
+            {/* Create / edit collection */}
+            <CollectionFormModal
+                uid={uid}
+                collection={editingCollection}
+                isOpen={collectionFormOpen}
+                onClose={() => setCollectionFormOpen(false)}
+            />
+
+            {/* Delete collection confirmation */}
+            <ConfirmDialog
+                isOpen={confirmDeleteCollection !== null}
+                onClose={() => setConfirmDeleteCollection(null)}
+                onConfirm={() => { if (confirmDeleteCollection) performDeleteCollection(confirmDeleteCollection); }}
+                title={`Delete “${confirmDeleteCollection?.name ?? ''}”?`}
+                message="This removes the collection and unlinks its cards. The cards themselves are kept. This can't be undone."
+                confirmLabel="Delete"
+                variant="danger"
+            />
 
             {/* Reminder Modal */}
             {reminderModalLink && uid && (

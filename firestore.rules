@@ -28,6 +28,20 @@ service cloud.firestore {
       }
     }
 
+    // Shared collections & cards: public, read-only snapshots for share links.
+    // World-readable so logged-out visitors can open /c?id= and /s?id= pages.
+    // Writes are owner-driven from the client today (single-user prototype, same
+    // residual risk as users/** above); tighten to `request.auth.uid == ownerUid`
+    // when real Firebase Auth lands.
+    match /shared_collections/{shareId} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /shared_cards/{shareId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
     // pending_processing: only Cloud Functions (admin SDK)
     match /pending_processing/{docId} {
       allow read, write: if false;

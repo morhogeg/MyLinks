@@ -63,6 +63,15 @@ const categoryColorStyles: Record<string, CategoryColorStyle> = {
 
 const colorKeys = Object.keys(categoryColorStyles);
 
+/** The named palette keys (purple, blue, …) — used by the collection color picker. */
+export const COLOR_KEYS = colorKeys;
+
+/** Inline style for a specific palette key, falling back to a hashed style. */
+export function getColorStyleByKey(key?: string): CategoryColorStyle {
+    if (key && categoryColorStyles[key]) return categoryColorStyles[key];
+    return getCategoryColorStyle(key || '');
+}
+
 /**
  * Generate consistent inline styles for a category
  */

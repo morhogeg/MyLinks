@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube, ImageOff, Image as ImageIcon, BookOpen } from 'lucide-react';
+import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2 } from 'lucide-react';
 import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
@@ -42,6 +42,8 @@ interface LinkDetailModalProps {
     onDelete: (id: string) => void;
     onUpdateReminder: (link: Link) => void;
     onOpenOtherLink?: (link: Link) => void;
+    onAddToCollection?: (link: Link) => void;
+    onShare?: (link: Link) => void;
 }
 
 export default function LinkDetailModal({
@@ -57,7 +59,9 @@ export default function LinkDetailModal({
     onUpdateCategory,
     onDelete,
     onUpdateReminder,
-    onOpenOtherLink
+    onOpenOtherLink,
+    onAddToCollection,
+    onShare,
 }: LinkDetailModalProps) {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isReading, setIsReading] = useState(false);
@@ -222,6 +226,26 @@ export default function LinkDetailModal({
                     </div>
 
                     <div className="flex gap-1.5 sm:gap-2">
+                        {onAddToCollection && (
+                            <button
+                                onClick={() => onAddToCollection(link)}
+                                title="Add to collection"
+                                aria-label="Add to collection"
+                                className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:text-accent transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                            >
+                                <Layers className="w-4 h-4" />
+                            </button>
+                        )}
+                        {onShare && (
+                            <button
+                                onClick={() => onShare(link)}
+                                title="Share"
+                                aria-label="Share this card"
+                                className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:text-accent transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                            >
+                                <Share2 className="w-4 h-4" />
+                            </button>
+                        )}
                         {canRead && (
                             <button
                                 onClick={() => setIsReading(true)}
