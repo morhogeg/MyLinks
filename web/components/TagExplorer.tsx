@@ -12,6 +12,13 @@ interface TagExplorerProps {
     onClearFilters: () => void;
     onCollapse?: () => void;
     className?: string;
+    /**
+     * "sidebar" (default) renders the full explorer with its own header + search,
+     * for the desktop card and the mobile drawer. "embedded" drops the header
+     * (the host supplies its own "Tags" label) and renders the tree flush so it
+     * can breathe inside a borderless bottom sheet.
+     */
+    variant?: 'sidebar' | 'embedded';
 }
 
 export default function TagExplorer({
@@ -21,7 +28,8 @@ export default function TagExplorer({
     onToggleTag,
     onClearFilters,
     onCollapse,
-    className = ""
+    className = "",
+    variant = 'sidebar'
 }: TagExplorerProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
@@ -68,39 +76,74 @@ export default function TagExplorer({
         return (
             <div key={node.fullName} className="flex flex-col">
                 <div
-                    className={`group flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all hover:bg-white/5 ${isSelected ? 'bg-accent/10 text-accent font-bold' : 'text-text-muted hover:text-text-secondary'
+                    className={`group flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-colors ${isSelected
+                        ? 'bg-accent/10 text-accent font-semibold'
+                        : 'text-text-secondary hover:bg-card-hover hover:text-text'
                         }`}
                     onClick={() => onToggleTag(node.fullName)}
                 >
-                    <div className="flex items-center justify-center w-4 h-4">
+                    <div className="flex items-center justify-center w-4 h-4 shrink-0">
                         {hasChildren ? (
                             <button
                                 onClick={(e) => toggleExpand(node.fullName, e)}
-                                className="p-0.5 hover:bg-white/10 rounded transition-colors"
+                                aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                                className="p-0.5 -m-0.5 rounded-md text-text-muted hover:text-text hover:bg-white/10 transition-colors"
                             >
-                                {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" />}
                             </button>
                         ) : (
-                            <Hash className="w-3 h-3 opacity-30" />
+                            <Hash className={`w-3 h-3 ${isSelected ? 'opacity-70' : 'opacity-30'}`} />
                         )}
                     </div>
 
                     <span className="text-[13px] flex-grow truncate">{node.name}</span>
 
-                    <span className={`text-[10px] tabular-nums font-medium px-1.5 py-0.5 rounded-md ${isSelected ? 'bg-accent/20 text-accent' : 'bg-white/5 text-text-muted opacity-60'
+                    <span className={`text-[10px] tabular-nums font-semibold px-1.5 py-0.5 rounded-full transition-colors ${isSelected
+                        ? 'bg-accent/15 text-accent'
+                        : 'text-text-muted/70 group-hover:text-text-muted'
                         }`}>
                         {node.count}
                     </span>
                 </div>
 
                 {hasChildren && isExpanded && (
-                    <div className="ml-4 pl-2 border-l border-white/5 mt-0.5 flex flex-col gap-0.5">
+                    <div className="ms-3.5 ps-2.5 border-s border-border-subtle/70 mt-0.5 flex flex-col gap-0.5">
                         {node.children.map(child => renderNode(child))}
                     </div>
                 )}
             </div>
         );
     };
+
+    // Embedded variant — no header (the host sheet supplies its own "Tags"
+    // label), just a light search field and the tree flowing flush. Designed to
+    // live in a borderless bottom sheet, so it carries no card chrome of its own.
+    if (variant === 'embedded') {
+        return (
+            <div className={`flex flex-col gap-3 ${className}`}>
+                <div className="relative">
+                    <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Filter tags…"
+                        className="w-full bg-card border border-border-subtle rounded-full ps-9 pe-3 py-2 text-[13px] text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-transparent transition-all"
+                    />
+                </div>
+
+                <div className="flex flex-col gap-0.5">
+                    {tagTree.length === 0 ? (
+                        <div className="py-8 text-center text-text-muted opacity-50 italic text-xs">
+                            {searchQuery ? 'No matching tags' : 'No tags found'}
+                        </div>
+                    ) : (
+                        tagTree.map(node => renderNode(node))
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className={`flex flex-col gap-4 h-full ${className}`}>

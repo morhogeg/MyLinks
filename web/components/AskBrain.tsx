@@ -473,7 +473,11 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
             }]);
         } finally {
             setIsThinking(false);
-            textareaRef.current?.focus();
+            // Intentionally do NOT refocus the textarea here. Auto-focusing forced
+            // the iOS keyboard open after every answer, so the user had to dismiss
+            // it before tapping a source card. Leaving focus as-is keeps the
+            // keyboard closed when it was closed (and untouched if the user is
+            // still typing).
         }
     };
 

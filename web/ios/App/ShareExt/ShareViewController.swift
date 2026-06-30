@@ -15,7 +15,7 @@ import MobileCoreServices
 /// upload, so the percentage eases toward 90% while the request is in flight
 /// and only snaps to 100% (green check) once the upload actually succeeds.
 @objc(ShareViewController)
-class ShareViewController: UIViewController {
+class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionTaskDelegate {
 
     private static let appGroup = "group.com.morhogeg.machina"
     // Fallback endpoint if the app hasn't pushed config yet (matches firebase.json
@@ -37,6 +37,16 @@ class ShareViewController: UIViewController {
     private let card = UIView()
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let label = UILabel()
+    private let cardCloseButton = UIButton(type: .system)
+
+    // MARK: Close (✕) button on the scan card
+    private let scanCloseButton = UIButton(type: .system)
+
+    // MARK: Background upload session (survives the extension being dismissed)
+    // A foreground URLSession is cancelled when the extension UI goes away, so we
+    // hand the upload to a *background* session that the system finishes for us.
+    private var backgroundSession: URLSession?
+    private var responseData = Data()
 
     // MARK: Image scan HUD
     private let scanContainer = UIView()          // rounded card holding the preview + bar
@@ -93,6 +103,9 @@ class ShareViewController: UIViewController {
         label.translatesAutoresizingMaskIntoConstraints = false
         card.addSubview(label)
 
+        configureCloseButton(cardCloseButton)
+        card.addSubview(cardCloseButton)
+
         NSLayoutConstraint.activate([
             card.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             card.centerYAnchor.constraint(equalTo: view.centerYAnchor),
@@ -105,7 +118,40 @@ class ShareViewController: UIViewController {
             label.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 16),
             label.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -16),
             label.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -24),
+
+            cardCloseButton.topAnchor.constraint(equalTo: card.topAnchor, constant: 8),
+            cardCloseButton.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -8),
+            cardCloseButton.widthAnchor.constraint(equalToConstant: 30),
+            cardCloseButton.heightAnchor.constraint(equalToConstant: 30),
         ])
+    }
+
+    /// Shared styling for the circular translucent "✕" close button. Tapping it
+    /// dismisses the share sheet immediately; the upload keeps running on the
+    /// background session.
+    private func configureCloseButton(_ button: UIButton) {
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.backgroundColor = UIColor(white: 1, alpha: 0.15)
+        button.tintColor = .white
+        button.layer.cornerRadius = 15   // half of the 30pt size => a circle
+        button.clipsToBounds = true
+        if let xmark = UIImage(systemName: "xmark",
+                               withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)) {
+            button.setImage(xmark, for: .normal)
+            button.setTitle(nil, for: .normal)
+        } else {
+            button.setTitle("✕", for: .normal)
+            button.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
+            button.setTitleColor(.white, for: .normal)
+        }
+        button.accessibilityLabel = "Close"
+        button.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
+    }
+
+    /// Dismiss the share extension immediately. The background upload session
+    /// continues independently, so closing here does not cancel the save.
+    @objc private func closeTapped() {
+        finish()
     }
 
     // MARK: - Scan UI (images)
@@ -185,6 +231,11 @@ class ShareViewController: UIViewController {
         hintLabel.translatesAutoresizingMaskIntoConstraints = false
         scanContainer.addSubview(hintLabel)
 
+        // Close (✕) button, top-trailing corner of the scan card. Added last so it
+        // sits above the preview / progress views.
+        configureCloseButton(scanCloseButton)
+        scanContainer.addSubview(scanCloseButton)
+
         barFillWidth = barFill.widthAnchor.constraint(equalToConstant: 0)
 
         NSLayoutConstraint.activate([
@@ -232,6 +283,11 @@ class ShareViewController: UIViewController {
             hintLabel.leadingAnchor.constraint(equalTo: scanContainer.leadingAnchor, constant: 16),
             hintLabel.trailingAnchor.constraint(equalTo: scanContainer.trailingAnchor, constant: -16),
             hintLabel.bottomAnchor.constraint(equalTo: scanContainer.bottomAnchor, constant: -16),
+
+            scanCloseButton.topAnchor.constraint(equalTo: scanContainer.topAnchor, constant: 8),
+            scanCloseButton.trailingAnchor.constraint(equalTo: scanContainer.trailingAnchor, constant: -8),
+            scanCloseButton.widthAnchor.constraint(equalToConstant: 30),
+            scanCloseButton.heightAnchor.constraint(equalToConstant: 30),
         ])
     }
 
@@ -518,28 +574,69 @@ class ShareViewController: UIViewController {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(token, forHTTPHeaderField: "X-Ingest-Token")
         req.timeoutInterval = 25
-        req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+        // NOTE: do NOT set req.httpBody — background sessions require an upload
+        // task fed from a file, and httpBody would be ignored anyway.
 
-        // Watchdog: never hang the share sheet open indefinitely.
+        guard let body = try? JSONSerialization.data(withJSONObject: payload) else {
+            showResult("Couldn't prepare upload", success: false)
+            return
+        }
+
+        // Write the JSON body to a temp file. A background URLSession can only run
+        // upload/download tasks; it cannot take an in-memory body, so we hand it a
+        // file on disk that the system reads even after we're dismissed.
+        let tmpURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("machina-share-\(UUID().uuidString).json")
+        do {
+            try body.write(to: tmpURL, options: .atomic)
+        } catch {
+            showResult("Couldn't prepare upload", success: false)
+            return
+        }
+
+        // Background session — append a UUID to the identifier so re-invocations of
+        // the extension never collide on an already-in-use identifier. The shared
+        // container identifier lets the daemon resume the transfer for our app group.
+        let config = URLSessionConfiguration.background(
+            withIdentifier: "group.com.morhogeg.machina.share-upload.\(UUID().uuidString)")
+        config.sharedContainerIdentifier = Self.appGroup
+        config.isDiscretionary = false
+        config.sessionSendsLaunchEvents = true
+        let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
+        backgroundSession = session
+
+        // Watchdog: never hang the share sheet open indefinitely. If we hit this
+        // before the delegate reports back, the upload still proceeds in the
+        // background; we just stop blocking the UI.
         DispatchQueue.main.asyncAfter(deadline: .now() + 26) { [weak self] in
             self?.showResult("Saved to Machina", success: true)
         }
 
-        URLSession.shared.dataTask(with: req) { [weak self] _, response, error in
-            guard let self = self else { return }
-            if error != nil {
-                self.showResult("Network error — try again", success: false)
-                return
-            }
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+        let task = session.uploadTask(with: req, fromFile: tmpURL)
+        task.resume()
+    }
+
+    // MARK: - URLSession delegate (background upload completion)
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        responseData.append(data)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if error != nil {
+            showResult("Network error — try again", success: false)
+        } else {
+            let code = (task.response as? HTTPURLResponse)?.statusCode ?? 0
             if (200...299).contains(code) {
-                self.showResult("Saved to Machina ✓", success: true)
+                showResult("Saved to Machina ✓", success: true)
             } else if code == 403 || code == 401 {
-                self.showResult("Auth failed — reopen Machina", success: false)
+                showResult("Auth failed — reopen Machina", success: false)
             } else {
-                self.showResult("Couldn't save (\(code))", success: false)
+                showResult("Couldn't save (\(code))", success: false)
             }
-        }.resume()
+        }
+        // Let the system tear the session down once it's done with it.
+        session.finishTasksAndInvalidate()
     }
 
     private static func mime(for url: URL) -> String {

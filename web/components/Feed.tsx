@@ -28,7 +28,7 @@ import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
 import { Button, IconButton } from './ui/Button';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessageCircleQuestion, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessageCircleQuestion, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus } from 'lucide-react';
 import { publishCard, publishCollection, unpublishCollection, deleteCollection, removeLinkFromCollection } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
 import TagExplorer from './TagExplorer';
@@ -652,11 +652,11 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                         </Button>
                     </div>
                 ) : viewMode === 'collections' ? (
-                    // Unified mobile-style subheader (matches the Ask page): back
-                    // chevron + Layers icon + title, with the new-collection "+"
-                    // pinned to the trailing slot. Span the full width by undoing
-                    // the section's horizontal padding.
-                    <div className="-mx-4 sm:mx-0">
+                    // Desktop only: the unified subheader rendered inline below the
+                    // global header. On mobile, Collections is a full-screen fixed
+                    // overlay (rendered separately below) that matches the Ask tab
+                    // exactly — flush at the top, no double header, no notch gap.
+                    <div className="hidden sm:block">
                         <MobileSubheader
                             onBack={() => setViewMode(lastLayout.current)}
                             backLabel="Back to your library"
@@ -803,9 +803,8 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                     : ctrlIdle
                                     }`}
                             >
-                                <span className="inline-flex items-center gap-1.5 min-w-0">
-                                    <LayoutGrid className="w-4 h-4 shrink-0" />
-                                    <TagIcon className="w-4 h-4 shrink-0 -ms-1" />
+                                <span className="inline-flex items-center gap-2 min-w-0">
+                                    <Tags className="w-4 h-4 shrink-0" />
                                     <span className="truncate">
                                         {(selectedCategory.size + selectedTags.size) === 0
                                             ? 'Categories & Tags'
@@ -977,6 +976,20 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                         </div>
                         )}
 
+                        {/* Select multiple — an icon chip living right beside the view
+                            switcher (visible on mobile too). Hidden while already in
+                            selection mode (the accent toolbar below takes its place). */}
+                        {isLibraryView && !isSelectionMode && (
+                            <button
+                                onClick={() => setIsSelectionMode(true)}
+                                title="Select multiple"
+                                aria-label="Select multiple"
+                                className={`${ctrlBase} w-9 px-0 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
+                            >
+                                <CheckSquare className="w-4 h-4" />
+                            </button>
+                        )}
+
                         {/* Tag filter + bulk selection act on the grid — hide them in Ask mode. */}
                         {isLibraryView && (<>
                         {/* Tag toggle — tablet only (mobile uses the Filters sheet; desktop
@@ -995,8 +1008,9 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                         </button>
                         </div>
 
-                        {/* Selection Control */}
-                        {isSelectionMode ? (
+                        {/* Selection Control — the active toolbar. The idle trigger now
+                            lives as an icon chip beside the view switcher above. */}
+                        {isSelectionMode && (
                             <div className="flex items-center gap-1 h-9 px-1.5 rounded-full bg-accent/10 border border-accent/20 animate-slide-up">
                                 <span className="text-xs font-bold text-accent px-1.5 tabular-nums">{selectedIds.size}</span>
                                 <button
@@ -1025,17 +1039,6 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                 >
                                     <X className="w-4 h-4" />
                                 </button>
-                            </div>
-                        ) : (
-                            <div className="hidden sm:block">
-                            <button
-                                onClick={() => setIsSelectionMode(true)}
-                                title="Select multiple"
-                                aria-label="Select multiple"
-                                className={`${ctrlBase} w-9 px-0 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
-                            >
-                                <CheckSquare className="w-4 h-4" />
-                            </button>
                             </div>
                         )}
                         </>)}
@@ -1260,16 +1263,6 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                     </div>
                                 )}
 
-                                {/* Select multiple. (Tags live in the Categories & Tags
-                                    sheet on the main toolbar, so they're not buried here.) */}
-                                <button
-                                    onClick={() => { setIsFiltersOpen(false); setIsSelectionMode(true); }}
-                                    className={`${ctrlBase} w-full justify-start px-3.5 ${ctrlIdle}`}
-                                >
-                                    <CheckSquare className="w-4 h-4" />
-                                    <span>Select multiple</span>
-                                </button>
-
                                 {/* Footer */}
                                 <div className="flex items-center gap-3 pt-1">
                                     {activeMobileFilters > 0 && (
@@ -1314,18 +1307,29 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                 </button>
                             </div>
 
-                            <label className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">
-                                <LayoutGrid className="w-3.5 h-3.5" /> Categories
-                            </label>
+                            {/* Categories — chips breathe directly on the sheet. */}
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">
+                                    <LayoutGrid className="w-3.5 h-3.5 text-accent/70" /> Categories
+                                </span>
+                                {selectedCategory.size > 0 && (
+                                    <button
+                                        onClick={() => setSelectedCategory(new Set())}
+                                        className="text-[11px] font-semibold text-text-muted hover:text-accent transition-colors"
+                                    >
+                                        Clear
+                                    </button>
+                                )}
+                            </div>
                             <div className="flex flex-wrap gap-2">
                                 <button
                                     onClick={() => setSelectedCategory(new Set())}
-                                    className={`px-3 py-1.5 rounded-full text-[13px] font-bold border transition-all ${selectedCategory.size === 0
+                                    className={`px-3.5 py-1.5 rounded-full text-[13px] font-semibold border transition-colors ${selectedCategory.size === 0
                                         ? 'bg-accent text-white border-accent shadow-sm'
-                                        : 'bg-card border-border-subtle text-text-muted'
+                                        : 'bg-card border-border-subtle text-text-secondary hover:border-text-muted/40 hover:text-text'
                                         }`}
                                 >
-                                    All Categories
+                                    All
                                 </button>
                                 {categories.map(cat => {
                                     const isSelected = selectedCategory.has(cat);
@@ -1338,9 +1342,9 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                                 if (isSelected) next.delete(cat); else next.add(cat);
                                                 setSelectedCategory(next);
                                             }}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-bold border transition-all ${isSelected
-                                                ? ''
-                                                : 'bg-card border-border-subtle text-text-muted'
+                                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[13px] font-semibold border transition-colors ${isSelected
+                                                ? 'shadow-sm'
+                                                : 'bg-card border-border-subtle text-text-secondary hover:border-text-muted/40 hover:text-text'
                                                 }`}
                                             style={isSelected ? {
                                                 backgroundColor: colorStyle.backgroundColor,
@@ -1349,28 +1353,42 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                             } : undefined}
                                         >
                                             {cat}
-                                            <span className="opacity-60 font-medium">({categoryCounts[cat]})</span>
+                                            <span className="opacity-50 font-medium tabular-nums">{categoryCounts[cat]}</span>
                                         </button>
                                     );
                                 })}
                             </div>
 
-                            {/* Tags — the same explorer used on desktop, embedded inline so
-                                tags are first-class here, not two taps deep. */}
+                            {/* Tags — the same explorer used on desktop, flowing freely in
+                                the sheet (no boxed container) so the tree can breathe.
+                                A hairline divider separates it from Categories. */}
                             {allTags.length > 0 && (
-                                <div className="mt-5">
-                                    <label className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">
-                                        <TagIcon className="w-3.5 h-3.5" /> Tags
-                                        {selectedTags.size > 0 && <span className="text-accent">· {selectedTags.size} selected</span>}
-                                    </label>
-                                    <div className="max-h-[44vh] overflow-y-auto rounded-2xl border border-border-subtle bg-card/40">
+                                <div className="mt-6 pt-5 border-t border-border-subtle/60">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">
+                                            <TagIcon className="w-3.5 h-3.5 text-accent/70" /> Tags
+                                            {selectedTags.size > 0 && (
+                                                <span className="text-accent normal-case tracking-normal font-semibold">· {selectedTags.size} selected</span>
+                                            )}
+                                        </span>
+                                        {selectedTags.size > 0 && (
+                                            <button
+                                                onClick={() => setSelectedTags(new Set())}
+                                                className="text-[11px] font-semibold text-text-muted hover:text-accent transition-colors"
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="max-h-[44vh] overflow-y-auto overscroll-contain -mx-1">
                                         <TagExplorer
                                             tags={allTags}
                                             tagCounts={tagCounts}
                                             selectedTags={selectedTags}
                                             onToggleTag={handleToggleTag}
                                             onClearFilters={() => setSelectedTags(new Set())}
-                                            className="p-3"
+                                            variant="embedded"
+                                            className="px-1"
                                         />
                                     </div>
                                 </div>
@@ -1433,15 +1451,19 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                 {/* Links Grid / Ask */}
                 <div className="flex-grow min-w-0">
                     {viewMode === 'collections' ? (
-                        <CollectionsGallery
-                            collections={collections}
-                            links={links}
-                            onOpen={openCollection}
-                            onEdit={openEditCollectionForm}
-                            onShare={handleShareCollection}
-                            onDelete={(col) => setConfirmDeleteCollection(col)}
-                            onManageCards={(col) => setManageCardsCollection(col)}
-                        />
+                        // Desktop only: gallery flows inline beneath the inline subheader.
+                        // Mobile renders the full-screen overlay below (mirrors Ask).
+                        <div className="hidden sm:block">
+                            <CollectionsGallery
+                                collections={collections}
+                                links={links}
+                                onOpen={openCollection}
+                                onEdit={openEditCollectionForm}
+                                onShare={handleShareCollection}
+                                onDelete={(col) => setConfirmDeleteCollection(col)}
+                                onManageCards={(col) => setManageCardsCollection(col)}
+                            />
+                        </div>
                     ) : viewMode === 'ask' ? (
                         <AskBrain
                             uid={uid}
@@ -1566,6 +1588,43 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                     )}
                 </div>
             </div>
+
+            {/* Collections — full-screen overlay (mobile only). Mirrors the Ask tab's
+                container exactly so entering Collections feels identical: the
+                fixed overlay covers the global header, MobileSubheader sits flush
+                at the top (its env(safe-area-inset-top) padding now lands at the
+                real screen top), and the gallery scrolls in the region below. */}
+            {viewMode === 'collections' && (
+                <div className="sm:hidden fixed inset-x-0 top-0 bottom-0 z-50 bg-background flex flex-col animate-fade-in">
+                    <MobileSubheader
+                        onBack={() => setViewMode(lastLayout.current)}
+                        backLabel="Back to your library"
+                        icon={<Layers className="w-5 h-5" />}
+                        title="Collections"
+                    >
+                        <IconButton
+                            onClick={openNewCollectionForm}
+                            title="New collection"
+                            aria-label="New collection"
+                            variant="primary"
+                            radius="full"
+                        >
+                            <Plus className="w-5 h-5" />
+                        </IconButton>
+                    </MobileSubheader>
+                    <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+                        <CollectionsGallery
+                            collections={collections}
+                            links={links}
+                            onOpen={openCollection}
+                            onEdit={openEditCollectionForm}
+                            onShare={handleShareCollection}
+                            onDelete={(col) => setConfirmDeleteCollection(col)}
+                            onManageCards={(col) => setManageCardsCollection(col)}
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* Active Link Modal */}
             {activeLink && (

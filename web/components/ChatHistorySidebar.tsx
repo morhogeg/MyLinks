@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     Pencil,
     Trash2,
@@ -10,6 +10,7 @@ import {
     PanelLeftOpen,
     MessagesSquare,
     SquarePen,
+    MoreHorizontal,
 } from 'lucide-react';
 import { ChatSession } from '@/lib/types';
 
@@ -63,13 +64,39 @@ function ChatRow({
 }) {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(chat.title);
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [menuUp, setMenuUp] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
 
-    const startEditing = () => { setDraft(chat.title); setEditing(true); };
+    // Open the menu, flipping it above the row when there isn't room below
+    // (the list scrolls with overflow, so a downward menu would clip on last rows).
+    const openMenu = () => {
+        const rect = menuRef.current?.getBoundingClientRect();
+        if (rect) setMenuUp(window.innerHeight - rect.bottom < 120);
+        setMenuOpen(true);
+    };
+
+    const startEditing = () => { setMenuOpen(false); setDraft(chat.title); setEditing(true); };
     const commit = () => {
         const next = draft.trim();
         if (next && next !== chat.title) onRename(next);
         setEditing(false);
     };
+
+    // Close the actions menu on outside tap or Escape, keeping it self-contained.
+    useEffect(() => {
+        if (!menuOpen) return;
+        const onDown = (e: PointerEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+        };
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false); };
+        window.addEventListener('pointerdown', onDown);
+        window.addEventListener('keydown', onKey);
+        return () => {
+            window.removeEventListener('pointerdown', onDown);
+            window.removeEventListener('keydown', onKey);
+        };
+    }, [menuOpen]);
 
     if (editing) {
         return (
@@ -116,23 +143,51 @@ function ChatRow({
                 </span>
                 <span className="text-[11px] text-text-muted">{relativeTime(chat.updatedAt)}</span>
             </button>
-            {/* Row actions: overlaid on the end so the title keeps full width. Always
-                tappable on mobile; on desktop they fade in over the row's hover fill. */}
-            <div className="absolute end-0 inset-y-0 flex items-center gap-0.5 ps-6 pe-1.5 rounded-e-xl bg-card-hover opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+            {/* Row actions. A single calm "more" affordance on the trailing edge keeps
+                the row reading as just title + time. On mobile it's always present but
+                quiet; on desktop it fades in on hover over a soft transparent-to-card
+                gradient so the icon sits elegantly with no harsh grey block. */}
+            <div
+                ref={menuRef}
+                className="absolute end-1 inset-y-0 flex items-center"
+            >
+                {/* Gradient scrim — only on desktop hover, fades the title's tail under
+                    the icon instead of stamping a grey box over it. Direction-aware so
+                    the fade always runs toward the trailing edge in LTR and RTL. */}
+                <span className="pointer-events-none absolute end-0 inset-y-0 w-16 rounded-e-xl opacity-0 hidden sm:block sm:group-hover:opacity-100 transition-opacity bg-gradient-to-l from-card-hover via-card-hover/80 to-transparent rtl:bg-gradient-to-r" />
                 <button
-                    onClick={startEditing}
-                    aria-label="Rename chat"
-                    className="p-1.5 rounded-md text-text-muted hover:text-text hover:bg-white/10 transition-colors"
+                    onClick={(e) => { e.stopPropagation(); if (menuOpen) setMenuOpen(false); else openMenu(); }}
+                    aria-label="Chat actions"
+                    aria-haspopup="menu"
+                    aria-expanded={menuOpen}
+                    className={`relative z-10 p-1.5 rounded-lg text-text-muted hover:text-text active:bg-card-hover sm:hover:bg-black/5 sm:dark:hover:bg-white/10 transition-all sm:opacity-0 sm:group-hover:opacity-100 ${menuOpen ? 'opacity-100 sm:opacity-100 text-text bg-card-hover' : ''}`}
                 >
-                    <Pencil className="w-3.5 h-3.5" />
+                    <MoreHorizontal className="w-4 h-4" />
                 </button>
-                <button
-                    onClick={() => onRequestDelete()}
-                    aria-label="Delete chat"
-                    className="p-1.5 rounded-md text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                >
-                    <Trash2 className="w-3.5 h-3.5" />
-                </button>
+
+                {menuOpen && (
+                    <div
+                        role="menu"
+                        className={`absolute z-20 end-0 min-w-[9rem] py-1 rounded-xl bg-card border border-border-subtle shadow-lg shadow-black/10 animate-fade-in ${menuUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}
+                    >
+                        <button
+                            role="menuitem"
+                            onClick={(e) => { e.stopPropagation(); startEditing(); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary hover:text-text hover:bg-card-hover transition-colors text-start"
+                        >
+                            <Pencil className="w-4 h-4 shrink-0" />
+                            Rename
+                        </button>
+                        <button
+                            role="menuitem"
+                            onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onRequestDelete(); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-colors text-start"
+                        >
+                            <Trash2 className="w-4 h-4 shrink-0" />
+                            Delete
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
