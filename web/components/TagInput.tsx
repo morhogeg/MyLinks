@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Plus, Check, Search } from 'lucide-react';
+import { useVisualViewport } from '@/lib/useVisualViewport';
 
 interface TagInputProps {
     allTags: string[];
@@ -25,97 +26,88 @@ export default function TagInput({
     const [isOpen, setIsOpen] = useState(true);
     const [selectedIndex, setSelectedIndex] = useState(-1);
     const containerRef = useRef<HTMLDivElement>(null);
-    const inputRef = useRef<HTMLInputElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);       // desktop inline field
+    const sheetInputRef = useRef<HTMLInputElement>(null);  // mobile sheet field
 
-    // Initial focus
+    // This component only ever mounts client-side (after a tap), so reading the
+    // width synchronously here is safe and avoids a first-frame flash.
+    const [isMobile, setIsMobile] = useState(() =>
+        typeof window !== 'undefined' && window.innerWidth < 640
+    );
+
+    // Visual viewport drives the mobile sheet so it rides above the keyboard.
+    const vp = useVisualViewport();
+
+    // Focus the right field on open.
     useEffect(() => {
-        if (inputRef.current) {
-            inputRef.current.focus();
-        }
+        if (!isOpen) return;
+        const el = isMobile ? sheetInputRef.current : inputRef.current;
+        el?.focus();
+    }, [isOpen, isMobile]);
+
+    // ── Desktop anchored-dropdown positioning ─────────────────────────────────
+    const [coords, setCoords] = useState<{ top?: number; bottom?: number; left: number; width: number; maxHeight: number; openUpwards: boolean } | null>(null);
+    useEffect(() => {
+        if (!isOpen || isMobile) return;
+        const updatePosition = () => {
+            const el = inputRef.current;
+            if (!el) return;
+            const rect = el.getBoundingClientRect();
+            const viewportHeight = window.innerHeight;
+            const spaceBelow = viewportHeight - rect.bottom;
+            const spaceAbove = rect.top;
+            const openUpwards = spaceBelow < 250 && spaceAbove > spaceBelow;
+            const availableSpace = openUpwards ? spaceAbove - 20 : spaceBelow - 20;
+            const maxHeight = Math.min(320, Math.max(160, availableSpace));
+            setCoords({
+                top: openUpwards ? undefined : rect.bottom,
+                bottom: openUpwards ? viewportHeight - rect.top : undefined,
+                left: rect.left,
+                width: rect.width,
+                maxHeight,
+                openUpwards,
+            });
+        };
+        updatePosition();
+        window.addEventListener('resize', updatePosition);
+        window.addEventListener('scroll', updatePosition, true);
+        return () => {
+            window.removeEventListener('resize', updatePosition);
+            window.removeEventListener('scroll', updatePosition, true);
+        };
+    }, [isOpen, isMobile]);
+
+    // Track the breakpoint while open (rotation / resize).
+    useEffect(() => {
+        const onResize = () => setIsMobile(window.innerWidth < 640);
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
     }, []);
 
-    const [coords, setCoords] = useState<{ top?: number; bottom?: number; left: number; width: number; maxHeight: number; openUpwards: boolean } | null>(null);
-    const [isMobile, setIsMobile] = useState(false);
-
-    // Update coordinates when opening or resizing
+    // Desktop only: clicking outside the dropdown cancels. (Mobile uses the
+    // sheet's own backdrop, so we don't attach a global handler there.)
     useEffect(() => {
-        if (isOpen) {
-            const checkMobile = () => setIsMobile(window.innerWidth < 640);
-
-            const updatePosition = () => {
-                if (inputRef.current) {
-                    const rect = inputRef.current.getBoundingClientRect();
-                    const viewportHeight = window.innerHeight;
-                    const spaceBelow = viewportHeight - rect.bottom;
-                    const spaceAbove = rect.top;
-
-                    // Decide whether to open upwards: 
-                    // If space below is limited (< 250px) AND there's more space above
-                    const openUpwards = spaceBelow < 250 && spaceAbove > spaceBelow;
-
-                    // Max height should be at most 320px (20rem), constrained by available space in chosen direction
-                    const availableSpace = openUpwards ? spaceAbove - 20 : spaceBelow - 20;
-                    const maxHeight = Math.min(320, Math.max(160, availableSpace)); // Try to keep at least 160px for ~4-5 tags
-
-                    setCoords({
-                        top: openUpwards ? undefined : rect.bottom,
-                        bottom: openUpwards ? viewportHeight - rect.top : undefined,
-                        left: rect.left,
-                        width: rect.width,
-                        maxHeight,
-                        openUpwards
-                    });
-                }
-                checkMobile();
-            };
-
-            updatePosition();
-            window.addEventListener('resize', updatePosition);
-            window.addEventListener('scroll', updatePosition, true);
-
-            return () => {
-                window.removeEventListener('resize', updatePosition);
-                window.removeEventListener('scroll', updatePosition, true);
-            };
-        }
-    }, [isOpen]);
-
-    // Handle outside clicks - updated for Portal
-    useEffect(() => {
+        if (!isOpen || isMobile) return;
         function handleClickOutside(event: MouseEvent) {
             const target = event.target as Node;
-            // If click is on input, do nothing (input handles its own focus/click)
-            const isInputClick = inputRef.current && inputRef.current.contains(target);
-
-            // If we are in Portal, checking strict hierarchy with `contains` on specific node is hard 
-            // without a ref to the portal root. 
-            // However, the dropdown logic stops propagation of mousedown events.
-            // So if `handleClickOutside` triggers, it effectively means the click was NOT in the dropdown.
-            // Thus, we only need to ensure it wasn't on the input.
-            if (!isInputClick) {
-                onCancel();
-            }
+            if (inputRef.current && inputRef.current.contains(target)) return;
+            onCancel();
         }
-
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
+        document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [isOpen, onCancel]);
+    }, [isOpen, isMobile, onCancel]);
 
-    // Filter tags: those that match input
-    const suggestions = allTags
-        .filter(t =>
-            t.toLowerCase().includes(value.toLowerCase())
-        );
-
+    // ── Suggestions ───────────────────────────────────────────────────────────
+    const suggestions = allTags.filter(t => t.toLowerCase().includes(value.toLowerCase()));
     const exactMatch = allTags.some(t => t.toLowerCase() === value.toLowerCase().trim());
     const isNew = value.trim() !== '' && !exactMatch && !existingTags.includes(value.trim());
 
-    // Reset selection when value changes
-    useEffect(() => {
+    // Typing resets the keyboard selection — done in the change handlers (not an
+    // effect) to avoid a redundant render pass.
+    const onValueChange = (next: string) => {
+        setValue(next);
         setSelectedIndex(-1);
-    }, [value]);
+    };
 
     const handleSelectTag = (tag: string) => {
         if (existingTags.includes(tag)) return;
@@ -137,7 +129,6 @@ export default function TagInput({
             } else if (isNew && (selectedIndex === suggestions.length || selectedIndex === -1)) {
                 handleSelectTag(value.trim());
             } else if (value.trim()) {
-                // If nothing selected but value exists, try to add value
                 handleSelectTag(value.trim());
             }
         } else if (e.key === 'Escape') {
@@ -146,107 +137,140 @@ export default function TagInput({
         }
     };
 
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
-
-    // Portal content
-    // Mobile: Center on screen
-    // Desktop: Align with input
-    const dropdownStyle: React.CSSProperties = isMobile ? {
-        top: '20%',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: '90%',
-        maxWidth: '320px',
-        maxHeight: '60vh'
-    } : {
-        top: coords?.openUpwards ? undefined : (coords?.top ? coords.top + 4 : 0),
-        bottom: coords?.openUpwards ? (coords?.bottom ? coords.bottom + 4 : 0) : undefined,
-        left: coords?.left || 0,
-        width: '12rem', // w-48
-        maxHeight: coords?.maxHeight ? `${coords.maxHeight}px` : '20rem'
-    };
-
-    const dropdown = isOpen && mounted ? (
-        <div
-            className="fixed z-[100] overflow-hidden rounded-xl shadow-2xl bg-background border border-white/10 animate-in fade-in zoom-in-95 duration-200 backdrop-blur-md"
-            style={dropdownStyle}
-            onMouseDown={(e) => e.stopPropagation()}
-        >
-            <div className={`overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-white/10 ${isMobile ? 'max-h-[50vh]' : ''} p-1 space-y-0.5`} style={!isMobile ? { maxHeight: coords?.maxHeight ? `${coords.maxHeight}px` : '20rem' } : {}}>
-                {suggestions.map((suggestion, index) => {
-                    const isSelected = existingTags.includes(suggestion);
-                    return (
-                        <button
-                            key={suggestion}
-                            onClick={() => handleSelectTag(suggestion)}
-                            onMouseEnter={() => setSelectedIndex(index)}
-                            disabled={isSelected}
-                            className={`w-full text-left px-3 py-2 text-xs transition-all flex items-center justify-between rounded-lg
-                                ${index === selectedIndex ? 'bg-accent text-white' : ''}
-                                ${isSelected
-                                    ? 'bg-accent/10 text-accent font-bold cursor-default opacity-80 hover:bg-accent/10'
-                                    : index !== selectedIndex ? 'hover:bg-white/10 text-text-muted hover:text-text' : ''
-                                }
-                            `}
-                        >
-                            <span>{suggestion}</span>
-                            {isSelected && <Check className="w-3.5 h-3.5" />}
-                        </button>
-                    );
-                })}
-
-                {isNew && (
+    // ── Shared list rows ──────────────────────────────────────────────────────
+    const listRows = (rowClass: string) => (
+        <>
+            {suggestions.map((suggestion, index) => {
+                const isSelected = existingTags.includes(suggestion);
+                return (
                     <button
-                        onClick={() => handleSelectTag(value.trim())}
-                        onMouseEnter={() => setSelectedIndex(suggestions.length)}
-                        className={`w-full text-left px-3 py-2 text-xs transition-colors border-t border-white/5 flex items-center gap-2 ${selectedIndex === suggestions.length ? 'bg-accent/20 text-accent' : 'text-accent hover:bg-accent/10'
-                            }`}
+                        key={suggestion}
+                        onClick={() => handleSelectTag(suggestion)}
+                        onMouseEnter={() => setSelectedIndex(index)}
+                        disabled={isSelected}
+                        className={`w-full text-left flex items-center justify-between rounded-lg transition-colors ${rowClass}
+                            ${index === selectedIndex ? 'bg-accent text-white' : ''}
+                            ${isSelected
+                                ? 'bg-accent/10 text-accent font-semibold cursor-default opacity-80'
+                                : index !== selectedIndex ? 'text-text hover:bg-white/10' : ''}`}
                     >
-                        <Plus className="w-3 h-3" />
-                        <span className="font-bold">Create &quot;{value.trim()}&quot;</span>
+                        <span className="truncate">{suggestion}</span>
+                        {isSelected && <Check className="w-4 h-4 shrink-0" />}
                     </button>
-                )}
+                );
+            })}
 
-                {suggestions.length === 0 && !isNew && value.trim() === '' && (
-                    <div className="px-3 py-3 text-xs text-text-muted/50 text-center italic">
-                        No recent tags
-                    </div>
-                )}
+            {isNew && (
+                <button
+                    onClick={() => handleSelectTag(value.trim())}
+                    onMouseEnter={() => setSelectedIndex(suggestions.length)}
+                    className={`w-full text-left flex items-center gap-2 rounded-lg transition-colors ${rowClass} ${selectedIndex === suggestions.length ? 'bg-accent/20 text-accent' : 'text-accent hover:bg-accent/10'}`}
+                >
+                    <Plus className="w-4 h-4 shrink-0" />
+                    <span className="font-semibold truncate">Create &quot;{value.trim()}&quot;</span>
+                </button>
+            )}
 
-                {suggestions.length === 0 && !isNew && value.trim() !== '' && (
-                    <div className="px-3 py-3 text-xs text-text-muted/50 text-center italic">
-                        No tags found
+            {suggestions.length === 0 && !isNew && (
+                <div className="px-3 py-3 text-xs text-text-muted/60 text-center italic">
+                    {value.trim() === '' ? 'No recent tags' : 'No tags found'}
+                </div>
+            )}
+        </>
+    );
+
+    // ── Mobile bottom sheet ───────────────────────────────────────────────────
+    const mobileSheet = (
+        <div
+            className="fixed inset-x-0 z-[100] flex items-end animate-fade-in"
+            style={{ top: vp.offsetTop || 0, height: vp.height || '100%', bottom: 'auto' }}
+        >
+            <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={onCancel} />
+            <div className="relative w-full max-h-[85%] flex flex-col bg-card border-t border-white/10 rounded-t-3xl shadow-2xl animate-slide-up overflow-hidden">
+                <div className="flex justify-center pt-3 pb-1 shrink-0">
+                    <div className="h-1.5 w-10 rounded-full bg-white/15" />
+                </div>
+                <div className="flex items-center gap-3 px-4 pb-3 shrink-0">
+                    <h3 className="flex-1 text-base font-bold text-text">Add a tag</h3>
+                    <button
+                        onClick={onCancel}
+                        aria-label="Close"
+                        className="h-9 w-9 -me-1 inline-flex items-center justify-center rounded-full text-text-muted hover:text-text hover:bg-white/5 transition-colors"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="px-4 pb-3 shrink-0">
+                    <div className="flex items-center gap-2 px-3 h-11 rounded-xl bg-background border border-border-subtle focus-within:border-accent/50 transition-colors">
+                        <Search className="w-4 h-4 text-text-muted shrink-0" />
+                        <input
+                            ref={sheetInputRef}
+                            type="text"
+                            value={value}
+                            onChange={(e) => onValueChange(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            placeholder="Search or create a tag…"
+                            className="flex-1 bg-transparent text-[15px] text-text placeholder:text-text-muted outline-none"
+                        />
                     </div>
-                )}
+                </div>
+                <div
+                    className="overflow-y-auto overscroll-contain px-2 pb-3 space-y-0.5 scrollbar-soft"
+                    style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+                >
+                    {listRows('px-3 py-3 text-[15px]')}
+                </div>
             </div>
         </div>
-    ) : null;
+    );
 
-    // Use createPortal to render dropdown
-
+    // ── Desktop anchored dropdown ─────────────────────────────────────────────
+    const desktopDropdown = (
+        <div
+            className="fixed z-[100] overflow-hidden rounded-xl shadow-2xl bg-background border border-white/10 animate-in fade-in zoom-in-95 duration-150"
+            style={{
+                top: coords?.openUpwards ? undefined : (coords?.top ? coords.top + 4 : 0),
+                bottom: coords?.openUpwards ? (coords?.bottom ? coords.bottom + 4 : 0) : undefined,
+                left: coords?.left || 0,
+                width: '14rem',
+                maxHeight: coords?.maxHeight ? `${coords.maxHeight}px` : '20rem',
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+        >
+            <div
+                className="overflow-y-auto overscroll-contain scrollbar-soft p-1 space-y-0.5"
+                style={{ maxHeight: coords?.maxHeight ? `${coords.maxHeight}px` : '20rem' }}
+            >
+                {listRows('px-3 py-2 text-xs')}
+            </div>
+        </div>
+    );
 
     return (
         <div className="relative inline-block" ref={containerRef}>
-            <div className="relative flex items-center">
+            {isMobile ? (
+                // The card already shows the chip row; this pill keeps the layout
+                // stable while the real input lives in the sheet.
+                <button
+                    onClick={() => setIsOpen(true)}
+                    className={`inline-flex items-center gap-1 text-xs font-bold text-accent bg-accent/10 px-2 py-1 rounded-lg border border-accent/20 ${className}`}
+                >
+                    <Plus className="w-3 h-3" />
+                    {value.trim() || 'Add tag'}
+                </button>
+            ) : (
                 <input
                     ref={inputRef}
                     type="text"
                     value={value}
-                    onChange={(e) => {
-                        setValue(e.target.value);
-                        setIsOpen(true);
-                    }}
+                    onChange={(e) => { onValueChange(e.target.value); setIsOpen(true); }}
                     onFocus={() => setIsOpen(true)}
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder}
                     className={`text-xs bg-white/5 border border-accent/30 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-accent w-32 animate-in fade-in zoom-in-95 duration-200 ${className}`}
                 />
-            </div>
-            {isOpen && mounted && createPortal(dropdown, document.body)}
+            )}
+            {isOpen && typeof document !== 'undefined' && createPortal(isMobile ? mobileSheet : desktopDropdown, document.body)}
         </div>
     );
 }
