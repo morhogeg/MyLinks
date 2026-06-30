@@ -883,6 +883,55 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
         if not uid:
             return _error_response("Invalid ingest token", 403, headers)
 
+        # Image share path: the native Share Extension can send a raw image
+        # (base64) when the user shares a photo/screenshot rather than a link.
+        # Store it, then queue an image job — the background pipeline already
+        # knows how to analyse images (isImage=True), same as the WhatsApp flow.
+        image_b64 = data.get('image') or data.get('imageBytes')
+        if image_b64:
+            try:
+                import base64, uuid
+                # Tolerate a "data:image/jpeg;base64,...." data-URI prefix.
+                if ',' in image_b64 and image_b64.strip().startswith('data:'):
+                    image_b64 = image_b64.split(',', 1)[1]
+                image_bytes = base64.b64decode(image_b64)
+            except Exception:
+                return _error_response("Invalid image data", 400, headers)
+
+            if not image_bytes:
+                return _error_response("Empty image data", 400, headers)
+            if len(image_bytes) > MAX_IMAGE_BYTES:
+                return _error_response("Image is too large", 413, headers)
+
+            mime_type = data.get('mimeType', 'image/jpeg')
+            ext = 'png' if 'png' in mime_type else 'jpg'
+            try:
+                stored_url = _store_image(
+                    f"screenshots/{uid}/{uuid.uuid4().hex}.{ext}", image_bytes, mime_type
+                )
+            except Exception as e:
+                logger.error(f"Share image store failed: {e}", exc_info=True)
+                return _server_error(headers, e)
+
+            db = get_db()
+            process_ref = db.collection('pending_processing').document()
+            process_ref.set({
+                "uid": uid,
+                "url": stored_url,
+                "isImage": True,
+                "mimeType": mime_type,
+                "source": "share",
+                "body": data.get('note', ''),
+                "createdAt": datetime.now(timezone.utc).isoformat(),
+                "status": "queued",
+                "attempts": 0,
+            })
+            logger.info(f"Share ingest queued image for user {uid}")
+            return https_fn.Response(
+                json.dumps({"success": True, "queued": True, "id": process_ref.id, "image": True}),
+                status=200, headers=headers, mimetype='application/json'
+            )
+
         url = _extract_url(data.get('url'), data.get('text'), data.get('shared'))
         if not url:
             return _error_response("No URL found in shared content", 400, headers)

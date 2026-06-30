@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { collection, query, getDocs, limit, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { syncShareConfigToNative } from '@/lib/shareConfig';
 
 interface AuthContextType {
     /** Firestore user document ID */
@@ -40,6 +41,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 if (!snapshot.empty) {
                     const userDoc = snapshot.docs[0];
                     setUid(userDoc.id);
+                    // On the native iOS app, hand the Share Extension its
+                    // endpoint + ingest token via the App Group (best-effort).
+                    syncShareConfigToNative(userDoc.id);
                     // Persist the browser timezone so the WhatsApp bot can show
                     // reminder times in the user's local time (best-effort).
                     try {
