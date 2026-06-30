@@ -1,6 +1,6 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-30. Branch: `claude/blissful-mayer-275ff0` (committed + pushed to `main`)._
+_Last updated: 2026-06-30. Branch: `claude/eloquent-ptolemy-5e56be` (merged + pushed to `main`)._
 
 ## ⚠️ IN-FLIGHT — YouTube channel name + deploys (READ FIRST)
 
@@ -55,7 +55,43 @@ were already deployed and confirmed working.
 
 ---
 
-## Latest session — Fix share-to-app token bridge (plugin registration) (2026-06-30)
+## Latest session — Toolbar/card/collections refinements round 2 (2026-06-30)
+
+Frontend-only. Merged into `main` (alongside the parallel share-pages + token-bridge work, no
+overlap), pushed (Vercel), `./deploy-hosting.sh` ✓, rebuilt iOS bundle, **bumped both targets to
+build 8** (was 6; their token-bridge round referenced build 7, so 8 stays safely above). Every
+change verified against **real prod data** in a headless browser at `http://127.0.0.1:3000` (the
+IP hostname bypasses the emulator gate — `localhost`+`http` would hit emulators).
+
+**Changes (all on `main`):**
+1. **Open-card close X** (`LinkDetailModal.tsx`) — was an out-of-place filled circle; now styled
+   like the other ghost toolbar icon buttons, same pinned-right placement.
+2. **New-collection sheet keyboard-aware** (`CollectionFormModal.tsx`) — the bottom sheet now rides
+   the visual viewport (`useVisualViewport`) so it sits **above the keyboard** while typing the
+   name; content scrolls within the visible area. Same pattern as the Add sheet.
+3. **Mobile toolbar density** (`Feed.tsx`):
+   - The **Filters** button is icon-only (filter + sort icons, no label — sorting lives in the same
+     sheet), so the **All Categories** selector takes the rest of that row.
+   - The view row now reads **Collections (left) · Ask (centered) · view pills (right)** via three
+     equal flex columns on mobile; the 3 view pills are **icon-only** on mobile. Desktop is
+     unchanged — `sm:contents` wrappers dissolve back to the inline cluster and the active view pill
+     keeps its label on `sm+`.
+4. **`CategoryInput.tsx`** — default value to `''` (kills a controlled→uncontrolled React warning
+   for category-less links).
+
+Earlier this same session (already on `main`, shipped): the open-card toolbar rebuild
+(non-clipping scroll row + pinned close + edge-swipe-close), removed the logo's pink halo,
+merged All Categories onto the Filters row, removed the add-image subtext, the Collections "…"
+menu portal (no clip), removed the dashed New-collection tile + added a header "+", and hid the
+add FAB in Collections.
+
+**Deployed:** Vercel (push), Hosting (`./deploy-hosting.sh`), iOS bundle (`./build-ios.sh`). No
+functions changed by this round. Build = **8**, both targets. **Next: Xcode → Archive →
+TestFlight** (this build includes the parallel session's share-page token-bridge fix too).
+
+---
+
+## Earlier — Fix share-to-app token bridge (plugin registration) (2026-06-30)
 
 **Symptom:** sharing into the app via the Share Extension showed "Open Machina and sign in
 first" and never created a card — the ingest token never reached the App Group.
