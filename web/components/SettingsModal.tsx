@@ -252,7 +252,7 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                         )}
                         <div className="leading-tight">
                             <h2 className="text-lg font-bold text-text">{view === 'digest' ? 'Curated digest' : 'Settings'}</h2>
-                            <p className="text-[11px] text-text-muted">{view === 'digest' ? 'Choose what, when & where' : 'Tune your Second Brain'}</p>
+                            <p className="text-[11px] text-text-muted">{view === 'digest' ? 'Choose what, when & where' : 'Tune your Machina'}</p>
                         </div>
                     </div>
                     <button
@@ -354,7 +354,7 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
 
                     {/* About */}
                     <Section icon={<RefreshCw className="w-4 h-4" />} title="About">
-                        <Row title="Second Brain" subtitle="Your knowledge, organized">
+                        <Row title="Machina" subtitle="Your knowledge, organized">
                             <button
                                 onClick={() => typeof window !== 'undefined' && window.location.reload()}
                                 className="h-9 px-3.5 rounded-full bg-card-hover border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer"

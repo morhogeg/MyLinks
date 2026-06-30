@@ -51,7 +51,7 @@ export default function Home() {
             </div>
             <div className="leading-none">
               <h1 className="text-lg sm:text-xl font-extrabold tracking-tight bg-[image:var(--accent-gradient)] bg-clip-text text-transparent">
-                Second Brain
+                Machina
               </h1>
               <p className="mt-1 text-[10px] sm:text-[11px] font-medium text-text-muted tracking-wide">
                 Your knowledge, organized

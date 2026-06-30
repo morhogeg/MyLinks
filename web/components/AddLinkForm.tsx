@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, FormEvent } from 'react';
 import { Link, Plus, Loader2, X, Upload } from 'lucide-react';
 import { saveLink, getUserTags } from '@/lib/storage';
 import { appCheckHeaders } from '@/lib/firebase';
+import { apiUrl } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { compressImage } from '@/lib/image';
@@ -155,7 +156,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
                 // LINK MODE — analysis happens in the canonical Python backend.
                 let response;
                 try {
-                    response = await fetchWithTimeout('/api/analyze', {
+                    response = await fetchWithTimeout(apiUrl('/api/analyze'), {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()) },
                         body: JSON.stringify({ url: formattedUrl, existingTags, uid }),
@@ -177,7 +178,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
 
                 let response;
                 try {
-                    response = await fetchWithTimeout('/api/analyze-image', {
+                    response = await fetchWithTimeout(apiUrl('/api/analyze-image'), {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()) },
                         body: JSON.stringify({

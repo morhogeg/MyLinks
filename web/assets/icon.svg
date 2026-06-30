@@ -1,0 +1,106 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Deep, premium background: a glowing violet core fading into near-black corners -->
+    <radialGradient id="bg" cx="50%" cy="34%" r="86%">
+      <stop offset="0%" stop-color="#41238A"/>
+      <stop offset="45%" stop-color="#1B0D44"/>
+      <stop offset="100%" stop-color="#06030E"/>
+    </radialGradient>
+    <!-- Aura bloom behind the mark -->
+    <radialGradient id="aura" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#E22BD6" stop-opacity="0.58"/>
+      <stop offset="48%" stop-color="#7C3AED" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#7C3AED" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Corner vignette for depth -->
+    <radialGradient id="vign" cx="50%" cy="50%" r="72%">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="74%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.55"/>
+    </radialGradient>
+    <!-- Synapse stroke: light violet → vivid purple → fuchsia (top-left to bottom-right) -->
+    <linearGradient id="stroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F2E6FF"/>
+      <stop offset="46%" stop-color="#B266FF"/>
+      <stop offset="100%" stop-color="#F86FD8"/>
+    </linearGradient>
+    <!-- Core: white-hot center bleeding to violet -->
+    <radialGradient id="core" cx="46%" cy="40%" r="64%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="38%" stop-color="#F6ECFF"/>
+      <stop offset="100%" stop-color="#CE8CFF"/>
+    </radialGradient>
+    <!-- Star glint: bright pinpoint fading out -->
+    <radialGradient id="glint" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="55%" stop-color="#FBF3FF"/>
+      <stop offset="100%" stop-color="#FBF3FF" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Core bloom: a soft halo of light, no hard rim -->
+    <radialGradient id="coreBloom" cx="50%" cy="46%" r="50%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="30%" stop-color="#F4E9FF" stop-opacity="0.92"/>
+      <stop offset="64%" stop-color="#D6A6FF" stop-opacity="0.40"/>
+      <stop offset="100%" stop-color="#C77DFF" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Glassy top sheen -->
+    <linearGradient id="sheen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.20"/>
+      <stop offset="36%" stop-color="#FFFFFF" stop-opacity="0.03"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="13" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="coreglow" x="-160%" y="-160%" width="420%" height="420%">
+      <feGaussianBlur stdDeviation="11" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- Faint neural field for depth -->
+  <g fill="#FFFFFF" opacity="0.045">
+    <circle cx="182" cy="240" r="6"/>
+    <circle cx="852" cy="288" r="5"/>
+    <circle cx="160" cy="788" r="5"/>
+    <circle cx="868" cy="804" r="6"/>
+    <circle cx="512" cy="150" r="4"/>
+    <circle cx="288" cy="872" r="4"/>
+    <circle cx="746" cy="866" r="4"/>
+  </g>
+
+  <!-- Corner vignette -->
+  <rect width="1024" height="1024" fill="url(#vign)"/>
+
+  <!-- Aura behind the glyph -->
+  <circle cx="512" cy="512" r="350" fill="url(#aura)"/>
+
+  <!-- The M: a single luminous connecting line (the hero).
+       Centered: bounding box (incl. stroke caps) spans x 265–759, y 306–718 → center 512,512. -->
+  <g filter="url(#glow)" fill="none" stroke="url(#stroke)" stroke-width="38"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M284 699 L284 325 L512 543 L740 325 L740 699"/>
+  </g>
+
+  <!-- Small satellite glints at the outer vertices (captured memories) -->
+  <g>
+    <circle cx="284" cy="325" r="16" fill="url(#glint)" opacity="0.8"/>
+    <circle cx="740" cy="325" r="16" fill="url(#glint)" opacity="0.8"/>
+    <circle cx="284" cy="699" r="16" fill="url(#glint)" opacity="0.8"/>
+    <circle cx="740" cy="699" r="16" fill="url(#glint)" opacity="0.8"/>
+  </g>
+
+  <!-- The core: the largest node — where every connection converges and
+       refines into one point of light (the mind) -->
+  <g filter="url(#coreglow)">
+    <circle cx="512" cy="543" r="44" fill="url(#coreBloom)"/>
+    <circle cx="512" cy="543" r="11" fill="#FFFFFF" opacity="0.92"/>
+  </g>
+
+  <!-- Glassy sheen overlay -->
+  <rect width="1024" height="1024" fill="url(#sheen)"/>
+</svg>

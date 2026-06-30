@@ -44,7 +44,7 @@ export default function InstallPWA() {
                         <Share className="w-5 h-5 text-white" />
                     </div>
                     <div className="flex-1">
-                        <h3 className="font-medium text-white mb-1">Install Second Brain</h3>
+                        <h3 className="font-medium text-white mb-1">Install Machina</h3>
                         <p className="text-sm text-text-secondary">
                             Tap <Share className="w-4 h-4 inline mx-1" /> then &quot;Add to Home Screen&quot; for the best experience.
                         </p>

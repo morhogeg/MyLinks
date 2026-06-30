@@ -1,0 +1,59 @@
+<svg width="2732" height="2732" viewBox="0 0 2732 2732" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="46%" r="70%">
+      <stop offset="0%" stop-color="#1C0E46"/>
+      <stop offset="52%" stop-color="#0E0726"/>
+      <stop offset="100%" stop-color="#06030E"/>
+    </radialGradient>
+    <radialGradient id="aura" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#D026D3" stop-opacity="0.42"/>
+      <stop offset="50%" stop-color="#7C3AED" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#7C3AED" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="stroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F2E6FF"/>
+      <stop offset="46%" stop-color="#B266FF"/>
+      <stop offset="100%" stop-color="#F86FD8"/>
+    </linearGradient>
+    <radialGradient id="glint" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="55%" stop-color="#FBF3FF"/>
+      <stop offset="100%" stop-color="#FBF3FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="coreBloom" cx="50%" cy="46%" r="50%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="30%" stop-color="#F4E9FF" stop-opacity="0.92"/>
+      <stop offset="64%" stop-color="#D6A6FF" stop-opacity="0.40"/>
+      <stop offset="100%" stop-color="#C77DFF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="11" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="coreglow" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="2732" height="2732" fill="url(#bg)"/>
+  <circle cx="1366" cy="1366" r="560" fill="url(#aura)"/>
+
+  <!-- Mark, centered: the icon glyph (1024 design space) placed at the splash center, scaled 1.4 -->
+  <g transform="translate(1366,1366) scale(1.4) translate(-512,-512)">
+    <g filter="url(#glow)" fill="none" stroke="url(#stroke)" stroke-width="38"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="M284 699 L284 325 L512 543 L740 325 L740 699"/>
+    </g>
+    <g>
+      <circle cx="284" cy="325" r="16" fill="url(#glint)" opacity="0.8"/>
+      <circle cx="740" cy="325" r="16" fill="url(#glint)" opacity="0.8"/>
+      <circle cx="284" cy="699" r="16" fill="url(#glint)" opacity="0.8"/>
+      <circle cx="740" cy="699" r="16" fill="url(#glint)" opacity="0.8"/>
+    </g>
+    <g filter="url(#coreglow)">
+      <circle cx="512" cy="543" r="44" fill="url(#coreBloom)"/>
+      <circle cx="512" cy="543" r="11" fill="#FFFFFF" opacity="0.92"/>
+    </g>
+  </g>
+</svg>
