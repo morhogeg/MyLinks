@@ -21,7 +21,10 @@ export default function CategoryInput({
     className = '',
     autoFocus = true
 }: CategoryInputProps) {
-    const [value, setValue] = useState(currentCategory);
+    // Default to '' so the input is always controlled — `currentCategory` can be
+    // undefined for links with no category (otherwise React warns about a
+    // controlled→uncontrolled switch once the user types).
+    const [value, setValue] = useState(currentCategory ?? '');
     const [isOpen, setIsOpen] = useState(true);
     const containerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);

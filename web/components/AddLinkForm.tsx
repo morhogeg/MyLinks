@@ -405,7 +405,6 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
                                                     <Upload className="w-6 h-6 text-accent" />
                                                 </div>
                                                 <p className="text-text font-medium text-sm">Tap to add an image</p>
-                                                <p className="text-text-muted text-xs mt-1 text-center px-2">A screenshot, tweet, or photo — Machina reads the text and saves what matters</p>
                                             </>
                                         )}
                                     </label>

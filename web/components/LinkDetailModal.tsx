@@ -11,6 +11,7 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import TagInput from './TagInput';
 import { hasHebrew } from '@/lib/rtl';
+import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 
 /**
  * Split a "M:SS — description" (or "H:MM:SS …") video highlight into its
@@ -94,7 +95,9 @@ export default function LinkDetailModal({
         };
     }, []);
 
-
+    // Swipe in from the left edge to close the card (iOS back gesture). Disabled
+    // while the distraction-free reader is on top (it has its own dismissal).
+    useEdgeSwipeBack(onClose, isOpen && !isReading);
 
     if (!isOpen) return null;
 
@@ -169,71 +172,67 @@ export default function LinkDetailModal({
                 aria-label="Link details"
                 className="relative bg-card border-0 sm:border border-white/10 w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300"
             >
-                {/* Header Actions */}
-                <div className="flex items-center justify-between p-3 sm:p-4 safe-pt">
-                    <div className="flex gap-1.5 sm:gap-2">
+                {/* Header Actions — a single compact row: the item actions scroll
+                    horizontally if they don't all fit (so nothing is ever clipped),
+                    while the close button stays pinned and always reachable. */}
+                <div className="flex items-center gap-2 p-3 sm:p-4 safe-pt border-b border-border-subtle/60">
+                    <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-1 overflow-x-auto scrollbar-hide">
                         <button
                             onClick={() => onReadStatusChange(link.id, !link.isRead)}
                             title={link.isRead ? 'Mark as unread' : 'Mark as read'}
-                            className={`p-2 rounded-xl border transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${link.isRead
-                                ? 'bg-white/10 border-white/5 text-text shadow-lg opacity-100'
-                                : 'bg-transparent border-transparent text-text-muted/40 hover:text-text'
+                            aria-label={link.isRead ? 'Mark as unread' : 'Mark as read'}
+                            className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${link.isRead
+                                ? 'bg-card-hover text-text'
+                                : 'text-text-muted/50 hover:text-text hover:bg-card-hover'
                                 }`}
                         >
-                            {link.isRead ? (
-                                <Check className="w-4 h-4" />
-                            ) : (
-                                <Circle className="w-4 h-4 opacity-40" />
-                            )}
+                            {link.isRead ? <Check className="w-[18px] h-[18px]" /> : <Circle className="w-[18px] h-[18px] opacity-50" />}
                         </button>
                         <button
                             onClick={() => onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite')}
                             title={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
-                            className={`p-2 rounded-xl border transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${link.status === 'favorite'
-                                ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500 shadow-lg shadow-yellow-500/5'
-                                : 'bg-transparent border-transparent text-text-muted hover:text-yellow-500'
+                            aria-label={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
+                            className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${link.status === 'favorite'
+                                ? 'bg-yellow-500/10 text-yellow-500'
+                                : 'text-text-muted hover:text-yellow-500 hover:bg-card-hover'
                                 }`}
                         >
-                            <Star className={`w-4 h-4 ${link.status === 'favorite' ? 'fill-current' : ''}`} />
+                            <Star className={`w-[18px] h-[18px] ${link.status === 'favorite' ? 'fill-current' : ''}`} />
                         </button>
                         <button
                             onClick={() => onStatusChange(link.id, link.status === 'archived' ? 'unread' : 'archived')}
                             title={link.status === 'archived' ? 'Unarchive' : 'Archive'}
-                            className={`p-2 rounded-xl border transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${link.status === 'archived'
-                                ? 'bg-accent/10 border-accent/20 text-accent shadow-lg shadow-accent/5'
-                                : 'bg-transparent border-transparent text-text-muted hover:text-accent'
+                            aria-label={link.status === 'archived' ? 'Unarchive' : 'Archive'}
+                            className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${link.status === 'archived'
+                                ? 'bg-accent/10 text-accent'
+                                : 'text-text-muted hover:text-accent hover:bg-card-hover'
                                 }`}
                         >
-                            <Archive className="w-4 h-4" />
+                            <Archive className="w-[18px] h-[18px]" />
                         </button>
                         <button
                             onClick={handleToggleReminder}
                             title={isReminderActive ? `Reminder active (next: ${nextReminderDate?.toLocaleDateString()})` : 'Set reminder'}
-                            className={`p-2 rounded-xl border transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${isReminderActive
-                                ? 'bg-blue-500/10 border-blue-500/20 text-blue-500 shadow-lg shadow-blue-500/5'
-                                : 'bg-transparent border-transparent text-text-muted hover:text-blue-500'
+                            aria-label={isReminderActive ? 'Reminder active' : 'Set reminder'}
+                            className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${isReminderActive
+                                ? 'bg-blue-500/10 text-blue-500'
+                                : 'text-text-muted hover:text-blue-500 hover:bg-card-hover'
                                 }`}
                         >
-                            {isReminderActive ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+                            {isReminderActive ? <Bell className="w-[18px] h-[18px]" /> : <BellOff className="w-[18px] h-[18px]" />}
                         </button>
-                        <button
-                            onClick={() => setShowDeleteConfirm(true)}
-                            title="Delete"
-                            className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:text-red-500 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
-                    </div>
 
-                    <div className="flex gap-1.5 sm:gap-2">
+                        {/* Divider between status toggles and the "do something with it" actions. */}
+                        <span className="shrink-0 mx-0.5 h-5 w-px bg-border-subtle" aria-hidden="true" />
+
                         {onAddToCollection && (
                             <button
                                 onClick={() => onAddToCollection(link)}
                                 title="Add to collection"
                                 aria-label="Add to collection"
-                                className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:text-accent transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                                className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
                             >
-                                <Layers className="w-4 h-4" />
+                                <Layers className="w-[18px] h-[18px]" />
                             </button>
                         )}
                         {onShare && (
@@ -241,9 +240,9 @@ export default function LinkDetailModal({
                                 onClick={() => onShare(link)}
                                 title="Share"
                                 aria-label="Share this card"
-                                className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:text-accent transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                                className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
                             >
-                                <Share2 className="w-4 h-4" />
+                                <Share2 className="w-[18px] h-[18px]" />
                             </button>
                         )}
                         {canRead && (
@@ -251,9 +250,9 @@ export default function LinkDetailModal({
                                 onClick={() => setIsReading(true)}
                                 title="Read in distraction-free mode"
                                 aria-label="Read article"
-                                className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:text-accent transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                                className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
                             >
-                                <BookOpen className="w-4 h-4" />
+                                <BookOpen className="w-[18px] h-[18px]" />
                             </button>
                         )}
                         {!!link.url && /^https?:\/\//.test(link.url) && (
@@ -262,18 +261,31 @@ export default function LinkDetailModal({
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 title={link.sourceType === 'image' ? 'View original image' : 'Open source'}
-                                className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:text-accent transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                                aria-label={link.sourceType === 'image' ? 'View original image' : 'Open source'}
+                                className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
                             >
-                                <ExternalLink className="w-4 h-4" />
+                                <ExternalLink className="w-[18px] h-[18px]" />
                             </a>
                         )}
                         <button
-                            onClick={onClose}
-                            className="p-2 rounded-xl bg-transparent border border-transparent text-text-muted hover:text-accent transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                            onClick={() => setShowDeleteConfirm(true)}
+                            title="Delete"
+                            aria-label="Delete"
+                            className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors"
                         >
-                            <X className="w-4 h-4" />
+                            <Trash2 className="w-[18px] h-[18px]" />
                         </button>
                     </div>
+
+                    {/* Close — pinned, always visible, never clipped by the scroll row. */}
+                    <button
+                        onClick={onClose}
+                        aria-label="Close"
+                        title="Close"
+                        className="shrink-0 h-10 w-10 rounded-full bg-card-hover border border-border-subtle text-text-secondary hover:text-text hover:bg-card transition-colors flex items-center justify-center"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
                 </div>
 
                 <div
