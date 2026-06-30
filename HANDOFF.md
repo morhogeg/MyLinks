@@ -1,6 +1,40 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-30. Branch: `claude/eloquent-ptolemy-5e56be` (merged + pushed to `main`)._
+_Last updated: 2026-06-30. Branch: `claude/beautiful-murdock-99c745` (merged + pushed to `main`)._
+
+## Latest session — iOS round: header/buttons, share markdown, scan HUD, tags, build 10 (2026-06-30)
+
+Shipped (web fully deployed: Vercel + Firebase Hosting + `share_page` function). iOS build 10
+archived + filed in Xcode Organizer; **user does the Organizer → Distribute → TestFlight upload**.
+
+**Web — design unification + fixes:**
+- New `web/components/MobileSubheader.tsx` (the Ask-page header treatment) reused on the
+  Collections view and Ask. New `web/components/ui/Button.tsx` (`Button` + `IconButton`
+  primitives) adopted across Reader/Ask/Collections/header/CardActionSheet.
+- Feed toolbar: Ask & Collections buttons made neutral grey (were accent purple). Review
+  view-switcher icon changed to `GalleryHorizontalEnd` (was `Layers`, identical to Collections).
+- `SwipeDeck.tsx`: action buttons now labelled with swipe direction (← Archive / ↑ Remind /
+  Keep →) + clearer footer copy.
+- Mobile home: the category button is now a combined **"Categories & Tags"** bottom-sheet with
+  `TagExplorer` embedded inline (tags no longer buried in the Filters sheet). Removed the
+  redundant Tags entry from the mobile Filters sheet.
+- `LinkDetailModal.tsx`: removed Archive from the open-card toolbar; moved Open-source next to X.
+- `app/page.tsx`: theme toggle hidden on mobile (`hidden sm:block`) — it lives in Settings.
+
+**Backend:** `functions/main.py` `share_page` (/s, /c) now renders the card markdown
+summary/detail as HTML (new `_md_to_html`/`_md_inline`, XSS-safe, RTL-aware) instead of leaking
+raw `**`/`##`. **Deployed** (`functions:share_page`).
+
+**iOS native:** `web/ios/App/ShareExt/ShareViewController.swift` — image share now shows a Swift
+recreation of the in-app scan animation (purple sweep, rising %, phase text, green success check,
+image preview) instead of the plain "Saving to Machina…" spinner; tied to the real upload
+lifecycle. Build number bumped to **10** on both targets. Archive at
+`~/MyLinks/build/Machina10.xcarchive` (also filed in `~/Library/Developer/Xcode/Archives/2026-06-30/`).
+
+**Remaining:** user clicks Distribute in Xcode Organizer to push build 10 to TestFlight. A QA
+audit (this session) flagged follow-ups worth doing next — see the chat's `ios-qa-report.md`
+(top items: share-extension false-success watchdog, deep-link modal re-open loop, PWA install
+banner showing inside the native app, "analyzing in background" being untrue).
 
 ## ⚠️ IN-FLIGHT — YouTube channel name + deploys (READ FIRST)
 
@@ -55,7 +89,7 @@ were already deployed and confirmed working.
 
 ---
 
-## Latest session — Toolbar/card/collections refinements round 2 (2026-06-30)
+## Earlier — Toolbar/card/collections refinements round 2 (2026-06-30)
 
 Frontend-only. Merged into `main` (alongside the parallel share-pages + token-bridge work, no
 overlap), pushed (Vercel), `./deploy-hosting.sh` ✓, rebuilt iOS bundle, **bumped both targets to
