@@ -6,6 +6,7 @@ import { Check, X, Search, LayoutGrid } from 'lucide-react';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { addLinkToCollection, removeLinkFromCollection } from '@/lib/collections';
 import { useToast } from '@/components/Toast';
+import { useVisualViewport } from '@/lib/useVisualViewport';
 
 interface ManageCollectionCardsSheetProps {
     uid: string | null;
@@ -30,6 +31,9 @@ export default function ManageCollectionCardsSheet({
 }: ManageCollectionCardsSheetProps) {
     const toast = useToast();
     const [q, setQ] = useState('');
+    // Keep the sheet within the visible viewport so opening the keyboard to search
+    // doesn't push the card list under the keys. No-op on desktop.
+    const vp = useVisualViewport();
 
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -72,14 +76,17 @@ export default function ManageCollectionCardsSheet({
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
+        <div
+            className="fixed inset-x-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
+            style={{ top: vp.offsetTop || 0, height: vp.height || '100%', bottom: 'auto' }}
+        >
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
             <div
                 role="dialog"
                 aria-modal="true"
                 aria-label={`Manage cards in ${collection.name}`}
-                className="relative w-full sm:max-w-lg bg-card border-t sm:border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up overflow-hidden safe-pb flex flex-col h-[85vh] sm:h-[70vh]"
+                className="relative w-full sm:max-w-lg bg-card border-t sm:border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up overflow-hidden safe-pb flex flex-col h-[85vh] sm:h-[70vh] max-h-full"
             >
                 <div className="sm:hidden flex justify-center pt-3 pb-1">
                     <div className="h-1.5 w-10 rounded-full bg-white/15" />

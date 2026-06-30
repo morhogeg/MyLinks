@@ -1,6 +1,33 @@
 import { useEffect } from 'react';
 
 /**
+ * True when the gesture starts inside a region that owns its own horizontal
+ * gesture — a horizontally scrollable container (e.g. the LinkDetailModal action
+ * toolbar) or an element that opts out of native panning via `touch-action`
+ * (`none`/`pan-y`, e.g. a swipeable deck card). Walking a short ancestor chain on
+ * touchstart is cheap and keeps the global edge-swipe from hijacking those.
+ * Opt out explicitly with a `data-no-edge-swipe` attribute.
+ */
+function startsInHorizontalGestureRegion(target: EventTarget | null): boolean {
+    let el = target instanceof Element ? target : null;
+    while (el && el !== document.body) {
+        if (el instanceof HTMLElement) {
+            if ('noEdgeSwipe' in el.dataset) return true;
+            const cs = getComputedStyle(el);
+            if (
+                (cs.overflowX === 'auto' || cs.overflowX === 'scroll') &&
+                el.scrollWidth > el.clientWidth + 1
+            ) {
+                return true;
+            }
+            if (cs.touchAction === 'none' || cs.touchAction === 'pan-y') return true;
+        }
+        el = el.parentElement;
+    }
+    return false;
+}
+
+/**
  * iOS-style "swipe from the left edge to go back" for in-app screens that aren't
  * real browser-history entries — full-screen overlays and modals-as-pages (Ask,
  * Settings, the Add sheet). While `enabled`, it watches passive touch events and
@@ -25,7 +52,11 @@ export function useEdgeSwipeBack(onBack: () => void, enabled = true) {
         const onStart = (e: TouchEvent) => {
             if (e.touches.length !== 1) { tracking = false; return; }
             const t = e.touches[0];
-            tracking = t.clientX <= EDGE;
+            if (t.clientX > EDGE) { tracking = false; return; }
+            // Don't hijack a gesture that belongs to a horizontally scrollable or
+            // gesture-locked region under the finger (toolbar scroll, deck swipe).
+            if (startsInHorizontalGestureRegion(e.target)) { tracking = false; return; }
+            tracking = true;
             startX = t.clientX;
             startY = t.clientY;
         };
