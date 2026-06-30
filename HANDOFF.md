@@ -1,6 +1,6 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-30. Branch: `claude/elastic-mayer-607c00` (merged + pushed to `main`)._
+_Last updated: 2026-06-30. Branch: `claude/eloquent-ptolemy-5e56be` (merged + pushed to `main`)._
 
 ## ⚠️ IN-FLIGHT — YouTube channel name + deploys (READ FIRST)
 
@@ -55,7 +55,41 @@ were already deployed and confirmed working.
 
 ---
 
-## Latest session — Collections + outbound sharing (2026-06-30)
+## Latest session — iOS "Load failed" CORS fix + app-icon header logo (2026-06-30)
+
+Shipped end-to-end: pushed to `main` (Vercel desktop), deployed 5 Cloud Functions, and deployed
+Firebase Hosting (iPhone). **Two earlier rounds of iOS UX polish are also already on `main`** —
+this session's branch was based behind `main` and was fast-forwarded first.
+
+**Three fixes (all live):**
+1. **"Load failed" when adding a link/image (and the earlier Ask failure) — root cause: CORS.**
+   Every `/api/*` fetch from the native app is cross-origin (`capacitor://localhost` → `*.web.app`)
+   with a custom header (`X-Firebase-AppCheck`), so it triggers a CORS preflight. The backend
+   allowlist (`functions/main.py` `_allowed_origins()`) only listed the web origins, so the
+   preflight was rejected → bare "Load failed" on every call. **Fix:** added `capacitor://localhost`
+   (+ `ionic://localhost`, `https://localhost`) to the allowlist. Verified live: `OPTIONS
+   /api/analyze` with `Origin: capacitor://localhost` now returns `204` +
+   `access-control-allow-origin: capacitor://localhost`. (This was the real blocker behind the
+   Ask "Couldn't reach Machina" too — bigger than the SSE-buffering patch from the prior round.)
+2. **In-app header logo now matches the app icon** (`web/app/page.tsx`). Replaced the monochrome
+   `MachinaMark` SVG with the real iOS AppIcon, downscaled to `web/public/app-icon.png` (128px),
+   in both the header brand and the loading screen. Shared header → desktop gets it too.
+3. **Search placeholder** `Search your brain…` → `Search Machina…` (`web/components/Feed.tsx`).
+
+**Deployed this session:**
+- Functions: `analyze_link, analyze_image, ask_brain, get_article, share_ingest` (all ✔).
+- Hosting (iPhone): ✔ — `app-icon.png` confirmed live (HTTP 200).
+- Vercel (desktop): pushed to `main` (auto-deploy).
+
+**For the iPhone app itself (TestFlight):** the CORS fix is server-side and takes effect for the
+*existing* installed build immediately (no rebuild needed for "Load failed"). The new header logo +
+search copy are bundled web assets, so they reach the phone via Hosting (PWA) but the **native
+TestFlight build needs `./build-ios.sh` + Xcode archive** to embed them. Reopen / hard-refresh to
+clear PWA cache.
+
+---
+
+## Earlier — Collections + outbound sharing (2026-06-30)
 
 Shipped to web (Vercel + Firebase Hosting) and built a TestFlight-ready iOS bundle. All on `main`, pushed.
 
