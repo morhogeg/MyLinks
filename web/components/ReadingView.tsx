@@ -6,6 +6,7 @@ import { Link } from '@/lib/types';
 import { getDirection } from '@/lib/rtl';
 import { appCheckHeaders } from '@/lib/firebase';
 import { apiUrl } from '@/lib/api';
+import { Button } from './ui/Button';
 
 interface Paragraph {
     type: 'p' | 'h2' | 'h3' | 'li' | 'blockquote';
@@ -166,15 +167,16 @@ export default function ReadingView({ link, onClose }: ReadingViewProps) {
 
             {/* Toolbar */}
             <div className="flex items-center justify-between gap-2 px-3 sm:px-5 py-3 safe-pt border-b border-border-subtle">
-                <button
+                <Button
                     onClick={onClose}
                     title="Back"
                     aria-label="Back to details"
-                    className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-text-secondary hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
+                    variant="ghost"
+                    className="px-2.5"
                 >
                     <ArrowLeft className="w-4 h-4" />
-                    <span className="text-sm font-medium hidden sm:inline">Back</span>
-                </button>
+                    <span className="font-medium hidden sm:inline">Back</span>
+                </Button>
 
                 <div className="flex items-center gap-1.5">
                     {/* Font size */}
@@ -190,18 +192,16 @@ export default function ReadingView({ link, onClose }: ReadingViewProps) {
 
                     {/* Listen (TTS) */}
                     {ttsSupported && !loading && !error && (
-                        <button
+                        <Button
                             onClick={toggleSpeech}
                             title={speech === 'playing' ? 'Pause' : speech === 'paused' ? 'Resume' : 'Listen'}
                             aria-label="Listen to article"
-                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border transition-colors cursor-pointer ${speech !== 'idle'
-                                ? 'bg-accent text-white border-accent'
-                                : 'bg-card border-border-subtle text-text-secondary hover:text-text hover:border-accent/40'
-                                }`}
+                            variant={speech !== 'idle' ? 'primary' : 'secondary'}
+                            className={speech !== 'idle' ? 'border border-accent' : 'hover:border-accent/40'}
                         >
                             {speech === 'playing' ? <Pause className="w-4 h-4" /> : speech === 'paused' ? <Play className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                             <span className="hidden sm:inline">{speech === 'idle' ? 'Listen' : speech === 'playing' ? 'Pause' : 'Resume'}</span>
-                        </button>
+                        </Button>
                     )}
 
                     {!!link.url && /^https?:\/\//.test(link.url) && (

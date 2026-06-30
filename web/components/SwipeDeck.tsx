@@ -196,25 +196,41 @@ export default function SwipeDeck({ links, onFavorite, onArchive, onRemind, onOp
                 })}
             </div>
 
-            {/* Action buttons — swipe alternative + Undo */}
-            <div className="flex items-center gap-3 shrink-0">
-                <DeckButton title="Undo" onClick={undo} disabled={!lastAction} className="text-text-muted hover:text-text">
+            {/* Action buttons — each labelled with the swipe direction it mirrors,
+                so it's obvious what left/right/up do without having to try. */}
+            <div className="flex items-end justify-center gap-3 shrink-0">
+                <DeckAction label="Undo" onClick={undo} disabled={!lastAction} buttonClassName="text-text-muted hover:text-text">
                     <RotateCcw className="w-5 h-5" />
-                </DeckButton>
-                <DeckButton title="Archive (swipe left)" onClick={() => fling('left')} className="text-blue-500 hover:bg-blue-500 hover:text-white border-blue-500/30">
+                </DeckAction>
+                <DeckAction label="← Archive" onClick={() => fling('left')} buttonClassName="text-blue-500 hover:bg-blue-500 hover:text-white border-blue-500/30">
                     <Archive className="w-6 h-6" />
-                </DeckButton>
-                <DeckButton title="Remind me (swipe up)" onClick={() => fling('up')} className="text-accent hover:bg-accent hover:text-white border-accent/30">
+                </DeckAction>
+                <DeckAction label="↑ Remind" onClick={() => fling('up')} buttonClassName="text-accent hover:bg-accent hover:text-white border-accent/30">
                     <Bell className="w-6 h-6" />
-                </DeckButton>
-                <DeckButton title="Favorite (swipe right)" onClick={() => fling('right')} className="text-green-500 hover:bg-green-500 hover:text-white border-green-500/30">
+                </DeckAction>
+                <DeckAction label="Keep →" onClick={() => fling('right')} buttonClassName="text-green-500 hover:bg-green-500 hover:text-white border-green-500/30">
                     <Star className="w-6 h-6" />
-                </DeckButton>
+                </DeckAction>
             </div>
 
             <p className="text-[11px] text-text-muted/70 text-center max-w-xs shrink-0">
-                Swipe or use the buttons · tap a card to open it
+                Swipe the card left to archive, right to keep, up to set a reminder — or tap a button. Tap the card to open it.
             </p>
+        </div>
+    );
+}
+
+/** A deck action: the round button plus a small label spelling out the swipe
+ *  direction it mirrors, so the gesture mapping is always visible. */
+function DeckAction({ children, onClick, label, disabled, buttonClassName = '' }: { children: React.ReactNode; onClick: () => void; label: string; disabled?: boolean; buttonClassName?: string }) {
+    return (
+        <div className="flex flex-col items-center gap-1.5">
+            <DeckButton title={label} onClick={onClick} disabled={disabled} className={buttonClassName}>
+                {children}
+            </DeckButton>
+            <span className={`text-[10px] font-bold uppercase tracking-wide whitespace-nowrap ${disabled ? 'text-text-muted/40' : 'text-text-muted'}`}>
+                {label}
+            </span>
         </div>
     );
 }

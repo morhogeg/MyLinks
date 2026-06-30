@@ -3,6 +3,7 @@
 import { Link, LinkStatus } from '@/lib/types';
 import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink, Layers, Share2, FolderMinus } from 'lucide-react';
 import { useEffect } from 'react';
+import { IconButton } from './ui/Button';
 
 interface CardActionSheetProps {
     link: Link;
@@ -153,13 +154,15 @@ export default function CardActionSheet({
                     <p className="flex-1 text-sm font-semibold text-text truncate" title={link.title}>
                         {link.title}
                     </p>
-                    <button
+                    <IconButton
                         onClick={onClose}
                         aria-label="Close"
-                        className="p-2 -me-2 rounded-full text-text-muted hover:text-text hover:bg-white/5 transition-colors"
+                        variant="ghost"
+                        radius="full"
+                        className="-me-2 text-text-muted"
                     >
                         <X className="w-5 h-5" />
-                    </button>
+                    </IconButton>
                 </div>
 
                 {/* Action rows */}

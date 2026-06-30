@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2 } from 'lucide-react';
+import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2 } from 'lucide-react';
 import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
 import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
@@ -200,17 +200,6 @@ export default function LinkDetailModal({
                             <Star className={`w-[18px] h-[18px] ${link.status === 'favorite' ? 'fill-current' : ''}`} />
                         </button>
                         <button
-                            onClick={() => onStatusChange(link.id, link.status === 'archived' ? 'unread' : 'archived')}
-                            title={link.status === 'archived' ? 'Unarchive' : 'Archive'}
-                            aria-label={link.status === 'archived' ? 'Unarchive' : 'Archive'}
-                            className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${link.status === 'archived'
-                                ? 'bg-accent/10 text-accent'
-                                : 'text-text-muted hover:text-accent hover:bg-card-hover'
-                                }`}
-                        >
-                            <Archive className="w-[18px] h-[18px]" />
-                        </button>
-                        <button
                             onClick={handleToggleReminder}
                             title={isReminderActive ? `Reminder active (next: ${nextReminderDate?.toLocaleDateString()})` : 'Set reminder'}
                             aria-label={isReminderActive ? 'Reminder active' : 'Set reminder'}
@@ -255,18 +244,6 @@ export default function LinkDetailModal({
                                 <BookOpen className="w-[18px] h-[18px]" />
                             </button>
                         )}
-                        {!!link.url && /^https?:\/\//.test(link.url) && (
-                            <a
-                                href={link.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title={link.sourceType === 'image' ? 'View original image' : 'Open source'}
-                                aria-label={link.sourceType === 'image' ? 'View original image' : 'Open source'}
-                                className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
-                            >
-                                <ExternalLink className="w-[18px] h-[18px]" />
-                            </a>
-                        )}
                         <button
                             onClick={() => setShowDeleteConfirm(true)}
                             title="Delete"
@@ -277,8 +254,20 @@ export default function LinkDetailModal({
                         </button>
                     </div>
 
-                    {/* Close — pinned right (never clipped by the scroll row), but
-                        styled exactly like the other toolbar icon buttons. */}
+                    {/* Open source + Close — pinned right (never clipped by the scroll
+                        row), styled exactly like the other toolbar icon buttons. */}
+                    {!!link.url && /^https?:\/\//.test(link.url) && (
+                        <a
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={link.sourceType === 'image' ? 'View original image' : 'Open source'}
+                            aria-label={link.sourceType === 'image' ? 'View original image' : 'Open source'}
+                            className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
+                        >
+                            <ExternalLink className="w-[18px] h-[18px]" />
+                        </a>
+                    )}
                     <button
                         onClick={onClose}
                         aria-label="Close"
