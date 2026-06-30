@@ -1,8 +1,36 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-30. Branch: `claude/beautiful-murdock-99c745` (merged + pushed to `main`)._
+_Last updated: 2026-06-30. Branch: `claude/eloquent-austin-00fb8c` (merged + pushed to `main`)._
 
-## Latest session — iOS round: header/buttons, share markdown, scan HUD, tags, build 10 (2026-06-30)
+## Latest session — iOS QA top-4 fixes + build 11 (2026-06-30)
+
+Worked the `ios-qa-report.md` "Top 10 to fix next" list (items #3 raw-markdown and #4 image-HUD
+were already done by other agents, skipped). Fixed the four highest-severity remaining items;
+`tsc --noEmit` clean. **Web fully deployed (Vercel + Firebase Hosting).** No backend change.
+
+1. **[Critical] Share Extension false "Saved ✓" watchdog** —
+   `web/ios/App/ShareExt/ShareViewController.swift`. Added a `resultShown` idempotency guard at
+   the top of `showResult()` so a real network error and the 26s watchdog can no longer both
+   render (first result wins). Made the watchdog neutral (`"Still saving — check Machina"`,
+   `success:false`) and moved it to **28s** — 3s past the 25s request timeout, so the real
+   outcome owns the UI.
+2. **[High] Deep-link card modal re-opened forever** — `web/components/Feed.tsx`. The `?linkId`
+   effect depends on `links`, which Firestore `onSnapshot` mutates on every background change, so
+   it kept re-opening a closed modal. Now consumes each `linkId` once via a ref guard and strips
+   the param with `history.replaceState`.
+3. **[High] PWA "Add to Home Screen" banner inside the native app** — `web/components/InstallPWA.tsx`.
+   WKWebView matches the Safari UA and isn't standalone, so the banner fired in the installed app.
+   Added an early `isNativeApp()` bail.
+4. **[High] "We'll keep analyzing in the background" was untrue** — analysis is one foreground
+   request that dies when the WebView suspends. Reworded the scan copy to "Keep Machina open…"
+   in `ImageScanProgress.tsx`, `LinkScanProgress.tsx`, and `VideoScanProgress.tsx`.
+
+**iOS native:** Swift file changed → build bumped **10 → 11** on both targets (App + ShareExt,
+all 4 `CURRENT_PROJECT_VERSION` entries). Archived to `~/MyLinks/build/Machina11.xcarchive` and
+filed in Xcode Organizer. **Remaining: user clicks Organizer → Distribute App → TestFlight** to
+push build 11. (Remaining QA-report items #5–#10 + F-series are still open for a future session.)
+
+## Earlier — iOS round: header/buttons, share markdown, scan HUD, tags, build 10 (2026-06-30)
 
 Shipped (web fully deployed: Vercel + Firebase Hosting + `share_page` function). iOS build 10
 archived + filed in Xcode Organizer; **user does the Organizer → Distribute → TestFlight upload**.
