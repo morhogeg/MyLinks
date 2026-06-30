@@ -25,8 +25,9 @@ import ConfirmDialog from './ConfirmDialog';
 import AddToCollectionSheet from './AddToCollectionSheet';
 import CollectionsGallery from './CollectionsGallery';
 import CollectionFormModal from './CollectionFormModal';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessageCircleQuestion, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe } from 'lucide-react';
-import { publishCard, publishCollection, unpublishCollection, deleteCollection } from '@/lib/collections';
+import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessageCircleQuestion, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus } from 'lucide-react';
+import { publishCard, publishCollection, unpublishCollection, deleteCollection, removeLinkFromCollection } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
 import TagExplorer from './TagExplorer';
 import { useSearchParams } from 'next/navigation';
@@ -82,6 +83,7 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
     const [collectionFormOpen, setCollectionFormOpen] = useState(false);
     const [editingCollection, setEditingCollection] = useState<Collection | null>(null);
     const [confirmDeleteCollection, setConfirmDeleteCollection] = useState<Collection | null>(null);
+    const [manageCardsCollection, setManageCardsCollection] = useState<Collection | null>(null);
 
     // Semantic Search State
     const [isSearching, setIsSearching] = useState(false);
@@ -451,7 +453,15 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
         setViewMode('grid');
     };
 
-    const clearCollectionFilter = () => setSelectedCollections(new Set());
+    const handleRemoveFromCollection = async (link: Link, collectionId: string) => {
+        if (!uid) return;
+        try {
+            await removeLinkFromCollection(uid, link.id, collectionId);
+            toast.success('Removed from collection');
+        } catch {
+            toast.error("Couldn't remove from the collection. Please try again.");
+        }
+    };
 
     // Share a single card as a public Machina page.
     const handleShareCard = async (link: Link) => {
@@ -576,6 +586,8 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
     // True for the card-browsing layouts (everything except the full-screen
     // Ask chat and the Collections gallery), which share the search/filter chrome.
     const isLibraryView = viewMode === 'grid' || viewMode === 'compact' || viewMode === 'review';
+    // When scoped to exactly one collection, cards offer a quick "remove from it".
+    const activeCollectionId = selectedCollections.size === 1 ? Array.from(selectedCollections)[0] : undefined;
     // Count of active grid filters — badges the mobile "Filters" button.
     const activeMobileFilters =
         (filter !== 'all' ? 1 : 0) + selectedPlatforms.size + (screenshotOnly ? 1 : 0) + selectedTags.size + selectedCollections.size;
@@ -646,13 +658,6 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                             <Layers className="w-5 h-5 text-accent" />
                             Collections
                         </h2>
-                        <button
-                            onClick={openNewCollectionForm}
-                            className={`${ctrlBase} ms-auto px-3.5 bg-accent text-white border border-accent hover:bg-accent-hover`}
-                        >
-                            <Layers className="w-4 h-4" />
-                            <span>New</span>
-                        </button>
                     </div>
                 ) : (
                     <div className="relative">
@@ -675,9 +680,10 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                     </div>
                 )}
 
-                {/* Row 1: Category Navigator — only relevant when browsing the grid.
+                {/* Row 1: Category Navigator — only relevant when browsing the full grid.
+                    Hidden while scoped to a collection (the collection already narrows the set).
                     Desktop shows scrollable chips; mobile collapses them into one button. */}
-                {isLibraryView && (<>
+                {isLibraryView && selectedCollections.size === 0 && (<>
                 <div className="relative hidden sm:block -mx-4 px-4 sm:mx-0 sm:px-0 group/category-nav">
                     {/* Left/Right Fades for Scrollability Cue */}
                     <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none opacity-0 group-hover/category-nav:opacity-100 transition-opacity duration-300 sm:left-0 sm:from-background" />
@@ -1060,6 +1066,14 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                                     </button>
                                 </div>
                                 <button
+                                    onClick={() => setManageCardsCollection(col)}
+                                    title="Add or remove cards in this collection"
+                                    className={`${ctrlBase} px-2.5 h-7 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
+                                >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    <span>Add cards</span>
+                                </button>
+                                <button
                                     onClick={() => handleShareCollection(col)}
                                     title={col.isPublic ? 'Re-share (updates the public snapshot)' : 'Share this collection'}
                                     className={`${ctrlBase} px-2.5 h-7 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
@@ -1373,6 +1387,7 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                             onEdit={openEditCollectionForm}
                             onShare={handleShareCollection}
                             onDelete={(col) => setConfirmDeleteCollection(col)}
+                            onManageCards={(col) => setManageCardsCollection(col)}
                         />
                     ) : viewMode === 'ask' ? (
                         <AskBrain
@@ -1464,6 +1479,11 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                                     onTagClick={handleToggleTag}
                                     onAddToCollection={(link) => setAddToCollectionLink(link)}
                                     onShare={handleShareCard}
+                                    cardCollections={collections
+                                        .filter(c => (link.collectionIds ?? []).includes(c.id))
+                                        .map(c => ({ id: c.id, name: c.name }))}
+                                    activeCollectionId={activeCollectionId}
+                                    onRemoveFromCollection={handleRemoveFromCollection}
                                 />
                             ))}
                         </Masonry>
@@ -1533,6 +1553,17 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                 isOpen={collectionFormOpen}
                 onClose={() => setCollectionFormOpen(false)}
             />
+
+            {/* Add / remove cards in a collection */}
+            {manageCardsCollection && (
+                <ManageCollectionCardsSheet
+                    uid={uid}
+                    collection={collections.find(c => c.id === manageCardsCollection.id) ?? manageCardsCollection}
+                    links={links}
+                    isOpen={!!manageCardsCollection}
+                    onClose={() => setManageCardsCollection(null)}
+                />
+            )}
 
             {/* Delete collection confirmation */}
             <ConfirmDialog

@@ -1,7 +1,7 @@
 'use client';
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink, Layers, Share2 } from 'lucide-react';
+import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink, Layers, Share2, FolderMinus } from 'lucide-react';
 import { useEffect } from 'react';
 
 interface CardActionSheetProps {
@@ -14,6 +14,8 @@ interface CardActionSheetProps {
     onDelete: (id: string) => void;
     onAddToCollection?: (link: Link) => void;
     onShare?: (link: Link) => void;
+    /** When viewing inside a collection, a one-tap remove from it. */
+    removeFromCollection?: { name: string; onRemove: () => void };
 }
 
 /**
@@ -36,6 +38,7 @@ export default function CardActionSheet({
     onDelete,
     onAddToCollection,
     onShare,
+    removeFromCollection,
 }: CardActionSheetProps) {
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
@@ -110,6 +113,12 @@ export default function CardActionSheet({
             label: 'Share',
             icon: <Share2 className="w-5 h-5" />,
             onClick: () => onShare(link),
+        }] : []),
+        ...(removeFromCollection ? [{
+            key: 'remove-collection',
+            label: `Remove from ${removeFromCollection.name}`,
+            icon: <FolderMinus className="w-5 h-5" />,
+            onClick: () => removeFromCollection.onRemove(),
         }] : []),
         {
             key: 'delete',
