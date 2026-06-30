@@ -92,6 +92,11 @@ or a single card as a public read-only "Machina page."
 - iOS — `./build-ios.sh` ✓; `cap sync` registered `@capacitor/share@8.0.1` (SPM, no CocoaPods).
   **Next: open Xcode → Archive → Distribute → TestFlight.**
 
+**Follow-up fix (same session):** first attempt to create a collection failed with "Couldn't save
+the collection" — `firestore.rules` was missing a `users/{uid}/collections` match (rules don't
+cascade to subcollections). Added it + redeployed. Also made the color picker optional: new
+collections get a random color and a "Surprise me" shuffle button was added. Re-shipped web + iOS.
+
 **Notes / future:** sharing rules are open writes for now (same single-user prototype posture as
 `users/**`); tighten to `request.auth.uid == ownerUid` when real auth lands. Out of scope this round:
 manual card ordering within a collection, live (non-snapshot) shared collections, choosing a
