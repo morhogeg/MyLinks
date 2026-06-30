@@ -2,6 +2,59 @@
 
 _Last updated: 2026-06-29. Branch: `claude/chat-history-sidebar-fgldj7` (merged to `main`)._
 
+## ⚠️ IN-FLIGHT — YouTube channel name + deploys (READ FIRST)
+
+All code below is committed/pushed to `main`. The remaining work is **deploying + verifying**
+(the user does deploys; the cloud session can't). Status as of this handoff:
+
+**Problem being chased:** YouTube cards (and their Ask citations) show "YouTube" or a wrong name
+(e.g. the AI returned "It's a mindset" instead of the real channel "Sprouht"/"Mark Manson").
+
+**Root cause (fixed in code):** `functions/main.py:_apply_youtube_metadata` set
+`youtubeChannel = analysis.sourceName or yt_meta.channel` — it **preferred the AI's guess** over
+the authoritative YouTube **oEmbed** channel. Now flipped to prefer the real oEmbed channel
+(`_real_channel or analysis.sourceName or _yt_channel`). Also: `ask_brain` now sends
+`metadata.youtubeChannel` in citation source objects via `_card_source_name()` (it only sent
+top-level `sourceName` before), and the Ask frontend (`AskBrain.tsx sourceTag`) shows the specific
+identity (X `@handle` via `xHandle`, LinkedIn author, channel/publisher).
+
+**New repair function:** `functions/main.py:backfill_youtube_channels` (HTTP, idempotent) re-fetches
+oEmbed `author_name` for existing YouTube cards missing a real channel and writes
+`metadata.youtubeChannel` + `sourceName`. Optional `?uid=`; no uid = all users (fine, single-user).
+
+**Deploy status / TODO for next session:**
+1. **Deploy the save functions** (channel fix only takes effect on deploy):
+   `./deploy-functions.sh functions:ask_brain,functions:analyze_link,functions:process_link_background,functions:backfill_youtube_channels`
+   - `analyze_link`, `ask_brain`, `backfill_youtube_channels` deployed OK last attempt.
+   - **`process_link_background` failed with a transient HTTP 409** ("unable to queue the
+     operation" — it's a Firestore-trigger fn; retry in ~60s: `./deploy-functions.sh
+     functions:process_link_background`). It's only the iPhone-share/WhatsApp path; web saves use
+     `analyze_link` which IS deployed.
+2. **Run the backfill once** to repair existing cards:
+   `curl https://us-central1-secondbrain-app-94da2.cloudfunctions.net/backfill_youtube_channels`
+   (expect `{"updated":N,...}`; if 404 right after first deploy, use the `run.app` URL the deploy
+   printed). **Not yet confirmed run/succeeded — verify this.**
+3. **Verify** a fresh YouTube save shows the real channel, and that backfilled cards + Ask citations
+   show it too. If still wrong, check: did `analyze_link` actually redeploy? did oEmbed return a real
+   `author_name` (some videos/regions block it)?
+
+**Deploy footgun (fixed):** `deploy-functions.sh` now auto-prefixes every target with `functions:`.
+Previously `functions:a,b,c` silently deployed only `a` (b/c read as unknown target types) — that's
+why an earlier deploy "did nothing". Either bare or prefixed names work now.
+
+**Still NOT done (user may ask):** the **`/api/analyze` 60s timeout** on slow YouTube videos (the
+"Analysis is taking longer than expected" message). It's the client `ANALYZE_TIMEOUT_MS=60_000` +
+Firebase Hosting's hard 60s cap on function rewrites; video analysis exceeds it. Proposed fix: the
+**same Hosting-bypass used for chat** — drop `/api/analyze` from `web/vercel.json` rewrites and route
+it through `web/app/api/analyze/route.ts` to the function's direct URL, then raise the timeout. NOT
+done (it touches all link-saving; needs care + can't be tested from the cloud session).
+
+**Also pending from this session:** `./deploy-hosting.sh` for iPhone (the script now runs
+`npm install` first — earlier it failed on the new `react-markdown` deps). Streaming + answer-language
+were already deployed and confirmed working.
+
+---
+
 ## Latest session — Ask Your Brain: chat history + UI overhaul + streaming + i18n
 
 Large multi-part session on the **Ask** page. All frontend is on `main` (Vercel auto-deploys
