@@ -16,6 +16,7 @@ import { useToast } from '@/components/Toast';
 import { httpsCallable } from 'firebase/functions';
 import Card from './Card';
 import CompactCard from './CompactCard';
+import ListCard from './ListCard';
 import Masonry from './Masonry';
 import ReminderModal from './ReminderModal';
 import SwipeDeck from './SwipeDeck';
@@ -28,7 +29,7 @@ import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
 import { Button, IconButton } from './ui/Button';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessageCircleQuestion, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessageCircleQuestion, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus } from 'lucide-react';
 import { publishCard, publishCollection, unpublishCollection, deleteCollection, removeLinkFromCollection } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
 import TagExplorer from './TagExplorer';
@@ -63,7 +64,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
     const [scrollLeft, setScrollLeft] = useState(0);
     const activeLink = links.find(l => l.id === activeLinkId) || null;
     const [isLoading, setIsLoading] = useState(true);
-    const [viewMode, setViewMode] = useState<'grid' | 'compact' | 'review' | 'ask' | 'collections'>('grid');
+    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'compact' | 'review' | 'ask' | 'collections'>('grid');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
@@ -329,16 +330,28 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
             }
         });
 
-    // Calculate category counts
-    const categoryCounts = links.reduce((acc, link) => {
+    // Does a link carry any of the currently selected tags? (parent tags match
+    // their children, e.g. "ai" matches "ai/agents"). Shared by the faceted counts.
+    const matchesSelectedTags = (link: Link) =>
+        link.tags.some(tag => Array.from(selectedTags).some(s => tag === s || tag.startsWith(`${s}/`)));
+
+    // Faceted counts — the numbers update live as you tap. Each facet's counts are
+    // computed against the OTHER facet's current selection (but never its own), so
+    // picking the "Tech" category instantly drops a non-overlapping tag like
+    // "politics" to 0, while the category chips keep reflecting the tag selection.
+    // Pure client-side derivation — no extra reads, no backend cost.
+    const linksForCategoryCounts = selectedTags.size === 0 ? links : links.filter(matchesSelectedTags);
+    const categoryCounts = linksForCategoryCounts.reduce((acc, link) => {
         acc[link.category] = (acc[link.category] || 0) + 1;
         return acc;
     }, {} as Record<string, number>);
 
+    // Category chips stay derived from the whole library so they never vanish —
+    // they just read 0 when nothing matches the current tag selection.
     const categories = Array.from(new Set(links.map(l => l.category))).sort();
 
-    // Calculate tag counts for all links (not just filtered)
-    const tagCounts = links.reduce((acc, link) => {
+    const linksForTagCounts = selectedCategory.size === 0 ? links : links.filter(link => selectedCategory.has(link.category));
+    const tagCounts = linksForTagCounts.reduce((acc, link) => {
         link.tags.forEach(tag => {
             acc[tag] = (acc[tag] || 0) + 1;
         });
@@ -594,15 +607,16 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
     // Layout views only — Ask is a distinct mode, surfaced as its own button.
     const viewModes: { key: typeof viewMode; label: string; icon: React.ReactNode; hint: string }[] = [
         { key: 'grid', label: 'Cards', icon: <LayoutGrid className="w-4 h-4" />, hint: 'Card view' },
+        { key: 'list', label: 'List', icon: <List className="w-4 h-4" />, hint: 'List view' },
         { key: 'compact', label: 'Compact', icon: <Grid2X2 className="w-4 h-4" />, hint: 'Compact grid' },
         { key: 'review', label: 'Review', icon: <GalleryHorizontalEnd className="w-4 h-4" />, hint: 'Swipe to review' },
     ];
     // The layout the Ask/Collections buttons return you to when you leave them.
-    const lastLayout = useRef<'grid' | 'compact' | 'review'>('grid');
-    if (viewMode === 'grid' || viewMode === 'compact' || viewMode === 'review') lastLayout.current = viewMode;
+    const lastLayout = useRef<'grid' | 'list' | 'compact' | 'review'>('grid');
+    if (viewMode === 'grid' || viewMode === 'list' || viewMode === 'compact' || viewMode === 'review') lastLayout.current = viewMode;
     // True for the card-browsing layouts (everything except the full-screen
     // Ask chat and the Collections gallery), which share the search/filter chrome.
-    const isLibraryView = viewMode === 'grid' || viewMode === 'compact' || viewMode === 'review';
+    const isLibraryView = viewMode === 'grid' || viewMode === 'list' || viewMode === 'compact' || viewMode === 'review';
     // When scoped to exactly one collection, cards offer a quick "remove from it".
     const activeCollectionId = selectedCollections.size === 1 ? Array.from(selectedCollections)[0] : undefined;
     // Count of active grid filters — badges the mobile "Filters" button.
@@ -1577,6 +1591,22 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                 />
                             ))}
                         </Masonry>
+                    ) : viewMode === 'list' ? (
+                        <div className="flex flex-col gap-2 max-w-3xl mx-auto">
+                            {filteredLinks.map((link, idx) => (
+                                <ListCard
+                                    key={link.id}
+                                    index={idx}
+                                    link={link}
+                                    onOpenDetails={(link) => setActiveLinkId(link.id)}
+                                    onStatusChange={handleStatusChange}
+                                    onTagClick={handleToggleTag}
+                                    isSelectionMode={isSelectionMode}
+                                    isSelected={selectedIds.has(link.id)}
+                                    onToggleSelection={toggleSelection}
+                                />
+                            ))}
+                        </div>
                     ) : (
                         <div
                             className="grid gap-2 sm:gap-3"
@@ -1722,7 +1752,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                     if (confirmDeleteId) performDelete(confirmDeleteId);
                 }}
                 title="Delete this link?"
-                message="This permanently removes it from your second brain. This can't be undone."
+                message="This permanently removes it from your Machina. This can't be undone."
                 confirmLabel="Delete"
                 variant="danger"
             />
@@ -1733,7 +1763,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                 onClose={() => setConfirmBulkDelete(false)}
                 onConfirm={performBulkDelete}
                 title={`Delete ${selectedIds.size} link${selectedIds.size === 1 ? '' : 's'}?`}
-                message="These will be permanently removed from your second brain. This can't be undone."
+                message="These will be permanently removed from your Machina. This can't be undone."
                 confirmLabel="Delete"
                 variant="danger"
             />

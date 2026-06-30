@@ -16,7 +16,7 @@ interface ConfirmDialogProps {
 
 /**
  * Custom branded confirmation dialog
- * Matches the Second Brain dark aesthetic
+ * Matches the Machina dark aesthetic
  */
 export default function ConfirmDialog({
     isOpen,

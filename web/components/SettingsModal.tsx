@@ -252,7 +252,7 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                 role="dialog"
                 aria-modal="true"
                 aria-label="Settings"
-                className={`relative w-full bg-card overflow-hidden flex flex-col shadow-[var(--shadow-card-hover)] h-full sm:h-auto sm:max-w-lg sm:max-h-[88vh] sm:rounded-3xl sm:border border-border-subtle ${isMobile ? 'animate-slide-in-left' : 'animate-fade-in'}`}
+                className={`relative w-full bg-card overflow-hidden flex flex-col shadow-[var(--shadow-card-hover)] h-full sm:h-auto sm:max-w-lg sm:max-h-[88vh] sm:rounded-3xl sm:border border-border-subtle ${isMobile ? 'animate-ios-push' : 'animate-fade-in'}`}
             >
                 {/* Header */}
                 <div

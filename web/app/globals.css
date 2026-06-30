@@ -220,6 +220,24 @@ html {
   animation: slide-in-left 0.25s var(--ease-spring, ease-out);
 }
 
+/* iOS-style navigation push: a full-screen sub-page slides in from the trailing
+   edge and decelerates smoothly into place — no spring overshoot, no "bump".
+   The curve is Apple's standard present/push easing. */
+@keyframes ios-push-in {
+  from {
+    transform: translateX(100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-ios-push {
+  animation: ios-push-in 0.34s cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform;
+}
+
 @keyframes pulse-subtle {
 
   0%,
@@ -393,6 +411,7 @@ a {
   .animate-scale-up,
   .animate-slide-up,
   .animate-slide-in-left,
+  .animate-ios-push,
   .animate-fade-in {
     animation-duration: 0.01ms !important;
     animation-delay: 0ms !important;
