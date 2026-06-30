@@ -8,6 +8,7 @@ import { httpsCallable } from 'firebase/functions';
 import { functions } from '@/lib/firebase';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
 import { useTheme } from './ThemeProvider';
+import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import Dropdown from './Dropdown';
 
 interface SettingsModalProps {
@@ -68,6 +69,24 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
     const [topics, setTopics] = useState<string[]>([]);
     const [sendingNow, setSendingNow] = useState(false);
     const [sendResult, setSendResult] = useState<string | null>(null);
+
+    // On phones Settings is a real full-screen page (slides in, fills the screen,
+    // clears the notch); on desktop it stays a centered modal.
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 639px)');
+        const onChange = () => setIsMobile(mq.matches);
+        onChange();
+        mq.addEventListener('change', onChange);
+        return () => mq.removeEventListener('change', onChange);
+    }, []);
+
+    // Swipe in from the left edge to leave Settings — the digest sub-screen pops
+    // back to the main list first, then the page closes.
+    useEdgeSwipeBack(() => {
+        if (view === 'digest') setView('main');
+        else onClose();
+    }, isMobile && isOpen);
 
     useEffect(() => {
         if (isOpen && uid) {
@@ -221,9 +240,11 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex sm:items-center sm:justify-center sm:p-4">
+            {/* Desktop dims the page behind a centered modal; the full-screen
+                mobile page is opaque, so it needs no backdrop. */}
             <div
-                className="absolute inset-0 bg-background/70 backdrop-blur-md animate-in fade-in duration-300"
+                className="hidden sm:block absolute inset-0 bg-background/70 backdrop-blur-md animate-fade-in"
                 onClick={onClose}
             />
 
@@ -231,10 +252,13 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                 role="dialog"
                 aria-modal="true"
                 aria-label="Settings"
-                className="relative w-full max-w-lg max-h-[88vh] rounded-3xl bg-card border border-border-subtle shadow-[var(--shadow-card-hover)] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 safe-pt"
+                className={`relative w-full bg-card overflow-hidden flex flex-col shadow-[var(--shadow-card-hover)] h-full sm:h-auto sm:max-w-lg sm:max-h-[88vh] sm:rounded-3xl sm:border border-border-subtle ${isMobile ? 'animate-slide-in-left' : 'animate-fade-in'}`}
             >
                 {/* Header */}
-                <div className="relative flex items-center justify-between px-6 py-5 border-b border-border-subtle">
+                <div
+                    className="relative flex items-center justify-between px-6 py-5 border-b border-border-subtle"
+                    style={isMobile ? { paddingTop: 'calc(env(safe-area-inset-top) + 1.25rem)' } : undefined}
+                >
                     <div className="absolute inset-x-0 bottom-0 h-px bg-[image:var(--accent-gradient)] opacity-30" />
                     <div className="flex items-center gap-3">
                         {view === 'digest' ? (
@@ -540,7 +564,10 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-border-subtle flex items-center justify-end gap-2 bg-card">
+                <div
+                    className="px-6 py-4 border-t border-border-subtle flex items-center justify-end gap-2 bg-card"
+                    style={isMobile ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' } : undefined}
+                >
                     <button
                         onClick={onClose}
                         className="h-10 px-4 rounded-full text-sm font-semibold text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"

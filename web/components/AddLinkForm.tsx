@@ -5,6 +5,8 @@ import { Link, Plus, Loader2, X, Upload } from 'lucide-react';
 import { saveLink, getUserTags } from '@/lib/storage';
 import { appCheckHeaders } from '@/lib/firebase';
 import { apiUrl } from '@/lib/api';
+import { useVisualViewport } from '@/lib/useVisualViewport';
+import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { compressImage } from '@/lib/image';
@@ -72,6 +74,24 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
     const [isExpanded, setIsExpanded] = useState(false);
     const [progress, setProgress] = useState(0);
     const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // Mobile vs. desktop drives how the Add sheet is positioned: a keyboard-aware
+    // centered card on phones, a popover anchored to the FAB on desktop.
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 639px)');
+        const onChange = () => setIsMobile(mq.matches);
+        onChange();
+        mq.addEventListener('change', onChange);
+        return () => mq.removeEventListener('change', onChange);
+    }, []);
+
+    // Track the visible viewport so the sheet centers in the space above the
+    // keyboard (the URL field autofocuses, so the keyboard is up immediately).
+    const viewport = useVisualViewport();
+
+    // Swipe in from the left edge to dismiss the open sheet (iOS back gesture).
+    useEdgeSwipeBack(() => setIsExpanded(false), isMobile && isExpanded);
 
     // A YouTube link gets the "watching the video" progress treatment, since
     // native video analysis takes ~1 minute vs. a few seconds for a page.
@@ -217,7 +237,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
                     relatedLinks: data.link.relatedLinks,
                 });
             } catch (saveErr) {
-                throw new Error(`Could not save to your brain: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
+                throw new Error(`Could not save to Machina: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
             }
 
             // Let the scan progress (link, image, or video) land on "Done!" first.
@@ -228,7 +248,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
             setImageFile(null);
             setImagePreview(null);
             setIsExpanded(false);
-            toast.success('Saved to your brain');
+            toast.success('Saved to Machina');
             onLinkAdded();
         } catch (err) {
             const message = err instanceof Error ? err.message : `Unknown error: ${String(err)}`;
@@ -249,12 +269,25 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
                 />
             )}
 
-            {/* Expanded Form - Moved outside the FAB container to fix z-index stacking context */}
+            {/* Expanded Form - Moved outside the FAB container to fix z-index stacking context.
+                Mobile: centered in the space above the keyboard (driven by the visual
+                viewport) so it never jams up under the status bar. Desktop: a popover
+                anchored just above the FAB. */}
             {isExpanded && (
-                <div className="fixed top-24 sm:top-auto sm:bottom-28 inset-x-4 sm:left-auto sm:right-4 sm:w-96 max-w-[400px] mx-auto sm:mx-0 z-[70] animate-slide-up">
+                <div
+                    className={`fixed z-[70] ${isMobile ? '' : 'bottom-28 right-4 w-96 max-w-[400px] animate-slide-up'}`}
+                    style={isMobile && viewport.height
+                        ? {
+                            left: '1rem',
+                            right: '1rem',
+                            top: viewport.offsetTop + viewport.height / 2,
+                            transform: 'translateY(-50%)',
+                        }
+                        : undefined}
+                >
                     <form
                         onSubmit={handleSubmit}
-                        className="bg-card border border-white/10 rounded-2xl p-6 shadow-2xl relative overflow-hidden"
+                        className="bg-card border border-white/10 rounded-3xl p-6 shadow-2xl relative overflow-hidden animate-fade-in"
                         noValidate
                     >
                         {/* Close button */}
@@ -270,10 +303,10 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
                         <div className="mb-6">
                             <h3 className="text-xl font-bold text-text mb-1 flex items-center gap-2">
                                 <Link className="w-5 h-5 text-accent" />
-                                Add to Brain
+                                Add to Machina
                             </h3>
                             <p className="text-sm text-text-secondary">
-                                Capture anything to your second brain.
+                                Capture a link or image — Machina reads, summarizes, and files it.
                             </p>
                         </div>
 
@@ -371,8 +404,8 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
                                                 <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3">
                                                     <Upload className="w-6 h-6 text-accent" />
                                                 </div>
-                                                <p className="text-text font-medium text-sm">Tap to upload image</p>
-                                                <p className="text-text-muted text-xs mt-1">Screenshots, tweets, articles</p>
+                                                <p className="text-text font-medium text-sm">Tap to add an image</p>
+                                                <p className="text-text-muted text-xs mt-1 text-center px-2">A screenshot, tweet, or photo — Machina reads the text and saves what matters</p>
                                             </>
                                         )}
                                     </label>
