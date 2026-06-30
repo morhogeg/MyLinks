@@ -55,7 +55,28 @@ were already deployed and confirmed working.
 
 ---
 
-## Latest session — Server-rendered share previews (per-card OG) (2026-06-30)
+## Latest session — Fix share-to-app token bridge (plugin registration) (2026-06-30)
+
+**Symptom:** sharing into the app via the Share Extension showed "Open Machina and sign in
+first" and never created a card — the ingest token never reached the App Group.
+
+**Root cause:** Capacitor 8 + SPM does NOT auto-discover a plugin compiled into the *app
+target*. `ShareConfigPlugin` conformed to `CAPBridgedPlugin` but was never registered, so JS
+`registerPlugin('ShareConfig').save()` silently no-opped and the token was never written.
+
+**Fix (committed + pushed; needs a new TestFlight build):**
+- `web/ios/App/App/MainViewController.swift` — `CAPBridgeViewController` subclass that registers
+  the plugin in `capacitorDidLoad()` via `bridge?.registerPluginInstance(ShareConfigPlugin())`.
+- `Main.storyboard` root VC customClass → `MainViewController` (module `App`). Added the file to
+  `project.pbxproj`. Realigned App+ShareExt build numbers (had drifted to 5/4 → now matched).
+- Built + archived: `~/Downloads/Machina-build6.ipa` (ships as **build 7**, App+ShareExt matched;
+  Xcode live-bumps the number +1). `MainViewController` verified present in the binary.
+
+**To finish:** upload `~/Downloads/Machina-build6.ipa` to TestFlight (Transporter or Xcode
+Organizer), install, **open the app once while signed in** (writes the token to the App Group),
+then share a link/photo → card should be created. Memory `ios-app-capacitor` has the gotcha.
+
+## Earlier — Server-rendered share previews (per-card OG) (2026-06-30)
 
 **Problem:** sharing a card produced a `/s?id=…` link that previewed as the generic "Machina"
 app in WhatsApp/iMessage (no card title/image), because `/s` (and `/c`) were client-rendered
