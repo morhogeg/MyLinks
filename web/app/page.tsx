@@ -6,8 +6,20 @@ import Feed from "@/components/Feed";
 import AddLinkForm from "@/components/AddLinkForm";
 import InstallPWA from "@/components/InstallPWA";
 import SettingsModal from "@/components/SettingsModal";
-import { Brain, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
+
+/** The Machina mark — a luminous "M" drawn as a connecting line that converges
+ *  on a central node (a monochrome form of the app icon). Tints via currentColor. */
+function MachinaMark({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="15 17 70 70" className={className} fill="none" aria-hidden="true">
+      <path d="M24 74 L24 30 L50 54 L76 30 L76 74" stroke="currentColor"
+        strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="50" cy="54" r="6" fill="currentColor" />
+    </svg>
+  );
+}
 
 /**
  * Main dashboard page
@@ -28,7 +40,7 @@ export default function Home() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-purple-500/20 animate-pulse">
-            <Brain className="w-6 h-6 text-white" />
+            <MachinaMark className="w-7 h-7 text-white" />
           </div>
           <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
         </div>
@@ -46,15 +58,15 @@ export default function Home() {
           {/* Brand */}
           <div className="flex items-center gap-2.5 sm:gap-3">
             <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-purple-500/25 ring-1 ring-white/15">
-              <Brain className="w-[18px] h-[18px] sm:w-5 sm:h-5 text-white" />
+              <MachinaMark className="w-[19px] h-[19px] sm:w-[22px] sm:h-[22px] text-white" />
               <span className="absolute -inset-1 rounded-2xl bg-[image:var(--accent-gradient)] opacity-20 blur-md -z-10" />
             </div>
             <div className="leading-none">
               <h1 className="text-lg sm:text-xl font-extrabold tracking-tight bg-[image:var(--accent-gradient)] bg-clip-text text-transparent">
-                Machina
+                Machina AI
               </h1>
               <p className="mt-1 text-[10px] sm:text-[11px] font-medium text-text-muted tracking-wide">
-                Your knowledge, organized
+                Capture. Connect. Recall.
               </p>
             </div>
           </div>
