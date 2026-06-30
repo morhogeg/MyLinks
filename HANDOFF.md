@@ -1,6 +1,6 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-30. Branch: `claude/eloquent-ptolemy-5e56be` (merged + pushed to `main`)._
+_Last updated: 2026-06-30. Branch: `claude/blissful-mayer-275ff0` (committed + pushed to `main`)._
 
 ## ⚠️ IN-FLIGHT — YouTube channel name + deploys (READ FIRST)
 
@@ -55,7 +55,36 @@ were already deployed and confirmed working.
 
 ---
 
-## Latest session — Card/Collections/toolbar UX polish + verified in-browser (2026-06-30)
+## Latest session — Server-rendered share previews (per-card OG) (2026-06-30)
+
+**Problem:** sharing a card produced a `/s?id=…` link that previewed as the generic "Machina"
+app in WhatsApp/iMessage (no card title/image), because `/s` (and `/c`) were client-rendered
+pages in the static export — link-preview crawlers don't run JS, so they only saw the global
+OpenGraph tags.
+
+**Fix (deployed):** new Cloud Function **`share_page`** OWNS `/s` (card) and `/c` (collection)
+via Hosting rewrites and returns real server-rendered HTML — correct `og:title` / `og:description`
+/ `og:image` / `twitter:card` per item (crawler-friendly) plus a readable, RTL-aware (`dir="auto"`)
+card page for humans with no JS. Removed the static `web/app/s` + `web/app/c` pages and the
+now-dead `PublicShare.tsx` so the function owns the routes.
+- Files: `functions/main.py` (`share_page` + `_render_shared_card`/`_render_shared_collection`/
+  `_share_html_shell` helpers), `firebase.json` (rewrites for `/s`, `/c` before the `**` SPA
+  fallback).
+- **Deployed:** `./deploy-functions.sh functions:share_page` ✓ + `./deploy-hosting.sh` ✓. Pushed.
+- **Verified live** with real `shared_cards` ids: og:title = the card's Hebrew title, og:image =
+  the card's own screenshot (Storage URL), real `<h1>`. No iOS rebuild needed — the fix is the
+  hosting origin the share link already points at.
+
+**Preview image coverage:** screenshots/image cards → their image; YouTube → thumbnail; **plain
+web-article cards → fall back to the Machina icon** (the scraper only captures `og:image` for
+YouTube). FOLLOW-UP to make web cards preview with their real image: extract `og:image`/
+`twitter:image` in `functions/scraper.py`, store it as `metadata.thumbnailUrl` in
+`process_link_background` + `analyze_link`, and add a one-shot backfill for existing cards.
+
+Secondary (not changed): the in-app Share button uses `@capacitor/share` (installed); the
+"copied to clipboard" toast in the report was the graceful fallback — the link itself is correct.
+
+## Earlier — Card/Collections/toolbar UX polish + verified in-browser (2026-06-30)
 
 Frontend-only round. Shipped to web (Vercel push + `./deploy-hosting.sh`), rebuilt the iOS bundle,
 and **bumped both targets (App + ShareExt) to build 4**. No functions changed. Each fix was verified
