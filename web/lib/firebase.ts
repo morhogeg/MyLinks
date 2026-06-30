@@ -1,6 +1,14 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { getFirestore, initializeFirestore } from "firebase/firestore";
+import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, connectAuthEmulator } from "firebase/auth";
+
+// Inside the native iOS shell (Capacitor) the page is served from
+// capacitor://localhost. Firestore's default WebChannel transport fails to
+// establish over that custom scheme inside WKWebView and hangs every read, so
+// we force long-polling there. Plain browsers keep the default transport.
+const isCapacitor = typeof window !== 'undefined'
+    && (window.location.protocol === 'capacitor:'
+        || Boolean((window as unknown as { Capacitor?: unknown }).Capacitor));
 
 // Firebase web config comes from NEXT_PUBLIC_* env vars (Vercel has them; local
 // builds read web/.env.local). These values aren't secret — they ship in the
@@ -19,11 +27,19 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // Initialize Firestore
-export const db = getFirestore(app);
+export const db = isCapacitor
+    ? initializeFirestore(app, { experimentalForceLongPolling: true })
+    : getFirestore(app);
 
-// Initialize Auth - REVERSIBLE CHANGE (AUTH_PHASE_1)
-// To revert: Comment out the line below and remove getAuth from imports
-export const auth = getAuth(app);
+// Initialize Auth WITHOUT a popup/redirect resolver. getAuth() eagerly loads
+// Google's gapi iframe (apis.google.com/js/api.js) to check for redirect
+// sign-in results; that script throws under Capacitor's capacitor:// WKWebView
+// origin and aborts app startup (the React bundle never hydrates). We don't use
+// popup/redirect auth anywhere, so omitting the resolver skips loading gapi
+// entirely — harmless on the web, and it unblocks the iOS app.
+export const auth = initializeAuth(app, {
+    persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+});
 
 // Initialize Storage
 import { getStorage, connectStorageEmulator } from "firebase/storage";
@@ -72,7 +88,12 @@ export async function appCheckHeaders(): Promise<Record<string, string>> {
 // Connect to emulators on localhost
 import { connectFirestoreEmulator } from "firebase/firestore";
 
-if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+// Only the real local dev server (http://localhost:3000) should hit the
+// emulators. The bundled iOS app (Capacitor) also serves from "localhost" but
+// over the capacitor:// scheme — gating on http: keeps it on the prod backend.
+if (typeof window !== 'undefined'
+    && window.location.hostname === 'localhost'
+    && window.location.protocol === 'http:') {
     console.log('Detected localhost, connecting to Firebase Emulators...');
     connectFirestoreEmulator(db, 'localhost', 8080);
     connectStorageEmulator(storage, 'localhost', 9199);

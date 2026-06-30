@@ -1194,7 +1194,7 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                                                 filter === 'read' ? 'No read links yet' :
                                                     selectedCategory.size > 0 ? `No links in ${Array.from(selectedCategory).join(', ')}` :
                                                         selectedTags.size > 0 ? 'No links match selected tags' :
-                                                            'Your Second Brain is empty'}
+                                                            'Your Machina is empty'}
                             </h3>
                             {debouncedQuery && isSearching && (
                                 <div className="flex items-center justify-center gap-2 text-accent mt-2">

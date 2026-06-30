@@ -8,6 +8,7 @@ import remarkBreaks from 'remark-breaks';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS, xHandle, linkedinDisplayName } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
+import { apiUrl } from '@/lib/api';
 import { ChatMessage, ChatSource, ChatSession } from '@/lib/types';
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
 import ConfirmDialog from './ConfirmDialog';
@@ -365,7 +366,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         setIsThinking(true);
 
         try {
-            const res = await fetch('/api/chat', {
+            const res = await fetch(apiUrl('/api/chat'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

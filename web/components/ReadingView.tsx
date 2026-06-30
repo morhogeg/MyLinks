@@ -5,6 +5,7 @@ import { ArrowLeft, Minus, Plus, Volume2, Pause, Play, ExternalLink, BookOpen, L
 import { Link } from '@/lib/types';
 import { getDirection } from '@/lib/rtl';
 import { appCheckHeaders } from '@/lib/firebase';
+import { apiUrl } from '@/lib/api';
 
 interface Paragraph {
     type: 'p' | 'h2' | 'h3' | 'li' | 'blockquote';
@@ -48,7 +49,7 @@ export default function ReadingView({ link, onClose }: ReadingViewProps) {
             setLoading(true);
             setError(null);
             try {
-                const res = await fetch('/api/article', {
+                const res = await fetch(apiUrl('/api/article'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()) },
                     body: JSON.stringify({ url: link.url }),

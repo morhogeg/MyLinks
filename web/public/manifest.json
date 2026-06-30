@@ -1,6 +1,6 @@
 {
-  "name": "Second Brain",
-  "short_name": "SecondBrain",
+  "name": "Machina",
+  "short_name": "Machina",
   "description": "Your AI-powered knowledge capture and retrieval system",
   "start_url": "/",
   "display": "standalone",

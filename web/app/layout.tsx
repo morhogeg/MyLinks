@@ -13,13 +13,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Second Brain",
+  title: "Machina",
   description: "Your AI-powered knowledge capture and retrieval system",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Second Brain",
+    title: "Machina",
   },
   icons: {
     apple: "/apple-touch-icon.png",
@@ -50,7 +50,7 @@ export default function RootLayout({
         {/* PWA iOS meta tags */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Second Brain" />
+        <meta name="apple-mobile-web-app-title" content="Machina" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body
