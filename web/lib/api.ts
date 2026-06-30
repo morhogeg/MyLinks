@@ -13,3 +13,16 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? '';
 export function apiUrl(path: string): string {
     return API_BASE ? `${API_BASE}${path}` : path;
 }
+
+/**
+ * True when running inside the bundled native shell (Capacitor's WKWebView)
+ * rather than a normal browser tab. The shell serves from capacitor://localhost
+ * and injects a global `Capacitor`. Some web APIs behave differently there — most
+ * notably streamed (SSE) response bodies, which the WKWebView fetch handles
+ * unreliably — so callers branch on this to pick the robust path.
+ */
+export function isNativeApp(): boolean {
+    if (typeof window === 'undefined') return false;
+    return window.location.protocol === 'capacitor:'
+        || Boolean((window as unknown as { Capacitor?: unknown }).Capacitor);
+}

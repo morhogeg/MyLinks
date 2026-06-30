@@ -8,7 +8,8 @@ import remarkBreaks from 'remark-breaks';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS, xHandle, linkedinDisplayName } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
-import { apiUrl } from '@/lib/api';
+import { apiUrl, isNativeApp } from '@/lib/api';
+import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { ChatMessage, ChatSource, ChatSession } from '@/lib/types';
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
 import ConfirmDialog from './ConfirmDialog';
@@ -166,6 +167,13 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         mq.addEventListener('change', onChange);
         return () => mq.removeEventListener('change', onChange);
     }, []);
+
+    // Swipe in from the left edge to go back — closes the history drawer first if
+    // it's open, otherwise leaves Ask mode (matching the iOS pop gesture).
+    useEdgeSwipeBack(() => {
+        if (historyOpen) setHistoryOpen(false);
+        else onExit?.();
+    }, isMobile);
 
     // Drive the mobile surface height from the visual viewport with *direct DOM
     // writes* (no React re-render) so it tracks the keyboard frame-for-frame
@@ -365,15 +373,21 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         setInput('');
         setIsThinking(true);
 
+        // The native shell's WKWebView reads streamed (SSE) response bodies
+        // unreliably and aborts mid-stream, which surfaced as "Couldn't reach
+        // Machina". So in the app we ask for a single buffered JSON answer; the
+        // browser still streams token-by-token.
+        const wantStream = !isNativeApp();
+
         try {
             const res = await fetch(apiUrl('/api/chat'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Accept: 'text/event-stream',
+                    Accept: wantStream ? 'text/event-stream' : 'application/json',
                     ...(await appCheckHeaders()),
                 },
-                body: JSON.stringify({ uid, question, history, stream: true }),
+                body: JSON.stringify({ uid, question, history, stream: wantStream }),
             });
 
             const contentType = res.headers.get('content-type') || '';
@@ -423,7 +437,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                             patchLast({ sources: evt.sources || [] });
                         } else if (evt.type === 'error') {
                             setIsThinking(false);
-                            patchLast({ content: evt.error || 'Something went wrong reaching your brain. Please try again.', error: true });
+                            patchLast({ content: evt.error || 'Something went wrong reaching Machina. Please try again.', error: true });
                             done = true;
                         } else if (evt.type === 'done') {
                             done = true;
@@ -445,14 +459,14 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
             } else {
                 setMessages(prev => [...prev, {
                     role: 'assistant',
-                    content: data.error || 'Something went wrong reaching your brain. Please try again.',
+                    content: data.error || 'Something went wrong reaching Machina. Please try again.',
                     error: true,
                 }]);
             }
         } catch {
             setMessages(prev => [...prev, {
                 role: 'assistant',
-                content: 'Could not reach your brain. Check your connection and try again.',
+                content: 'Couldn’t reach Machina. Check your connection and try again.',
                 error: true,
             }]);
         } finally {
@@ -475,8 +489,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                 <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-accent/20">
                     <Brain className="w-8 h-8 text-white" />
                 </div>
-                <h3 className="text-lg font-medium text-text mb-2">Your brain is empty</h3>
-                <p className="text-text-secondary text-sm">Save a few links first, then ask me anything about them.</p>
+                <h3 className="text-lg font-medium text-text mb-2">Nothing in Machina yet</h3>
+                <p className="text-text-secondary text-sm">Save a few links first, then ask Machina anything about them.</p>
             </div>
         );
     }
@@ -487,9 +501,15 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
     // both layouts; the desktop layout wraps it next to the history sidebar.
     const chatColumn = (
         <div className={isMobile ? 'flex flex-col flex-1 min-h-0' : 'flex flex-col flex-1 min-w-0 min-h-0 h-full sm:ps-5'}>
-            {/* Mobile-only top bar: back, history, title, New chat. */}
+            {/* Mobile-only top bar: back, history, title, New chat. The fixed Ask
+                overlay sits at the very top of the screen (it's position:fixed, so
+                it ignores the body's safe-area padding), so the bar pads itself
+                down past the status bar / notch. */}
             {isMobile && (
-                <div className="flex items-center gap-1 px-2 h-12 shrink-0 border-b border-border-subtle">
+                <div
+                    className="flex items-center gap-1 px-2 h-12 shrink-0 border-b border-border-subtle"
+                    style={{ paddingTop: 'env(safe-area-inset-top)', boxSizing: 'content-box' }}
+                >
                     <button
                         onClick={onExit}
                         aria-label="Back"
@@ -504,7 +524,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                     >
                         <MessagesSquare className="w-5 h-5" />
                     </button>
-                    <span className="font-semibold text-text truncate">Ask your brain</span>
+                    <span className="font-semibold text-text truncate">Ask Machina</span>
                     {!isEmpty && (
                         <button
                             onClick={newChat}
@@ -529,7 +549,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                         <div className="w-14 h-14 mb-4 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-accent/20">
                             <MessageCircleQuestion className="w-7 h-7 text-white" />
                         </div>
-                        <h2 className="text-xl font-semibold text-text mb-1.5">Ask your brain</h2>
+                        <h2 className="text-xl font-semibold text-text mb-1.5">Ask Machina</h2>
                         <p className="text-text-secondary text-sm max-w-md mb-6">
                             Ask anything about the {totalLinks} {totalLinks === 1 ? 'thing' : 'things'} you&apos;ve saved.
                             Answers come only from your library, with sources you can open.
