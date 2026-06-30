@@ -50,13 +50,27 @@ logger = logging.getLogger(__name__)
 APP_URL = os.environ.get("APP_URL", "https://secondbrain-app-94da2.web.app")
 
 # Comma-separated allowlist of origins permitted to call these endpoints.
-# Defaults to the app's own Firebase Hosting + firebaseapp.com origins when
-# unset. Set CORS_ORIGIN to "*" only for local debugging — never in prod.
+# Defaults to the app's own Firebase Hosting + firebaseapp.com origins, plus the
+# native iOS shell's WebView origins, when unset. Set CORS_ORIGIN to "*" only for
+# local debugging — never in prod.
+#
+# The bundled iOS app (Capacitor) serves the WebView from `capacitor://localhost`
+# (older builds / iOS configs may use `https://localhost` or `ionic://localhost`),
+# so its cross-origin /api/* fetches send that as the Origin. Without these on the
+# allowlist the CORS preflight is rejected and the WebView fails every call with a
+# bare "Load failed". These are defense-in-depth only — the endpoints still enforce
+# App Check + rate limits + POST-only.
 def _allowed_origins() -> list:
     raw = os.environ.get("CORS_ORIGIN", "").strip()
     if raw:
         return [o.strip() for o in raw.split(",") if o.strip()]
-    return [APP_URL, "https://secondbrain-app-94da2.firebaseapp.com"]
+    return [
+        APP_URL,
+        "https://secondbrain-app-94da2.firebaseapp.com",
+        "capacitor://localhost",
+        "ionic://localhost",
+        "https://localhost",
+    ]
 
 
 def _resolve_origin(req=None) -> str:
