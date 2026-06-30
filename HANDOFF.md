@@ -78,6 +78,11 @@ IP hostname bypasses the emulator gate — `localhost`+`http` would hit emulator
      keeps its label on `sm+`.
 4. **`CategoryInput.tsx`** — default value to `''` (kills a controlled→uncontrolled React warning
    for category-less links).
+5. **Tag picker rebuilt** (`TagInput.tsx`) — the open-card "Add tag" dropdown rendered as a big
+   centered floating panel on mobile (detached from the input, ignoring the keyboard). Mobile now
+   gets a proper **bottom sheet above the keyboard** (visual viewport) with a search/create field +
+   a scrollable full-width tag list (applied tags checked). Desktop keeps its anchored dropdown.
+   Folded into **build 8** (was rebuilt after the version bump; build not yet archived).
 
 Earlier this same session (already on `main`, shipped): the open-card toolbar rebuild
 (non-clipping scroll row + pinned close + edge-swipe-close), removed the logo's pink halo,
