@@ -45,7 +45,7 @@ type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
  * - Multiple view modes (grid / compact / table / insights)
  * - Deep linking to specific links via URL params
  */
-function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) => void }) {
+function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void }) {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
@@ -592,10 +592,15 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
     const activeMobileFilters =
         (filter !== 'all' ? 1 : 0) + selectedPlatforms.size + (screenshotOnly ? 1 : 0) + selectedTags.size + selectedCollections.size;
 
-    // Tell the page when we're in Ask mode so it can hide the add-link FAB.
+    // Tell the page when we're in Ask mode (drives the full-height chat layout).
     useEffect(() => {
         onAskModeChange?.(viewMode === 'ask');
     }, [viewMode, onAskModeChange]);
+
+    // Hide the add-link FAB in Ask *and* Collections — neither view captures links.
+    useEffect(() => {
+        onHideAddButton?.(viewMode === 'ask' || viewMode === 'collections');
+    }, [viewMode, onHideAddButton]);
 
     if (isLoading) {
         return (
@@ -658,6 +663,15 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                             <Layers className="w-5 h-5 text-accent" />
                             Collections
                         </h2>
+                        {/* Explicit add affordance — the only way to create a collection. */}
+                        <button
+                            onClick={openNewCollectionForm}
+                            title="New collection"
+                            aria-label="New collection"
+                            className="ms-auto shrink-0 inline-flex items-center justify-center h-9 w-9 rounded-full bg-accent text-white shadow-sm shadow-accent/20 hover:bg-accent-hover transition-colors cursor-pointer"
+                        >
+                            <Plus className="w-5 h-5" />
+                        </button>
                     </div>
                 ) : (
                     <div className="relative">
@@ -772,24 +786,45 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                     </div>
                 </div>
 
-                {/* Mobile: collapse the category chips into one button that opens a sheet. */}
-                <button
-                    onClick={() => setIsCategoriesOpen(true)}
-                    aria-label="Filter by category"
-                    className={`${ctrlBase} sm:hidden w-full justify-between px-3.5 ${selectedCategory.size > 0
-                        ? 'bg-accent text-white border border-accent shadow-sm'
-                        : ctrlIdle
-                        }`}
-                >
-                    <span className="inline-flex items-center gap-1.5">
-                        <LayoutGrid className="w-4 h-4" />
-                        {selectedCategory.size === 0
-                            ? 'All Categories'
-                            : `${selectedCategory.size} ${selectedCategory.size === 1 ? 'category' : 'categories'}`}
-                    </span>
-                    <ChevronDown className="w-4 h-4 opacity-60" />
-                </button>
                 </>)}
+
+                {/* Mobile: category selector + Filters share one row (saves a line vs.
+                    a full-width category button stacked above the toolbar). */}
+                {isLibraryView && (
+                    <div className="flex sm:hidden items-center gap-2">
+                        {selectedCollections.size === 0 && (
+                            <button
+                                onClick={() => setIsCategoriesOpen(true)}
+                                aria-label="Filter by category"
+                                className={`${ctrlBase} flex-1 min-w-0 justify-between px-3.5 ${selectedCategory.size > 0
+                                    ? 'bg-accent text-white border border-accent shadow-sm'
+                                    : ctrlIdle
+                                    }`}
+                            >
+                                <span className="inline-flex items-center gap-1.5 min-w-0">
+                                    <LayoutGrid className="w-4 h-4 shrink-0" />
+                                    <span className="truncate">
+                                        {selectedCategory.size === 0
+                                            ? 'All Categories'
+                                            : `${selectedCategory.size} ${selectedCategory.size === 1 ? 'category' : 'categories'}`}
+                                    </span>
+                                </span>
+                                <ChevronDown className="w-4 h-4 opacity-60 shrink-0" />
+                            </button>
+                        )}
+                        <button
+                            onClick={() => setIsFiltersOpen(true)}
+                            aria-label="Filters"
+                            className={`${ctrlBase} shrink-0 px-3.5 ${activeMobileFilters > 0
+                                ? 'bg-accent text-white border border-accent shadow-sm'
+                                : ctrlIdle
+                                }`}
+                        >
+                            <Filter className="w-4 h-4" />
+                            <span>Filters{activeMobileFilters > 0 ? ` (${activeMobileFilters})` : ''}</span>
+                        </button>
+                    </div>
+                )}
 
                 {/* Row 2: Toolbar — filter / sort / source on the left, view & actions on the
                     right. Card-browsing layouts only; Ask and Collections hide it. */}
@@ -872,21 +907,7 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                         </>)}
                     </div>
 
-                    {/* Mobile: a single Filters entry opens the sheet (desktop shows the
-                        controls inline above). Hidden in Ask mode. */}
-                    {isLibraryView && (
-                        <button
-                            onClick={() => setIsFiltersOpen(true)}
-                            aria-label="Filters"
-                            className={`${ctrlBase} sm:hidden px-3.5 ${activeMobileFilters > 0
-                                ? 'bg-accent text-white border border-accent shadow-sm'
-                                : ctrlIdle
-                                }`}
-                        >
-                            <Filter className="w-4 h-4" />
-                            <span>Filters{activeMobileFilters > 0 ? ` (${activeMobileFilters})` : ''}</span>
-                        </button>
-                    )}
+                    {/* (Mobile Filters now lives on the category row above, to save a line.) */}
 
                     <div className="flex items-center gap-2">
                         {/* Collections — opens the dedicated Collections gallery. */}
@@ -1383,7 +1404,6 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
                             collections={collections}
                             links={links}
                             onOpen={openCollection}
-                            onNew={openNewCollectionForm}
                             onEdit={openEditCollectionForm}
                             onShare={handleShareCollection}
                             onDelete={(col) => setConfirmDeleteCollection(col)}
@@ -1614,14 +1634,14 @@ function FeedContent({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) =
     );
 }
 
-export default function Feed({ onAskModeChange }: { onAskModeChange?: (isAsk: boolean) => void }) {
+export default function Feed({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void }) {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
             </div>
         }>
-            <FeedContent onAskModeChange={onAskModeChange} />
+            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} />
         </Suspense>
     );
 }

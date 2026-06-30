@@ -17,6 +17,7 @@ export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAskMode, setIsAskMode] = useState(false);
+  const [hideAddButton, setHideAddButton] = useState(false);
 
   const handleLinkAdded = () => {
     setRefreshKey(prev => prev + 1);
@@ -46,11 +47,10 @@ export default function Home() {
         <div className="w-full max-w-[2200px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 flex items-center justify-between">
           {/* Brand */}
           <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl overflow-hidden shadow-lg shadow-purple-500/25 ring-1 ring-white/15">
+            <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl overflow-hidden shadow-lg shadow-black/10 ring-1 ring-black/5 dark:ring-white/10">
               {/* The exact app icon, so the in-app mark matches the home-screen icon. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
-              <span className="absolute -inset-1 rounded-2xl bg-[image:var(--accent-gradient)] opacity-20 blur-md -z-10" />
             </div>
             <div className="leading-none">
               <h1 className="text-lg sm:text-xl font-extrabold tracking-tight bg-[image:var(--accent-gradient)] bg-clip-text text-transparent">
@@ -80,11 +80,11 @@ export default function Home() {
       {/* Main Content — Ask mode fills to the viewport bottom, so it drops the
           tall bottom padding the grid uses for the FAB. */}
       <main className={`max-w-[2200px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-2 sm:py-4 ${isAskMode ? 'pb-0 sm:pb-0' : 'pb-24 sm:pb-20'}`}>
-        <Feed key={refreshKey} onAskModeChange={setIsAskMode} />
+        <Feed key={refreshKey} onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} />
       </main>
 
-      {/* Add Link FAB — hidden in Ask mode (the composer is the primary action there) */}
-      <AddLinkForm onLinkAdded={handleLinkAdded} hidden={isAskMode} />
+      {/* Add Link FAB — hidden in Ask & Collections (neither view captures links). */}
+      <AddLinkForm onLinkAdded={handleLinkAdded} hidden={hideAddButton} />
 
       {/* Settings Modal */}
       {uid && (
