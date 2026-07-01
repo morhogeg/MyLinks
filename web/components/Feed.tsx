@@ -1656,7 +1656,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                     link={link}
                                     onOpenDetails={(link) => setActiveLinkId(link.id)}
                                     onStatusChange={handleStatusChange}
-                                    onTagClick={handleToggleTag}
+                                    onDelete={handleDelete}
                                     isSelectionMode={isSelectionMode}
                                     isSelected={selectedIds.has(link.id)}
                                     onToggleSelection={toggleSelection}
