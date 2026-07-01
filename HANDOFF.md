@@ -1,13 +1,14 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-30. Branch: `claude/eloquent-austin-00fb8c` (merged + pushed to `main`)._
+_Last updated: 2026-07-01. Branch: `claude/google-auth-implementation-wgblpr` (merged + pushed to `main`)._
 
-## Latest session — Google Sign-In, Phase 1 (web) — branch `claude/google-auth-implementation-wgblpr`
+## Latest session — Google Sign-In, Phase 1 (web) — 2026-07-01
 
 Started real auth. Full design (incl. the data-keying decision and Phases 2–3) is in **`AUTH_SPEC.md`**.
-This is the **P0 launch blocker** ("Session 0") finally moving. **Not yet merged/deployed** — on the
-feature branch; `tsc --noEmit` clean, lint clean (the one SettingsModal warning is pre-existing),
-`next build` fails only on offline Google Fonts (unrelated, as always).
+This is the **P0 launch blocker** ("Session 0") finally moving. **Merged to `main` and pushed** (Vercel
+desktop auto-deploys). `tsc --noEmit` clean, lint clean (the one SettingsModal warning is pre-existing).
+Merged the concurrent UI-unification round (below) in on the way — one import + one HANDOFF conflict,
+both trivial.
 
 **What shipped in the code (web only, deliberately non-bricking):**
 - **Google Sign-In gate on the web.** New `web/lib/auth.ts` (popup + redirect fallback, explicit
@@ -31,6 +32,81 @@ add prod domains to Firebase Auth **Authorized domains**; optionally set `NEXT_P
 (native `@capacitor-firebase/authentication` + Xcode config, and Cloud Functions verifying
 `Authorization: Bearer <idToken>` instead of trusting the body `uid` — client helper `getIdToken()`
 is already in place) and **Phase 3** (lock the rules). All detailed in `AUTH_SPEC.md`.
+
+**iPhone PWA follow-up:** run `./deploy-hosting.sh` to push the same gate to Firebase Hosting
+(`secondbrain-app-94da2.web.app`). **Native iOS app is untouched** (legacy path; no rebuild needed).
+
+## Earlier — UI unification round + build 15 (2026-06-30)
+
+Follow-up polish after the TestFlight build-14 check. Web-only + a build bump.
+`tsc --noEmit` clean.
+
+1. **Detail modal delete always visible** — `web/components/LinkDetailModal.tsx`. The Delete
+   button lived in the horizontally-scrolling action row, so when the reader (BookOpen) icon was
+   present it scrolled off-screen on narrow phones (looked "missing" on articles). Moved Delete
+   into the pinned-right cluster (with Open/Close) so every card shows it.
+2. **Removed the Compact view** — `web/components/Feed.tsx`. Dropped the `compact` viewMode from
+   the switcher (mobile + desktop) and its render branch; Cards is the default/fallback.
+   `CompactCard` no longer imported (component file left in place, now unused).
+3. **Collections header unified with Ask** — neutral (not purple) leading icon via
+   `MobileSubheader` (`text-accent` → `text-text-secondary`), and the purple circular `+`
+   replaced with Ask's subtle "＋ New" text button (both desktop inline + mobile overlay).
+4. **Home Ask button icon** — `MessageCircleQuestion` → `MessagesSquare` (the bubbles icon from
+   the Ask top bar).
+5. **Categories section icon** — in the Categories & Tags sheet, the `Categories` label icon was
+   `LayoutGrid` (identical to the Cards view icon); now `Shapes`.
+
+**iOS native:** build bumped **14 → 15** on both targets (App + ShareExt) — build 14 is already on
+TestFlight, so these web changes need a new number. Archive on a Mac.
+
+## Earlier — iOS UI refinements round (2026-06-30)
+
+Six requested UI refinements, all web/native-frontend (no backend change), plus a
+build-resilience fix. `tsc --noEmit` clean; static export builds offline after the font fix.
+
+1. **New vertical List view** — `web/components/ListCard.tsx` (new): full-width, glanceable
+   rows (headline + category colour cue + one tag chip + star) for fast scrolling. Wired into
+   `Feed.tsx` as a new `list` viewMode with its own **List** icon/label in the view switcher
+   (between Cards and Compact).
+2. **Chat-row ••• placement** — `web/components/ChatHistorySidebar.tsx`. The actions button is
+   now a real flex sibling (was an absolute overlay), so long truncated chat names no longer
+   collide with the dots; fixed-width slot reserves space (no hover reflow), dots stay centred.
+3. **Faceted Categories & Tags counts** — `web/components/Feed.tsx`. Category and tag counts now
+   recompute against the *other* facet's selection (each excludes its own), so picking e.g.
+   "Tech" drops a non-overlapping tag to 0. Pure client-side, no extra reads.
+4. **Native link-share scan loader** — `web/ios/App/ShareExt/ShareViewController.swift`. Shared
+   links/text now get a native scan HUD mirroring `LinkScanProgress.tsx` (favicon + host +
+   skeleton page behind the sweep, link glyph, %/phase labels, bar) instead of the plain spinner.
+   Generalised the existing image-scan flow with an `isLinkFlow` path + `presentLinkScan`.
+5. **Delete dialog copy** — `Feed.tsx` / `ConfirmDialog.tsx`: "second brain" → "Machina".
+6. **Settings open animation** — `globals.css` + `SettingsModal.tsx`: replaced the spring
+   overshoot (`--ease-spring`, the "bump") with a no-overshoot iOS push curve
+   (`cubic-bezier(0.32,0.72,0,1)`, new `.animate-ios-push`). Chat drawer left as-is.
+
+7. **Mobile search collapsed to an icon** — `web/components/Feed.tsx`. Removed the always-on
+   full-width search bar on mobile (desktop keeps it); search now lives as an icon on the single
+   `Categories & Tags · Filters/Sort · Search` line and expands into a large field in place
+   (autofocus, clear, Done; icon reads accent while a query is active). Reclaims the vertical
+   space the bar took, pushing the grid up.
+8. **List view polish** — `web/components/ListCard.tsx`. Trailing chip is now the **category**
+   colour pill (was a tag); source shows its **home-screen brand icon** (X/Facebook/YouTube… via
+   `platformIcon` + `platformColor`, text fallback for generic hosts); titles use **line-clamp-2**
+   (better truncation); added **swipe actions** (touch): swipe right → delete (branded confirm),
+   swipe left → favourite, with revealed red/yellow action zones. `onDelete` now passed to
+   ListCard from `Feed.tsx`.
+
+**Build resilience:** `web/app/layout.tsx` now self-hosts Geist via the `geist` package instead
+of `next/font/google`, so the build never fetches `fonts.googleapis.com` (same CSS var names;
+globals.css unchanged). Added `geist` to `web/package.json`.
+
+**iOS native:** build bumped **13 → 14** on both targets (App + ShareExt) for the Swift
+Share-Extension link-scan HUD. **Not archived here** (this Linux cloud session has no macOS/Xcode
+and no `web/.env.local`, so it can't produce a valid bundle). Archive on a Mac.
+
+**Deploy status:** Desktop **Vercel deployed** (all 7 changes on `main`, FF). iPhone **Firebase
+Hosting NOT deployed from here** (no `web/.env.local` Firebase secrets in the cloud clone). On a
+local Mac: `git pull origin main` → `./deploy-hosting.sh` (iPhone web) and `./build-ios.sh` →
+Xcode archive → Organizer → Distribute → TestFlight (build 14).
 
 ## Earlier — iOS QA items #5–#10 + build 13 (2026-06-30)
 

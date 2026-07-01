@@ -451,6 +451,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
 
                 {/* FAB Button */}
                 <button
+                    data-tour="add"
                     onClick={() => setIsExpanded(!isExpanded)}
                     className={`w-14 h-14 min-h-[44px] min-w-[44px] rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${isExpanded
                         ? 'bg-card border border-white/10 rotate-45 scale-90 opacity-0 pointer-events-none'

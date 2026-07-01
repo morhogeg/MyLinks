@@ -59,7 +59,7 @@ export default function MobileSubheader({
             {leading}
 
             {icon && (
-                <span className="flex items-center text-accent shrink-0">{icon}</span>
+                <span className="flex items-center text-text-secondary shrink-0">{icon}</span>
             )}
 
             <span className="font-semibold text-text truncate">{title}</span>

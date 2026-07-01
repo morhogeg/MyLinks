@@ -136,25 +136,23 @@ function ChatRow({
             <button
                 onClick={onSelect}
                 title={chat.title}
-                className="flex-1 min-w-0 flex flex-col items-start text-start ps-3.5 pe-3 py-2 min-h-[42px] justify-center cursor-pointer"
+                className="flex-1 min-w-0 flex flex-col items-start text-start ps-3.5 pe-1 py-2 min-h-[42px] justify-center cursor-pointer"
             >
                 <span className={`w-full truncate text-sm leading-snug ${active ? 'font-medium text-text' : 'text-text-secondary'}`}>
                     {chat.title}
                 </span>
                 <span className="text-[11px] text-text-muted">{relativeTime(chat.updatedAt)}</span>
             </button>
-            {/* Row actions. A single calm "more" affordance on the trailing edge keeps
-                the row reading as just title + time. On mobile it's always present but
-                quiet; on desktop it fades in on hover over a soft transparent-to-card
-                gradient so the icon sits elegantly with no harsh grey block. */}
+            {/* Row actions. A single calm "more" affordance, laid out as a real flex
+                sibling (not an overlay) so the title always truncates with room to
+                spare and the dots never crowd a long name. The fixed-width slot
+                reserves its space even while the button is hover-hidden on desktop,
+                so revealing it never reflows the row. The dots stay vertically
+                centered on the title + time block. */}
             <div
                 ref={menuRef}
-                className="absolute end-1 inset-y-0 flex items-center"
+                className="relative shrink-0 self-stretch flex items-center justify-center w-9 pe-1"
             >
-                {/* Gradient scrim — only on desktop hover, fades the title's tail under
-                    the icon instead of stamping a grey box over it. Direction-aware so
-                    the fade always runs toward the trailing edge in LTR and RTL. */}
-                <span className="pointer-events-none absolute end-0 inset-y-0 w-16 rounded-e-xl opacity-0 hidden sm:block sm:group-hover:opacity-100 transition-opacity bg-gradient-to-l from-card-hover via-card-hover/80 to-transparent rtl:bg-gradient-to-r" />
                 <button
                     onClick={(e) => { e.stopPropagation(); if (menuOpen) setMenuOpen(false); else openMenu(); }}
                     aria-label="Chat actions"

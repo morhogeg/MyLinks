@@ -62,10 +62,21 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     private let hintLabel = UILabel()             // "You can close this…"
     private var barFillWidth: NSLayoutConstraint!
 
+    // MARK: Link scan HUD (mirrors web/components/LinkScanProgress.tsx)
+    // A faux page preview — favicon + host + skeleton lines — shown behind the
+    // dim + sweep when the user shares a link/text instead of an image, so links
+    // get the same polished "reading…" treatment images already get.
+    private let linkPreview = UIView()            // faux page container
+    private let faviconView = UIImageView()       // site favicon (or globe fallback)
+    private let hostLabel = UILabel()             // the link's host
+    private let linkGlyph = UIImageView()         // link icon above the % counter
+    private var faviconTask: URLSessionDataTask?
+
     private var displayLink: CADisplayLink?
     private var progress: CGFloat = 0             // 0…100, what's shown on screen
     private var ceiling: CGFloat = 90             // animation eases toward this while uploading
     private var isImageFlow = false
+    private var isLinkFlow = false
     private var finished = false
     private var resultShown = false
 
@@ -204,6 +215,16 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         checkLabel.translatesAutoresizingMaskIntoConstraints = false
         previewView.addSubview(checkLabel)
 
+        // Link icon, shown above the % counter in link mode (mirrors the web
+        // link loader). Hidden in image mode.
+        linkGlyph.image = UIImage(systemName: "link",
+                                  withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .semibold))
+        linkGlyph.tintColor = Self.accent
+        linkGlyph.contentMode = .center
+        linkGlyph.isHidden = true
+        linkGlyph.translatesAutoresizingMaskIntoConstraints = false
+        previewView.addSubview(linkGlyph)
+
         // Phase label.
         phaseLabel.text = "Uploading…"
         phaseLabel.font = .systemFont(ofSize: 14, weight: .medium)
@@ -266,6 +287,9 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             checkLabel.centerXAnchor.constraint(equalTo: percentLabel.centerXAnchor),
             checkLabel.centerYAnchor.constraint(equalTo: percentLabel.centerYAnchor),
 
+            linkGlyph.centerXAnchor.constraint(equalTo: percentLabel.centerXAnchor),
+            linkGlyph.bottomAnchor.constraint(equalTo: percentLabel.topAnchor, constant: -2),
+
             phaseLabel.topAnchor.constraint(equalTo: percentLabel.bottomAnchor, constant: 4),
             phaseLabel.leadingAnchor.constraint(equalTo: previewView.leadingAnchor, constant: 12),
             phaseLabel.trailingAnchor.constraint(equalTo: previewView.trailingAnchor, constant: -12),
@@ -290,6 +314,83 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             scanCloseButton.widthAnchor.constraint(equalToConstant: 30),
             scanCloseButton.heightAnchor.constraint(equalToConstant: 30),
         ])
+
+        setupLinkPreview()
+    }
+
+    /// Builds the faux-page preview (favicon + host + skeleton lines) that sits
+    /// behind the dim + sweep in link mode. Mirrors the skeleton page in
+    /// web/components/LinkScanProgress.tsx.
+    private func setupLinkPreview() {
+        linkPreview.backgroundColor = UIColor(white: 0.10, alpha: 1)
+        linkPreview.isHidden = true
+        linkPreview.translatesAutoresizingMaskIntoConstraints = false
+        // Behind the dim overlay so the scan line and status still read clearly.
+        previewView.insertSubview(linkPreview, aboveSubview: imageView)
+
+        faviconView.contentMode = .scaleAspectFit
+        faviconView.layer.cornerRadius = 4
+        faviconView.clipsToBounds = true
+        faviconView.tintColor = UIColor(white: 1, alpha: 0.6)
+        faviconView.translatesAutoresizingMaskIntoConstraints = false
+        linkPreview.addSubview(faviconView)
+
+        hostLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        hostLabel.textColor = UIColor(white: 1, alpha: 0.75)
+        hostLabel.lineBreakMode = .byTruncatingTail
+        hostLabel.translatesAutoresizingMaskIntoConstraints = false
+        linkPreview.addSubview(hostLabel)
+
+        // Skeleton: a title line, then body lines of decreasing width.
+        let title = skeletonLine(alpha: 0.10)
+        let b1 = skeletonLine(alpha: 0.06)
+        let b2 = skeletonLine(alpha: 0.06)
+        let b3 = skeletonLine(alpha: 0.06)
+        [title, b1, b2, b3].forEach { linkPreview.addSubview($0) }
+
+        NSLayoutConstraint.activate([
+            linkPreview.topAnchor.constraint(equalTo: previewView.topAnchor),
+            linkPreview.leadingAnchor.constraint(equalTo: previewView.leadingAnchor),
+            linkPreview.trailingAnchor.constraint(equalTo: previewView.trailingAnchor),
+            linkPreview.bottomAnchor.constraint(equalTo: previewView.bottomAnchor),
+
+            faviconView.topAnchor.constraint(equalTo: linkPreview.topAnchor, constant: 14),
+            faviconView.leadingAnchor.constraint(equalTo: linkPreview.leadingAnchor, constant: 14),
+            faviconView.widthAnchor.constraint(equalToConstant: 18),
+            faviconView.heightAnchor.constraint(equalToConstant: 18),
+
+            hostLabel.centerYAnchor.constraint(equalTo: faviconView.centerYAnchor),
+            hostLabel.leadingAnchor.constraint(equalTo: faviconView.trailingAnchor, constant: 8),
+            hostLabel.trailingAnchor.constraint(lessThanOrEqualTo: linkPreview.trailingAnchor, constant: -14),
+
+            title.topAnchor.constraint(equalTo: faviconView.bottomAnchor, constant: 12),
+            title.leadingAnchor.constraint(equalTo: linkPreview.leadingAnchor, constant: 14),
+            title.heightAnchor.constraint(equalToConstant: 9),
+            title.widthAnchor.constraint(equalTo: linkPreview.widthAnchor, multiplier: 0.62),
+
+            b1.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 10),
+            b1.leadingAnchor.constraint(equalTo: title.leadingAnchor),
+            b1.heightAnchor.constraint(equalToConstant: 6),
+            b1.widthAnchor.constraint(equalTo: linkPreview.widthAnchor, multiplier: 0.82),
+
+            b2.topAnchor.constraint(equalTo: b1.bottomAnchor, constant: 7),
+            b2.leadingAnchor.constraint(equalTo: title.leadingAnchor),
+            b2.heightAnchor.constraint(equalToConstant: 6),
+            b2.widthAnchor.constraint(equalTo: linkPreview.widthAnchor, multiplier: 0.70),
+
+            b3.topAnchor.constraint(equalTo: b2.bottomAnchor, constant: 7),
+            b3.leadingAnchor.constraint(equalTo: title.leadingAnchor),
+            b3.heightAnchor.constraint(equalToConstant: 6),
+            b3.widthAnchor.constraint(equalTo: linkPreview.widthAnchor, multiplier: 0.50),
+        ])
+    }
+
+    private func skeletonLine(alpha: CGFloat) -> UIView {
+        let v = UIView()
+        v.backgroundColor = UIColor(white: 1, alpha: alpha)
+        v.layer.cornerRadius = 3
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
     }
 
     /// Gradient (transparent -> accent -> transparent) for the sweep band, plus a
@@ -299,7 +400,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     private var sweepConfigured = false
 
     private func layoutSweepGradient() {
-        guard isImageFlow else { return }
+        guard isImageFlow || isLinkFlow else { return }
         // The sweep band spans 20% of the preview height (matches h-1/5 in web).
         let bandHeight = max(previewView.bounds.height * 0.20, 1)
         let bandWidth = previewView.bounds.width
@@ -343,9 +444,17 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
 
     // MARK: - Progress animation (cosmetic, upload-anchored)
 
-    /// Phase label from progress — mirrors phaseFor() in ImageScanProgress.tsx.
+    /// Phase label from progress — mirrors phaseFor() in the matching web loader
+    /// (LinkScanProgress.tsx for links, ImageScanProgress.tsx for images).
     private func phase(for p: CGFloat) -> String {
         if p >= 100 { return "Done!" }
+        if isLinkFlow {
+            if p >= 92 { return "Organizing & tagging…" }
+            if p >= 72 { return "Writing the summary…" }
+            if p >= 50 { return "Understanding the content…" }
+            if p >= 25 { return "Reading the page…" }
+            return "Fetching the link…"
+        }
         if p >= 95 { return "Finishing up…" }
         if p >= 80 { return "Organizing & tagging…" }
         if p >= 60 { return "Understanding content…" }
@@ -354,8 +463,9 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         return "Uploading…"
     }
 
+    /// Reveal the scan HUD and start the cosmetic progress animation. The caller
+    /// sets isImageFlow / isLinkFlow (and the matching preview) before calling.
     private func beginScanAnimation() {
-        isImageFlow = true
         card.isHidden = true
         scanContainer.isHidden = false
         displayLink = CADisplayLink(target: self, selector: #selector(tick))
@@ -380,6 +490,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             percentLabel.alpha = 0
             checkLabel.alpha = 1
             sweepView.isHidden = true
+            linkGlyph.alpha = 0
         }
         // Animate the bar width change smoothly.
         UIView.animate(withDuration: 0.2) { self.barTrack.layoutIfNeeded() }
@@ -407,7 +518,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             guard !self.resultShown else { return }
             self.resultShown = true
 
-            if self.isImageFlow {
+            if self.isImageFlow || self.isLinkFlow {
                 if success {
                     // Snap the scan to 100% with the green check, then finish.
                     self.completeScanSuccess { self.finish() }
@@ -418,6 +529,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                     self.sweepView.isHidden = true
                     self.percentLabel.alpha = 0
                     self.checkLabel.alpha = 0
+                    self.linkGlyph.alpha = 0
                     self.phaseLabel.text = message
                     self.phaseLabel.textColor = .white
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { self.finish() }
@@ -467,9 +579,11 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                         self?.upload(payload: ["image": data.base64EncodedString(),
                                                "mimeType": Self.mime(for: url)])
                     } else {
+                        DispatchQueue.main.async { self?.presentLinkScan(urlString: url.absoluteString) }
                         self?.upload(payload: ["url": url.absoluteString])
                     }
                 } else if let s = item as? String {
+                    DispatchQueue.main.async { self?.presentLinkScan(urlString: s) }
                     self?.upload(payload: ["url": s])
                 } else {
                     self?.showResult("Couldn't read the link", success: false)
@@ -480,6 +594,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             let id = provider.hasItemConformingToTypeIdentifier(kPlainText) ? kPlainText : kText
             provider.loadItem(forTypeIdentifier: id, options: nil) { [weak self] item, _ in
                 if let s = item as? String {
+                    DispatchQueue.main.async { self?.presentLinkScan(urlString: s) }
                     self?.upload(payload: ["text": s])
                 } else {
                     self?.showResult("Couldn't read the text", success: false)
@@ -492,11 +607,75 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
 
     /// Show the native scan animation, with the shared image behind the sweep.
     private func presentScan(with image: UIImage?) {
+        guard !isImageFlow, !isLinkFlow else { return }
+        isImageFlow = true
         if let image = image { imageView.image = image }
         beginScanAnimation()
         view.setNeedsLayout()
         view.layoutIfNeeded()
         layoutSweepGradient()
+    }
+
+    /// Show the native scan animation for a shared link/text: a faux page preview
+    /// (favicon + host + skeleton) behind the sweep, mirroring LinkScanProgress.tsx.
+    private func presentLinkScan(urlString: String?) {
+        guard !isImageFlow, !isLinkFlow else { return }
+        isLinkFlow = true
+        let host = urlString.flatMap { Self.host(from: $0) }
+        hostLabel.text = host ?? "Saving link…"
+        setGlobeFavicon()
+        imageView.isHidden = true
+        linkPreview.isHidden = false
+        dimView.backgroundColor = UIColor.black.withAlphaComponent(0.50)
+        linkGlyph.isHidden = false
+        beginScanAnimation()
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
+        layoutSweepGradient()
+        if let host = host { loadFavicon(host: host) }
+    }
+
+    /// Load the site favicon for the host (best-effort, cosmetic). Falls back to
+    /// a globe glyph on any failure.
+    private func loadFavicon(host: String) {
+        guard let url = URL(string: "https://www.google.com/s2/favicons?domain=\(host)&sz=64") else {
+            setGlobeFavicon(); return
+        }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 6
+        faviconTask = URLSession.shared.dataTask(with: req) { [weak self] data, _, _ in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                if let data = data, let img = UIImage(data: data), img.size.width > 1 {
+                    self.faviconView.image = img
+                } else {
+                    self.setGlobeFavicon()
+                }
+            }
+        }
+        faviconTask?.resume()
+    }
+
+    private func setGlobeFavicon() {
+        faviconView.image = UIImage(systemName: "globe")
+        faviconView.tintColor = UIColor(white: 1, alpha: 0.6)
+    }
+
+    /// The display host for a shared link or a URL embedded in shared text,
+    /// stripped of a leading "www." — mirrors hostOf() in LinkScanProgress.tsx.
+    private static func host(from urlString: String) -> String? {
+        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Pull the first URL out of free text (e.g. "look at this https://x.com/…").
+        if let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) {
+            let range = NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)
+            if let match = detector.firstMatch(in: trimmed, options: [], range: range),
+               let host = match.url?.host {
+                return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+            }
+        }
+        let normalized = trimmed.lowercased().hasPrefix("http") ? trimmed : "https://\(trimmed)"
+        guard let host = URL(string: normalized)?.host else { return nil }
+        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
 
     /// First attachment across all input items that we can handle.

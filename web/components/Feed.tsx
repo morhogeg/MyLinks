@@ -15,7 +15,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { httpsCallable } from 'firebase/functions';
 import Card from './Card';
-import CompactCard from './CompactCard';
+import ListCard from './ListCard';
 import Masonry from './Masonry';
 import ReminderModal from './ReminderModal';
 import SwipeDeck from './SwipeDeck';
@@ -27,8 +27,8 @@ import CollectionsGallery from './CollectionsGallery';
 import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
-import { Button, IconButton } from './ui/Button';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessageCircleQuestion, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Grid2X2, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus } from 'lucide-react';
+import { Button } from './ui/Button';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Shapes, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus } from 'lucide-react';
 import { publishCard, publishCollection, unpublishCollection, deleteCollection, removeLinkFromCollection } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
 import TagExplorer from './TagExplorer';
@@ -63,7 +63,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
     const [scrollLeft, setScrollLeft] = useState(0);
     const activeLink = links.find(l => l.id === activeLinkId) || null;
     const [isLoading, setIsLoading] = useState(true);
-    const [viewMode, setViewMode] = useState<'grid' | 'compact' | 'review' | 'ask' | 'collections'>('grid');
+    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'ask' | 'collections'>('grid');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
@@ -73,6 +73,9 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
     const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
+    // Mobile: the search bar is collapsed to an icon; tapping it expands a large
+    // search field in place, so the card grid gets the vertical space back.
+    const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
     const [isTagExplorerCollapsed, setIsTagExplorerCollapsed] = useState(false);
     const [reminderModalLink, setReminderModalLink] = useState<Link | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -329,16 +332,28 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
             }
         });
 
-    // Calculate category counts
-    const categoryCounts = links.reduce((acc, link) => {
+    // Does a link carry any of the currently selected tags? (parent tags match
+    // their children, e.g. "ai" matches "ai/agents"). Shared by the faceted counts.
+    const matchesSelectedTags = (link: Link) =>
+        link.tags.some(tag => Array.from(selectedTags).some(s => tag === s || tag.startsWith(`${s}/`)));
+
+    // Faceted counts — the numbers update live as you tap. Each facet's counts are
+    // computed against the OTHER facet's current selection (but never its own), so
+    // picking the "Tech" category instantly drops a non-overlapping tag like
+    // "politics" to 0, while the category chips keep reflecting the tag selection.
+    // Pure client-side derivation — no extra reads, no backend cost.
+    const linksForCategoryCounts = selectedTags.size === 0 ? links : links.filter(matchesSelectedTags);
+    const categoryCounts = linksForCategoryCounts.reduce((acc, link) => {
         acc[link.category] = (acc[link.category] || 0) + 1;
         return acc;
     }, {} as Record<string, number>);
 
+    // Category chips stay derived from the whole library so they never vanish —
+    // they just read 0 when nothing matches the current tag selection.
     const categories = Array.from(new Set(links.map(l => l.category))).sort();
 
-    // Calculate tag counts for all links (not just filtered)
-    const tagCounts = links.reduce((acc, link) => {
+    const linksForTagCounts = selectedCategory.size === 0 ? links : links.filter(link => selectedCategory.has(link.category));
+    const tagCounts = linksForTagCounts.reduce((acc, link) => {
         link.tags.forEach(tag => {
             acc[tag] = (acc[tag] || 0) + 1;
         });
@@ -594,15 +609,15 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
     // Layout views only — Ask is a distinct mode, surfaced as its own button.
     const viewModes: { key: typeof viewMode; label: string; icon: React.ReactNode; hint: string }[] = [
         { key: 'grid', label: 'Cards', icon: <LayoutGrid className="w-4 h-4" />, hint: 'Card view' },
-        { key: 'compact', label: 'Compact', icon: <Grid2X2 className="w-4 h-4" />, hint: 'Compact grid' },
+        { key: 'list', label: 'List', icon: <List className="w-4 h-4" />, hint: 'List view' },
         { key: 'review', label: 'Review', icon: <GalleryHorizontalEnd className="w-4 h-4" />, hint: 'Swipe to review' },
     ];
     // The layout the Ask/Collections buttons return you to when you leave them.
-    const lastLayout = useRef<'grid' | 'compact' | 'review'>('grid');
-    if (viewMode === 'grid' || viewMode === 'compact' || viewMode === 'review') lastLayout.current = viewMode;
+    const lastLayout = useRef<'grid' | 'list' | 'review'>('grid');
+    if (viewMode === 'grid' || viewMode === 'list' || viewMode === 'review') lastLayout.current = viewMode;
     // True for the card-browsing layouts (everything except the full-screen
     // Ask chat and the Collections gallery), which share the search/filter chrome.
-    const isLibraryView = viewMode === 'grid' || viewMode === 'compact' || viewMode === 'review';
+    const isLibraryView = viewMode === 'grid' || viewMode === 'list' || viewMode === 'review';
     // When scoped to exactly one collection, cards offer a quick "remove from it".
     const activeCollectionId = selectedCollections.size === 1 ? Array.from(selectedCollections)[0] : undefined;
     // Count of active grid filters — badges the mobile "Filters" button.
@@ -679,19 +694,20 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                             title="Collections"
                         >
                             {/* Explicit add affordance — the only way to create a collection. */}
-                            <IconButton
+                            <button
                                 onClick={openNewCollectionForm}
-                                title="New collection"
                                 aria-label="New collection"
-                                variant="primary"
-                                radius="full"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-text-muted text-xs font-medium hover:text-text active:bg-card-hover transition-colors cursor-pointer"
                             >
-                                <Plus className="w-5 h-5" />
-                            </IconButton>
+                                <Plus className="w-3.5 h-3.5" />
+                                New
+                            </button>
                         </MobileSubheader>
                     </div>
                 ) : (
-                    <div className="relative">
+                    // Desktop keeps the full search bar; on mobile it collapses to a
+                    // search icon in the toolbar row below (expandable in place).
+                    <div data-tour="search" className="relative hidden sm:block">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                         <input
                             type="text"
@@ -805,9 +821,41 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
 
                 </>)}
 
-                {/* Mobile: category selector + Filters share one row (saves a line vs.
-                    a full-width category button stacked above the toolbar). */}
+                {/* Mobile: one tidy line — Categories & Tags · Filters/Sort · Search.
+                    The big search bar is gone (desktop-only above); tapping the search
+                    icon expands a large field right here, so the grid keeps the space. */}
                 {isLibraryView && (
+                    mobileSearchOpen ? (
+                        <div className="flex sm:hidden items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="relative flex-1 min-w-0">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Escape') setMobileSearchOpen(false); }}
+                                    placeholder="Search Machina…"
+                                    className="w-full h-10 pl-9 pr-9 bg-card border border-border-subtle rounded-full text-[15px] text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-transparent transition-all"
+                                />
+                                {searchQuery && (
+                                    <button
+                                        onClick={() => setSearchQuery('')}
+                                        aria-label="Clear search"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-white/10 transition-colors"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => setMobileSearchOpen(false)}
+                                className="shrink-0 text-[13px] font-semibold text-accent px-1.5 py-2"
+                            >
+                                Done
+                            </button>
+                        </div>
+                    ) : (
                     <div className="flex sm:hidden items-center gap-2">
                         {selectedCollections.size === 0 && (
                             <button
@@ -829,6 +877,9 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                 <ChevronDown className="w-4 h-4 opacity-60 shrink-0" />
                             </button>
                         )}
+                        {/* When scoped to a collection the category button is hidden — keep
+                            the remaining controls pinned to the trailing edge. */}
+                        {selectedCollections.size > 0 && <span className="flex-1" />}
                         {/* Filters + sort live in the same sheet, so the button just shows
                             both icons (no label) — keeping it compact so the category
                             selector can take the rest of the row. */}
@@ -846,7 +897,21 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                 <span className="text-xs font-bold tabular-nums">{activeMobileFilters}</span>
                             )}
                         </button>
+                        {/* Search — icon only; expands into a large field in place. Reads
+                            accent when a query is active so it's clear a search is on. */}
+                        <button
+                            data-tour="search"
+                            onClick={() => setMobileSearchOpen(true)}
+                            aria-label="Search"
+                            className={`${ctrlBase} shrink-0 w-9 px-0 ${searchQuery
+                                ? 'bg-accent text-white border border-accent shadow-sm'
+                                : ctrlIdle
+                                }`}
+                        >
+                            <Search className="w-4 h-4" />
+                        </button>
                     </div>
+                    )
                 )}
 
                 {/* Row 2: Toolbar — filter / sort / source on the left, view & actions on the
@@ -939,6 +1004,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                         {/* Left zone — Collections */}
                         <div className="flex-1 flex justify-start sm:contents">
                             <button
+                                data-tour="collections"
                                 onClick={() => setViewMode('collections')}
                                 title="Browse collections"
                                 aria-label="Browse collections"
@@ -953,12 +1019,13 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                         <div className="flex-1 flex justify-center sm:contents">
                             {isLibraryView && (
                             <button
+                                data-tour="ask"
                                 onClick={() => setViewMode('ask')}
                                 title="Ask your brain"
                                 aria-label="Ask your brain"
                                 className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
                             >
-                                <MessageCircleQuestion className="w-4 h-4" />
+                                <MessagesSquare className="w-4 h-4" />
                                 <span>Ask</span>
                             </button>
                             )}
@@ -967,7 +1034,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                         {/* Right zone — view switcher (icon-only on mobile) + desktop-only tools. */}
                         <div className="flex-1 flex justify-end items-center gap-2 sm:contents">
                         {isLibraryView && (
-                        <div className="inline-flex items-center gap-0.5 p-1 rounded-full bg-card border border-border-subtle">
+                        <div data-tour="views" className="inline-flex items-center gap-0.5 p-1 rounded-full bg-card border border-border-subtle">
                             {viewModes.map(vm => {
                                 const active = viewMode === vm.key;
                                 return (
@@ -1325,7 +1392,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                             {/* Categories — chips breathe directly on the sheet. */}
                             <div className="flex items-center justify-between mb-3">
                                 <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">
-                                    <LayoutGrid className="w-3.5 h-3.5 text-accent/70" /> Categories
+                                    <Shapes className="w-3.5 h-3.5 text-accent/70" /> Categories
                                 </span>
                                 {selectedCategory.size > 0 && (
                                     <button
@@ -1549,7 +1616,23 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                             onOpen={(link) => setActiveLinkId(link.id)}
                             onResetStatus={(link) => handleStatusChange(link.id, 'unread')}
                         />
-                    ) : viewMode === 'grid' ? (
+                    ) : viewMode === 'list' ? (
+                        <div className="flex flex-col gap-2 max-w-3xl mx-auto">
+                            {filteredLinks.map((link, idx) => (
+                                <ListCard
+                                    key={link.id}
+                                    index={idx}
+                                    link={link}
+                                    onOpenDetails={(link) => setActiveLinkId(link.id)}
+                                    onStatusChange={handleStatusChange}
+                                    onDelete={handleDelete}
+                                    isSelectionMode={isSelectionMode}
+                                    isSelected={selectedIds.has(link.id)}
+                                    onToggleSelection={toggleSelection}
+                                />
+                            ))}
+                        </div>
+                    ) : (
                         <Masonry columnWidth={340} gap={16}>
                             {filteredLinks.map((link, idx) => (
                                 <Card
@@ -1577,29 +1660,6 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                 />
                             ))}
                         </Masonry>
-                    ) : (
-                        <div
-                            className="grid gap-2 sm:gap-3"
-                            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}
-                        >
-                            {filteredLinks.map((link, idx) => (
-                                <CompactCard
-                                    key={link.id}
-                                    index={idx}
-                                    link={link}
-                                    onOpenDetails={(link) => setActiveLinkId(link.id)}
-                                    onStatusChange={handleStatusChange}
-                                    onReadStatusChange={handleReadStatusChange}
-                                    onUpdateCategory={handleUpdateCategory}
-                                    allCategories={categories}
-                                    onDelete={handleDelete}
-                                    onUpdateReminder={(link) => handleOpenReminderModal(link)}
-                                    isSelectionMode={isSelectionMode}
-                                    isSelected={selectedIds.has(link.id)}
-                                    onToggleSelection={toggleSelection}
-                                />
-                            ))}
-                        </div>
                     )}
                 </div>
             </div>
@@ -1617,15 +1677,14 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                         icon={<Layers className="w-5 h-5" />}
                         title="Collections"
                     >
-                        <IconButton
+                        <button
                             onClick={openNewCollectionForm}
-                            title="New collection"
                             aria-label="New collection"
-                            variant="primary"
-                            radius="full"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-text-muted text-xs font-medium hover:text-text active:bg-card-hover transition-colors cursor-pointer"
                         >
-                            <Plus className="w-5 h-5" />
-                        </IconButton>
+                            <Plus className="w-3.5 h-3.5" />
+                            New
+                        </button>
                     </MobileSubheader>
                     <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
                         <CollectionsGallery
@@ -1722,7 +1781,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                     if (confirmDeleteId) performDelete(confirmDeleteId);
                 }}
                 title="Delete this link?"
-                message="This permanently removes it from your second brain. This can't be undone."
+                message="This permanently removes it from your Machina. This can't be undone."
                 confirmLabel="Delete"
                 variant="danger"
             />
@@ -1733,7 +1792,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                 onClose={() => setConfirmBulkDelete(false)}
                 onConfirm={performBulkDelete}
                 title={`Delete ${selectedIds.size} link${selectedIds.size === 1 ? '' : 's'}?`}
-                message="These will be permanently removed from your second brain. This can't be undone."
+                message="These will be permanently removed from your Machina. This can't be undone."
                 confirmLabel="Delete"
                 variant="danger"
             />
