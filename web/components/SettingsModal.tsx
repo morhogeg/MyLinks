@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { User, DigestMode, DigestChannel } from '@/lib/types';
-import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight, Compass } from 'lucide-react';
+import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight, Compass, LogOut, UserCircle } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '@/lib/firebase';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
 import { useTheme } from './ThemeProvider';
+import { useAuth } from './AuthProvider';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import Dropdown from './Dropdown';
 
@@ -45,6 +46,7 @@ const COUNT_OPTIONS = ['3', '5', '7', '10'].map((c) => ({ value: c, label: `${c}
 
 export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: SettingsModalProps) {
     const { theme, setTheme } = useTheme();
+    const { email: accountEmail, signOut } = useAuth();
 
     const [settings, setSettings] = useState<User['settings']>({
         theme: 'dark',
@@ -309,6 +311,21 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                             />
                         </Row>
                     </Section>
+
+                    {/* Account — only on the web, where Google Sign-In is live. */}
+                    {accountEmail && (
+                    <Section icon={<UserCircle className="w-4 h-4" />} title="Account">
+                        <Row title="Signed in" subtitle={accountEmail}>
+                            <button
+                                onClick={() => { onClose(); signOut(); }}
+                                className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold border border-border-subtle text-text hover:bg-surface transition-colors"
+                            >
+                                <LogOut className="w-4 h-4" />
+                                Sign out
+                            </button>
+                        </Row>
+                    </Section>
+                    )}
 
                     {/* Reminders */}
                     <Section icon={<Bell className="w-4 h-4" />} title="Reminders">

@@ -1,8 +1,42 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-06-30. Branch: `claude/ios-ui-refinements-8pe0s1` (merged + pushed to `main`)._
+_Last updated: 2026-07-01. Branch: `claude/google-auth-implementation-wgblpr` (merged + pushed to `main`)._
 
-## Latest session — UI unification round + build 15 (2026-06-30)
+## Latest session — Google Sign-In, Phase 1 (web) — 2026-07-01
+
+Started real auth. Full design (incl. the data-keying decision and Phases 2–3) is in **`AUTH_SPEC.md`**.
+This is the **P0 launch blocker** ("Session 0") finally moving. **Merged to `main` and pushed** (Vercel
+desktop auto-deploys). `tsc --noEmit` clean, lint clean (the one SettingsModal warning is pre-existing).
+Merged the concurrent UI-unification round (below) in on the way — one import + one HANDOFF conflict,
+both trivial.
+
+**What shipped in the code (web only, deliberately non-bricking):**
+- **Google Sign-In gate on the web.** New `web/lib/auth.ts` (popup + redirect fallback, explicit
+  `browserPopupRedirectResolver`, web-only so `gapi` never loads under Capacitor) and a branded
+  `web/components/LoginScreen.tsx` ("Continue with Google").
+- **`AuthProvider` is now auth-aware** (`web/components/AuthProvider.tsx`). On the **web** it gates on
+  `onAuthStateChanged` and resolves the data doc; on **native iOS (Capacitor)** it keeps the legacy
+  "first user doc, no gate" behavior so the shipped app is **not bricked** (popup auth can't run in
+  the WKWebView — native sign-in is Phase 2).
+- **Account linking without data migration.** Data is still keyed by phone number; the Google account
+  links to it via a new `authUids[]` field on the user doc. First owner sign-in **claims** the doc
+  (writes `authUids` + `email`), gated by optional `NEXT_PUBLIC_OWNER_EMAIL`. A signed-in non-owner
+  sees a restricted screen, not someone else's data.
+- **Sign out** in `SettingsModal` (new Account section, web only).
+- **`firestore.rules`** stays open (locking now would brick native/share/WhatsApp) but the comments
+  now document the exact **Phase 3** lock (ownership via `authUids` `get()`).
+
+**Owner follow-ups (need web consoles / can't be done headlessly):** confirm Google provider enabled +
+add prod domains to Firebase Auth **Authorized domains**; optionally set `NEXT_PUBLIC_OWNER_EMAIL`
+(Vercel + `web/.env.local`); first sign-in on the live site links the account; then **Phase 2**
+(native `@capacitor-firebase/authentication` + Xcode config, and Cloud Functions verifying
+`Authorization: Bearer <idToken>` instead of trusting the body `uid` — client helper `getIdToken()`
+is already in place) and **Phase 3** (lock the rules). All detailed in `AUTH_SPEC.md`.
+
+**iPhone PWA follow-up:** run `./deploy-hosting.sh` to push the same gate to Firebase Hosting
+(`secondbrain-app-94da2.web.app`). **Native iOS app is untouched** (legacy path; no rebuild needed).
+
+## Earlier — UI unification round + build 15 (2026-06-30)
 
 Follow-up polish after the TestFlight build-14 check. Web-only + a build bump.
 `tsc --noEmit` clean.
