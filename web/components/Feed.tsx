@@ -74,6 +74,9 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
     const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
+    // Mobile: the search bar is collapsed to an icon; tapping it expands a large
+    // search field in place, so the card grid gets the vertical space back.
+    const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
     const [isTagExplorerCollapsed, setIsTagExplorerCollapsed] = useState(false);
     const [reminderModalLink, setReminderModalLink] = useState<Link | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -705,7 +708,9 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                         </MobileSubheader>
                     </div>
                 ) : (
-                    <div className="relative">
+                    // Desktop keeps the full search bar; on mobile it collapses to a
+                    // search icon in the toolbar row below (expandable in place).
+                    <div className="relative hidden sm:block">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                         <input
                             type="text"
@@ -819,9 +824,41 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
 
                 </>)}
 
-                {/* Mobile: category selector + Filters share one row (saves a line vs.
-                    a full-width category button stacked above the toolbar). */}
+                {/* Mobile: one tidy line — Categories & Tags · Filters/Sort · Search.
+                    The big search bar is gone (desktop-only above); tapping the search
+                    icon expands a large field right here, so the grid keeps the space. */}
                 {isLibraryView && (
+                    mobileSearchOpen ? (
+                        <div className="flex sm:hidden items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="relative flex-1 min-w-0">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Escape') setMobileSearchOpen(false); }}
+                                    placeholder="Search Machina…"
+                                    className="w-full h-10 pl-9 pr-9 bg-card border border-border-subtle rounded-full text-[15px] text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-transparent transition-all"
+                                />
+                                {searchQuery && (
+                                    <button
+                                        onClick={() => setSearchQuery('')}
+                                        aria-label="Clear search"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-white/10 transition-colors"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => setMobileSearchOpen(false)}
+                                className="shrink-0 text-[13px] font-semibold text-accent px-1.5 py-2"
+                            >
+                                Done
+                            </button>
+                        </div>
+                    ) : (
                     <div className="flex sm:hidden items-center gap-2">
                         {selectedCollections.size === 0 && (
                             <button
@@ -843,6 +880,9 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                 <ChevronDown className="w-4 h-4 opacity-60 shrink-0" />
                             </button>
                         )}
+                        {/* When scoped to a collection the category button is hidden — keep
+                            the remaining controls pinned to the trailing edge. */}
+                        {selectedCollections.size > 0 && <span className="flex-1" />}
                         {/* Filters + sort live in the same sheet, so the button just shows
                             both icons (no label) — keeping it compact so the category
                             selector can take the rest of the row. */}
@@ -860,7 +900,20 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                 <span className="text-xs font-bold tabular-nums">{activeMobileFilters}</span>
                             )}
                         </button>
+                        {/* Search — icon only; expands into a large field in place. Reads
+                            accent when a query is active so it's clear a search is on. */}
+                        <button
+                            onClick={() => setMobileSearchOpen(true)}
+                            aria-label="Search"
+                            className={`${ctrlBase} shrink-0 w-9 px-0 ${searchQuery
+                                ? 'bg-accent text-white border border-accent shadow-sm'
+                                : ctrlIdle
+                                }`}
+                        >
+                            <Search className="w-4 h-4" />
+                        </button>
                     </div>
+                    )
                 )}
 
                 {/* Row 2: Toolbar — filter / sort / source on the left, view & actions on the
