@@ -10,6 +10,17 @@ desktop auto-deploys). `tsc --noEmit` clean, lint clean (the one SettingsModal w
 Merged the concurrent UI-unification round (below) in on the way — one import + one HANDOFF conflict,
 both trivial.
 
+**Follow-up (same day) — profile UI + full-page Settings:**
+- **Profile avatar in the header** (`web/app/page.tsx`) — Google photo (or gradient monogram from
+  name/email) next to the Settings gear; tapping it opens Settings. Web-only (hidden when no signed-in
+  email, i.e. native). New reusable `web/components/ProfileAvatar.tsx`.
+- **Account card in Settings** (`web/components/SettingsModal.tsx`) — avatar + name + email + "Signed in
+  with Google" + Sign out (replaces the earlier one-line row).
+- **Settings is now a full-screen page** (was a centered desktop modal): fills the viewport with a
+  centered `max-w-2xl` content column (header/body/footer all constrained). Mobile keeps its
+  full-screen push. `AuthProvider` now also exposes `displayName` + `photoURL`.
+- Verified: `tsc --noEmit` clean, `next build` clean (all pages prerender).
+
 **What shipped in the code (web only, deliberately non-bricking):**
 - **Google Sign-In gate on the web.** New `web/lib/auth.ts` (popup + redirect fallback, explicit
   `browserPopupRedirectResolver`, web-only so `gapi` never loads under Capacitor) and a branded
