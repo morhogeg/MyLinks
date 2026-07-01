@@ -31,6 +31,12 @@ build-resilience fix. `tsc --noEmit` clean; static export builds offline after t
    `Categories & Tags · Filters/Sort · Search` line and expands into a large field in place
    (autofocus, clear, Done; icon reads accent while a query is active). Reclaims the vertical
    space the bar took, pushing the grid up.
+8. **List view polish** — `web/components/ListCard.tsx`. Trailing chip is now the **category**
+   colour pill (was a tag); source shows its **home-screen brand icon** (X/Facebook/YouTube… via
+   `platformIcon` + `platformColor`, text fallback for generic hosts); titles use **line-clamp-2**
+   (better truncation); added **swipe actions** (touch): swipe right → delete (branded confirm),
+   swipe left → favourite, with revealed red/yellow action zones. `onDelete` now passed to
+   ListCard from `Feed.tsx`.
 
 **Build resilience:** `web/app/layout.tsx` now self-hosts Geist via the `geist` package instead
 of `next/font/google`, so the build never fetches `fonts.googleapis.com` (same CSS var names;
