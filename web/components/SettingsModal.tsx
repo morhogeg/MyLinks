@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { User, DigestMode, DigestChannel } from '@/lib/types';
-import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight, Compass } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '@/lib/firebase';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
@@ -15,6 +15,8 @@ interface SettingsModalProps {
     uid: string;
     isOpen: boolean;
     onClose: () => void;
+    /** Replay the first-run product tour. */
+    onReplayTour?: () => void;
 }
 
 type Frequency = User['settings']['reminder_frequency'];
@@ -41,7 +43,7 @@ const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
 }));
 const COUNT_OPTIONS = ['3', '5', '7', '10'].map((c) => ({ value: c, label: `${c} cards` }));
 
-export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalProps) {
+export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: SettingsModalProps) {
     const { theme, setTheme } = useTheme();
 
     const [settings, setSettings] = useState<User['settings']>({
@@ -378,6 +380,17 @@ export default function SettingsModal({ uid, isOpen, onClose }: SettingsModalPro
 
                     {/* About */}
                     <Section icon={<RefreshCw className="w-4 h-4" />} title="About">
+                        {onReplayTour && (
+                            <Row title="Take the tour" subtitle="Replay the guided intro to Machina's features.">
+                                <button
+                                    onClick={onReplayTour}
+                                    className="h-9 px-3.5 rounded-full bg-card-hover border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer"
+                                >
+                                    <Compass className="w-4 h-4" />
+                                    Start
+                                </button>
+                            </Row>
+                        )}
                         <Row title="Machina AI" subtitle="Capture. Connect. Recall.">
                             <button
                                 onClick={() => typeof window !== 'undefined' && window.location.reload()}
