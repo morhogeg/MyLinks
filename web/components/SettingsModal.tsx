@@ -47,7 +47,7 @@ const COUNT_OPTIONS = ['3', '5', '7', '10'].map((c) => ({ value: c, label: `${c}
 
 export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: SettingsModalProps) {
     const { theme, setTheme } = useTheme();
-    const { email: accountEmail, displayName, photoURL, signOut } = useAuth();
+    const { authUid, email: accountEmail, displayName, photoURL, signOut } = useAuth();
 
     const [settings, setSettings] = useState<User['settings']>({
         theme: 'dark',
@@ -85,6 +85,16 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
         mq.addEventListener('change', onChange);
         return () => mq.removeEventListener('change', onChange);
     }, []);
+
+    // Lock the page behind Settings while it's open. Settings is a fixed
+    // full-screen overlay, so without this the underlying feed keeps its own
+    // scrollbar — you'd see two scrollbars and the page could scroll behind.
+    useEffect(() => {
+        if (!isOpen) return;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = prev; };
+    }, [isOpen]);
 
     // Swipe in from the left edge to leave Settings — the digest sub-screen pops
     // back to the main list first, then the page closes.
@@ -311,18 +321,20 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                         </Row>
                     </Section>
 
-                    {/* Account — only on the web, where Google Sign-In is live. */}
-                    {accountEmail && (
+                    {/* Account — only on the web, where Google Sign-In is live
+                        (native has no signed-in user). Gated on being signed in,
+                        not on email, so it shows even if the token has no email. */}
+                    {authUid && (
                     <Section icon={<UserCircle className="w-4 h-4" />} title="Account">
                         <div className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-card-hover border border-border-subtle">
                             <ProfileAvatar email={accountEmail} name={displayName} photoURL={photoURL} size={48} />
                             <div className="min-w-0 flex-1">
-                                {displayName && (
-                                    <div className="text-[14px] font-semibold text-text truncate">{displayName}</div>
-                                )}
-                                <div className={`text-[12px] truncate ${displayName ? 'text-text-muted' : 'text-[14px] font-semibold text-text'}`}>
-                                    {accountEmail}
+                                <div className="text-[14px] font-semibold text-text truncate">
+                                    {displayName || accountEmail || 'Signed in'}
                                 </div>
+                                {displayName && accountEmail && (
+                                    <div className="text-[12px] text-text-muted truncate">{accountEmail}</div>
+                                )}
                                 <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-emerald-500">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                                     Signed in with Google

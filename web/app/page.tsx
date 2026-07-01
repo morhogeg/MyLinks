@@ -16,7 +16,7 @@ import { IconButton } from "@/components/ui/Button";
  * Main dashboard page
  */
 export default function Home() {
-  const { uid, loading, email, displayName, photoURL } = useAuth();
+  const { uid, loading, authUid, email, displayName, photoURL } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAskMode, setIsAskMode] = useState(false);
@@ -107,12 +107,12 @@ export default function Home() {
               <Settings className="w-[18px] h-[18px]" />
             </IconButton>
             {/* Profile — who's signed in (web). Opens Settings → Account. */}
-            {email && (
+            {authUid && (
               <button
                 onClick={() => setIsSettingsOpen(true)}
                 className="rounded-full transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-                aria-label={`Account: ${displayName || email}`}
-                title={displayName || email}
+                aria-label={`Account: ${displayName || email || 'signed in'}`}
+                title={displayName || email || 'Account'}
               >
                 <ProfileAvatar email={email} name={displayName} photoURL={photoURL} size={32} />
               </button>
