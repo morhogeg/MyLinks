@@ -2,7 +2,30 @@
 
 _Last updated: 2026-06-30. Branch: `claude/ios-ui-refinements-8pe0s1` (merged + pushed to `main`)._
 
-## Latest session — iOS UI refinements round (2026-06-30)
+## Latest session — UI unification round + build 15 (2026-06-30)
+
+Follow-up polish after the TestFlight build-14 check. Web-only + a build bump.
+`tsc --noEmit` clean.
+
+1. **Detail modal delete always visible** — `web/components/LinkDetailModal.tsx`. The Delete
+   button lived in the horizontally-scrolling action row, so when the reader (BookOpen) icon was
+   present it scrolled off-screen on narrow phones (looked "missing" on articles). Moved Delete
+   into the pinned-right cluster (with Open/Close) so every card shows it.
+2. **Removed the Compact view** — `web/components/Feed.tsx`. Dropped the `compact` viewMode from
+   the switcher (mobile + desktop) and its render branch; Cards is the default/fallback.
+   `CompactCard` no longer imported (component file left in place, now unused).
+3. **Collections header unified with Ask** — neutral (not purple) leading icon via
+   `MobileSubheader` (`text-accent` → `text-text-secondary`), and the purple circular `+`
+   replaced with Ask's subtle "＋ New" text button (both desktop inline + mobile overlay).
+4. **Home Ask button icon** — `MessageCircleQuestion` → `MessagesSquare` (the bubbles icon from
+   the Ask top bar).
+5. **Categories section icon** — in the Categories & Tags sheet, the `Categories` label icon was
+   `LayoutGrid` (identical to the Cards view icon); now `Shapes`.
+
+**iOS native:** build bumped **14 → 15** on both targets (App + ShareExt) — build 14 is already on
+TestFlight, so these web changes need a new number. Archive on a Mac.
+
+## Earlier — iOS UI refinements round (2026-06-30)
 
 Six requested UI refinements, all web/native-frontend (no backend change), plus a
 build-resilience fix. `tsc --noEmit` clean; static export builds offline after the font fix.

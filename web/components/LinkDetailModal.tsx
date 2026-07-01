@@ -244,18 +244,20 @@ export default function LinkDetailModal({
                                 <BookOpen className="w-[18px] h-[18px]" />
                             </button>
                         )}
-                        <button
-                            onClick={() => setShowDeleteConfirm(true)}
-                            title="Delete"
-                            aria-label="Delete"
-                            className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors"
-                        >
-                            <Trash2 className="w-[18px] h-[18px]" />
-                        </button>
                     </div>
 
-                    {/* Open source + Close — pinned right (never clipped by the scroll
-                        row), styled exactly like the other toolbar icon buttons. */}
+                    {/* Delete + Open source + Close — pinned right so they're NEVER
+                        clipped by the scrolling action row (the reader icon used to
+                        push Delete off-screen on narrow phones). Delete keeps its red
+                        hover so it reads distinctly from the neutral Close. */}
+                    <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        title="Delete"
+                        aria-label="Delete"
+                        className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                    >
+                        <Trash2 className="w-[18px] h-[18px]" />
+                    </button>
                     {!!link.url && /^https?:\/\//.test(link.url) && (
                         <a
                             href={link.url}
