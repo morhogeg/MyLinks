@@ -1,7 +1,7 @@
 'use client';
 
 import { X, AlertTriangle } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface ConfirmDialogProps {
     isOpen: boolean;
@@ -28,6 +28,21 @@ export default function ConfirmDialog({
     cancelLabel = 'Cancel',
     variant = 'danger',
 }: ConfirmDialogProps) {
+    // Busy-guard: a fast double-tap on Confirm must run the action once, not
+    // twice (the dialog stays mounted for a frame after onConfirm fires). Reset
+    // each time the dialog opens.
+    const confirmedRef = useRef(false);
+    useEffect(() => {
+        if (isOpen) confirmedRef.current = false;
+    }, [isOpen]);
+
+    const handleConfirm = () => {
+        if (confirmedRef.current) return;
+        confirmedRef.current = true;
+        onConfirm();
+        onClose();
+    };
+
     // Handle Escape key to close
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
@@ -90,10 +105,7 @@ export default function ConfirmDialog({
                         {cancelLabel}
                     </button>
                     <button
-                        onClick={() => {
-                            onConfirm();
-                            onClose();
-                        }}
+                        onClick={handleConfirm}
                         className={`flex-1 px-4 py-2.5 rounded-xl font-medium transition-colors ${variant === 'danger'
                                 ? 'bg-red-500 text-white hover:bg-red-600'
                                 : 'bg-white text-black hover:bg-gray-200'

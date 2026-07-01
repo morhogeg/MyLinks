@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, ScanText } from 'lucide-react';
 
 interface ImageScanProgressProps {
     /** Data URL of the image being analyzed. */
@@ -22,8 +22,9 @@ function phaseFor(progress: number): string {
 
 /**
  * "Reading your image" indicator: an OCR-style scan line sweeps over the
- * uploaded preview while a simulated (but upload-anchored) progress bar and a
- * rotating phase label give a strong sense of forward motion.
+ * uploaded preview while an indeterminate bar and a rotating phase label convey
+ * calm forward motion — no fake percentage, since the backend gives us no real
+ * progress to report (M6).
  */
 export default function ImageScanProgress({ imageSrc, progress }: ImageScanProgressProps) {
     const clamped = Math.min(100, Math.max(0, progress));
@@ -47,14 +48,12 @@ export default function ImageScanProgress({ imageSrc, progress }: ImageScanProgr
                     </div>
                 )}
 
-                {/* Center status */}
+                {/* Center status — icon + honest phase label, no fake % (M6). */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center px-4">
                     {done ? (
                         <CheckCircle2 className="w-10 h-10 text-green-400 animate-fade-in" />
                     ) : (
-                        <span className="text-2xl font-bold text-white tabular-nums">
-                            {Math.round(clamped)}%
-                        </span>
+                        <ScanText className="w-8 h-8 text-accent" />
                     )}
                     <p className="text-sm font-medium text-white/90" aria-live="polite">
                         {label}
@@ -62,19 +61,18 @@ export default function ImageScanProgress({ imageSrc, progress }: ImageScanProgr
                 </div>
             </div>
 
-            {/* Progress bar */}
+            {/* Indeterminate progress bar — motion, not a lying number. */}
             <div
                 className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden"
                 role="progressbar"
-                aria-valuenow={Math.round(clamped)}
-                aria-valuemin={0}
-                aria-valuemax={100}
                 aria-label="Image analysis progress"
+                aria-busy={!done}
             >
-                <div
-                    className={`h-full rounded-full transition-[width] duration-200 ease-out ${done ? 'bg-green-400' : 'bg-accent'}`}
-                    style={{ width: `${clamped}%` }}
-                />
+                {done ? (
+                    <div className="h-full w-full rounded-full bg-green-400" />
+                ) : (
+                    <div className="h-full w-2/5 rounded-full bg-accent animate-progress-indeterminate" />
+                )}
             </div>
 
             {/* Analysis is a single foreground request (see AddLinkForm.handleSubmit)

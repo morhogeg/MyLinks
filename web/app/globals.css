@@ -271,6 +271,23 @@ html {
   animation: scan-sweep 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
+/* Indeterminate progress bar — an honest "working" state for analyses whose
+   true completion we can't measure (M6). A segment glides across the track,
+   conveying motion without claiming a fake percentage. */
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+.animate-progress-indeterminate {
+  animation: progress-indeterminate 1.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
 /* Scale-up: used by ConfirmDialog (was referenced but never defined). */
 @keyframes scale-up {
   from {
@@ -420,6 +437,7 @@ a {
 
   .animate-pulse-subtle,
   .animate-scan-sweep,
+  .animate-progress-indeterminate,
   .skeleton-shimmer::after {
     animation: none !important;
   }

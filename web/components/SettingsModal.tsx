@@ -11,6 +11,7 @@ import { useTheme } from './ThemeProvider';
 import { useAuth } from './AuthProvider';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import Dropdown from './Dropdown';
+import ConfirmDialog from './ConfirmDialog';
 
 interface SettingsModalProps {
     uid: string;
@@ -44,26 +45,28 @@ const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
 }));
 const COUNT_OPTIONS = ['3', '5', '7', '10'].map((c) => ({ value: c, label: `${c} cards` }));
 
+const DEFAULT_SETTINGS: User['settings'] = {
+    theme: 'dark',
+    daily_digest: false,
+    reminders_enabled: true,
+    reminder_frequency: 'smart',
+    digest_enabled: false,
+    digest_frequency: 'weekly',
+    digest_channels: ['whatsapp'],
+    digest_mode: 'smart',
+    digest_topics: [],
+    digest_topic: null,
+    digest_count: 5,
+    digest_hour: 9,
+    digest_day: 0,
+    digest_skip_empty: true,
+};
+
 export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: SettingsModalProps) {
     const { theme, setTheme } = useTheme();
     const { email: accountEmail, signOut } = useAuth();
 
-    const [settings, setSettings] = useState<User['settings']>({
-        theme: 'dark',
-        daily_digest: false,
-        reminders_enabled: true,
-        reminder_frequency: 'smart',
-        digest_enabled: false,
-        digest_frequency: 'weekly',
-        digest_channels: ['whatsapp'],
-        digest_mode: 'smart',
-        digest_topics: [],
-        digest_topic: null,
-        digest_count: 5,
-        digest_hour: 9,
-        digest_day: 0,
-        digest_skip_empty: true,
-    });
+    const [settings, setSettings] = useState<User['settings']>(DEFAULT_SETTINGS);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     // 'main' = the settings list; 'digest' = the curation sub-screen.
@@ -73,6 +76,24 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
     const [topics, setTopics] = useState<string[]>([]);
     const [sendingNow, setSendingNow] = useState(false);
     const [sendResult, setSendResult] = useState<string | null>(null);
+
+    // Dirty-tracking (M7): baselines captured when the form loads, so closing
+    // with unsaved edits warns instead of silently discarding the user's work.
+    // Theme is excluded — it applies live via ThemeProvider, not this form's Save.
+    const [settingsBaseline, setSettingsBaseline] = useState('');
+    const [emailBaseline, setEmailBaseline] = useState('');
+    const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+
+    const isDirty = () => {
+        if (isLoading || !settingsBaseline) return false;
+        return JSON.stringify(settings) !== settingsBaseline || email.trim() !== emailBaseline;
+    };
+
+    // Guarded close: prompt before throwing away unsaved edits; close freely if clean.
+    const handleClose = () => {
+        if (isDirty()) setShowDiscardConfirm(true);
+        else onClose();
+    };
 
     // On phones Settings is a real full-screen page (slides in, fills the screen,
     // clears the notch); on desktop it stays a centered modal.
@@ -89,7 +110,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
     // back to the main list first, then the page closes.
     useEdgeSwipeBack(() => {
         if (view === 'digest') setView('main');
-        else onClose();
+        else handleClose();
     }, isMobile && isOpen);
 
     useEffect(() => {
@@ -107,6 +128,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                 getLinksFromFirestore(uid),
             ]);
             if (storedEmail) setEmail(storedEmail);
+            setEmailBaseline((storedEmail || '').trim());
             // Distinct categories + tags → topic options.
             const set = new Set<string>();
             links.forEach((l) => {
@@ -123,8 +145,8 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
         setIsLoading(true);
         try {
             const userSettings = await getUserSettings(uid);
-            if (userSettings) {
-                setSettings({
+            const loaded: User['settings'] = userSettings
+                ? {
                     theme: userSettings.theme || 'dark',
                     daily_digest: userSettings.daily_digest || false,
                     reminders_enabled: userSettings.reminders_enabled ?? true,
@@ -141,8 +163,11 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                     digest_hour: userSettings.digest_hour ?? 9,
                     digest_day: userSettings.digest_day ?? 0,
                     digest_skip_empty: userSettings.digest_skip_empty ?? true,
-                });
-            }
+                }
+                : DEFAULT_SETTINGS;
+            setSettings(loaded);
+            // Baseline for dirty-tracking (M7): the exact state we just loaded.
+            setSettingsBaseline(JSON.stringify(loaded));
         } catch (error) {
             console.error('Failed to load settings:', error);
         } finally {
@@ -249,7 +274,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                 mobile page is opaque, so it needs no backdrop. */}
             <div
                 className="hidden sm:block absolute inset-0 bg-background/70 backdrop-blur-md animate-fade-in"
-                onClick={onClose}
+                onClick={handleClose}
             />
 
             <div
@@ -284,7 +309,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                         </div>
                     </div>
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         className="h-9 w-9 rounded-full flex items-center justify-center text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
                         aria-label="Close settings"
                     >
@@ -599,7 +624,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                     style={isMobile ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' } : undefined}
                 >
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         className="h-10 px-4 rounded-full text-sm font-semibold text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
                     >
                         Cancel
@@ -613,6 +638,19 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                     </button>
                 </div>
             </div>
+
+            {/* Guard unsaved edits — closing while dirty prompts instead of
+                silently discarding the user's work (M7). */}
+            <ConfirmDialog
+                isOpen={showDiscardConfirm}
+                onClose={() => setShowDiscardConfirm(false)}
+                onConfirm={() => { setShowDiscardConfirm(false); onClose(); }}
+                title="Discard changes?"
+                message="You've made changes that haven't been saved. Close settings and discard them?"
+                confirmLabel="Discard"
+                cancelLabel="Keep editing"
+                variant="danger"
+            />
         </div>
     );
 }
