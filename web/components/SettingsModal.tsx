@@ -9,6 +9,7 @@ import { functions } from '@/lib/firebase';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from './AuthProvider';
+import ProfileAvatar from './ProfileAvatar';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import Dropdown from './Dropdown';
 
@@ -46,7 +47,7 @@ const COUNT_OPTIONS = ['3', '5', '7', '10'].map((c) => ({ value: c, label: `${c}
 
 export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: SettingsModalProps) {
     const { theme, setTheme } = useTheme();
-    const { email: accountEmail, signOut } = useAuth();
+    const { email: accountEmail, displayName, photoURL, signOut } = useAuth();
 
     const [settings, setSettings] = useState<User['settings']>({
         theme: 'dark',
@@ -244,26 +245,22 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex sm:items-center sm:justify-center sm:p-4">
-            {/* Desktop dims the page behind a centered modal; the full-screen
-                mobile page is opaque, so it needs no backdrop. */}
-            <div
-                className="hidden sm:block absolute inset-0 bg-background/70 backdrop-blur-md animate-fade-in"
-                onClick={onClose}
-            />
-
+        <div className="fixed inset-0 z-50">
+            {/* Full-screen settings page — fills the viewport on every device; the
+                content sits in a centered, readable column (max-w-2xl). */}
             <div
                 role="dialog"
                 aria-modal="true"
                 aria-label="Settings"
-                className={`relative w-full bg-card overflow-hidden flex flex-col shadow-[var(--shadow-card-hover)] h-full sm:h-auto sm:max-w-lg sm:max-h-[88vh] sm:rounded-3xl sm:border border-border-subtle ${isMobile ? 'animate-ios-push' : 'animate-fade-in'}`}
+                className={`relative w-full h-full bg-background overflow-hidden flex flex-col ${isMobile ? 'animate-ios-push' : 'animate-fade-in'}`}
             >
                 {/* Header */}
                 <div
-                    className="relative flex items-center justify-between px-6 py-5 border-b border-border-subtle"
+                    className="relative px-6 py-5 border-b border-border-subtle"
                     style={isMobile ? { paddingTop: 'calc(env(safe-area-inset-top) + 1.25rem)' } : undefined}
                 >
                     <div className="absolute inset-x-0 bottom-0 h-px bg-[image:var(--accent-gradient)] opacity-30" />
+                    <div className="w-full max-w-2xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         {view === 'digest' ? (
                             <button
@@ -290,10 +287,12 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                     >
                         <X className="w-5 h-5" />
                     </button>
+                    </div>
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-7">
+                <div className="flex-1 overflow-y-auto">
+                  <div className="w-full max-w-2xl mx-auto px-6 py-6 space-y-7">
                   {view === 'main' && (
                     <>
                     {/* Appearance */}
@@ -315,15 +314,28 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                     {/* Account — only on the web, where Google Sign-In is live. */}
                     {accountEmail && (
                     <Section icon={<UserCircle className="w-4 h-4" />} title="Account">
-                        <Row title="Signed in" subtitle={accountEmail}>
+                        <div className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-card-hover border border-border-subtle">
+                            <ProfileAvatar email={accountEmail} name={displayName} photoURL={photoURL} size={48} />
+                            <div className="min-w-0 flex-1">
+                                {displayName && (
+                                    <div className="text-[14px] font-semibold text-text truncate">{displayName}</div>
+                                )}
+                                <div className={`text-[12px] truncate ${displayName ? 'text-text-muted' : 'text-[14px] font-semibold text-text'}`}>
+                                    {accountEmail}
+                                </div>
+                                <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-emerald-500">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                    Signed in with Google
+                                </div>
+                            </div>
                             <button
                                 onClick={() => { onClose(); signOut(); }}
-                                className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold border border-border-subtle text-text hover:bg-surface transition-colors"
+                                className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold border border-border-subtle text-text hover:bg-surface transition-colors"
                             >
                                 <LogOut className="w-4 h-4" />
                                 Sign out
                             </button>
-                        </Row>
+                        </div>
                     </Section>
                     )}
 
@@ -591,13 +603,15 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                         </div>
                     </div>
                   )}
+                  </div>
                 </div>
 
                 {/* Footer */}
                 <div
-                    className="px-6 py-4 border-t border-border-subtle flex items-center justify-end gap-2 bg-card"
+                    className="px-6 py-4 border-t border-border-subtle bg-background"
                     style={isMobile ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' } : undefined}
                 >
+                  <div className="w-full max-w-2xl mx-auto flex items-center justify-end gap-2">
                     <button
                         onClick={onClose}
                         className="h-10 px-4 rounded-full text-sm font-semibold text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
@@ -611,6 +625,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                     >
                         {isSaving ? 'Saving…' : 'Save changes'}
                     </button>
+                  </div>
                 </div>
             </div>
         </div>
