@@ -118,7 +118,7 @@ export default function AddToCollectionSheet({
                 role="dialog"
                 aria-modal="true"
                 aria-label="Add to collection"
-                className="relative w-full sm:max-w-sm bg-card border-t sm:border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up overflow-hidden safe-pb max-h-[80vh] flex flex-col"
+                className="relative w-full sm:max-w-sm bg-card border-t sm:border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up overflow-hidden safe-pb max-h-full sm:max-h-[80vh] flex flex-col"
             >
                 {/* Grab handle (mobile) */}
                 <div className="sm:hidden flex justify-center pt-3 pb-1">

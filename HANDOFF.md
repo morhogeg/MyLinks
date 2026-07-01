@@ -1,6 +1,65 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-07-01. Branch: `claude/google-auth-implementation-wgblpr` (merged + pushed to `main`)._
+_Last updated: 2026-07-01. Branch: `claude/phase1-step2-trust-bugs-khdqer` (PR opened; not merged)._
+
+## Latest session — Phase 1 Step 2: the hard trust bugs (M2, M3, M5) — 2026-07-01
+
+Implemented **Machina spec Phase 1 step 2** — the "never doubt it" trust bedrock — on branch
+`claude/phase1-step2-trust-bugs-khdqer`. **PR opened (not merged; this repo reviews via PR).**
+`web` `tsc --noEmit` clean; `functions` `py_compile` clean. Nothing deployed from here.
+
+**M8/auth is a separate track on `main` — untouched this session.**
+
+### M2 — Share Extension never lies about saving (QA F-4/F-5)
+`web/ios/App/ShareExt/ShareViewController.swift`. The ~26s watchdog now resolves to a **neutral
+terminal state** ("**Still saving — open Machina to confirm**"), never the green check, and it
+**does not auto-dismiss** — the ✕ close affordance is the escape hatch (closes F-5). Green check now
+only appears on a real 2xx server ack. Aligned the **client request timeout (22s) under the watchdog
+(26s)**; a client-side timeout (`NSURLErrorTimedOut`) is now reported as the same neutral "still
+saving" state rather than a false failure, since the background upload keeps running. `share_ingest`
+already returns a real 200 ack the extension waits on (confirmed). The idempotency guard
+(`resultShown`) from build 11 is retained.
+- ⚠️ **Needs on-device verification (can't be done headlessly):** throttle/kill the network mid-share
+  on a physical device and confirm the HUD **never** shows the green check — it shows the neutral
+  state and can be dismissed; and that a real save shows the check only after the ack.
+- **iOS build not bumped/archived here** (no macOS/Xcode in this cloud session). Bump both targets +
+  archive on a Mac for the next TestFlight build.
+
+### M3 — No phantom saves: durable processing → ready | failed lifecycle (QA F-6)
+Backend `functions/main.py` (`process_link_background`) + `functions/models.py`
+(`LinkStatus.PROCESSING`/`FAILED`). The moment a capture is queued, a **visible card** is written to
+`users/{uid}/links` with `status: 'processing'`; the same doc is then flipped **in place** to `ready`
+(status `unread`, full analysis) on success or to a retryable **`failed`** card (original URL +
+`error` + `failedAt`) on analysis error — replacing the old confusing "Processing Failed"-tagged
+fallback card. The queue doc is deleted in both terminal cases (no orphans). Dedup still holds (the
+pending doc lives through processing; a failed/ready card matches `link_exists_for_url`).
+- Frontend: `web/lib/types.ts` (`CaptureState`, `error`/`failedAt`), `web/lib/storage.ts`
+  (`retryFailedLink` — re-runs the existing `/api/analyze` pipeline and updates the SAME doc in place,
+  so **no new backend/rules and nothing is duplicated**), `web/components/Card.tsx` (skeleton
+  `processing` card + `failed` card with **Retry**/Delete/open-original), `web/components/Feed.tsx`
+  (pending cards pinned atop the default library view; excluded from facets/filters so they never
+  spawn a phantom "Processing" category/tag; retry handler wired).
+- ⚠️ **Needs live verification:** force a server-side analysis error and confirm a **retryable failed
+  card** appears in the feed within seconds, and that **Retry** re-runs analysis and turns it into a
+  normal card. (Retry via `/api/analyze` works for link captures; image-capture failed cards still
+  appear — nothing is lost — but retry-by-URL is best-effort for images.)
+- **Deploy needed** (not done here): `./deploy-functions.sh functions:process_link_background`
+  (Firestore-trigger fn — watch for the transient 409 the earlier handoff noted; retry in ~60s).
+
+### M5 — Keyboard never covers an input (QA F-6/F-15/F-30)
+Applied the existing `web/lib/useVisualViewport.ts` to the remaining offenders. `LinkDetailModal.tsx`
+(the main gap) now clamps the modal to the **visible** viewport (`top: offsetTop`, `height`) so the
+inline category/tag edit rides above the keyboard. `AddToCollectionSheet.tsx` body clamped to
+`max-h-full` on mobile (was `80vh` = layout viewport, could overrun the top). `AddLinkForm.tsx`
+(already centers above the keyboard) and `ManageCollectionCardsSheet.tsx` (already clamps + pins)
+verified — no change needed. Desktop behavior unchanged; native/web-safe fallback via the hook.
+- ⚠️ **Needs on-device verification (iPhone SE, keyboard up):** in LinkDetailModal (category + Add
+  Tag), AddToCollectionSheet (new-collection name + Create), and AddLinkForm, confirm the focused
+  input **and** its primary action button are both fully visible.
+
+**Verification done here:** `web` `tsc --noEmit` exit 0 (after `npm ci`); `functions` `py_compile`
+OK. A full `next build` can't run offline (Google Fonts) — unrelated. No live/device checks possible
+headlessly — see the ⚠️ notes above and the PR body.
 
 ## Latest session — Google Sign-In, Phase 1 (web) — 2026-07-01
 
