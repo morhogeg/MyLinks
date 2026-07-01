@@ -710,7 +710,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                 ) : (
                     // Desktop keeps the full search bar; on mobile it collapses to a
                     // search icon in the toolbar row below (expandable in place).
-                    <div className="relative hidden sm:block">
+                    <div data-tour="search" className="relative hidden sm:block">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                         <input
                             type="text"
@@ -903,6 +903,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                         {/* Search — icon only; expands into a large field in place. Reads
                             accent when a query is active so it's clear a search is on. */}
                         <button
+                            data-tour="search"
                             onClick={() => setMobileSearchOpen(true)}
                             aria-label="Search"
                             className={`${ctrlBase} shrink-0 w-9 px-0 ${searchQuery
@@ -1006,6 +1007,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                         {/* Left zone — Collections */}
                         <div className="flex-1 flex justify-start sm:contents">
                             <button
+                                data-tour="collections"
                                 onClick={() => setViewMode('collections')}
                                 title="Browse collections"
                                 aria-label="Browse collections"
@@ -1020,6 +1022,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                         <div className="flex-1 flex justify-center sm:contents">
                             {isLibraryView && (
                             <button
+                                data-tour="ask"
                                 onClick={() => setViewMode('ask')}
                                 title="Ask your brain"
                                 aria-label="Ask your brain"
@@ -1034,7 +1037,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                         {/* Right zone — view switcher (icon-only on mobile) + desktop-only tools. */}
                         <div className="flex-1 flex justify-end items-center gap-2 sm:contents">
                         {isLibraryView && (
-                        <div className="inline-flex items-center gap-0.5 p-1 rounded-full bg-card border border-border-subtle">
+                        <div data-tour="views" className="inline-flex items-center gap-0.5 p-1 rounded-full bg-card border border-border-subtle">
                             {viewModes.map(vm => {
                                 const active = viewMode === vm.key;
                                 return (

@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import Feed from "@/components/Feed";
 import AddLinkForm from "@/components/AddLinkForm";
 import InstallPWA from "@/components/InstallPWA";
 import SettingsModal from "@/components/SettingsModal";
+import OnboardingTour, { ONBOARDING_STORAGE_KEY } from "@/components/OnboardingTour";
 import { Settings } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { IconButton } from "@/components/ui/Button";
@@ -19,9 +20,33 @@ export default function Home() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAskMode, setIsAskMode] = useState(false);
   const [hideAddButton, setHideAddButton] = useState(false);
+  const [isTourOpen, setIsTourOpen] = useState(false);
 
   const handleLinkAdded = () => {
     setRefreshKey(prev => prev + 1);
+  };
+
+  // First-run onboarding: once auth resolves and the feed is on screen, show the
+  // guided tour if this browser hasn't seen it yet. A short delay lets the
+  // toolbar anchors (Ask, Collections, view switcher…) mount so they can be
+  // spotlighted. Ask/Collections views hide those anchors, so wait for the grid.
+  useEffect(() => {
+    if (loading || !uid || isAskMode || hideAddButton) return;
+    let seen = true;
+    try {
+      seen = !!localStorage.getItem(ONBOARDING_STORAGE_KEY);
+    } catch {
+      seen = true; // private mode — don't nag
+    }
+    if (seen) return;
+    const timer = setTimeout(() => setIsTourOpen(true), 600);
+    return () => clearTimeout(timer);
+  }, [loading, uid, isAskMode, hideAddButton]);
+
+  const replayTour = () => {
+    setIsSettingsOpen(false);
+    // Let the settings sheet finish closing before the spotlight appears.
+    setTimeout(() => setIsTourOpen(true), 250);
   };
 
   // Loading state while auth resolves
@@ -71,6 +96,7 @@ export default function Home() {
               <ThemeToggle />
             </div>
             <IconButton
+              data-tour="settings"
               onClick={() => setIsSettingsOpen(true)}
               variant="secondary"
               radius="full"
@@ -98,8 +124,12 @@ export default function Home() {
           uid={uid}
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
+          onReplayTour={replayTour}
         />
       )}
+
+      {/* First-run guided tour */}
+      <OnboardingTour open={isTourOpen} onClose={() => setIsTourOpen(false)} />
 
       {/* iOS Install Banner */}
       <InstallPWA />
