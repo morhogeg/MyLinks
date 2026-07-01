@@ -26,16 +26,24 @@ build-resilience fix. `tsc --noEmit` clean; static export builds offline after t
    overshoot (`--ease-spring`, the "bump") with a no-overshoot iOS push curve
    (`cubic-bezier(0.32,0.72,0,1)`, new `.animate-ios-push`). Chat drawer left as-is.
 
+7. **Mobile search collapsed to an icon** — `web/components/Feed.tsx`. Removed the always-on
+   full-width search bar on mobile (desktop keeps it); search now lives as an icon on the single
+   `Categories & Tags · Filters/Sort · Search` line and expands into a large field in place
+   (autofocus, clear, Done; icon reads accent while a query is active). Reclaims the vertical
+   space the bar took, pushing the grid up.
+
 **Build resilience:** `web/app/layout.tsx` now self-hosts Geist via the `geist` package instead
 of `next/font/google`, so the build never fetches `fonts.googleapis.com` (same CSS var names;
 globals.css unchanged). Added `geist` to `web/package.json`.
 
-**Deploy status:** Desktop **Vercel deployed** (pushed to `main`, FF). iPhone **Firebase Hosting
-NOT yet deployed** — the cloud session can't run the static build (no `web/.env.local` Firebase
-secrets here) and Google Fonts was firewalled (now moot after the geist switch). **Run
-`./deploy-hosting.sh` locally** to update the iPhone. **iOS native:** no build-number bump this
-round; the Swift Share-Extension change needs a new archive — run `./build-ios.sh`, bump build in
-Xcode, archive, Organizer → Distribute → TestFlight.
+**iOS native:** build bumped **13 → 14** on both targets (App + ShareExt) for the Swift
+Share-Extension link-scan HUD. **Not archived here** (this Linux cloud session has no macOS/Xcode
+and no `web/.env.local`, so it can't produce a valid bundle). Archive on a Mac.
+
+**Deploy status:** Desktop **Vercel deployed** (all 7 changes on `main`, FF). iPhone **Firebase
+Hosting NOT deployed from here** (no `web/.env.local` Firebase secrets in the cloud clone). On a
+local Mac: `git pull origin main` → `./deploy-hosting.sh` (iPhone web) and `./build-ios.sh` →
+Xcode archive → Organizer → Distribute → TestFlight (build 14).
 
 ## Earlier — iOS QA items #5–#10 + build 13 (2026-06-30)
 
