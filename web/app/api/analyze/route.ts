@@ -21,9 +21,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     try {
+        // Forward auth + App Check so dev behaves like prod (this route only runs
+        // under `next dev`; the hosting rewrite preserves these in production).
+        const fwd: Record<string, string> = { 'Content-Type': 'application/json' };
+        const _auth = request.headers.get('authorization');
+        const _ac = request.headers.get('x-firebase-appcheck');
+        if (_auth) fwd['Authorization'] = _auth;
+        if (_ac) fwd['X-Firebase-AppCheck'] = _ac;
         const upstream = await fetch(`${BACKEND_BASE}/api/analyze`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: fwd,
             body: JSON.stringify(body),
         });
 

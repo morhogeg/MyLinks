@@ -6,6 +6,7 @@ import {
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '@/lib/firebase';
+import { isNativeApp, REQUIRE_AUTH } from '@/lib/api';
 import {
     onAuthChange, completeRedirectSignIn, signIn, signOutUser,
 } from '@/lib/auth';
@@ -60,14 +61,14 @@ function attachUserDoc(docId: string, data: Record<string, unknown> | undefined)
 }
 
 /**
- * Auth-aware provider.
+ * Auth-aware provider (two-mode, for the staged rollout).
  *
- * Both web and native require real sign-in (Google or Apple). Signed-out renders
- * the login gate; signed-in resolves the user's data doc (linked via `authUids`,
- * claimed on first sign-in). A signed-in account with no linked doc sees the
- * restricted screen. Native uses the Capacitor auth plugin bridged into the same
- * Firebase JS SDK (see lib/auth.ts), so this path is platform-agnostic.
- * See AUTH_SPEC.md and NATIVE_AUTH_SETUP.md.
+ * REQUIRE_AUTH ON: both web and native require real sign-in (Google or Apple);
+ * signed-in resolves the data doc (linked via `authUids`, claimed server-side).
+ * Native uses the Capacitor auth plugin bridged into the Firebase JS SDK
+ * (lib/auth.ts). REQUIRE_AUTH OFF (default, pre-cutover): web keeps its Google
+ * sign-in gate; native loads the owner workspace with no gate (legacy). Flip
+ * NEXT_PUBLIC_REQUIRE_AUTH at cutover — see AUTH_SPEC.md / NATIVE_AUTH_SETUP.md.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [uid, setUid] = useState<string | null>(null);
@@ -76,8 +77,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [displayName, setDisplayName] = useState<string | null>(null);
     const [photoURL, setPhotoURL] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-    // Signed in, but the Google account isn't linked to any workspace.
+    // Signed in, but the account isn't linked to any workspace.
     const [restricted, setRestricted] = useState(false);
+
+    const native = typeof window !== 'undefined' && isNativeApp();
 
     const signOut = useCallback(async () => {
         await signOutUser();
@@ -89,11 +92,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRestricted(false);
     }, []);
 
-    // ── Auth + data-doc resolution (web AND native) ──────────────────────────
-    // Both platforms now use real sign-in: web via Google/Apple popup-redirect,
-    // native via the Capacitor plugin bridged into the same JS SDK (see
-    // lib/auth.ts). So a single onAuthStateChanged path serves both.
+    // ── Legacy native path (pre-cutover only): load the owner workspace, no gate.
     useEffect(() => {
+        if (REQUIRE_AUTH || !native) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const snapshot = await getDocs(query(collection(db, 'users'), limit(1)));
+                if (cancelled) return;
+                if (!snapshot.empty) {
+                    const userDoc = snapshot.docs[0];
+                    setUid(userDoc.id);
+                    attachUserDoc(userDoc.id, userDoc.data());
+                }
+            } catch (err) {
+                console.error('Failed to look up user:', err);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
+    // ── Real sign-in path: web always; native only when REQUIRE_AUTH is on. ──
+    useEffect(() => {
+        if (!REQUIRE_AUTH && native) return;
         let cancelled = false;
 
         // Finish a redirect-based sign-in if one is pending (web only; no-op
@@ -142,21 +165,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const value: AuthContextType = { uid, authUid, email, displayName, photoURL, loading, signOut };
 
-    // Sign-in gating (web and native). During loading we render children so the
-    // page shows its own spinner (and SSR/first paint stay consistent — loading
-    // starts true).
-    if (!loading) {
+    // Sign-in gating. Web is always gated; native is gated only when enforcing.
+    // During loading we render children so the page shows its own spinner (and
+    // SSR/first paint stay consistent — loading starts true).
+    const gated = REQUIRE_AUTH || !native;
+    if (gated && !loading) {
         if (!authUid) {
             return (
                 <AuthContext.Provider value={value}>
-                    <LoginScreen onSignIn={signIn} />
+                    <LoginScreen onSignIn={signIn} showApple={REQUIRE_AUTH} />
                 </AuthContext.Provider>
             );
         }
         if (restricted) {
             return (
                 <AuthContext.Provider value={value}>
-                    <LoginScreen restricted email={email} onSignIn={signIn} onSignOut={signOut} />
+                    <LoginScreen restricted email={email} onSignIn={signIn} onSignOut={signOut} showApple={REQUIRE_AUTH} />
                 </AuthContext.Provider>
             );
         }

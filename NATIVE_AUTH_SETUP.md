@@ -7,10 +7,18 @@ deletion, locked Firestore rules) is done; the steps below are the console /
 Xcode / Apple-Developer pieces that can't be done from the repo, plus the order
 to roll it out safely.
 
-> ⚠️ **Do not re-archive the iOS app for TestFlight/App Store until steps 1–4 are
-> complete.** The native app now *requires* sign-in; if the plugin / Firebase iOS
-> config / Apple capability aren't in place, sign-in fails and users are locked
-> out. The currently-deployed build keeps working until you ship the new one.
+> **Flag-gated & safe to merge.** The whole cutover is gated behind
+> `REQUIRE_AUTH` (backend) / `NEXT_PUBLIC_REQUIRE_AUTH` (web), both **off by
+> default**. With the flags off the app behaves exactly as it does today (web
+> Google gate; native loads the owner workspace; backend still accepts a client
+> uid), so merging this branch does **not** change the live app. You flip the
+> flags — and deploy the locked rules — only at cutover, after sign-in is
+> verified. Rollback = flip the flags back off and redeploy.
+
+> ⚠️ **Do not flip the flags / re-archive the iOS app until steps 1–5 are
+> complete.** Once `REQUIRE_AUTH` is on, the native app *requires* sign-in; if the
+> plugin / Firebase iOS config / Apple capability aren't in place, users are
+> locked out.
 
 ---
 
@@ -97,21 +105,28 @@ SDK). That native SDK ships its own privacy manifest — no action needed for it
 Web build (Vercel / `web/.env.local`): `NEXT_PUBLIC_OWNER_EMAIL` may still be set
 for parity, but claim gating is now enforced server-side by `OWNER_EMAIL`.
 
-## 6. Cutover order (important — avoids bricking)
+## 6. Cutover order (flag-gated — nothing breaks until you flip)
 
-1. **Deploy Cloud Functions** first (they now require ID tokens; the updated web
-   client sends them). `cd functions && firebase deploy --only functions`.
-2. **Deploy the web app** (Vercel auto on push; Firebase Hosting via
-   `./deploy-hosting.sh`). Sign in on web with Google → confirm your existing
-   cards appear (this triggers `claim_workspace`, linking your account).
-3. **Test the locked rules in the Firestore emulator** (`firebase emulators:start`)
-   — verify: an owner can read/write their docs; a different signed-in account
-   cannot; the `authUids array-contains` query works; share pages still read.
-4. **Deploy Firestore rules** — `firebase deploy --only firestore:rules`. This is
-   the point of no return for the open-rules era; do it only after 1–3 pass.
-5. **Archive the iOS app** (after steps 1–4 in this file). `./build-ios.sh`, then
-   Xcode → Archive → TestFlight. Test Google **and** Apple sign-in on device, then
-   account deletion.
+1. **Deploy Cloud Functions with flags OFF** (`REQUIRE_AUTH` unset). The client
+   already sends `Authorization: Bearer` when signed in, so you can confirm from
+   the logs that verified tokens are arriving before enforcing anything.
+   `cd functions && firebase deploy --only functions`.
+2. **Deploy the web app** with `NEXT_PUBLIC_REQUIRE_AUTH` still off (Vercel auto on
+   push; Firebase Hosting via `./deploy-hosting.sh`). Behavior is unchanged.
+3. **Flip the flags on** — set `REQUIRE_AUTH=true` (Functions) and
+   `NEXT_PUBLIC_REQUIRE_AUTH=true` (Vercel + `web/.env.local`) and redeploy both.
+   Sign in on web with Google → confirm your cards appear (this triggers
+   `claim_workspace`, linking your account). Rollback = flip both back off.
+4. **Test the locked rules in the Firestore emulator** (`firebase emulators:start`)
+   with `firestore.rules.locked` — verify: an owner can read/write their docs; a
+   different signed-in account cannot; the `authUids array-contains` query works;
+   share pages still read.
+5. **Deploy the locked rules** —
+   `cp firestore.rules.locked firestore.rules && firebase deploy --only firestore:rules`.
+   Point of no return for the open-rules era; do it only after 1–4 pass.
+6. **Archive the iOS app** (after 1–5, with `NEXT_PUBLIC_REQUIRE_AUTH=true` baked
+   into the build). `./build-ios.sh`, then Xcode → Archive → TestFlight. Test
+   Google **and** Apple sign-in on device, then account deletion.
 
 ## 7. Open questions / limits
 

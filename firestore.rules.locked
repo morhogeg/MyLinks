@@ -1,0 +1,82 @@
+// STAGED, NOT LIVE. This is the locked target ruleset. The live `firestore.rules`
+// stays open until cutover so the current app keeps working. Deploy this only as
+// the LAST cutover step, after REQUIRE_AUTH is on and sign-in is verified:
+//   cp firestore.rules.locked firestore.rules && firebase deploy --only firestore:rules
+// See NATIVE_AUTH_SETUP.md ("Cutover order").
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Multi-user access control (see AUTH_SPEC.md) ─────────────────────────
+    // Data docs are keyed by phone number, NOT the Firebase Auth uid, so a
+    // signed-in account owns a doc when its uid is in that doc's `authUids`
+    // array. The first-time link ("claim") and account deletion run server-side
+    // via the Admin SDK (claim_workspace / delete_account), which bypasses these
+    // rules — so the client only ever reads/updates a doc it already owns.
+    //
+    // ⚠️ Test with the Firestore emulator before deploying. Deploying rules that
+    // are too tight will brick reads/writes until corrected. Deploy this ONLY
+    // after native + web sign-in and the claim flow are confirmed working (see
+    // NATIVE_AUTH_SETUP.md, "Cutover order").
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // True when the signed-in account is linked to the user doc `uid`.
+    function owns(uid) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(uid))
+        && (request.auth.uid in get(/databases/$(database)/documents/users/$(uid)).data.authUids);
+    }
+
+    match /users/{uid} {
+      // read covers the `authUids array-contains <auth uid>` lookup the client
+      // runs to resolve its own workspace; every matched doc satisfies owns(uid).
+      allow read, write: if owns(uid);
+
+      match /links/{linkId} {
+        allow read, write: if owns(uid);
+      }
+
+      // Ask-your-brain saved conversations
+      match /chats/{chatId} {
+        allow read, write: if owns(uid);
+      }
+
+      // User-curated collections of cards
+      match /collections/{collectionId} {
+        allow read, write: if owns(uid);
+      }
+    }
+
+    // Shared collections & cards: public, read-only snapshots for share links so
+    // logged-out visitors can open /c?id= and /s?id= pages. Writes are limited to
+    // the owner of the referenced workspace (docs carry `ownerUid`).
+    match /shared_collections/{shareId} {
+      allow read: if true;
+      allow create, update: if owns(request.resource.data.ownerUid);
+      allow delete: if owns(resource.data.ownerUid);
+    }
+    match /shared_cards/{shareId} {
+      allow read: if true;
+      allow create, update: if owns(request.resource.data.ownerUid);
+      allow delete: if owns(resource.data.ownerUid);
+    }
+
+    // pending_processing: only Cloud Functions (admin SDK)
+    match /pending_processing/{docId} {
+      allow read, write: if false;
+    }
+
+    // task_logs: only Cloud Functions (admin SDK)
+    match /task_logs/{docId} {
+      allow read, write: if false;
+    }
+
+    // rate_limits: only Cloud Functions (admin SDK) — never client-writable.
+    match /rate_limits/{docId} {
+      allow read, write: if false;
+    }
+  }
+}

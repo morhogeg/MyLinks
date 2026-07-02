@@ -25,8 +25,10 @@ export async function POST(request: NextRequest): Promise<NextResponse | Respons
     // Forward the caller's App Check token (and other relevant headers) so the
     // backend sees the same auth context as a direct call would.
     const appCheck = request.headers.get('X-Firebase-AppCheck');
+    const authz = request.headers.get('authorization');
     const fwdHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
     if (appCheck) fwdHeaders['X-Firebase-AppCheck'] = appCheck;
+    if (authz) fwdHeaders['Authorization'] = authz;
     // Ask the backend to stream when the client requested it.
     fwdHeaders['Accept'] = request.headers.get('Accept') || 'application/json';
 

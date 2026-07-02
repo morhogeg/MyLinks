@@ -279,18 +279,25 @@ environment (no `node_modules`); backend Python byte-compiles clean
 - Set **`ADMIN_TOKEN`** in the Functions environment (else the admin/debug endpoints return 404 — the safe default). Callers pass it as the `X-Admin-Token` header.
 - Set **`APPCHECK_ENFORCE=true`** in production (this addresses **H-2** — App Check was left soft/fail-open in code intentionally for rollout; enforcement is an env flag, not a code change).
 
-### Batch 2 — multi-user auth cutover (done in code; deploy-gated)
-Decision: **public multi-user** with **Sign in with Apple**. All changes are on
-the branch; they take effect on a coordinated deploy (see `NATIVE_AUTH_SETUP.md`,
-"Cutover order"). Backend byte-compiles clean; native pieces need the manual
-console/Xcode steps in `NATIVE_AUTH_SETUP.md`.
+### Batch 2 — multi-user auth cutover (done in code; **flag-gated**, deploy-safe)
+Decision: **public multi-user** with **Sign in with Apple**. This branch is the
+consolidation of this work and the parallel PR #6 (`auth-real-implementation`):
+it keeps PR #6's **safe-rollout mechanics** — a `REQUIRE_AUTH` /
+`NEXT_PUBLIC_REQUIRE_AUTH` flag (off by default, so merging changes nothing
+live), a staged `firestore.rules.locked` (live rules stay open until cutover),
+and dev-proxy header forwarding — on top of this branch's fuller implementation
+(real native Apple **and** Google sign-in in the Capacitor app, account
+deletion, `authUids` linking with a server-side `claim_workspace`, no data
+migration). PR #6 is superseded. Flip the flags + deploy the locked rules only at
+cutover (see `NATIVE_AUTH_SETUP.md`). Backend byte-compiles clean; native pieces
+need the manual console/Xcode steps.
 
 | Finding | Status | What changed |
 |---|---|---|
 | **B-2 Native auth bypass** | ✅ Fixed (code) | Removed the "first user doc" fallback; `AuthProvider` gates web **and** native behind real sign-in. Native uses `@capacitor-firebase/authentication` bridged into the Firebase JS SDK (`lib/auth.ts`). |
 | **B-7 Sign in with Apple** | ✅ Fixed (code) | Google **and** Apple sign-in on web + native (`lib/auth.ts`, `LoginScreen.tsx`); `App.entitlements` gains the Sign in with Apple capability. Needs Firebase Apple provider + Apple Developer config (setup doc). |
 | **B-3 Endpoints trust client `uid`** | ✅ Fixed (code) | `_verify_bearer` / `_authed_uid` verify the ID token and resolve the workspace uid via `authUids` server-side. Applied to `analyze_link`, `ask_brain`, `analyze_image`, `get_share_config`, `search_links`, `send_digest_now`. Client now sends `Authorization: Bearer`. Also removed the digest `email` override (exfiltration). |
-| **B-1 Open Firestore rules** | ✅ Fixed (code, deploy last) | `firestore.rules` locked to `owns(uid)` (membership in `authUids`); shared docs owner-write/public-read. First-time claim moved server-side (`claim_workspace`) so it works under locked rules. **Deploy only after testing** (setup doc). |
+| **B-1 Open Firestore rules** | ✅ Fixed (staged) | Locked ruleset staged in `firestore.rules.locked` (`owns(uid)` via `authUids`; shared docs owner-write/public-read; deny `rate_limits`). Live `firestore.rules` stays **open** until cutover so nothing breaks on merge. First-time claim is server-side (`claim_workspace`). **Deploy the locked file last** (setup doc). |
 | **B-5 In-app account deletion** | ✅ Fixed (code) | `delete_account` callable (deletes Firestore workspace + Storage + Auth user); "Delete account" flow in `SettingsModal` with a confirm dialog. |
 
 **New deploy-config requirement:** `OWNER_EMAIL` (Functions env) to gate the

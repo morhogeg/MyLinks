@@ -12,11 +12,15 @@ export default function LoginScreen({
     onSignOut,
     restricted = false,
     email,
+    showApple = true,
 }: {
     onSignIn: (provider: 'google' | 'apple') => Promise<void>;
     onSignOut?: () => void;
     restricted?: boolean;
     email?: string | null;
+    /** Show "Continue with Apple". Hidden pre-cutover when the Apple provider
+        may not be configured yet. */
+    showApple?: boolean;
 }) {
     const [busy, setBusy] = useState<null | 'google' | 'apple'>(null);
     const [error, setError] = useState<string | null>(null);
@@ -72,18 +76,20 @@ export default function LoginScreen({
                         <p className="mt-8 text-sm text-text-secondary">
                             Sign in to access your second brain.
                         </p>
-                        <button
-                            onClick={() => handleSignIn('apple')}
-                            disabled={busy !== null}
-                            className="mt-5 w-full inline-flex items-center justify-center gap-2.5 rounded-full bg-black text-white px-5 py-3 text-sm font-semibold shadow-sm ring-1 ring-white/10 hover:bg-gray-900 disabled:opacity-60 transition-colors"
-                        >
-                            <AppleGlyph />
-                            {busy === 'apple' ? 'Signing in…' : 'Continue with Apple'}
-                        </button>
+                        {showApple && (
+                            <button
+                                onClick={() => handleSignIn('apple')}
+                                disabled={busy !== null}
+                                className="mt-5 w-full inline-flex items-center justify-center gap-2.5 rounded-full bg-black text-white px-5 py-3 text-sm font-semibold shadow-sm ring-1 ring-white/10 hover:bg-gray-900 disabled:opacity-60 transition-colors"
+                            >
+                                <AppleGlyph />
+                                {busy === 'apple' ? 'Signing in…' : 'Continue with Apple'}
+                            </button>
+                        )}
                         <button
                             onClick={() => handleSignIn('google')}
                             disabled={busy !== null}
-                            className="mt-3 w-full inline-flex items-center justify-center gap-3 rounded-full bg-white text-gray-800 px-5 py-3 text-sm font-semibold shadow-sm ring-1 ring-black/5 hover:bg-gray-50 disabled:opacity-60 transition-colors"
+                            className={`${showApple ? 'mt-3' : 'mt-5'} w-full inline-flex items-center justify-center gap-3 rounded-full bg-white text-gray-800 px-5 py-3 text-sm font-semibold shadow-sm ring-1 ring-black/5 hover:bg-gray-50 disabled:opacity-60 transition-colors`}
                         >
                             <GoogleGlyph />
                             {busy === 'google' ? 'Signing in…' : 'Continue with Google'}

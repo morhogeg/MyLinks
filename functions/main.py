@@ -168,21 +168,29 @@ def _verify_bearer(req):
         return None
 
 
-def _authed_uid(req, headers: dict = None):
-    """Resolve the caller's DATA-doc uid from a verified ID token.
+def _authed_uid(req, headers: dict = None, body_uid: str = None):
+    """Resolve the caller's DATA-doc uid, preferring a verified ID token.
 
     Returns (uid, None) on success or (None, error_response) to return directly.
-    401 when unauthenticated; 403 when the verified account isn't linked to any
-    workspace. This replaces the old pattern of trusting a client-supplied uid
-    (which allowed cross-tenant IDOR).
+    When REQUIRE_AUTH is ON, a valid token is mandatory (401) and it must map to
+    a workspace (403); the client-supplied uid is ignored. When OFF (pre-cutover)
+    a verified token still wins, but we fall back to the client-supplied uid so
+    the current app keeps working. This kills the cross-tenant IDOR once enforced.
     """
     decoded = _verify_bearer(req)
-    if not decoded:
+    if decoded:
+        uid = find_data_uid_by_auth_uid(decoded.get("uid"))
+        if uid:
+            return uid, None
+        if REQUIRE_AUTH:
+            return None, _error_response("No workspace linked to this account", 403, headers)
+    elif REQUIRE_AUTH:
         return None, _error_response("Authentication required", 401, headers)
-    uid = find_data_uid_by_auth_uid(decoded.get("uid"))
-    if not uid:
-        return None, _error_response("No workspace linked to this account", 403, headers)
-    return uid, None
+
+    # Soft mode (or verified-but-unlinked while not enforcing): trust the client.
+    if body_uid:
+        return body_uid, None
+    return None, _error_response("Authentication required", 401, headers)
 
 
 def _require_admin(req, headers: dict = None):
@@ -233,6 +241,14 @@ def _rate_limited(bucket: str, identity: str, headers: dict = None):
 # but never blocks (soft rollout) — lets us confirm the web client is sending
 # tokens before flipping APPCHECK_ENFORCE=true to start rejecting.
 APPCHECK_ENFORCE = os.environ.get("APPCHECK_ENFORCE", "").lower() in ("1", "true", "yes")
+
+# Auth enforcement flag for the staged multi-user rollout. When OFF (default),
+# the backend still accepts a client-supplied uid so the current app keeps
+# working; a verified ID token is preferred when present. When ON, every data
+# endpoint/callable REQUIRES a valid ID token and derives the workspace uid from
+# it (client-supplied uids are rejected). Flip to true only after sign-in is
+# confirmed working end-to-end. See NATIVE_AUTH_SETUP.md ("Cutover order").
+REQUIRE_AUTH = os.environ.get("REQUIRE_AUTH", "").lower() in ("1", "true", "yes")
 
 
 def _require_app_check(req, headers: dict = None) -> bool:
@@ -490,8 +506,9 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         if len(url) > MAX_URL_LENGTH:
             return _error_response("URL is too long", 400, headers)
 
-        # Identity from the verified ID token — never from the body (IDOR).
-        uid, auth_err = _authed_uid(req, headers)
+        # Identity: prefer the verified ID token; falls back to the body uid only
+        # while REQUIRE_AUTH is off (see _authed_uid).
+        uid, auth_err = _authed_uid(req, headers, data.get('uid'))
         if auth_err:
             return auth_err
 
@@ -651,8 +668,9 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         if not data:
             return _error_response("Invalid JSON body", 400, headers)
 
-        # Identity from the verified ID token — never from the body (IDOR).
-        uid, auth_err = _authed_uid(req, headers)
+        # Identity: prefer the verified ID token; falls back to the body uid only
+        # while REQUIRE_AUTH is off (see _authed_uid).
+        uid, auth_err = _authed_uid(req, headers, data.get('uid'))
         if auth_err:
             return auth_err
         question = (data.get('question') or '').strip()
@@ -840,8 +858,9 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
         image_url = data.get('imageUrl')
         image_b64 = data.get('imageBytes')
         existing_tags = data.get('existingTags', [])
-        # Identity from the verified ID token — never from the body (IDOR).
-        uid, auth_err = _authed_uid(req, headers)
+        # Identity: prefer the verified ID token; falls back to the body uid only
+        # while REQUIRE_AUTH is off (see _authed_uid).
+        uid, auth_err = _authed_uid(req, headers, data.get('uid'))
         if auth_err:
             return auth_err
 
@@ -1068,17 +1087,15 @@ def get_share_config(req: https_fn.CallableRequest) -> dict:
     Returns the share-ingest endpoint and the caller's personal ingest token
     (generating one on first use). Used by Settings to configure the Shortcut.
     """
-    # Derive the data-doc uid from the verified caller — never from the body.
-    if not req.auth:
-        raise https_fn.HttpsError(
-            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
-            message="User must be signed in"
-        )
-    uid = find_data_uid_by_auth_uid(req.auth.uid)
+    # Prefer the verified caller; fall back to the client uid only while
+    # REQUIRE_AUTH is off (staged rollout).
+    uid = find_data_uid_by_auth_uid(req.auth.uid) if req.auth else None
+    if not uid and not REQUIRE_AUTH and req.data:
+        uid = req.data.get("uid") or req.data.get("test_uid")
     if not uid:
         raise https_fn.HttpsError(
-            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
-            message="No workspace linked to this account"
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="User must be identified",
         )
 
     token = ensure_ingest_token(uid)
@@ -2027,17 +2044,15 @@ def send_digest_now(req: https_fn.CallableRequest) -> dict:
     """
     from digest_service import build_and_send_digest
 
-    # Derive the data-doc uid from the verified caller — never from the body.
-    if not req.auth:
-        raise https_fn.HttpsError(
-            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
-            message="User must be signed in",
-        )
-    uid = find_data_uid_by_auth_uid(req.auth.uid)
+    # Prefer the verified caller; fall back to the client uid only while
+    # REQUIRE_AUTH is off (staged rollout).
+    uid = find_data_uid_by_auth_uid(req.auth.uid) if req.auth else None
+    if not uid and not REQUIRE_AUTH and req.data:
+        uid = req.data.get("uid") or req.data.get("test_uid")
     if not uid:
         raise https_fn.HttpsError(
-            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
-            message="No workspace linked to this account",
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="User must be identified",
         )
 
     db = get_db()

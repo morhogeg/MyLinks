@@ -10,6 +10,15 @@
 // function. apiUrl() prefixes that base only when it's set.
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? '';
 
+/**
+ * Staged multi-user auth rollout flag. When false (default), the app keeps its
+ * current behavior (web Google gate; native loads the owner workspace) and the
+ * backend still accepts a client uid. When true, web + native both require
+ * sign-in (Google/Apple) and the backend enforces ID-token auth. Flip this (and
+ * the matching backend REQUIRE_AUTH) only at cutover — see NATIVE_AUTH_SETUP.md.
+ */
+export const REQUIRE_AUTH = process.env.NEXT_PUBLIC_REQUIRE_AUTH === 'true';
+
 export function apiUrl(path: string): string {
     return API_BASE ? `${API_BASE}${path}` : path;
 }

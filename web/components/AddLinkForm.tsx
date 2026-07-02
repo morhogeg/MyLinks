@@ -180,7 +180,8 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
                     response = await fetchWithTimeout(apiUrl('/api/analyze'), {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
-                        body: JSON.stringify({ url: formattedUrl, existingTags }),
+                        // uid kept for the pre-cutover soft-auth fallback; ignored once REQUIRE_AUTH is on.
+                        body: JSON.stringify({ url: formattedUrl, existingTags, uid }),
                     });
                 } catch (netErr) {
                     throw new Error(netErr instanceof Error ? netErr.message : `Network error: ${String(netErr)}`);
