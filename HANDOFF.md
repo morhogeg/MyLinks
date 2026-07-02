@@ -1,8 +1,47 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-07-01. Branch: `claude/phase1-step2-trust-bugs-khdqer` (PR opened; not merged)._
+_Last updated: 2026-07-02. Branch: `claude/brave-blackburn-0a8bcf` (merged to `main` + deployed)._
 
-## Latest session — Phase 1 Step 2: the hard trust bugs (M2, M3, M5) — 2026-07-01
+## Latest session — Curated digest settings redesign — 2026-07-02
+
+Design overhaul of the **Curated digest** sub-screen in
+`web/components/SettingsModal.tsx` (the `view === 'digest'` region), to match the app's premium
+visual language, plus a rebuilt Topics picker. **Merged to `main` and fully deployed.**
+
+**What changed (all in `web/components/SettingsModal.tsx`):**
+- Live **"Your digest" gradient preview card** at the top of the digest screen (summarizes the
+  current mode · count · schedule · channel).
+- **"What to send"** is now elevated mode tiles (gradient icon chip + check badge on the active
+  tile) instead of flat pills; mode icons bumped 16→18px.
+- Consistent **uppercase section headers** (What to send / Topics / Schedule / Delivery) via a new
+  `GroupLabel` helper, matching the main Settings screen.
+- **Schedule** and **Delivery** are now grouped iOS-style bordered cards with divider rows (How
+  many / How often / Delivery time; channels / email / skip-empty).
+- **Topics picker rebuilt for findability** (this was the ask): live **search/filter** (shown when
+  > 8 topics), split into **Categories vs Tags** sub-groups (`TopicGroup`/`TopicPill` helpers),
+  and **selected topics pinned on top** as removable accent chips. `loadDigestExtras` now dedupes
+  case-variant topics (e.g. "tech"/"Tech") keyed by lowercase — safe because the digest matcher in
+  `functions/digest_service.py` (`_normalize_topics`) already lowercases everything. `toggleTopic`
+  and the active check are now case-insensitive.
+- The primary "Send one now" button became "**Send a preview now**" with the brand gradient.
+
+**Verification:** `web` `tsc --noEmit` clean (before and after merging origin's concurrent
+`SettingsModal.tsx` edits — the auto-merge was conflict-free). Redesign visually verified via a
+throwaway `/digest-preview` harness (since the real screen needs Firebase auth); harness removed.
+
+**Deployed:**
+- **Desktop** → pushed to `main` (`56f3b9f`), Vercel auto-deploy.
+- **iPhone (PWA)** → `./deploy-hosting.sh` → `secondbrain-app-94da2.web.app`. ✅
+- **iOS native app** → `./build-ios.sh` refreshed `ios/App/App/public` from `56f3b9f`; Xcode opened.
+  **Not archived** — bump the build number in Xcode and Product → Archive → TestFlight to ship the
+  native app.
+- **Backend** → none (frontend-only change).
+
+> ⚠️ The pull before pushing brought in a batch of concurrent `main` work from another track
+> (ProfileAvatar, Card/Feed/storage/types changes, iOS ShareExt build 19). That code is now on
+> local `main` and was deployed alongside the digest redesign — worth a glance if anything looks off.
+
+## Earlier session — Phase 1 Step 2: the hard trust bugs (M2, M3, M5) — 2026-07-01
 
 Implemented **Machina spec Phase 1 step 2** — the "never doubt it" trust bedrock — on branch
 `claude/phase1-step2-trust-bugs-khdqer`. **PR opened (not merged; this repo reviews via PR).**
