@@ -416,6 +416,37 @@ def backfill_youtube_channels(req: https_fn.Request) -> https_fn.Response:
         return _server_error(headers, e, "Backfill failed")
 
 
+@https_fn.on_request()
+def backfill_related_links(req: https_fn.Request) -> https_fn.Response:
+    """One-off repair: compute link.relatedLinks (the "See also" graph, M9) for
+    existing cards that predate graph_service, and backfill any missing
+    embedding_vector so older cards can be found as neighbors too. Optional
+    ?uid=… (or JSON {uid}) limits to one user; otherwise all users. ?force=1
+    recomputes even where relatedLinks already exist. Idempotent; re-runnable.
+    """
+    headers = _cors_headers(req)
+    if req.method == "OPTIONS":
+        return https_fn.Response("", status=204, headers=headers)
+    try:
+        uid = req.args.get("uid") or (req.get_json(silent=True) or {}).get("uid")
+        force = str(req.args.get("force") or "").lower() in ("1", "true", "yes")
+        db = get_db()
+        graph = GraphService(db)
+        user_refs = ([db.collection("users").document(uid)] if uid
+                     else list(db.collection("users").list_documents()))
+        totals = {"users": 0, "embedded": 0, "updated": 0, "skipped": 0, "failed": 0}
+        for uref in user_refs:
+            res = graph.backfill_related_links(uref.id, force=force)
+            for k in ("embedded", "updated", "skipped", "failed"):
+                totals[k] += res.get(k, 0)
+            totals["users"] += 1
+        return https_fn.Response(
+            json.dumps(totals), status=200, headers=headers, mimetype="application/json",
+        )
+    except Exception as e:
+        return _server_error(headers, e, "Backfill related links failed")
+
+
 # ─────────────────────────────────────────────
 # HTTP Endpoints
 # ─────────────────────────────────────────────
@@ -1637,7 +1668,7 @@ def whatsapp_webhook(request):
 
     if not uid:
         logger.warning(f"Unauthorized number: {_mask_phone(payload.from_number)}")
-        msg = "❌ מצטערים, מספר הטלפון שלך לא מזוהה. אנא וודא שהוא תואם להגדרות." if user_msg_is_hebrew else "❌ Sorry, your phone number is not recognized. Please make sure it matches the number in your Second Brain settings."
+        msg = "❌ מצטערים, מספר הטלפון שלך לא מזוהה. אנא וודא שהוא תואם להגדרות." if user_msg_is_hebrew else "❌ Sorry, your phone number is not recognized. Please make sure it matches the number in your Machina AI settings."
         send_whatsapp_message(payload.from_number, msg)
         return https_fn.Response(json.dumps({"error": "User not found"}), status=403, mimetype="application/json")
 
@@ -1792,6 +1823,18 @@ def log_to_firestore(task_id: str, message: str, level: str = "INFO", data: dict
         logger.error(f"Failed to log to Firestore: {e}")
 
 
+def _capture_placeholder_title(url: str, is_image: bool) -> str:
+    """A friendly, human-readable title for a still-processing capture card."""
+    if is_image:
+        return "Analyzing image…"
+    try:
+        from urllib.parse import urlparse
+        host = (urlparse(url).netloc or "").replace("www.", "")
+        return host or "Analyzing link…"
+    except Exception:
+        return "Analyzing link…"
+
+
 @firestore_fn.on_document_created(
     document="pending_processing/{doc_id}",
     memory=1024,
@@ -1822,6 +1865,35 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
 
     log_to_firestore(task_id, "Background processing started", data={"url": url, "uid": uid, "isImage": is_image})
     ref.update({"status": "processing", "startedAt": datetime.now(timezone.utc).isoformat()})
+
+    # The URL we were handed before any reassignment (the image path rewrites `url`
+    # to the stored Storage URL below). Kept so a FAILED card records the original.
+    original_url = url
+
+    # M3 — durable capture lifecycle. Write a visible "processing" card into the
+    # user's library the instant work begins, then update THIS SAME card to ready
+    # (on success) or a retryable "failed" state (on error). A captured item is
+    # therefore never invisible and never silently dropped, even if analysis fails.
+    card_ref = get_db().collection('users').document(uid).collection('links').document()
+    card_id = card_ref.id
+    try:
+        card_ref.set({
+            "url": original_url,
+            "title": _capture_placeholder_title(original_url, is_image),
+            "summary": "",
+            "tags": [],
+            "category": "",
+            "status": LinkStatus.PROCESSING.value,
+            "sourceType": "image" if is_image else "web",
+            "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+            "metadata": {"originalTitle": "", "estimatedReadTime": 0},
+        })
+        ref.update({"cardId": card_id})
+    except Exception as placeholder_err:
+        # Non-fatal: if we can't write the placeholder, fall back to the legacy
+        # "create the real card at the end" behaviour so a save is never lost.
+        logger.error(f"Failed to write processing placeholder card: {placeholder_err}", exc_info=True)
+        card_ref = None
 
     analysis = {}
     scraped = {"html": "", "title": "", "text": ""}
@@ -1933,8 +2005,14 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         if is_youtube:
             _apply_youtube_metadata(link_data, yt_meta, analysis, estimated_time)
 
-        # 5. Save to Firestore
-        link_id = save_link_to_firestore(uid, link_data)
+        # 5. Save to Firestore — flip the placeholder card to its ready state in
+        # place (preserving its id) so it transitions processing → ready without
+        # flicker. If the placeholder couldn't be created, fall back to a new doc.
+        if card_ref is not None:
+            card_ref.set(link_data)
+            link_id = card_id
+        else:
+            link_id = save_link_to_firestore(uid, link_data)
         db.collection('users').document(uid).update({'lastSavedLinkId': link_id})
 
         # 6. Check for reminder intent
@@ -1964,22 +2042,42 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
 
     except Exception as e:
         logger.error(f"Background processing error: {e}", exc_info=True)
-        ref.update({"status": "failed", "error": str(e)})
 
-        fallback_data = {
-            "url": url,
-            "title": scraped.get("title", url),
-            "summary": f"Cloud processing error: {str(e)}",
-            "tags": ["Processing Failed"],
-            "category": "Uncategorized",
-            "status": LinkStatus.UNREAD.value,
+        # M3 — never drop a capture. Mark the visible card as a retryable FAILED
+        # state carrying the original URL + a short error, rather than leaving a
+        # confusing "Processing Failed"-tagged card or (worse) nothing at all. The
+        # frontend renders this as a "couldn't analyze — retry" card.
+        failed_data = {
+            "url": original_url,
+            "title": scraped.get("title") or _capture_placeholder_title(original_url, is_image),
+            "summary": "",
+            "tags": [],
+            "category": "",
+            "status": LinkStatus.FAILED.value,
+            "sourceType": "image" if is_image else "web",
+            "error": str(e)[:300],
+            "failedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
             "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
             "metadata": {
                 "originalTitle": scraped.get("title", ""),
                 "estimatedReadTime": 0
             }
         }
-        save_link_to_firestore(uid, fallback_data)
+        try:
+            if card_ref is not None:
+                card_ref.set(failed_data)
+            else:
+                save_link_to_firestore(uid, failed_data)
+        except Exception as write_err:
+            logger.error(f"Failed to write FAILED card record: {write_err}", exc_info=True)
+
+        # The retryable failed card now lives in the library; drop the queue doc so
+        # no orphaned pending_processing record is left behind.
+        try:
+            ref.delete()
+        except Exception:
+            pass
+
         if from_number:
             send_whatsapp_message(from_number, f"⚠️ Saved: {url}\n\nNote: Detailed AI analysis encountered an issue ({str(e)[:50]}...).")
 

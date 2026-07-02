@@ -3,9 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { User, DigestMode, DigestChannel } from '@/lib/types';
-import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight, Compass, LogOut, UserCircle } from 'lucide-react';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '@/lib/firebase';
+import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight, Compass, LogOut, UserCircle, CalendarClock, Search } from 'lucide-react';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from './AuthProvider';
@@ -32,14 +30,21 @@ const FREQUENCY_NOTE: Record<string, string> = {
     weekly: 'A weekly nudge to revisit what you saved.',
 };
 
-const DIGEST_MODES: { value: DigestMode; label: string; icon: ReactNode; note: string }[] = [
-    { value: 'smart', label: 'Smart mix', icon: <Sparkles className="w-4 h-4" />, note: 'A balanced blend of your backlog and older gems worth a second look.' },
-    { value: 'random', label: 'Surprise me', icon: <Shuffle className="w-4 h-4" />, note: 'A random handful from across your whole library.' },
-    { value: 'topic', label: 'By topic', icon: <Tag className="w-4 h-4" />, note: 'Only cards from a category or tag you choose.' },
-    { value: 'unread', label: 'Backlog', icon: <Inbox className="w-4 h-4" />, note: 'Chip away at what you saved but never read (oldest first).' },
-    { value: 'favorites', label: 'Favorites', icon: <Star className="w-4 h-4" />, note: 'Bring your starred cards back for an encore.' },
-    { value: 'rediscover', label: 'Rediscover', icon: <History className="w-4 h-4" />, note: 'Resurface older saves you haven\'t opened in a while.' },
+// The three primary modes cover the common cases; the rest live behind an
+// "Advanced" disclosure so the picker isn't six equal-weight choices (M14).
+// The backend still curates every mode — this is presentation only.
+const DIGEST_MODES: { value: DigestMode; label: string; icon: ReactNode; note: string; advanced?: boolean }[] = [
+    { value: 'smart', label: 'Smart mix', icon: <Sparkles className="w-[18px] h-[18px]" />, note: 'A balanced blend of your backlog and older gems worth a second look.' },
+    { value: 'unread', label: 'Backlog', icon: <Inbox className="w-[18px] h-[18px]" />, note: 'Chip away at what you saved but never read (oldest first).' },
+    { value: 'rediscover', label: 'Rediscover', icon: <History className="w-[18px] h-[18px]" />, note: 'Resurface older saves you haven\'t opened in a while.' },
+    { value: 'random', label: 'Surprise me', icon: <Shuffle className="w-[18px] h-[18px]" />, note: 'A random handful from across your whole library.', advanced: true },
+    { value: 'topic', label: 'By topic', icon: <Tag className="w-[18px] h-[18px]" />, note: 'Only cards from a category or tag you choose.', advanced: true },
+    { value: 'favorites', label: 'Favorites', icon: <Star className="w-[18px] h-[18px]" />, note: 'Bring your starred cards back for an encore.', advanced: true },
 ];
+
+const PRIMARY_DIGEST_MODES = DIGEST_MODES.filter((m) => !m.advanced);
+const ADVANCED_DIGEST_MODES = DIGEST_MODES.filter((m) => m.advanced);
+const ADVANCED_MODE_VALUES = new Set<DigestMode>(ADVANCED_DIGEST_MODES.map((m) => m.value));
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
@@ -48,35 +53,60 @@ const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
 }));
 const COUNT_OPTIONS = ['3', '5', '7', '10'].map((c) => ({ value: c, label: `${c} cards` }));
 
+const DEFAULT_SETTINGS: User['settings'] = {
+    theme: 'dark',
+    daily_digest: false,
+    reminders_enabled: true,
+    reminder_frequency: 'smart',
+    digest_enabled: false,
+    digest_frequency: 'weekly',
+    digest_channels: ['whatsapp'],
+    digest_mode: 'smart',
+    digest_topics: [],
+    digest_topic: null,
+    digest_count: 5,
+    digest_hour: 9,
+    digest_day: 0,
+    digest_skip_empty: true,
+};
+
 export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: SettingsModalProps) {
     const { theme, setTheme } = useTheme();
     const { authUid, email: accountEmail, displayName, photoURL, signOut } = useAuth();
 
-    const [settings, setSettings] = useState<User['settings']>({
-        theme: 'dark',
-        daily_digest: false,
-        reminders_enabled: true,
-        reminder_frequency: 'smart',
-        digest_enabled: false,
-        digest_frequency: 'weekly',
-        digest_channels: ['whatsapp'],
-        digest_mode: 'smart',
-        digest_topics: [],
-        digest_topic: null,
-        digest_count: 5,
-        digest_hour: 9,
-        digest_day: 0,
-        digest_skip_empty: true,
-    });
+    const [settings, setSettings] = useState<User['settings']>(DEFAULT_SETTINGS);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     // 'main' = the settings list; 'digest' = the curation sub-screen.
     const [view, setView] = useState<'main' | 'digest'>('main');
 
     const [email, setEmail] = useState('');
-    const [topics, setTopics] = useState<string[]>([]);
-    const [sendingNow, setSendingNow] = useState(false);
-    const [sendResult, setSendResult] = useState<string | null>(null);
+    // Topic options, split by origin and de-duped case-insensitively (the
+    // digest matcher lowercases everything, so "Tech" and "tech" are the same).
+    const [categoryTopics, setCategoryTopics] = useState<string[]>([]);
+    const [tagTopics, setTagTopics] = useState<string[]>([]);
+    const [topicQuery, setTopicQuery] = useState('');
+    // Advanced digest modes (Surprise me / By topic / Favorites) stay tucked
+    // behind a disclosure until the user asks for them — or is already using one.
+    const [showAdvancedModes, setShowAdvancedModes] = useState(false);
+
+    // Dirty-tracking (M7): baselines captured when the form loads, so closing
+    // with unsaved edits warns instead of silently discarding the user's work.
+    // Theme is excluded — it applies live via ThemeProvider, not this form's Save.
+    const [settingsBaseline, setSettingsBaseline] = useState('');
+    const [emailBaseline, setEmailBaseline] = useState('');
+    const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+
+    const isDirty = () => {
+        if (isLoading || !settingsBaseline) return false;
+        return JSON.stringify(settings) !== settingsBaseline || email.trim() !== emailBaseline;
+    };
+
+    // Guarded close: prompt before throwing away unsaved edits; close freely if clean.
+    const handleClose = () => {
+        if (isDirty()) setShowDiscardConfirm(true);
+        else onClose();
+    };
 
     // Account deletion (App Store guideline 5.1.1(v)): confirm, then hard-delete
     // the user's workspace + Auth account via the delete_account function.
@@ -124,16 +154,23 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
     // back to the main list first, then the page closes.
     useEdgeSwipeBack(() => {
         if (view === 'digest') setView('main');
-        else onClose();
+        else handleClose();
     }, isMobile && isOpen);
 
     useEffect(() => {
         if (isOpen && uid) {
             setView('main');
+            setTopicQuery('');
             loadSettings();
             loadDigestExtras();
         }
     }, [isOpen, uid]);
+
+    // Keep the advanced disclosure open whenever an advanced mode is selected,
+    // so the current choice is never hidden behind a collapsed section.
+    useEffect(() => {
+        if (ADVANCED_MODE_VALUES.has(settings.digest_mode)) setShowAdvancedModes(true);
+    }, [settings.digest_mode]);
 
     const loadDigestExtras = async () => {
         try {
@@ -142,13 +179,27 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                 getLinksFromFirestore(uid),
             ]);
             if (storedEmail) setEmail(storedEmail);
-            // Distinct categories + tags → topic options.
-            const set = new Set<string>();
+            setEmailBaseline((storedEmail || '').trim());
+            // Categories and tags → topic options, keyed by lowercase so case
+            // variants collapse to one chip. Keep the nicer-cased label.
+            const startsUpper = (s: string) => s.length > 0 && s[0] === s[0].toUpperCase() && s[0] !== s[0].toLowerCase();
+            const prefer = (existing: string | undefined, next: string) =>
+                !existing ? next : (startsUpper(next) && !startsUpper(existing) ? next : existing);
+            const catMap = new Map<string, string>();
+            const tagMap = new Map<string, string>();
             links.forEach((l) => {
-                if (l.category) set.add(l.category);
-                (l.tags || []).forEach((t) => t && set.add(t));
+                const cat = (l.category || '').trim();
+                if (cat) catMap.set(cat.toLowerCase(), prefer(catMap.get(cat.toLowerCase()), cat));
+                (l.tags || []).forEach((raw) => {
+                    const t = (raw || '').trim();
+                    if (t) tagMap.set(t.toLowerCase(), prefer(tagMap.get(t.toLowerCase()), t));
+                });
             });
-            setTopics(Array.from(set).sort((a, b) => a.localeCompare(b)));
+            // A tag that's also a category shouldn't appear twice.
+            catMap.forEach((_, key) => tagMap.delete(key));
+            const byLabel = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+            setCategoryTopics(Array.from(catMap.values()).sort(byLabel));
+            setTagTopics(Array.from(tagMap.values()).sort(byLabel));
         } catch (error) {
             console.error('Failed to load digest extras:', error);
         }
@@ -158,8 +209,8 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
         setIsLoading(true);
         try {
             const userSettings = await getUserSettings(uid);
-            if (userSettings) {
-                setSettings({
+            const loaded: User['settings'] = userSettings
+                ? {
                     theme: userSettings.theme || 'dark',
                     daily_digest: userSettings.daily_digest || false,
                     reminders_enabled: userSettings.reminders_enabled ?? true,
@@ -176,8 +227,11 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                     digest_hour: userSettings.digest_hour ?? 9,
                     digest_day: userSettings.digest_day ?? 0,
                     digest_skip_empty: userSettings.digest_skip_empty ?? true,
-                });
-            }
+                }
+                : DEFAULT_SETTINGS;
+            setSettings(loaded);
+            // Baseline for dirty-tracking (M7): the exact state we just loaded.
+            setSettingsBaseline(JSON.stringify(loaded));
         } catch (error) {
             console.error('Failed to load settings:', error);
         } finally {
@@ -224,9 +278,10 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
 
     const toggleTopic = (topic: string) => {
         setSettings((p) => {
-            const has = p.digest_topics.includes(topic);
+            const key = topic.toLowerCase();
+            const has = p.digest_topics.some((t) => t.toLowerCase() === key);
             const next = has
-                ? p.digest_topics.filter((t) => t !== topic)
+                ? p.digest_topics.filter((t) => t.toLowerCase() !== key)
                 : [...p.digest_topics, topic];
             return { ...p, digest_topics: next };
         });
@@ -244,37 +299,13 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
         return `${mode} · ${settings.digest_count} cards · ${when} · ${where}`;
     })();
 
-    const handleSendNow = async () => {
-        setSendingNow(true);
-        setSendResult(null);
-        try {
-            // Persist first so the preview reflects exactly what's configured.
-            await updateUserSettings(uid, {
-                digest_mode: settings.digest_mode,
-                digest_topics: settings.digest_topics,
-                digest_count: settings.digest_count,
-                digest_channels: settings.digest_channels,
-                digest_frequency: settings.digest_frequency,
-            });
-            if (email.trim()) await updateUserEmail(uid, email.trim());
-
-            const fn = httpsCallable(functions, 'send_digest_now');
-            const result = await fn({ uid });
-            const data = result.data as { sent: boolean; channels: string[]; card_count: number; skipped?: string };
-            if (data.sent) {
-                setSendResult(`✅ Sent ${data.card_count} cards via ${data.channels.join(' & ')}.`);
-            } else if (data.skipped === 'no_cards') {
-                setSendResult('📭 Nothing to curate yet — save a few links first.');
-            } else {
-                setSendResult('⚠️ Couldn\'t deliver — check your channel settings.');
-            }
-        } catch (error) {
-            console.error('Send digest now failed:', error);
-            setSendResult('⚠️ Something went wrong sending the digest.');
-        } finally {
-            setSendingNow(false);
-        }
-    };
+    // Derived topic-picker state (only meaningful in topic mode).
+    const totalTopics = categoryTopics.length + tagTopics.length;
+    const isTopicActive = (t: string) => settings.digest_topics.some((x) => x.toLowerCase() === t.toLowerCase());
+    const topicQ = topicQuery.trim().toLowerCase();
+    const matchesQuery = (t: string) => !topicQ || t.toLowerCase().includes(topicQ);
+    const visibleCategories = categoryTopics.filter(matchesQuery);
+    const visibleTags = tagTopics.filter(matchesQuery);
 
     if (!isOpen) return null;
 
@@ -315,7 +346,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                         </div>
                     </div>
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         className="h-9 w-9 rounded-full flex items-center justify-center text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
                         aria-label="Close settings"
                     >
@@ -400,17 +431,37 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                             />
                         </Row>
 
-                        {settings.reminders_enabled && (
+                        {settings.reminders_enabled && (() => {
+                            // Two front-and-center choices (M14): "Smart (spaced)" is
+                            // the recommended default; "Custom" reveals the fixed
+                            // Daily / Weekly cadences — still reachable, not up front.
+                            const isCustom = settings.reminder_frequency === 'daily' || settings.reminder_frequency === 'weekly';
+                            return (
                             <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
                                 <Segmented
-                                    value={settings.reminder_frequency || 'smart'}
-                                    onChange={(v) => setSettings((p) => ({ ...p, reminder_frequency: v as Frequency }))}
+                                    value={isCustom ? 'custom' : 'smart'}
+                                    onChange={(v) => setSettings((p) => ({
+                                        ...p,
+                                        // Entering Custom keeps an existing fixed cadence, else defaults to weekly.
+                                        reminder_frequency: v === 'smart'
+                                            ? 'smart'
+                                            : (p.reminder_frequency === 'daily' || p.reminder_frequency === 'weekly' ? p.reminder_frequency : 'weekly'),
+                                    }))}
                                     options={[
-                                        { value: 'smart', label: 'Smart' },
-                                        { value: 'daily', label: 'Daily' },
-                                        { value: 'weekly', label: 'Weekly' },
+                                        { value: 'smart', label: 'Smart (spaced)' },
+                                        { value: 'custom', label: 'Custom' },
                                     ]}
                                 />
+                                {isCustom && (
+                                    <Segmented
+                                        value={settings.reminder_frequency as Frequency}
+                                        onChange={(v) => setSettings((p) => ({ ...p, reminder_frequency: v as Frequency }))}
+                                        options={[
+                                            { value: 'daily', label: 'Daily' },
+                                            { value: 'weekly', label: 'Weekly' },
+                                        ]}
+                                    />
+                                )}
                                 <div className="flex gap-2 p-3 rounded-xl bg-accent/5 border border-accent/10">
                                     <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
                                     <p className="text-[12px] text-text-secondary leading-relaxed">
@@ -418,7 +469,8 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                                     </p>
                                 </div>
                             </div>
-                        )}
+                            );
+                        })()}
                     </Section>
 
                     {/* Curated Digest */}
@@ -483,26 +535,61 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                   )}
 
                   {view === 'digest' && (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-200">
-                        {/* What to send */}
-                        <div className="space-y-2">
-                            <div className="text-[12px] font-semibold text-text-secondary">What to send</div>
-                            <div className="grid grid-cols-2 gap-2">
-                                {DIGEST_MODES.map((m) => {
-                                    const active = settings.digest_mode === m.value;
-                                    return (
-                                        <button
-                                            key={m.value}
-                                            onClick={() => setSettings((p) => ({ ...p, digest_mode: m.value }))}
-                                            className={`flex items-center gap-2 px-3 h-11 rounded-xl border text-[13px] font-semibold transition-colors cursor-pointer ${active ? 'bg-accent/10 border-accent/40 text-accent' : 'bg-card-hover border-border-subtle text-text-secondary hover:text-text hover:border-text-muted/40'}`}
-                                        >
-                                            {m.icon}
-                                            {m.label}
-                                        </button>
-                                    );
-                                })}
+                    <div className="space-y-7 animate-in fade-in slide-in-from-right-2 duration-200">
+                        {/* Live preview — what the next digest will look like */}
+                        <div className="relative overflow-hidden rounded-2xl border border-border-subtle p-4">
+                            <div className="absolute inset-0 bg-[image:var(--accent-gradient)] opacity-[0.08]" />
+                            <div className="absolute inset-x-0 top-0 h-px bg-[image:var(--accent-gradient)] opacity-40" />
+                            <div className="relative flex items-start gap-3">
+                                <div className="w-11 h-11 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-purple-500/25 ring-1 ring-white/15 shrink-0">
+                                    <Newspaper className="w-[22px] h-[22px] text-white" />
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-accent">Your digest</div>
+                                    <div className="text-[13px] font-semibold text-text leading-relaxed mt-1">{digestSummary}</div>
+                                </div>
                             </div>
-                            <div className="flex gap-2 p-3 rounded-xl bg-accent/5 border border-accent/10">
+                        </div>
+
+                        {/* What to send — three primary modes up front, the rest
+                            behind an Advanced disclosure (M14). */}
+                        <div className="space-y-3">
+                            <GroupLabel icon={<Sparkles className="w-4 h-4" />} title="What to send" />
+                            <div className="grid grid-cols-2 gap-2.5">
+                                {PRIMARY_DIGEST_MODES.map((m) => (
+                                    <DigestModeButton
+                                        key={m.value}
+                                        mode={m}
+                                        active={settings.digest_mode === m.value}
+                                        onClick={() => setSettings((p) => ({ ...p, digest_mode: m.value }))}
+                                    />
+                                ))}
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setShowAdvancedModes((v) => !v)}
+                                aria-expanded={showAdvancedModes}
+                                className="w-full flex items-center justify-center gap-1.5 text-[12px] font-semibold text-text-muted hover:text-text transition-colors cursor-pointer py-1"
+                            >
+                                {showAdvancedModes ? 'Hide advanced modes' : 'More ways to curate'}
+                                <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showAdvancedModes ? 'rotate-90' : ''}`} />
+                            </button>
+
+                            {showAdvancedModes && (
+                                <div className="grid grid-cols-2 gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                    {ADVANCED_DIGEST_MODES.map((m) => (
+                                        <DigestModeButton
+                                            key={m.value}
+                                            mode={m}
+                                            active={settings.digest_mode === m.value}
+                                            onClick={() => setSettings((p) => ({ ...p, digest_mode: m.value }))}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="flex gap-2.5 items-start p-3 rounded-xl bg-accent/5 border border-accent/10">
                                 <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
                                 <p className="text-[12px] text-text-secondary leading-relaxed">
                                     {DIGEST_MODES.find((m) => m.value === settings.digest_mode)?.note}
@@ -510,145 +597,188 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                             </div>
                         </div>
 
-                        {/* Topic picker — multi-select */}
+                        {/* Topic picker — searchable, grouped by categories & tags */}
                         {settings.digest_mode === 'topic' && (
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <div className="text-[12px] font-semibold text-text-secondary">Topics</div>
-                                    {settings.digest_topics.length > 0 && (
-                                        <button
-                                            onClick={() => setSettings((p) => ({ ...p, digest_topics: [] }))}
-                                            className="text-[11px] font-medium text-text-muted hover:text-text transition-colors cursor-pointer"
-                                        >
-                                            Clear
-                                        </button>
-                                    )}
-                                </div>
-                                {topics.length === 0 ? (
-                                    <p className="text-[12px] text-text-muted">Save some links first to build topics.</p>
+                            <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <GroupLabel
+                                    icon={<Tag className="w-4 h-4" />}
+                                    title="Topics"
+                                    action={
+                                        settings.digest_topics.length > 0 ? (
+                                            <button
+                                                onClick={() => setSettings((p) => ({ ...p, digest_topics: [] }))}
+                                                className="text-[11px] font-semibold text-text-muted hover:text-text transition-colors cursor-pointer"
+                                            >
+                                                Clear{' '}<span className="text-accent">{settings.digest_topics.length}</span>
+                                            </button>
+                                        ) : undefined
+                                    }
+                                />
+                                {totalTopics === 0 ? (
+                                    <div className="rounded-2xl border border-dashed border-border-subtle p-4 text-center">
+                                        <p className="text-[12px] text-text-muted">Save some links first to build topics.</p>
+                                    </div>
                                 ) : (
-                                    <>
-                                        <p className="text-[12px] text-text-muted">Pick one or more categories/tags to focus on.</p>
-                                        <div className="flex flex-wrap gap-2 max-h-44 overflow-y-auto p-0.5">
-                                            {topics.map((t) => {
-                                                const active = settings.digest_topics.includes(t);
-                                                return (
+                                    <div className="rounded-2xl border border-border-subtle bg-card-hover/40 p-4 space-y-4">
+                                        {/* Selected — always visible, removable */}
+                                        {settings.digest_topics.length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {settings.digest_topics.map((t) => (
                                                     <button
                                                         key={t}
                                                         onClick={() => toggleTopic(t)}
-                                                        className={`inline-flex items-center gap-1.5 px-3 h-8 rounded-full border text-[12px] font-semibold transition-colors cursor-pointer ${active ? 'bg-accent/10 border-accent/40 text-accent' : 'bg-card-hover border-border-subtle text-text-secondary hover:text-text hover:border-text-muted/40'}`}
+                                                        className="inline-flex items-center gap-1 pl-2.5 pr-1.5 h-7 rounded-full bg-accent/15 border border-accent/40 text-[12px] font-semibold text-accent hover:bg-accent/25 transition-colors cursor-pointer"
+                                                        aria-label={`Remove ${t}`}
                                                     >
-                                                        {active && <Check className="w-3 h-3" />}
                                                         {t}
+                                                        <X className="w-3 h-3" />
                                                     </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Search — appears once the list is long enough to warrant it */}
+                                        {totalTopics > 8 && (
+                                            <div className="relative">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
+                                                <input
+                                                    type="text"
+                                                    value={topicQuery}
+                                                    onChange={(e) => setTopicQuery(e.target.value)}
+                                                    placeholder="Search topics…"
+                                                    className="w-full h-9 pl-9 pr-8 rounded-xl bg-card border border-border-subtle text-[13px] text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
+                                                />
+                                                {topicQuery && (
+                                                    <button
+                                                        onClick={() => setTopicQuery('')}
+                                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text transition-colors cursor-pointer"
+                                                        aria-label="Clear search"
+                                                    >
+                                                        <X className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Available — grouped, filtered, scrollable */}
+                                        {visibleCategories.length === 0 && visibleTags.length === 0 ? (
+                                            <p className="text-[12px] text-text-muted text-center py-3">No topics match “{topicQuery}”.</p>
+                                        ) : (
+                                            <div className="max-h-[22rem] overflow-y-auto scrollbar-subtle pr-1 space-y-4">
+                                                {visibleCategories.length > 0 && (
+                                                    <TopicGroup label="Categories">
+                                                        {visibleCategories.map((t) => (
+                                                            <TopicPill key={t} label={t} active={isTopicActive(t)} onClick={() => toggleTopic(t)} />
+                                                        ))}
+                                                    </TopicGroup>
+                                                )}
+                                                {visibleTags.length > 0 && (
+                                                    <TopicGroup label="Tags">
+                                                        {visibleTags.map((t) => (
+                                                            <TopicPill key={t} label={t} active={isTopicActive(t)} onClick={() => toggleTopic(t)} />
+                                                        ))}
+                                                    </TopicGroup>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         )}
 
-                        {/* How many */}
-                        <Row title="How many" subtitle="Cards per digest">
-                            <Dropdown
-                                ariaLabel="Cards per digest"
-                                align="right"
-                                value={String(settings.digest_count)}
-                                onChange={(v) => setSettings((p) => ({ ...p, digest_count: Number(v) }))}
-                                options={COUNT_OPTIONS}
-                            />
-                        </Row>
-
-                        {/* Frequency */}
-                        <div className="space-y-2">
-                            <div className="text-[12px] font-semibold text-text-secondary">How often</div>
-                            <Segmented
-                                value={settings.digest_frequency}
-                                onChange={(v) => setSettings((p) => ({ ...p, digest_frequency: v as 'daily' | 'weekly' }))}
-                                options={[
-                                    { value: 'daily', label: 'Daily' },
-                                    { value: 'weekly', label: 'Weekly' },
-                                ]}
-                            />
-                        </div>
-
-                        {/* When */}
-                        <Row title="Delivery time" subtitle={settings.digest_frequency === 'weekly' ? 'Day & hour (your local time)' : 'Hour (your local time)'}>
-                            <div className="flex items-center gap-2">
-                                {settings.digest_frequency === 'weekly' && (
-                                    <Dropdown
-                                        ariaLabel="Digest day"
-                                        align="right"
-                                        value={String(settings.digest_day)}
-                                        onChange={(v) => setSettings((p) => ({ ...p, digest_day: Number(v) }))}
-                                        options={DAYS.map((d, i) => ({ value: String(i), label: d }))}
+                        {/* Schedule — how many, how often, when */}
+                        <div className="space-y-3">
+                            <GroupLabel icon={<CalendarClock className="w-4 h-4" />} title="Schedule" />
+                            <div className="rounded-2xl border border-border-subtle divide-y divide-border-subtle">
+                                <div className="p-4">
+                                    <Row title="How many" subtitle="Cards per digest">
+                                        <Dropdown
+                                            ariaLabel="Cards per digest"
+                                            align="right"
+                                            value={String(settings.digest_count)}
+                                            onChange={(v) => setSettings((p) => ({ ...p, digest_count: Number(v) }))}
+                                            options={COUNT_OPTIONS}
+                                        />
+                                    </Row>
+                                </div>
+                                <div className="p-4 space-y-2.5">
+                                    <div className="text-sm font-semibold text-text">How often</div>
+                                    <Segmented
+                                        value={settings.digest_frequency}
+                                        onChange={(v) => setSettings((p) => ({ ...p, digest_frequency: v as 'daily' | 'weekly' }))}
+                                        options={[
+                                            { value: 'daily', label: 'Daily' },
+                                            { value: 'weekly', label: 'Weekly' },
+                                        ]}
                                     />
-                                )}
-                                <Dropdown
-                                    ariaLabel="Digest hour"
-                                    align="right"
-                                    value={String(settings.digest_hour)}
-                                    onChange={(v) => setSettings((p) => ({ ...p, digest_hour: Number(v) }))}
-                                    options={HOUR_OPTIONS}
-                                />
-                            </div>
-                        </Row>
-
-                        {/* Channels */}
-                        <div className="space-y-2">
-                            <div className="text-[12px] font-semibold text-text-secondary">Where to send it</div>
-                            <div className="flex gap-2">
-                                <ChannelChip
-                                    active={settings.digest_channels.includes('whatsapp')}
-                                    onClick={() => toggleChannel('whatsapp')}
-                                    icon={<MessageCircle className="w-4 h-4" />}
-                                    label="WhatsApp"
-                                />
-                                <ChannelChip
-                                    active={settings.digest_channels.includes('email')}
-                                    onClick={() => toggleChannel('email')}
-                                    icon={<Mail className="w-4 h-4" />}
-                                    label="Email"
-                                />
+                                </div>
+                                <div className="p-4">
+                                    <Row title="Delivery time" subtitle={settings.digest_frequency === 'weekly' ? 'Day & hour (your local time)' : 'Hour (your local time)'}>
+                                        <div className="flex items-center gap-2">
+                                            {settings.digest_frequency === 'weekly' && (
+                                                <Dropdown
+                                                    ariaLabel="Digest day"
+                                                    align="right"
+                                                    value={String(settings.digest_day)}
+                                                    onChange={(v) => setSettings((p) => ({ ...p, digest_day: Number(v) }))}
+                                                    options={DAYS.map((d, i) => ({ value: String(i), label: d }))}
+                                                />
+                                            )}
+                                            <Dropdown
+                                                ariaLabel="Digest hour"
+                                                align="right"
+                                                value={String(settings.digest_hour)}
+                                                onChange={(v) => setSettings((p) => ({ ...p, digest_hour: Number(v) }))}
+                                                options={HOUR_OPTIONS}
+                                            />
+                                        </div>
+                                    </Row>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Email address */}
-                        {settings.digest_channels.includes('email') && (
-                            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                                <label className="text-[12px] font-semibold text-text-secondary">Email address</label>
-                                <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="you@example.com"
-                                    className="w-full h-10 px-3 rounded-xl bg-card-hover border border-border-subtle text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
-                                />
+                        {/* Delivery — where, email, skip empty */}
+                        <div className="space-y-3">
+                            <GroupLabel icon={<Send className="w-4 h-4" />} title="Delivery" />
+                            <div className="rounded-2xl border border-border-subtle divide-y divide-border-subtle">
+                                <div className="p-4 space-y-2.5">
+                                    <div className="text-sm font-semibold text-text">Where to send it</div>
+                                    <div className="flex gap-2">
+                                        <ChannelChip
+                                            active={settings.digest_channels.includes('whatsapp')}
+                                            onClick={() => toggleChannel('whatsapp')}
+                                            icon={<MessageCircle className="w-4 h-4" />}
+                                            label="WhatsApp"
+                                        />
+                                        <ChannelChip
+                                            active={settings.digest_channels.includes('email')}
+                                            onClick={() => toggleChannel('email')}
+                                            icon={<Mail className="w-4 h-4" />}
+                                            label="Email"
+                                        />
+                                    </div>
+                                    {settings.digest_channels.includes('email') && (
+                                        <div className="space-y-1.5 pt-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                                            <label className="text-[12px] font-semibold text-text-secondary">Email address</label>
+                                            <input
+                                                type="email"
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
+                                                placeholder="you@example.com"
+                                                className="w-full h-10 px-3 rounded-xl bg-card-hover border border-border-subtle text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="p-4">
+                                    <Row title="Skip when empty" subtitle="Don't send if there's nothing fresh to show">
+                                        <Toggle
+                                            on={settings.digest_skip_empty}
+                                            onChange={() => setSettings((p) => ({ ...p, digest_skip_empty: !p.digest_skip_empty }))}
+                                        />
+                                    </Row>
+                                </div>
                             </div>
-                        )}
-
-                        {/* Skip empty */}
-                        <Row title="Skip when empty" subtitle="Don't send if there's nothing fresh to show">
-                            <Toggle
-                                on={settings.digest_skip_empty}
-                                onChange={() => setSettings((p) => ({ ...p, digest_skip_empty: !p.digest_skip_empty }))}
-                            />
-                        </Row>
-
-                        {/* Send one now */}
-                        <div className="space-y-2">
-                            <button
-                                onClick={handleSendNow}
-                                disabled={sendingNow || settings.digest_channels.length === 0}
-                                className="w-full h-11 rounded-xl bg-card-hover border border-accent/30 text-[13px] font-semibold text-accent hover:bg-accent/10 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <Send className="w-4 h-4" />
-                                {sendingNow ? 'Sending…' : 'Send one now'}
-                            </button>
-                            {sendResult && (
-                                <p className="text-[12px] text-text-secondary text-center animate-in fade-in duration-200">{sendResult}</p>
-                            )}
                         </div>
                     </div>
                   )}
@@ -662,7 +792,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                 >
                   <div className="w-full max-w-2xl mx-auto flex items-center justify-end gap-2">
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         className="h-10 px-4 rounded-full text-sm font-semibold text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
                     >
                         Cancel
@@ -687,6 +817,19 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                 cancelLabel="Cancel"
                 variant="danger"
             />
+
+            {/* Guard unsaved edits — closing while dirty prompts instead of
+                silently discarding the user's work (M7). */}
+            <ConfirmDialog
+                isOpen={showDiscardConfirm}
+                onClose={() => setShowDiscardConfirm(false)}
+                onConfirm={() => { setShowDiscardConfirm(false); onClose(); }}
+                title="Discard changes?"
+                message="You've made changes that haven't been saved. Close settings and discard them?"
+                confirmLabel="Discard"
+                cancelLabel="Keep editing"
+                variant="danger"
+            />
         </div>
     );
 }
@@ -702,6 +845,60 @@ function Section({ icon, title, children }: { icon: ReactNode; title: string; ch
             </div>
             <div className="rounded-2xl border border-border-subtle p-4 space-y-4">{children}</div>
         </section>
+    );
+}
+
+function GroupLabel({ icon, title, action }: { icon: ReactNode; title: string; action?: ReactNode }) {
+    return (
+        <div className="flex items-center justify-between px-0.5">
+            <div className="flex items-center gap-2 text-text-muted">
+                {icon}
+                <h3 className="text-[11px] font-bold uppercase tracking-[0.15em]">{title}</h3>
+            </div>
+            {action}
+        </div>
+    );
+}
+
+function DigestModeButton({ mode, active, onClick }: { mode: { value: DigestMode; label: string; icon: ReactNode }; active: boolean; onClick: () => void }) {
+    return (
+        <button
+            onClick={onClick}
+            aria-pressed={active}
+            className={`relative flex flex-col items-center justify-center gap-2 py-3.5 rounded-2xl border transition-all duration-150 cursor-pointer ${active ? 'bg-accent/10 border-accent/50 shadow-[0_0_0_1px_var(--accent-ring)]' : 'bg-card-hover border-border-subtle hover:border-text-muted/40 hover:-translate-y-px'}`}
+        >
+            {active && (
+                <span className="absolute top-2 right-2 w-4 h-4 rounded-full bg-accent flex items-center justify-center">
+                    <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                </span>
+            )}
+            <span className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${active ? 'bg-[image:var(--accent-gradient)] text-white shadow-md shadow-purple-500/25 ring-1 ring-white/15' : 'bg-card border border-border-subtle text-text-secondary'}`}>
+                {mode.icon}
+            </span>
+            <span className={`text-[12.5px] font-semibold ${active ? 'text-accent' : 'text-text-secondary'}`}>{mode.label}</span>
+        </button>
+    );
+}
+
+function TopicGroup({ label, children }: { label: string; children: ReactNode }) {
+    return (
+        <div className="space-y-2.5">
+            <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-text-muted/70 px-0.5">{label}</div>
+            <div className="flex flex-wrap gap-2.5">{children}</div>
+        </div>
+    );
+}
+
+function TopicPill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+    return (
+        <button
+            onClick={onClick}
+            aria-pressed={active}
+            className={`inline-flex items-center gap-1.5 px-3 h-8 rounded-full border text-[12px] font-semibold transition-colors cursor-pointer ${active ? 'bg-accent/10 border-accent/40 text-accent' : 'bg-card border-border-subtle text-text-secondary hover:text-text hover:border-text-muted/40'}`}
+        >
+            {active && <Check className="w-3 h-3" strokeWidth={3} />}
+            {label}
+        </button>
     );
 }
 

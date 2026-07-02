@@ -102,12 +102,12 @@ def format_success_message(
     elif "Business" in category: cat_emoji = "💼"
     elif "Science" in category: cat_emoji = "🔬"
 
-    lbl_saved = "✅ *נשמר למוח השני*" if is_he else "✅ *Saved to Second Brain*"
+    lbl_saved = "✅ *נשמר ב-Machina AI*" if is_he else "✅ *Saved to Machina AI*"
     lbl_gist = "📌 *בקצרה*" if is_he else "📌 *In one line*"
     lbl_points = "🔑 *כדאי לדעת*" if is_he else "🔑 *Worth knowing*"
     lbl_moments = "🔑 *רגעים מרכזיים*" if is_he else "🔑 *Key moments*"
     lbl_min = "דק׳ קריאה" if is_he else "min read"
-    lbl_view_app = "📲 *פתח במוח השני*" if is_he else "📲 *Open in Second Brain*"
+    lbl_view_app = "📲 *פתח ב-Machina AI*" if is_he else "📲 *Open in Machina AI*"
 
     lines = [lbl_saved, "", f"🧠 *{title}*"]
 

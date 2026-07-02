@@ -207,13 +207,13 @@ def run_reminder_check() -> dict:
 
             if is_he:
                 cat_name = "מתכון" if category == "Recipe" else category
-                message = f"🧠 *לולאת המוח השני*\n\nזמן לחזור אל:\n📄 *{title}*\n📂 {cat_name}\n\n{url}\n\n🔗 *פתח במוח השני:*\n{APP_URL}?linkId={link_id}\n\n💡 *למה עכשיו?* חזרה ברווחים מחזקת את הזיכרון לטווח ארוך."
+                message = f"🧠 *Machina AI — לולאת חזרה*\n\nזמן לחזור אל:\n📄 *{title}*\n📂 {cat_name}\n\n{url}\n\n🔗 *פתח ב-Machina AI:*\n{APP_URL}?linkId={link_id}\n\n💡 *למה עכשיו?* חזרה ברווחים מחזקת את הזיכרון לטווח ארוך."
             else:
                 cat_emoji = "📂"
                 if "Recipe" in category: cat_emoji = "🍲"
                 elif "Tech" in category: cat_emoji = "💻"
 
-                message = f"🧠 *Second Brain Loop*\n\nTime to revisit:\n📄 *{title}*\n{cat_emoji} {category}\n\n{url}\n\n🔗 *Open in Second Brain:*\n{APP_URL}?linkId={link_id}\n\n💡 *Why now?* Spaced repetition strengthens long-term retention."
+                message = f"🧠 *Machina AI — Revisit Loop*\n\nTime to revisit:\n📄 *{title}*\n{cat_emoji} {category}\n\n{url}\n\n🔗 *Open in Machina AI:*\n{APP_URL}?linkId={link_id}\n\n💡 *Why now?* Spaced repetition strengthens long-term retention."
 
             try:
                 send_whatsapp_message(f"whatsapp:{phone_number}", message)

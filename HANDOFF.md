@@ -1,6 +1,225 @@
-# Session Handoff — MyLinks ("Second Brain")
+# Session Handoff — Machina AI
 
-_Last updated: 2026-07-01. Branch: `claude/google-auth-implementation-wgblpr` (merged + pushed to `main`)._
+_Last updated: 2026-07-02. Branch: `claude/phase2-sprawl-m9-m13-m14` (Phase 2 cut-the-sprawl + loose ends — merged to `main`)._
+
+## Latest session — Phase 2: cut the sprawl + M9 backfill — 2026-07-02
+
+Phase 2 "reveal the magic / cut the sprawl" per `MACHINA_SPEC.md` step 4. Web `tsc --noEmit` clean,
+`py_compile` clean, eslint clean on the changed files (the 2 pre-existing `any` errors in `Feed.tsx`
+at lines ~128/212 are baseline, untouched by this work). Verified each item against current code first.
+
+**M13 — Cut Compact view (finish).** ✅ Done. The view switcher already offered only Cards + List;
+this removed the leftover dead code: deleted `web/components/CompactCard.tsx` (only self-referenced —
+no imports anywhere) and fixed the stale doc comment in `web/components/Feed.tsx` (~line 47, was
+"grid / compact / table / insights"). `viewMode` union is `grid | list | review | ask | collections` —
+no Compact code path remains. (`isCompact` props on `SimpleMarkdown`/`Card` are a separate, unrelated
+markdown-density flag — left as-is.)
+
+**M14 — Trim the option sprawl.** ✅ Done, presentation-only (backend curates every mode unchanged).
+- Digest modes (`web/components/SettingsModal.tsx`): **Smart mix / Backlog / Rediscover** are the three
+  primary buttons; **Surprise me / By topic / Favorites** now live behind a "More ways to curate"
+  disclosure (`showAdvancedModes`), which auto-opens when an advanced mode is already selected so the
+  current choice is never hidden. Extracted a `DigestModeButton` helper (reused by both grids).
+- Reminder profiles (`SettingsModal.tsx` Reminders section): reduced the front-and-center segmented from
+  **Smart / Daily / Weekly** to **Smart (spaced) + Custom**; picking Custom reveals a secondary
+  Daily / Weekly toggle (power options reachable, not up front). The `reminder_frequency` data model
+  (`smart | daily | weekly | off`) is unchanged — Custom just maps to daily/weekly.
+- `functions/digest_service.py`: no logic change (all 6 modes still valid/curated); updated the
+  module docstring to label modes primary vs advanced so the backend doc matches the UI.
+- Acceptance met: default digest exposes 3 modes up front, reminders 2 choices; power options still reachable.
+
+**M9 — See also (finish: backfill).** ✅ Done. The See-also UI was already shipped in `LinkDetailModal.tsx`;
+the only open item was backfilling `link.relatedLinks` for older cards that predate `graph_service.py`.
+Added `GraphService.backfill_related_links(uid, force)` (`functions/graph_service.py`) — a safe,
+idempotent, re-runnable two-pass repair: pass 1 backfills any missing `embedding_vector` (so old cards
+are discoverable as neighbors at all), pass 2 computes `relatedLinks` for cards missing them (or all
+when `force`). Exposed as HTTP endpoint `backfill_related_links` in `functions/main.py` (mirrors the
+existing `backfill_youtube_channels`): optional `?uid=` limits to one user, `?force=1` recomputes,
+returns per-run counts `{users, embedded, updated, skipped, failed}`.
+
+**Deploy follow-ups (not yet run this session):**
+- `./deploy-hosting.sh` — push the SettingsModal/Feed changes to the iPhone PWA (Vercel auto-deploys desktop on merge).
+- `./deploy-functions.sh` — functions changed (`graph_service.py`, `main.py`, `digest_service.py`).
+- After functions deploy, run the M9 backfill once: `curl "https://<functions-host>/backfill_related_links"`
+  (optionally `?uid=<uid>` first to spot-check, then all-users). Idempotent; safe to re-run.
+
+**Not touched:** M8 (auth) — in flight separately. Also left an unrelated, pre-existing dirty
+`web/ios/App/App.xcodeproj/project.pbxproj` (`CURRENT_PROJECT_VERSION` 19→20) out of this commit —
+it belongs to another session's iOS build bump.
+
+---
+
+## Earlier — Ask page desktop header consistency — 2026-07-02
+
+Small desktop polish (commit `6cd74ae`, fully deployed): the **Ask page** top bar now uses the
+shared **`MobileSubheader`** (round back chevron + leading icon + bold title) instead of a
+standalone "Back" pill, so it matches the **Collections** tab exactly. Change is one branch in
+`web/components/Feed.tsx` (the `viewMode === 'ask'` branch of the header block) — swapped the bare
+`<Button>Back</Button>` for `<MobileSubheader icon={<MessagesSquare/>} title="Ask Machina" />`
+wrapped in `hidden sm:block`. Mobile is untouched (Ask there is a full-screen overlay that renders
+its own `MobileSubheader`). Both `MobileSubheader` and `MessagesSquare` were already imported.
+This merge touched only `Feed.tsx` — the concurrent Phase 1 trust-wins work below was not affected
+(`tsc --noEmit` clean post-merge). Deployed: `main` push (Vercel) + `./deploy-hosting.sh`
+(iPhone PWA ✅) + `./build-ios.sh` refreshed the native bundle from `6cd74ae` + Xcode opened
+(native app still needs a manual build-number bump + Archive → TestFlight).
+
+> Also shipped earlier today from this same branch: the **Curated digest** settings redesign +
+> searchable Topics picker, and two follow-ups (removed the "Send a preview now" button, roomier
+> Topics area). Those are on `main` and live.
+
+## Earlier session — Phase 1 quick trust-wins: M1, M4, M6, M7 — 2026-07-02
+
+Per `MACHINA_SPEC.md` execution order step 1 (quick trust wins + the name). Web `tsc --noEmit` clean,
+eslint clean (only the two pre-existing warnings). Python `py_compile` clean. **PR #11, merged to `main`.**
+Merged the newer `main` in first (Curated-digest redesign + PR #12's M2/M3/M5 trust bugs + auth UX) —
+one real conflict in `SettingsModal.tsx` (kept main's redesigned full-screen layout + topic picker,
+re-applied the M7 dirty-tracking on top) and the HANDOFF banner. M8 (auth) is in flight separately.
+
+**M1 — One name "Machina AI" everywhere.** ✅ Done.
+- App identity → "Machina AI": `web/public/manifest.json` (name + short_name), `web/capacitor.config.ts`
+  (appName), `web/ios/App/App/Info.plist` (`CFBundleDisplayName`), `web/app/layout.tsx` (title,
+  appleWebApp title, `apple-mobile-web-app-title` meta).
+- Backend user-facing copy → "Machina AI": WhatsApp save/open labels (EN + HE) in
+  `functions/whatsapp_handler.py`; reminder loop copy (EN + HE) in `functions/reminder_service.py`;
+  digest email/WhatsApp footers, button, from-name in `functions/digest_service.py`; phone-not-recognized
+  reply in `functions/main.py`; assistant identity in `functions/ai_service.py`; `functions/.env.example`.
+- Docs: `README.md`, `SHORTCUT_SETUP.md` brand headers.
+- Acceptance grep (`grep -rI -e "Second Brain" -e "MyLinks" web/ functions/ *.md`) now returns **only
+  intentional internal refs**: the `morhogeg/MyLinks` repo name / `~/MyLinks` local paths, and the
+  planning/spec/QA docs that discuss the rename itself (PRODUCT_REVIEW, MACHINA_SPEC, TASKS, AUTH_SPEC,
+  ios-qa-report) + the historical changelog line in this file. Bundle id `com.morhogeg.machina` kept.
+
+**M4 — Deep-link modal opens once.** ✅ Already shipped (verify-only). The fix (ref guard +
+`history.replaceState` to strip `?linkId`) already exists in `web/components/Feed.tsx` (commit
+`e45c85e`, on `main`). Confirmed it matches the spec's acceptance; no code change needed.
+
+**M6 — Honest progress states (kill the fake 99%).** ✅ Done. Removed the simulated `0→99%` numeric
+readout and determinate width-bar from `web/components/LinkScanProgress.tsx`, `ImageScanProgress.tsx`,
+`VideoScanProgress.tsx`. Kept the scan-sweep + phase labels; replaced the bar with a new indeterminate
+treatment (`animate-progress-indeterminate` keyframe in `web/app/globals.css`, also added to the
+reduced-motion block). Center now shows an icon + honest phase label (green check on done). Dropped the
+`Analyzing… NN%` text from the minimized chip in `AddLinkForm.tsx`. The `progress` prop still advances
+the phase labels; only the lying number is gone. (Reading-view scroll bar is a real scroll %, left as-is.)
+
+**M7 — Settings never silently discards edits.** ✅ Done. `web/components/SettingsModal.tsx`: extracted
+`DEFAULT_SETTINGS`, capture a baseline of `settings` + `email` on load, compute `isDirty()`, and route
+every close affordance (backdrop, X, Cancel, edge-swipe-back) through `handleClose()` — which pops a
+"Discard changes?" `ConfirmDialog` when dirty and closes freely when clean. Theme is excluded (it applies
+live via ThemeProvider, not this form's Save). Also added a busy-guard to `ConfirmDialog.tsx` (a
+`confirmedRef` reset on open) so a double-tap on Confirm fires `onConfirm` exactly once.
+
+**Ship note:** frontend changes → after merge, run `./deploy-hosting.sh` for the iPhone PWA and redeploy
+Cloud Functions (`./deploy-functions.sh`) for the M1 backend copy. Native iOS app needs a rebuild
+(`./build-ios.sh`) to pick up the `CFBundleDisplayName` / capacitor appName rename.
+
+
+## Latest session — Curated digest settings redesign — 2026-07-02
+
+Design overhaul of the **Curated digest** sub-screen in
+`web/components/SettingsModal.tsx` (the `view === 'digest'` region), to match the app's premium
+visual language, plus a rebuilt Topics picker. **Merged to `main` and fully deployed.**
+
+**Follow-up tweaks after review (same day, commit `639eea2`, also fully deployed):**
+- Removed the "Send a preview now" button (+ its `handleSendNow` handler, `sendingNow`/`sendResult`
+  state, and the `httpsCallable`/`functions` imports it was the only user of). The
+  `send_digest_now` Cloud Function is untouched — just no longer invoked from this screen.
+- Gave the Topics picker more room: taller scroll area (`max-h-[22rem]`), larger container
+  padding (`p-4`), looser spacing between groups and pills.
+- Redeployed: pushed `main` (`639eea2`, Vercel), `./deploy-hosting.sh` (iPhone PWA ✅),
+  `./build-ios.sh` refreshed the native bundle from `639eea2` + Xcode opened (native app still
+  needs a manual build-number bump + Archive → TestFlight).
+
+**What changed (all in `web/components/SettingsModal.tsx`):**
+- Live **"Your digest" gradient preview card** at the top of the digest screen (summarizes the
+  current mode · count · schedule · channel).
+- **"What to send"** is now elevated mode tiles (gradient icon chip + check badge on the active
+  tile) instead of flat pills; mode icons bumped 16→18px.
+- Consistent **uppercase section headers** (What to send / Topics / Schedule / Delivery) via a new
+  `GroupLabel` helper, matching the main Settings screen.
+- **Schedule** and **Delivery** are now grouped iOS-style bordered cards with divider rows (How
+  many / How often / Delivery time; channels / email / skip-empty).
+- **Topics picker rebuilt for findability** (this was the ask): live **search/filter** (shown when
+  > 8 topics), split into **Categories vs Tags** sub-groups (`TopicGroup`/`TopicPill` helpers),
+  and **selected topics pinned on top** as removable accent chips. `loadDigestExtras` now dedupes
+  case-variant topics (e.g. "tech"/"Tech") keyed by lowercase — safe because the digest matcher in
+  `functions/digest_service.py` (`_normalize_topics`) already lowercases everything. `toggleTopic`
+  and the active check are now case-insensitive.
+- The primary "Send one now" button became "**Send a preview now**" with the brand gradient.
+
+**Verification:** `web` `tsc --noEmit` clean (before and after merging origin's concurrent
+`SettingsModal.tsx` edits — the auto-merge was conflict-free). Redesign visually verified via a
+throwaway `/digest-preview` harness (since the real screen needs Firebase auth); harness removed.
+
+**Deployed:**
+- **Desktop** → pushed to `main` (`56f3b9f`), Vercel auto-deploy.
+- **iPhone (PWA)** → `./deploy-hosting.sh` → `secondbrain-app-94da2.web.app`. ✅
+- **iOS native app** → `./build-ios.sh` refreshed `ios/App/App/public` from `56f3b9f`; Xcode opened.
+  **Not archived** — bump the build number in Xcode and Product → Archive → TestFlight to ship the
+  native app.
+- **Backend** → none (frontend-only change).
+
+> ⚠️ The pull before pushing brought in a batch of concurrent `main` work from another track
+> (ProfileAvatar, Card/Feed/storage/types changes, iOS ShareExt build 19). That code is now on
+> local `main` and was deployed alongside the digest redesign — worth a glance if anything looks off.
+
+## Earlier session — Phase 1 Step 2: the hard trust bugs (M2, M3, M5) — 2026-07-01
+
+Implemented **Machina spec Phase 1 step 2** — the "never doubt it" trust bedrock — on branch
+`claude/phase1-step2-trust-bugs-khdqer`. **PR opened (not merged; this repo reviews via PR).**
+`web` `tsc --noEmit` clean; `functions` `py_compile` clean. Nothing deployed from here.
+
+**M8/auth is a separate track on `main` — untouched this session.**
+
+### M2 — Share Extension never lies about saving (QA F-4/F-5)
+`web/ios/App/ShareExt/ShareViewController.swift`. The ~26s watchdog now resolves to a **neutral
+terminal state** ("**Still saving — open Machina to confirm**"), never the green check, and it
+**does not auto-dismiss** — the ✕ close affordance is the escape hatch (closes F-5). Green check now
+only appears on a real 2xx server ack. Aligned the **client request timeout (22s) under the watchdog
+(26s)**; a client-side timeout (`NSURLErrorTimedOut`) is now reported as the same neutral "still
+saving" state rather than a false failure, since the background upload keeps running. `share_ingest`
+already returns a real 200 ack the extension waits on (confirmed). The idempotency guard
+(`resultShown`) from build 11 is retained.
+- ⚠️ **Needs on-device verification (can't be done headlessly):** throttle/kill the network mid-share
+  on a physical device and confirm the HUD **never** shows the green check — it shows the neutral
+  state and can be dismissed; and that a real save shows the check only after the ack.
+- **iOS build not bumped/archived here** (no macOS/Xcode in this cloud session). Bump both targets +
+  archive on a Mac for the next TestFlight build.
+
+### M3 — No phantom saves: durable processing → ready | failed lifecycle (QA F-6)
+Backend `functions/main.py` (`process_link_background`) + `functions/models.py`
+(`LinkStatus.PROCESSING`/`FAILED`). The moment a capture is queued, a **visible card** is written to
+`users/{uid}/links` with `status: 'processing'`; the same doc is then flipped **in place** to `ready`
+(status `unread`, full analysis) on success or to a retryable **`failed`** card (original URL +
+`error` + `failedAt`) on analysis error — replacing the old confusing "Processing Failed"-tagged
+fallback card. The queue doc is deleted in both terminal cases (no orphans). Dedup still holds (the
+pending doc lives through processing; a failed/ready card matches `link_exists_for_url`).
+- Frontend: `web/lib/types.ts` (`CaptureState`, `error`/`failedAt`), `web/lib/storage.ts`
+  (`retryFailedLink` — re-runs the existing `/api/analyze` pipeline and updates the SAME doc in place,
+  so **no new backend/rules and nothing is duplicated**), `web/components/Card.tsx` (skeleton
+  `processing` card + `failed` card with **Retry**/Delete/open-original), `web/components/Feed.tsx`
+  (pending cards pinned atop the default library view; excluded from facets/filters so they never
+  spawn a phantom "Processing" category/tag; retry handler wired).
+- ⚠️ **Needs live verification:** force a server-side analysis error and confirm a **retryable failed
+  card** appears in the feed within seconds, and that **Retry** re-runs analysis and turns it into a
+  normal card. (Retry via `/api/analyze` works for link captures; image-capture failed cards still
+  appear — nothing is lost — but retry-by-URL is best-effort for images.)
+- **Deploy needed** (not done here): `./deploy-functions.sh functions:process_link_background`
+  (Firestore-trigger fn — watch for the transient 409 the earlier handoff noted; retry in ~60s).
+
+### M5 — Keyboard never covers an input (QA F-6/F-15/F-30)
+Applied the existing `web/lib/useVisualViewport.ts` to the remaining offenders. `LinkDetailModal.tsx`
+(the main gap) now clamps the modal to the **visible** viewport (`top: offsetTop`, `height`) so the
+inline category/tag edit rides above the keyboard. `AddToCollectionSheet.tsx` body clamped to
+`max-h-full` on mobile (was `80vh` = layout viewport, could overrun the top). `AddLinkForm.tsx`
+(already centers above the keyboard) and `ManageCollectionCardsSheet.tsx` (already clamps + pins)
+verified — no change needed. Desktop behavior unchanged; native/web-safe fallback via the hook.
+- ⚠️ **Needs on-device verification (iPhone SE, keyboard up):** in LinkDetailModal (category + Add
+  Tag), AddToCollectionSheet (new-collection name + Create), and AddLinkForm, confirm the focused
+  input **and** its primary action button are both fully visible.
+
+**Verification done here:** `web` `tsc --noEmit` exit 0 (after `npm ci`); `functions` `py_compile`
+OK. A full `next build` can't run offline (Google Fonts) — unrelated. No live/device checks possible
+headlessly — see the ⚠️ notes above and the PR body.
 
 ## Latest session — Google Sign-In, Phase 1 (web) — 2026-07-01
 

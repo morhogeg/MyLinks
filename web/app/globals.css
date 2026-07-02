@@ -271,6 +271,23 @@ html {
   animation: scan-sweep 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
+/* Indeterminate progress bar — an honest "working" state for analyses whose
+   true completion we can't measure (M6). A segment glides across the track,
+   conveying motion without claiming a fake percentage. */
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+.animate-progress-indeterminate {
+  animation: progress-indeterminate 1.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
 /* Scale-up: used by ConfirmDialog (was referenced but never defined). */
 @keyframes scale-up {
   from {
@@ -343,10 +360,12 @@ html {
 /* Safe area insets for iOS */
 @supports (padding: max(0px)) {
   body {
-    /* Top inset included unconditionally so the header clears the status
-       bar/notch inside the Capacitor WebView, which is not display-mode:
-       standalone. On the regular web this inset is 0, so it's a no-op there. */
-    padding-top: env(safe-area-inset-top);
+    /* The TOP inset is intentionally NOT applied here. The sticky page header
+       owns it (padding-top: env(safe-area-inset-top) in app/page.tsx) so its
+       content stays below the status bar even when it sticks on scroll — a
+       body padding only offsets the resting position, not the stuck one, which
+       let content slide under the notch. Full-screen overlays (Ask, Collections,
+       Settings, drawers) pad their own top via MobileSubheader / safe-pt. */
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
     padding-bottom: env(safe-area-inset-bottom);
@@ -362,12 +381,6 @@ html {
   }
 }
 
-/* PWA standalone mode adjustments */
-@media (display-mode: standalone) {
-  body {
-    padding-top: env(safe-area-inset-top);
-  }
-}
 
 /* Touch optimization for iOS */
 * {
@@ -420,6 +433,7 @@ a {
 
   .animate-pulse-subtle,
   .animate-scan-sweep,
+  .animate-progress-indeterminate,
   .skeleton-shimmer::after {
     animation: none !important;
   }

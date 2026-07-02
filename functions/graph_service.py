@@ -92,7 +92,87 @@ class GraphService:
             # Fallback: Return empty list rather than breaking flow
             return []
 
-    def _verify_relationships_with_llm(self, 
+    def backfill_related_links(self, uid: str, force: bool = False) -> dict:
+        """One-off repair for a single user: compute `relatedLinks` for cards
+        that predate the graph (older saves never ran through find_related_links).
+
+        Two passes so old cards can actually connect to each other:
+          1. Ensure every card has an `embedding_vector` — cards saved before
+             embeddings existed aren't discoverable as neighbors otherwise.
+          2. For each card missing `relatedLinks` (or all cards when `force`),
+             recompute neighbors and write them back.
+
+        Pure repair: idempotent and safe to re-run. Returns per-user counts.
+        """
+        links_ref = self.db.collection('users').document(uid).collection('links')
+        docs = list(links_ref.stream())
+
+        # Pass 1 — backfill missing embeddings (reused as query vectors below).
+        embeddings: Dict[str, List[float]] = {}
+        embedded = 0
+        for doc in docs:
+            d = doc.to_dict() or {}
+            if d.get('embedding_vector') is not None:
+                continue
+            text = f"{d.get('title', '')}\n{d.get('summary', '')}".strip()
+            if not text:
+                continue
+            try:
+                emb = self.ai.embed_text(text)
+            except Exception as e:
+                logger.error(f"Backfill embed failed for {doc.id}: {e}")
+                emb = None
+            if not emb:
+                continue
+            try:
+                doc.reference.update({'embedding_vector': Vector(emb)})
+                embeddings[doc.id] = emb
+                embedded += 1
+            except Exception as e:
+                logger.error(f"Backfill embedding write failed for {doc.id}: {e}")
+
+        # Pass 2 — compute neighbors for cards that don't have them yet. The
+        # vector search runs against live Firestore, so it sees the embeddings
+        # just written in pass 1.
+        updated = skipped = failed = 0
+        for doc in docs:
+            d = doc.to_dict() or {}
+            if d.get('relatedLinks') and not force:
+                skipped += 1
+                continue
+            text = f"{d.get('title', '')}\n{d.get('summary', '')}".strip()
+            if not text:
+                failed += 1
+                continue
+            emb = embeddings.get(doc.id)
+            if emb is None:
+                try:
+                    emb = self.ai.embed_text(text)
+                except Exception as e:
+                    logger.error(f"Backfill query embed failed for {doc.id}: {e}")
+                    emb = None
+            if not emb:
+                failed += 1
+                continue
+            related = self.find_related_links(
+                new_link_id=doc.id,
+                title=d.get('title', ''),
+                summary=d.get('summary', ''),
+                embedding=emb,
+                new_concepts=d.get('concepts', []),
+                uid=uid,
+            )
+            try:
+                doc.reference.update({'relatedLinks': related})
+                updated += 1
+            except Exception as e:
+                logger.error(f"Backfill relatedLinks write failed for {doc.id}: {e}")
+                failed += 1
+
+        logger.info(f"Backfill for {uid}: embedded={embedded} updated={updated} skipped={skipped} failed={failed}")
+        return {'embedded': embedded, 'updated': updated, 'skipped': skipped, 'failed': failed}
+
+    def _verify_relationships_with_llm(self,
                                      title: str, 
                                      summary: str, 
                                      concepts: List[str], 

@@ -8,7 +8,7 @@ import { Link, LinkStatus, Collection } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, type PlatformKey } from '@/lib/platform';
 import Dropdown from './Dropdown';
-import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus } from '@/lib/storage';
+import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
 import { collection, query, orderBy, onSnapshot, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
@@ -44,7 +44,7 @@ type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
  * - Real-time updates via Firestore onSnapshot
  * - Keyword + semantic search
  * - Filter by status, category, and tags
- * - Multiple view modes (grid / compact / table / insights)
+ * - Two card views (grid / list), plus review, ask, and collections modes
  * - Deep linking to specific links via URL params
  */
 function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void }) {
@@ -247,8 +247,15 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
         }
     }, [searchParams, links]);
 
+    // Pending captures (M3) — processing/failed cards. They're excluded from the
+    // normal filtered feed and from every facet derivation below (so a still-empty
+    // card never spawns a phantom "Processing" category/tag), then surfaced
+    // separately, pinned at the top of the library, so a capture is always visible.
+    const isPending = (l: Link) => l.status === 'processing' || l.status === 'failed';
+    const contentLinks = links.filter((l) => !isPending(l));
+
     // 4. Hybrid Search Logic
-    const filteredLinks = links
+    const filteredLinks = contentLinks
         .filter((link) => {
             // Apply status filters
             if (filter === 'reminders') return link.reminderStatus === 'pending';
@@ -342,7 +349,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
     // picking the "Tech" category instantly drops a non-overlapping tag like
     // "politics" to 0, while the category chips keep reflecting the tag selection.
     // Pure client-side derivation — no extra reads, no backend cost.
-    const linksForCategoryCounts = selectedTags.size === 0 ? links : links.filter(matchesSelectedTags);
+    const linksForCategoryCounts = selectedTags.size === 0 ? contentLinks : contentLinks.filter(matchesSelectedTags);
     const categoryCounts = linksForCategoryCounts.reduce((acc, link) => {
         acc[link.category] = (acc[link.category] || 0) + 1;
         return acc;
@@ -350,9 +357,9 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
 
     // Category chips stay derived from the whole library so they never vanish —
     // they just read 0 when nothing matches the current tag selection.
-    const categories = Array.from(new Set(links.map(l => l.category))).sort();
+    const categories = Array.from(new Set(contentLinks.map(l => l.category).filter(Boolean))).sort();
 
-    const linksForTagCounts = selectedCategory.size === 0 ? links : links.filter(link => selectedCategory.has(link.category));
+    const linksForTagCounts = selectedCategory.size === 0 ? contentLinks : contentLinks.filter(link => selectedCategory.has(link.category));
     const tagCounts = linksForTagCounts.reduce((acc, link) => {
         link.tags.forEach(tag => {
             acc[tag] = (acc[tag] || 0) + 1;
@@ -360,7 +367,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
         return acc;
     }, {} as Record<string, number>);
 
-    const allTags = Array.from(new Set(links.flatMap(l => l.tags))).sort();
+    const allTags = Array.from(new Set(contentLinks.flatMap(l => l.tags))).sort();
 
     const handleToggleTag = (tag: string) => {
         const next = new Set(selectedTags);
@@ -370,13 +377,13 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
     };
 
     // Source/platform filter: only surface platforms actually present in the library.
-    const platformCounts = links.reduce((acc, link) => {
+    const platformCounts = contentLinks.reduce((acc, link) => {
         const p = getPlatform(link.url);
         if (p) acc[p] = (acc[p] || 0) + 1;
         return acc;
     }, {} as Record<PlatformKey, number>);
     const availablePlatforms = (Object.keys(PLATFORM_LABELS) as PlatformKey[]).filter(p => platformCounts[p]);
-    const screenshotCount = links.filter(l => l.sourceType === 'image').length;
+    const screenshotCount = contentLinks.filter(l => l.sourceType === 'image').length;
 
     const handleTogglePlatform = (p: PlatformKey) => {
         const next = new Set(selectedPlatforms);
@@ -385,7 +392,22 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
         setSelectedPlatforms(next);
     };
 
-    const reminderCount = links.filter(l => l.reminderStatus === 'pending').length;
+    const reminderCount = contentLinks.filter(l => l.reminderStatus === 'pending').length;
+
+    // Pending capture cards to surface, pinned above the feed. Only shown on the
+    // default library views (All/Unread, no active facet/search) so they're always
+    // visible right where a fresh capture lands, without cluttering narrowed views.
+    const pendingCards =
+        (viewMode === 'grid' || viewMode === 'list')
+            && (filter === 'all' || filter === 'unread')
+            && selectedCollections.size === 0
+            && selectedCategory.size === 0
+            && selectedTags.size === 0
+            && selectedPlatforms.size === 0
+            && !screenshotOnly
+            && !debouncedQuery.trim()
+            ? links.filter(isPending).sort((a, b) => getTimestampNumber(b.createdAt) - getTimestampNumber(a.createdAt))
+            : [];
 
 
 
@@ -477,6 +499,37 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
     const handleOpenReminderModal = (link: Link) => {
         setReminderModalLink(link);
     };
+
+    // Retry analysis for a failed capture card (M3). Optimistically flips the card
+    // back to `processing` and re-runs analysis in place; on failure it returns to
+    // a `failed` card so nothing is ever lost.
+    const handleRetryProcessing = async (link: Link) => {
+        if (!uid) return;
+        try {
+            await retryFailedLink(uid, link);
+            toast.success('Retrying analysis…');
+        } catch {
+            toast.error("Couldn't analyze that link. Please try again.");
+        }
+    };
+
+    // A pending capture (processing / failed) rendered with Card's dedicated
+    // skeleton / retry treatment. Reused above both the grid and list layouts.
+    const renderPendingCard = (link: Link) => (
+        <Card
+            key={link.id}
+            index={0}
+            link={link}
+            onOpenDetails={() => { }}
+            onStatusChange={handleStatusChange}
+            onReadStatusChange={handleReadStatusChange}
+            onUpdateCategory={handleUpdateCategory}
+            allCategories={categories}
+            onDelete={handleDelete}
+            onUpdateReminder={() => { }}
+            onRetry={handleRetryProcessing}
+        />
+    );
 
     // ── Collections ──────────────────────────────────────────────────────────
     // Open a collection: scope the feed to it and drop back into the card grid.
@@ -669,17 +722,16 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                 {/* Ask mode drops the search bar entirely (typing there just exits Ask)
                     and shows only a Back button, so the chat gets the full height. */}
                 {viewMode === 'ask' ? (
-                    <div className="flex items-center">
-                        <Button
-                            onClick={() => setViewMode(lastLayout.current)}
-                            title="Back to your library"
-                            aria-label="Back to your library"
-                            variant="secondary"
-                            className="shrink-0 ps-2 pe-3 font-medium hover:border-accent/40"
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                            Back
-                        </Button>
+                    // Desktop only: the unified subheader (back + icon + title),
+                    // matching the Collections tab. On mobile, Ask is a full-screen
+                    // fixed overlay that renders its own MobileSubheader.
+                    <div className="hidden sm:block">
+                        <MobileSubheader
+                            onBack={() => setViewMode(lastLayout.current)}
+                            backLabel="Back to your library"
+                            icon={<MessagesSquare className="w-5 h-5" />}
+                            title="Ask Machina"
+                        />
                     </div>
                 ) : viewMode === 'collections' ? (
                     // Desktop only: the unified subheader rendered inline below the
@@ -1554,7 +1606,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                             onExit={() => setViewMode(lastLayout.current)}
                             categories={[...categories].sort((a, b) => (categoryCounts[b] || 0) - (categoryCounts[a] || 0))}
                         />
-                    ) : filteredLinks.length === 0 ? (
+                    ) : filteredLinks.length === 0 && pendingCards.length === 0 ? (
                         <div className="text-center py-16 animate-fade-in">
                             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-accent/20">
                                 {filter === 'favorite' ? (
@@ -1618,6 +1670,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                         />
                     ) : viewMode === 'list' ? (
                         <div className="flex flex-col gap-2 max-w-3xl mx-auto">
+                            {pendingCards.map(renderPendingCard)}
                             {filteredLinks.map((link, idx) => (
                                 <ListCard
                                     key={link.id}
@@ -1634,6 +1687,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                         </div>
                     ) : (
                         <Masonry columnWidth={340} gap={16}>
+                            {pendingCards.map(renderPendingCard)}
                             {filteredLinks.map((link, idx) => (
                                 <Card
                                     key={link.id}

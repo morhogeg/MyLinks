@@ -22,8 +22,9 @@ function phaseFor(progress: number): string {
 
 /**
  * "Watching your video" indicator: a scan line sweeps over the video thumbnail
- * while a simulated (slow-creep, tuned for ~1 minute) progress bar and rotating
- * phase label convey that Gemini is working through the whole video.
+ * while an indeterminate bar and rotating phase label convey that Gemini is
+ * working through the whole video — no fake percentage, since we can't read
+ * real progress from the analysis (M6).
  */
 export default function VideoScanProgress({ thumbnailSrc, progress }: VideoScanProgressProps) {
     const clamped = Math.min(100, Math.max(0, progress));
@@ -51,17 +52,12 @@ export default function VideoScanProgress({ thumbnailSrc, progress }: VideoScanP
                     </div>
                 )}
 
-                {/* Center status */}
+                {/* Center status — icon + honest phase label, no fake % (M6). */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center px-4">
                     {done ? (
                         <CheckCircle2 className="w-10 h-10 text-green-400 animate-fade-in" />
                     ) : (
-                        <>
-                            <Youtube className="w-7 h-7 text-red-500/90" />
-                            <span className="text-2xl font-bold text-white tabular-nums leading-none">
-                                {Math.round(clamped)}%
-                            </span>
-                        </>
+                        <Youtube className="w-8 h-8 text-red-500/90" />
                     )}
                     <p className="text-sm font-medium text-white/90" aria-live="polite">
                         {label}
@@ -69,19 +65,18 @@ export default function VideoScanProgress({ thumbnailSrc, progress }: VideoScanP
                 </div>
             </div>
 
-            {/* Progress bar */}
+            {/* Indeterminate progress bar — motion, not a lying number. */}
             <div
                 className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden"
                 role="progressbar"
-                aria-valuenow={Math.round(clamped)}
-                aria-valuemin={0}
-                aria-valuemax={100}
                 aria-label="Video analysis progress"
+                aria-busy={!done}
             >
-                <div
-                    className={`h-full rounded-full transition-[width] duration-200 ease-out ${done ? 'bg-green-400' : 'bg-accent'}`}
-                    style={{ width: `${clamped}%` }}
-                />
+                {done ? (
+                    <div className="h-full w-full rounded-full bg-green-400" />
+                ) : (
+                    <div className="h-full w-2/5 rounded-full bg-accent animate-progress-indeterminate" />
+                )}
             </div>
 
             {/* Video analysis is slow (~a minute) and runs in the foreground (see

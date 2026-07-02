@@ -1,4 +1,4 @@
-# 🌟 MyLinks - Your AI-Powered Second Brain
+# 🌟 Machina AI — Your AI-Powered Knowledge Brain
 
 <p align="center">
   <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
@@ -8,11 +8,11 @@
   <img src="https://img.shields.io/badge/AI-Gemini-8E8E8E?style=for-the-badge&logo=google&logoColor=white" alt="Gemini AI">
 </p>
 
-> Transform your saved links into intelligent, searchable knowledge. MyLinks captures content from anywhere, analyzes it with AI, and transforms it into a personal knowledge base you can actually use.
+> Transform your saved links into intelligent, searchable knowledge. Machina AI captures content from anywhere, analyzes it with AI, and transforms it into a personal knowledge base you can actually use.
 
 ---
 
-## 🚀 Why MyLinks?
+## 🚀 Why Machina AI?
 
 ### The Problem
 
@@ -25,7 +25,7 @@ You save hundreds of links every month — articles, videos, resources — with 
 
 ### The Solution
 
-**MyLinks** automatically captures, analyzes, and organizes your web content using AI. It's not just a bookmark manager — it's your **second brain** that understands what you save.
+**Machina AI** automatically captures, analyzes, and organizes your web content using AI. It's not just a bookmark manager — it's a **personal knowledge base** that understands what you save.
 
 ---
 
@@ -72,9 +72,9 @@ You save hundreds of links every month — articles, videos, resources — with 
 
 ---
 
-## 🏆 What Makes MyLinks Different?
+## 🏆 What Makes Machina AI Different?
 
-| Feature | MyLinks | Pocket | Instapaper | Notion | Raindrop.io |
+| Feature | Machina AI | Pocket | Instapaper | Notion | Raindrop.io |
 |---------|---------|--------|------------|--------|-------------|
 | AI Analysis | ✅ Gemini | ❌ | ❌ | ❌ | ❌ |
 | WhatsApp Capture | ✅ | ❌ | ❌ | ❌ | ❌ |

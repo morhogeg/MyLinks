@@ -12,6 +12,7 @@ import CategoryInput from './CategoryInput';
 import TagInput from './TagInput';
 import { hasHebrew } from '@/lib/rtl';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
+import { useVisualViewport } from '@/lib/useVisualViewport';
 
 /**
  * Split a "M:SS — description" (or "H:MM:SS …") video highlight into its
@@ -99,6 +100,12 @@ export default function LinkDetailModal({
     // while the distraction-free reader is on top (it has its own dismissal).
     useEdgeSwipeBack(onClose, isOpen && !isReading);
 
+    // Clamp the modal to the *visible* viewport so an inline edit (category /
+    // tags) can't be hidden behind the on-screen keyboard: the body scrolls the
+    // focused field into the shrunken visible area instead of extending under
+    // the keys. No-op on desktop (visualViewport spans the full window).
+    const vp = useVisualViewport();
+
     if (!isOpen) return null;
 
     const getRelatedLinks = () => {
@@ -160,7 +167,10 @@ export default function LinkDetailModal({
     return (
         <>
         {isReading && <ReadingView link={link} onClose={() => setIsReading(false)} />}
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4">
+        <div
+            className="fixed inset-x-0 z-50 flex items-center justify-center p-0 sm:p-4"
+            style={{ top: vp.offsetTop || 0, height: vp.height || '100%', bottom: 'auto' }}
+        >
             <div
                 className="absolute inset-0 bg-background/80 backdrop-blur-sm animate-in fade-in duration-300"
                 onClick={onClose}
