@@ -8,7 +8,7 @@ import remarkBreaks from 'remark-breaks';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS, xHandle, linkedinDisplayName } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
-import { apiUrl, isNativeApp } from '@/lib/api';
+import { apiUrl, isNativeApp, fetchWithTimeout } from '@/lib/api';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { ChatMessage, ChatSource, ChatSession } from '@/lib/types';
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
@@ -382,7 +382,9 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         const wantStream = !isNativeApp();
 
         try {
-            const res = await fetch(apiUrl('/api/chat'), {
+            // 30s bounds connection setup only; for the streaming path fetch()
+            // resolves on headers, so a long token stream is not cut off.
+            const res = await fetchWithTimeout(apiUrl('/api/chat'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -390,7 +392,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                     ...(await appCheckHeaders()),
                 },
                 body: JSON.stringify({ uid, question, history, stream: wantStream }),
-            });
+            }, 30_000);
 
             const contentType = res.headers.get('content-type') || '';
             if (contentType.includes('text/event-stream') && res.body) {

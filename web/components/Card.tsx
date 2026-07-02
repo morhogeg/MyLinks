@@ -216,16 +216,20 @@ export default function Card({
                     {/* Action Buttons (Absolute Center) - Fades in on hover */}
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none group-hover:pointer-events-auto">
                         <div className="flex items-center gap-1 bg-card/90 backdrop-blur-md border border-white/10 p-1 rounded-full shadow-xl">
-                            <a
-                                href={link.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                title="Open source"
-                                className="p-1.5 rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center"
-                            >
-                                <ExternalLink className="w-3 h-3" />
-                            </a>
+                            {/* Only render as a link for real http(s) URLs — never make a
+                                stored javascript:/data: value clickable. */}
+                            {!!link.url && /^https?:\/\//i.test(link.url) && (
+                                <a
+                                    href={link.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    title="Open source"
+                                    className="p-1.5 rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center"
+                                >
+                                    <ExternalLink className="w-3 h-3" />
+                                </a>
+                            )}
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();

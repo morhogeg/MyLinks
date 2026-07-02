@@ -16,6 +16,7 @@ All business logic is extracted into dedicated modules:
 import os
 import re
 import json
+import hmac
 import html as _html
 import logging
 import requests
@@ -136,6 +137,32 @@ def _server_error(headers: dict = None, exc: Exception = None,
     if exc is not None:
         logger.error("Unhandled error: %s", exc, exc_info=True)
     return _error_response(message, status, headers)
+
+
+def _mask_phone(value) -> str:
+    """Redact a phone number for logging — keep only the last 4 digits.
+
+    Inbound WhatsApp numbers are PII; never log them in the clear.
+    """
+    s = str(value or "")
+    return f"***{s[-4:]}" if len(s) >= 4 else "***"
+
+
+def _require_admin(req, headers: dict = None):
+    """Gate internal/admin/debug endpoints behind a shared ADMIN_TOKEN.
+
+    These endpoints expose internal task data or trigger backend spend / mass
+    sends, so they must never be reachable anonymously. Fail closed: deny when
+    ADMIN_TOKEN is unset (a prod misconfiguration must not open the door).
+    Returns an error Response when unauthorized, or None to proceed. Responds
+    404 so the endpoint's existence isn't confirmed to a probing caller.
+    """
+    expected = os.environ.get("ADMIN_TOKEN", "")
+    provided = req.headers.get("X-Admin-Token", "")
+    if not expected or not hmac.compare_digest(provided, expected):
+        logger.warning("Blocked unauthorized admin endpoint access")
+        return _error_response("Not found", 404, headers)
+    return None
 
 
 # Input size caps to reject abusive/oversized payloads before any paid work.
@@ -295,6 +322,9 @@ def backfill_youtube_channels(req: https_fn.Request) -> https_fn.Response:
     headers = _cors_headers(req)
     if req.method == "OPTIONS":
         return https_fn.Response("", status=204, headers=headers)
+    guard = _require_admin(req, headers)
+    if guard:
+        return guard
     try:
         uid = req.args.get("uid") or (req.get_json(silent=True) or {}).get("uid")
         db = get_db()
@@ -346,6 +376,9 @@ def ping(req: https_fn.Request) -> https_fn.Response:
 @https_fn.on_request()
 def debug_status(req: https_fn.Request) -> https_fn.Response:
     """Debug endpoint to inspect system state."""
+    guard = _require_admin(req)
+    if guard:
+        return guard
     try:
         db = get_db()
 
@@ -386,7 +419,7 @@ def debug_status(req: https_fn.Request) -> https_fn.Response:
             mimetype="application/json"
         )
     except Exception as e:
-        return https_fn.Response(f"Debug failed: {str(e)}", status=500)
+        return _server_error(exc=e, message="Debug failed")
 
 
 @https_fn.on_request()
@@ -784,14 +817,15 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
             if len(image_url) > MAX_URL_LENGTH:
                 return _error_response("URL is too long", 400, headers)
             logger.info(f"Analyzing Image by URL: {image_url}")
-            # SSRF guard: block private/internal/metadata targets before fetch.
-            from scraper import validate_public_url, UnsafeURLError
+            # SSRF guard: block private/internal/metadata targets before fetch,
+            # and re-validate on every redirect hop via safe_get.
+            from scraper import validate_public_url, UnsafeURLError, safe_get
             try:
                 validate_public_url(image_url)
             except UnsafeURLError:
                 return _error_response("Invalid image URL", 400, headers)
             try:
-                img_response = requests.get(image_url, timeout=20)
+                img_response = safe_get(image_url, timeout=20)
                 img_response.raise_for_status()
                 image_bytes = img_response.content
                 mime_type = img_response.headers.get('Content-Type', 'image/jpeg')
@@ -849,8 +883,7 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
         )
 
     except Exception as e:
-        logger.error(f"Image analysis failed: {e}")
-        return _error_response(str(e), 500, headers)
+        return _server_error(headers, e, "Image analysis failed")
 
 
 # ─────────────────────────────────────────────
@@ -1370,8 +1403,14 @@ def _verify_twilio_signature(request) -> bool:
     """
     auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
     if not auth_token:
-        logger.warning("TWILIO_AUTH_TOKEN not set — skipping webhook signature verification")
-        return True
+        # Fail CLOSED in production: an unsigned webhook lets anyone POST a
+        # victim's phone number and act as them. Only allow the unverified path
+        # under the local Functions emulator, never on deployed Cloud Run.
+        if os.environ.get("FUNCTIONS_EMULATOR", "").lower() in ("1", "true", "yes"):
+            logger.warning("TWILIO_AUTH_TOKEN not set — skipping signature check (emulator only)")
+            return True
+        logger.error("TWILIO_AUTH_TOKEN not set in production — rejecting webhook")
+        return False
 
     from twilio.request_validator import RequestValidator
     validator = RequestValidator(auth_token)
@@ -1415,7 +1454,14 @@ def whatsapp_webhook(request):
         else:
             data = request.get_json()
 
-        logger.info(f"Received webhook payload: {json.dumps(data)}")
+        # Do NOT log the raw payload — it carries the sender's phone number
+        # (From) and full message body (PII). Log only routing metadata.
+        logger.info(
+            "Received webhook payload (sid=%s, num_media=%s, fields=%d)",
+            (data or {}).get("MessageSid") or (data or {}).get("SmsMessageSid") or "?",
+            (data or {}).get("NumMedia", "0"),
+            len(data) if isinstance(data, dict) else 0,
+        )
         payload = WebhookPayload(**data)
     except Exception as e:
         logger.error(f"Payload parse error: {e}")
@@ -1434,7 +1480,7 @@ def whatsapp_webhook(request):
     user_msg_is_hebrew = is_hebrew(payload.body)
 
     if not uid:
-        logger.warning(f"Unauthorized number: {payload.from_number}")
+        logger.warning(f"Unauthorized number: {_mask_phone(payload.from_number)}")
         msg = "❌ מצטערים, מספר הטלפון שלך לא מזוהה. אנא וודא שהוא תואם להגדרות." if user_msg_is_hebrew else "❌ Sorry, your phone number is not recognized. Please make sure it matches the number in your Second Brain settings."
         send_whatsapp_message(payload.from_number, msg)
         return https_fn.Response(json.dumps({"error": "User not found"}), status=403, mimetype="application/json")
@@ -1795,6 +1841,9 @@ def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
 @https_fn.on_request()
 def force_check_reminders(req: https_fn.Request) -> https_fn.Response:
     """Manual trigger for reminder check to debug without waiting for schedule."""
+    guard = _require_admin(req)
+    if guard:
+        return guard
     try:
         report = run_reminder_check()
         return https_fn.Response(json.dumps(report, indent=2), status=200, mimetype="application/json")
@@ -1818,6 +1867,9 @@ def send_digests(event: scheduler_fn.ScheduledEvent) -> None:
 def force_send_digests(req: https_fn.Request) -> https_fn.Response:
     """Manual trigger for the digest sweep (debug, ignores nothing-due skips)."""
     from digest_service import run_digest_check
+    guard = _require_admin(req)
+    if guard:
+        return guard
     try:
         report = run_digest_check()
         return https_fn.Response(json.dumps(report, indent=2), status=200, mimetype="application/json")

@@ -47,6 +47,36 @@ def validate_public_url(url: str) -> None:
             raise UnsafeURLError(f"URL resolves to a non-public address: {ip}")
 
 
+def safe_get(url: str, *, headers: Optional[dict] = None,
+             timeout: int = 10, max_redirects: int = 5) -> requests.Response:
+    """`requests.get` that re-validates the SSRF guard on every redirect hop.
+
+    `validate_public_url` only checks the URL it's handed, but `requests` follows
+    redirects by default — so a public URL could 302 to http://169.254.169.254/
+    or an RFC1918 host and the follow-up fetch would happily retrieve it. Here we
+    disable automatic redirects and re-validate each Location ourselves before
+    following it, preserving legitimate redirects (http→https, shorteners) while
+    closing the bypass.
+
+    Residual: a TOCTOU gap remains between DNS resolution and the socket connect
+    (DNS rebinding). Pinning the connection to the validated IP would close it
+    fully; tracked as a follow-up.
+    """
+    current = url
+    for _ in range(max_redirects + 1):
+        validate_public_url(current)
+        resp = requests.get(current, headers=headers, timeout=timeout,
+                             allow_redirects=False)
+        if resp.is_redirect or resp.is_permanent_redirect:
+            location = resp.headers.get("Location")
+            if not location:
+                return resp
+            current = requests.compat.urljoin(current, location)
+            continue
+        return resp
+    raise UnsafeURLError("Too many redirects")
+
+
 def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
     """
     Fetch and extract content from a URL.
@@ -83,7 +113,7 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         headers = {
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
         }
-        response = requests.get(url, headers=headers, timeout=10)
+        response = safe_get(url, headers=headers, timeout=10)
         response.raise_for_status()
 
         html = response.text
@@ -143,7 +173,7 @@ def extract_readable_article(url: str) -> dict:
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) "
                       "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
     }
-    response = requests.get(url, headers=headers, timeout=12)
+    response = safe_get(url, headers=headers, timeout=12)
     response.raise_for_status()
 
     from bs4 import BeautifulSoup

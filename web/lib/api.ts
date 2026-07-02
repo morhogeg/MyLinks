@@ -15,6 +15,32 @@ export function apiUrl(path: string): string {
 }
 
 /**
+ * fetch() with a hard timeout. A stalled socket (common on flaky cellular,
+ * especially inside the iOS WKWebView) can otherwise leave a request pending
+ * forever, so the caller's spinner never resolves. Aborts after `timeoutMs`;
+ * the rejection surfaces through the caller's existing catch as a normal
+ * network error.
+ *
+ * NOTE for streamed (SSE) responses: fetch() settles as soon as the response
+ * *headers* arrive, so the timeout here only bounds connection setup — the
+ * (legitimately long) body stream that follows is not cut off. Callers reading
+ * a single JSON body get the same protection for free.
+ */
+export async function fetchWithTimeout(
+    input: string,
+    init: RequestInit = {},
+    timeoutMs = 30_000,
+): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        return await fetch(input, { ...init, signal: controller.signal });
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+/**
  * True when running inside the bundled native shell (Capacitor's WKWebView)
  * rather than a normal browser tab. The shell serves from capacitor://localhost
  * and injects a global `Capacitor`. Some web APIs behave differently there — most

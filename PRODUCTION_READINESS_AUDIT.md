@@ -255,14 +255,54 @@ These change *which* findings are blockers and how much work Phase 2 is.
 
 ---
 
-## 5. Fixed vs. Deferred (Phase 2 — to be completed after implementation)
+## 5. Fixed vs. Deferred (Phase 2 — in progress)
 
-| Finding | Decision | Notes |
+### Batch 1 — audience-independent fixes (done)
+These are correct regardless of the single-user vs. multi-user decision, so they
+were implemented first. Frontend TS changes were not type-checked in this
+environment (no `node_modules`); backend Python byte-compiles clean
+(`py_compile main.py scraper.py`).
+
+| Finding | Status | What changed |
 |---|---|---|
-| _pending user go-ahead_ | — | — |
+| **H-3 SSRF redirect bypass** | ✅ Fixed | Added `safe_get()` in `functions/scraper.py` that re-runs `validate_public_url` on every redirect hop (`allow_redirects=False` + manual follow). Routed `scrape_url`, `extract_readable_article`, and `analyze_image`'s URL fetch through it. Residual DNS-rebinding TOCTOU noted in code. |
+| **H-4 PII in logs** | ✅ Fixed | Removed the raw `json.dumps(data)` WhatsApp payload log (`main.py`); now logs only SID/media-count/field-count. Added `_mask_phone()` and applied it to the "Unauthorized number" log. *(Remaining phone logs in `link_service.py`/`whatsapp_handler.py` deferred — see below.)* |
+| **H-5 Twilio verify fails open** | ✅ Fixed | `_verify_twilio_signature` now fails **closed** when `TWILIO_AUTH_TOKEN` is unset in production; the unverified path is allowed only under `FUNCTIONS_EMULATOR`. |
+| **H-6 No fetch timeout (hang)** | ✅ Fixed | Added shared `fetchWithTimeout()` in `web/lib/api.ts`; applied to `/api/article` (ReadingView, 25s) and `/api/chat` (AskBrain, 30s connect bound — does not cut the SSE stream). |
+| **B-6 Unauthenticated debug/admin endpoints** | ✅ Fixed | Added `_require_admin()` (shared `ADMIN_TOKEN` header, **fail-closed**, 404 on deny) and applied it to `debug_status`, `backfill_youtube_channels`, `force_check_reminders`, `force_send_digests`. `ping` left public (no data). |
+| **M-1 `window.open` no `noopener`** | ✅ Fixed | `LinkDetailModal.tsx` image click now passes `noopener,noreferrer` and gates the scheme. |
+| **M-2 Unvalidated URL scheme on Card** | ✅ Fixed | `Card.tsx` source anchor now renders only for `^https?://` URLs. |
+| **M-4 Internal error leaked to client** | ✅ Fixed | `debug_status` and `analyze_image` now route errors through `_server_error` (generic message; full detail logged server-side). |
+| **B-4 Privacy manifest** | ⚠️ Partial | Created `App/PrivacyInfo.xcprivacy` and `ShareExt/PrivacyInfo.xcprivacy` with correct content (UserDefaults `CA92.1`, `NSPrivacyTracking=false`, collected-data types). **Remaining manual step:** add each file to its target in Xcode (Target ▸ Build Phases ▸ Copy Bundle Resources) — not hand-wired into `project.pbxproj` because it can't be validated without Xcode on this platform. |
+
+**New deploy-config requirements introduced by Batch 1:**
+- Set **`ADMIN_TOKEN`** in the Functions environment (else the admin/debug endpoints return 404 — the safe default). Callers pass it as the `X-Admin-Token` header.
+- Set **`APPCHECK_ENFORCE=true`** in production (this addresses **H-2** — App Check was left soft/fail-open in code intentionally for rollout; enforcement is an env flag, not a code change).
+
+### Already fixed in the working tree (before this audit — verified, no action needed)
+| Finding | Note |
+|---|---|
+| H-7 Deep-link modal re-opens forever | `Feed.tsx` now uses a `consumedDeepLinkRef` + `history.replaceState` to strip `?linkId`. |
+| H-8 "keep analyzing in the background" untrue copy | Copy corrected to "Keep Machina open — this only takes a few seconds." |
+| Share Extension false-success watchdog (old QA F-4) | `resultShown` idempotency guard + neutral watchdog message present. |
+
+### Deferred — needs the Section 3 audience decision (the auth fork)
+| Finding | Why deferred |
+|---|---|
+| **B-1** Lock Firestore rules | Locking to `request.auth != null` **breaks the current native app** (B-2) until native sign-in ships. Coupled to the audience decision. |
+| **B-2** Native auth bypass | Requires either native Google Sign-In (multi-user) or a single-account lock (personal). Large, forking change. |
+| **B-3** Endpoints trust client `uid` | The token-verification approach depends on the auth model chosen. |
+| **B-5** In-app account deletion | Needs real accounts on the target platform (depends on B-2) + a delete Cloud Function. |
+| **B-7** Sign in with Apple | Only applies to the public multi-user path. |
+
+### Deferred — lower priority / larger UX work (backlog unless promoted)
+- **H-1** Ingest token → Keychain + rotation (native change; requires a small Keychain wrapper in the ShareExt + main app).
+- **M-3** Rate-limit hardening; **M-5** chat-history cap; **M-6–M-14** UX/HIG items from the audit + `ios-qa-report.md`.
+- Remaining PII phone logs in `link_service.py` / `whatsapp_handler.py` (apply `_mask_phone` pattern).
+- All **Low / Backlog** items in §2.4.
 
 ---
 
-*End of Phase 1 audit. Awaiting go-ahead and answers to Section 3 before making any code changes.*
+*Phase 1 audit complete. Phase 2 Batch 1 (audience-independent blockers/highs/mediums) implemented and committed. The remaining blockers (B-1/B-2/B-3/B-5/B-7) are deferred pending the Section 3 audience decision.*
 </content>
 </invoke>

@@ -293,7 +293,13 @@ export default function LinkDetailModal({
                                     alt="Source screenshot"
                                     onError={() => setImgFailed(true)}
                                     className="w-full h-auto max-h-[400px] object-contain cursor-zoom-in transition-transform duration-500 group-hover/img:scale-105"
-                                    onClick={() => window.open(link.url, '_blank')}
+                                    onClick={() => {
+                                        // Guard the scheme (never open a stored javascript:/data: URL)
+                                        // and pass noopener so the opened page can't reach window.opener.
+                                        if (/^https?:\/\//i.test(link.url)) {
+                                            window.open(link.url, '_blank', 'noopener,noreferrer');
+                                        }
+                                    }}
                                 />
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                                     <span className="text-white text-xs font-bold px-3 py-1.5 bg-black/60 rounded-full backdrop-blur-md border border-white/20">

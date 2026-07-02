@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The Share Extension is a separate binary and needs its own manifest.
+	     It does not track users; no ad SDK, no cross-company data sharing. -->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+
+	<!-- The extension itself does not collect data for the privacy label beyond
+	     what the app already declares; it forwards the shared item to the app's
+	     own backend. -->
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+
+	<!-- Reads the ingest endpoint + token from App Group UserDefaults (written
+	     by the main app) to authenticate the upload. Reason CA92.1: app/group's
+	     own data, not used for tracking. -->
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

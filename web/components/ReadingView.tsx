@@ -5,7 +5,7 @@ import { ArrowLeft, Minus, Plus, Volume2, Pause, Play, ExternalLink, BookOpen, L
 import { Link } from '@/lib/types';
 import { getDirection } from '@/lib/rtl';
 import { appCheckHeaders } from '@/lib/firebase';
-import { apiUrl } from '@/lib/api';
+import { apiUrl, fetchWithTimeout } from '@/lib/api';
 import { Button } from './ui/Button';
 
 interface Paragraph {
@@ -50,11 +50,11 @@ export default function ReadingView({ link, onClose }: ReadingViewProps) {
             setLoading(true);
             setError(null);
             try {
-                const res = await fetch(apiUrl('/api/article'), {
+                const res = await fetchWithTimeout(apiUrl('/api/article'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()) },
                     body: JSON.stringify({ url: link.url }),
-                });
+                }, 25_000);
                 const data = await res.json();
                 if (cancelled) return;
                 if (data.success && Array.isArray(data.paragraphs) && data.paragraphs.length) {
