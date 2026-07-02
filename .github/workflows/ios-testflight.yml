@@ -72,6 +72,13 @@ jobs:
           npm run build
           npx cap sync ios
           test -f ios/App/App/public/index.html || { echo "::error::web bundle not synced"; exit 1; }
+          # UI-only build (TEMPORARY): drop the native @capacitor-firebase/authentication
+          # plugin from the generated SPM manifest. It pulls a Capacitor that breaks
+          # @capacitor/share's native compile, and it's dormant at runtime while
+          # REQUIRE_AUTH is off. Remove this line once the native-auth deps are aligned
+          # (see NATIVE_AUTH_SETUP.md) so Apple/Google sign-in works in the app.
+          sed -i '' '/CapacitorFirebaseAuthentication/d' ios/App/CapApp-SPM/Package.swift
+          echo "SPM plugins after strip:"; grep -E '\.product\(name: "Capacitor' ios/App/CapApp-SPM/Package.swift || true
 
       # Native Firebase (the @capacitor-firebase/authentication pod) reads
       # GoogleService-Info.plist at launch; it's gitignored, so materialize it
