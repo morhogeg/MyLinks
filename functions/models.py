@@ -14,6 +14,11 @@ class LinkStatus(str, Enum):
     UNREAD = "unread"
     ARCHIVED = "archived"
     FAVORITE = "favorite"
+    # Async-capture lifecycle (M3): a captured item is written as PROCESSING the
+    # moment it's queued, then flips to UNREAD (ready) or FAILED (retryable) so a
+    # capture is never silently lost while background analysis runs.
+    PROCESSING = "processing"
+    FAILED = "failed"
 
 
 class ReminderStatus(str, Enum):

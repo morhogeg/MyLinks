@@ -1,5 +1,6 @@
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, getDocs, getDoc, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, appCheckHeaders } from './firebase';
+import { apiUrl } from './api';
 
 import { Link, LinkStatus, User } from './types';
 
@@ -54,6 +55,80 @@ export async function saveLink(uid: string, linkData: Partial<Link>): Promise<vo
         status: 'unread',
         isRead: false
     });
+}
+
+/**
+ * Retry analysis for a `failed` capture card (M3).
+ *
+ * Re-runs the same synchronous analysis the Add-Link form uses, then updates the
+ * SAME card doc in place: `processing` while it runs, `unread` (ready) on
+ * success, or back to `failed` (with the error) if it fails again. Reusing the
+ * existing analyze pipeline means no new backend/rules and the card keeps its id
+ * — nothing is ever dropped or duplicated.
+ */
+export async function retryFailedLink(uid: string, link: Link): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', link.id);
+    // Optimistic: show the processing skeleton immediately.
+    await updateDoc(linkRef, { status: 'processing', error: null });
+
+    try {
+        let existingTags: string[] = [];
+        try {
+            existingTags = await getUserTags(uid);
+        } catch {
+            // Tag context is a non-critical optimization.
+        }
+
+        const response = await fetch(apiUrl('/api/analyze'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()) },
+            body: JSON.stringify({ url: link.url, existingTags, uid }),
+        });
+        const text = await response.text();
+        let data: any;
+        try {
+            data = JSON.parse(text);
+        } catch {
+            throw new Error('The analysis service returned an unexpected response.');
+        }
+        if (!response.ok || !data.success) {
+            throw new Error(data?.error || 'Analysis failed. Please try again.');
+        }
+
+        const l = data.link;
+        await updateDoc(linkRef, {
+            url: l.url,
+            title: l.title,
+            summary: l.summary,
+            detailedSummary: l.detailedSummary ?? null,
+            tags: l.tags ?? [],
+            category: l.category ?? 'General',
+            language: l.language ?? 'en',
+            metadata: {
+                originalTitle: l.metadata?.originalTitle ?? '',
+                estimatedReadTime: l.metadata?.estimatedReadTime ?? 0,
+                actionableTakeaway: l.metadata?.actionableTakeaway ?? null,
+            },
+            sourceType: l.sourceType || 'web',
+            sourceName: l.sourceName ?? null,
+            embedding_vector: l.embedding_vector ?? null,
+            concepts: l.concepts ?? [],
+            relatedLinks: l.relatedLinks ?? [],
+            status: 'unread',
+            isRead: false,
+            error: null,
+            failedAt: null,
+            createdAt: Date.now(),
+        });
+    } catch (err) {
+        // Re-mark as failed so it stays a visible, retryable card — never lost.
+        await updateDoc(linkRef, {
+            status: 'failed',
+            error: err instanceof Error ? err.message.slice(0, 300) : 'Retry failed',
+            failedAt: Date.now(),
+        });
+        throw err;
+    }
 }
 
 /**

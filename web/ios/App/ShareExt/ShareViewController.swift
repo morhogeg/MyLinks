@@ -510,7 +510,16 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
 
     // MARK: - Result / dismiss
 
-    private func showResult(_ message: String, success: Bool) {
+    /// Present the outcome of the save.
+    ///
+    /// - success == true  → the server acknowledged (2xx). Only here do we ever
+    ///   show the green check.
+    /// - neutral == true  → we genuinely don't know the outcome yet (the watchdog
+    ///   fired, or the request timed out while the background upload keeps going).
+    ///   We must NOT claim success OR a hard failure — show a calm "still saving"
+    ///   terminal state and leave the ✕ as the escape hatch (no auto-dismiss).
+    /// - otherwise         → a real, terminal failure (auth/HTTP/parse error).
+    private func showResult(_ message: String, success: Bool, neutral: Bool = false) {
         DispatchQueue.main.async {
             // Idempotency guard: a real network response and the watchdog can both
             // call this. Whichever lands first owns the UI; later calls are dropped
@@ -523,7 +532,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                     // Snap the scan to 100% with the green check, then finish.
                     self.completeScanSuccess { self.finish() }
                 } else {
-                    // Surface the error on the scan card itself.
+                    // Stop the cosmetic scan and surface the message on the card.
                     self.displayLink?.invalidate()
                     self.displayLink = nil
                     self.sweepView.isHidden = true
@@ -532,18 +541,32 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                     self.linkGlyph.alpha = 0
                     self.phaseLabel.text = message
                     self.phaseLabel.textColor = .white
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { self.finish() }
+                    if neutral {
+                        // Neutral terminal state: the save may still be finishing on
+                        // the background session. Keep the card up with the ✕ close
+                        // affordance instead of auto-dismissing, and never a check.
+                        self.hintLabel.text = "The save is still finishing — you can close this."
+                    } else {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { self.finish() }
+                    }
                 }
                 return
             }
 
-            // Generic (non-image) HUD path — unchanged behaviour.
+            // Generic (non-image) HUD path.
             self.card.isHidden = false
-            self.spinner.stopAnimating()
-            self.spinner.isHidden = true
             self.label.text = message
-            DispatchQueue.main.asyncAfter(deadline: .now() + (success ? 0.9 : 1.6)) {
-                self.finish()
+            if neutral {
+                // Keep a subtle spinner going to signal the background upload is
+                // still in flight; the ✕ dismisses. No auto-finish, no false check.
+                self.spinner.startAnimating()
+                self.spinner.isHidden = false
+            } else {
+                self.spinner.stopAnimating()
+                self.spinner.isHidden = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + (success ? 0.9 : 1.6)) {
+                    self.finish()
+                }
             }
         }
     }
@@ -759,7 +782,11 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(token, forHTTPHeaderField: "X-Ingest-Token")
-        req.timeoutInterval = 25
+        // Client request timeout sits UNDER the watchdog (below) so a slow save
+        // resolves to the neutral "still saving" state (see didCompleteWithError)
+        // rather than racing the watchdog — never a false success, never a false
+        // hard failure.
+        req.timeoutInterval = 22
         // NOTE: do NOT set req.httpBody — background sessions require an upload
         // task fed from a file, and httpBody would be ignored anyway.
 
@@ -792,14 +819,14 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
         backgroundSession = session
 
-        // Watchdog: never hang the share sheet open indefinitely. Fires 3s after
-        // the 25s request timeout, so the real result (success or error) almost
-        // always lands first and owns the UI via the resultShown guard. The
-        // message is deliberately neutral — we don't know the outcome here, so we
-        // must NOT claim a false "Saved ✓". The upload still proceeds in the
-        // background regardless.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 28) { [weak self] in
-            self?.showResult("Still saving — check Machina", success: false)
+        // Watchdog: never hang the share sheet open indefinitely, and never lie.
+        // Fires ~4s after the 22s request timeout, so a real 2xx/ack almost always
+        // lands first and owns the UI via the resultShown guard. If nothing has
+        // resolved by now we genuinely don't know the outcome — the background
+        // upload is still in flight — so we show a NEUTRAL terminal state (never a
+        // green check) with the ✕ escape hatch, not a false "Saved ✓".
+        DispatchQueue.main.asyncAfter(deadline: .now() + 26) { [weak self] in
+            self?.showResult("Still saving — open Machina to confirm", success: false, neutral: true)
         }
 
         let task = session.uploadTask(with: req, fromFile: tmpURL)
@@ -813,8 +840,16 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if error != nil {
-            showResult("Network error — try again", success: false)
+        if let error = error {
+            // A client-side timeout does NOT mean the save failed — the background
+            // session keeps the upload alive and it may still succeed. Report the
+            // neutral "still saving" state so a slow-but-successful save is never
+            // shown as a false failure. Other errors are genuine and terminal.
+            if (error as NSError).code == NSURLErrorTimedOut {
+                showResult("Still saving — open Machina to confirm", success: false, neutral: true)
+            } else {
+                showResult("Network error — try again", success: false)
+            }
         } else {
             let code = (task.response as? HTTPURLResponse)?.statusCode ?? 0
             if (200...299).contains(code) {
