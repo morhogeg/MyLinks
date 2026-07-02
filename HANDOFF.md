@@ -8,6 +8,16 @@ Design overhaul of the **Curated digest** sub-screen in
 `web/components/SettingsModal.tsx` (the `view === 'digest'` region), to match the app's premium
 visual language, plus a rebuilt Topics picker. **Merged to `main` and fully deployed.**
 
+**Follow-up tweaks after review (same day, commit `639eea2`, also fully deployed):**
+- Removed the "Send a preview now" button (+ its `handleSendNow` handler, `sendingNow`/`sendResult`
+  state, and the `httpsCallable`/`functions` imports it was the only user of). The
+  `send_digest_now` Cloud Function is untouched — just no longer invoked from this screen.
+- Gave the Topics picker more room: taller scroll area (`max-h-[22rem]`), larger container
+  padding (`p-4`), looser spacing between groups and pills.
+- Redeployed: pushed `main` (`639eea2`, Vercel), `./deploy-hosting.sh` (iPhone PWA ✅),
+  `./build-ios.sh` refreshed the native bundle from `639eea2` + Xcode opened (native app still
+  needs a manual build-number bump + Archive → TestFlight).
+
 **What changed (all in `web/components/SettingsModal.tsx`):**
 - Live **"Your digest" gradient preview card** at the top of the digest screen (summarizes the
   current mode · count · schedule · channel).
