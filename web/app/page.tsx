@@ -67,8 +67,14 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background text-text transition-colors duration-200">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/70 backdrop-blur-xl border-b border-border-subtle h-[60px] sm:h-[68px] flex items-center">
+      {/* Header — the sticky bar owns the top safe-area inset so it always sits
+          below the status bar/notch, even once it sticks on scroll. content-box
+          keeps the h-[60px] bar height while the inset padding stacks on top, and
+          the translucent bg fills the notch area so content scrolls under it. */}
+      <header
+        className="sticky top-0 z-50 bg-background/70 backdrop-blur-xl border-b border-border-subtle h-[60px] sm:h-[68px] flex items-center"
+        style={{ paddingTop: 'env(safe-area-inset-top)', boxSizing: 'content-box' }}
+      >
         {/* hairline accent glow under the bar */}
         <div className="absolute inset-x-0 bottom-0 h-px bg-[image:var(--accent-gradient)] opacity-30" />
         <div className="w-full max-w-[2200px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 flex items-center justify-between">

@@ -360,10 +360,12 @@ html {
 /* Safe area insets for iOS */
 @supports (padding: max(0px)) {
   body {
-    /* Top inset included unconditionally so the header clears the status
-       bar/notch inside the Capacitor WebView, which is not display-mode:
-       standalone. On the regular web this inset is 0, so it's a no-op there. */
-    padding-top: env(safe-area-inset-top);
+    /* The TOP inset is intentionally NOT applied here. The sticky page header
+       owns it (padding-top: env(safe-area-inset-top) in app/page.tsx) so its
+       content stays below the status bar even when it sticks on scroll — a
+       body padding only offsets the resting position, not the stuck one, which
+       let content slide under the notch. Full-screen overlays (Ask, Collections,
+       Settings, drawers) pad their own top via MobileSubheader / safe-pt. */
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
     padding-bottom: env(safe-area-inset-bottom);
@@ -379,12 +381,6 @@ html {
   }
 }
 
-/* PWA standalone mode adjustments */
-@media (display-mode: standalone) {
-  body {
-    padding-top: env(safe-area-inset-top);
-  }
-}
 
 /* Touch optimization for iOS */
 * {
