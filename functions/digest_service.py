@@ -13,13 +13,15 @@ The user controls, from Settings:
   • how many cards                             (digest_count)
   • when, in their local time                  (digest_hour, digest_day)
 
-Curation modes (digest_mode):
-  smart      – a balanced mix of backlog + rediscovery (the default)
-  random     – "surprise me": a random sample across the whole library
-  topic      – only cards from a chosen category/tag
-  unread     – chip away at the backlog (oldest unread first)
-  favorites  – revisit your starred cards
-  rediscover – "on this day": older saves you haven't opened in a while
+Curation modes (digest_mode). The Settings UI surfaces the first three as the
+primary choices and tucks the rest behind an "advanced" disclosure (M14); the
+backend curates all six identically — the split is presentation only:
+  smart      – a balanced mix of backlog + rediscovery (the default)   [primary]
+  unread     – chip away at the backlog (oldest unread first)          [primary]
+  rediscover – "on this day": older saves you haven't opened in a while [primary]
+  random     – "surprise me": a random sample across the whole library [advanced]
+  topic      – only cards from a chosen category/tag                    [advanced]
+  favorites  – revisit your starred cards                               [advanced]
 
 Email is sent via SendGrid (if SENDGRID_API_KEY is set) or SMTP (if SMTP_HOST
 is set); otherwise it degrades gracefully to a logged no-op, exactly like the

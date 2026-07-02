@@ -333,6 +333,37 @@ def backfill_youtube_channels(req: https_fn.Request) -> https_fn.Response:
         return _server_error(headers, e, "Backfill failed")
 
 
+@https_fn.on_request()
+def backfill_related_links(req: https_fn.Request) -> https_fn.Response:
+    """One-off repair: compute link.relatedLinks (the "See also" graph, M9) for
+    existing cards that predate graph_service, and backfill any missing
+    embedding_vector so older cards can be found as neighbors too. Optional
+    ?uid=… (or JSON {uid}) limits to one user; otherwise all users. ?force=1
+    recomputes even where relatedLinks already exist. Idempotent; re-runnable.
+    """
+    headers = _cors_headers(req)
+    if req.method == "OPTIONS":
+        return https_fn.Response("", status=204, headers=headers)
+    try:
+        uid = req.args.get("uid") or (req.get_json(silent=True) or {}).get("uid")
+        force = str(req.args.get("force") or "").lower() in ("1", "true", "yes")
+        db = get_db()
+        graph = GraphService(db)
+        user_refs = ([db.collection("users").document(uid)] if uid
+                     else list(db.collection("users").list_documents()))
+        totals = {"users": 0, "embedded": 0, "updated": 0, "skipped": 0, "failed": 0}
+        for uref in user_refs:
+            res = graph.backfill_related_links(uref.id, force=force)
+            for k in ("embedded", "updated", "skipped", "failed"):
+                totals[k] += res.get(k, 0)
+            totals["users"] += 1
+        return https_fn.Response(
+            json.dumps(totals), status=200, headers=headers, mimetype="application/json",
+        )
+    except Exception as e:
+        return _server_error(headers, e, "Backfill related links failed")
+
+
 # ─────────────────────────────────────────────
 # HTTP Endpoints
 # ─────────────────────────────────────────────

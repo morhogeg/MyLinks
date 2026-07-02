@@ -1,8 +1,55 @@
 # Session Handoff — Machina AI
 
-_Last updated: 2026-07-02. Branch: `claude/brave-blackburn-0a8bcf` (Ask-page header polish — merged to `main` + deployed)._
+_Last updated: 2026-07-02. Branch: `claude/phase2-sprawl-m9-m13-m14` (Phase 2 cut-the-sprawl + loose ends — merged to `main`)._
 
-## Latest session — Ask page desktop header consistency — 2026-07-02
+## Latest session — Phase 2: cut the sprawl + M9 backfill — 2026-07-02
+
+Phase 2 "reveal the magic / cut the sprawl" per `MACHINA_SPEC.md` step 4. Web `tsc --noEmit` clean,
+`py_compile` clean, eslint clean on the changed files (the 2 pre-existing `any` errors in `Feed.tsx`
+at lines ~128/212 are baseline, untouched by this work). Verified each item against current code first.
+
+**M13 — Cut Compact view (finish).** ✅ Done. The view switcher already offered only Cards + List;
+this removed the leftover dead code: deleted `web/components/CompactCard.tsx` (only self-referenced —
+no imports anywhere) and fixed the stale doc comment in `web/components/Feed.tsx` (~line 47, was
+"grid / compact / table / insights"). `viewMode` union is `grid | list | review | ask | collections` —
+no Compact code path remains. (`isCompact` props on `SimpleMarkdown`/`Card` are a separate, unrelated
+markdown-density flag — left as-is.)
+
+**M14 — Trim the option sprawl.** ✅ Done, presentation-only (backend curates every mode unchanged).
+- Digest modes (`web/components/SettingsModal.tsx`): **Smart mix / Backlog / Rediscover** are the three
+  primary buttons; **Surprise me / By topic / Favorites** now live behind a "More ways to curate"
+  disclosure (`showAdvancedModes`), which auto-opens when an advanced mode is already selected so the
+  current choice is never hidden. Extracted a `DigestModeButton` helper (reused by both grids).
+- Reminder profiles (`SettingsModal.tsx` Reminders section): reduced the front-and-center segmented from
+  **Smart / Daily / Weekly** to **Smart (spaced) + Custom**; picking Custom reveals a secondary
+  Daily / Weekly toggle (power options reachable, not up front). The `reminder_frequency` data model
+  (`smart | daily | weekly | off`) is unchanged — Custom just maps to daily/weekly.
+- `functions/digest_service.py`: no logic change (all 6 modes still valid/curated); updated the
+  module docstring to label modes primary vs advanced so the backend doc matches the UI.
+- Acceptance met: default digest exposes 3 modes up front, reminders 2 choices; power options still reachable.
+
+**M9 — See also (finish: backfill).** ✅ Done. The See-also UI was already shipped in `LinkDetailModal.tsx`;
+the only open item was backfilling `link.relatedLinks` for older cards that predate `graph_service.py`.
+Added `GraphService.backfill_related_links(uid, force)` (`functions/graph_service.py`) — a safe,
+idempotent, re-runnable two-pass repair: pass 1 backfills any missing `embedding_vector` (so old cards
+are discoverable as neighbors at all), pass 2 computes `relatedLinks` for cards missing them (or all
+when `force`). Exposed as HTTP endpoint `backfill_related_links` in `functions/main.py` (mirrors the
+existing `backfill_youtube_channels`): optional `?uid=` limits to one user, `?force=1` recomputes,
+returns per-run counts `{users, embedded, updated, skipped, failed}`.
+
+**Deploy follow-ups (not yet run this session):**
+- `./deploy-hosting.sh` — push the SettingsModal/Feed changes to the iPhone PWA (Vercel auto-deploys desktop on merge).
+- `./deploy-functions.sh` — functions changed (`graph_service.py`, `main.py`, `digest_service.py`).
+- After functions deploy, run the M9 backfill once: `curl "https://<functions-host>/backfill_related_links"`
+  (optionally `?uid=<uid>` first to spot-check, then all-users). Idempotent; safe to re-run.
+
+**Not touched:** M8 (auth) — in flight separately. Also left an unrelated, pre-existing dirty
+`web/ios/App/App.xcodeproj/project.pbxproj` (`CURRENT_PROJECT_VERSION` 19→20) out of this commit —
+it belongs to another session's iOS build bump.
+
+---
+
+## Earlier — Ask page desktop header consistency — 2026-07-02
 
 Small desktop polish (commit `6cd74ae`, fully deployed): the **Ask page** top bar now uses the
 shared **`MobileSubheader`** (round back chevron + leading icon + bold title) instead of a
