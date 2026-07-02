@@ -1,8 +1,26 @@
 # Session Handoff — Machina AI
 
-_Last updated: 2026-07-02. Branch: `claude/upbeat-dewdney-68d438` (Phase 1 trust-wins M1/M4/M6/M7 — PR #11, merged to `main` after merging latest `main` in)._
+_Last updated: 2026-07-02. Branch: `claude/brave-blackburn-0a8bcf` (Ask-page header polish — merged to `main` + deployed)._
 
-## Latest session — Phase 1 quick trust-wins: M1, M4, M6, M7 — 2026-07-02
+## Latest session — Ask page desktop header consistency — 2026-07-02
+
+Small desktop polish (commit `6cd74ae`, fully deployed): the **Ask page** top bar now uses the
+shared **`MobileSubheader`** (round back chevron + leading icon + bold title) instead of a
+standalone "Back" pill, so it matches the **Collections** tab exactly. Change is one branch in
+`web/components/Feed.tsx` (the `viewMode === 'ask'` branch of the header block) — swapped the bare
+`<Button>Back</Button>` for `<MobileSubheader icon={<MessagesSquare/>} title="Ask Machina" />`
+wrapped in `hidden sm:block`. Mobile is untouched (Ask there is a full-screen overlay that renders
+its own `MobileSubheader`). Both `MobileSubheader` and `MessagesSquare` were already imported.
+This merge touched only `Feed.tsx` — the concurrent Phase 1 trust-wins work below was not affected
+(`tsc --noEmit` clean post-merge). Deployed: `main` push (Vercel) + `./deploy-hosting.sh`
+(iPhone PWA ✅) + `./build-ios.sh` refreshed the native bundle from `6cd74ae` + Xcode opened
+(native app still needs a manual build-number bump + Archive → TestFlight).
+
+> Also shipped earlier today from this same branch: the **Curated digest** settings redesign +
+> searchable Topics picker, and two follow-ups (removed the "Send a preview now" button, roomier
+> Topics area). Those are on `main` and live.
+
+## Earlier session — Phase 1 quick trust-wins: M1, M4, M6, M7 — 2026-07-02
 
 Per `MACHINA_SPEC.md` execution order step 1 (quick trust wins + the name). Web `tsc --noEmit` clean,
 eslint clean (only the two pre-existing warnings). Python `py_compile` clean. **PR #11, merged to `main`.**
