@@ -3,6 +3,13 @@
 
 export type LinkStatus = 'unread' | 'archived' | 'favorite';
 
+// Async-capture lifecycle (M3). Items saved via the share sheet / WhatsApp are
+// written as `processing` the instant they're queued, then flip to a normal
+// LinkStatus (ready) or `failed` (retryable) — so a capture is never invisible
+// and never silently dropped. A card's `status` field holds one of these while
+// in-flight; the feed renders them as skeleton / retry cards.
+export type CaptureState = LinkStatus | 'processing' | 'failed';
+
 export interface LinkMetadata {
   originalTitle: string;
   estimatedReadTime: number; // in minutes
@@ -47,8 +54,12 @@ export interface Link {
   detailedSummary?: string;
   tags: string[];
   category: string;
-  status: LinkStatus;
+  status: CaptureState;
   createdAt: number | string; // Handle both Unix timestamp and ISO string
+  // Async-capture (M3): populated on a `failed` card so the UI can explain what
+  // went wrong and offer a retry that re-runs analysis for `url`.
+  error?: string;
+  failedAt?: number;
   metadata: LinkMetadata;
   // AI Analysis metadata
   sourceType?: string;

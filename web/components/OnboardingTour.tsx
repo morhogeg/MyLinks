@@ -78,7 +78,7 @@ const STEPS: Step[] = [
         target: 'views',
         icon: <LayoutGrid className="w-5 h-5" />,
         title: 'See it your way',
-        body: 'Switch between Grid, List, and Compact layouts — or flip to Review to swipe through your cards one at a time and revisit what you saved.',
+        body: 'Switch between Grid and List layouts — or flip to Review to swipe through your cards one at a time and revisit what you saved.',
     },
     {
         target: 'settings',
