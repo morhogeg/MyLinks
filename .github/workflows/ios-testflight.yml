@@ -8,11 +8,20 @@ name: iOS → TestFlight
 
 on:
   workflow_dispatch: {}
-  push:
-    branches: [main]
-    paths:
-      - 'web/**'
-      - '.github/workflows/ios-testflight.yml'
+  # AUTO-BUILD TEMPORARILY GATED during the multi-user auth cutover.
+  # The build now includes the Sign in with Apple entitlement and the
+  # @capacitor-firebase/authentication pod (native Firebase SDK). Archiving
+  # requires (a) "Sign in with Apple" enabled on the App ID in the Apple
+  # Developer portal and (b) GoogleService-Info.plist available to the build,
+  # or the app fails to sign / crashes on launch. Until those are set up (see
+  # NATIVE_AUTH_SETUP.md), run this workflow MANUALLY (Actions → Run workflow)
+  # after verifying a build on a device. Re-enable the push trigger below once
+  # the native setup is confirmed:
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - 'web/**'
+  #     - '.github/workflows/ios-testflight.yml'
 
 concurrency:
   group: ios-testflight
