@@ -4,7 +4,7 @@ import logging
 import time
 from typing import List
 from google import genai
-from models import AIAnalysis, BrainAnswer
+from models import AIAnalysis, BrainAnswer, WeeklySynthesis
 
 logger = logging.getLogger(__name__)
 
@@ -480,6 +480,81 @@ Output the marker exactly once, as the very last line, and nothing after it."""
         if not cited:
             cited = list(valid_ids)
         yield ("citedIds", cited)
+
+    def synthesize_week(self, cards: list) -> dict:
+        """Write a weekly "What you learned" synthesis over the week's saves (M12).
+
+        `cards` is a list of dicts (id/title/summary/category/tags/concepts). The
+        point is a *recap that reads like a thoughtful friend*, not a bullet dump
+        of links: an opening throughline, 2-4 themes that each connect specific
+        cards, one standout, and an open question to carry forward — every part
+        tied back to the source cards by id so the app can link to them.
+
+        Returns a dict matching the WeeklySynthesis schema. Raises AnalysisError
+        on failure so the caller can skip delivery rather than send junk.
+        """
+        if not self.client:
+            raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
+        if not cards:
+            raise AnalysisError("No cards to synthesize")
+
+        def _card_block(c: dict) -> str:
+            concepts = ", ".join((c.get("concepts") or [])[:5])
+            tags = ", ".join((c.get("tags") or [])[:5])
+            meta = f"category: {c.get('category', 'General')}"
+            if concepts:
+                meta += f"; concepts: {concepts}"
+            if tags:
+                meta += f"; tags: {tags}"
+            summary = (c.get("summary") or "").strip()
+            return f"[{c.get('id')}] {c.get('title', 'Untitled')} ({meta})\n{summary}"
+
+        sources_text = "\n\n".join(_card_block(c) for c in cards)
+
+        prompt = f"""You are Machina AI, the user's personal knowledge companion. Below are the cards this person saved over the past week — links, videos, and notes they thought were worth keeping.
+
+Write them a short, warm weekly recap of what they were learning and thinking about. This is the thing they'll want to screenshot and forward — make it feel like a thoughtful friend reflecting their week back to them, NOT a list of links or a dry summary.
+
+Guidelines:
+- narrative: 2-4 sentences naming the real throughline of the week — what themes or questions their saves circle around. Speak to them ("you"), be specific and observant, never generic. If the week is scattered, say so honestly and find the loose thread.
+- themes: 2-4 themes. Each has a short title, a 1-2 sentence insight that connects the saves and says what they add up to (not just "you saved things about X"), and the cardIds it draws on. Only group cards that genuinely belong together.
+- standoutCardId + standoutWhy: pick the single most interesting or important save of the week and say why in one sentence.
+- openQuestion: one genuine, thought-provoking question their saves raise — something to pull on next week.
+- Ground everything ONLY in the cards below. Do NOT invent facts or reference things they didn't save. Every cardId you cite MUST be one of the ids provided.
+- CRITICAL — language: write the ENTIRE synthesis in the language most of the cards are written in. If most are in Hebrew, write in Hebrew; otherwise English.
+
+This week's saves:
+{sources_text}
+
+Return ONLY a JSON object matching the schema."""
+
+        data = self._generate_json(
+            [prompt], "weekly synthesis",
+            config_extra={"response_schema": WeeklySynthesis},
+        )
+
+        # Guard against hallucinated ids — keep only ones we actually supplied.
+        valid_ids = {c.get("id") for c in cards}
+        themes = []
+        for t in (data.get("themes") or []):
+            if not isinstance(t, dict):
+                continue
+            cited = [cid for cid in (t.get("cardIds") or []) if cid in valid_ids]
+            themes.append({
+                "title": t.get("title") or "",
+                "insight": t.get("insight") or "",
+                "cardIds": cited,
+            })
+        standout = data.get("standoutCardId")
+        if standout not in valid_ids:
+            standout = None
+        return {
+            "narrative": data.get("narrative") or "",
+            "themes": themes,
+            "standoutCardId": standout,
+            "standoutWhy": data.get("standoutWhy") or "",
+            "openQuestion": data.get("openQuestion") or "",
+        }
 
     def embed_text(self, text: str) -> List[float]:
         """Generate vector embedding for text using Gemini.

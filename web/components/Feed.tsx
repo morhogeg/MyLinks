@@ -4,12 +4,12 @@
 
 
 import { useState, useEffect, useRef } from 'react';
-import { Link, LinkStatus, Collection } from '@/lib/types';
+import { Link, LinkStatus, Collection, WeeklySynthesis } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, type PlatformKey } from '@/lib/platform';
 import Dropdown from './Dropdown';
 import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
-import { collection, query, orderBy, onSnapshot, getDocsFromServer, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, doc, query, orderBy, onSnapshot, getDocsFromServer, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
@@ -21,6 +21,8 @@ import ReminderModal from './ReminderModal';
 import SwipeDeck from './SwipeDeck';
 import AskBrain from './AskBrain';
 import LinkDetailModal from './LinkDetailModal';
+import ConnectionInsight from './ConnectionInsight';
+import WeeklySynthesisCard from './WeeklySynthesisCard';
 import ConfirmDialog from './ConfirmDialog';
 import AddToCollectionSheet from './AddToCollectionSheet';
 import CollectionsGallery from './CollectionsGallery';
@@ -90,6 +92,10 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
     const [editingCollection, setEditingCollection] = useState<Collection | null>(null);
     const [confirmDeleteCollection, setConfirmDeleteCollection] = useState<Collection | null>(null);
     const [manageCardsCollection, setManageCardsCollection] = useState<Collection | null>(null);
+
+    // Weekly "What you learned" synthesis (M12) — written server-side onto the
+    // user doc; surfaced in-app as a special card at the top of the feed.
+    const [synthesis, setSynthesis] = useState<WeeklySynthesis | null>(null);
 
     // Semantic Search State
     const [isSearching, setIsSearching] = useState(false);
@@ -205,6 +211,19 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
             } as Collection)));
         }, (error: Error) => {
             console.error("Collections sync error:", error);
+        });
+        return () => unsubscribe();
+    }, [uid]);
+
+    // 2c. Live sync of the weekly synthesis (M12) off the user doc.
+    useEffect(() => {
+        if (!uid) return;
+        const ref = doc(db, 'users', uid);
+        const unsubscribe = onSnapshot(ref, (snap) => {
+            const data = snap.data() as DocumentData | undefined;
+            setSynthesis((data?.latestSynthesis as WeeklySynthesis) ?? null);
+        }, (error: Error) => {
+            console.error("Synthesis sync error:", error);
         });
         return () => unsubscribe();
     }, [uid]);
@@ -441,6 +460,21 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
             && !debouncedQuery.trim()
             ? links.filter(isPending).sort((a, b) => getTimestampNumber(b.createdAt) - getTimestampNumber(a.createdAt))
             : [];
+
+    // M10 — proactive connections. Surfaced only on the default library view
+    // (grid/list, no active facet/search), same as pending captures, so the
+    // brain "speaks first" right where the user is browsing without ever
+    // hijacking a narrowed/searched view. ConnectionInsight itself decides
+    // whether there's a genuine, un-dismissed cluster worth showing.
+    const showConnections =
+        (viewMode === 'grid' || viewMode === 'list')
+        && (filter === 'all' || filter === 'unread')
+        && selectedCollections.size === 0
+        && selectedCategory.size === 0
+        && selectedTags.size === 0
+        && selectedPlatforms.size === 0
+        && !screenshotOnly
+        && !debouncedQuery.trim();
 
 
 
@@ -1639,6 +1673,20 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
 
                 {/* Links Grid / Ask */}
                 <div className="flex-grow min-w-0">
+                    {/* M12 — the weekly "What you learned" recap, the week's headline. */}
+                    {showConnections && synthesis && (
+                        <WeeklySynthesisCard
+                            synthesis={synthesis}
+                            onOpenLink={(id) => setActiveLinkId(id)}
+                        />
+                    )}
+                    {/* M10 — one proactive connection card, pinned above the feed. */}
+                    {showConnections && (
+                        <ConnectionInsight
+                            links={contentLinks}
+                            onOpenLink={(id) => setActiveLinkId(id)}
+                        />
+                    )}
                     {viewMode === 'collections' ? (
                         // Desktop only: gallery flows inline beneath the inline subheader.
                         // Mobile renders the full-screen overlay below (mirrors Ask).

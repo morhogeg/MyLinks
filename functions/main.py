@@ -2180,3 +2180,61 @@ def send_digest_now(req: https_fn.CallableRequest) -> dict:
     except Exception as e:
         logger.error(f"send_digest_now failed for {uid}: {e}")
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=str(e))
+
+
+# ─────────────────────────────────────────────
+# Weekly "What you learned" synthesis (M12)
+# ─────────────────────────────────────────────
+
+@scheduler_fn.on_schedule(schedule="every 60 minutes")
+def send_weekly_synthesis(event: scheduler_fn.ScheduledEvent) -> None:
+    """Hourly: deliver the weekly synthesis to users whose weekly slot is due."""
+    from digest_service import run_synthesis_check
+    run_synthesis_check()
+
+
+@https_fn.on_request()
+def force_send_synthesis(req: https_fn.Request) -> https_fn.Response:
+    """Manual trigger for the synthesis sweep (debug)."""
+    from digest_service import run_synthesis_check
+    try:
+        report = run_synthesis_check()
+        return https_fn.Response(json.dumps(report, indent=2), status=200, mimetype="application/json")
+    except Exception as e:
+        logger.error(f"Manual synthesis trigger failed: {e}")
+        return https_fn.Response(f"Error: {e}", status=500)
+
+
+@https_fn.on_call()
+def send_synthesis_now(req: https_fn.CallableRequest) -> dict:
+    """Build and deliver the weekly synthesis immediately for the caller, and
+    write the in-app card. Powers a "preview my recap" action and lets the
+    acceptance test surface a synthesis on demand (force=True bypasses the
+    minimum-cards skip)."""
+    from digest_service import build_and_send_synthesis
+
+    uid = req.auth.uid if req.auth else None
+    if not uid and req.data:
+        uid = req.data.get("uid") or req.data.get("test_uid")
+    if not uid:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="User must be identified",
+        )
+
+    db = get_db()
+    snap = db.collection("users").document(uid).get()
+    if not snap.exists:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.NOT_FOUND, message="User not found"
+        )
+    user_data = snap.to_dict() or {}
+
+    if req.data and req.data.get("email"):
+        user_data["email"] = req.data["email"]
+
+    try:
+        return build_and_send_synthesis(uid, user_data, force=True)
+    except Exception as e:
+        logger.error(f"send_synthesis_now failed for {uid}: {e}")
+        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=str(e))

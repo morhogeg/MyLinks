@@ -151,6 +151,36 @@ export interface RelatedLink {
   commonConcepts: string[];
 }
 
+// ── Weekly "What you learned" synthesis (M12) ────────────────────────────────
+// A narrative recap of the week's saves, written server-side (digest_service)
+// and stored on the user doc under `latestSynthesis`. The feed reads it and
+// renders a special in-app card that links back to the source cards.
+export interface SynthesisTheme {
+  title: string;
+  insight: string;
+  cardIds: string[];
+}
+
+/** Minimal denormalized card ref so the synthesis card can render titles/links
+ *  even for saves scrolled out of the live feed. */
+export interface SynthesisCardRef {
+  id: string;
+  title: string;
+  category: string;
+}
+
+export interface WeeklySynthesis {
+  narrative: string;
+  themes: SynthesisTheme[];
+  standoutCardId?: string | null;
+  standoutWhy?: string;
+  openQuestion?: string;
+  generatedAt: number;      // Unix ms — also the dismissal key
+  weekOf?: number;          // Unix ms of the window start
+  cardCount?: number;
+  cards: SynthesisCardRef[];
+}
+
 export type DigestFrequency = 'daily' | 'weekly';
 export type DigestChannel = 'email' | 'whatsapp';
 export type DigestMode = 'smart' | 'random' | 'topic' | 'unread' | 'favorites' | 'rediscover';

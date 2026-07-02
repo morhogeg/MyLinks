@@ -51,6 +51,11 @@ REDISCOVER_MIN_AGE_DAYS = 14
 # Cap how many links we pull per user when curating (keeps reads bounded).
 CANDIDATE_LIMIT = 500
 
+# Weekly "What you learned" synthesis (M12).
+SYNTHESIS_WINDOW_DAYS = 7        # look back this far for "this week's" saves
+SYNTHESIS_MIN_CARDS = 3          # below this, a recap isn't worth writing
+SYNTHESIS_MAX_CARDS = 40         # bound the prompt size / cost
+
 VALID_MODES = {"smart", "random", "topic", "unread", "favorites", "rediscover"}
 
 # Short, human description of each mode — shown as the digest's "why these".
@@ -636,4 +641,342 @@ def run_digest_check() -> dict:
             report["errors"].append(err)
 
     logger.info(f"Digest check complete: {report}")
+    return report
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Weekly "What you learned" synthesis (M12)
+# ─────────────────────────────────────────────────────────────────────────
+#
+# A narrative recap of the week's saves — themes + a standout + an open
+# question — written by Gemini so it reads like a thoughtful friend, not a list
+# of links. Delivered over the same email/WhatsApp channels as the digest AND
+# always surfaced in-app as a special card (stored on the user doc under
+# `latestSynthesis`, which the feed subscribes to). Reuses the digest schedule
+# knobs (digest_day/digest_hour) for cadence.
+
+def fetch_week_links(uid: str) -> List[dict]:
+    """This week's non-archived saves (created within SYNTHESIS_WINDOW_DAYS),
+    newest first, capped for prompt size. Reuses the digest candidate loader."""
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    cutoff = now_ms - SYNTHESIS_WINDOW_DAYS * 86_400_000
+    links = [l for l in fetch_candidate_links(uid) if _to_ms(l.get("createdAt")) >= cutoff]
+    links.sort(key=lambda l: _to_ms(l.get("createdAt")), reverse=True)
+    return links[:SYNTHESIS_MAX_CARDS]
+
+
+def _synthesis_card_refs(cards: List[dict]) -> List[dict]:
+    """Minimal card refs denormalized onto the in-app synthesis card so the feed
+    can render titles + deep-links even for cards scrolled out of the live feed."""
+    return [
+        {
+            "id": c["id"],
+            "title": (c.get("title") or "Untitled").strip(),
+            "category": c.get("category") or "General",
+        }
+        for c in cards
+    ]
+
+
+def build_synthesis(uid: str, cards: List[dict]) -> Optional[dict]:
+    """Generate the week's synthesis object (or None if it can't be written)."""
+    if len(cards) < SYNTHESIS_MIN_CARDS:
+        return None
+    try:
+        from ai_service import GeminiService  # lazy: pulls the Gemini SDK
+        synthesis = GeminiService().synthesize_week(cards)
+    except Exception as e:
+        logger.error(f"Synthesis generation failed for {uid}: {e}")
+        return None
+
+    if not (synthesis.get("narrative") or synthesis.get("themes")):
+        return None
+
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    synthesis["generatedAt"] = now_ms
+    synthesis["weekOf"] = now_ms - SYNTHESIS_WINDOW_DAYS * 86_400_000
+    synthesis["cardCount"] = len(cards)
+    synthesis["cards"] = _synthesis_card_refs(cards)
+    return synthesis
+
+
+# ── Formatting — WhatsApp ──
+
+def format_synthesis_whatsapp_messages(synthesis: dict, cards: List[dict]) -> List[str]:
+    """Render the synthesis as one or more WhatsApp messages under the length cap."""
+    by_id = {c["id"]: c for c in cards}
+
+    def _title(cid: str) -> str:
+        return (by_id.get(cid, {}).get("title") or "Untitled").strip()
+
+    header = "🧠 *What you learned this week*"
+    narrative = (synthesis.get("narrative") or "").strip()
+
+    blocks: List[str] = []
+    if narrative:
+        blocks.append(narrative)
+
+    for theme in synthesis.get("themes") or []:
+        title = (theme.get("title") or "").strip()
+        insight = (theme.get("insight") or "").strip()
+        lines = [f"*{title}*"] if title else []
+        if insight:
+            lines.append(insight)
+        for cid in (theme.get("cardIds") or [])[:4]:
+            lines.append(f"• {_title(cid)}\n{_link_url(cid)}")
+        if lines:
+            blocks.append("\n".join(lines))
+
+    standout_id = synthesis.get("standoutCardId")
+    if standout_id:
+        why = (synthesis.get("standoutWhy") or "").strip()
+        block = f"⭐ *Standout:* {_title(standout_id)}"
+        if why:
+            block += f"\n{why}"
+        block += f"\n{_link_url(standout_id)}"
+        blocks.append(block)
+
+    question = (synthesis.get("openQuestion") or "").strip()
+    if question:
+        blocks.append(f"💭 *To explore next:*\n{question}")
+
+    footer = f"📲 Open Machina AI:\n{APP_URL}"
+
+    messages: List[str] = []
+    current = header
+    for block in blocks:
+        candidate = f"{current}\n\n{block}"
+        if len(candidate) > WHATSAPP_LIMIT:
+            messages.append(current)
+            current = block
+        else:
+            current = candidate
+    candidate = f"{current}\n\n{footer}"
+    if len(candidate) > WHATSAPP_LIMIT:
+        messages.append(current)
+        messages.append(footer)
+    else:
+        messages.append(candidate)
+
+    if len(messages) > 1:
+        total = len(messages)
+        messages = [f"{m}\n\n_({i}/{total})_" for i, m in enumerate(messages, 1)]
+    return messages
+
+
+# ── Formatting — Email ──
+
+def format_synthesis_email(synthesis: dict, cards: List[dict]) -> tuple:
+    """Return (subject, html_body, text_body) for the weekly synthesis."""
+    by_id = {c["id"]: c for c in cards}
+
+    def _title(cid: str) -> str:
+        return (by_id.get(cid, {}).get("title") or "Untitled").strip()
+
+    subject = "🧠 What you learned this week — your Machina recap"
+    narrative = (synthesis.get("narrative") or "").strip()
+
+    # ── HTML ──
+    theme_html = []
+    for theme in synthesis.get("themes") or []:
+        title = html.escape((theme.get("title") or "").strip())
+        insight = html.escape((theme.get("insight") or "").strip())
+        card_links = []
+        for cid in theme.get("cardIds") or []:
+            card_links.append(
+                f'<a href="{html.escape(_link_url(cid))}" '
+                'style="display:block;margin-top:6px;font:500 14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#a78bfa;text-decoration:none;">'
+                f'→ {html.escape(_title(cid))}</a>'
+            )
+        theme_html.append(f"""
+        <tr><td style="padding:0 0 18px 0;">
+          <div style="font:700 16px/1.35 -apple-system,Segoe UI,Roboto,sans-serif;color:#ffffff;">{title}</div>
+          <div style="margin-top:4px;font:400 14px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#b6b6cc;">{insight}</div>
+          {''.join(card_links)}
+        </td></tr>""")
+
+    standout_html = ""
+    standout_id = synthesis.get("standoutCardId")
+    if standout_id:
+        why = html.escape((synthesis.get("standoutWhy") or "").strip())
+        standout_html = f"""
+        <tr><td style="padding:4px 0 18px 0;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#1b1b29;border:1px solid #2c2c40;border-radius:16px;">
+            <tr><td style="padding:16px 18px;">
+              <div style="font:700 11px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#f0b429;letter-spacing:.08em;text-transform:uppercase;">⭐ Standout of the week</div>
+              <a href="{html.escape(_link_url(standout_id))}" style="display:block;margin:6px 0 6px;font:700 16px/1.35 -apple-system,Segoe UI,Roboto,sans-serif;color:#ffffff;text-decoration:none;">{html.escape(_title(standout_id))}</a>
+              <div style="font:400 14px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#b6b6cc;">{why}</div>
+            </td></tr>
+          </table>
+        </td></tr>"""
+
+    question_html = ""
+    question = (synthesis.get("openQuestion") or "").strip()
+    if question:
+        question_html = f"""
+        <tr><td style="padding:4px 0 20px 0;">
+          <div style="font:700 11px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#8a8aa3;letter-spacing:.08em;text-transform:uppercase;">💭 To explore next</div>
+          <div style="margin-top:6px;font:500 15px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#e6e6f0;font-style:italic;">{html.escape(question)}</div>
+        </td></tr>"""
+
+    html_body = f"""<!doctype html>
+<html><body style="margin:0;padding:0;background:#0e0e16;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#0e0e16;">
+    <tr><td align="center" style="padding:32px 16px;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;">
+        <tr><td style="padding:0 4px 18px;">
+          <div style="font:800 24px/1.2 -apple-system,Segoe UI,Roboto,sans-serif;background:linear-gradient(90deg,#a78bfa,#ec4899);-webkit-background-clip:text;background-clip:text;color:#a78bfa;">🧠 What you learned this week</div>
+          <div style="margin-top:8px;font:400 15px/1.65 -apple-system,Segoe UI,Roboto,sans-serif;color:#c8c8de;">{html.escape(narrative)}</div>
+        </td></tr>
+        {''.join(theme_html)}
+        {standout_html}
+        {question_html}
+        <tr><td align="center" style="padding:8px 0 4px;">
+          <a href="{html.escape(APP_URL)}" style="display:inline-block;background:linear-gradient(90deg,#7c3aed,#db2777);color:#fff;font:700 14px/1 -apple-system,Segoe UI,Roboto,sans-serif;text-decoration:none;padding:14px 26px;border-radius:999px;">Open Machina AI</a>
+        </td></tr>
+        <tr><td align="center" style="padding:22px 0 0;">
+          <div style="font:400 12px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#5c5c75;">Your weekly recap from Machina AI.<br/>Turn it off anytime in Settings.</div>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
+    # ── Plain text ──
+    text_lines = ["What you learned this week", "", narrative, ""]
+    for theme in synthesis.get("themes") or []:
+        text_lines.append((theme.get("title") or "").strip())
+        if theme.get("insight"):
+            text_lines.append(theme["insight"].strip())
+        for cid in theme.get("cardIds") or []:
+            text_lines.append(f"  → {_title(cid)}: {_link_url(cid)}")
+        text_lines.append("")
+    if standout_id:
+        text_lines.append(f"Standout: {_title(standout_id)}")
+        if synthesis.get("standoutWhy"):
+            text_lines.append(f"  {synthesis['standoutWhy'].strip()}")
+        text_lines.append(f"  {_link_url(standout_id)}")
+        text_lines.append("")
+    if question:
+        text_lines.append(f"To explore next: {question}")
+        text_lines.append("")
+    text_lines.append(f"Open Machina AI: {APP_URL}")
+    text_body = "\n".join(text_lines)
+
+    return subject, html_body, text_body
+
+
+# ── Orchestration ──
+
+def build_and_send_synthesis(uid: str, user_data: dict, force: bool = False) -> dict:
+    """Build the weekly synthesis for one user, store it in-app, and deliver it
+    on their chosen channels. `force=True` bypasses the "enough cards" skip.
+
+    The in-app card (users/{uid}.latestSynthesis) is ALWAYS written when a
+    synthesis is generated, even if no channel is configured — the app surfaces
+    it regardless. Channel delivery is best-effort on top of that.
+    """
+    from whatsapp_handler import send_whatsapp_message  # lazy: pulls Twilio SDK
+
+    settings = user_data.get("settings", {}) or {}
+    result = {"uid": uid, "generated": False, "sent": False, "channels": [], "card_count": 0, "skipped": None}
+
+    cards = fetch_week_links(uid)
+    if len(cards) < SYNTHESIS_MIN_CARDS and not force:
+        result["skipped"] = "too_few_cards"
+        return result
+
+    synthesis = build_synthesis(uid, cards)
+    if not synthesis:
+        result["skipped"] = "no_synthesis"
+        return result
+
+    result["generated"] = True
+    result["card_count"] = synthesis.get("cardCount", len(cards))
+    db = get_db()
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+
+    # In-app special card — always written; the feed reads this off the user doc.
+    db.collection("users").document(uid).set(
+        {"latestSynthesis": synthesis, "lastSynthesisSentAt": now_ms},
+        merge=True,
+    )
+
+    channels = settings.get("digest_channels", []) or []
+
+    # WhatsApp
+    if "whatsapp" in channels:
+        phone = user_data.get("phone_number") or user_data.get("phoneNumber")
+        if phone:
+            try:
+                for body in format_synthesis_whatsapp_messages(synthesis, cards):
+                    send_whatsapp_message(f"whatsapp:{phone}", body)
+                result["channels"].append("whatsapp")
+            except Exception as e:
+                logger.error(f"Synthesis WhatsApp send failed for {uid}: {e}")
+
+    # Email
+    if "email" in channels:
+        email_addr = user_data.get("email") or settings.get("email")
+        if email_addr:
+            try:
+                subject, html_body, text_body = format_synthesis_email(synthesis, cards)
+                if send_email(email_addr, subject, html_body, text_body):
+                    result["channels"].append("email")
+            except Exception as e:
+                logger.error(f"Synthesis email send failed for {uid}: {e}")
+
+    result["sent"] = bool(result["channels"])
+    return result
+
+
+def is_synthesis_due(settings: dict, tz_name: Optional[str], last_sent_ms: Optional[int]) -> bool:
+    """Whether a user's weekly synthesis is due right now. Weekly cadence on the
+    digest day/hour; deduped by last_sent_ms. Independent of digest_frequency —
+    the synthesis is always weekly regardless of how often the digest goes out."""
+    if not settings.get("digest_enabled"):
+        return False
+    if not settings.get("synthesis_enabled", True):
+        return False
+
+    local = _local_now(tz_name)
+    if local.hour != int(settings.get("digest_hour", 9)):
+        return False
+    if local.weekday() != int(settings.get("digest_day", 0)):
+        return False
+
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    last = last_sent_ms or 0
+    return (now_ms - last) >= 6 * 86_400 * 1000
+
+
+def run_synthesis_check() -> dict:
+    """Scheduled entry point: send the weekly synthesis to every due user."""
+    db = get_db()
+    logger.info("Starting weekly synthesis check…")
+
+    report = {"users_checked": 0, "users_enabled": 0, "syntheses_sent": 0, "errors": []}
+
+    for user_doc in db.collection("users").get():
+        report["users_checked"] += 1
+        uid = user_doc.id
+        user_data = user_doc.to_dict() or {}
+        settings = user_data.get("settings", {}) or {}
+
+        if not settings.get("digest_enabled") or not settings.get("synthesis_enabled", True):
+            continue
+        report["users_enabled"] += 1
+
+        try:
+            if not is_synthesis_due(settings, user_data.get("timezone"), user_data.get("lastSynthesisSentAt")):
+                continue
+            res = build_and_send_synthesis(uid, user_data, force=False)
+            if res.get("generated"):
+                report["syntheses_sent"] += 1
+        except Exception as e:
+            err = f"Synthesis failed for {uid}: {e}"
+            logger.error(err)
+            report["errors"].append(err)
+
+    logger.info(f"Synthesis check complete: {report}")
     return report

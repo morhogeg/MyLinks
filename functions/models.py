@@ -65,6 +65,33 @@ class BrainAnswer(BaseModel):
     citedIds: List[str] = Field(default_factory=list, description="Ids of the saved sources actually used")
 
 
+class SynthesisTheme(BaseModel):
+    """One throughline in the weekly synthesis (M12).
+
+    A theme ties together several of the week's saves under a single idea and
+    narrates *why* they belong together — the connective tissue that turns a
+    list of links into a recap.
+    """
+    title: str = Field(description="Short name for the theme, in the cards' language")
+    insight: str = Field(description="1-2 sentences narrating what connects these saves and what they add up to")
+    cardIds: List[str] = Field(default_factory=list, description="Ids of the saved cards this theme draws on")
+
+
+class WeeklySynthesis(BaseModel):
+    """Structured output for the weekly "What you learned" synthesis (M12).
+
+    Schema-constrained generation guarantees valid, fully-escaped JSON (including
+    Hebrew) and a consistent narrative shape: an opening throughline, a few
+    themes, one standout, and an open question to carry into next week — always
+    linking back to the specific source cards by id.
+    """
+    narrative: str = Field(description="A short opening paragraph naming the throughline across the week's saves")
+    themes: List[SynthesisTheme] = Field(default_factory=list, description="2-4 themes, each linking specific cardIds")
+    standoutCardId: Optional[str] = Field(None, description="Id of the single most interesting/important save of the week")
+    standoutWhy: str = Field(default="", description="One sentence on why that card stands out")
+    openQuestion: str = Field(default="", description="One thoughtful open question the week's saves raise, to explore next")
+
+
 class LinkDocument(BaseModel):
     """
     Firestore document schema for a saved link
@@ -160,6 +187,13 @@ class UserSettings(BaseModel):
     digest_day: int = 0
     # Don't send a digest if there's nothing fresh to show.
     digest_skip_empty: bool = True
+
+    # ── Weekly "What you learned" synthesis (M12) ────────────────────────
+    # An AI-written narrative recap of the week's saves (themes + a standout +
+    # an open question), delivered once a week over the same channels as the
+    # digest and always surfaced in-app as a special card. On by default when
+    # digests are enabled; reuses digest_day/digest_hour for its cadence.
+    synthesis_enabled: bool = True
 
 
 class UserDocument(BaseModel):

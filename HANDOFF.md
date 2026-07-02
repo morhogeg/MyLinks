@@ -1,6 +1,58 @@
 # Session Handoff — Machina AI
 
-_Last updated: 2026-07-02. Branch: `claude/phase2-feel-native-m11-m16-polish` (Phase 2 "feel-native" batch — M11, M16, M-P2/P3/P4 — merged to `main`)._
+_Last updated: 2026-07-02. Branch: `claude/vibrant-einstein-9a8152` (Phase 2 retention/word-of-mouth engine — M10 + M12 — merged to `main`)._
+
+## Latest session — Phase 2 retention engine: M10 + M12 — 2026-07-02
+
+MACHINA_SPEC step 6 (the retention / word-of-mouth batch). Started from a fast-forward of the branch
+to `origin/main` (was 9 commits behind — the M8 auth + iOS production-readiness work had landed).
+Verified M9/M11/M13/M14/M16 + polish M-P2/P3/P4 were already present before building. **M8 (auth)
+untouched.** Gates: `tsc --noEmit` clean; `next build` clean; `py_compile` clean; ESLint — no new
+problems (the 4 pre-existing `no-explicit-any` errors in Card.tsx / Feed.tsx ×2 / LinkDetailModal.tsx
+remain the only errors, on lines this batch never touched).
+
+**M10 — Proactive connections on the home feed.** ✅ Done. New `web/components/ConnectionInsight.tsx`
+— a pure, memoized client-side pass over the cards already in the feed (no new compute) that clusters
+recent saves by shared `link.concepts` and surfaces ONE genuine insight at a time
+("N things you saved connect to <Concept>"). Tap-to-expand into the cluster (each member card opens
+via `setActiveLinkId`), dismissible (a dismissed concept never returns — persisted in localStorage
+`machina.connections.dismissed`). Rate-limited/un-spammy: only clusters of ≥3 recent saves, only one
+shown (strongest then freshest), only on the default library view. Expand uses the M-P2 `--ease-modal`
+curve (`.animate-slide-up`) and fires an M11 `hapticLight()` on tap. Wired into `web/components/Feed.tsx`
+above the grid/list, gated by a new `showConnections` (same default-view gating as pending captures).
+
+**M12 — Weekly "What you learned" synthesis.** ✅ Done. A NEW narrative digest mode, delivered over
+email + WhatsApp AND surfaced in-app as a special card.
+- Backend: `functions/models.py` adds `WeeklySynthesis` + `SynthesisTheme` schemas and a
+  `synthesis_enabled` (default True) user setting. `functions/ai_service.py` adds `synthesize_week()`
+  — a new schema-constrained Gemini prompt that writes a warm recap (a throughline `narrative`, 2-4
+  themes each citing specific `cardIds`, one standout + why, an open question), grounded only in the
+  week's cards, language-matched to the cards, with hallucinated ids filtered out.
+  `functions/digest_service.py` adds `fetch_week_links` (last 7 days), `build_synthesis`, email +
+  WhatsApp formatters that link back to source cards, `build_and_send_synthesis` (writes the in-app
+  card to `users/{uid}.latestSynthesis` **always**, then best-effort channel delivery), plus
+  `is_synthesis_due` / `run_synthesis_check` (weekly cadence reusing `digest_day`/`digest_hour`,
+  deduped via `lastSynthesisSentAt`). `functions/main.py` adds the hourly `send_weekly_synthesis`
+  scheduler, a `force_send_synthesis` debug endpoint, and a `send_synthesis_now` callable (force=True,
+  for on-demand preview / acceptance testing).
+- Frontend: `web/lib/types.ts` adds the `WeeklySynthesis` types; new
+  `web/components/WeeklySynthesisCard.tsx` renders the recap as a collapsible special card (themes /
+  standout / open question, each source tappable), dismissible per recap; `web/components/Feed.tsx`
+  subscribes to the user doc's `latestSynthesis` and renders it at the top of the default feed (above
+  the M10 connection card). Reused `--ease-modal` + M11 haptics. **In-app storage is on the user doc
+  (`latestSynthesis`), which is already client-readable — no Firestore rules change needed.**
+
+**DEPLOY FOLLOW-UPS (required this session):**
+- `./deploy-hosting.sh` — M10 + M12 are frontend changes; the iPhone PWA stays stale until this runs
+  (Vercel desktop auto-deploys on push).
+- `./deploy-functions.sh` — **REQUIRED**: M12 changed `functions/` (new schemas, AI method, digest
+  synthesis, scheduler + callables). Until deployed, the weekly synthesis won't generate/send.
+- `./build-ios.sh` + Xcode build-number bump → Archive → TestFlight — **NOT needed**: no native/plugin
+  changes this session (pure web + backend); the PWA update reaches the app via hosting.
+
+_Prior session below._
+
+## Latest session — Phase 2 "feel-native" polish: M11, M16, M-P2/P3/P4 — 2026-07-02 (prior)
 
 ## Latest session — Phase 2 "feel-native" polish: M11, M16, M-P2/P3/P4 — 2026-07-02
 
