@@ -1,8 +1,51 @@
 # Session Handoff — Machina AI
 
-_Last updated: 2026-07-02. Branch: `claude/phase2-feel-native-m11-m16-polish` (Phase 2 "feel-native" batch — M11, M16, M-P2/P3/P4 — merged to `main`)._
+_Last updated: 2026-07-02. Branch: `claude/phase2-retention-m10-m12` (Phase 2 retention/word-of-mouth engine — M10 + M12 — merged to `main`)._
 
-## Latest session — Phase 2 "feel-native" polish: M11, M16, M-P2/P3/P4 — 2026-07-02
+## Latest session — Phase 2 retention engine: M10 + M12 — 2026-07-02
+
+MACHINA_SPEC step 6 (the retention / word-of-mouth engine). Verified the already-merged Phase 2 work
+(M9, M11, M13, M14, M16, M-P2/P3/P4) present against current code first, then built M10 + M12.
+`tsc --noEmit` clean; `py_compile` clean; ESLint adds **zero** new problems (the 2 pre-existing
+`no-explicit-any` errors in `Feed.tsx` are baseline on lines this work never touched — confirmed
+identical on `origin/main`). **M8 (auth) untouched.**
+
+**M10 — Proactive connections on the home feed.** ✅ Done. New `web/components/ConnectionInsight.tsx`
+— a lightweight, client-only module that clusters recent saves (last 30 days, or the 40 newest when
+that window is thin) by the abstract `concepts` already on each card, and surfaces the single
+strongest cluster: _"3 things you saved connect to Network Effects."_ Tap-to-expand (uses the M-P2
+`--ease-modal` curve + an M11 `hapticLight`) lists the member cards; each links back via
+`setActiveLinkId`. Dismissible — remembers the concept in `localStorage` (`connection-insight-dismissed`)
+and quiets the module for the session so it never nags. **No new compute** — reads `link.concepts`
+the feed already holds. Rate-limited to genuine clusters (≥3 recent saves) and only ONE at a time.
+
+**M12 — Weekly "What you learned" synthesis.** ✅ Done. A new **`synthesis`** digest mode:
+- Backend: `WeeklySynthesis`/`SynthesisTheme` schema (`functions/models.py`); `GeminiService.synthesize_week()`
+  + a narrative prompt (`functions/ai_service.py`) that returns themes + a standout + an open question,
+  all referencing real card ids (hallucinated ids filtered out). `functions/digest_service.py` gains a
+  synthesis path (`build_and_send_synthesis`, 7-day window, min 3 cards) that **always writes an in-app
+  special card** to `users/{uid}/syntheses/{weekId}` AND delivers a narrative email/WhatsApp that links
+  back to every source card. Routed through the existing weekly digest scheduler — no scheduler change.
+- Frontend: `web/lib/synthesis.ts` (`subscribeLatestSynthesis`), `web/components/SynthesisCard.tsx`
+  (expandable in-app recap card, `--ease-modal` + haptics, dismissible via `synthesis-dismissed-week`),
+  wired into `Feed.tsx` above the feed on the default library view. Added `synthesis` to `DigestMode`
+  + a "Weekly synthesis" primary option in `SettingsModal.tsx`. `firestore.rules` gains a read rule for
+  the `syntheses` subcollection.
+- Verified the pure formatting/window functions (window filtering + card link-backs in
+  WhatsApp/email/text) with a stubbed run; the Gemini call itself needs live keys.
+
+**Deploy follow-ups (NOT run this session):**
+- `./deploy-functions.sh` — **REQUIRED** this time (M12 changes `functions/` — synthesis generation +
+  delivery + the in-app doc write live in Cloud Functions).
+- `./deploy-hosting.sh` — push the M10/M12 frontend to the iPhone **PWA** (Vercel auto-deploys desktop on merge).
+- `firebase deploy --only firestore:rules` (or via `./deploy-hosting.sh` if it bundles rules) — the new
+  `syntheses` read rule must be live for the in-app card to load.
+- `./build-ios.sh` + Xcode build-number bump + Archive → TestFlight — **not needed**: no native/bundled
+  change; both M10 and M12 are web + backend only. (The PWA/desktop pick them up via the two deploys above.)
+
+---
+
+## Prior session — Phase 2 "feel-native" polish: M11, M16, M-P2/P3/P4 — 2026-07-02
 
 The cheap-but-felt-everywhere batch (MACHINA_SPEC step 5). Verified each item against current code
 first. `tsc --noEmit` clean; `next build` (static export) clean; `py_compile` clean (backend untouched).

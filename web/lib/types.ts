@@ -153,7 +153,38 @@ export interface RelatedLink {
 
 export type DigestFrequency = 'daily' | 'weekly';
 export type DigestChannel = 'email' | 'whatsapp';
-export type DigestMode = 'smart' | 'random' | 'topic' | 'unread' | 'favorites' | 'rediscover';
+export type DigestMode = 'smart' | 'random' | 'topic' | 'unread' | 'favorites' | 'rediscover' | 'synthesis';
+
+// ── Weekly "What you learned" synthesis (M12) ────────────────────────────────
+// A narrative recap of the week's saves, generated server-side (digest_service)
+// and stored at users/{uid}/syntheses/{weekId}. Surfaced in-app as a special
+// feed card and also delivered over email/WhatsApp.
+export interface SynthesisTheme {
+  title: string;
+  insight: string;
+  cardIds: string[];
+}
+
+/** A denormalized reference to a source card, so the synthesis card renders
+ *  even if the underlying link was later deleted. */
+export interface SynthesisCardRef {
+  id: string;
+  title: string;
+  category?: string;
+}
+
+export interface WeeklySynthesis {
+  weekId: string;          // ISO week, e.g. "2026-W27" — also the doc id
+  title: string;
+  narrative: string;       // 2-4 short paragraphs (may contain \n breaks)
+  themes: SynthesisTheme[];
+  standoutCardId?: string | null;
+  standoutReason?: string;
+  openQuestion?: string;
+  cards: SynthesisCardRef[]; // all cards referenced across themes + standout
+  cardCount: number;         // total saves in the synthesized week
+  createdAt: number;         // Unix ms
+}
 
 // TODO: Replace with Firebase Auth user type
 export interface User {

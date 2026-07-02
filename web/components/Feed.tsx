@@ -4,7 +4,7 @@
 
 
 import { useState, useEffect, useRef } from 'react';
-import { Link, LinkStatus, Collection } from '@/lib/types';
+import { Link, LinkStatus, Collection, WeeklySynthesis } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, type PlatformKey } from '@/lib/platform';
 import Dropdown from './Dropdown';
@@ -21,6 +21,8 @@ import ReminderModal from './ReminderModal';
 import SwipeDeck from './SwipeDeck';
 import AskBrain from './AskBrain';
 import LinkDetailModal from './LinkDetailModal';
+import SynthesisCard from './SynthesisCard';
+import ConnectionInsight from './ConnectionInsight';
 import ConfirmDialog from './ConfirmDialog';
 import AddToCollectionSheet from './AddToCollectionSheet';
 import CollectionsGallery from './CollectionsGallery';
@@ -30,6 +32,7 @@ import MobileSubheader from './MobileSubheader';
 import { Button } from './ui/Button';
 import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Shapes, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus, RefreshCw } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
+import { subscribeLatestSynthesis } from '@/lib/synthesis';
 import { publishCard, publishCollection, unpublishCollection, deleteCollection, removeLinkFromCollection } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
 import TagExplorer from './TagExplorer';
@@ -90,6 +93,10 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
     const [editingCollection, setEditingCollection] = useState<Collection | null>(null);
     const [confirmDeleteCollection, setConfirmDeleteCollection] = useState<Collection | null>(null);
     const [manageCardsCollection, setManageCardsCollection] = useState<Collection | null>(null);
+
+    // Weekly synthesis (M12) — the in-app "What you learned" special card.
+    const [latestSynthesis, setLatestSynthesis] = useState<WeeklySynthesis | null>(null);
+    const [dismissedSynthesisWeek, setDismissedSynthesisWeek] = useState<string | null>(null);
 
     // Semantic Search State
     const [isSearching, setIsSearching] = useState(false);
@@ -160,7 +167,22 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
         if (saved !== null) {
             setIsTagExplorerCollapsed(saved === 'true');
         }
+        // Which weekly synthesis (if any) the user has already dismissed (M12).
+        setDismissedSynthesisWeek(localStorage.getItem('synthesis-dismissed-week'));
     }, []);
+
+    // Subscribe to the latest weekly synthesis (M12), surfaced as a feed card.
+    useEffect(() => {
+        if (!uid) return;
+        return subscribeLatestSynthesis(uid, setLatestSynthesis);
+    }, [uid]);
+
+    const dismissSynthesis = () => {
+        if (latestSynthesis) {
+            localStorage.setItem('synthesis-dismissed-week', latestSynthesis.weekId);
+            setDismissedSynthesisWeek(latestSynthesis.weekId);
+        }
+    };
 
     // Save collapsed state to localStorage
     const toggleTagExplorer = () => {
@@ -430,17 +452,39 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
     // Pending capture cards to surface, pinned above the feed. Only shown on the
     // default library views (All/Unread, no active facet/search) so they're always
     // visible right where a fresh capture lands, without cluttering narrowed views.
-    const pendingCards =
+    // The default library view (All/Unread, no active facet/search) is the only
+    // place we pin extra surfaces — pending captures (above) and the proactive
+    // feed modules (weekly synthesis M12 + connection insight M10) — so they
+    // land right where a fresh capture does, without cluttering narrowed views.
+    const isDefaultLibraryView =
         (viewMode === 'grid' || viewMode === 'list')
-            && (filter === 'all' || filter === 'unread')
-            && selectedCollections.size === 0
-            && selectedCategory.size === 0
-            && selectedTags.size === 0
-            && selectedPlatforms.size === 0
-            && !screenshotOnly
-            && !debouncedQuery.trim()
-            ? links.filter(isPending).sort((a, b) => getTimestampNumber(b.createdAt) - getTimestampNumber(a.createdAt))
-            : [];
+        && (filter === 'all' || filter === 'unread')
+        && selectedCollections.size === 0
+        && selectedCategory.size === 0
+        && selectedTags.size === 0
+        && selectedPlatforms.size === 0
+        && !screenshotOnly
+        && !debouncedQuery.trim();
+
+    const pendingCards = isDefaultLibraryView
+        ? links.filter(isPending).sort((a, b) => getTimestampNumber(b.createdAt) - getTimestampNumber(a.createdAt))
+        : [];
+
+    // The proactive feed modules, rendered once and reused in both the grid and
+    // list layouts (above pending + real cards). Synthesis first (the weekly
+    // recap), then the lighter connection insight.
+    const feedModules = isDefaultLibraryView ? (
+        <>
+            {latestSynthesis && latestSynthesis.weekId !== dismissedSynthesisWeek && (
+                <SynthesisCard
+                    synthesis={latestSynthesis}
+                    onOpenCard={(id) => setActiveLinkId(id)}
+                    onDismiss={dismissSynthesis}
+                />
+            )}
+            <ConnectionInsight links={links} onOpenCard={(id) => setActiveLinkId(id)} />
+        </>
+    ) : null;
 
 
 
@@ -1725,6 +1769,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                         />
                     ) : viewMode === 'list' ? (
                         <div className="flex flex-col gap-2 max-w-3xl mx-auto">
+                            {feedModules}
                             {pendingCards.map(renderPendingCard)}
                             {filteredLinks.map((link, idx) => (
                                 <ListCard
@@ -1741,6 +1786,8 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                             ))}
                         </div>
                     ) : (
+                        <>
+                        {feedModules}
                         <Masonry columnWidth={340} gap={16}>
                             {pendingCards.map(renderPendingCard)}
                             {filteredLinks.map((link, idx) => (
@@ -1769,6 +1816,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                                 />
                             ))}
                         </Masonry>
+                        </>
                     )}
                 </div>
             </div>
