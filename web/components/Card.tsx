@@ -3,7 +3,7 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Play, Youtube, ExternalLink, Layers, Share2, X } from 'lucide-react';
+import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Play, Youtube, ExternalLink, Layers, Share2, X, Loader2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
@@ -38,6 +38,8 @@ interface CardProps {
     activeCollectionId?: string;
     /** Remove this card from the given collection. */
     onRemoveFromCollection?: (link: Link, collectionId: string) => void;
+    /** Retry analysis for a `failed` capture card (M3). */
+    onRetry?: (link: Link) => void;
 }
 
 /**
@@ -62,6 +64,7 @@ export default function Card({
     cardCollections,
     activeCollectionId,
     onRemoveFromCollection,
+    onRetry,
 }: CardProps) {
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
@@ -114,6 +117,87 @@ export default function Card({
         const days = Math.floor(hours / 24);
         return isRtl ? `לפני ${days} ימים` : `${days}d ago`;
     };
+
+    // M3 — async-capture lifecycle. A card queued via the share sheet / WhatsApp
+    // is written as `processing` and flips to `failed` if analysis errors. Render
+    // a skeleton (processing) or a retryable "couldn't analyze" card (failed) so a
+    // capture is never invisible and never silently dropped. These are terminal
+    // presentational states — the normal card body/actions don't apply.
+    if (link.status === 'processing' || link.status === 'failed') {
+        const failed = link.status === 'failed';
+        const host = (() => {
+            try { return new URL(link.url).hostname.replace(/^www\./, ''); }
+            catch { return link.url; }
+        })();
+        return (
+            <article
+                className={`surface-card animate-card-enter bg-card rounded-2xl border shadow-[var(--shadow-card)] relative flex flex-col h-full overflow-hidden ${failed ? 'border-red-500/30' : 'border-white/5'
+                    }`}
+                aria-busy={!failed}
+            >
+                <div className="p-4 sm:p-5 flex flex-col h-full space-y-3">
+                    <div className="flex items-center gap-2">
+                        {failed ? (
+                            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                        ) : (
+                            <Loader2 className="w-4 h-4 text-accent animate-spin shrink-0" />
+                        )}
+                        <span className={`text-[10px] uppercase font-black tracking-widest ${failed ? 'text-red-400' : 'text-accent'}`}>
+                            {failed ? 'Couldn’t analyze' : 'Saving…'}
+                        </span>
+                    </div>
+
+                    <h3 dir="auto" className="font-bold text-base text-text leading-tight line-clamp-2">
+                        {link.title || host}
+                    </h3>
+
+                    {failed ? (
+                        <p className="text-sm text-text-secondary flex-grow">
+                            Your link is safe — the AI analysis didn’t finish. Retry to try again, or open the original.
+                        </p>
+                    ) : (
+                        <div className="space-y-2 flex-grow">
+                            <div className="h-3 w-full bg-white/5 rounded animate-pulse" />
+                            <div className="h-3 w-5/6 bg-white/5 rounded animate-pulse" />
+                            <div className="h-3 w-2/3 bg-white/5 rounded animate-pulse" />
+                        </div>
+                    )}
+
+                    <div className="flex items-center gap-2 pt-2 mt-auto border-t border-white/5">
+                        <a
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={link.url}
+                            className="text-[11px] text-text-muted/70 truncate min-w-0 hover:text-accent transition-colors flex items-center gap-1"
+                        >
+                            <ExternalLink className="w-3 h-3 shrink-0" />
+                            <span className="truncate">{host}</span>
+                        </a>
+                        {failed && (
+                            <div className="flex items-center gap-1.5 ms-auto shrink-0">
+                                {onRetry && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onRetry(link); }}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-accent text-white text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
+                                    >
+                                        <RotateCcw className="w-3 h-3" /> Retry
+                                    </button>
+                                )}
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onDelete(link.id); }}
+                                    aria-label="Delete"
+                                    className="p-1.5 rounded-full text-text-muted hover:text-red-500 transition-all"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </article>
+        );
+    }
 
     return (
         <>

@@ -19,6 +19,10 @@ interface AuthContextType {
     authUid: string | null;
     /** Signed-in Google account email (web), if any. */
     email: string | null;
+    /** Signed-in Google account display name (web), if any. */
+    displayName: string | null;
+    /** Signed-in Google account photo URL (web), if any. */
+    photoURL: string | null;
     /** True while auth state + the data doc are being resolved. */
     loading: boolean;
     /** Sign the current user out (web). */
@@ -29,6 +33,8 @@ const AuthContext = createContext<AuthContextType>({
     uid: null,
     authUid: null,
     email: null,
+    displayName: null,
+    photoURL: null,
     loading: true,
     signOut: async () => {},
 });
@@ -72,6 +78,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [uid, setUid] = useState<string | null>(null);
     const [authUid, setAuthUid] = useState<string | null>(null);
     const [email, setEmail] = useState<string | null>(null);
+    const [displayName, setDisplayName] = useState<string | null>(null);
+    const [photoURL, setPhotoURL] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     // Signed in, but the Google account isn't linked to any workspace.
     const [restricted, setRestricted] = useState(false);
@@ -83,6 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUid(null);
         setAuthUid(null);
         setEmail(null);
+        setDisplayName(null);
+        setPhotoURL(null);
         setRestricted(false);
     }, []);
 
@@ -124,6 +134,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setUid(null);
                 setAuthUid(null);
                 setEmail(null);
+                setDisplayName(null);
+                setPhotoURL(null);
                 setRestricted(false);
                 setLoading(false);
                 return;
@@ -131,6 +143,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             setAuthUid(user.uid);
             setEmail(user.email);
+            setDisplayName(user.displayName);
+            setPhotoURL(user.photoURL);
             setLoading(true);
             try {
                 const dataDoc = await resolveDataDoc(user.uid, user.email);
@@ -154,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return () => { cancelled = true; unsub(); };
     }, [native]);
 
-    const value: AuthContextType = { uid, authUid, email, loading, signOut };
+    const value: AuthContextType = { uid, authUid, email, displayName, photoURL, loading, signOut };
 
     // Web gating. During loading we render children so the page shows its own
     // spinner (and SSR/first paint stay consistent — loading starts true).
