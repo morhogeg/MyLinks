@@ -65,6 +65,30 @@ class BrainAnswer(BaseModel):
     citedIds: List[str] = Field(default_factory=list, description="Ids of the saved sources actually used")
 
 
+class SynthesisTheme(BaseModel):
+    """One throughline of the week's reading, tied back to the cards that fed it."""
+    title: str = Field(description="Short name for the theme (e.g. 'Network effects', 'Sleep & recovery')")
+    insight: str = Field(description="1-2 sentences on what the week's saves said about this theme, factual and specific")
+    cardIds: List[str] = Field(default_factory=list, description="Ids of the source cards that belong to this theme")
+
+
+class WeeklySynthesis(BaseModel):
+    """Structured output for the weekly "What you learned" synthesis (M12).
+
+    A narrative recap of the week's saves — themes + a standout + an open
+    question — that reads like a thoughtful debrief, not a list of links. Every
+    theme and the standout reference real card ids so the UI/email can link back
+    to the sources. Schema-constrained so the model returns valid, escaped JSON
+    even with quotes/newlines (matches the BrainAnswer approach for Hebrew etc.).
+    """
+    title: str = Field(description="A warm, specific title for the week, e.g. 'A week of systems thinking'")
+    narrative: str = Field(description="2-4 short paragraphs (markdown) that tie the week's saves together into a story — the throughline, not a bullet dump")
+    themes: List[SynthesisTheme] = Field(default_factory=list, description="2-4 themes that ran through the week's saves")
+    standoutCardId: Optional[str] = Field(None, description="Id of the single most noteworthy card this week")
+    standoutReason: str = Field(default="", description="One sentence on why that card stood out")
+    openQuestion: str = Field(default="", description="One genuine open question the week's reading raises, to carry into next week")
+
+
 class LinkDocument(BaseModel):
     """
     Firestore document schema for a saved link

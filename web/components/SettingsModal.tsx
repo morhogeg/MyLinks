@@ -35,6 +35,7 @@ const FREQUENCY_NOTE: Record<string, string> = {
 // The backend still curates every mode — this is presentation only.
 const DIGEST_MODES: { value: DigestMode; label: string; icon: ReactNode; note: string; advanced?: boolean }[] = [
     { value: 'smart', label: 'Smart mix', icon: <Sparkles className="w-[18px] h-[18px]" />, note: 'A balanced blend of your backlog and older gems worth a second look.' },
+    { value: 'synthesis', label: 'Weekly synthesis', icon: <BrainCircuit className="w-[18px] h-[18px]" />, note: 'A short "what you learned" recap that ties your week\'s saves together — themes, a standout, and an open question.' },
     { value: 'unread', label: 'Backlog', icon: <Inbox className="w-[18px] h-[18px]" />, note: 'Chip away at what you saved but never read (oldest first).' },
     { value: 'rediscover', label: 'Rediscover', icon: <History className="w-[18px] h-[18px]" />, note: 'Resurface older saves you haven\'t opened in a while.' },
     { value: 'random', label: 'Surprise me', icon: <Shuffle className="w-[18px] h-[18px]" />, note: 'A random handful from across your whole library.', advanced: true },

@@ -51,7 +51,13 @@ REDISCOVER_MIN_AGE_DAYS = 14
 # Cap how many links we pull per user when curating (keeps reads bounded).
 CANDIDATE_LIMIT = 500
 
-VALID_MODES = {"smart", "random", "topic", "unread", "favorites", "rediscover"}
+VALID_MODES = {"smart", "random", "topic", "unread", "favorites", "rediscover", "synthesis"}
+
+# How many days of saves the weekly "What you learned" synthesis (M12) looks back
+# over, and the minimum number of cards in that window worth synthesizing (below
+# this a recap would be thin — skip rather than send something hollow).
+SYNTHESIS_WINDOW_DAYS = 7
+SYNTHESIS_MIN_CARDS = 3
 
 # Short, human description of each mode — shown as the digest's "why these".
 MODE_BLURB = {
@@ -61,6 +67,7 @@ MODE_BLURB = {
     "unread": "Still on your list — let's chip away at the backlog.",
     "favorites": "Your starred cards, back for an encore.",
     "rediscover": "From the archives — saves you haven't opened in a while.",
+    "synthesis": "A short recap of what your week of reading added up to.",
 }
 
 CATEGORY_EMOJI = {
@@ -475,6 +482,321 @@ def _parse_from(value: str) -> dict:
 
 
 # ─────────────────────────────────────────────────────────────────────────
+# Weekly "What you learned" synthesis (M12)
+# ─────────────────────────────────────────────────────────────────────────
+
+def _week_id(now: Optional[datetime] = None) -> str:
+    """Stable id for the current ISO week, e.g. '2026-W27' — one synthesis/week."""
+    now = now or datetime.now(timezone.utc)
+    iso = now.isocalendar()
+    return f"{iso[0]}-W{iso[1]:02d}"
+
+
+def synthesis_window_cards(links: List[dict]) -> List[dict]:
+    """The saves from the last SYNTHESIS_WINDOW_DAYS, newest first — the raw
+    material for the weekly recap. Pure function so it can be unit-tested."""
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    cutoff = now_ms - SYNTHESIS_WINDOW_DAYS * 86_400_000
+    recent = [l for l in links if _to_ms(l.get("createdAt")) >= cutoff]
+    recent.sort(key=lambda l: _to_ms(l.get("createdAt")), reverse=True)
+    return recent
+
+
+def _card_index(cards: List[dict]) -> dict:
+    return {c["id"]: c for c in cards if c.get("id")}
+
+
+def format_synthesis_whatsapp_messages(synth: dict, cards: List[dict]) -> List[str]:
+    """Render the synthesis as one or more WhatsApp messages under Twilio's limit."""
+    by_id = _card_index(cards)
+    title = (synth.get("title") or "What you learned this week").strip()
+    parts = [f"🧠 *{title}*"]
+
+    narrative = (synth.get("narrative") or "").strip()
+    if narrative:
+        parts.append(narrative)
+
+    for theme in (synth.get("themes") or []):
+        t_title = (theme.get("title") or "").strip()
+        insight = (theme.get("insight") or "").strip()
+        if not t_title and not insight:
+            continue
+        block = f"*{t_title}*" if t_title else ""
+        if insight:
+            block = f"{block}\n{insight}" if block else insight
+        # Link the theme's source cards.
+        links_lines = []
+        for cid in (theme.get("cardIds") or []):
+            c = by_id.get(cid)
+            if c:
+                links_lines.append(f"• {(c.get('title') or 'Untitled').strip()}\n  {_link_url(cid)}")
+        if links_lines:
+            block += "\n" + "\n".join(links_lines)
+        parts.append(block)
+
+    standout_id = synth.get("standoutCardId")
+    standout = by_id.get(standout_id) if standout_id else None
+    if standout:
+        reason = (synth.get("standoutReason") or "").strip()
+        s = f"⭐ *Standout:* {(standout.get('title') or 'Untitled').strip()}"
+        if reason:
+            s += f"\n{reason}"
+        s += f"\n{_link_url(standout_id)}"
+        parts.append(s)
+
+    question = (synth.get("openQuestion") or "").strip()
+    if question:
+        parts.append(f"💭 *Worth sitting with:*\n{question}")
+
+    footer = f"📲 Open Machina AI:\n{APP_URL}"
+
+    # Pack greedily into messages under the WhatsApp limit.
+    messages: List[str] = []
+    current = ""
+    for block in parts:
+        candidate = f"{current}\n\n{block}" if current else block
+        if len(candidate) > WHATSAPP_LIMIT and current:
+            messages.append(current)
+            current = block
+        else:
+            current = candidate
+    candidate = f"{current}\n\n{footer}"
+    if len(candidate) > WHATSAPP_LIMIT:
+        messages.append(current)
+        messages.append(footer)
+    else:
+        messages.append(candidate)
+
+    if len(messages) > 1:
+        total = len(messages)
+        messages = [f"{m}\n\n_({i}/{total})_" for i, m in enumerate(messages, 1)]
+    return messages
+
+
+def format_synthesis_email(synth: dict, cards: List[dict]) -> tuple:
+    """Return (subject, html_body, text_body) for the weekly synthesis email."""
+    by_id = _card_index(cards)
+    title = (synth.get("title") or "What you learned this week").strip()
+    subject = f"🧠 {title}"
+
+    def _rtl(s: str) -> str:
+        return ' dir="rtl"' if is_hebrew(s or "") else ""
+
+    # Narrative — render paragraph breaks.
+    narrative = html.escape((synth.get("narrative") or "").strip())
+    narrative_html = "".join(
+        f'<p style="margin:0 0 14px;font:400 15px/1.7 -apple-system,Segoe UI,Roboto,sans-serif;color:#c8c8dc;"{_rtl(p)}>{p}</p>'
+        for p in narrative.split("\n") if p.strip()
+    )
+
+    theme_rows = []
+    for theme in (synth.get("themes") or []):
+        t_title = html.escape((theme.get("title") or "").strip())
+        insight = html.escape((theme.get("insight") or "").strip())
+        card_links = []
+        for cid in (theme.get("cardIds") or []):
+            c = by_id.get(cid)
+            if not c:
+                continue
+            ct = html.escape((c.get("title") or "Untitled").strip())
+            url = html.escape(_link_url(cid))
+            card_links.append(
+                f'<a href="{url}" style="display:block;margin:4px 0;font:500 14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#a78bfa;text-decoration:none;">↳ {ct}</a>'
+            )
+        theme_rows.append(f"""
+        <tr><td style="padding:0 0 18px;">
+          <div style="font:700 16px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#ffffff;">{t_title}</div>
+          <div style="margin:4px 0 8px;font:400 14px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#b6b6cc;">{insight}</div>
+          {''.join(card_links)}
+        </td></tr>""")
+
+    standout_html = ""
+    standout_id = synth.get("standoutCardId")
+    standout = by_id.get(standout_id) if standout_id else None
+    if standout:
+        reason = html.escape((synth.get("standoutReason") or "").strip())
+        ct = html.escape((standout.get("title") or "Untitled").strip())
+        url = html.escape(_link_url(standout_id))
+        standout_html = f"""
+        <tr><td style="padding:4px 0 18px;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#1b1b29;border:1px solid #2c2c40;border-radius:16px;">
+            <tr><td style="padding:16px 18px;">
+              <div style="font:600 11px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#f0b45a;letter-spacing:.08em;text-transform:uppercase;">⭐ Standout</div>
+              <a href="{url}" style="display:block;margin:6px 0 4px;font:700 16px/1.35 -apple-system,Segoe UI,Roboto,sans-serif;color:#ffffff;text-decoration:none;">{ct}</a>
+              <div style="font:400 14px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#b6b6cc;">{reason}</div>
+            </td></tr>
+          </table>
+        </td></tr>"""
+
+    question_html = ""
+    question = html.escape((synth.get("openQuestion") or "").strip())
+    if question:
+        question_html = f"""
+        <tr><td style="padding:4px 0 18px;">
+          <div style="font:600 11px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#8a8aa3;letter-spacing:.08em;text-transform:uppercase;">💭 Worth sitting with</div>
+          <div style="margin-top:6px;font:400 15px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#c8c8dc;font-style:italic;">{question}</div>
+        </td></tr>"""
+
+    html_body = f"""<!doctype html>
+<html><body style="margin:0;padding:0;background:#0e0e16;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#0e0e16;">
+    <tr><td align="center" style="padding:32px 16px;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;">
+        <tr><td style="padding:0 4px 20px;">
+          <div style="font:800 24px/1.25 -apple-system,Segoe UI,Roboto,sans-serif;background:linear-gradient(90deg,#a78bfa,#ec4899);-webkit-background-clip:text;background-clip:text;color:#a78bfa;"{_rtl(title)}>{html.escape(title)}</div>
+          <div style="margin-top:6px;font:400 13px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#8a8aa3;">Your week in Machina AI</div>
+        </td></tr>
+        <tr><td style="padding:0 4px 8px;">{narrative_html}</td></tr>
+        {''.join(theme_rows)}
+        {standout_html}
+        {question_html}
+        <tr><td align="center" style="padding:8px 0 4px;">
+          <a href="{html.escape(APP_URL)}" style="display:inline-block;background:linear-gradient(90deg,#7c3aed,#db2777);color:#fff;font:700 14px/1 -apple-system,Segoe UI,Roboto,sans-serif;text-decoration:none;padding:14px 26px;border-radius:999px;">Open Machina AI</a>
+        </td></tr>
+        <tr><td align="center" style="padding:22px 0 0;">
+          <div style="font:400 12px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#5c5c75;">You're getting this weekly recap because digests are on in Machina AI.<br/>Change it anytime in Settings.</div>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
+    # ── Plain text ──
+    text_lines = [title, ""]
+    if synth.get("narrative"):
+        text_lines += [synth["narrative"].strip(), ""]
+    for theme in (synth.get("themes") or []):
+        if theme.get("title"):
+            text_lines.append(theme["title"])
+        if theme.get("insight"):
+            text_lines.append(f"  {theme['insight']}")
+        for cid in (theme.get("cardIds") or []):
+            c = by_id.get(cid)
+            if c:
+                text_lines.append(f"  - {(c.get('title') or 'Untitled').strip()}: {_link_url(cid)}")
+        text_lines.append("")
+    if standout:
+        text_lines.append(f"Standout: {(standout.get('title') or 'Untitled').strip()} — {_link_url(standout_id)}")
+        if synth.get("standoutReason"):
+            text_lines.append(f"  {synth['standoutReason']}")
+        text_lines.append("")
+    if synth.get("openQuestion"):
+        text_lines += [f"Worth sitting with: {synth['openQuestion']}", ""]
+    text_lines.append(f"Open Machina AI: {APP_URL}")
+    text_body = "\n".join(text_lines)
+
+    return subject, html_body, text_body
+
+
+def _write_inapp_synthesis(uid: str, synth: dict, cards: List[dict], week_id: str) -> None:
+    """Persist the synthesis as an in-app "special card" the feed surfaces (M12).
+
+    Stored at users/{uid}/syntheses/{week_id} (one per ISO week, so a re-run
+    within the same week overwrites rather than duplicates). We denormalize the
+    referenced cards' id+title+category so the card renders even if a source is
+    later deleted — the feed still deep-links by id when the card exists.
+    """
+    by_id = _card_index(cards)
+    referenced_ids = set()
+    for theme in (synth.get("themes") or []):
+        referenced_ids.update(theme.get("cardIds") or [])
+    if synth.get("standoutCardId"):
+        referenced_ids.add(synth["standoutCardId"])
+
+    card_refs = [
+        {
+            "id": cid,
+            "title": (by_id[cid].get("title") or "Untitled").strip(),
+            "category": by_id[cid].get("category") or "General",
+        }
+        for cid in referenced_ids if cid in by_id
+    ]
+
+    doc = {
+        "weekId": week_id,
+        "title": synth.get("title") or "What you learned this week",
+        "narrative": synth.get("narrative") or "",
+        "themes": synth.get("themes") or [],
+        "standoutCardId": synth.get("standoutCardId"),
+        "standoutReason": synth.get("standoutReason") or "",
+        "openQuestion": synth.get("openQuestion") or "",
+        "cards": card_refs,
+        "cardCount": len(cards),
+        "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+    }
+    try:
+        get_db().collection("users").document(uid).collection("syntheses").document(week_id).set(doc)
+    except Exception as e:
+        logger.error(f"Failed to write in-app synthesis for {uid}: {e}")
+
+
+def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force: bool = False) -> dict:
+    """Generate the weekly "What you learned" synthesis and deliver it.
+
+    Always writes the in-app special card (that's the primary surface), and
+    additionally sends over whichever email/WhatsApp channels the user has on.
+    Returns a result dict shaped like build_and_send_digest's.
+    """
+    from whatsapp_handler import send_whatsapp_message  # lazy: pulls Twilio SDK
+    from ai_service import GeminiService, AnalysisError
+
+    settings = user_data.get("settings", {}) or {}
+    channels = settings.get("digest_channels", ["whatsapp"]) or []
+    result = {"uid": uid, "sent": False, "channels": [], "card_count": 0, "skipped": None, "mode": "synthesis"}
+
+    cards = synthesis_window_cards(links)
+    if len(cards) < SYNTHESIS_MIN_CARDS and not force:
+        result["skipped"] = "not_enough_cards"
+        return result
+    if not cards:
+        result["skipped"] = "no_cards"
+        return result
+
+    try:
+        synth = GeminiService().synthesize_week(cards)
+    except AnalysisError as e:
+        logger.error(f"Synthesis generation failed for {uid}: {e}")
+        result["skipped"] = "synthesis_failed"
+        return result
+
+    result["card_count"] = len(cards)
+    week_id = _week_id()
+
+    # Primary surface: always write the in-app special card.
+    _write_inapp_synthesis(uid, synth, cards, week_id)
+    result["channels"].append("in_app")
+
+    # WhatsApp
+    if "whatsapp" in channels:
+        phone = user_data.get("phone_number") or user_data.get("phoneNumber")
+        if phone:
+            try:
+                for body in format_synthesis_whatsapp_messages(synth, cards):
+                    send_whatsapp_message(f"whatsapp:{phone}", body)
+                result["channels"].append("whatsapp")
+            except Exception as e:
+                logger.error(f"Synthesis WhatsApp send failed for {uid}: {e}")
+
+    # Email
+    if "email" in channels:
+        email_addr = user_data.get("email") or settings.get("email")
+        if email_addr:
+            try:
+                subject, html_body, text_body = format_synthesis_email(synth, cards)
+                if send_email(email_addr, subject, html_body, text_body):
+                    result["channels"].append("email")
+            except Exception as e:
+                logger.error(f"Synthesis email send failed for {uid}: {e}")
+
+    result["sent"] = True
+    get_db().collection("users").document(uid).set(
+        {"lastDigestSentAt": int(datetime.now(timezone.utc).timestamp() * 1000)},
+        merge=True,
+    )
+    return result
+
+
+# ─────────────────────────────────────────────────────────────────────────
 # Orchestration
 # ─────────────────────────────────────────────────────────────────────────
 
@@ -502,6 +824,12 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
     skip_empty = settings.get("digest_skip_empty", True)
 
     links = fetch_candidate_links(uid)
+
+    # The weekly "What you learned" synthesis (M12) is its own narrative path —
+    # it recaps the week's saves instead of curating a set of cards.
+    if mode == "synthesis":
+        return build_and_send_synthesis(uid, user_data, links, force=force)
+
     cards = curate(links, mode, count, topics)
 
     if not cards and skip_empty and not force:

@@ -41,6 +41,12 @@ service cloud.firestore {
       match /collections/{collectionId} {
         allow read, write: if true;
       }
+
+      // Weekly "What you learned" synthesis (M12). Written by Cloud Functions
+      // (admin SDK); the client only reads to surface the in-app recap card.
+      match /syntheses/{weekId} {
+        allow read, write: if true;
+      }
     }
 
     // Shared collections & cards: public, read-only snapshots for share links.
