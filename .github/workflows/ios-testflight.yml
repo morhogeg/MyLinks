@@ -72,6 +72,22 @@ jobs:
           npx cap sync ios
           test -f ios/App/App/public/index.html || { echo "::error::web bundle not synced"; exit 1; }
 
+      # Native Firebase (the @capacitor-firebase/authentication pod) reads
+      # GoogleService-Info.plist at launch; it's gitignored, so materialize it
+      # from a secret into the App target (the .pbxproj references it as a bundle
+      # resource). Without this the archive fails on a missing input file.
+      - name: Write GoogleService-Info.plist
+        env:
+          GS_PLIST_BASE64: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
+        run: |
+          if [ -z "$GS_PLIST_BASE64" ]; then
+            echo "::error::GOOGLE_SERVICE_INFO_PLIST_BASE64 secret is not set — add it (see docs/IOS_CICD.md)."
+            exit 1
+          fi
+          echo "$GS_PLIST_BASE64" | base64 --decode > web/ios/App/App/GoogleService-Info.plist
+          test -s web/ios/App/App/GoogleService-Info.plist || { echo "::error::plist decoded to an empty file"; exit 1; }
+          echo "Wrote GoogleService-Info.plist ($(wc -c < web/ios/App/App/GoogleService-Info.plist) bytes)"
+
       # Signing uses Apple "cloud-managed" distribution: xcodebuild, given the
       # App Store Connect API key + -allowProvisioningUpdates, creates/reuses a
       # cloud signing certificate and provisioning profile automatically. No

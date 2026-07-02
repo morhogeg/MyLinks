@@ -28,6 +28,22 @@ key above creates/reuses the signing certificate and provisioning profile
 automatically. (This relies on the project's automatic signing, which the app
 already uses.)
 
+### Native Firebase / Sign in with Apple (from the auth cutover)
+
+The app bundles the native Firebase Auth pod + the Sign in with Apple
+entitlement, so an iOS build additionally needs:
+
+| Secret | What it is | How to get it |
+| --- | --- | --- |
+| `GOOGLE_SERVICE_INFO_PLIST_BASE64` | The iOS Firebase config, base64 | Firebase Console → Project settings → add an iOS app (bundle `com.morhogeg.machina`) → download `GoogleService-Info.plist`, then `base64 -i GoogleService-Info.plist \| pbcopy`. Gitignored — CI writes it into the App target at build time. |
+
+Plus a one-time Apple-Developer toggle (not a secret): **Identifiers →
+`com.morhogeg.machina` → enable Sign in with Apple → Save**, so the
+cloud-managed profile can include that entitlement.
+
+Local `./build-ios.sh` builds also need `GoogleService-Info.plist` placed at
+`web/ios/App/App/GoogleService-Info.plist` (same file; it stays gitignored).
+
 ### Firebase web config (baked into the bundle at build time)
 Copy these from `web/.env.local`:
 
