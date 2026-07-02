@@ -29,7 +29,14 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-14
+    # macos-26 ships Xcode 26. The Capacitor 8 SPM binary (capacitor-swift-pm)
+    # gates core APIs (CAPPluginCall.reject, getString(_:), …) behind the
+    # experimental $NonescapableTypes Swift feature; those symbols are only
+    # visible to a matching Swift toolchain. Xcode 16 (macos-14) strips them, so
+    # @capacitor/share fails to compile once any extra SPM plugin (the native
+    # @capacitor-firebase/authentication pod) is in the graph. Xcode 26 resolves
+    # them, so Share + Haptics + firebase-auth all build. See ionic-team/capacitor#8333.
+    runs-on: macos-26
     timeout-minutes: 45
     env:
       # Live Firebase Hosting origin (rewrites /api/* to the Cloud Functions).
@@ -48,7 +55,7 @@ jobs:
           cache-dependency-path: web/package-lock.json
 
       - name: Select latest Xcode
-        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)"
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
 
       # Build number: strictly increasing, well above the manual builds (18).
       - name: Compute build number
@@ -72,13 +79,8 @@ jobs:
           npm run build
           npx cap sync ios
           test -f ios/App/App/public/index.html || { echo "::error::web bundle not synced"; exit 1; }
-          # UI-only build (TEMPORARY): drop the native @capacitor-firebase/authentication
-          # plugin from the generated SPM manifest. It pulls a Capacitor that breaks
-          # @capacitor/share's native compile, and it's dormant at runtime while
-          # REQUIRE_AUTH is off. Remove this line once the native-auth deps are aligned
-          # (see NATIVE_AUTH_SETUP.md) so Apple/Google sign-in works in the app.
-          sed -i '' '/CapacitorFirebaseAuthentication/d' ios/App/CapApp-SPM/Package.swift
-          echo "SPM plugins after strip:"; grep -E '\.product\(name: "Capacitor' ios/App/CapApp-SPM/Package.swift || true
+          echo "SPM plugins in the generated manifest (native firebase-auth included):"
+          grep -E '\.product\(name: "Capacitor' ios/App/CapApp-SPM/Package.swift || true
 
       # Native Firebase (the @capacitor-firebase/authentication pod) reads
       # GoogleService-Info.plist at launch; it's gitignored, so materialize it
