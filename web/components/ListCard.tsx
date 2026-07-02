@@ -5,6 +5,7 @@ import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { hasHebrew } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformColor, PLATFORM_LABELS, xHandle, prettyHost } from '@/lib/platform';
+import { hapticLight, hapticMedium } from '@/lib/haptics';
 import { Star, Check, Trash2 } from 'lucide-react';
 
 interface ListCardProps {
@@ -54,8 +55,9 @@ export default function ListCard({
         : null;
     const sourceLabel = handle ? `@${handle}` : (cleanSource ?? (platform ? PLATFORM_LABELS[platform] : prettyHost(link.url)));
 
-    // Cap the stagger so long lists still finish assembling quickly.
-    const enterDelay = `${Math.min(index, 16) * 22}ms`;
+    // Cap the stagger so long lists still finish assembling quickly (M-P4: tighter
+    // per-card delay for a snappier entrance).
+    const enterDelay = `${Math.min(index, 12) * 14}ms`;
 
     // ── Swipe-to-action (touch) ──────────────────────────────────────────────
     const [offset, setOffset] = useState(0);
@@ -95,8 +97,13 @@ export default function ListCard({
         setDragging(false);
         const o = offsetRef.current;
         if (axis.current === 'h' && Math.abs(o) >= TRIGGER) {
-            if (o > 0) onDelete?.(link.id);
-            else onStatusChange(link.id, isFavorite ? 'unread' : 'favorite');
+            if (o > 0) {
+                hapticMedium(); // swipe-to-delete: a firmer tap acknowledges the destructive intent
+                onDelete?.(link.id);
+            } else {
+                hapticLight(); // swipe-to-favorite: a crisp light tap
+                onStatusChange(link.id, isFavorite ? 'unread' : 'favorite');
+            }
         }
         setOff(0);
     };
@@ -145,9 +152,10 @@ export default function ListCard({
                 }}
                 className={`relative z-10 flex items-center gap-3 ps-3.5 pe-3 py-3 cursor-pointer ${isSelected ? 'bg-accent/5' : 'bg-card'}`}
             >
-                {/* Category colour cue on the leading edge for quick scanning. */}
+                {/* Category colour cue on the leading edge for quick scanning —
+                    widened to 6px so the category reads at a glance (M-P3). */}
                 <span
-                    className="absolute start-0 inset-y-2 w-1 rounded-full"
+                    className="absolute start-0 inset-y-2 w-1.5 rounded-full"
                     style={{ backgroundColor: colorStyle.backgroundColor }}
                     aria-hidden
                 />
@@ -192,7 +200,7 @@ export default function ListCard({
                         onStatusChange(link.id, isFavorite ? 'unread' : 'favorite');
                     }}
                     aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                    className={`shrink-0 p-1.5 rounded-lg transition-colors ${isFavorite ? 'text-yellow-500' : 'text-text-muted/40 hover:text-accent'
+                    className={`shrink-0 -me-1.5 w-11 h-11 flex items-center justify-center rounded-lg transition-colors ${isFavorite ? 'text-yellow-500' : 'text-text-muted/40 hover:text-accent'
                         }`}
                 >
                     <Star className={`w-4 h-4 ${isFavorite ? 'fill-yellow-500' : ''}`} />

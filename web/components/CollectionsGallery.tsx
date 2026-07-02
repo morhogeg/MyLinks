@@ -91,15 +91,20 @@ export default function CollectionsGallery({
                             )}
                         </div>
 
-                        {/* Actions trigger — sits on the tile (not the clipped cover). */}
+                        {/* Actions trigger — sits on the tile (not the clipped cover).
+                            A full 44px hit target (M-P3) with a compact 32px visible
+                            circle nested inside, so the touch area meets iOS's minimum
+                            without a heavy-looking chip. */}
                         <button
                             onClick={(e) => openMenu(c, e)}
                             aria-label="Collection actions"
                             aria-haspopup="menu"
                             aria-expanded={open}
-                            className="absolute top-2 end-2 p-1.5 rounded-full bg-black/45 backdrop-blur-sm text-white/90 hover:bg-black/70 transition-colors opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+                            className="group/menu absolute top-1 end-1 w-11 h-11 flex items-center justify-center text-white/90 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
                         >
-                            <MoreHorizontal className="w-4 h-4" />
+                            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm group-hover/menu:bg-black/70 transition-colors">
+                                <MoreHorizontal className="w-4 h-4" />
+                            </span>
                         </button>
 
                         {/* Title + count */}
@@ -198,7 +203,7 @@ function MenuRow({ icon, label, onClick, danger }: { icon: React.ReactNode; labe
         <button
             role="menuitem"
             onClick={onClick}
-            className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium transition-colors ${danger ? 'text-red-400 hover:bg-red-500/10' : 'text-text hover:bg-white/5'}`}
+            className={`w-full flex items-center gap-2.5 px-3 py-3 min-h-[44px] text-sm font-medium transition-colors ${danger ? 'text-red-400 hover:bg-red-500/10' : 'text-text hover:bg-white/5'}`}
         >
             <span className="shrink-0">{icon}</span>
             {label}
