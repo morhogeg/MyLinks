@@ -10,6 +10,7 @@ import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { compressImage } from '@/lib/image';
+import { hapticSuccess } from '@/lib/haptics';
 import ImageScanProgress from '@/components/ImageScanProgress';
 import VideoScanProgress from '@/components/VideoScanProgress';
 import LinkScanProgress from '@/components/LinkScanProgress';
@@ -248,6 +249,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
             setImageFile(null);
             setImagePreview(null);
             setIsExpanded(false);
+            hapticSuccess(); // the save landed — a satisfying success buzz on device
             toast.success('Saved to Machina');
             onLinkAdded();
         } catch (err) {

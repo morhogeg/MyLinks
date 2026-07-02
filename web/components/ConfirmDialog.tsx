@@ -2,6 +2,7 @@
 
 import { X, AlertTriangle } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { hapticWarning, hapticMedium } from '@/lib/haptics';
 
 interface ConfirmDialogProps {
     isOpen: boolean;
@@ -39,6 +40,9 @@ export default function ConfirmDialog({
     const handleConfirm = () => {
         if (confirmedRef.current) return;
         confirmedRef.current = true;
+        // A destructive confirm gets a warning buzz; an info confirm a lighter tap.
+        if (variant === 'danger') hapticWarning();
+        else hapticMedium();
         onConfirm();
         onClose();
     };

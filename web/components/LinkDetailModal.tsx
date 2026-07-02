@@ -172,7 +172,7 @@ export default function LinkDetailModal({
             style={{ top: vp.offsetTop || 0, height: vp.height || '100%', bottom: 'auto' }}
         >
             <div
-                className="absolute inset-0 bg-background/80 backdrop-blur-sm animate-in fade-in duration-300"
+                className="absolute inset-0 bg-background/80 backdrop-blur-sm animate-fade-in"
                 onClick={onClose}
             />
 
@@ -180,7 +180,7 @@ export default function LinkDetailModal({
                 role="dialog"
                 aria-modal="true"
                 aria-label="Link details"
-                className="relative bg-card border-0 sm:border border-white/10 w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300"
+                className="relative bg-card border-0 sm:border border-white/10 w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-up"
             >
                 {/* Header Actions — a single compact row: the item actions scroll
                     horizontally if they don't all fit (so nothing is ever clipped),

@@ -9,7 +9,7 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, type PlatformKey } from '@/lib/platform';
 import Dropdown from './Dropdown';
 import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
-import { collection, query, orderBy, onSnapshot, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, getDocsFromServer, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
@@ -28,7 +28,8 @@ import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
 import { Button } from './ui/Button';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Shapes, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Shapes, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus, RefreshCw } from 'lucide-react';
+import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { publishCard, publishCollection, unpublishCollection, deleteCollection, removeLinkFromCollection } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
 import TagExplorer from './TagExplorer';
@@ -246,6 +247,38 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
             window.history.replaceState(window.history.state, '', url.toString());
         }
     }, [searchParams, links]);
+
+    // Pull-to-refresh (M16). The library already streams live via onSnapshot, so a
+    // pull forces an authoritative server re-read (round-trips the network and
+    // confirms freshness) rather than faking a spinner. A short floor keeps the
+    // native spinner visible long enough to read as a deliberate refresh.
+    const handlePullRefresh = async () => {
+        if (!uid) return;
+        const linksRef = collection(db, 'users', uid, 'links');
+        const q = query(linksRef, orderBy('createdAt', 'desc'));
+        try {
+            const [snap] = await Promise.all([
+                getDocsFromServer(q),
+                new Promise((r) => setTimeout(r, 600)),
+            ]);
+            setLinks(snap.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as Link)));
+        } catch {
+            toast.error("Couldn't refresh. Please try again.");
+        }
+    };
+
+    // Only the scrollable card layouts drive pull-to-refresh; disable it while a
+    // full-screen mode (Ask/Collections) or any overlay/sheet owns the screen so
+    // the gesture never fights a modal's own scrolling.
+    const anyOverlayOpen =
+        activeLinkId !== null || isTagExplorerOpen || isFiltersOpen || isCategoriesOpen ||
+        reminderModalLink !== null || confirmDeleteId !== null || confirmBulkDelete ||
+        addToCollectionLink !== null || collectionFormOpen || confirmDeleteCollection !== null ||
+        manageCardsCollection !== null;
+    const { pull, refreshing, animating } = usePullToRefresh({
+        onRefresh: handlePullRefresh,
+        enabled: (viewMode === 'grid' || viewMode === 'list') && !anyOverlayOpen,
+    });
 
     // Pending captures (M3) — processing/failed cards. They're excluded from the
     // normal filtered feed and from every facet derivation below (so a still-empty
@@ -717,6 +750,28 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
 
     return (
         <div className={viewMode === 'ask' ? 'space-y-2' : 'space-y-4 lg:space-y-6'}>
+            {/* Pull-to-refresh spinner (M16) — rides the finger down from just under
+                the safe-area inset and spins while the refetch is in flight. */}
+            {(pull > 0 || refreshing) && (
+                <div
+                    className="fixed inset-x-0 top-0 z-40 flex justify-center pointer-events-none"
+                    style={{
+                        transform: `translateY(calc(env(safe-area-inset-top, 0px) + ${pull}px))`,
+                        transition: animating ? 'transform 0.3s cubic-bezier(0.32,0.72,0,1)' : 'none',
+                    }}
+                    aria-hidden
+                >
+                    <div
+                        className="mt-1 flex items-center justify-center w-9 h-9 rounded-full bg-card border border-border-subtle shadow-lg"
+                        style={{ opacity: refreshing ? 1 : Math.min(1, pull / 40) }}
+                    >
+                        <RefreshCw
+                            className={`w-4 h-4 text-accent ${refreshing ? 'animate-spin' : ''}`}
+                            style={refreshing ? undefined : { transform: `rotate(${pull * 3}deg)` }}
+                        />
+                    </div>
+                </div>
+            )}
             {/* Header Section (Not Sticky) */}
             <div className={`pt-2 -mx-4 px-4 sm:mx-0 sm:px-0 transition-all duration-300 ${viewMode === 'ask' ? 'space-y-2 pb-0' : 'space-y-3 sm:space-y-4 pb-3'}`}>
                 {/* Ask mode drops the search bar entirely (typing there just exits Ask)
