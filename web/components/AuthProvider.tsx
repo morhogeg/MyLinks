@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import {
-    collection, query, getDocs, limit, where, doc, getDoc, updateDoc,
+    collection, query, getDocs, limit, where, doc, getDoc, updateDoc, arrayUnion,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '@/lib/firebase';
@@ -222,8 +222,32 @@ async function resolveDataDoc(
             const fresh = await getDoc(doc(db, 'users', claimedUid));
             return { id: claimedUid, data: fresh.data() ?? {} };
         }
+        // Callable ran and declined (non-owner / nothing to claim) → restricted.
+        return null;
     } catch (e) {
-        console.warn('Workspace claim failed:', e);
+        console.warn('Workspace claim callable unavailable:', e);
+    }
+
+    // 3. Soft-mode fallback: if the callable isn't deployed yet (pre-cutover),
+    //    fall back to the legacy client-side claim, which works while the live
+    //    rules are still open. Skipped once REQUIRE_AUTH is on (locked rules
+    //    would reject it, and claim_workspace is the only correct path then).
+    if (!REQUIRE_AUTH) {
+        try {
+            const first = await getDocs(query(collection(db, 'users'), limit(1)));
+            if (!first.empty) {
+                const candidate = first.docs[0];
+                const existing = candidate.data().authUids;
+                // Don't hijack a doc already claimed by a different account.
+                if (!(Array.isArray(existing) && existing.length > 0 && !existing.includes(authUid))) {
+                    await updateDoc(doc(db, 'users', candidate.id), { authUids: arrayUnion(authUid) });
+                    const fresh = await getDoc(doc(db, 'users', candidate.id));
+                    return { id: candidate.id, data: fresh.data() ?? candidate.data() };
+                }
+            }
+        } catch (e) {
+            console.warn('Legacy client-side claim failed:', e);
+        }
     }
     return null;
 }
