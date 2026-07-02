@@ -722,17 +722,16 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                 {/* Ask mode drops the search bar entirely (typing there just exits Ask)
                     and shows only a Back button, so the chat gets the full height. */}
                 {viewMode === 'ask' ? (
-                    <div className="flex items-center">
-                        <Button
-                            onClick={() => setViewMode(lastLayout.current)}
-                            title="Back to your library"
-                            aria-label="Back to your library"
-                            variant="secondary"
-                            className="shrink-0 ps-2 pe-3 font-medium hover:border-accent/40"
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                            Back
-                        </Button>
+                    // Desktop only: the unified subheader (back + icon + title),
+                    // matching the Collections tab. On mobile, Ask is a full-screen
+                    // fixed overlay that renders its own MobileSubheader.
+                    <div className="hidden sm:block">
+                        <MobileSubheader
+                            onBack={() => setViewMode(lastLayout.current)}
+                            backLabel="Back to your library"
+                            icon={<MessagesSquare className="w-5 h-5" />}
+                            title="Ask Machina"
+                        />
                     </div>
                 ) : viewMode === 'collections' ? (
                     // Desktop only: the unified subheader rendered inline below the
