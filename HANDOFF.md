@@ -1,8 +1,70 @@
 # Session Handoff — Machina AI
 
-_Last updated: 2026-07-02. Branch: `claude/phase2-sprawl-m9-m13-m14` (Phase 2 cut-the-sprawl + loose ends — merged to `main`)._
+_Last updated: 2026-07-02. Branch: `claude/phase2-feel-native-m11-m16-polish` (Phase 2 "feel-native" batch — M11, M16, M-P2/P3/P4 — merged to `main`)._
 
-## Latest session — Phase 2: cut the sprawl + M9 backfill — 2026-07-02
+## Latest session — Phase 2 "feel-native" polish: M11, M16, M-P2/P3/P4 — 2026-07-02
+
+The cheap-but-felt-everywhere batch (MACHINA_SPEC step 5). Verified each item against current code
+first. `tsc --noEmit` clean; `next build` (static export) clean; `py_compile` clean (backend untouched).
+ESLint: no new problems from this work — the 4 pre-existing `no-explicit-any` errors (Card.tsx,
+Feed.tsx ×2, LinkDetailModal.tsx) are baseline on lines this batch never touched. **M8 (auth) untouched.**
+
+**M11 — Haptics.** ✅ Done. Added `@capacitor/haptics@^8` + a native-guarded helper
+`web/lib/haptics.ts` (`hapticLight/Medium/Success/Warning`; every call no-ops off native via
+`Capacitor.isNativePlatform()`, fire-and-forget, errors swallowed — **web is fully unaffected**).
+Wired to the key moments: swipe-to-favorite (light) / swipe-to-delete (medium) in
+`ListCard.tsx`; the review-deck commit in `SwipeDeck.tsx` (`fling`, light); save-success in
+`AddLinkForm.tsx` (success buzz); destructive confirm in `ConfirmDialog.tsx` (danger→warning,
+info→medium); and the pull-to-refresh trigger (light, in the M16 hook). `cap sync ios` now finds
+**2 plugins** (haptics@8.0.2 + share@8.0.1) and registered CapacitorHaptics in
+`web/ios/App/CapApp-SPM/Package.swift` (committed).
+
+**M16 — Pull-to-refresh.** ✅ Done. New `web/lib/usePullToRefresh.ts` — passive window-scroll
+gesture that only engages at the very top of the page with a clearly vertical downward drag, so it
+**never competes** with `useEdgeSwipeBack` (horizontal from the left edge) or the list rows'
+horizontal swipe actions. Crossing the threshold fires a light haptic; releasing past it runs the
+refresh. Wired into `Feed.tsx`: `handlePullRefresh` does an authoritative `getDocsFromServer` re-read
+(a real network round-trip, not a fake spinner) with a ~600ms floor so the spinner reads as
+deliberate; a `RefreshCw` indicator rides down from under the safe-area inset and spins while
+in-flight. Enabled only on the grid/list layouts and disabled while any overlay/sheet/modal is open.
+
+**M-P2 — Unify modal animation curve.** ✅ Done. Added one easing token
+`--ease-modal: cubic-bezier(0.32, 0.72, 0, 1)` (Apple's no-overshoot push curve) in
+`web/app/globals.css` (`:root` + `.light`) and repointed every modal-entrance keyframe to it:
+`.animate-scale-up` (was the springy `--ease-spring` overshoot — the offender the review flagged),
+`.animate-slide-up`, and `.animate-ios-push`. Also fixed `LinkDetailModal.tsx`, whose
+`animate-in zoom-in-95` / `fade-in` classes were **inert** (no tailwindcss-animate plugin is
+installed) — swapped to the real `animate-scale-up` + `animate-fade-in`. Net: detail modal, settings,
+ask, collections, and the add sheet now share one motion personality; no springy overshoot remains in
+any modal. (`--ease-spring` still drives the card grid entrance + hover lifts — intentional.)
+
+**M-P3 — Sub-scannable cues + touch targets.** ✅ Done. List category colour bar widened 4px→6px
+(`w-1`→`w-1.5`) in `ListCard.tsx`. The Collections `•••` tile menu (`CollectionsGallery.tsx`) grew
+from ~28px to a full **44px hit target** (a compact 32px visible circle nested inside so it isn't
+visually heavy); its dropdown rows bumped to `min-h-[44px]`. The List-row favourite star also grew to
+a 44px target.
+
+**M-P4 — Snappier entrance.** ✅ Done. `.animate-card-enter` duration 0.42s→**0.25s** (keeps the
+`--ease-spring` personality) in `globals.css`; per-card stagger tightened — `Card.tsx`
+`Math.min(index,12)*30ms`→`Math.min(index,10)*16ms`, `ListCard.tsx`
+`Math.min(index,16)*22ms`→`Math.min(index,12)*14ms`. A full feed now assembles briskly (~0.4s total
+vs ~0.78s).
+
+**Deploy follow-ups (NOT run this session — frontend + native only, no `functions/` change):**
+- `./deploy-hosting.sh` — push the polish + haptics/PTR to the iPhone **PWA** (Vercel auto-deploys desktop on merge).
+- `./build-ios.sh` — rebuild the **native** app so the bundle embeds the new `@capacitor/haptics`
+  plugin (already validated: `cap sync` finds it + Package.swift is committed). **Run from the main
+  repo** (the worktree/clone lacks the gitignored `web/.env.local`, so the static export can't
+  prerender there). Then in Xcode: **bump the build number** (currently 21 on `main`) + Archive →
+  TestFlight. Haptics only fire on the native build — the PWA is unaffected either way.
+- `./deploy-functions.sh` — **not needed** (no backend change this batch).
+- ⚠️ **On-device verification** (can't be done headlessly): favoriting/deleting a row, saving a link,
+  pulling to refresh, and confirming a delete should each produce an appropriate haptic; and pull-to-
+  refresh should show a native-feeling spinner without fighting edge-swipe-back or row swipes.
+
+---
+
+## Earlier session — Phase 2: cut the sprawl + M9 backfill — 2026-07-02
 
 Phase 2 "reveal the magic / cut the sprawl" per `MACHINA_SPEC.md` step 4. Web `tsc --noEmit` clean,
 `py_compile` clean, eslint clean on the changed files (the 2 pre-existing `any` errors in `Feed.tsx`

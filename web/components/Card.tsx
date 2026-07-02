@@ -71,8 +71,9 @@ export default function Card({
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [now, setNow] = useState<number>(0);
 
-    // Cap the stagger so long feeds still finish assembling quickly.
-    const enterDelay = `${Math.min(index, 12) * 30}ms`;
+    // Cap the stagger so long feeds still finish assembling quickly (M-P4: tighter
+    // per-card delay for a snappier entrance).
+    const enterDelay = `${Math.min(index, 10) * 16}ms`;
 
     const platform = getPlatform(link.url);
     const sourceIcon = platform ? platformIcon(platform, 'w-3 h-3 shrink-0 opacity-80') : null;

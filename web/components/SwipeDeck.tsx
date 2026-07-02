@@ -6,6 +6,7 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import { hasHebrew } from '@/lib/rtl';
+import { hapticLight } from '@/lib/haptics';
 import { Star, Archive, Bell, RotateCcw, Youtube, Sparkles, Image as ImageIcon } from 'lucide-react';
 
 type SwipeDir = 'left' | 'right' | 'up';
@@ -72,6 +73,7 @@ export default function SwipeDeck({ links, onFavorite, onArchive, onRemind, onOp
 
     // Animate the top card off-screen, then apply the action.
     const fling = (dir: SwipeDir) => {
+        hapticLight(); // crisp tap at the moment the card commits to its action
         exitDir.current = dir;
         setPhase('exiting');
         if (dir === 'right') setDrag({ x: window.innerWidth, y: 0 });

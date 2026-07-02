@@ -34,6 +34,10 @@
   --accent-ring: rgba(168, 85, 247, 0.35);
   /* Shared spring-ish easing for lifts/entrances. */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* The one modal-entrance curve (M-P2): Apple's no-overshoot push/present easing.
+     Every overlay (detail, settings, ask, collections, add sheet) uses this so
+     they all share one motion personality — a decisive, settle-in-place open. */
+  --ease-modal: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .light {
@@ -61,6 +65,7 @@
   --accent-gradient: linear-gradient(135deg, #8B5CF6, #EC4899);
   --accent-ring: rgba(139, 92, 246, 0.3);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-modal: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 @theme inline {
@@ -209,7 +214,7 @@ html {
 }
 
 .animate-slide-up {
-  animation: slide-up 0.3s ease-out;
+  animation: slide-up 0.3s var(--ease-modal, ease-out);
 }
 
 .animate-fade-in {
@@ -234,7 +239,7 @@ html {
 }
 
 .animate-ios-push {
-  animation: ios-push-in 0.34s cubic-bezier(0.32, 0.72, 0, 1);
+  animation: ios-push-in 0.34s var(--ease-modal);
   will-change: transform;
 }
 
@@ -302,7 +307,7 @@ html {
 }
 
 .animate-scale-up {
-  animation: scale-up 0.2s var(--ease-spring, ease-out);
+  animation: scale-up 0.24s var(--ease-modal, ease-out);
 }
 
 /* Card entrance — staggered grid assembly (delay set per-card via --enter-delay). */
@@ -319,7 +324,9 @@ html {
 }
 
 .animate-card-enter {
-  animation: card-enter 0.42s var(--ease-spring, ease-out) both;
+  /* Snappier entrance (M-P4): shorter duration + tighter per-card stagger so a
+     full feed assembles briskly, while keeping the spring personality. */
+  animation: card-enter 0.25s var(--ease-spring, ease-out) both;
   animation-delay: var(--enter-delay, 0ms);
 }
 
