@@ -1,6 +1,104 @@
 # Session Handoff — MyLinks ("Second Brain")
 
-_Last updated: 2026-07-01. Branch: `claude/google-auth-implementation-wgblpr` (merged + pushed to `main`)._
+_Last updated: 2026-07-02. Branch: `claude/brave-blackburn-0a8bcf` (merged to `main` + deployed)._
+
+## Latest session — Curated digest settings redesign — 2026-07-02
+
+Design overhaul of the **Curated digest** sub-screen in
+`web/components/SettingsModal.tsx` (the `view === 'digest'` region), to match the app's premium
+visual language, plus a rebuilt Topics picker. **Merged to `main` and fully deployed.**
+
+**What changed (all in `web/components/SettingsModal.tsx`):**
+- Live **"Your digest" gradient preview card** at the top of the digest screen (summarizes the
+  current mode · count · schedule · channel).
+- **"What to send"** is now elevated mode tiles (gradient icon chip + check badge on the active
+  tile) instead of flat pills; mode icons bumped 16→18px.
+- Consistent **uppercase section headers** (What to send / Topics / Schedule / Delivery) via a new
+  `GroupLabel` helper, matching the main Settings screen.
+- **Schedule** and **Delivery** are now grouped iOS-style bordered cards with divider rows (How
+  many / How often / Delivery time; channels / email / skip-empty).
+- **Topics picker rebuilt for findability** (this was the ask): live **search/filter** (shown when
+  > 8 topics), split into **Categories vs Tags** sub-groups (`TopicGroup`/`TopicPill` helpers),
+  and **selected topics pinned on top** as removable accent chips. `loadDigestExtras` now dedupes
+  case-variant topics (e.g. "tech"/"Tech") keyed by lowercase — safe because the digest matcher in
+  `functions/digest_service.py` (`_normalize_topics`) already lowercases everything. `toggleTopic`
+  and the active check are now case-insensitive.
+- The primary "Send one now" button became "**Send a preview now**" with the brand gradient.
+
+**Verification:** `web` `tsc --noEmit` clean (before and after merging origin's concurrent
+`SettingsModal.tsx` edits — the auto-merge was conflict-free). Redesign visually verified via a
+throwaway `/digest-preview` harness (since the real screen needs Firebase auth); harness removed.
+
+**Deployed:**
+- **Desktop** → pushed to `main` (`56f3b9f`), Vercel auto-deploy.
+- **iPhone (PWA)** → `./deploy-hosting.sh` → `secondbrain-app-94da2.web.app`. ✅
+- **iOS native app** → `./build-ios.sh` refreshed `ios/App/App/public` from `56f3b9f`; Xcode opened.
+  **Not archived** — bump the build number in Xcode and Product → Archive → TestFlight to ship the
+  native app.
+- **Backend** → none (frontend-only change).
+
+> ⚠️ The pull before pushing brought in a batch of concurrent `main` work from another track
+> (ProfileAvatar, Card/Feed/storage/types changes, iOS ShareExt build 19). That code is now on
+> local `main` and was deployed alongside the digest redesign — worth a glance if anything looks off.
+
+## Earlier session — Phase 1 Step 2: the hard trust bugs (M2, M3, M5) — 2026-07-01
+
+Implemented **Machina spec Phase 1 step 2** — the "never doubt it" trust bedrock — on branch
+`claude/phase1-step2-trust-bugs-khdqer`. **PR opened (not merged; this repo reviews via PR).**
+`web` `tsc --noEmit` clean; `functions` `py_compile` clean. Nothing deployed from here.
+
+**M8/auth is a separate track on `main` — untouched this session.**
+
+### M2 — Share Extension never lies about saving (QA F-4/F-5)
+`web/ios/App/ShareExt/ShareViewController.swift`. The ~26s watchdog now resolves to a **neutral
+terminal state** ("**Still saving — open Machina to confirm**"), never the green check, and it
+**does not auto-dismiss** — the ✕ close affordance is the escape hatch (closes F-5). Green check now
+only appears on a real 2xx server ack. Aligned the **client request timeout (22s) under the watchdog
+(26s)**; a client-side timeout (`NSURLErrorTimedOut`) is now reported as the same neutral "still
+saving" state rather than a false failure, since the background upload keeps running. `share_ingest`
+already returns a real 200 ack the extension waits on (confirmed). The idempotency guard
+(`resultShown`) from build 11 is retained.
+- ⚠️ **Needs on-device verification (can't be done headlessly):** throttle/kill the network mid-share
+  on a physical device and confirm the HUD **never** shows the green check — it shows the neutral
+  state and can be dismissed; and that a real save shows the check only after the ack.
+- **iOS build not bumped/archived here** (no macOS/Xcode in this cloud session). Bump both targets +
+  archive on a Mac for the next TestFlight build.
+
+### M3 — No phantom saves: durable processing → ready | failed lifecycle (QA F-6)
+Backend `functions/main.py` (`process_link_background`) + `functions/models.py`
+(`LinkStatus.PROCESSING`/`FAILED`). The moment a capture is queued, a **visible card** is written to
+`users/{uid}/links` with `status: 'processing'`; the same doc is then flipped **in place** to `ready`
+(status `unread`, full analysis) on success or to a retryable **`failed`** card (original URL +
+`error` + `failedAt`) on analysis error — replacing the old confusing "Processing Failed"-tagged
+fallback card. The queue doc is deleted in both terminal cases (no orphans). Dedup still holds (the
+pending doc lives through processing; a failed/ready card matches `link_exists_for_url`).
+- Frontend: `web/lib/types.ts` (`CaptureState`, `error`/`failedAt`), `web/lib/storage.ts`
+  (`retryFailedLink` — re-runs the existing `/api/analyze` pipeline and updates the SAME doc in place,
+  so **no new backend/rules and nothing is duplicated**), `web/components/Card.tsx` (skeleton
+  `processing` card + `failed` card with **Retry**/Delete/open-original), `web/components/Feed.tsx`
+  (pending cards pinned atop the default library view; excluded from facets/filters so they never
+  spawn a phantom "Processing" category/tag; retry handler wired).
+- ⚠️ **Needs live verification:** force a server-side analysis error and confirm a **retryable failed
+  card** appears in the feed within seconds, and that **Retry** re-runs analysis and turns it into a
+  normal card. (Retry via `/api/analyze` works for link captures; image-capture failed cards still
+  appear — nothing is lost — but retry-by-URL is best-effort for images.)
+- **Deploy needed** (not done here): `./deploy-functions.sh functions:process_link_background`
+  (Firestore-trigger fn — watch for the transient 409 the earlier handoff noted; retry in ~60s).
+
+### M5 — Keyboard never covers an input (QA F-6/F-15/F-30)
+Applied the existing `web/lib/useVisualViewport.ts` to the remaining offenders. `LinkDetailModal.tsx`
+(the main gap) now clamps the modal to the **visible** viewport (`top: offsetTop`, `height`) so the
+inline category/tag edit rides above the keyboard. `AddToCollectionSheet.tsx` body clamped to
+`max-h-full` on mobile (was `80vh` = layout viewport, could overrun the top). `AddLinkForm.tsx`
+(already centers above the keyboard) and `ManageCollectionCardsSheet.tsx` (already clamps + pins)
+verified — no change needed. Desktop behavior unchanged; native/web-safe fallback via the hook.
+- ⚠️ **Needs on-device verification (iPhone SE, keyboard up):** in LinkDetailModal (category + Add
+  Tag), AddToCollectionSheet (new-collection name + Create), and AddLinkForm, confirm the focused
+  input **and** its primary action button are both fully visible.
+
+**Verification done here:** `web` `tsc --noEmit` exit 0 (after `npm ci`); `functions` `py_compile`
+OK. A full `next build` can't run offline (Google Fonts) — unrelated. No live/device checks possible
+headlessly — see the ⚠️ notes above and the PR body.
 
 ## Latest session — Google Sign-In, Phase 1 (web) — 2026-07-01
 
@@ -9,6 +107,17 @@ This is the **P0 launch blocker** ("Session 0") finally moving. **Merged to `mai
 desktop auto-deploys). `tsc --noEmit` clean, lint clean (the one SettingsModal warning is pre-existing).
 Merged the concurrent UI-unification round (below) in on the way — one import + one HANDOFF conflict,
 both trivial.
+
+**Follow-up (same day) — profile UI + full-page Settings:**
+- **Profile avatar in the header** (`web/app/page.tsx`) — Google photo (or gradient monogram from
+  name/email) next to the Settings gear; tapping it opens Settings. Web-only (hidden when no signed-in
+  email, i.e. native). New reusable `web/components/ProfileAvatar.tsx`.
+- **Account card in Settings** (`web/components/SettingsModal.tsx`) — avatar + name + email + "Signed in
+  with Google" + Sign out (replaces the earlier one-line row).
+- **Settings is now a full-screen page** (was a centered desktop modal): fills the viewport with a
+  centered `max-w-2xl` content column (header/body/footer all constrained). Mobile keeps its
+  full-screen push. `AuthProvider` now also exposes `displayName` + `photoURL`.
+- Verified: `tsc --noEmit` clean, `next build` clean (all pages prerender).
 
 **What shipped in the code (web only, deliberately non-bricking):**
 - **Google Sign-In gate on the web.** New `web/lib/auth.ts` (popup + redirect fallback, explicit
