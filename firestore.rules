@@ -2,59 +2,61 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users can access their own document.
+    // ── Multi-user access control (see AUTH_SPEC.md) ─────────────────────────
+    // Data docs are keyed by phone number, NOT the Firebase Auth uid, so a
+    // signed-in account owns a doc when its uid is in that doc's `authUids`
+    // array. The first-time link ("claim") and account deletion run server-side
+    // via the Admin SDK (claim_workspace / delete_account), which bypasses these
+    // rules — so the client only ever reads/updates a doc it already owns.
     //
-    // SECURITY — ACCEPTED RESIDUAL RISK (auth rollout in progress):
-    // Phase 1 (web Google Sign-In) is LIVE, but these rules stay open on purpose.
-    // The data doc is keyed by phone number, NOT the Auth uid, and the native iOS
-    // shell + share ingest + WhatsApp paths still write without a user token.
-    // Locking now would brick them. Cloud Functions are hardened (App Check +
-    // pinned CORS + rate limiting), so the realistic abuse surface is reduced.
-    //
-    // PHASE 3 LOCK (apply once native sign-in + backend token verification land —
-    // see AUTH_SPEC.md). Ownership is membership in the doc's `authUids` array,
-    // because the doc ID is the phone number, not request.auth.uid:
-    //
-    //   function owns(uid) {
-    //     return request.auth != null
-    //       && get(/databases/$(database)/documents/users/$(uid))
-    //            .data.authUids.hasAny([request.auth.uid]);
-    //   }
-    //   match /users/{uid}             { allow read, write: if owns(uid);
-    //     match /links/{linkId}        { allow read, write: if owns(uid); }
-    //     match /chats/{chatId}        { allow read, write: if owns(uid); }
-    //     match /collections/{cid}     { allow read, write: if owns(uid); }
-    //   }
+    // ⚠️ Test with the Firestore emulator before deploying. Deploying rules that
+    // are too tight will brick reads/writes until corrected. Deploy this ONLY
+    // after native + web sign-in and the claim flow are confirmed working (see
+    // NATIVE_AUTH_SETUP.md, "Cutover order").
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // True when the signed-in account is linked to the user doc `uid`.
+    function owns(uid) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(uid))
+        && (request.auth.uid in get(/databases/$(database)/documents/users/$(uid)).data.authUids);
+    }
+
     match /users/{uid} {
-      allow read, write: if true;
+      // read covers the `authUids array-contains <auth uid>` lookup the client
+      // runs to resolve its own workspace; every matched doc satisfies owns(uid).
+      allow read, write: if owns(uid);
 
       match /links/{linkId} {
-        allow read, write: if true;
+        allow read, write: if owns(uid);
       }
 
       // Ask-your-brain saved conversations
       match /chats/{chatId} {
-        allow read, write: if true;
+        allow read, write: if owns(uid);
       }
 
       // User-curated collections of cards
       match /collections/{collectionId} {
-        allow read, write: if true;
+        allow read, write: if owns(uid);
       }
     }
 
-    // Shared collections & cards: public, read-only snapshots for share links.
-    // World-readable so logged-out visitors can open /c?id= and /s?id= pages.
-    // Writes are owner-driven from the client today (single-user prototype, same
-    // residual risk as users/** above); tighten to `request.auth.uid == ownerUid`
-    // when real Firebase Auth lands.
+    // Shared collections & cards: public, read-only snapshots for share links so
+    // logged-out visitors can open /c?id= and /s?id= pages. Writes are limited to
+    // the owner of the referenced workspace (docs carry `ownerUid`).
     match /shared_collections/{shareId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if owns(request.resource.data.ownerUid);
+      allow delete: if owns(resource.data.ownerUid);
     }
     match /shared_cards/{shareId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if owns(request.resource.data.ownerUid);
+      allow delete: if owns(resource.data.ownerUid);
     }
 
     // pending_processing: only Cloud Functions (admin SDK)

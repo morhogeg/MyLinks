@@ -1,46 +1,82 @@
 'use client';
 
-// Google Sign-In helpers (web only).
+// Auth helpers — Google + Sign in with Apple, on both the web and the native
+// iOS shell.
 //
 // firebase.ts initializes `auth` WITHOUT a popup/redirect resolver on purpose:
 // the default resolver eagerly loads Google's gapi iframe, which throws under
-// Capacitor's capacitor:// WKWebView origin and aborts native startup. So every
-// sign-in entry point here passes `browserPopupRedirectResolver` EXPLICITLY, and
-// callers must only invoke these on the web — never inside the native shell.
-// Native Google Sign-In is Phase 2 (a native plugin); see AUTH_SPEC.md.
+// Capacitor's capacitor:// WKWebView origin and aborts native startup. So:
+//   - WEB sign-in passes `browserPopupRedirectResolver` EXPLICITLY (popup, with
+//     a redirect fallback).
+//   - NATIVE sign-in never uses popup/redirect: it drives the native
+//     @capacitor-firebase/authentication plugin to obtain an OAuth credential,
+//     then bridges that into this same JS SDK via signInWithCredential — so
+//     `auth.currentUser`, getIdToken(), and onAuthStateChanged work identically
+//     on both platforms afterwards.
+//
+// The native plugin is configured with skipNativeAuth (capacitor.config.ts) so
+// it only returns credentials and does not maintain a separate native Firebase
+// session; the JS SDK remains the single source of truth.
 
 import {
     GoogleAuthProvider,
+    OAuthProvider,
     signInWithPopup,
     signInWithRedirect,
     getRedirectResult,
+    signInWithCredential,
     browserPopupRedirectResolver,
     signOut,
     onAuthStateChanged,
     type User,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { isNativeApp } from '@/lib/api';
 
-const provider = new GoogleAuthProvider();
-provider.setCustomParameters({ prompt: 'select_account' });
+export type AuthProviderId = 'google' | 'apple';
 
-/**
- * Start a Google sign-in. Tries a popup first (best desktop UX); if the popup is
- * blocked or unsupported (notably standalone iOS PWAs), falls back to a full-page
- * redirect — completeRedirectSignIn() finishes that on the next load.
- */
-export async function signInWithGoogle(): Promise<void> {
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+/** Popup error codes that mean "fall back to a full-page redirect". */
+function popupUnsupported(code: string): boolean {
+    return (
+        code === 'auth/popup-blocked' ||
+        code === 'auth/popup-closed-by-user' ||
+        code === 'auth/cancelled-popup-request' ||
+        code === 'auth/operation-not-supported-in-this-environment'
+    );
+}
+
+// ── Web flows (popup, with redirect fallback) ────────────────────────────────
+
+async function signInWithGoogleWeb(): Promise<void> {
+    try {
+        await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
+    } catch (err) {
+        const code = (err as { code?: string })?.code ?? '';
+        if (popupUnsupported(code)) {
+            await signInWithRedirect(auth, googleProvider, browserPopupRedirectResolver);
+            return;
+        }
+        throw err;
+    }
+}
+
+function appleProvider(): OAuthProvider {
+    const provider = new OAuthProvider('apple.com');
+    provider.addScope('email');
+    provider.addScope('name');
+    return provider;
+}
+
+async function signInWithAppleWeb(): Promise<void> {
+    const provider = appleProvider();
     try {
         await signInWithPopup(auth, provider, browserPopupRedirectResolver);
     } catch (err) {
         const code = (err as { code?: string })?.code ?? '';
-        const popupUnsupported =
-            code === 'auth/popup-blocked' ||
-            code === 'auth/popup-closed-by-user' ||
-            code === 'auth/cancelled-popup-request' ||
-            code === 'auth/operation-not-supported-in-this-environment';
-        if (popupUnsupported) {
-            // Redirect leaves the page; resolves on the next load.
+        if (popupUnsupported(code)) {
             await signInWithRedirect(auth, provider, browserPopupRedirectResolver);
             return;
         }
@@ -48,23 +84,69 @@ export async function signInWithGoogle(): Promise<void> {
     }
 }
 
+// ── Native flows (Capacitor plugin → JS SDK credential bridge) ────────────────
+
+async function signInWithGoogleNative(): Promise<void> {
+    const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+    const result = await FirebaseAuthentication.signInWithGoogle({ skipNativeAuth: true });
+    const idToken = result.credential?.idToken;
+    if (!idToken) throw new Error('Google sign-in returned no idToken');
+    const credential = GoogleAuthProvider.credential(idToken);
+    await signInWithCredential(auth, credential);
+}
+
+async function signInWithAppleNative(): Promise<void> {
+    const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+    // The plugin generates the nonce and returns the rawNonce; Apple's idToken
+    // is bound to sha256(rawNonce), so we must hand the SAME rawNonce to Firebase.
+    const result = await FirebaseAuthentication.signInWithApple({ skipNativeAuth: true });
+    const idToken = result.credential?.idToken;
+    const rawNonce = result.credential?.nonce;
+    if (!idToken) throw new Error('Apple sign-in returned no idToken');
+    const credential = appleProvider().credential({ idToken, rawNonce });
+    await signInWithCredential(auth, credential);
+}
+
+// ── Public API ───────────────────────────────────────────────────────────────
+
+/** Start a sign-in with the given provider, picking the web or native flow. */
+export async function signIn(provider: AuthProviderId): Promise<void> {
+    if (isNativeApp()) {
+        return provider === 'apple' ? signInWithAppleNative() : signInWithGoogleNative();
+    }
+    return provider === 'apple' ? signInWithAppleWeb() : signInWithGoogleWeb();
+}
+
+/** Back-compat named helpers. */
+export function signInWithGoogle(): Promise<void> { return signIn('google'); }
+export function signInWithApple(): Promise<void> { return signIn('apple'); }
+
 /**
- * Complete a redirect-based sign-in if one is pending. No-op (returns null) for
- * the popup flow or a normal load. Safe to call once on web startup.
+ * Complete a redirect-based sign-in if one is pending (web only). No-op for the
+ * popup/native flows or a normal load. Must not run under Capacitor — the
+ * redirect resolver would try to load gapi in the WKWebView.
  */
 export async function completeRedirectSignIn(): Promise<User | null> {
+    if (isNativeApp()) return null;
     try {
         const result = await getRedirectResult(auth, browserPopupRedirectResolver);
         return result?.user ?? null;
     } catch {
-        // No pending redirect, or it failed — treat as signed-out.
         return null;
     }
 }
 
-/** Sign the current user out. */
-export function signOutUser(): Promise<void> {
-    return signOut(auth);
+/** Sign the current user out (clears native plugin state too, when present). */
+export async function signOutUser(): Promise<void> {
+    if (isNativeApp()) {
+        try {
+            const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+            await FirebaseAuthentication.signOut();
+        } catch {
+            // Plugin missing/failed — still sign out of the JS SDK below.
+        }
+    }
+    await signOut(auth);
 }
 
 /** Subscribe to auth state; returns the unsubscribe function. */
@@ -73,7 +155,7 @@ export function onAuthChange(cb: (user: User | null) => void): () => void {
 }
 
 /**
- * Fresh Firebase ID token for the signed-in user, or null. Phase 2 sends this as
+ * Fresh Firebase ID token for the signed-in user, or null. Sent as
  * `Authorization: Bearer <token>` so the Cloud Functions can verify the caller
  * instead of trusting a client-supplied uid.
  */
@@ -85,4 +167,23 @@ export async function getIdToken(): Promise<string | null> {
     } catch {
         return null;
     }
+}
+
+/** Authorization header carrying the ID token (empty object when signed out). */
+export async function authHeaders(): Promise<Record<string, string>> {
+    const token = await getIdToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/**
+ * Permanently delete the signed-in user's account and all their data. Calls the
+ * `delete_account` Cloud Function (which verifies the ID token, deletes the
+ * Firestore workspace + storage, then the Auth user), then signs out locally.
+ */
+export async function deleteAccount(): Promise<void> {
+    const { httpsCallable } = await import('firebase/functions');
+    const { functions } = await import('@/lib/firebase');
+    const callable = httpsCallable(functions, 'delete_account');
+    await callable({});
+    await signOutUser();
 }

@@ -9,9 +9,12 @@ import { functions } from '@/lib/firebase';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from './AuthProvider';
+import { deleteAccount } from '@/lib/auth';
 import ProfileAvatar from './ProfileAvatar';
+import ConfirmDialog from './ConfirmDialog';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import Dropdown from './Dropdown';
+import { Trash2 } from 'lucide-react';
 
 interface SettingsModalProps {
     uid: string;
@@ -74,6 +77,27 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
     const [topics, setTopics] = useState<string[]>([]);
     const [sendingNow, setSendingNow] = useState(false);
     const [sendResult, setSendResult] = useState<string | null>(null);
+
+    // Account deletion (App Store guideline 5.1.1(v)): confirm, then hard-delete
+    // the user's workspace + Auth account via the delete_account function.
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+
+    const handleDeleteAccount = async () => {
+        setDeleting(true);
+        setDeleteError(null);
+        try {
+            await deleteAccount();
+            // deleteAccount() signs out; the AuthProvider will render the login
+            // gate. Close the modal so we don't sit over it.
+            setShowDeleteConfirm(false);
+            onClose();
+        } catch {
+            setDeleting(false);
+            setDeleteError('Could not delete your account. Please try again.');
+        }
+    };
 
     // On phones Settings is a real full-screen page (slides in, fills the screen,
     // clears the notch); on desktop it stays a centered modal.
@@ -337,7 +361,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                                 )}
                                 <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-emerald-500">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                    Signed in with Google
+                                    Signed in
                                 </div>
                             </div>
                             <button
@@ -348,6 +372,19 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                                 Sign out
                             </button>
                         </div>
+                        {/* Account deletion — required in-app when account creation
+                            is offered (App Store guideline 5.1.1(v)). */}
+                        <button
+                            onClick={() => { setDeleteError(null); setShowDeleteConfirm(true); }}
+                            className="mt-2.5 w-full inline-flex items-center justify-center gap-2 rounded-2xl px-3.5 py-3 text-[13px] font-semibold border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            Delete account
+                        </button>
+                        <p className="mt-1.5 text-[11px] text-text-muted leading-relaxed">
+                            Permanently deletes your account and all saved links, collections, and chats. This can’t be undone.
+                        </p>
+                        {deleteError && <p className="mt-1.5 text-[12px] text-red-500">{deleteError}</p>}
                     </Section>
                     )}
 
@@ -640,6 +677,16 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                   </div>
                 </div>
             </div>
+            <ConfirmDialog
+                isOpen={showDeleteConfirm}
+                onClose={() => { if (!deleting) setShowDeleteConfirm(false); }}
+                onConfirm={handleDeleteAccount}
+                title="Delete account?"
+                message="This permanently deletes your account and all saved links, collections, and chats. This action cannot be undone."
+                confirmLabel={deleting ? 'Deleting…' : 'Delete account'}
+                cancelLabel="Cancel"
+                variant="danger"
+            />
         </div>
     );
 }

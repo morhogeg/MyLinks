@@ -279,6 +279,23 @@ environment (no `node_modules`); backend Python byte-compiles clean
 - Set **`ADMIN_TOKEN`** in the Functions environment (else the admin/debug endpoints return 404 — the safe default). Callers pass it as the `X-Admin-Token` header.
 - Set **`APPCHECK_ENFORCE=true`** in production (this addresses **H-2** — App Check was left soft/fail-open in code intentionally for rollout; enforcement is an env flag, not a code change).
 
+### Batch 2 — multi-user auth cutover (done in code; deploy-gated)
+Decision: **public multi-user** with **Sign in with Apple**. All changes are on
+the branch; they take effect on a coordinated deploy (see `NATIVE_AUTH_SETUP.md`,
+"Cutover order"). Backend byte-compiles clean; native pieces need the manual
+console/Xcode steps in `NATIVE_AUTH_SETUP.md`.
+
+| Finding | Status | What changed |
+|---|---|---|
+| **B-2 Native auth bypass** | ✅ Fixed (code) | Removed the "first user doc" fallback; `AuthProvider` gates web **and** native behind real sign-in. Native uses `@capacitor-firebase/authentication` bridged into the Firebase JS SDK (`lib/auth.ts`). |
+| **B-7 Sign in with Apple** | ✅ Fixed (code) | Google **and** Apple sign-in on web + native (`lib/auth.ts`, `LoginScreen.tsx`); `App.entitlements` gains the Sign in with Apple capability. Needs Firebase Apple provider + Apple Developer config (setup doc). |
+| **B-3 Endpoints trust client `uid`** | ✅ Fixed (code) | `_verify_bearer` / `_authed_uid` verify the ID token and resolve the workspace uid via `authUids` server-side. Applied to `analyze_link`, `ask_brain`, `analyze_image`, `get_share_config`, `search_links`, `send_digest_now`. Client now sends `Authorization: Bearer`. Also removed the digest `email` override (exfiltration). |
+| **B-1 Open Firestore rules** | ✅ Fixed (code, deploy last) | `firestore.rules` locked to `owns(uid)` (membership in `authUids`); shared docs owner-write/public-read. First-time claim moved server-side (`claim_workspace`) so it works under locked rules. **Deploy only after testing** (setup doc). |
+| **B-5 In-app account deletion** | ✅ Fixed (code) | `delete_account` callable (deletes Firestore workspace + Storage + Auth user); "Delete account" flow in `SettingsModal` with a confirm dialog. |
+
+**New deploy-config requirement:** `OWNER_EMAIL` (Functions env) to gate the
+one-time workspace claim to your account during the single-owner migration.
+
 ### Already fixed in the working tree (before this audit — verified, no action needed)
 | Finding | Note |
 |---|---|
@@ -286,14 +303,9 @@ environment (no `node_modules`); backend Python byte-compiles clean
 | H-8 "keep analyzing in the background" untrue copy | Copy corrected to "Keep Machina open — this only takes a few seconds." |
 | Share Extension false-success watchdog (old QA F-4) | `resultShown` idempotency guard + neutral watchdog message present. |
 
-### Deferred — needs the Section 3 audience decision (the auth fork)
-| Finding | Why deferred |
-|---|---|
-| **B-1** Lock Firestore rules | Locking to `request.auth != null` **breaks the current native app** (B-2) until native sign-in ships. Coupled to the audience decision. |
-| **B-2** Native auth bypass | Requires either native Google Sign-In (multi-user) or a single-account lock (personal). Large, forking change. |
-| **B-3** Endpoints trust client `uid` | The token-verification approach depends on the auth model chosen. |
-| **B-5** In-app account deletion | Needs real accounts on the target platform (depends on B-2) + a delete Cloud Function. |
-| **B-7** Sign in with Apple | Only applies to the public multi-user path. |
+### Audience decision: **resolved → public multi-user + Sign in with Apple**
+B-1/B-2/B-3/B-5/B-7 are implemented in Batch 2 above (deploy-gated; see
+`NATIVE_AUTH_SETUP.md`).
 
 ### Deferred — lower priority / larger UX work (backlog unless promoted)
 - **H-1** Ingest token → Keychain + rotation (native change; requires a small Keychain wrapper in the ShareExt + main app).

@@ -40,6 +40,50 @@ def find_user_by_phone(phone_number: str) -> Optional[str]:
     return None
 
 
+def find_data_uid_by_auth_uid(auth_uid: str) -> Optional[str]:
+    """Resolve the data-doc ID (phone-number key) for a Firebase Auth uid.
+
+    Data docs are keyed by phone number, not the Auth uid; a signed-in account
+    is linked to its workspace via the `authUids` array (see AUTH_SPEC.md). The
+    backend must NEVER trust a client-supplied data uid — it derives it here from
+    the verified Auth uid instead.
+    """
+    if not auth_uid:
+        return None
+    db = get_db()
+    docs = (
+        db.collection('users')
+        .where('authUids', 'array_contains', auth_uid)
+        .limit(1)
+        .get()
+    )
+    if docs:
+        return docs[0].id
+    return None
+
+
+def delete_user_data(uid: str) -> int:
+    """Hard-delete a user's Firestore workspace: the links/chats/collections
+    subcollections and the top-level user doc. Returns the number of documents
+    deleted (best-effort). Storage objects are removed separately by the caller.
+    """
+    db = get_db()
+    user_ref = db.collection('users').document(uid)
+    deleted = 0
+    for sub in ('links', 'chats', 'collections'):
+        for doc in user_ref.collection(sub).stream():
+            doc.reference.delete()
+            deleted += 1
+    # Any queued processing rows for this user.
+    for doc in db.collection('pending_processing').where('uid', '==', uid).stream():
+        doc.reference.delete()
+        deleted += 1
+    user_ref.delete()
+    deleted += 1
+    logger.info(f"Deleted {deleted} docs for user workspace")
+    return deleted
+
+
 def save_link_to_firestore(uid: str, link_data: dict) -> str:
     """Save a new link document to Firestore."""
     db = get_db()

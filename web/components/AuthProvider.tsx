@@ -2,12 +2,12 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import {
-    collection, query, getDocs, limit, where, doc, getDoc, updateDoc, arrayUnion,
+    collection, query, getDocs, limit, where, doc, getDoc, updateDoc,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { isNativeApp } from '@/lib/api';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '@/lib/firebase';
 import {
-    onAuthChange, completeRedirectSignIn, signInWithGoogle, signOutUser,
+    onAuthChange, completeRedirectSignIn, signIn, signOutUser,
 } from '@/lib/auth';
 import { syncShareConfigToNative } from '@/lib/shareConfig';
 import LoginScreen from '@/components/LoginScreen';
@@ -43,10 +43,6 @@ export function useAuth() {
     return useContext(AuthContext);
 }
 
-// When set (Vercel + web/.env.local), only this Google account may claim/own the
-// workspace. Unset → the sole unclaimed user doc is claimed (single-user dev).
-const OWNER_EMAIL = process.env.NEXT_PUBLIC_OWNER_EMAIL || null;
-
 /**
  * Best-effort, fire-and-forget side effects once the data doc is known: hand the
  * iOS Share Extension its endpoint/token, and persist the browser timezone.
@@ -66,13 +62,12 @@ function attachUserDoc(docId: string, data: Record<string, unknown> | undefined)
 /**
  * Auth-aware provider.
  *
- * Web: real Google Sign-In. Signed-out renders a login gate; signed-in resolves
- * the user's data doc (linked via `authUids`, or claimed on first sign-in). A
- * signed-in account with no linked doc sees a restricted screen.
- *
- * Native (Capacitor): keeps the legacy single-user behavior (load the first user
- * doc, no gate) — popup/redirect auth can't run in the WKWebView. Native Google
- * Sign-In is Phase 2. See AUTH_SPEC.md.
+ * Both web and native require real sign-in (Google or Apple). Signed-out renders
+ * the login gate; signed-in resolves the user's data doc (linked via `authUids`,
+ * claimed on first sign-in). A signed-in account with no linked doc sees the
+ * restricted screen. Native uses the Capacitor auth plugin bridged into the same
+ * Firebase JS SDK (see lib/auth.ts), so this path is platform-agnostic.
+ * See AUTH_SPEC.md and NATIVE_AUTH_SETUP.md.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [uid, setUid] = useState<string | null>(null);
@@ -84,8 +79,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Signed in, but the Google account isn't linked to any workspace.
     const [restricted, setRestricted] = useState(false);
 
-    const native = typeof window !== 'undefined' && isNativeApp();
-
     const signOut = useCallback(async () => {
         await signOutUser();
         setUid(null);
@@ -96,36 +89,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRestricted(false);
     }, []);
 
-    // ── Native: legacy first-user-doc lookup (no auth gate) ──────────────────
+    // ── Auth + data-doc resolution (web AND native) ──────────────────────────
+    // Both platforms now use real sign-in: web via Google/Apple popup-redirect,
+    // native via the Capacitor plugin bridged into the same JS SDK (see
+    // lib/auth.ts). So a single onAuthStateChanged path serves both.
     useEffect(() => {
-        if (!native) return;
-        let cancelled = false;
-        (async () => {
-            try {
-                const snapshot = await getDocs(query(collection(db, 'users'), limit(1)));
-                if (cancelled) return;
-                if (!snapshot.empty) {
-                    const userDoc = snapshot.docs[0];
-                    setUid(userDoc.id);
-                    attachUserDoc(userDoc.id, userDoc.data());
-                } else {
-                    console.warn('No user document found in Firestore');
-                }
-            } catch (err) {
-                console.error('Failed to look up user:', err);
-            } finally {
-                if (!cancelled) setLoading(false);
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [native]);
-
-    // ── Web: Google Sign-In + data-doc resolution ────────────────────────────
-    useEffect(() => {
-        if (native) return;
         let cancelled = false;
 
-        // Finish a redirect-based sign-in if one is pending (no-op otherwise).
+        // Finish a redirect-based sign-in if one is pending (web only; no-op
+        // under Capacitor and on a normal load).
         completeRedirectSignIn().catch(() => {});
 
         const unsub = onAuthChange(async (user) => {
@@ -147,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setPhotoURL(user.photoURL);
             setLoading(true);
             try {
-                const dataDoc = await resolveDataDoc(user.uid, user.email);
+                const dataDoc = await resolveDataDoc(user.uid);
                 if (cancelled) return;
                 if (dataDoc) {
                     setRestricted(false);
@@ -166,24 +138,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         return () => { cancelled = true; unsub(); };
-    }, [native]);
+    }, []);
 
     const value: AuthContextType = { uid, authUid, email, displayName, photoURL, loading, signOut };
 
-    // Web gating. During loading we render children so the page shows its own
-    // spinner (and SSR/first paint stay consistent — loading starts true).
-    if (!native && !loading) {
+    // Sign-in gating (web and native). During loading we render children so the
+    // page shows its own spinner (and SSR/first paint stay consistent — loading
+    // starts true).
+    if (!loading) {
         if (!authUid) {
             return (
                 <AuthContext.Provider value={value}>
-                    <LoginScreen onSignIn={signInWithGoogle} />
+                    <LoginScreen onSignIn={signIn} />
                 </AuthContext.Provider>
             );
         }
         if (restricted) {
             return (
                 <AuthContext.Provider value={value}>
-                    <LoginScreen restricted email={email} onSignIn={signInWithGoogle} onSignOut={signOut} />
+                    <LoginScreen restricted email={email} onSignIn={signIn} onSignOut={signOut} />
                 </AuthContext.Provider>
             );
         }
@@ -195,12 +168,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 /**
  * Map a Firebase Auth uid to its Firestore data doc.
  * 1. A doc already linked via `authUids array-contains authUid`.
- * 2. Otherwise claim the bootstrap (owner) doc: link it (+ email), gated by
- *    NEXT_PUBLIC_OWNER_EMAIL when set. Returns null if no doc may be claimed.
+ * 2. Otherwise ask the backend to claim one (server-side, Admin SDK — works
+ *    under locked rules; OWNER_EMAIL gating lives there). Returns null if no
+ *    workspace could be resolved or claimed (caller shows the restricted screen).
  */
 async function resolveDataDoc(
     authUid: string,
-    accountEmail: string | null,
 ): Promise<{ id: string; data: Record<string, unknown> } | null> {
     // 1. Already linked.
     const linked = await getDocs(
@@ -211,25 +184,22 @@ async function resolveDataDoc(
         return { id: d.id, data: d.data() };
     }
 
-    // 2. Bootstrap claim of the (single-user) owner doc.
-    if (OWNER_EMAIL && accountEmail !== OWNER_EMAIL) return null;
-
-    const first = await getDocs(query(collection(db, 'users'), limit(1)));
-    if (first.empty) return null;
-
-    const candidate = first.docs[0];
-    const existing = candidate.data().authUids;
-    // Already claimed by a different account → don't hijack it.
-    if (Array.isArray(existing) && existing.length > 0 && !existing.includes(authUid)) {
-        return null;
+    // 2. Not linked yet — ask the backend to claim the workspace. This runs with
+    //    Admin privileges (bypasses Firestore rules), so it works under the
+    //    locked rules; the OWNER_EMAIL allowlist gating lives server-side. The
+    //    client no longer reads or writes an arbitrary "first user" doc.
+    try {
+        const claim = httpsCallable<Record<string, never>, { uid: string | null }>(
+            functions, 'claim_workspace',
+        );
+        const res = await claim({});
+        const claimedUid = res.data?.uid;
+        if (claimedUid) {
+            const fresh = await getDoc(doc(db, 'users', claimedUid));
+            return { id: claimedUid, data: fresh.data() ?? {} };
+        }
+    } catch (e) {
+        console.warn('Workspace claim failed:', e);
     }
-
-    await updateDoc(doc(db, 'users', candidate.id), {
-        authUids: arrayUnion(authUid),
-        ...(accountEmail ? { email: accountEmail } : {}),
-    });
-
-    // Re-read so callers see the freshly written fields.
-    const fresh = await getDoc(doc(db, 'users', candidate.id));
-    return { id: candidate.id, data: fresh.data() ?? candidate.data() };
+    return null;
 }

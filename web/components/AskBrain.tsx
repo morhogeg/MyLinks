@@ -8,6 +8,7 @@ import remarkBreaks from 'remark-breaks';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS, xHandle, linkedinDisplayName } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
+import { authHeaders } from '@/lib/auth';
 import { apiUrl, isNativeApp, fetchWithTimeout } from '@/lib/api';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { ChatMessage, ChatSource, ChatSession } from '@/lib/types';
@@ -390,6 +391,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                     'Content-Type': 'application/json',
                     Accept: wantStream ? 'text/event-stream' : 'application/json',
                     ...(await appCheckHeaders()),
+                    ...(await authHeaders()),
                 },
                 body: JSON.stringify({ uid, question, history, stream: wantStream }),
             }, 30_000);

@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 
 # Firebase Functions framework
 from firebase_functions import https_fn, scheduler_fn, firestore_fn, options
-from firebase_admin import storage
+from firebase_admin import storage, auth as admin_auth
 from google.cloud.firestore_v1.vector import Vector
 
 # Internal modules
@@ -34,7 +34,7 @@ from ai_service import GeminiService, AnalysisError
 from link_service import (
     find_user_by_phone, save_link_to_firestore, get_user_tags, is_hebrew,
     ensure_ingest_token, find_user_by_ingest_token, link_exists_for_url,
-    pending_exists_for_url,
+    pending_exists_for_url, find_data_uid_by_auth_uid, delete_user_data,
 )
 from reminder_service import handle_reminder_intent, set_reminder, calculate_next_reminder, run_reminder_check, format_local_time
 from graph_service import GraphService
@@ -105,7 +105,7 @@ def _cors_preflight(req=None) -> https_fn.Response:
         'Access-Control-Allow-Origin': _resolve_origin(req),
         'Vary': 'Origin',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, X-Ingest-Token, X-Firebase-AppCheck',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Ingest-Token, X-Firebase-AppCheck, Authorization',
         'Access-Control-Max-Age': '3600'
     }
     return https_fn.Response('', status=204, headers=headers)
@@ -146,6 +146,43 @@ def _mask_phone(value) -> str:
     """
     s = str(value or "")
     return f"***{s[-4:]}" if len(s) >= 4 else "***"
+
+
+def _verify_bearer(req):
+    """Verify the Firebase ID token from the Authorization: Bearer header.
+
+    Returns the decoded token dict on success, or None if the header is missing
+    or the token is invalid/expired. The caller derives the user identity from
+    the returned token — never from the request body.
+    """
+    header = req.headers.get("Authorization", "")
+    if not header.startswith("Bearer "):
+        return None
+    token = header[len("Bearer "):].strip()
+    if not token:
+        return None
+    try:
+        return admin_auth.verify_id_token(token)
+    except Exception as e:
+        logger.warning("ID token verification failed: %s", e)
+        return None
+
+
+def _authed_uid(req, headers: dict = None):
+    """Resolve the caller's DATA-doc uid from a verified ID token.
+
+    Returns (uid, None) on success or (None, error_response) to return directly.
+    401 when unauthenticated; 403 when the verified account isn't linked to any
+    workspace. This replaces the old pattern of trusting a client-supplied uid
+    (which allowed cross-tenant IDOR).
+    """
+    decoded = _verify_bearer(req)
+    if not decoded:
+        return None, _error_response("Authentication required", 401, headers)
+    uid = find_data_uid_by_auth_uid(decoded.get("uid"))
+    if not uid:
+        return None, _error_response("No workspace linked to this account", 403, headers)
+    return uid, None
 
 
 def _require_admin(req, headers: dict = None):
@@ -453,6 +490,11 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         if len(url) > MAX_URL_LENGTH:
             return _error_response("URL is too long", 400, headers)
 
+        # Identity from the verified ID token — never from the body (IDOR).
+        uid, auth_err = _authed_uid(req, headers)
+        if auth_err:
+            return auth_err
+
         logger.info(f"Analyzing URL synchronously: {url}")
 
         # 1. Scrape content (scraper imported lazily — see top-of-file note).
@@ -470,7 +512,6 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         embedding_text = f"{analysis.get('title', '')}\n{analysis.get('summary', '')}"
         embedding = ai.embed_text(embedding_text)
 
-        uid = data.get('uid')
         related_links = []
         if uid:
             graph_service = GraphService(get_db())
@@ -610,7 +651,10 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         if not data:
             return _error_response("Invalid JSON body", 400, headers)
 
-        uid = data.get('uid')
+        # Identity from the verified ID token — never from the body (IDOR).
+        uid, auth_err = _authed_uid(req, headers)
+        if auth_err:
+            return auth_err
         question = (data.get('question') or '').strip()
         history = data.get('history') or []
         # Opt-in token streaming (SSE). Only honored for POST so the JSON path is
@@ -796,7 +840,10 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
         image_url = data.get('imageUrl')
         image_b64 = data.get('imageBytes')
         existing_tags = data.get('existingTags', [])
-        uid = data.get('uid')
+        # Identity from the verified ID token — never from the body (IDOR).
+        uid, auth_err = _authed_uid(req, headers)
+        if auth_err:
+            return auth_err
 
         if not image_url and not image_b64:
             return _error_response("imageBytes or imageUrl is required", 400, headers)
@@ -1021,14 +1068,17 @@ def get_share_config(req: https_fn.CallableRequest) -> dict:
     Returns the share-ingest endpoint and the caller's personal ingest token
     (generating one on first use). Used by Settings to configure the Shortcut.
     """
-    uid = req.auth.uid if req.auth else None
-    if not uid and req.data:
-        uid = req.data.get("uid") or req.data.get("test_uid")
-
-    if not uid:
+    # Derive the data-doc uid from the verified caller — never from the body.
+    if not req.auth:
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
-            message="User must be identified"
+            message="User must be signed in"
+        )
+    uid = find_data_uid_by_auth_uid(req.auth.uid)
+    if not uid:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+            message="No workspace linked to this account"
         )
 
     token = ensure_ingest_token(uid)
@@ -1036,6 +1086,95 @@ def get_share_config(req: https_fn.CallableRequest) -> dict:
         "endpoint": f"{APP_URL}/api/share",
         "token": token
     }
+
+
+@https_fn.on_call()
+def claim_workspace(req: https_fn.CallableRequest) -> dict:
+    """First-time link of a signed-in account to its data workspace.
+
+    Runs with Admin privileges (bypasses Firestore rules), so it still works
+    after the rules are locked — unlike a client-side claim, which can't read an
+    arbitrary unclaimed doc under locked rules. If already linked, returns that
+    workspace. Otherwise claims the single unclaimed owner doc, gated by the
+    OWNER_EMAIL allowlist when set. A new (non-owner) account gets no workspace
+    and the client shows the restricted screen.
+    """
+    if not req.auth:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="User must be signed in",
+        )
+    auth_uid = req.auth.uid
+    email = req.auth.token.get("email") if getattr(req.auth, "token", None) else None
+
+    existing = find_data_uid_by_auth_uid(auth_uid)
+    if existing:
+        return {"uid": existing}
+
+    owner_email = os.environ.get("OWNER_EMAIL", "")
+    if owner_email and email != owner_email:
+        return {"uid": None}
+
+    db = get_db()
+    # Claim the first doc that has no authUids yet (bounded scan). In the
+    # single-owner migration there is exactly one such doc.
+    for doc in db.collection("users").limit(50).stream():
+        d = doc.to_dict() or {}
+        if not d.get("authUids"):
+            update = {"authUids": [auth_uid]}
+            if email:
+                update["email"] = email
+            doc.reference.set(update, merge=True)
+            logger.info("Claimed workspace for signed-in account")
+            return {"uid": doc.id}
+    return {"uid": None}
+
+
+@https_fn.on_call()
+def delete_account(req: https_fn.CallableRequest) -> dict:
+    """Permanently delete the signed-in user's account and all their data.
+
+    Required in-app by App Store guideline 5.1.1(v). Verifies the caller, then
+    deletes their Firestore workspace, Storage objects, and Firebase Auth user.
+    Idempotent-ish: a missing workspace is not an error (the Auth user is still
+    removed) so a partially-completed deletion can be retried.
+    """
+    if not req.auth:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="User must be signed in",
+        )
+    auth_uid = req.auth.uid
+    uid = find_data_uid_by_auth_uid(auth_uid)
+
+    if uid:
+        try:
+            delete_user_data(uid)
+        except Exception as e:
+            logger.error("Failed to delete Firestore data for account: %s", e)
+            raise https_fn.HttpsError(
+                code=https_fn.FunctionsErrorCode.INTERNAL,
+                message="Failed to delete account data",
+            )
+        # Best-effort: remove the user's screenshots from Storage.
+        try:
+            bucket = storage.bucket()
+            for blob in bucket.list_blobs(prefix=f"screenshots/{uid}/"):
+                blob.delete()
+        except Exception as e:
+            logger.warning("Failed to delete storage objects for account: %s", e)
+
+    # Delete the Firebase Auth user last so the login can't be reused.
+    try:
+        admin_auth.delete_user(auth_uid)
+    except Exception as e:
+        logger.error("Failed to delete auth user: %s", e)
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INTERNAL,
+            message="Failed to delete account",
+        )
+
+    return {"success": True}
 
 
 # ─────────────────────────────────────────────
@@ -1888,13 +2027,17 @@ def send_digest_now(req: https_fn.CallableRequest) -> dict:
     """
     from digest_service import build_and_send_digest
 
-    uid = req.auth.uid if req.auth else None
-    if not uid and req.data:
-        uid = req.data.get("uid") or req.data.get("test_uid")
-    if not uid:
+    # Derive the data-doc uid from the verified caller — never from the body.
+    if not req.auth:
         raise https_fn.HttpsError(
             code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
-            message="User must be identified",
+            message="User must be signed in",
+        )
+    uid = find_data_uid_by_auth_uid(req.auth.uid)
+    if not uid:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.PERMISSION_DENIED,
+            message="No workspace linked to this account",
         )
 
     db = get_db()
@@ -1911,8 +2054,9 @@ def send_digest_now(req: https_fn.CallableRequest) -> dict:
         short = key.replace("digest_", "")
         if req.data and short in req.data:
             overrides[key] = req.data[short]
-    if req.data and req.data.get("email"):
-        user_data["email"] = req.data["email"]
+    # NOTE: the delivery address is always the user's own stored email — we do
+    # NOT honor a client-supplied "email" override (that allowed exfiltrating a
+    # digest to an arbitrary address).
     if overrides:
         user_data.setdefault("settings", {})
         user_data["settings"] = {**user_data.get("settings", {}), **overrides}

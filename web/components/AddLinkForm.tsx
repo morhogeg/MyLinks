@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, FormEvent } from 'react';
 import { Link, Plus, Loader2, X, Upload } from 'lucide-react';
 import { saveLink, getUserTags } from '@/lib/storage';
 import { appCheckHeaders } from '@/lib/firebase';
+import { authHeaders } from '@/lib/auth';
 import { apiUrl } from '@/lib/api';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
@@ -178,8 +179,8 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
                 try {
                     response = await fetchWithTimeout(apiUrl('/api/analyze'), {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()) },
-                        body: JSON.stringify({ url: formattedUrl, existingTags, uid }),
+                        headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
+                        body: JSON.stringify({ url: formattedUrl, existingTags }),
                     });
                 } catch (netErr) {
                     throw new Error(netErr instanceof Error ? netErr.message : `Network error: ${String(netErr)}`);
@@ -200,7 +201,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
                 try {
                     response = await fetchWithTimeout(apiUrl('/api/analyze-image'), {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()) },
+                        headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
                         body: JSON.stringify({
                             imageBytes: compressed.base64,
                             mimeType: compressed.mimeType,

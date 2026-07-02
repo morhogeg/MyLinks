@@ -161,12 +161,13 @@ def search_links(req: https_fn.CallableRequest) -> Any:
     Input: { query: string, limit?: number }
     """
     try:
-        uid = req.auth.uid if req.auth else None
-        if not uid and req.data and "test_uid" in req.data:
-            uid = req.data["test_uid"]
-
-        if not uid:
+        # Derive the data-doc uid from the verified caller — never from the body.
+        if not req.auth:
             raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="User must be authenticated")
+        from link_service import find_data_uid_by_auth_uid
+        uid = find_data_uid_by_auth_uid(req.auth.uid)
+        if not uid:
+            raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.PERMISSION_DENIED, message="No workspace linked to this account")
 
         query_text = req.data.get("query")
         limit = req.data.get("limit", 10)

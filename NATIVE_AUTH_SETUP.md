@@ -1,0 +1,125 @@
+# Native Multi-User Auth + Sign in with Apple — Setup & Cutover
+
+This is the manual configuration required to finish the multi-user auth work
+that the code changes on this branch prepare. The **code** (client sign-in for
+Google + Apple on web and native, backend ID-token verification, account
+deletion, locked Firestore rules) is done; the steps below are the console /
+Xcode / Apple-Developer pieces that can't be done from the repo, plus the order
+to roll it out safely.
+
+> ⚠️ **Do not re-archive the iOS app for TestFlight/App Store until steps 1–4 are
+> complete.** The native app now *requires* sign-in; if the plugin / Firebase iOS
+> config / Apple capability aren't in place, sign-in fails and users are locked
+> out. The currently-deployed build keeps working until you ship the new one.
+
+---
+
+## What the code already does
+
+- `web/lib/auth.ts` — Google + Apple sign-in. Web uses Firebase popup/redirect;
+  native uses `@capacitor-firebase/authentication` and bridges the credential
+  into the Firebase JS SDK (`signInWithCredential`), so `getIdToken()` and
+  `onAuthStateChanged` work the same on both platforms.
+- `web/components/AuthProvider.tsx` — both web and native are now gated by real
+  sign-in; the "first user doc" fallback is gone. First-time linking is done via
+  the `claim_workspace` Cloud Function (Admin SDK).
+- `web/components/LoginScreen.tsx` — "Continue with Apple" + "Continue with Google".
+- `web/components/SettingsModal.tsx` — in-app **Delete account** (calls
+  `delete_account`), required by App Store guideline 5.1.1(v).
+- Backend (`functions/`) — every data endpoint/callable verifies the Firebase ID
+  token and derives the workspace uid server-side (no more trusting a body
+  `uid`); new `claim_workspace` and `delete_account` callables.
+- `firestore.rules` — locked to `owns(uid)` (membership in `authUids`).
+- iOS `App.entitlements` — Sign in with Apple capability; `capacitor.config.ts` —
+  plugin config; `PrivacyInfo.xcprivacy` — added for both targets.
+
+---
+
+## 1. Dependencies
+
+```bash
+cd web
+npm install
+# Verify the plugin major matches Capacitor 8. package.json pins ^7.2.0 as a
+# placeholder — if npm warns about a peer/version mismatch with @capacitor/core 8,
+# install the matching major explicitly:
+npm install @capacitor-firebase/authentication@latest
+npx cap sync ios
+```
+
+`cap sync` installs the plugin's iOS pod (which pulls the native Firebase Auth
+SDK). That native SDK ships its own privacy manifest — no action needed for it.
+
+## 2. Firebase Console
+
+1. **Add an iOS app** to the Firebase project (bundle id `com.morhogeg.machina`)
+   if one doesn't exist. Download **`GoogleService-Info.plist`** and add it to the
+   `App` target in Xcode (drag in, "Copy items if needed", target = App). It is
+   gitignored — keep it out of the repo.
+2. **Authentication → Sign-in method:**
+   - **Google** — enabled (confirm).
+   - **Apple** — enable it. For **web** Apple sign-in you must also fill in the
+     Services ID, Apple Team ID, Key ID, and the `.p8` private key (step 3). For
+     **native** iOS, enabling the provider is enough.
+   - **Authorized domains** — add the Vercel domain and `*.web.app` / `firebaseapp.com`.
+
+## 3. Apple Developer
+
+1. **App ID** (`com.morhogeg.machina`) → enable the **Sign in with Apple** capability.
+2. For **web** Apple sign-in (only needed if you want Apple login on the desktop/PWA):
+   - Create a **Services ID**; set the return URL to
+     `https://<your-project>.firebaseapp.com/__/auth/handler`.
+   - Create a **Sign in with Apple key** (`.p8`); note the Key ID + Team ID and
+     paste the key into the Firebase Apple provider config.
+3. Regenerate provisioning profiles so they include the Sign in with Apple entitlement.
+
+## 4. Xcode
+
+1. **Signing & Capabilities → App target:** confirm **Sign in with Apple** appears
+   (the entitlement is already in `App.entitlements`); Xcode may need it re-added
+   through the UI to sync the provisioning profile.
+2. **URL scheme for native Google:** open the new `GoogleService-Info.plist`, copy
+   `REVERSED_CLIENT_ID`, and add it under **Info → URL Types** (or `CFBundleURLTypes`
+   in `Info.plist`). Without this the native Google flow can't return to the app.
+   *(Apple sign-in needs no URL scheme.)*
+3. **Privacy manifests:** add `App/PrivacyInfo.xcprivacy` to the **App** target and
+   `ShareExt/PrivacyInfo.xcprivacy` to the **ShareExt** target (each: File
+   Inspector → Target Membership, and confirm it's in *Copy Bundle Resources*).
+
+## 5. Environment variables (Cloud Functions)
+
+| Var | Purpose |
+|---|---|
+| `OWNER_EMAIL` | If set, only this account may claim the existing (single-owner) workspace via `claim_workspace`. Set it to your Google/Apple email for the migration. |
+| `ADMIN_TOKEN` | Required to reach the debug/admin endpoints (they 404 otherwise). |
+| `APPCHECK_ENFORCE=true` | Enforce App Check on the paid endpoints (closes audit H-2). |
+
+Web build (Vercel / `web/.env.local`): `NEXT_PUBLIC_OWNER_EMAIL` may still be set
+for parity, but claim gating is now enforced server-side by `OWNER_EMAIL`.
+
+## 6. Cutover order (important — avoids bricking)
+
+1. **Deploy Cloud Functions** first (they now require ID tokens; the updated web
+   client sends them). `cd functions && firebase deploy --only functions`.
+2. **Deploy the web app** (Vercel auto on push; Firebase Hosting via
+   `./deploy-hosting.sh`). Sign in on web with Google → confirm your existing
+   cards appear (this triggers `claim_workspace`, linking your account).
+3. **Test the locked rules in the Firestore emulator** (`firebase emulators:start`)
+   — verify: an owner can read/write their docs; a different signed-in account
+   cannot; the `authUids array-contains` query works; share pages still read.
+4. **Deploy Firestore rules** — `firebase deploy --only firestore:rules`. This is
+   the point of no return for the open-rules era; do it only after 1–3 pass.
+5. **Archive the iOS app** (after steps 1–4 in this file). `./build-ios.sh`, then
+   Xcode → Archive → TestFlight. Test Google **and** Apple sign-in on device, then
+   account deletion.
+
+## 7. Open questions / limits
+
+- **New (non-owner) users:** `claim_workspace` only links the *existing* unclaimed
+  workspace (single-owner migration). There is no self-serve "create a fresh empty
+  workspace for a brand-new user" flow yet — a new account currently lands on the
+  restricted screen. If you want open public sign-up, that onboarding path is a
+  follow-up (create `users/{newId}` with `authUids` on first sign-in).
+- **Plugin version** must match Capacitor 8 (see step 1).
+- **Sign in with Apple on web** is optional; if you only need it on iOS you can
+  skip the Services ID / `.p8` (step 3.2) — the iOS native flow doesn't use them.
