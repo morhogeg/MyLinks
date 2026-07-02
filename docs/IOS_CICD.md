@@ -21,12 +21,12 @@ I can't add these for you: they're your private Apple + Firebase credentials.
 | `ASC_KEY_ID` | App Store Connect API key ID | [App Store Connect → Users and Access → Integrations → App Store Connect API](https://appstoreconnect.apple.com/access/integrations/api) → create a key with **App Manager** role. It's the "Key ID". |
 | `ASC_ISSUER_ID` | Issuer ID | Same page, shown above the keys list. |
 | `ASC_KEY_P8_BASE64` | The `.p8` key file, base64 | Download the key once (`AuthKey_XXXX.p8`), then: `base64 -i AuthKey_XXXX.p8 \| pbcopy` |
-| `IOS_DIST_CERT_P12_BASE64` | Apple **Distribution** certificate incl. private key, base64 | Xcode → Settings → Accounts → Manage Certificates, or Keychain Access → export your "Apple Distribution" cert as `.p12`. Then `base64 -i cert.p12 \| pbcopy`. |
-| `IOS_DIST_CERT_PASSWORD` | Password you set when exporting the `.p12` | — |
-| `IOS_KEYCHAIN_PASSWORD` | Any random string (temp keychain password) | e.g. `openssl rand -base64 16` |
 
-Signing profiles are created/renewed automatically by `-allowProvisioningUpdates`
-using the API key, so you don't need to manage provisioning profiles by hand.
+**No exported distribution certificate is needed.** Signing uses Apple's
+cloud-managed distribution: `xcodebuild -allowProvisioningUpdates` with the API
+key above creates/reuses the signing certificate and provisioning profile
+automatically. (This relies on the project's automatic signing, which the app
+already uses.)
 
 ### Firebase web config (baked into the bundle at build time)
 Copy these from `web/.env.local`:

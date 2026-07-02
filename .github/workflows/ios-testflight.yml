@@ -72,20 +72,12 @@ jobs:
           npx cap sync ios
           test -f ios/App/App/public/index.html || { echo "::error::web bundle not synced"; exit 1; }
 
-      - name: Import signing certificate
-        env:
-          CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
-          CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
-        run: |
-          KEYCHAIN="$RUNNER_TEMP/app-signing.keychain-db"
-          echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
-          security import "$RUNNER_TEMP/cert.p12" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
-          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
-          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed s/\"//g)
+      # Signing uses Apple "cloud-managed" distribution: xcodebuild, given the
+      # App Store Connect API key + -allowProvisioningUpdates, creates/reuses a
+      # cloud signing certificate and provisioning profile automatically. No
+      # manually-exported .p12 certificate is needed (that's the step people get
+      # stuck on). Requires the project's automatic signing (CODE_SIGN_STYLE =
+      # Automatic), which this app already uses.
 
       - name: Install App Store Connect API key
         env:
