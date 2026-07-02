@@ -1,6 +1,52 @@
-# Session Handoff — MyLinks ("Second Brain")
+# Session Handoff — Machina AI
 
-_Last updated: 2026-07-02. Branch: `claude/brave-blackburn-0a8bcf` (merged to `main` + deployed)._
+_Last updated: 2026-07-02. Branch: `claude/upbeat-dewdney-68d438` (Phase 1 trust-wins M1/M4/M6/M7 — PR #11, merged to `main` after merging latest `main` in)._
+
+## Latest session — Phase 1 quick trust-wins: M1, M4, M6, M7 — 2026-07-02
+
+Per `MACHINA_SPEC.md` execution order step 1 (quick trust wins + the name). Web `tsc --noEmit` clean,
+eslint clean (only the two pre-existing warnings). Python `py_compile` clean. **PR #11, merged to `main`.**
+Merged the newer `main` in first (Curated-digest redesign + PR #12's M2/M3/M5 trust bugs + auth UX) —
+one real conflict in `SettingsModal.tsx` (kept main's redesigned full-screen layout + topic picker,
+re-applied the M7 dirty-tracking on top) and the HANDOFF banner. M8 (auth) is in flight separately.
+
+**M1 — One name "Machina AI" everywhere.** ✅ Done.
+- App identity → "Machina AI": `web/public/manifest.json` (name + short_name), `web/capacitor.config.ts`
+  (appName), `web/ios/App/App/Info.plist` (`CFBundleDisplayName`), `web/app/layout.tsx` (title,
+  appleWebApp title, `apple-mobile-web-app-title` meta).
+- Backend user-facing copy → "Machina AI": WhatsApp save/open labels (EN + HE) in
+  `functions/whatsapp_handler.py`; reminder loop copy (EN + HE) in `functions/reminder_service.py`;
+  digest email/WhatsApp footers, button, from-name in `functions/digest_service.py`; phone-not-recognized
+  reply in `functions/main.py`; assistant identity in `functions/ai_service.py`; `functions/.env.example`.
+- Docs: `README.md`, `SHORTCUT_SETUP.md` brand headers.
+- Acceptance grep (`grep -rI -e "Second Brain" -e "MyLinks" web/ functions/ *.md`) now returns **only
+  intentional internal refs**: the `morhogeg/MyLinks` repo name / `~/MyLinks` local paths, and the
+  planning/spec/QA docs that discuss the rename itself (PRODUCT_REVIEW, MACHINA_SPEC, TASKS, AUTH_SPEC,
+  ios-qa-report) + the historical changelog line in this file. Bundle id `com.morhogeg.machina` kept.
+
+**M4 — Deep-link modal opens once.** ✅ Already shipped (verify-only). The fix (ref guard +
+`history.replaceState` to strip `?linkId`) already exists in `web/components/Feed.tsx` (commit
+`e45c85e`, on `main`). Confirmed it matches the spec's acceptance; no code change needed.
+
+**M6 — Honest progress states (kill the fake 99%).** ✅ Done. Removed the simulated `0→99%` numeric
+readout and determinate width-bar from `web/components/LinkScanProgress.tsx`, `ImageScanProgress.tsx`,
+`VideoScanProgress.tsx`. Kept the scan-sweep + phase labels; replaced the bar with a new indeterminate
+treatment (`animate-progress-indeterminate` keyframe in `web/app/globals.css`, also added to the
+reduced-motion block). Center now shows an icon + honest phase label (green check on done). Dropped the
+`Analyzing… NN%` text from the minimized chip in `AddLinkForm.tsx`. The `progress` prop still advances
+the phase labels; only the lying number is gone. (Reading-view scroll bar is a real scroll %, left as-is.)
+
+**M7 — Settings never silently discards edits.** ✅ Done. `web/components/SettingsModal.tsx`: extracted
+`DEFAULT_SETTINGS`, capture a baseline of `settings` + `email` on load, compute `isDirty()`, and route
+every close affordance (backdrop, X, Cancel, edge-swipe-back) through `handleClose()` — which pops a
+"Discard changes?" `ConfirmDialog` when dirty and closes freely when clean. Theme is excluded (it applies
+live via ThemeProvider, not this form's Save). Also added a busy-guard to `ConfirmDialog.tsx` (a
+`confirmedRef` reset on open) so a double-tap on Confirm fires `onConfirm` exactly once.
+
+**Ship note:** frontend changes → after merge, run `./deploy-hosting.sh` for the iPhone PWA and redeploy
+Cloud Functions (`./deploy-functions.sh`) for the M1 backend copy. Native iOS app needs a rebuild
+(`./build-ios.sh`) to pick up the `CFBundleDisplayName` / capacitor appName rename.
+
 
 ## Latest session — Curated digest settings redesign — 2026-07-02
 

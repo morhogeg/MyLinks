@@ -20,7 +20,7 @@ class AnalysisError(Exception):
     error instead of silently saving a junk 'Analysis Failed' card."""
 
 # Professional system prompt
-SYSTEM_PROMPT = """You are a professional knowledge extraction assistant for a "Second Brain" system.
+SYSTEM_PROMPT = """You are a professional knowledge extraction assistant for Machina AI, a personal knowledge capture and recall system.
 Your goal is to objectively summarize web content with accuracy and precision. Do NOT add opinions, interpretations, or subjective assessments.
 
 Output MUST be a valid JSON object only.
@@ -245,7 +245,7 @@ If the image is an article, extract the headline and body."""
         `cards` is a list of dicts with id/title/summary/category/tags. Returns
         {"answer": str, "citedIds": [str]}. Raises AnalysisError on failure.
 
-        The whole point of a "Second Brain" answer is trust: the model must
+        The whole point of a Machina AI answer is trust: the model must
         speak only from what the user actually saved, and cite it. Generation is
         schema-constrained (BrainAnswer) so the model returns valid, fully
         escaped JSON even when the answer contains quotes or newlines — a plain
@@ -296,7 +296,7 @@ If the image is an article, extract the headline and body."""
                 turns.append(f"{role}: {h.get('content', '')}")
             history_text = "\n\nEarlier in this conversation:\n" + "\n".join(turns)
 
-        prompt = f"""You are the user's "Second Brain" assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved.
+        prompt = f"""You are Machina AI, the user's personal knowledge assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved.
 
 Rules:
 - Ground every claim in the provided sources. Do NOT use outside knowledge or invent facts.
@@ -387,7 +387,7 @@ Return ONLY a JSON object: {{"answer": string, "citedIds": string[]}} where cite
                 turns.append(f"{role}: {h.get('content', '')}")
             history_text = "\n\nEarlier in this conversation:\n" + "\n".join(turns)
 
-        prompt = f"""You are the user's "Second Brain" assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved.
+        prompt = f"""You are Machina AI, the user's personal knowledge assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved.
 
 Rules:
 - Ground every claim in the provided sources. Do NOT use outside knowledge or invent facts.

@@ -1,6 +1,6 @@
-# Save to Second Brain — iOS Shortcut Setup
+# Save to Machina AI — iOS Shortcut Setup
 
-This adds **"Save to Second Brain"** to your iPhone/iPad share sheet. Tap Share in any app
+This adds **"Save to Machina AI"** to your iPhone/iPad share sheet. Tap Share in any app
 (Safari, Google Maps, Instagram, X, …) → pick it → the link is captured, AI-analyzed, and
 appears in your feed within seconds.
 
@@ -11,7 +11,7 @@ appears in your feed within seconds.
 
 ## 1. Get your endpoint + token
 
-In the app: **Settings → Share to Second Brain**. You'll see two values:
+In the app: **Settings → Share to Machina AI**. You'll see two values:
 
 - **Endpoint URL** — e.g. `https://secondbrain-app-94da2.web.app/api/share`
 - **Ingest Token** — a long random string (keep it private)
@@ -22,7 +22,7 @@ Copy both (tap the copy button). You'll paste them in step 2.
 
 ## 2. Build the Shortcut
 
-Open the **Shortcuts** app → **+** (new shortcut) → name it **Save to Second Brain**.
+Open the **Shortcuts** app → **+** (new shortcut) → name it **Save to Machina AI**.
 
 1. **Shortcut details / Info** → enable **Show in Share Sheet**.
    - Under *Share Sheet Types*, keep **URLs** and **Text** enabled (you can turn the rest off).
@@ -45,8 +45,8 @@ That's it. Save the shortcut.
 
 ## 3. Use it
 
-In **Safari**: tap **Share** → scroll to **Save to Second Brain**.
-In **Google Maps**: open a place → **Share** → **Save to Second Brain** (captures the
+In **Safari**: tap **Share** → scroll to **Save to Machina AI**.
+In **Google Maps**: open a place → **Share** → **Save to Machina AI** (captures the
 `maps.app.goo.gl` link).
 Same in Instagram, X, News, etc.
 

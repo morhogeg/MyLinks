@@ -279,7 +279,7 @@ def format_digest_whatsapp_messages(cards: List[dict], mode: str, topics, freque
     period = "Daily" if frequency == "daily" else "Weekly"
     blurb = MODE_BLURB.get(mode, MODE_BLURB["smart"]).format(topic=_topics_label(topics))
     header = f"🧠 *Your {period} Brew* — {len(cards)} cards\n_{blurb}_"
-    footer = (f"📲 Open Second Brain:\n{APP_URL}\n\n"
+    footer = (f"📲 Open Machina AI:\n{APP_URL}\n\n"
               "_Reply DIGEST for a fresh one • STOP DIGEST to pause_")
 
     blocks = [_whatsapp_card_block(i, c) for i, c in enumerate(cards, 1)]
@@ -366,10 +366,10 @@ def format_digest_email(cards: List[dict], mode: str, topics, frequency: str) ->
         </td></tr>
         {''.join(rows)}
         <tr><td align="center" style="padding:8px 0 4px;">
-          <a href="{html.escape(APP_URL)}" style="display:inline-block;background:linear-gradient(90deg,#7c3aed,#db2777);color:#fff;font:700 14px/1 -apple-system,Segoe UI,Roboto,sans-serif;text-decoration:none;padding:14px 26px;border-radius:999px;">Open Second Brain</a>
+          <a href="{html.escape(APP_URL)}" style="display:inline-block;background:linear-gradient(90deg,#7c3aed,#db2777);color:#fff;font:700 14px/1 -apple-system,Segoe UI,Roboto,sans-serif;text-decoration:none;padding:14px 26px;border-radius:999px;">Open Machina AI</a>
         </td></tr>
         <tr><td align="center" style="padding:22px 0 0;">
-          <div style="font:400 12px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#5c5c75;">You're getting this because digests are on in your Second Brain.<br/>Change the schedule, topic, or turn it off anytime in Settings.</div>
+          <div style="font:400 12px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#5c5c75;">You're getting this because digests are on in Machina AI.<br/>Change the schedule, topic, or turn it off anytime in Settings.</div>
         </td></tr>
       </table>
     </td></tr>
@@ -384,7 +384,7 @@ def format_digest_email(cards: List[dict], mode: str, topics, frequency: str) ->
             text_lines.append(f"   {c['summary']}")
         text_lines.append(f"   {_link_url(c['id'])}")
         text_lines.append("")
-    text_lines.append(f"Open Second Brain: {APP_URL}")
+    text_lines.append(f"Open Machina AI: {APP_URL}")
     text_body = "\n".join(text_lines)
 
     return subject, html_body, text_body
@@ -395,7 +395,7 @@ def format_digest_email(cards: List[dict], mode: str, topics, frequency: str) ->
 # ─────────────────────────────────────────────────────────────────────────
 
 def _from_email() -> str:
-    return os.environ.get("DIGEST_FROM_EMAIL", "Second Brain <digest@secondbrain.app>")
+    return os.environ.get("DIGEST_FROM_EMAIL", "Machina AI <digest@secondbrain.app>")
 
 
 def send_email(to_email: str, subject: str, html_body: str, text_body: str) -> bool:
@@ -468,8 +468,8 @@ def _parse_from(value: str) -> dict:
     if "<" in value and ">" in value:
         name = value.split("<")[0].strip()
         email_addr = value.split("<")[1].split(">")[0].strip()
-        return {"email": email_addr, "name": name or "Second Brain"}
-    return {"email": value.strip(), "name": "Second Brain"}
+        return {"email": email_addr, "name": name or "Machina AI"}
+    return {"email": value.strip(), "name": "Machina AI"}
 
 
 # ─────────────────────────────────────────────────────────────────────────

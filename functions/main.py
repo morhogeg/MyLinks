@@ -1435,7 +1435,7 @@ def whatsapp_webhook(request):
 
     if not uid:
         logger.warning(f"Unauthorized number: {payload.from_number}")
-        msg = "❌ מצטערים, מספר הטלפון שלך לא מזוהה. אנא וודא שהוא תואם להגדרות." if user_msg_is_hebrew else "❌ Sorry, your phone number is not recognized. Please make sure it matches the number in your Second Brain settings."
+        msg = "❌ מצטערים, מספר הטלפון שלך לא מזוהה. אנא וודא שהוא תואם להגדרות." if user_msg_is_hebrew else "❌ Sorry, your phone number is not recognized. Please make sure it matches the number in your Machina AI settings."
         send_whatsapp_message(payload.from_number, msg)
         return https_fn.Response(json.dumps({"error": "User not found"}), status=403, mimetype="application/json")
 

@@ -11,13 +11,13 @@ const geistSans = GeistSans;
 const geistMono = GeistMono;
 
 export const metadata: Metadata = {
-  title: "Machina",
+  title: "Machina AI",
   description: "Your AI-powered knowledge capture and retrieval system",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Machina",
+    title: "Machina AI",
   },
   icons: {
     apple: "/apple-touch-icon.png",
@@ -58,7 +58,7 @@ export default function RootLayout({
         {/* PWA iOS meta tags */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Machina" />
+        <meta name="apple-mobile-web-app-title" content="Machina AI" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body

@@ -1,6 +1,6 @@
 {
-  "name": "Machina",
-  "short_name": "Machina",
+  "name": "Machina AI",
+  "short_name": "Machina AI",
   "description": "Your AI-powered knowledge capture and retrieval system",
   "start_url": "/",
   "display": "standalone",
