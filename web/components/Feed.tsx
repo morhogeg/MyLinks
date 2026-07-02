@@ -44,7 +44,7 @@ type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
  * - Real-time updates via Firestore onSnapshot
  * - Keyword + semantic search
  * - Filter by status, category, and tags
- * - Multiple view modes (grid / compact / table / insights)
+ * - Two card views (grid / list), plus review, ask, and collections modes
  * - Deep linking to specific links via URL params
  */
 function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void }) {

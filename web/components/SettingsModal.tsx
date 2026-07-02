@@ -28,14 +28,21 @@ const FREQUENCY_NOTE: Record<string, string> = {
     weekly: 'A weekly nudge to revisit what you saved.',
 };
 
-const DIGEST_MODES: { value: DigestMode; label: string; icon: ReactNode; note: string }[] = [
+// The three primary modes cover the common cases; the rest live behind an
+// "Advanced" disclosure so the picker isn't six equal-weight choices (M14).
+// The backend still curates every mode — this is presentation only.
+const DIGEST_MODES: { value: DigestMode; label: string; icon: ReactNode; note: string; advanced?: boolean }[] = [
     { value: 'smart', label: 'Smart mix', icon: <Sparkles className="w-[18px] h-[18px]" />, note: 'A balanced blend of your backlog and older gems worth a second look.' },
-    { value: 'random', label: 'Surprise me', icon: <Shuffle className="w-[18px] h-[18px]" />, note: 'A random handful from across your whole library.' },
-    { value: 'topic', label: 'By topic', icon: <Tag className="w-[18px] h-[18px]" />, note: 'Only cards from a category or tag you choose.' },
     { value: 'unread', label: 'Backlog', icon: <Inbox className="w-[18px] h-[18px]" />, note: 'Chip away at what you saved but never read (oldest first).' },
-    { value: 'favorites', label: 'Favorites', icon: <Star className="w-[18px] h-[18px]" />, note: 'Bring your starred cards back for an encore.' },
     { value: 'rediscover', label: 'Rediscover', icon: <History className="w-[18px] h-[18px]" />, note: 'Resurface older saves you haven\'t opened in a while.' },
+    { value: 'random', label: 'Surprise me', icon: <Shuffle className="w-[18px] h-[18px]" />, note: 'A random handful from across your whole library.', advanced: true },
+    { value: 'topic', label: 'By topic', icon: <Tag className="w-[18px] h-[18px]" />, note: 'Only cards from a category or tag you choose.', advanced: true },
+    { value: 'favorites', label: 'Favorites', icon: <Star className="w-[18px] h-[18px]" />, note: 'Bring your starred cards back for an encore.', advanced: true },
 ];
+
+const PRIMARY_DIGEST_MODES = DIGEST_MODES.filter((m) => !m.advanced);
+const ADVANCED_DIGEST_MODES = DIGEST_MODES.filter((m) => m.advanced);
+const ADVANCED_MODE_VALUES = new Set<DigestMode>(ADVANCED_DIGEST_MODES.map((m) => m.value));
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
@@ -77,6 +84,9 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
     const [categoryTopics, setCategoryTopics] = useState<string[]>([]);
     const [tagTopics, setTagTopics] = useState<string[]>([]);
     const [topicQuery, setTopicQuery] = useState('');
+    // Advanced digest modes (Surprise me / By topic / Favorites) stay tucked
+    // behind a disclosure until the user asks for them — or is already using one.
+    const [showAdvancedModes, setShowAdvancedModes] = useState(false);
 
     // Dirty-tracking (M7): baselines captured when the form loads, so closing
     // with unsaved edits warns instead of silently discarding the user's work.
@@ -132,6 +142,12 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
             loadDigestExtras();
         }
     }, [isOpen, uid]);
+
+    // Keep the advanced disclosure open whenever an advanced mode is selected,
+    // so the current choice is never hidden behind a collapsed section.
+    useEffect(() => {
+        if (ADVANCED_MODE_VALUES.has(settings.digest_mode)) setShowAdvancedModes(true);
+    }, [settings.digest_mode]);
 
     const loadDigestExtras = async () => {
         try {
@@ -379,17 +395,37 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                             />
                         </Row>
 
-                        {settings.reminders_enabled && (
+                        {settings.reminders_enabled && (() => {
+                            // Two front-and-center choices (M14): "Smart (spaced)" is
+                            // the recommended default; "Custom" reveals the fixed
+                            // Daily / Weekly cadences — still reachable, not up front.
+                            const isCustom = settings.reminder_frequency === 'daily' || settings.reminder_frequency === 'weekly';
+                            return (
                             <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
                                 <Segmented
-                                    value={settings.reminder_frequency || 'smart'}
-                                    onChange={(v) => setSettings((p) => ({ ...p, reminder_frequency: v as Frequency }))}
+                                    value={isCustom ? 'custom' : 'smart'}
+                                    onChange={(v) => setSettings((p) => ({
+                                        ...p,
+                                        // Entering Custom keeps an existing fixed cadence, else defaults to weekly.
+                                        reminder_frequency: v === 'smart'
+                                            ? 'smart'
+                                            : (p.reminder_frequency === 'daily' || p.reminder_frequency === 'weekly' ? p.reminder_frequency : 'weekly'),
+                                    }))}
                                     options={[
-                                        { value: 'smart', label: 'Smart' },
-                                        { value: 'daily', label: 'Daily' },
-                                        { value: 'weekly', label: 'Weekly' },
+                                        { value: 'smart', label: 'Smart (spaced)' },
+                                        { value: 'custom', label: 'Custom' },
                                     ]}
                                 />
+                                {isCustom && (
+                                    <Segmented
+                                        value={settings.reminder_frequency as Frequency}
+                                        onChange={(v) => setSettings((p) => ({ ...p, reminder_frequency: v as Frequency }))}
+                                        options={[
+                                            { value: 'daily', label: 'Daily' },
+                                            { value: 'weekly', label: 'Weekly' },
+                                        ]}
+                                    />
+                                )}
                                 <div className="flex gap-2 p-3 rounded-xl bg-accent/5 border border-accent/10">
                                     <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
                                     <p className="text-[12px] text-text-secondary leading-relaxed">
@@ -397,7 +433,8 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                                     </p>
                                 </div>
                             </div>
-                        )}
+                            );
+                        })()}
                     </Section>
 
                     {/* Curated Digest */}
@@ -478,32 +515,44 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                             </div>
                         </div>
 
-                        {/* What to send */}
+                        {/* What to send — three primary modes up front, the rest
+                            behind an Advanced disclosure (M14). */}
                         <div className="space-y-3">
                             <GroupLabel icon={<Sparkles className="w-4 h-4" />} title="What to send" />
                             <div className="grid grid-cols-2 gap-2.5">
-                                {DIGEST_MODES.map((m) => {
-                                    const active = settings.digest_mode === m.value;
-                                    return (
-                                        <button
-                                            key={m.value}
-                                            onClick={() => setSettings((p) => ({ ...p, digest_mode: m.value }))}
-                                            aria-pressed={active}
-                                            className={`relative flex flex-col items-center justify-center gap-2 py-3.5 rounded-2xl border transition-all duration-150 cursor-pointer ${active ? 'bg-accent/10 border-accent/50 shadow-[0_0_0_1px_var(--accent-ring)]' : 'bg-card-hover border-border-subtle hover:border-text-muted/40 hover:-translate-y-px'}`}
-                                        >
-                                            {active && (
-                                                <span className="absolute top-2 right-2 w-4 h-4 rounded-full bg-accent flex items-center justify-center">
-                                                    <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
-                                                </span>
-                                            )}
-                                            <span className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${active ? 'bg-[image:var(--accent-gradient)] text-white shadow-md shadow-purple-500/25 ring-1 ring-white/15' : 'bg-card border border-border-subtle text-text-secondary'}`}>
-                                                {m.icon}
-                                            </span>
-                                            <span className={`text-[12.5px] font-semibold ${active ? 'text-accent' : 'text-text-secondary'}`}>{m.label}</span>
-                                        </button>
-                                    );
-                                })}
+                                {PRIMARY_DIGEST_MODES.map((m) => (
+                                    <DigestModeButton
+                                        key={m.value}
+                                        mode={m}
+                                        active={settings.digest_mode === m.value}
+                                        onClick={() => setSettings((p) => ({ ...p, digest_mode: m.value }))}
+                                    />
+                                ))}
                             </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setShowAdvancedModes((v) => !v)}
+                                aria-expanded={showAdvancedModes}
+                                className="w-full flex items-center justify-center gap-1.5 text-[12px] font-semibold text-text-muted hover:text-text transition-colors cursor-pointer py-1"
+                            >
+                                {showAdvancedModes ? 'Hide advanced modes' : 'More ways to curate'}
+                                <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showAdvancedModes ? 'rotate-90' : ''}`} />
+                            </button>
+
+                            {showAdvancedModes && (
+                                <div className="grid grid-cols-2 gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                    {ADVANCED_DIGEST_MODES.map((m) => (
+                                        <DigestModeButton
+                                            key={m.value}
+                                            mode={m}
+                                            active={settings.digest_mode === m.value}
+                                            onClick={() => setSettings((p) => ({ ...p, digest_mode: m.value }))}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+
                             <div className="flex gap-2.5 items-start p-3 rounded-xl bg-accent/5 border border-accent/10">
                                 <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
                                 <p className="text-[12px] text-text-secondary leading-relaxed">
@@ -762,6 +811,26 @@ function GroupLabel({ icon, title, action }: { icon: ReactNode; title: string; a
             </div>
             {action}
         </div>
+    );
+}
+
+function DigestModeButton({ mode, active, onClick }: { mode: { value: DigestMode; label: string; icon: ReactNode }; active: boolean; onClick: () => void }) {
+    return (
+        <button
+            onClick={onClick}
+            aria-pressed={active}
+            className={`relative flex flex-col items-center justify-center gap-2 py-3.5 rounded-2xl border transition-all duration-150 cursor-pointer ${active ? 'bg-accent/10 border-accent/50 shadow-[0_0_0_1px_var(--accent-ring)]' : 'bg-card-hover border-border-subtle hover:border-text-muted/40 hover:-translate-y-px'}`}
+        >
+            {active && (
+                <span className="absolute top-2 right-2 w-4 h-4 rounded-full bg-accent flex items-center justify-center">
+                    <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                </span>
+            )}
+            <span className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${active ? 'bg-[image:var(--accent-gradient)] text-white shadow-md shadow-purple-500/25 ring-1 ring-white/15' : 'bg-card border border-border-subtle text-text-secondary'}`}>
+                {mode.icon}
+            </span>
+            <span className={`text-[12.5px] font-semibold ${active ? 'text-accent' : 'text-text-secondary'}`}>{mode.label}</span>
+        </button>
     );
 }
 
