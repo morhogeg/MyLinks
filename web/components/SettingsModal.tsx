@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { User, DigestMode, DigestChannel } from '@/lib/types';
 import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight, Compass, LogOut, UserCircle, CalendarClock, Search } from 'lucide-react';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '@/lib/firebase';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from './AuthProvider';
@@ -76,8 +74,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
     const [categoryTopics, setCategoryTopics] = useState<string[]>([]);
     const [tagTopics, setTagTopics] = useState<string[]>([]);
     const [topicQuery, setTopicQuery] = useState('');
-    const [sendingNow, setSendingNow] = useState(false);
-    const [sendResult, setSendResult] = useState<string | null>(null);
 
     // On phones Settings is a real full-screen page (slides in, fills the screen,
     // clears the notch); on desktop it stays a centered modal.
@@ -238,38 +234,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
             .join(' & ') || 'no channel';
         return `${mode} · ${settings.digest_count} cards · ${when} · ${where}`;
     })();
-
-    const handleSendNow = async () => {
-        setSendingNow(true);
-        setSendResult(null);
-        try {
-            // Persist first so the preview reflects exactly what's configured.
-            await updateUserSettings(uid, {
-                digest_mode: settings.digest_mode,
-                digest_topics: settings.digest_topics,
-                digest_count: settings.digest_count,
-                digest_channels: settings.digest_channels,
-                digest_frequency: settings.digest_frequency,
-            });
-            if (email.trim()) await updateUserEmail(uid, email.trim());
-
-            const fn = httpsCallable(functions, 'send_digest_now');
-            const result = await fn({ uid });
-            const data = result.data as { sent: boolean; channels: string[]; card_count: number; skipped?: string };
-            if (data.sent) {
-                setSendResult(`✅ Sent ${data.card_count} cards via ${data.channels.join(' & ')}.`);
-            } else if (data.skipped === 'no_cards') {
-                setSendResult('📭 Nothing to curate yet — save a few links first.');
-            } else {
-                setSendResult('⚠️ Couldn\'t deliver — check your channel settings.');
-            }
-        } catch (error) {
-            console.error('Send digest now failed:', error);
-            setSendResult('⚠️ Something went wrong sending the digest.');
-        } finally {
-            setSendingNow(false);
-        }
-    };
 
     // Derived topic-picker state (only meaningful in topic mode).
     const totalTopics = categoryTopics.length + tagTopics.length;
@@ -545,7 +509,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                                         <p className="text-[12px] text-text-muted">Save some links first to build topics.</p>
                                     </div>
                                 ) : (
-                                    <div className="rounded-2xl border border-border-subtle bg-card-hover/40 p-3 space-y-3">
+                                    <div className="rounded-2xl border border-border-subtle bg-card-hover/40 p-4 space-y-4">
                                         {/* Selected — always visible, removable */}
                                         {settings.digest_topics.length > 0 && (
                                             <div className="flex flex-wrap gap-1.5">
@@ -590,7 +554,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                                         {visibleCategories.length === 0 && visibleTags.length === 0 ? (
                                             <p className="text-[12px] text-text-muted text-center py-3">No topics match “{topicQuery}”.</p>
                                         ) : (
-                                            <div className="max-h-56 overflow-y-auto scrollbar-subtle pr-1 space-y-3.5">
+                                            <div className="max-h-[22rem] overflow-y-auto scrollbar-subtle pr-1 space-y-4">
                                                 {visibleCategories.length > 0 && (
                                                     <TopicGroup label="Categories">
                                                         {visibleCategories.map((t) => (
@@ -706,21 +670,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                                 </div>
                             </div>
                         </div>
-
-                        {/* Send one now */}
-                        <div className="space-y-2">
-                            <button
-                                onClick={handleSendNow}
-                                disabled={sendingNow || settings.digest_channels.length === 0}
-                                className="w-full h-11 rounded-xl bg-[image:var(--accent-gradient)] text-[13px] font-semibold text-white shadow-lg shadow-purple-500/20 ring-1 ring-white/15 hover:opacity-95 transition-opacity flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
-                            >
-                                <Send className="w-4 h-4" />
-                                {sendingNow ? 'Sending…' : 'Send a preview now'}
-                            </button>
-                            {sendResult && (
-                                <p className="text-[12px] text-text-secondary text-center animate-in fade-in duration-200">{sendResult}</p>
-                            )}
-                        </div>
                     </div>
                   )}
                   </div>
@@ -780,9 +729,9 @@ function GroupLabel({ icon, title, action }: { icon: ReactNode; title: string; a
 
 function TopicGroup({ label, children }: { label: string; children: ReactNode }) {
     return (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
             <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-text-muted/70 px-0.5">{label}</div>
-            <div className="flex flex-wrap gap-2">{children}</div>
+            <div className="flex flex-wrap gap-2.5">{children}</div>
         </div>
     );
 }
