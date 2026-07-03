@@ -204,8 +204,9 @@ The multi-user auth work is **fully written but not live**:
    both `PrivacyInfo.xcprivacy` files wired into `project.pbxproj` by hand —
    file refs + build files + group membership + Copy Bundle Resources for App,
    and a new Resources build phase created for ShareExt, which had none.
-   Pending confirmation by the next CI archive: both `.app` and `.appex`
-   bundles must contain `PrivacyInfo.xcprivacy`).*
+   **CI-confirmed:** run #8 (2026-07-03) archived and uploaded build 1008 with
+   the edited pbxproj — Xcode accepted the wiring. Spot-check the manifests in
+   the delivered build via TestFlight/Connect if paranoid).*
 8. **[x] Privacy policy + Terms URLs, App Privacy "nutrition label", App Store
    metadata** *(doc/code side done 2026-07-03).* Hosted pages live:
    `web/app/privacy/page.tsx` + `web/app/terms/page.tsx` (static, prose,
@@ -475,6 +476,15 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-03 — P1 pack CI-verified + shipped (multi-agent session).** All
+  automatable P1 items done in one round (three agents, entries below): AI
+  consent (task 6), privacy manifests wired + iPhone-only (task 7 + half of 9),
+  legal pages + App Store pack (task 8 + doc half of 9). **CI run #8 green —
+  build 1008 uploaded to TestFlight** with the wired manifests and
+  `TARGETED_DEVICE_FAMILY = 1`; merged to `main` (Vercel deployed `/privacy`,
+  `/terms`, and the consent screen to the web). Remaining P1 is owner-only:
+  device sweep (task 11), reviewer demo account + screenshots + clicking the
+  Connect forms from `docs/APP_STORE.md`.
 - **2026-07-03 — Legal pages + App Store pack (§4 task 8 + doc half of 9).**
   Hosted Privacy Policy and Terms shipped as static pages
   (`web/app/privacy/page.tsx`, `web/app/terms/page.tsx` — prose column, theme
