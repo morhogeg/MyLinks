@@ -35,6 +35,7 @@ from link_service import (
     find_user_by_phone, save_link_to_firestore, get_user_tags, is_hebrew,
     ensure_ingest_token, find_user_by_ingest_token, link_exists_for_url,
     pending_exists_for_url, find_data_uid_by_auth_uid, delete_user_data,
+    create_workspace,
 )
 from reminder_service import handle_reminder_intent, set_reminder, calculate_next_reminder, run_reminder_check, format_local_time
 from graph_service import GraphService
@@ -427,6 +428,9 @@ def backfill_related_links(req: https_fn.Request) -> https_fn.Response:
     headers = _cors_headers(req)
     if req.method == "OPTIONS":
         return https_fn.Response("", status=204, headers=headers)
+    guard = _require_admin(req, headers)
+    if guard:
+        return guard
     try:
         uid = req.args.get("uid") or (req.get_json(silent=True) or {}).get("uid")
         force = str(req.args.get("force") or "").lower() in ("1", "true", "yes")
@@ -1138,14 +1142,22 @@ def get_share_config(req: https_fn.CallableRequest) -> dict:
 
 @https_fn.on_call()
 def claim_workspace(req: https_fn.CallableRequest) -> dict:
-    """First-time link of a signed-in account to its data workspace.
+    """Resolve (or set up) the data workspace for a signed-in account.
 
     Runs with Admin privileges (bypasses Firestore rules), so it still works
     after the rules are locked — unlike a client-side claim, which can't read an
-    arbitrary unclaimed doc under locked rules. If already linked, returns that
-    workspace. Otherwise claims the single unclaimed owner doc, gated by the
-    OWNER_EMAIL allowlist when set. A new (non-owner) account gets no workspace
-    and the client shows the restricted screen.
+    arbitrary unclaimed doc under locked rules. Resolution order:
+
+    1. Already linked (`authUids array-contains` the caller) → return it.
+    2. Legacy owner claim: link the single pre-auth unclaimed doc, gated by the
+       OWNER_EMAIL allowlist when set (only the owner email may claim it).
+    3. New-user path (REQUIRE_AUTH on only): create a fresh, empty workspace
+       keyed by the Firebase Auth uid (see link_service.create_workspace) and
+       return it with `created: True` so the client can show onboarding.
+
+    With REQUIRE_AUTH off (pre-cutover live state) step 3 is skipped, so a
+    non-owner account still gets `uid: None` (restricted screen) — the live
+    app's behavior is unchanged until the flag flips.
     """
     if not req.auth:
         raise https_fn.HttpsError(
@@ -1157,25 +1169,31 @@ def claim_workspace(req: https_fn.CallableRequest) -> dict:
 
     existing = find_data_uid_by_auth_uid(auth_uid)
     if existing:
-        return {"uid": existing}
+        return {"uid": existing, "created": False}
 
     owner_email = os.environ.get("OWNER_EMAIL", "")
-    if owner_email and email != owner_email:
-        return {"uid": None}
+    if not owner_email or email == owner_email:
+        db = get_db()
+        # Claim the first doc that has no authUids yet (bounded scan). In the
+        # single-owner migration there is exactly one such doc.
+        for doc in db.collection("users").limit(50).stream():
+            d = doc.to_dict() or {}
+            if not d.get("authUids"):
+                update = {"authUids": [auth_uid]}
+                if email:
+                    update["email"] = email
+                doc.reference.set(update, merge=True)
+                logger.info("Claimed workspace for signed-in account")
+                return {"uid": doc.id, "created": False}
 
-    db = get_db()
-    # Claim the first doc that has no authUids yet (bounded scan). In the
-    # single-owner migration there is exactly one such doc.
-    for doc in db.collection("users").limit(50).stream():
-        d = doc.to_dict() or {}
-        if not d.get("authUids"):
-            update = {"authUids": [auth_uid]}
-            if email:
-                update["email"] = email
-            doc.reference.set(update, merge=True)
-            logger.info("Claimed workspace for signed-in account")
-            return {"uid": doc.id}
-    return {"uid": None}
+    # Nothing to claim (non-owner, or the owner doc is already linked to a
+    # different account) → self-serve sign-up. Flag-gated: only once the
+    # auth cutover is live.
+    if not REQUIRE_AUTH:
+        return {"uid": None, "created": False}
+
+    new_uid = create_workspace(auth_uid, email)
+    return {"uid": new_uid, "created": True}
 
 
 @https_fn.on_call()

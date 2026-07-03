@@ -1,5 +1,6 @@
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, getDocs, getDoc, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { db, appCheckHeaders } from './firebase';
+import { authHeaders } from './auth';
 import { apiUrl } from './api';
 
 import { Link, LinkStatus, User } from './types';
@@ -81,7 +82,7 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
 
         const response = await fetch(apiUrl('/api/analyze'), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()) },
+            headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
             body: JSON.stringify({ url: link.url, existingTags, uid }),
         });
         const text = await response.text();

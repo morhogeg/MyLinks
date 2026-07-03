@@ -25,7 +25,7 @@ The `/api/*` calls are proxied to Firebase via `vercel.json`.
   (`https://secondbrain-app-94da2.web.app/api/share`) shown in Settings, OR your new
   Vercel domain `/api/share` (it's proxied to the same function).
 - Auth is still the single-user prototype (no login yet), so anyone with the link
-  sees the same data. Lock this down with real auth (TASKS.md T1) before sharing widely.
+  sees the same data. Lock this down with real auth (SOURCE_OF_TRUTH.md §4 task 2, the auth cutover) before sharing widely.
 - This does NOT replace Firebase Hosting; both can coexist. `firebase deploy` still
   works for the original `*.web.app` site.
 

@@ -1,0 +1,13 @@
+{
+  "firestore": {
+    "rules": "firestore.rules.locked.copy"
+  },
+  "emulators": {
+    "firestore": {
+      "port": 8080
+    },
+    "ui": {
+      "enabled": false
+    }
+  }
+}

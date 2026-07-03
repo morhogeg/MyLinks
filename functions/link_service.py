@@ -6,11 +6,33 @@ Handles Firestore operations for links and users.
 import re
 import secrets
 import logging
+from datetime import datetime, timezone
 from typing import Optional
+
+from google.cloud import firestore
 
 from db import get_db
 
 logger = logging.getLogger(__name__)
+
+# Defaults for a brand-new workspace. Mirrors DEFAULT_SETTINGS in
+# web/components/SettingsModal.tsx — keep the two in sync.
+DEFAULT_USER_SETTINGS = {
+    "theme": "dark",
+    "daily_digest": False,
+    "reminders_enabled": True,
+    "reminder_frequency": "smart",
+    "digest_enabled": False,
+    "digest_frequency": "weekly",
+    "digest_channels": ["whatsapp"],
+    "digest_mode": "smart",
+    "digest_topics": [],
+    "digest_topic": None,
+    "digest_count": 5,
+    "digest_hour": 9,
+    "digest_day": 0,
+    "digest_skip_empty": True,
+}
 
 
 def find_user_by_phone(phone_number: str) -> Optional[str]:
@@ -60,6 +82,48 @@ def find_data_uid_by_auth_uid(auth_uid: str) -> Optional[str]:
     if docs:
         return docs[0].id
     return None
+
+
+def create_workspace(auth_uid: str, email: Optional[str] = None) -> str:
+    """Create a fresh, empty workspace for a brand-new signed-in account.
+
+    Legacy data docs are keyed by phone number, but nothing requires that for
+    new users — the doc ID is the Firebase Auth uid (collision-free, known at
+    sign-in; WhatsApp/phone linking can be layered on later by setting the
+    phone fields on this same doc). The doc carries `authUids` so every
+    existing lookup path (rules, `find_data_uid_by_auth_uid`) works unchanged.
+
+    Idempotent: if the doc already exists (e.g. a retried partial create), the
+    account is merge-linked instead of overwritten. Also mints the ingest token
+    so the iOS Share Extension works immediately for the new workspace.
+    """
+    db = get_db()
+    user_ref = db.collection('users').document(auth_uid)
+    snapshot = user_ref.get()
+
+    if snapshot.exists:
+        update = {'authUids': firestore.ArrayUnion([auth_uid])}
+        if email and not (snapshot.to_dict() or {}).get('email'):
+            update['email'] = email
+        user_ref.set(update, merge=True)
+        logger.info("Re-linked existing doc as workspace for new account")
+    else:
+        doc = {
+            'authUids': [auth_uid],
+            'createdAt': int(datetime.now(timezone.utc).timestamp() * 1000),
+            'settings': dict(DEFAULT_USER_SETTINGS),
+            # First-run onboarding pending; the client flips this to True.
+            'onboarded': False,
+        }
+        if email:
+            doc['email'] = email
+        user_ref.set(doc)
+        logger.info("Created fresh workspace for new account")
+
+    # Share Extension auth — mint the token now so the share sheet works
+    # before the user ever opens Settings.
+    ensure_ingest_token(auth_uid)
+    return auth_uid
 
 
 def delete_user_data(uid: str) -> int:

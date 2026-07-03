@@ -117,10 +117,51 @@ for parity, but claim gating is now enforced server-side by `OWNER_EMAIL`.
    `NEXT_PUBLIC_REQUIRE_AUTH=true` (Vercel + `web/.env.local`) and redeploy both.
    Sign in on web with Google → confirm your cards appear (this triggers
    `claim_workspace`, linking your account). Rollback = flip both back off.
-4. **Test the locked rules in the Firestore emulator** (`firebase emulators:start`)
-   with `firestore.rules.locked` — verify: an owner can read/write their docs; a
-   different signed-in account cannot; the `authUids array-contains` query works;
-   share pages still read.
+
+   **Known break to fix BEFORE flipping** (found in the 2026-07-03 readiness
+   audit): `retryFailedLink` (`web/lib/storage.ts` ~line 82) POSTs
+   `/api/analyze` **without** `authHeaders()` — with `REQUIRE_AUTH=true` the
+   backend 401s and every failed-card Retry fails. Add
+   `...(await authHeaders())` to that fetch (same pattern as
+   `AddLinkForm.tsx`). Related, non-blocking notes:
+   - `/api/article` (`get_article`) verifies **no** token even when
+     `REQUIRE_AUTH` is on — reading view keeps working (its fetch in
+     `ReadingView.tsx` sends no auth header), but the endpoint stays
+     anonymous-callable (App Check + per-IP rate limit only). Decide whether
+     that's acceptable or add `_authed_uid` + a client header.
+   - `backfill_related_links` (functions/main.py) has **no `_require_admin`
+     guard** (unlike `backfill_youtube_channels`) — anyone who finds the URL can
+     trigger a paid all-user embedding backfill. Add the guard before/at cutover
+     (then pass `X-Admin-Token` when running the M9 backfill).
+   - Unaffected by the flag (verified): `share_ingest` still authenticates by
+     ingest token (Share Extension, Shortcut, browser extension keep working);
+     `whatsapp_webhook` by Twilio signature (fail-closed); the callables
+     (`search_links`, `get_share_config`, `send_digest_now`, `claim_workspace`,
+     `delete_account`) take the SDK-attached token; the Vercel proxy routes
+     (`web/app/api/*/route.ts`) forward the `Authorization` header.
+4. **Test the locked rules in the Firestore emulator** — a ready-made suite
+   lives in `firestore-rules-test/` (see its README):
+   `cd firestore-rules-test && npm install && npm test`
+   (needs Java for the emulator). It verifies: owner can read/write their
+   `users/{uid}` doc + `links`/`chats`/`collections` and read `syntheses`; the
+   `authUids array-contains` workspace-resolve **list query** works; a different
+   signed-in account and an unauthenticated client get nothing; `shared_cards`/
+   `shared_collections` are publicly readable but owner-only writable;
+   `rate_limits`/`pending_processing`/`task_logs` stay denied.
+
+   Rules changes staged 2026-07-03 in `firestore.rules.locked`:
+   - **`syntheses` subcollection added** (M12 was newer than the locked file):
+     client read-only; writes stay Cloud-Functions-only.
+   - **`users/{uid}` read rule rewritten** from `owns(uid)` to
+     `request.auth.uid in resource.data.authUids`: list rules can't call
+     `get()` with an unbound `{uid}`, so the old rule would have rejected the
+     workspace-resolve query and dead-ended every sign-in on the restricted
+     screen. The resource-based form is provable from the query's own
+     `array-contains` filter.
+   - **`users/{uid}` create/delete denied to clients** (claim/deletion are
+     Admin-SDK-side). If the new-user onboarding path creates the workspace doc
+     client-side rather than in `claim_workspace`, add an `allow create` first.
+   - `rate_limits` confirmed denied.
 5. **Deploy the locked rules** —
    `cp firestore.rules.locked firestore.rules && firebase deploy --only firestore:rules`.
    Point of no return for the open-rules era; do it only after 1–4 pass.

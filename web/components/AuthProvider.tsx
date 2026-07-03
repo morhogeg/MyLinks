@@ -12,6 +12,20 @@ import {
 } from '@/lib/auth';
 import { syncShareConfigToNative } from '@/lib/shareConfig';
 import LoginScreen from '@/components/LoginScreen';
+import Onboarding from '@/components/Onboarding';
+
+/** localStorage fallback for onboarding dismissal (user doc is the primary
+    record — this only covers a failed `onboarded: true` write). */
+const WELCOME_DISMISSED_KEY = 'machina_welcome_done';
+
+function welcomeDismissedLocally(docId: string): boolean {
+    try {
+        return localStorage.getItem(`${WELCOME_DISMISSED_KEY}:${docId}`) === '1';
+    } catch {
+        // Private mode — rely on the user-doc record (`onboarded`) alone.
+        return false;
+    }
+}
 
 interface AuthContextType {
     /** Firestore user document ID (the data key — a phone number today). */
@@ -77,8 +91,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [displayName, setDisplayName] = useState<string | null>(null);
     const [photoURL, setPhotoURL] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-    // Signed in, but the account isn't linked to any workspace.
+    // Signed in, but no workspace could be resolved or created (edge case —
+    // post-cutover this only happens when workspace creation failed).
     const [restricted, setRestricted] = useState(false);
+    // Fresh workspace → show the one-screen welcome before the app.
+    const [needsOnboarding, setNeedsOnboarding] = useState(false);
+    // Bumped by "Try again" on the restricted screen to re-run resolution.
+    const [retryNonce, setRetryNonce] = useState(0);
 
     const native = typeof window !== 'undefined' && isNativeApp();
 
@@ -90,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setDisplayName(null);
         setPhotoURL(null);
         setRestricted(false);
+        setNeedsOnboarding(false);
     }, []);
 
     // ── Legacy native path (pre-cutover only): load the owner workspace, no gate.
@@ -148,6 +168,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     setRestricted(false);
                     setUid(dataDoc.id);
                     attachUserDoc(dataDoc.id, dataDoc.data);
+                    // First run for a fresh workspace: the backend returns
+                    // `created` on creation and stamps `onboarded: false` on
+                    // the doc (covers a reload before dismissal).
+                    setNeedsOnboarding(
+                        (dataDoc.created || dataDoc.data?.onboarded === false)
+                        && !welcomeDismissedLocally(dataDoc.id),
+                    );
                 } else {
                     setRestricted(true);
                     setUid(null);
@@ -161,7 +188,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         return () => { cancelled = true; unsub(); };
-    }, []);
+        // retryNonce re-runs resolution (onAuthChange re-fires with the
+        // current user on resubscribe) after a failed workspace setup.
+    }, [retryNonce]);
+
+    // Dismiss the first-run welcome: record it on the user doc (authoritative,
+    // survives devices) with a localStorage fallback if the write fails.
+    const finishOnboarding = useCallback(() => {
+        setNeedsOnboarding(false);
+        if (!uid) return;
+        try {
+            localStorage.setItem(`${WELCOME_DISMISSED_KEY}:${uid}`, '1');
+        } catch { /* private mode — best effort */ }
+        updateDoc(doc(db, 'users', uid), { onboarded: true }).catch(() => {});
+    }, [uid]);
 
     const value: AuthContextType = { uid, authUid, email, displayName, photoURL, loading, signOut };
 
@@ -178,9 +218,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             );
         }
         if (restricted) {
+            // Edge case only: resolution failed AND the backend couldn't (or,
+            // pre-cutover, wouldn't) create a workspace. Post-cutover the
+            // screen offers a retry; pre-cutover it keeps the owner-account
+            // message (live behavior unchanged).
             return (
                 <AuthContext.Provider value={value}>
-                    <LoginScreen restricted email={email} onSignIn={signIn} onSignOut={signOut} showApple={REQUIRE_AUTH} />
+                    <LoginScreen
+                        restricted
+                        email={email}
+                        onSignIn={signIn}
+                        onSignOut={signOut}
+                        onRetry={REQUIRE_AUTH ? () => setRetryNonce((n) => n + 1) : undefined}
+                        showApple={REQUIRE_AUTH}
+                    />
+                </AuthContext.Provider>
+            );
+        }
+        if (uid && needsOnboarding) {
+            // Fresh workspace: one welcome screen before the app.
+            return (
+                <AuthContext.Provider value={value}>
+                    <Onboarding onDone={finishOnboarding} />
                 </AuthContext.Provider>
             );
         }
@@ -192,13 +251,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 /**
  * Map a Firebase Auth uid to its Firestore data doc.
  * 1. A doc already linked via `authUids array-contains authUid`.
- * 2. Otherwise ask the backend to claim one (server-side, Admin SDK — works
- *    under locked rules; OWNER_EMAIL gating lives there). Returns null if no
- *    workspace could be resolved or claimed (caller shows the restricted screen).
+ * 2. Otherwise ask the backend to claim one — or, post-cutover, create a
+ *    fresh workspace for a brand-new account (server-side, Admin SDK — works
+ *    under locked rules; OWNER_EMAIL gating lives there). `created` is true
+ *    when a new workspace was just made (triggers the welcome screen).
+ *    Returns null only if no workspace could be resolved, claimed, or created
+ *    (caller shows the restricted screen).
  */
 async function resolveDataDoc(
     authUid: string,
-): Promise<{ id: string; data: Record<string, unknown> } | null> {
+): Promise<{ id: string; data: Record<string, unknown>; created?: boolean } | null> {
     // 1. Already linked.
     const linked = await getDocs(
         query(collection(db, 'users'), where('authUids', 'array-contains', authUid), limit(1)),
@@ -208,21 +270,23 @@ async function resolveDataDoc(
         return { id: d.id, data: d.data() };
     }
 
-    // 2. Not linked yet — ask the backend to claim the workspace. This runs with
-    //    Admin privileges (bypasses Firestore rules), so it works under the
-    //    locked rules; the OWNER_EMAIL allowlist gating lives server-side. The
-    //    client no longer reads or writes an arbitrary "first user" doc.
+    // 2. Not linked yet — ask the backend to claim (owner) or create (new
+    //    account, REQUIRE_AUTH only) the workspace. This runs with Admin
+    //    privileges (bypasses Firestore rules), so it works under the locked
+    //    rules; the OWNER_EMAIL allowlist gating lives server-side. The client
+    //    no longer reads or writes an arbitrary "first user" doc.
     try {
-        const claim = httpsCallable<Record<string, never>, { uid: string | null }>(
-            functions, 'claim_workspace',
-        );
+        const claim = httpsCallable<
+            Record<string, never>,
+            { uid: string | null; created?: boolean }
+        >(functions, 'claim_workspace');
         const res = await claim({});
         const claimedUid = res.data?.uid;
         if (claimedUid) {
             const fresh = await getDoc(doc(db, 'users', claimedUid));
-            return { id: claimedUid, data: fresh.data() ?? {} };
+            return { id: claimedUid, data: fresh.data() ?? {}, created: res.data?.created === true };
         }
-        // Callable ran and declined (non-owner / nothing to claim) → restricted.
+        // Callable ran and declined (pre-cutover non-owner) → restricted.
         return null;
     } catch (e) {
         console.warn('Workspace claim callable unavailable:', e);
