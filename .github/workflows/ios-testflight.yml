@@ -17,6 +17,9 @@ on:
           Default OFF = legacy pre-cutover behavior (no sign-in UI).
         type: boolean
         default: false
+  # TEMPORARY: build trigger for the List-view RTL/truncation fix. Remove after green.
+  push:
+    branches: [claude/machina-readiness-consolidation-yq73k4]
   # AUTO-BUILD TEMPORARILY GATED during the multi-user auth cutover.
   # The build now includes the Sign in with Apple entitlement and the
   # @capacitor-firebase/authentication pod (native Firebase SDK). Archiving

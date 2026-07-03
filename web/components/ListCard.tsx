@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { hasHebrew } from '@/lib/rtl';
+import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformColor, PLATFORM_LABELS, xHandle, prettyHost } from '@/lib/platform';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
 import { Star, Check, Trash2 } from 'lucide-react';
@@ -42,7 +42,7 @@ export default function ListCard({
     onToggleSelection,
     index = 0,
 }: ListCardProps) {
-    const isRtl = link.language === 'he' || hasHebrew(link.title);
+    const isRtl = getDirection(link.title, link.language) === 'rtl';
     const colorStyle = getCategoryColorStyle(link.category);
     const isFavorite = link.status === 'favorite';
 
@@ -139,6 +139,12 @@ export default function ListCard({
             )}
 
             <article
+                /* Mirror the whole row per card language: the colour bar
+                   (start-0), category chip, and star all use logical
+                   properties/flex order, so dir alone flips them to the
+                   correct side for Hebrew cards. The swipe overlays live on
+                   the LTR wrapper, so gesture direction stays physical. */
+                dir={isRtl ? 'rtl' : 'ltr'}
                 onClick={handleClick}
                 onTouchStart={onTouchStart}
                 onTouchMove={onTouchMove}
@@ -170,11 +176,13 @@ export default function ListCard({
                 )}
 
                 {/* Headline + source */}
-                <div className="flex-1 min-w-0 ps-1" dir={isRtl ? 'rtl' : 'ltr'}>
-                    <h3 className={`line-clamp-2 font-semibold text-[15px] leading-snug text-text ${isRtl ? 'font-hebrew' : ''}`}>
+                <div className="flex-1 min-w-0 ps-1">
+                    <h3 className={`line-clamp-3 font-semibold text-[15px] leading-snug text-text ${isRtl ? 'font-hebrew' : ''}`}>
                         {link.title}
                     </h3>
-                    <div className="mt-1 flex items-center gap-1.5 min-w-0 text-[11px] text-text-muted" dir="ltr">
+                    {/* Source stays LTR internally (brand icon + latin handle/host)
+                        but hugs the title's edge on RTL cards. */}
+                    <div className={`mt-1 flex items-center gap-1.5 min-w-0 text-[11px] text-text-muted ${isRtl ? 'justify-end' : ''}`} dir="ltr">
                         {platform && (
                             <span className="shrink-0 inline-flex items-center" style={{ color: platformColor(platform) }} title={PLATFORM_LABELS[platform]}>
                                 {platformIcon(platform, 'w-3.5 h-3.5')}
