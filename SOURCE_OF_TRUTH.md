@@ -139,8 +139,13 @@ The multi-user auth work is **fully written but not live**:
    `macos-26`/Xcode 26, `sed` strip removed, all three plugins in the committed
    SPM manifest. This also satisfies Apple's current-SDK submission floor —
    former task 10. **CI-confirmed 2026-07-03:** run #7 built all three plugins
-   and uploaded build 1007 to TestFlight.)* **Remaining:** verify Apple + Google
-   sign-in **on device** (install build 1007 from TestFlight) before the cutover.
+   and uploaded build 1007 to TestFlight.)* Note: build 1007 shows **no sign-in
+   UI** — that's correct; the flag is off pre-cutover. **Remaining:** run the
+   workflow with the **`require_auth` input = true** (Actions → iOS → TestFlight
+   → Run workflow) to get a sign-in-enabled build, then verify Apple + Google
+   sign-in on device. CI now also injects the `REVERSED_CLIENT_ID` URL scheme
+   into Info.plist at build time (was missing — native Google sign-in couldn't
+   return to the app; `NATIVE_AUTH_SETUP.md` §4.2 is automated now).
 2. **[ ] Auth cutover** *(code-side prep done 2026-07-03; owner steps remain).*
    Prep completed: `firestore.rules.locked` updated — added `syntheses`;
    **rewrote the `users` read rule** (the old `owns()` `get()` was unprovable for

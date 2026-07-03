@@ -86,10 +86,16 @@ SDK). That native SDK ships its own privacy manifest — no action needed for it
 1. **Signing & Capabilities → App target:** confirm **Sign in with Apple** appears
    (the entitlement is already in `App.entitlements`); Xcode may need it re-added
    through the UI to sync the provisioning profile.
-2. **URL scheme for native Google:** open the new `GoogleService-Info.plist`, copy
-   `REVERSED_CLIENT_ID`, and add it under **Info → URL Types** (or `CFBundleURLTypes`
-   in `Info.plist`). Without this the native Google flow can't return to the app.
-   *(Apple sign-in needs no URL scheme.)*
+2. **URL scheme for native Google:** ~~manual Xcode step~~ **automated in CI
+   (2026-07-03)** — the TestFlight workflow extracts `REVERSED_CLIENT_ID` from the
+   decoded `GoogleService-Info.plist` and injects it into `Info.plist`
+   (`CFBundleURLTypes`) at build time. Only needed manually for local
+   `./build-ios.sh` + Xcode builds: copy `REVERSED_CLIENT_ID` from the plist into
+   **Info → URL Types**. Without it the native Google flow can't return to the
+   app. *(Apple sign-in needs no URL scheme.)*
+   **Sign-in-enabled TestFlight builds:** dispatch the *iOS → TestFlight* workflow
+   with the **`require_auth: true`** input — it bakes `NEXT_PUBLIC_REQUIRE_AUTH=true`
+   into the bundle. Default runs (input off) keep the pre-cutover legacy behavior.
 3. **Privacy manifests:** add `App/PrivacyInfo.xcprivacy` to the **App** target and
    `ShareExt/PrivacyInfo.xcprivacy` to the **ShareExt** target (each: File
    Inspector → Target Membership, and confirm it's in *Copy Bundle Resources*).

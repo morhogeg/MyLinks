@@ -7,7 +7,16 @@ name: iOS → TestFlight
 # main that touch the app. See the one-time secret setup at the bottom.
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      require_auth:
+        description: >-
+          Bake NEXT_PUBLIC_REQUIRE_AUTH=true into the bundle (shows the
+          Apple/Google sign-in gate + Account section on device). Use for
+          on-device auth verification and for the post-cutover store builds.
+          Default OFF = legacy pre-cutover behavior (no sign-in UI).
+        type: boolean
+        default: false
   # AUTO-BUILD TEMPORARILY GATED during the multi-user auth cutover.
   # The build now includes the Sign in with Apple entitlement and the
   # @capacitor-firebase/authentication pod (native Firebase SDK). Archiving
@@ -74,7 +83,11 @@ jobs:
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
           NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
           NEXT_PUBLIC_RECAPTCHA_SITE_KEY: ${{ secrets.NEXT_PUBLIC_RECAPTCHA_SITE_KEY }}
+          # Flag-gated auth cutover: only baked in when the run is dispatched
+          # with require_auth=true (see NATIVE_AUTH_SETUP.md).
+          NEXT_PUBLIC_REQUIRE_AUTH: ${{ inputs.require_auth == true && 'true' || '' }}
         run: |
+          echo "NEXT_PUBLIC_REQUIRE_AUTH='${NEXT_PUBLIC_REQUIRE_AUTH}' (empty = pre-cutover legacy behavior)"
           npm ci
           npm run build
           npx cap sync ios
@@ -97,6 +110,32 @@ jobs:
           echo "$GS_PLIST_BASE64" | base64 --decode > web/ios/App/App/GoogleService-Info.plist
           test -s web/ios/App/App/GoogleService-Info.plist || { echo "::error::plist decoded to an empty file"; exit 1; }
           echo "Wrote GoogleService-Info.plist ($(wc -c < web/ios/App/App/GoogleService-Info.plist) bytes)"
+
+      # Native Google Sign-In needs the app to claim the REVERSED_CLIENT_ID URL
+      # scheme (NATIVE_AUTH_SETUP.md §4.2) or the Google flow can't return to
+      # the app. The value lives inside the (secret) GoogleService-Info.plist,
+      # so inject it into Info.plist at build time instead of committing it.
+      # Idempotent; Apple sign-in needs no URL scheme.
+      - name: Add REVERSED_CLIENT_ID URL scheme to Info.plist
+        run: |
+          PB=/usr/libexec/PlistBuddy
+          GS=web/ios/App/App/GoogleService-Info.plist
+          INFO=web/ios/App/App/Info.plist
+          RCID="$($PB -c 'Print :REVERSED_CLIENT_ID' "$GS" 2>/dev/null || true)"
+          if [ -z "$RCID" ]; then
+            echo "::error::REVERSED_CLIENT_ID missing from GoogleService-Info.plist — re-download it from Firebase (iOS app must have an OAuth client)."
+            exit 1
+          fi
+          if ! $PB -c 'Print :CFBundleURLTypes' "$INFO" >/dev/null 2>&1; then
+            $PB -c 'Add :CFBundleURLTypes array' "$INFO"
+          fi
+          if ! grep -q "$RCID" "$INFO"; then
+            IDX=$($PB -c 'Print :CFBundleURLTypes' "$INFO" | grep -c 'Dict' || true)
+            $PB -c "Add :CFBundleURLTypes:${IDX} dict" "$INFO"
+            $PB -c "Add :CFBundleURLTypes:${IDX}:CFBundleURLSchemes array" "$INFO"
+            $PB -c "Add :CFBundleURLTypes:${IDX}:CFBundleURLSchemes:0 string ${RCID}" "$INFO"
+          fi
+          echo "URL scheme registered: ${RCID:0:24}…"
 
       # Signing uses Apple "cloud-managed" distribution: xcodebuild, given the
       # App Store Connect API key + -allowProvisioningUpdates, creates/reuses a
