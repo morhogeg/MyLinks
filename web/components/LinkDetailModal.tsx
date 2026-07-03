@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
 import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2 } from 'lucide-react';
 import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
-import ConfirmDialog from './ConfirmDialog';
 import SimpleMarkdown from './SimpleMarkdown';
 import ReadingView from './ReadingView';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -65,7 +64,6 @@ export default function LinkDetailModal({
     onAddToCollection,
     onShare,
 }: LinkDetailModalProps) {
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isReading, setIsReading] = useState(false);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
     const [editedCategory, setEditedCategory] = useState(link.category);
@@ -261,7 +259,11 @@ export default function LinkDetailModal({
                         push Delete off-screen on narrow phones). Delete keeps its red
                         hover so it reads distinctly from the neutral Close. */}
                     <button
-                        onClick={() => setShowDeleteConfirm(true)}
+                        /* One confirm only: the parent (Feed.handleDelete) owns the
+                           branded dialog, which stacks above this modal (z-100 > z-50).
+                           Cancel returns to the card; confirming deletes the link,
+                           which unmounts this modal via the live links snapshot. */
+                        onClick={() => onDelete(link.id)}
                         title="Delete"
                         aria-label="Delete"
                         className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors"
@@ -657,17 +659,6 @@ export default function LinkDetailModal({
                 </div>
             </div>
 
-            <ConfirmDialog
-                isOpen={showDeleteConfirm}
-                title="Delete Link"
-                message="Are you sure you want to delete this link? This action cannot be undone."
-                confirmLabel="Delete"
-                onConfirm={() => {
-                    onDelete(link.id);
-                    onClose();
-                }}
-                onClose={() => setShowDeleteConfirm(false)}
-            />
         </div>
         </>
     );
