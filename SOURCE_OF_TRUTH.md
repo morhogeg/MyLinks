@@ -476,6 +476,16 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-03 — List view: per-language mirroring + full-width titles.** Two
+  rounds from user feedback. (1) `ListCard` rows now set `dir` per card, so
+  Hebrew cards mirror completely (colour bar/chip/star on the correct sides;
+  RTL detection unified through `getDirection`); titles clamp at 3 lines (was
+  2) — TestFlight build 1009. (2) Layout redesign: the category chip left the
+  title row (it squeezed long titles) and joined the metadata line as a compact
+  truncating pill (icon · source · chip); title spans the full row; star keeps
+  its 44px target, top-aligned — build 1010, **screenshot-verified** (real
+  Chromium renders, EN+HE fixtures, dark+light, via a throwaway `/dev-listcard`
+  harness removed before commit). Both live on web via `main`.
 - **2026-07-03 — P1 pack CI-verified + shipped (multi-agent session).** All
   automatable P1 items done in one round (three agents, entries below): AI
   consent (task 6), privacy manifests wired + iPhone-only (task 7 + half of 9),
