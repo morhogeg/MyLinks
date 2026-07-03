@@ -139,11 +139,16 @@ The multi-user auth work is **fully written but not live**:
    the emulator, then `cp firestore.rules.locked firestore.rules && firebase
    deploy --only firestore:rules`. Closes audit blockers B-1/B-2/B-3. Steps:
    `NATIVE_AUTH_SETUP.md` §6.
-3. **[ ] New-user path.** `claim_workspace` only links the single existing owner
-   workspace; a brand-new account lands on a restricted screen. Public sign-up
-   needs "create a fresh `users/{id}` with `authUids` on first sign-in" + the
-   one-screen onboarding (teach share-sheet capture, optionally seed 2–3 example
-   cards). Without this the App Store app is unusable for anyone but the owner.
+3. **[x] New-user path** *(code done 2026-07-03; goes live with the task-2
+   cutover — flag-gated behind `REQUIRE_AUTH`).* `claim_workspace` now falls
+   back to creating a fresh `users/{authUid}` workspace (authUids/email/
+   createdAt/default settings + ingest token) for any verified account that
+   can't claim the OWNER_EMAIL-gated legacy doc; the web app shows a one-screen
+   welcome (`web/components/Onboarding.tsx`, dismissal on the user doc
+   `onboarded` + localStorage fallback) instead of the restricted screen, which
+   now remains only for creation failures (with a Retry). Example-card seeding
+   was skipped (optional). Ships with the task-2 functions deploy — no separate
+   action.
 4. **[ ] Pending deploys/verifications from the last sessions** (owner machine):
    - `./deploy-functions.sh` — M12 weekly synthesis backend is written but dark.
    - `firebase deploy --only firestore:rules` — the `syntheses` read rule.
@@ -422,6 +427,26 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-03 — New-user path (§4 task 3).** `claim_workspace` extended:
+  claim (OWNER_EMAIL-gated) → create-fresh-workspace fallback
+  (`link_service.create_workspace`, doc ID = Firebase Auth uid, default
+  settings + ingest token, `onboarded: false`); returns `created` so the
+  client shows the new one-screen `Onboarding.tsx` welcome (capture surfaces +
+  "Start saving"). Restricted screen kept only for failures, now with Retry.
+  Fully flag-gated: with `REQUIRE_AUTH` off nothing changes live.
+- **2026-07-03 — Auth-cutover readiness (code side of §4 task 2).** Brought
+  `firestore.rules.locked` up to date: added the missing `syntheses` rule
+  (client read-only), rewrote the `users/{uid}` read rule to be
+  `resource.data.authUids`-based (the old `owns(uid)` `get()` can't run in a
+  *list* rule, so it would have rejected the workspace-resolve query and
+  bricked every sign-in at cutover), denied client create/delete on user docs.
+  Added `firestore-rules-test/` (rules-unit-testing suite + README; couldn't
+  run in the cloud session — emulator JAR download blocked — run it on the
+  owner machine). Flag audit: `retryFailedLink` (web/lib/storage.ts) misses
+  `authHeaders()` → card Retry 401s under `REQUIRE_AUTH`; `get_article` is
+  auth-exempt by design (App Check + IP rate limit only);
+  `backfill_related_links` lacks `_require_admin`. Details + required
+  pre-flip fixes: `NATIVE_AUTH_SETUP.md` §6.
 - **2026-07-03 — Consolidation.** Merged all task/handoff/spec/audit docs into
   this file; deleted the superseded seven; verified every claimed-done item
   against code; re-ranked the backlog; rewrote the `/ship` skill (Vercel +

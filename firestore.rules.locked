@@ -14,16 +14,20 @@ service cloud.firestore {
     // via the Admin SDK (claim_workspace / delete_account), which bypasses these
     // rules — so the client only ever reads/updates a doc it already owns.
     //
-    // ⚠️ Test with the Firestore emulator before deploying. Deploying rules that
-    // are too tight will brick reads/writes until corrected. Deploy this ONLY
-    // after native + web sign-in and the claim flow are confirmed working (see
-    // NATIVE_AUTH_SETUP.md, "Cutover order").
+    // ⚠️ Test with the emulator before deploying: `firestore-rules-test/` holds
+    // a rules-unit-testing suite that exercises exactly these rules (see its
+    // README). Deploying rules that are too tight will brick reads/writes until
+    // corrected. Deploy this ONLY after native + web sign-in and the claim flow
+    // are confirmed working (see NATIVE_AUTH_SETUP.md, "Cutover order").
 
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // True when the signed-in account is linked to the user doc `uid`.
+    // True when the signed-in account is linked to the user doc `uid`. Costs one
+    // extra document read. Use only where `uid` is BOUND to a concrete value
+    // (subcollection paths, shared_* ownerUid fields) — get()/exists() cannot
+    // run in a LIST rule over /users where {uid} is an unbound wildcard.
     function owns(uid) {
       return isSignedIn()
         && exists(/databases/$(database)/documents/users/$(uid))
@@ -31,9 +35,24 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      // read covers the `authUids array-contains <auth uid>` lookup the client
-      // runs to resolve its own workspace; every matched doc satisfies owns(uid).
-      allow read, write: if owns(uid);
+      // Read = get + list, written against `resource` (NOT owns()) on purpose:
+      // the client resolves its workspace with the LIST query
+      //   collection('users').where('authUids', 'array-contains', <auth uid>)
+      // (AuthProvider.resolveDataDoc). Rules are not filters — a list rule must
+      // be provable from the query's own constraints, and the array-contains
+      // filter provably satisfies this condition. Any broader query on /users
+      // (e.g. the legacy limit(1) "first doc" lookup) is denied.
+      allow read: if isSignedIn() && request.auth.uid in resource.data.authUids;
+
+      // Owner-only updates (timezone, settings, digest prefs, ingest token…).
+      // Same resource-based check as read: only a doc already linked to this
+      // account can be touched, and only linked accounts can grow `authUids`.
+      allow update: if isSignedIn() && request.auth.uid in resource.data.authUids;
+
+      // User docs are created and deleted ONLY server-side (claim_workspace /
+      // delete_account, Admin SDK). If a future new-user onboarding creates the
+      // doc client-side instead, this needs a matching `allow create`.
+      allow create, delete: if false;
 
       match /links/{linkId} {
         allow read, write: if owns(uid);
@@ -47,6 +66,14 @@ service cloud.firestore {
       // User-curated collections of cards
       match /collections/{collectionId} {
         allow read, write: if owns(uid);
+      }
+
+      // Weekly "What you learned" synthesis (M12). Written by Cloud Functions
+      // (Admin SDK, bypasses rules); the client only reads to surface the
+      // in-app recap card (lib/synthesis.ts).
+      match /syntheses/{weekId} {
+        allow read: if owns(uid);
+        allow write: if false;
       }
     }
 

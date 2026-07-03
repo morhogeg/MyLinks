@@ -1,0 +1,4 @@
+node_modules/
+firestore.rules.locked.copy
+firebase-debug.log
+*.log

@@ -4,18 +4,22 @@ import { useState } from 'react';
 
 /**
  * Branded sign-in gate (web). Shown when no user is signed in, and — in the
- * `restricted` variant — when a signed-in Google account isn't linked to any
- * data (a non-owner). See AUTH_SPEC.md.
+ * `restricted` variant — when a signed-in account couldn't get a workspace.
+ * Post-cutover that's an edge case (workspace creation failed) and `onRetry`
+ * is provided; pre-cutover it's the non-owner message. See AUTH_SPEC.md.
  */
 export default function LoginScreen({
     onSignIn,
     onSignOut,
+    onRetry,
     restricted = false,
     email,
     showApple = true,
 }: {
     onSignIn: (provider: 'google' | 'apple') => Promise<void>;
     onSignOut?: () => void;
+    /** Re-run workspace resolution (restricted variant, post-cutover only). */
+    onRetry?: () => void;
     restricted?: boolean;
     email?: string | null;
     /** Show "Continue with Apple". Hidden pre-cutover when the Apple provider
@@ -55,17 +59,37 @@ export default function LoginScreen({
 
                 {restricted ? (
                     <>
-                        <p className="mt-8 text-sm text-text-secondary">
-                            {email ? <span className="font-semibold">{email}</span> : 'This account'}{' '}
-                            isn&apos;t linked to a workspace.
-                        </p>
-                        <p className="mt-1 text-[13px] text-text-muted">
-                            Sign in with the owner account to continue.
-                        </p>
+                        {onRetry ? (
+                            <>
+                                <p className="mt-8 text-sm text-text-secondary">
+                                    We couldn&apos;t finish setting up a workspace for{' '}
+                                    {email ? <span className="font-semibold">{email}</span> : 'this account'}.
+                                </p>
+                                <p className="mt-1 text-[13px] text-text-muted">
+                                    This is usually temporary — please try again.
+                                </p>
+                                <button
+                                    onClick={onRetry}
+                                    className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-full bg-accent text-white px-5 py-2.5 text-sm font-semibold shadow-sm shadow-accent/20 hover:bg-accent-hover transition-colors"
+                                >
+                                    Try again
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <p className="mt-8 text-sm text-text-secondary">
+                                    {email ? <span className="font-semibold">{email}</span> : 'This account'}{' '}
+                                    isn&apos;t linked to a workspace.
+                                </p>
+                                <p className="mt-1 text-[13px] text-text-muted">
+                                    Sign in with the owner account to continue.
+                                </p>
+                            </>
+                        )}
                         {onSignOut && (
                             <button
                                 onClick={onSignOut}
-                                className="mt-6 inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold border border-border-subtle text-text hover:bg-surface transition-colors"
+                                className={`${onRetry ? 'mt-3' : 'mt-6'} inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold border border-border-subtle text-text hover:bg-surface transition-colors`}
                             >
                                 Sign out
                             </button>
