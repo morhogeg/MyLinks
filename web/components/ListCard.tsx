@@ -28,9 +28,11 @@ const TRIGGER = 64;
 
 /**
  * ListCard — a compact, full-width row for the List view: a glanceable vertical
- * stack of headlines. Shows the headline (up to two lines), the source's brand
- * icon (matching the card grid), and the category as a colour chip. On touch,
- * swipe right to delete or left to favourite; tapping opens the link.
+ * stack of headlines. The headline (up to three lines) gets the full row width;
+ * the metadata line below carries the source's brand icon, source label and a
+ * compact category chip (the 6px colour bar on the row edge stays the primary
+ * category cue, M-P3). On touch, swipe right to delete or left to favourite;
+ * tapping opens the link.
  */
 export default function ListCard({
     link,
@@ -140,7 +142,7 @@ export default function ListCard({
 
             <article
                 /* Mirror the whole row per card language: the colour bar
-                   (start-0), category chip, and star all use logical
+                   (start-0), metadata line, and star all use logical
                    properties/flex order, so dir alone flips them to the
                    correct side for Hebrew cards. The swipe overlays live on
                    the LTR wrapper, so gesture direction stays physical. */
@@ -156,7 +158,7 @@ export default function ListCard({
                     transitionTimingFunction: 'var(--ease-spring)',
                     touchAction: 'pan-y',
                 }}
-                className={`relative z-10 flex items-center gap-3 ps-3.5 pe-3 py-3 cursor-pointer ${isSelected ? 'bg-accent/5' : 'bg-card'}`}
+                className={`relative z-10 flex items-start gap-3 ps-3.5 pe-3 py-3 cursor-pointer ${isSelected ? 'bg-accent/5' : 'bg-card'}`}
             >
                 {/* Category colour cue on the leading edge for quick scanning —
                     widened to 6px so the category reads at a glance (M-P3). */}
@@ -168,20 +170,22 @@ export default function ListCard({
 
                 {isSelectionMode && (
                     <span
-                        className={`shrink-0 w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'bg-accent border-accent text-white' : 'border-text-muted/40 text-transparent'
+                        className={`shrink-0 self-center w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'bg-accent border-accent text-white' : 'border-text-muted/40 text-transparent'
                             }`}
                     >
                         <Check className="w-3 h-3" />
                     </span>
                 )}
 
-                {/* Headline + source */}
+                {/* Headline + metadata. The title owns the full content width —
+                    only the star (and the checkbox in selection mode) sit beside it. */}
                 <div className="flex-1 min-w-0 ps-1">
                     <h3 className={`line-clamp-3 font-semibold text-[15px] leading-snug text-text ${isRtl ? 'font-hebrew' : ''}`}>
                         {link.title}
                     </h3>
-                    {/* Source stays LTR internally (brand icon + latin handle/host)
-                        but hugs the title's edge on RTL cards. */}
+                    {/* Metadata stays LTR internally (brand icon + latin
+                        handle/host + category name) but hugs the title's edge
+                        on RTL cards. Order: icon · source · chip. */}
                     <div className={`mt-1 flex items-center gap-1.5 min-w-0 text-[11px] text-text-muted ${isRtl ? 'justify-end' : ''}`} dir="ltr">
                         {platform && (
                             <span className="shrink-0 inline-flex items-center" style={{ color: platformColor(platform) }} title={PLATFORM_LABELS[platform]}>
@@ -189,26 +193,29 @@ export default function ListCard({
                             </span>
                         )}
                         {sourceLabel && <span className="truncate">{sourceLabel}</span>}
+                        {/* Category chip — secondary labeling next to the source;
+                            the colour bar on the row edge is the primary cue (M-P3). */}
+                        <span
+                            className="shrink-0 max-w-[120px] px-1.5 py-px rounded-full text-[9px] leading-4 font-bold uppercase tracking-wider truncate"
+                            style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.color }}
+                            title={link.category}
+                        >
+                            {link.category}
+                        </span>
                     </div>
                 </div>
 
-                {/* Category — a colour chip (replaces the old tag). */}
-                <span
-                    className="shrink-0 max-w-[30vw] sm:max-w-[150px] px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider truncate"
-                    style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.color }}
-                    title={link.category}
-                >
-                    {link.category}
-                </span>
-
-                {/* Favourite toggle — stays put as you scan. */}
+                {/* Favourite toggle — stays put as you scan. Keeps its 44px hit
+                    target (M-P3) but hugs the row's top corner (negative margins
+                    eat into the row padding) so 3-line titles aren't forced to
+                    centre around it. */}
                 <button
                     onClick={(e) => {
                         e.stopPropagation();
                         onStatusChange(link.id, isFavorite ? 'unread' : 'favorite');
                     }}
                     aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                    className={`shrink-0 -me-1.5 w-11 h-11 flex items-center justify-center rounded-lg transition-colors ${isFavorite ? 'text-yellow-500' : 'text-text-muted/40 hover:text-accent'
+                    className={`shrink-0 -mt-2 -me-1.5 w-11 h-11 flex items-center justify-center rounded-lg transition-colors ${isFavorite ? 'text-yellow-500' : 'text-text-muted/40 hover:text-accent'
                         }`}
                 >
                     <Star className={`w-4 h-4 ${isFavorite ? 'fill-yellow-500' : ''}`} />
