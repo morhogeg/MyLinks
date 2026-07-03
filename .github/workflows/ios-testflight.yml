@@ -8,6 +8,10 @@ name: iOS → TestFlight
 
 on:
   workflow_dispatch: {}
+  # TEMPORARY verification trigger for the native-auth build fix (Xcode 26 +
+  # firebase-auth plugin restored). Remove once this branch's run is green.
+  push:
+    branches: [claude/machina-readiness-consolidation-yq73k4]
   # AUTO-BUILD TEMPORARILY GATED during the multi-user auth cutover.
   # The build now includes the Sign in with Apple entitlement and the
   # @capacitor-firebase/authentication pod (native Firebase SDK). Archiving
