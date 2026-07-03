@@ -138,8 +138,9 @@ The multi-user auth work is **fully written but not live**:
    the Xcode 16 toolchain, not a dependency conflict; see §3. Workflow moved to
    `macos-26`/Xcode 26, `sed` strip removed, all three plugins in the committed
    SPM manifest. This also satisfies Apple's current-SDK submission floor —
-   former task 10.)* **Remaining:** one CI run to confirm archive + upload, then
-   verify Apple + Google sign-in **on device** before the cutover.
+   former task 10. **CI-confirmed 2026-07-03:** run #7 built all three plugins
+   and uploaded build 1007 to TestFlight.)* **Remaining:** verify Apple + Google
+   sign-in **on device** (install build 1007 from TestFlight) before the cutover.
 2. **[ ] Auth cutover** *(code-side prep done 2026-07-03; owner steps remain).*
    Prep completed: `firestore.rules.locked` updated — added `syntheses`;
    **rewrote the `users` read rule** (the old `owns()` `get()` was unprovable for
@@ -443,6 +444,16 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-03 — Top-3 blockers finished + CI-verified (multi-agent session).**
+  (1) Native-auth build FIXED and proven: root cause was the Xcode 16 toolchain
+  stripping Capacitor's feature-gated symbols, not a dependency conflict — CI
+  moved to macos-26/Xcode 26, plugin strip removed, and **run #7 archived +
+  uploaded build 1007 to TestFlight with all three native plugins**. (2) Cutover
+  prep: locked rules corrected (a `users` read rule that would have bricked
+  sign-in; `syntheses` added), rules test suite in `firestore-rules-test/`,
+  `retryFailedLink` bearer header, `backfill_related_links` admin-gated.
+  (3) New-user path + onboarding (entry below). Merged to `main`. Next: install
+  build 1007, verify Apple/Google sign-in on device, then the §4 task-2 cutover.
 - **2026-07-03 — New-user path (§4 task 3).** `claim_workspace` extended:
   claim (OWNER_EMAIL-gated) → create-fresh-workspace fallback
   (`link_service.create_workspace`, doc ID = Firebase Auth uid, default
