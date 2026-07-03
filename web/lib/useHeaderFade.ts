@@ -1,39 +1,76 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 /**
- * Direction-aware header visibility for the sticky top bar: scrolling down
- * fades it out, any deliberate upward scroll brings it back — the standard
- * iOS large-title/toolbar behavior.
+ * Scroll-scrubbed header fade — the top bar's opacity is driven continuously
+ * by scroll travel (like iOS large titles), not toggled: scrolling down eases
+ * it away over ~140px of travel, scrolling up draws it back over ~80px, and
+ * your thumb scrubs the fade frame-by-frame in both directions.
  *
- * Tuned for feel, not just function:
- * - Hysteresis: ~24px of accumulated downward travel hides it (a lazy thumb
- *   drag doesn't), while ~8px upward shows it (returning must feel instant).
- * - The accumulator resets on direction change, so jittery finger reversals
- *   never fight the animation.
- * - Always visible near the top (< 32px), and scrollY is clamped to the
- *   document range so iOS rubber-banding (negative / past-end overscroll)
- *   can't trigger a phantom hide at either extreme.
- * - rAF-throttled passive listener; state only changes on real transitions,
- *   so scrolling never causes re-render churn.
+ * Feel notes:
+ * - A `progress` value (0 = shown, 1 = hidden) accumulates scroll deltas —
+ *   downward travel divided over FADE_PX, upward over the shorter RETURN_PX,
+ *   so leaving is lazy and returning is eager. Direction changes just reverse
+ *   the scrub; there is no state flip to pop.
+ * - While the finger (or momentum) is moving, styles are applied directly with
+ *   NO transition — the scroll itself is the animation. ~160ms after the last
+ *   scroll event, progress settles to the nearest endpoint on the app's
+ *   --ease-modal curve, so the bar never parks half-faded.
+ * - Near the very top (< 24px) it always returns to fully shown; scrollY is
+ *   clamped to the document range so iOS rubber-banding at either end can't
+ *   scrub a phantom fade.
+ * - Styles are written straight to the element (no React re-render per frame);
+ *   listener is passive + rAF-throttled. Reduced motion skips the drift and
+ *   keeps the pure fade. pointer-events cut once it's essentially gone.
  *
- * The caller animates opacity/transform only — the header stays sticky and
- * keeps its height, so content never reflows.
+ * Attach the returned ref to the sticky header. The bar keeps its height, so
+ * content never reflows — it just glides underneath.
  */
-export function useHeaderFade(): boolean {
-    const [visible, setVisible] = useState(true);
+export function useHeaderFade<T extends HTMLElement>() {
+    const ref = useRef<T | null>(null);
 
     useEffect(() => {
-        let lastY = window.scrollY;
-        let acc = 0;
-        let shown = true;
-        let ticking = false;
+        const el = ref.current;
+        if (!el) return;
 
-        const set = (v: boolean) => {
-            if (v !== shown) {
-                shown = v;
-                setVisible(v);
+        const FADE_PX = 140;   // downward travel for a full fade-out
+        const RETURN_PX = 80;  // upward travel for a full fade-in
+        const DRIFT_PX = 10;   // upward drift at full fade
+        const TOP_LOCK = 24;   // always shown this close to the top
+        const SETTLE_MS = 160; // idle time before snapping to an endpoint
+
+        const reduced =
+            typeof window.matchMedia === 'function' &&
+            window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        let progress = 0;
+        let lastY = 0;
+        let ticking = false;
+        let settleTimer: ReturnType<typeof setTimeout> | undefined;
+
+        const clampY = () => {
+            const maxY = Math.max(
+                document.documentElement.scrollHeight - window.innerHeight,
+                0,
+            );
+            return Math.min(Math.max(window.scrollY, 0), maxY);
+        };
+
+        const apply = (p: number, settle: boolean) => {
+            el.style.transition = settle
+                ? 'opacity 320ms var(--ease-modal), transform 320ms var(--ease-modal)'
+                : 'none';
+            el.style.opacity = String(1 - p);
+            el.style.transform = reduced ? '' : `translateY(${(-DRIFT_PX * p).toFixed(2)}px)`;
+            el.style.pointerEvents = p > 0.9 ? 'none' : '';
+        };
+
+        const settle = () => {
+            const target = clampY() < TOP_LOCK ? 0 : progress > 0.5 ? 1 : 0;
+            if (target !== progress) {
+                progress = target;
+                apply(progress, true);
             }
         };
 
@@ -42,29 +79,38 @@ export function useHeaderFade(): boolean {
             ticking = true;
             requestAnimationFrame(() => {
                 ticking = false;
-                const maxY = Math.max(
-                    document.documentElement.scrollHeight - window.innerHeight,
-                    0,
-                );
-                const y = Math.min(Math.max(window.scrollY, 0), maxY);
+                const y = clampY();
                 const dy = y - lastY;
                 lastY = y;
 
-                if (y < 32) {
-                    acc = 0;
-                    set(true);
-                    return;
+                if (y < TOP_LOCK) {
+                    progress = 0;
+                } else {
+                    progress += dy > 0 ? dy / FADE_PX : dy / RETURN_PX;
+                    progress = Math.min(Math.max(progress, 0), 1);
                 }
-                if ((dy > 0 && acc < 0) || (dy < 0 && acc > 0)) acc = 0;
-                acc += dy;
-                if (acc > 24) set(false);
-                else if (acc < -8) set(true);
+                apply(progress, false);
+
+                if (settleTimer) clearTimeout(settleTimer);
+                settleTimer = setTimeout(settle, SETTLE_MS);
             });
         };
 
+        lastY = clampY();
+        el.style.willChange = 'opacity, transform';
+        apply(0, false);
+
         window.addEventListener('scroll', onScroll, { passive: true });
-        return () => window.removeEventListener('scroll', onScroll);
+        return () => {
+            window.removeEventListener('scroll', onScroll);
+            if (settleTimer) clearTimeout(settleTimer);
+            el.style.opacity = '';
+            el.style.transform = '';
+            el.style.transition = '';
+            el.style.pointerEvents = '';
+            el.style.willChange = '';
+        };
     }, []);
 
-    return visible;
+    return ref;
 }

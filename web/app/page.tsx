@@ -23,8 +23,9 @@ export default function Home() {
   const [isAskMode, setIsAskMode] = useState(false);
   const [hideAddButton, setHideAddButton] = useState(false);
   const [isTourOpen, setIsTourOpen] = useState(false);
-  // Scrolling down eases the top bar away; scrolling up brings it back.
-  const headerVisible = useHeaderFade();
+  // Scroll-scrubbed top bar: opacity rides the scroll itself (down = away,
+  // up = back), settling to shown/hidden when the finger rests.
+  const headerRef = useHeaderFade<HTMLElement>();
 
   const handleLinkAdded = () => {
     setRefreshKey(prev => prev + 1);
@@ -83,14 +84,12 @@ export default function Home() {
         aria-hidden
       />
       <header
-        /* Direction-aware fade (useHeaderFade): opacity + a small upward drift
-           on the iOS push curve. The bar stays sticky and keeps its height, so
-           content never reflows — it just glides under. pointer-events-none
-           while hidden so faded controls can't catch stray taps; motion-reduce
-           drops the drift and keeps the pure fade. */
-        className={`sticky top-0 z-50 bg-background/70 backdrop-blur-xl border-b border-border-subtle h-[60px] sm:h-[68px] flex items-center transition-[opacity,transform] duration-300 [transition-timing-function:var(--ease-modal)] motion-reduce:transform-none ${
-          headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'
-        }`}
+        /* Scroll-scrubbed fade (useHeaderFade): the hook drives opacity +
+           drift inline, frame-by-frame with the scroll — no toggle, no pop.
+           The bar stays sticky and keeps its height, so content never
+           reflows; it just glides under. */
+        ref={headerRef}
+        className="sticky top-0 z-50 bg-background/70 backdrop-blur-xl border-b border-border-subtle h-[60px] sm:h-[68px] flex items-center"
         style={{ paddingTop: 'env(safe-area-inset-top)', boxSizing: 'content-box' }}
       >
         {/* hairline accent glow under the bar */}
