@@ -186,24 +186,50 @@ The multi-user auth work is **fully written but not live**:
 
 ### 🟠 P1 — App Store submission requirements (see §6 for the full readiness review)
 
-6. **[ ] AI-consent disclosure (Guideline 5.1.1/5.1.2 as updated Nov 2025).**
+6. **[x] AI-consent disclosure (Guideline 5.1.1/5.1.2 as updated Nov 2025).**
    Apps sending personal data to third-party AI must name the provider and get
    explicit consent. Machina sends saved URLs/images/questions to **Google
-   Gemini**. Add a first-run consent screen + a line in Settings; cover it in the
-   privacy policy. *New requirement — not in the old audit.*
-7. **[ ] Privacy manifests wired into both Xcode targets.** The two
-   `PrivacyInfo.xcprivacy` files exist but must be added to Copy Bundle Resources
-   in Xcode (App + ShareExt) — audit B-4's remaining manual step. Verify in the
-   next archive.
-8. **[ ] Privacy policy + Terms URLs, App Privacy "nutrition label", App Store
-   metadata.** Host a privacy policy (list: Google account data, saved content in
-   Firebase, Gemini processing, WhatsApp phone number if used); link it in-app
-   (Settings) and in App Store Connect. Fill the data-collection declarations.
-   Screenshots, description, keywords (§8 has drafts).
+   Gemini**. *Code done 2026-07-03:* first-run consent gate
+   (`web/components/AIConsentNotice.tsx`, mounted in `AuthProvider` after the
+   sign-in/restricted screens and before the welcome screen + tour, on BOTH
+   platforms — not behind the auth flags) with persistence in localStorage
+   `ai-consent-v1` mirrored to `aiConsentAt` (ms) on the user doc
+   (`web/lib/aiConsent.ts`); Settings "AI & privacy" section names Gemini,
+   shows the consent date, links Privacy Policy + Terms (native-safe via
+   `policyUrl`/`openExternal` in `web/lib/share.ts`). Existing users see it
+   once too. **Remaining:** privacy-policy coverage lives with task 8's
+   `/privacy` page; verify the flow on device/TestFlight.
+   *New requirement — not in the old audit.*
+7. **[x] Privacy manifests wired into both Xcode targets** *(done 2026-07-03:
+   both `PrivacyInfo.xcprivacy` files wired into `project.pbxproj` by hand —
+   file refs + build files + group membership + Copy Bundle Resources for App,
+   and a new Resources build phase created for ShareExt, which had none.
+   Pending confirmation by the next CI archive: both `.app` and `.appex`
+   bundles must contain `PrivacyInfo.xcprivacy`).*
+8. **[x] Privacy policy + Terms URLs, App Privacy "nutrition label", App Store
+   metadata** *(doc/code side done 2026-07-03).* Hosted pages live:
+   `web/app/privacy/page.tsx` + `web/app/terms/page.tsx` (static, prose,
+   theme-tokened; content verified against the code — Gemini/Twilio/Firebase
+   processors, share-page caveat, `delete_account` scope). They are **public**:
+   `web/lib/publicRoutes.tsx` (used by `app/layout.tsx`) skips the
+   AuthProvider gate on `/privacy` + `/terms` so App Review can read them
+   signed-out. Nutrition-label declarations, metadata (name/subtitle/
+   keywords/description), and age-rating answers drafted in
+   `docs/APP_STORE.md` §1–§2. In-app Settings link ships with task 6.
+   **Remaining manual:** click the declarations + metadata into App Store
+   Connect, take the screenshots (`docs/APP_STORE.md` §4), name a concrete
+   governing-law jurisdiction in `/terms` §10 before public launch.
 9. **[ ] Reviewer readiness.** Demo account credentials for App Review (auth will
    be ON), review notes explaining WhatsApp capture (reviewer can't test Twilio),
-   and either iPad screenshots or set `TARGETED_DEVICE_FAMILY = 1` (currently
-   `"1,2"` = universal — iPhone-only is the cheaper path).
+   and either iPad screenshots or set `TARGETED_DEVICE_FAMILY = 1`. *Device
+   family half done 2026-07-03: `TARGETED_DEVICE_FAMILY = 1` set in all four
+   build configs (App + ShareExt, Debug + Release) — iPhone-only, no iPad
+   screenshots needed. Doc side done 2026-07-03: review-notes template (demo-
+   account placeholder + fresh-sign-in-auto-creates-workspace explanation,
+   WhatsApp-is-optional/test-share-sheet-instead, AI-consent-on-first-run,
+   Sign in with Apple) and the 6-screenshot shot-list are in
+   `docs/APP_STORE.md` §3–§4. **Remaining:** create + seed the demo account
+   post-cutover, fill its credentials into the notes, take the screenshots.*
 10. **[x] CI SDK check** *(done 2026-07-03, folded into task 1: the workflow now
     runs on `macos-26` with `Xcode_26*`, satisfying Apple's current-SDK
     submission requirement in effect since April 2026).*
@@ -449,6 +475,29 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-03 — Legal pages + App Store pack (§4 task 8 + doc half of 9).**
+  Hosted Privacy Policy and Terms shipped as static pages
+  (`web/app/privacy/page.tsx`, `web/app/terms/page.tsx` — prose column, theme
+  tokens, content verified against `delete_account`/share-page/processor
+  reality; governing-law jurisdiction left as an explicit placeholder). New
+  `web/lib/publicRoutes.tsx` + a two-line `app/layout.tsx` change make
+  `/privacy` and `/terms` reachable signed-out (AuthProvider otherwise swaps
+  every route for the LoginScreen after hydration — App Review must be able to
+  read the policy URL). `docs/APP_STORE.md` added: nutrition-label
+  declarations with justifications (tracking = NO; Usage Data/Diagnostics =
+  none; phone number deliberately not declared — collected outside the app,
+  covered in the policy), full metadata drafts, review-notes template, and the
+  6-shot screenshot list. §4 tasks 8/9 statuses updated. tsc clean. Remaining
+  manual: Connect forms, demo account, screenshots.
+- **2026-07-03 — AI-consent disclosure (§4 task 6).** First-run consent gate
+  `AIConsentNotice.tsx` naming Google Gemini, rendered from `AuthProvider` on
+  both native (pre-cutover, no sign-in needed) and web, after the sign-in gate
+  and before `Onboarding`/the tour; acceptance in localStorage `ai-consent-v1`
+  + mirrored `aiConsentAt` on the user doc (either signal suppresses re-ask;
+  helpers in `web/lib/aiConsent.ts`); Settings gained an "AI & privacy"
+  section (provider line, consent date, Privacy Policy/Terms links via new
+  `policyUrl`/`openExternal` in `web/lib/share.ts` — external Safari open
+  under Capacitor, Vercel origin). tsc clean. Device verification pending.
 - **2026-07-03 — Top-3 blockers finished + CI-verified (multi-agent session).**
   (1) Native-auth build FIXED and proven: root cause was the Xcode 16 toolchain
   stripping Capacitor's feature-gated symbols, not a dependency conflict — CI

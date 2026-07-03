@@ -34,7 +34,9 @@ export const viewport: Viewport = {
 };
 
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { AuthProvider } from "@/components/AuthProvider";
+// AuthGate = AuthProvider everywhere except the public legal pages
+// (/privacy, /terms), which App Store review must reach without sign-in.
+import { AuthGate } from "@/lib/publicRoutes";
 import { ToastProvider } from "@/components/Toast";
 
 export default function RootLayout({
@@ -65,11 +67,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-text transition-colors duration-200`}
       >
         <ThemeProvider>
-          <AuthProvider>
+          <AuthGate>
             <ToastProvider>
               {children}
             </ToastProvider>
-          </AuthProvider>
+          </AuthGate>
         </ThemeProvider>
       </body>
     </html>

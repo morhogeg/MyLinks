@@ -21,6 +21,29 @@ export function shareUrlFor(path: string): string {
     return `${SHARE_BASE}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
+/**
+ * Legal/policy pages (`/privacy`, `/terms`) are served by the Next.js app on
+ * Vercel. On the web a relative path is the right link; inside the native
+ * shell relative paths resolve against `capacitor://localhost`, so we point
+ * at the public Vercel origin and open it externally instead.
+ */
+const POLICY_BASE = 'https://my-links-sable.vercel.app';
+
+/** Href for a policy page: relative on the web, absolute (Vercel) on native. */
+export function policyUrl(path: string): string {
+    const p = path.startsWith('/') ? path : `/${path}`;
+    return isCapacitor ? `${POLICY_BASE}${p}` : p;
+}
+
+/**
+ * Open a URL outside the app: the system browser on native (Capacitor routes
+ * `window.open` of an external URL to Safari), a new tab on the web. noopener
+ * so the opened page can't reach `window.opener`.
+ */
+export function openExternal(url: string): void {
+    if (typeof window !== 'undefined') window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 export type ShareOutcome = 'shared' | 'copied' | 'cancelled' | 'failed';
 
 /**

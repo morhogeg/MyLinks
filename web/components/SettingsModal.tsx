@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { User, DigestMode, DigestChannel } from '@/lib/types';
-import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight, Compass, LogOut, UserCircle, CalendarClock, Search } from 'lucide-react';
+import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight, Compass, LogOut, UserCircle, CalendarClock, Search, ShieldCheck, ExternalLink } from 'lucide-react';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
+import { policyUrl, openExternal } from '@/lib/share';
+import { readLocalAiConsent } from '@/lib/aiConsent';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from './AuthProvider';
 import { deleteAccount } from '@/lib/auth';
@@ -129,6 +131,14 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
             setDeleteError('Could not delete your account. Please try again.');
         }
     };
+
+    // AI-consent timestamp for the "AI & privacy" section. The local record is
+    // kept in sync with the user doc's `aiConsentAt` by AuthProvider, so
+    // reading it here is enough (re-read each open in case it just changed).
+    const [aiConsentAt, setAiConsentAt] = useState<number | null>(null);
+    useEffect(() => {
+        if (isOpen) setAiConsentAt(readLocalAiConsent());
+    }, [isOpen]);
 
     // On phones Settings is a real full-screen page (slides in, fills the screen,
     // clears the notch); on desktop it stays a centered modal.
@@ -507,6 +517,29 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                             title="WhatsApp"
                             subtitle="Send any link to the bot — it's saved, summarized, and tagged automatically."
                         />
+                    </Section>
+
+                    {/* AI & Privacy — App Review 5.1.1/5.1.2: name the AI
+                        provider, show when the user consented, and link the
+                        policy pages (opened externally under Capacitor). */}
+                    <Section icon={<ShieldCheck className="w-4 h-4" />} title="AI & privacy">
+                        <Row
+                            icon={<Sparkles className="w-5 h-5 text-accent" />}
+                            title="Content analysis is powered by Google Gemini"
+                            subtitle="Content you save (links, page text, images) and questions you ask are sent to Google Gemini for summaries, tags, and answers. Machina does not use your content to train AI models."
+                        />
+                        {aiConsentAt !== null && (
+                            <p className="text-[11px] text-text-muted leading-relaxed">
+                                You agreed to this on{' '}
+                                {new Date(aiConsentAt).toLocaleDateString(undefined, {
+                                    year: 'numeric', month: 'long', day: 'numeric',
+                                })}.
+                            </p>
+                        )}
+                        <div className="flex gap-2">
+                            <PolicyLinkButton label="Privacy Policy" path="/privacy" />
+                            <PolicyLinkButton label="Terms" path="/terms" />
+                        </div>
                     </Section>
 
                     {/* About */}
@@ -915,6 +948,20 @@ function Row({ icon, title, subtitle, children }: { icon?: ReactNode; title: str
             </div>
             {children && <div className="shrink-0">{children}</div>}
         </div>
+    );
+}
+
+/** Policy-page link that stays native-safe: relative link on the web, the
+    public Vercel origin opened in Safari inside the Capacitor shell. */
+function PolicyLinkButton({ label, path }: { label: string; path: string }) {
+    return (
+        <button
+            onClick={() => openExternal(policyUrl(path))}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-xl bg-card-hover border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
+        >
+            {label}
+            <ExternalLink className="w-3.5 h-3.5" />
+        </button>
     );
 }
 

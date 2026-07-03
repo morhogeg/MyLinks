@@ -11,8 +11,10 @@ import {
     onAuthChange, completeRedirectSignIn, signIn, signOutUser,
 } from '@/lib/auth';
 import { syncShareConfigToNative } from '@/lib/shareConfig';
+import { readLocalAiConsent, writeLocalAiConsent } from '@/lib/aiConsent';
 import LoginScreen from '@/components/LoginScreen';
 import Onboarding from '@/components/Onboarding';
+import AIConsentNotice from '@/components/AIConsentNotice';
 
 /** localStorage fallback for onboarding dismissal (user doc is the primary
     record — this only covers a failed `onboarded: true` write). */
@@ -98,8 +100,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [needsOnboarding, setNeedsOnboarding] = useState(false);
     // Bumped by "Try again" on the restricted screen to re-run resolution.
     const [retryNonce, setRetryNonce] = useState(0);
+    // AI-consent gate (App Review 5.1.1/5.1.2): null until the local record is
+    // read on mount (keeps SSR/first paint consistent), then true/false. Both
+    // signals count — localStorage `ai-consent-v1` OR `aiConsentAt` on the
+    // user doc (checked when the doc resolves, so a reinstall doesn't re-ask).
+    const [aiConsented, setAiConsented] = useState<boolean | null>(null);
 
     const native = typeof window !== 'undefined' && isNativeApp();
+
+    useEffect(() => {
+        setAiConsented(readLocalAiConsent() !== null);
+    }, []);
+
+    // Reconcile the two consent records once the data doc is known: a doc
+    // timestamp wins (cache it locally); otherwise mirror a local acceptance
+    // up to the doc so it survives reinstalls.
+    const reconcileAiConsent = useCallback(
+        (docId: string, data: Record<string, unknown> | undefined) => {
+            const docTs = typeof data?.aiConsentAt === 'number' ? data.aiConsentAt : null;
+            if (docTs) {
+                setAiConsented(true);
+                writeLocalAiConsent(docTs);
+                return;
+            }
+            const localTs = readLocalAiConsent();
+            if (localTs !== null) {
+                updateDoc(doc(db, 'users', docId), { aiConsentAt: localTs }).catch(() => {});
+            }
+        },
+        [],
+    );
+
+    // Explicit acceptance from the notice: persist locally + on the user doc.
+    const acceptAiConsent = useCallback(() => {
+        const now = Date.now();
+        setAiConsented(true);
+        writeLocalAiConsent(now);
+        if (uid) {
+            updateDoc(doc(db, 'users', uid), { aiConsentAt: now }).catch(() => {});
+        }
+    }, [uid]);
 
     const signOut = useCallback(async () => {
         await signOutUser();
@@ -124,6 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     const userDoc = snapshot.docs[0];
                     setUid(userDoc.id);
                     attachUserDoc(userDoc.id, userDoc.data());
+                    reconcileAiConsent(userDoc.id, userDoc.data());
                 }
             } catch (err) {
                 console.error('Failed to look up user:', err);
@@ -168,6 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     setRestricted(false);
                     setUid(dataDoc.id);
                     attachUserDoc(dataDoc.id, dataDoc.data);
+                    reconcileAiConsent(dataDoc.id, dataDoc.data);
                     // First run for a fresh workspace: the backend returns
                     // `created` on creation and stamps `onboarded: false` on
                     // the doc (covers a reload before dismissal).
@@ -235,14 +277,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 </AuthContext.Provider>
             );
         }
-        if (uid && needsOnboarding) {
-            // Fresh workspace: one welcome screen before the app.
-            return (
-                <AuthContext.Provider value={value}>
-                    <Onboarding onDone={finishOnboarding} />
-                </AuthContext.Provider>
-            );
-        }
+    }
+
+    // AI-consent gate (App Review 5.1.1/5.1.2, Nov 2025): explicit consent to
+    // Google Gemini processing before anything can be saved. Deliberately NOT
+    // behind the auth flags — pre-cutover native has no sign-in, so this sits
+    // after the sign-in/restricted screens (web) but gates children on both
+    // platforms, including existing users with no recorded consent. Renders
+    // BEFORE the welcome screen (below) and the tour (app/page.tsx mounts only
+    // once children render), so the screens appear one at a time, in order.
+    if (!loading && aiConsented === false) {
+        return (
+            <AuthContext.Provider value={value}>
+                <AIConsentNotice onAccept={acceptAiConsent} />
+            </AuthContext.Provider>
+        );
+    }
+
+    if (gated && !loading && uid && needsOnboarding) {
+        // Fresh workspace: one welcome screen before the app.
+        return (
+            <AuthContext.Provider value={value}>
+                <Onboarding onDone={finishOnboarding} />
+            </AuthContext.Provider>
+        );
     }
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
