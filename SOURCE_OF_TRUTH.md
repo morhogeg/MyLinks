@@ -476,6 +476,13 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-03 — Delete flow: one confirm, warmer copy.** Deleting from an open
+  card showed two stacked confirms (the detail modal's generic dialog, then the
+  Feed's branded one). The modal's own dialog was removed — Delete routes
+  straight to the Feed's branded confirm (stacks above the card; Cancel returns
+  to it). Single + bulk microcopy rewritten: "Delete this card? / It comes out
+  of your Machina completely — summary, tags, and connections included. There's
+  no undo." TestFlight build 1011; live on web via `main`.
 - **2026-07-03 — List view: per-language mirroring + full-width titles.** Two
   rounds from user feedback. (1) `ListCard` rows now set `dir` per card, so
   Hebrew cards mirror completely (colour bar/chip/star on the correct sides;
