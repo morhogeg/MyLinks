@@ -476,6 +476,16 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-03 — Header fade + calmer delete copy.** The home top bar now does
+  a **scroll-scrubbed fade** (`web/lib/useHeaderFade.ts`): a progress value
+  rides the actual scroll travel (~140px down = fully away, ~80px up = fully
+  back), styles written per rAF frame via ref (no re-renders), with a 160ms
+  idle settle to the nearest endpoint on `--ease-modal`, top-lock, rubber-band
+  clamp, reduced-motion fallback, and an always-on status-bar scrim so content
+  never scrolls naked under the notch. First iteration (binary toggle, build
+  1012) read as a pop — replaced by the scrubbed version in **build 1013**.
+  Delete-dialog copy softened again per feedback: "It'll be removed from your
+  Machina, along with its summary and connections." Live on web via `main`.
 - **2026-07-03 — Delete flow: one confirm, warmer copy.** Deleting from an open
   card showed two stacked confirms (the detail modal's generic dialog, then the
   Feed's branded one). The modal's own dialog was removed — Delete routes
