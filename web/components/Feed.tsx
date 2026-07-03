@@ -1938,7 +1938,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                     if (confirmDeleteId) performDelete(confirmDeleteId);
                 }}
                 title="Delete this card?"
-                message="It comes out of your Machina completely — summary, tags, and connections included. There's no undo."
+                message="It'll be removed from your Machina, along with its summary and connections."
                 confirmLabel="Delete"
                 variant="danger"
             />
@@ -1949,7 +1949,7 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
                 onClose={() => setConfirmBulkDelete(false)}
                 onConfirm={performBulkDelete}
                 title={`Delete ${selectedIds.size} card${selectedIds.size === 1 ? '' : 's'}?`}
-                message="They come out of your Machina completely — summaries, tags, and connections included. There's no undo."
+                message="They'll be removed from your Machina, along with their summaries and connections."
                 confirmLabel="Delete"
                 variant="danger"
             />
