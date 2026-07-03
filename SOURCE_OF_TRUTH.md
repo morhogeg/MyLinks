@@ -50,8 +50,8 @@ surface in the category and a knowledge graph computed on every save. The path t
 - **iOS app:** Capacitor 8 shell (`web/ios/`, SPM, no CocoaPods) + native **Share
   Extension** (`web/ios/App/ShareExt/`) that authenticates via an ingest token
   bridged through App Group `group.com.morhogeg.machina`
-  (`ShareConfigPlugin.swift`). Plugins: haptics, share (+ firebase-authentication,
-  currently stripped in CI — see task 1). Team `8Y2M94RUHG`.
+  (`ShareConfigPlugin.swift`). Plugins: haptics, share, firebase-authentication
+  (all three in the committed SPM manifest as of 2026-07-03). Team `8Y2M94RUHG`.
 - **Backend:** Python 3.13 Firebase Cloud Functions in `functions/` (project
   **`secondbrain-app-94da2`**, us-central1). Gemini `gemini-3.1-flash-lite`
   (analysis/vision, centralized in `GEMINI_ANALYSIS_MODEL`), `gemini-embedding-001`
@@ -115,11 +115,16 @@ The multi-user auth work is **fully written but not live**:
   (web) are unset → live behavior is still web-Google-gate + native
   first-user-doc + backend trusting client `uid`.
 - **Live `firestore.rules` are still `allow read, write: if true`.**
-- **CI blocker:** adding the firebase-auth plugin makes SPM resolve a
-  `capacitor-swift-pm` incompatible with `@capacitor/share@8.0.1`
-  (`CAPPluginCall has no member 'reject'`). CI currently `sed`-strips the plugin
-  (UI-only builds). Fix = align the Capacitor/SPM version set, then revert the
-  strip. Cutover order (do not deviate): `NATIVE_AUTH_SETUP.md`.
+- **CI blocker: FIXED in code (2026-07-03), root cause corrected.** It was never
+  a version conflict — the Capacitor 8 SPM binary gates core APIs
+  (`CAPPluginCall.reject`, `getString(_:)`, …) behind the `$NonescapableTypes`
+  Swift feature in its `.swiftinterface`; **Xcode 16 (macos-14) strips those
+  symbols** so `@capacitor/share` failed to compile (ionic-team/capacitor#8333),
+  while Xcode 26 resolves them (proven by green run #6, which built all three
+  plugins with no strip). Fix: workflow now runs on `macos-26` + `Xcode_26*`, the
+  `sed` strip is removed, and the committed `CapApp-SPM/Package.swift` lists all
+  three plugins. Awaiting one CI run to confirm, then on-device sign-in
+  verification. Cutover order (do not deviate): `NATIVE_AUTH_SETUP.md`.
 
 ## 4. THE BACKLOG — ranked, most urgent → least
 
@@ -129,16 +134,26 @@ The multi-user auth work is **fully written but not live**:
 
 ### 🔴 P0 — launch blockers (in order)
 
-1. **[ ] Native auth build green (iOS).** Fix the `capacitor-swift-pm` /
-   `@capacitor/share` version conflict, remove the CI `sed` strip of
-   `CapacitorFirebaseAuthentication` in `ios-testflight.yml`, get a TestFlight
-   build with working native Apple + Google sign-in. Needs CI iteration on macOS.
-   (Was `HANDOFF-iOS-AUTH.md` steps 1–2.)
-2. **[ ] Auth cutover.** After 1 is verified on device: flip `REQUIRE_AUTH` +
-   `NEXT_PUBLIC_REQUIRE_AUTH`, redeploy functions + web, test the locked rules in
-   the emulator, then `cp firestore.rules.locked firestore.rules && firebase
-   deploy --only firestore:rules`. Closes audit blockers B-1/B-2/B-3. Steps:
-   `NATIVE_AUTH_SETUP.md` §6.
+1. **[x] Native auth build green (iOS)** *(code done 2026-07-03 — root cause was
+   the Xcode 16 toolchain, not a dependency conflict; see §3. Workflow moved to
+   `macos-26`/Xcode 26, `sed` strip removed, all three plugins in the committed
+   SPM manifest. This also satisfies Apple's current-SDK submission floor —
+   former task 10.)* **Remaining:** one CI run to confirm archive + upload, then
+   verify Apple + Google sign-in **on device** before the cutover.
+2. **[ ] Auth cutover** *(code-side prep done 2026-07-03; owner steps remain).*
+   Prep completed: `firestore.rules.locked` updated — added `syntheses`;
+   **rewrote the `users` read rule** (the old `owns()` `get()` was unprovable for
+   the `authUids array-contains` list query and would have bricked every sign-in
+   at cutover); client create/delete on user docs denied. `retryFailedLink` now
+   sends the bearer header; `backfill_related_links` is admin-gated; a rules
+   test suite exists in `firestore-rules-test/` (**run on the owner machine** —
+   the cloud sandbox can't download the emulator JAR). Owner steps, after task 1
+   is device-verified: flip `REQUIRE_AUTH` + `NEXT_PUBLIC_REQUIRE_AUTH`, redeploy
+   functions + web, `cd firestore-rules-test && npm test`, then
+   `cp firestore.rules.locked firestore.rules && firebase deploy --only
+   firestore:rules`. Flagged decision: `get_article` stays anonymous-callable
+   (App Check + rate limit only) — keep or gate deliberately. Closes audit
+   blockers B-1/B-2/B-3. Full checklist: `NATIVE_AUTH_SETUP.md` §6.
 3. **[x] New-user path** *(code done 2026-07-03; goes live with the task-2
    cutover — flag-gated behind `REQUIRE_AUTH`).* `claim_workspace` now falls
    back to creating a fresh `users/{authUid}` workspace (authUids/email/
@@ -152,7 +167,9 @@ The multi-user auth work is **fully written but not live**:
 4. **[ ] Pending deploys/verifications from the last sessions** (owner machine):
    - `./deploy-functions.sh` — M12 weekly synthesis backend is written but dark.
    - `firebase deploy --only firestore:rules` — the `syntheses` read rule.
-   - Run the M9 backfill once: `curl .../backfill_related_links` (idempotent).
+   - Run the M9 backfill once: `curl -H "X-Admin-Token: $ADMIN_TOKEN"
+     .../backfill_related_links` (idempotent; now admin-gated — set `ADMIN_TOKEN`
+     in the functions env first).
    - Confirm `backfill_youtube_channels` was run (channel-name repair).
    - `/api/analyze` 60s timeout on slow YouTube videos — route around Hosting's
      60s cap like `/api/chat` did (touches all link-saving; test carefully).
@@ -181,10 +198,9 @@ The multi-user auth work is **fully written but not live**:
    be ON), review notes explaining WhatsApp capture (reviewer can't test Twilio),
    and either iPad screenshots or set `TARGETED_DEVICE_FAMILY = 1` (currently
    `"1,2"` = universal — iPhone-only is the cheaper path).
-10. **[ ] CI SDK check.** Apple requires builds against the current-generation
-    SDK (Xcode 26 era rule took effect April 2026); CI selects `Xcode_16*` on
-    `macos-14`. The 2026-07-02 upload succeeded, but verify TestFlight processing
-    didn't warn, and move to the latest runner/Xcode before App Store submission.
+10. **[x] CI SDK check** *(done 2026-07-03, folded into task 1: the workflow now
+    runs on `macos-26` with `Xcode_26*`, satisfying Apple's current-SDK
+    submission requirement in effect since April 2026).*
 11. **[ ] On-device verification sweep** (can't be done headlessly, one pass on a
     physical iPhone): share-ext neutral "still saving" state under killed network
     (never a false green check); haptics on favorite/delete/save/PTR/confirm;
