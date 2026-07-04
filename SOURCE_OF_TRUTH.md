@@ -487,7 +487,9 @@ exact-match, capped.
   explores X and Y", RTL variants included). No model call, no cost. Section
   renamed "Related cards", capped at 4, every entry navigates (dead links drop
   out). Kept inline (not behind a button): it's already below the fold, and the
-  graph is the product's hero.
+  graph is the product's hero. Shipped: web via `main`; iOS via TestFlight run
+  #14 (green, **build 1014** — triggered with the temporary-push-trigger
+  pattern; API dispatch is 403 from remote sessions).
 - **2026-07-03 — Header fade + calmer delete copy.** The home top bar now does
   a **scroll-scrubbed fade** (`web/lib/useHeaderFade.ts`): a progress value
   rides the actual scroll travel (~140px down = fully away, ~80px up = fully
