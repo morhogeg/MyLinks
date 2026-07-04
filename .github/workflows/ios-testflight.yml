@@ -158,17 +158,17 @@ jobs:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
-          # UNSIGNED archive — signing happens once, at export, with the
-          # account's cloud-managed DISTRIBUTION identity. Why: with automatic
-          # signing, `archive` signs with Apple Development, and every
-          # ephemeral runner is a "new Mac" that mints a fresh development
-          # certificate — ~14 runs exhausted Apple's cert cap and broke
-          # signing ("maximum number of certificates", runs #15/#16). A global
-          # CODE_SIGN_IDENTITY=Distribution override doesn't work either: it
-          # leaks onto every SPM package target and conflicts with automatic
-          # signing (run #17). Skipping codesign at archive avoids both — the
-          # export step (below) provisions + signs App and ShareExt with the
-          # one account-level distribution cert that all green runs already used.
+          # SIGNED archive (automatic signing) — do NOT "optimize" this to an
+          # unsigned archive + sign-at-export: build 1018 shipped that way and
+          # LOST the App Group entitlement (group.com.morhogeg.machina), which
+          # silently broke the Share Extension's token bridge ("Open Machina
+          # and sign in first"). Entitlements are baked at archive-time
+          # codesign; export re-signing from an unsigned archive does not
+          # restore them. The entitlement check step below is the tripwire.
+          # Cost of this approach: each ephemeral runner mints an Apple
+          # Development certificate, and Apple caps those — prune them at
+          # developer.apple.com → Certificates when archive fails with
+          # "maximum number of certificates" (runs #15/#16).
           xcodebuild clean archive \
             -project App.xcodeproj \
             -scheme App \
@@ -176,8 +176,10 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/App.xcarchive" \
             CURRENT_PROJECT_VERSION=${{ steps.bn.outputs.value }} \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            -authenticationKeyPath ~/private_keys/AuthKey_${ASC_KEY_ID}.p8
 
       - name: Export IPA
         working-directory: web/ios/App
@@ -193,7 +195,6 @@ jobs:
             <key>method</key><string>app-store-connect</string>
             <key>teamID</key><string>${TEAM_ID}</string>
             <key>signingStyle</key><string>automatic</string>
-            <key>signingCertificate</key><string>Apple Distribution</string>
             <key>uploadSymbols</key><true/>
             <key>destination</key><string>export</string>
           </dict>
@@ -207,6 +208,28 @@ jobs:
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             -authenticationKeyPath ~/private_keys/AuthKey_${ASC_KEY_ID}.p8
+
+      # Tripwire for the build-1018 regression: verify the signed IPA actually
+      # carries the App Group entitlement in BOTH the app and the Share
+      # Extension. Without it the ingest-token bridge silently dies and every
+      # share shows "Open Machina and sign in first". Fail here, never on a
+      # user's phone.
+      - name: Verify entitlements in exported IPA
+        run: |
+          cd "$RUNNER_TEMP/export"
+          unzip -q -o *.ipa
+          for TARGET in "Payload/App.app" "Payload/App.app/PlugIns/ShareExt.appex"; do
+            echo "── entitlements: $TARGET"
+            ENT="$(codesign -d --entitlements :- "$TARGET" 2>/dev/null)"
+            echo "$ENT" | grep -q "group.com.morhogeg.machina" || {
+              echo "::error::$TARGET is missing the App Group entitlement (group.com.morhogeg.machina) — the Share Extension token bridge would be broken. Refusing to upload."
+              echo "$ENT"
+              exit 1
+            }
+          done
+          echo "$(codesign -d --entitlements :- Payload/App.app 2>/dev/null)" | grep -q "com.apple.developer.applesignin" \
+            || echo "::warning::App is missing the Sign in with Apple entitlement — required before the auth cutover build."
+          echo "Entitlements OK: App Group present in app + extension."
 
       - name: Upload to TestFlight
         env:

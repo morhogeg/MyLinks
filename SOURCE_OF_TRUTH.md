@@ -98,15 +98,20 @@ surface in the category and a knowledge graph computed on every save. The path t
 - Web builds self-host fonts (`geist` package) so builds never fetch Google Fonts.
 - Cloud sessions can't reach `*.run.app` URLs (egress allowlist) — verify deployed
   functions via the app, not curl.
-- **iOS CI signing architecture (do not "simplify"):** the archive step is
-  deliberately UNSIGNED (`CODE_SIGNING_ALLOWED=NO`); signing happens once at
-  export with the cloud-managed **Apple Distribution** identity + ASC API key.
-  Automatic signing at archive uses Apple *Development* certs, and every
-  ephemeral runner is a "new Mac" that mints one — 14 runs exhausted Apple's
-  certificate cap and broke all signing (runs #15/#16, 2026-07-04). A global
-  `CODE_SIGN_IDENTITY` override doesn't work either — it leaks onto every SPM
-  package target (run #17). Prune leftover runner Development certs at
-  developer.apple.com when convenient (safe; they regenerate on demand).
+- **iOS CI signing — the hard-won rules (2026-07-04):** the archive step MUST
+  be signed (automatic signing + `-allowProvisioningUpdates` + ASC key).
+  **Never switch to an unsigned archive + sign-at-export**: build 1018 shipped
+  that way and silently **lost the App Group entitlement**, killing the Share
+  Extension token bridge ("Open Machina and sign in first") — entitlements are
+  baked at archive-time codesign and export re-signing doesn't restore them.
+  A CI step now cracks open every exported IPA and fails if the App Group
+  entitlement is missing from the app or the extension. Known cost of signed
+  archives: each ephemeral runner mints an Apple *Development* cert, and
+  Apple caps those — when archive fails with "maximum number of certificates"
+  (runs #15/#16), **prune Development certs at developer.apple.com →
+  Certificates** (safe; they regenerate). A global `CODE_SIGN_IDENTITY`
+  override is also not an option — it leaks onto every SPM target (run #17).
+  Durable fix candidate (backlog): import one stable dev cert as a CI secret.
 - **Two parallel Claude sessions:** TestFlight runs share one concurrency group
   and one build-number sequence (1000 + run number) — runs queue, numbers never
   collide, but a build only contains its own branch's code. Sync with
@@ -489,6 +494,18 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-04 — ⚠️ Build 1018 REGRESSION: Share Extension broken.** The
+  unsigned-archive signing workaround lost the App Group entitlement — every
+  share fails with "Open Machina and sign in first" on 1018. Fixed in CI:
+  reverted to signed archives + added an IPA entitlement tripwire (App Group
+  must be present in app + extension or the run fails before upload). §2
+  gotcha rewritten accordingly. **Next build is blocked until the owner prunes
+  Apple Development certificates** (developer.apple.com → Certificates — the
+  cert cap from runs #15/#16 still stands). Until then, roll back to
+  **build 1013** in TestFlight (share works there; it lacks only related-cards
+  + the fade late-mount fix). Related-cards on OLD saves is separate and not a
+  bug: they need the M9 backfill (§4 task 4 — set `ADMIN_TOKEN`, deploy
+  functions, run the admin curl); new saves relate immediately.
 - **2026-07-04 — Two-session race + Apple cert-cap outage; build 1018 is the
   definitive merged build.** Two parallel sessions pushed builds minutes apart:
   run #14 (build 1014, other session's related-cards branch) and #15 (this
