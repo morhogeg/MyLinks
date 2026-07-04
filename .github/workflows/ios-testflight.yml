@@ -17,6 +17,9 @@ on:
           Default OFF = legacy pre-cutover behavior (no sign-in UI).
         type: boolean
         default: false
+  # TEMPORARY: build trigger for the related-cards round. Remove after green.
+  push:
+    branches: [claude/related-cards-open-state-a1wum6]
   # AUTO-BUILD TEMPORARILY GATED during the multi-user auth cutover.
   # The build now includes the Sign in with Apple entitlement and the
   # @capacitor-firebase/authentication pod (native Firebase SDK). Archiving
