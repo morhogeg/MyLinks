@@ -476,6 +476,18 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-04 — Related cards go live (open-card view).** The open card's
+  "See Also" section was a frozen save-time snapshot: old cards never learned
+  about newer related saves, and pre-graph cards showed nothing (plus a dead
+  client heuristic that was computed but never rendered). New `web/lib/related.ts`
+  merges the stored LLM-verified relations (curated reasons, ranked first) with
+  **live client-side matches** — cosine over the in-memory `embedding_vector`s
+  (normalizes both plain-array and Firestore `VectorValue` storage), corroborated
+  by shared concepts/tags — each with a deterministic "why" sentence ("Also
+  explores X and Y", RTL variants included). No model call, no cost. Section
+  renamed "Related cards", capped at 4, every entry navigates (dead links drop
+  out). Kept inline (not behind a button): it's already below the fold, and the
+  graph is the product's hero.
 - **2026-07-03 — Header fade + calmer delete copy.** The home top bar now does
   a **scroll-scrubbed fade** (`web/lib/useHeaderFade.ts`): a progress value
   rides the actual scroll travel (~140px down = fully away, ~80px up = fully
