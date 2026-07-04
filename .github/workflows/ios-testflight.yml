@@ -161,6 +161,14 @@ jobs:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
+          # CODE_SIGN_IDENTITY="Apple Distribution": archive straight to the
+          # account's cloud-managed DISTRIBUTION cert instead of the automatic
+          # default (Apple Development). Every ephemeral runner is a "new Mac"
+          # and was minting a fresh development certificate per run, which
+          # eventually hit Apple's cert cap and broke signing entirely
+          # ("Your account has reached the maximum number of certificates",
+          # runs #15/#16). The distribution cert is one account-level identity
+          # reused by all runners — nothing new is created per run.
           xcodebuild clean archive \
             -project App.xcodeproj \
             -scheme App \
@@ -168,6 +176,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/App.xcarchive" \
             CURRENT_PROJECT_VERSION=${{ steps.bn.outputs.value }} \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             -allowProvisioningUpdates \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
