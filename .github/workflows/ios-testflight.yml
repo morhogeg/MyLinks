@@ -161,14 +161,17 @@ jobs:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
-          # CODE_SIGN_IDENTITY="Apple Distribution": archive straight to the
-          # account's cloud-managed DISTRIBUTION cert instead of the automatic
-          # default (Apple Development). Every ephemeral runner is a "new Mac"
-          # and was minting a fresh development certificate per run, which
-          # eventually hit Apple's cert cap and broke signing entirely
-          # ("Your account has reached the maximum number of certificates",
-          # runs #15/#16). The distribution cert is one account-level identity
-          # reused by all runners — nothing new is created per run.
+          # UNSIGNED archive — signing happens once, at export, with the
+          # account's cloud-managed DISTRIBUTION identity. Why: with automatic
+          # signing, `archive` signs with Apple Development, and every
+          # ephemeral runner is a "new Mac" that mints a fresh development
+          # certificate — ~14 runs exhausted Apple's cert cap and broke
+          # signing ("maximum number of certificates", runs #15/#16). A global
+          # CODE_SIGN_IDENTITY=Distribution override doesn't work either: it
+          # leaks onto every SPM package target and conflicts with automatic
+          # signing (run #17). Skipping codesign at archive avoids both — the
+          # export step (below) provisions + signs App and ShareExt with the
+          # one account-level distribution cert that all green runs already used.
           xcodebuild clean archive \
             -project App.xcodeproj \
             -scheme App \
@@ -176,11 +179,8 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/App.xcarchive" \
             CURRENT_PROJECT_VERSION=${{ steps.bn.outputs.value }} \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            -allowProvisioningUpdates \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            -authenticationKeyPath ~/private_keys/AuthKey_${ASC_KEY_ID}.p8
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
 
       - name: Export IPA
         working-directory: web/ios/App
@@ -196,6 +196,7 @@ jobs:
             <key>method</key><string>app-store-connect</string>
             <key>teamID</key><string>${TEAM_ID}</string>
             <key>signingStyle</key><string>automatic</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
             <key>uploadSymbols</key><true/>
             <key>destination</key><string>export</string>
           </dict>
