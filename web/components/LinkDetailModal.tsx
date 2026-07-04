@@ -12,6 +12,7 @@ import TagInput from './TagInput';
 import { hasHebrew } from '@/lib/rtl';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useVisualViewport } from '@/lib/useVisualViewport';
+import { getRelatedCards } from '@/lib/related';
 
 /**
  * Split a "M:SS — description" (or "H:MM:SS …") video highlight into its
@@ -106,25 +107,12 @@ export default function LinkDetailModal({
 
     if (!isOpen) return null;
 
-    const getRelatedLinks = () => {
-        if (!allLinks || !allLinks.length) return [];
-        return allLinks
-            .filter(l => l.id !== link.id)
-            .map(l => {
-                let score = 0;
-                if (l.category === link.category) score += 3;
-                const sharedTags = l.tags.filter(t => link.tags.includes(t));
-                score += sharedTags.length * 2;
-                return { link: l, score };
-            })
-            .filter(item => item.score > 0)
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 3)
-            .map(item => item.link);
-    };
-
-    const relatedLinks = getRelatedLinks();
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary) || (link.detailedSummary ? hasHebrew(link.detailedSummary) : false);
+
+    // Live related cards: stored AI relations merged with fresh embedding /
+    // concept matches (see lib/related.ts). Computed here, below the isOpen
+    // guard, so the closed modal costs nothing.
+    const relatedCards = getRelatedCards(link, allLinks, isRtl);
 
     // Branded source credit, matching the card: YouTube channel in red, X
     // author (@handle from the URL) in the X grey, everything else muted.
@@ -599,59 +587,53 @@ export default function LinkDetailModal({
                             )}
                         </div>
 
-                        {/* See Also / Contextual Connections */}
-                        {link.relatedLinks && link.relatedLinks.length > 0 && (
+                        {/* Related cards — stored AI relations + live matches
+                            (lib/related.ts), each with a one-line "why". Every
+                            entry resolves to a live card, so tapping always
+                            navigates. */}
+                        {relatedCards.length > 0 && (
                             <div className="mb-8 border-t border-white/5 pt-6">
                                 <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
                                     <Network className="w-4 h-4" />
-                                    {isRtl ? 'קשרים סמנטיים' : 'See Also (AI Connections)'}
+                                    {isRtl ? 'כרטיסים קשורים' : 'Related cards'}
                                 </h3>
                                 <div className="grid gap-3">
-                                    {link.relatedLinks.map((rel) => {
-                                        const fullLink = allLinks.find(l => l.id === rel.id);
-                                        if (!fullLink && !rel.title) return null; // Skip if dead link and no title fallback
-
-                                        return (
-                                            <div
-                                                key={rel.id}
-                                                onClick={() => {
-                                                    if (fullLink && onOpenOtherLink) {
-                                                        onOpenOtherLink(fullLink);
-                                                    }
-                                                }}
-                                                className={`group p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-accent/20 transition-all cursor-pointer ${!fullLink ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                            >
-                                                <div className="flex justify-between items-start gap-3">
-                                                    <h4
-                                                        dir={isRtl ? "rtl" : "ltr"}
-                                                        className={`font-medium text-text-secondary group-hover:text-accent transition-colors text-sm ${isRtl ? 'text-right' : ''}`}
-                                                    >
-                                                        {fullLink?.title || rel.title}
-                                                    </h4>
-                                                    {rel.similarity > 0.85 && (
-                                                        <span className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-mono">
-                                                            strong
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <p
+                                    {relatedCards.map(({ link: rel, reason, strong, sharedConcepts }) => (
+                                        <div
+                                            key={rel.id}
+                                            onClick={() => onOpenOtherLink?.(rel)}
+                                            className="group p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-accent/20 transition-all cursor-pointer"
+                                        >
+                                            <div className="flex justify-between items-start gap-3">
+                                                <h4
                                                     dir={isRtl ? "rtl" : "ltr"}
-                                                    className={`text-xs text-text-muted/60 mt-1.5 font-normal italic ${isRtl ? 'text-right' : ''}`}
+                                                    className={`font-medium text-text-secondary group-hover:text-accent transition-colors text-sm ${isRtl ? 'text-right' : ''}`}
                                                 >
-                                                    {isRtl ? "✨ " : "✨ "}{rel.reason}
-                                                </p>
-                                                {rel.commonConcepts && rel.commonConcepts.length > 0 && (
-                                                    <div className={`flex flex-wrap gap-1.5 mt-2 ${isRtl ? 'justify-end' : ''}`}>
-                                                        {rel.commonConcepts.map(c => (
-                                                            <span key={c} className="text-[10px] text-text-muted/50 bg-black/20 px-1.5 py-0.5 rounded">
-                                                                {c}
-                                                            </span>
-                                                        ))}
-                                                    </div>
+                                                    {rel.title}
+                                                </h4>
+                                                {strong && (
+                                                    <span className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-mono">
+                                                        strong
+                                                    </span>
                                                 )}
                                             </div>
-                                        );
-                                    })}
+                                            <p
+                                                dir={isRtl ? "rtl" : "ltr"}
+                                                className={`text-xs text-text-muted/60 mt-1.5 font-normal italic ${isRtl ? 'text-right' : ''}`}
+                                            >
+                                                ✨ {reason}
+                                            </p>
+                                            {sharedConcepts.length > 0 && (
+                                                <div className={`flex flex-wrap gap-1.5 mt-2 ${isRtl ? 'justify-end' : ''}`}>
+                                                    {sharedConcepts.map(c => (
+                                                        <span key={c} className="text-[10px] text-text-muted/50 bg-black/20 px-1.5 py-0.5 rounded">
+                                                            {c}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         )}
