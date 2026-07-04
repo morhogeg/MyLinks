@@ -98,6 +98,19 @@ surface in the category and a knowledge graph computed on every save. The path t
 - Web builds self-host fonts (`geist` package) so builds never fetch Google Fonts.
 - Cloud sessions can't reach `*.run.app` URLs (egress allowlist) — verify deployed
   functions via the app, not curl.
+- **iOS CI signing architecture (do not "simplify"):** the archive step is
+  deliberately UNSIGNED (`CODE_SIGNING_ALLOWED=NO`); signing happens once at
+  export with the cloud-managed **Apple Distribution** identity + ASC API key.
+  Automatic signing at archive uses Apple *Development* certs, and every
+  ephemeral runner is a "new Mac" that mints one — 14 runs exhausted Apple's
+  certificate cap and broke all signing (runs #15/#16, 2026-07-04). A global
+  `CODE_SIGN_IDENTITY` override doesn't work either — it leaks onto every SPM
+  package target (run #17). Prune leftover runner Development certs at
+  developer.apple.com when convenient (safe; they regenerate on demand).
+- **Two parallel Claude sessions:** TestFlight runs share one concurrency group
+  and one build-number sequence (1000 + run number) — runs queue, numbers never
+  collide, but a build only contains its own branch's code. Sync with
+  `origin/main` before triggering a build, and coordinate via §9 here.
 - Frontend check: `cd web && npx tsc --noEmit`. Backend: `cd functions &&
   python -m py_compile *.py`.
 
@@ -476,6 +489,20 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-04 — Two-session race + Apple cert-cap outage; build 1018 is the
+  definitive merged build.** Two parallel sessions pushed builds minutes apart:
+  run #14 (build 1014, other session's related-cards branch) and #15 (this
+  session's header-fade fix) — no build-number collision (run numbers are
+  unique), but neither contained both changes. Merged `main` into this branch →
+  the combined build. Then #15/#16 failed on **Apple's certificate cap**: with
+  automatic signing, every ephemeral runner mints a new Development cert at
+  archive; 14 runs exhausted the quota. #17 (global Distribution override)
+  failed — it leaks onto SPM targets. **Fix that stuck (run #18, build 1018):
+  unsigned archive + one-time distribution signing at export** (see the new §2
+  gotcha). Also in 1018: the header-fade **late-mount fix** — the scrub never
+  attached because the header mounts after the auth loading screen; the hook
+  now uses a callback ref (Chromium-verified: opacity 1 → 0.77 mid-scrub → 0
+  settled → 1 on return). **Install 1018; ignore 1014–1017.** Merged to `main`.
 - **2026-07-04 — Related cards go live (open-card view).** The open card's
   "See Also" section was a frozen save-time snapshot: old cards never learned
   about newer related saves, and pre-graph cards showed nothing (plus a dead

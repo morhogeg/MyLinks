@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 /**
  * Scroll-scrubbed header fade — the top bar's opacity is driven continuously
@@ -24,14 +24,25 @@ import { useEffect, useRef } from 'react';
  *   listener is passive + rAF-throttled. Reduced motion skips the drift and
  *   keeps the pure fade. pointer-events cut once it's essentially gone.
  *
- * Attach the returned ref to the sticky header. The bar keeps its height, so
- * content never reflows — it just glides underneath.
+ * Returned as a CALLBACK ref (not a ref object): the home page early-returns
+ * a loading screen while auth resolves, so the header mounts long after this
+ * hook first runs. A callback ref attaches the listener the moment the element
+ * actually exists and tears it down when it goes away — an effect with []
+ * deps would run against a null ref once and never recover.
  */
 export function useHeaderFade<T extends HTMLElement>() {
-    const ref = useRef<T | null>(null);
+    const cleanupRef = useRef<(() => void) | null>(null);
 
-    useEffect(() => {
-        const el = ref.current;
+    // Tear down on hook unmount too (React calls the callback with null when
+    // the element unmounts, but not when the whole component tree drops).
+    useEffect(() => () => {
+        cleanupRef.current?.();
+        cleanupRef.current = null;
+    }, []);
+
+    return useCallback((el: T | null) => {
+        cleanupRef.current?.();
+        cleanupRef.current = null;
         if (!el) return;
 
         const FADE_PX = 140;   // downward travel for a full fade-out
@@ -101,7 +112,7 @@ export function useHeaderFade<T extends HTMLElement>() {
         apply(0, false);
 
         window.addEventListener('scroll', onScroll, { passive: true });
-        return () => {
+        cleanupRef.current = () => {
             window.removeEventListener('scroll', onScroll);
             if (settleTimer) clearTimeout(settleTimer);
             el.style.opacity = '';
@@ -111,6 +122,4 @@ export function useHeaderFade<T extends HTMLElement>() {
             el.style.willChange = '';
         };
     }, []);
-
-    return ref;
 }
