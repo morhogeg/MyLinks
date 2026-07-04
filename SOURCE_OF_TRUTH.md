@@ -494,6 +494,13 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-04 — ✅ Build 1020: share extension fixed, tripwire-verified — the
+  build to install.** Owner pruned the API-created Development certificates;
+  run #20 signed the archive properly (App Group entitlement baked in), the
+  new CI tripwire confirmed the entitlement in BOTH the app and ShareExt
+  binaries before upload, and 1020 shipped with everything: working share,
+  related cards, scrubbed header fade (late-mount fix), softened delete copy.
+  Builds 1014–1019 are superseded/broken — do not use.
 - **2026-07-04 — ⚠️ Build 1018 REGRESSION: Share Extension broken.** The
   unsigned-archive signing workaround lost the App Group entitlement — every
   share fails with "Open Machina and sign in first" on 1018. Fixed in CI:
