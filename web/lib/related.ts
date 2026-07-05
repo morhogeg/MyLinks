@@ -146,29 +146,30 @@ export function getRelatedCards(link: Link, allLinks: Link[], isRtl: boolean): R
         const otherVec = myVec ? toVector(other.embedding_vector) : null;
         const sim = myVec && otherVec ? cosine(myVec, otherVec) : 0;
 
-        let qualifies: boolean;
-        let score: number;
-        if (sim > 0) {
-            // A strong semantic match stands alone; a softer one (0.74–0.80)
-            // needs one corroborating signal — a shared concept/tag OR the same
-            // category. Two "sun & skin health" cards land right here: close in
-            // embedding space and same category, but their concepts are worded
-            // differently ("sun exposure" vs "sunscreen"), so without the
-            // same-category assist they were silently dropped.
-            const corroborated = sharedConcepts.length > 0 || sharedTags.length > 0 || sameCategory;
-            qualifies = sim >= SEMANTIC_MIN || (sim >= SEMANTIC_ASSIST_MIN && corroborated);
-            score = sim + sharedConcepts.length * 0.02 + sharedTags.length * 0.01 + (sameCategory ? 0.005 : 0);
-        } else {
-            // No readable embedding on one side: fall back to topical signals.
-            // Same category + any shared tag/concept is a genuine relation;
-            // two shared concepts or two shared tags stand on their own.
-            qualifies =
-                sharedConcepts.length >= 2 ||
-                sharedTags.length >= 2 ||
-                (sameCategory && (sharedConcepts.length >= 1 || sharedTags.length >= 1));
-            score = 0.5 + sharedConcepts.length * 0.05 + sharedTags.length * 0.03 + (sameCategory ? 0.02 : 0);
-        }
-        if (!qualifies) continue;
+        // Two INDEPENDENT paths to "related" — a card qualifies via EITHER, so
+        // a moderate embedding score never vetoes a genuine topical match:
+        //   • semantic — strong similarity (≥0.80) alone, or a softer one
+        //     (≥0.74) backed by a shared concept/tag or the same category;
+        //   • topical  — two shared concepts, two shared tags, or the same
+        //     category plus at least one shared tag/concept.
+        // The old bug: when any embedding existed the code took ONLY the
+        // semantic path, so two same-category cards that shared tags but sat
+        // below 0.74 (e.g. opposing "sun is healthy" vs "sunscreen caution"
+        // takes) were dropped. Topical overlap now always counts.
+        const corroborated = sharedConcepts.length > 0 || sharedTags.length > 0 || sameCategory;
+        const semantic = sim >= SEMANTIC_MIN || (sim >= SEMANTIC_ASSIST_MIN && corroborated);
+        const topical =
+            sharedConcepts.length >= 2 ||
+            sharedTags.length >= 2 ||
+            (sameCategory && (sharedConcepts.length >= 1 || sharedTags.length >= 1));
+        if (!semantic && !topical) continue;
+
+        // Rank: real semantic similarity first, then topical overlap. Semantic
+        // matches (sim ~0.8) naturally outrank pure-topical ones (base 0.45).
+        const score = (semantic && sim > 0 ? sim : 0.45)
+            + sharedConcepts.length * 0.05
+            + sharedTags.length * 0.03
+            + (sameCategory ? 0.02 : 0);
 
         candidates.push({
             score,
