@@ -78,8 +78,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
         if (activeLinkId) setLinkStack(prev => [...prev, activeLinkId]);
         setActiveLinkId(link.id);
     };
-    // Close the detail modal: step back to the card we came from if there is one,
-    // otherwise dismiss entirely.
+    // Step back one card: return to the one we came from, or dismiss if there's
+    // none. Wired to the modal's back arrow + iOS edge-swipe-back.
     const goBackOrClose = () => {
         if (linkStack.length === 0) {
             setActiveLinkId(null);
@@ -87,6 +87,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
             setActiveLinkId(linkStack[linkStack.length - 1]);
             setLinkStack(linkStack.slice(0, -1));
         }
+    };
+    // Close everything at once: the X button + backdrop dismiss the whole stack,
+    // however deep the related-card back-and-forth went.
+    const closeActiveLinkStack = () => {
+        setLinkStack([]);
+        setActiveLinkId(null);
     };
     const [isLoading, setIsLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'ask' | 'collections' | 'connections'>('grid');
@@ -1962,7 +1968,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                     allCategories={categories}
                     uid={uid}
                     isOpen={!!activeLink}
-                    onClose={goBackOrClose}
+                    onClose={closeActiveLinkStack}
+                    onBack={goBackOrClose}
+                    canGoBack={linkStack.length > 0}
                     onStatusChange={handleStatusChange}
                     onReadStatusChange={handleReadStatusChange}
                     onUpdateTags={handleUpdateTags}
