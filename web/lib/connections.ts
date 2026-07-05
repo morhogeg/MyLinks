@@ -1,12 +1,12 @@
 import { Link } from '@/lib/types';
 
 /**
- * Concept clustering shared by the two connection surfaces (M10):
- *  - the proactive inline banner on the feed (`bestCluster`, strict ≥3), and
- *  - the opted-in Connections view (`allClusters`, relaxed to ≥2).
- *
- * Both read the abstract `concepts` already computed on each card — no new
- * compute — and only consider *recent* saves, so a connection feels fresh.
+ * Concept clustering behind the Connections surface (M10). `allClusters` groups
+ * recent saves by the abstract `concepts` already computed on each card (no new
+ * compute); `crossCategoryClusters` keeps only the threads that bridge 2+
+ * categories — the connections a category filter can't reproduce, which is what
+ * the Connections view/pill shows. Only *recent* saves count, so a connection
+ * feels fresh.
  */
 
 // Only consider recent saves — a connection is interesting when it's fresh.
@@ -15,9 +15,10 @@ const RECENT_WINDOW_DAYS = 30;
 const RECENT_FALLBACK_COUNT = 40;
 
 export interface Cluster {
-    concept: string;   // original-case display label
-    key: string;       // lowercased key for dedupe
-    links: Link[];     // members, newest first
+    concept: string;     // original-case display label
+    key: string;         // lowercased key for dedupe
+    links: Link[];       // members, newest first
+    categories: string[]; // distinct categories the members span, most-common first
 }
 
 function toMs(value: number | string | undefined): number {
@@ -27,6 +28,19 @@ function toMs(value: number | string | undefined): number {
         return Number.isNaN(n) ? 0 : n;
     }
     return 0;
+}
+
+/** Distinct categories among a cluster's members, most-common first. */
+function clusterCategories(links: Link[]): string[] {
+    const counts = new Map<string, number>();
+    for (const l of links) {
+        const c = (l.category ?? '').trim();
+        if (!c) continue;
+        counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .map(([c]) => c);
 }
 
 /** All concept clusters among recent saves, strongest first. `minCluster`
@@ -45,7 +59,7 @@ export function allClusters(links: Link[], minCluster = 3): Cluster[] {
 
     // concept key -> { label, links }. `recent` is already newest-first, so each
     // cluster's links inherit that order (links[0] is the freshest member).
-    const byConcept = new Map<string, Cluster>();
+    const byConcept = new Map<string, { concept: string; key: string; links: Link[] }>();
     for (const link of recent) {
         const seen = new Set<string>(); // guard against a card repeating a concept
         for (const raw of link.concepts ?? []) {
@@ -62,6 +76,7 @@ export function allClusters(links: Link[], minCluster = 3): Cluster[] {
 
     return [...byConcept.values()]
         .filter((c) => c.links.length >= minCluster)
+        .map((c) => ({ ...c, categories: clusterCategories(c.links) }))
         .sort(
             (a, b) =>
                 b.links.length - a.links.length ||
@@ -70,7 +85,18 @@ export function allClusters(links: Link[], minCluster = 3): Cluster[] {
         );
 }
 
-/** The single strongest cluster — the inline "brain speaks first" surface. */
-export function bestCluster(links: Link[], minCluster = 3): Cluster | null {
-    return allClusters(links, minCluster)[0] ?? null;
+/** Clusters that bridge 2+ categories — the connections a category filter *can't*
+ *  reproduce (cards in different categories sharing a hidden thread). This is the
+ *  whole reason the Connections view exists as something distinct from browsing
+ *  by category. Ranked by how many categories a cluster bridges, then size, then
+ *  recency. */
+export function crossCategoryClusters(links: Link[], minCluster = 2): Cluster[] {
+    return allClusters(links, minCluster)
+        .filter((c) => c.categories.length >= 2)
+        .sort(
+            (a, b) =>
+                b.categories.length - a.categories.length ||
+                b.links.length - a.links.length ||
+                toMs(b.links[0].createdAt) - toMs(a.links[0].createdAt)
+        );
 }

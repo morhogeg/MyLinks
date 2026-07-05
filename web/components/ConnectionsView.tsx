@@ -1,16 +1,21 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Link2, ArrowRight } from 'lucide-react';
+import { Link2, ArrowRight, ArrowLeftRight } from 'lucide-react';
 import { Link } from '@/lib/types';
-import { allClusters } from '@/lib/connections';
+import { crossCategoryClusters } from '@/lib/connections';
+import { getCategoryColorStyle } from '@/lib/colors';
 import { hapticLight } from '@/lib/haptics';
 
 /**
- * The Connections surface (M10) — the opted-in home for every concept cluster
- * across recent saves. The feed shows only the single strongest connection
- * proactively; here the user has tapped in, so we relax the threshold (≥2) and
- * list them all, strongest first. Each member links back to its card.
+ * The Connections surface (M10) — deliberately NOT a category browser.
+ *
+ * It shows only clusters that *bridge 2+ categories*: cards filed under
+ * different categories that nonetheless share a concept. Those links are exactly
+ * what a category filter can never surface (it keeps the categories apart), so
+ * this earns its place as a distinct lens rather than a second way to browse
+ * buckets. Each cluster names the categories it bridges (as their real colored
+ * chips) and lists its members; tapping one opens the card.
  */
 export default function ConnectionsView({
     links,
@@ -19,9 +24,7 @@ export default function ConnectionsView({
     links: Link[];
     onOpenCard: (id: string) => void;
 }) {
-    // Relaxed threshold (2): the user opted in, so smaller patterns are welcome
-    // here even though they'd be too quiet to interrupt the feed with.
-    const clusters = useMemo(() => allClusters(links, 2), [links]);
+    const clusters = useMemo(() => crossCategoryClusters(links, 2), [links]);
 
     if (clusters.length === 0) {
         return (
@@ -29,10 +32,11 @@ export default function ConnectionsView({
                 <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-accent/15 flex items-center justify-center">
                     <Link2 className="w-7 h-7 text-accent" />
                 </div>
-                <p className="text-text font-semibold">No connections yet</p>
+                <p className="text-text font-semibold">No cross-category links yet</p>
                 <p className="text-sm text-text-muted mt-1.5 max-w-xs mx-auto leading-relaxed">
-                    As you save more, Machina surfaces the themes that link your cards
-                    together and gathers them here.
+                    When cards from different categories turn out to share a theme,
+                    Machina surfaces that hidden thread here — the kind of link a
+                    category filter would never show.
                 </p>
             </div>
         );
@@ -50,17 +54,33 @@ export default function ConnectionsView({
                     key={cluster.key}
                     className="rounded-2xl border border-border-subtle bg-card overflow-hidden"
                 >
-                    <div className="flex items-center gap-3 px-4 py-3 border-b border-border-subtle">
+                    <div className="flex items-start gap-3 px-4 py-3 border-b border-border-subtle">
                         <div className="w-9 h-9 shrink-0 rounded-xl bg-accent/15 flex items-center justify-center">
                             <Link2 className="w-[18px] h-[18px] text-accent" />
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                             <h3 className="text-[15px] font-bold text-accent truncate">
                                 {cluster.concept}
                             </h3>
-                            <p className="text-xs text-text-muted">
-                                {cluster.links.length} cards connect here
-                            </p>
+                            {/* The categories this thread bridges — the point of the view. */}
+                            <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                                {cluster.categories.map((cat, i) => (
+                                    <span key={cat} className="flex items-center gap-1.5">
+                                        {i > 0 && (
+                                            <ArrowLeftRight className="w-3 h-3 text-text-muted shrink-0" />
+                                        )}
+                                        <span
+                                            className="text-[10px] font-semibold px-1.5 py-0.5 rounded border"
+                                            style={getCategoryColorStyle(cat)}
+                                        >
+                                            {cat}
+                                        </span>
+                                    </span>
+                                ))}
+                                <span className="text-xs text-text-muted">
+                                    · {cluster.links.length} cards
+                                </span>
+                            </div>
                         </div>
                     </div>
                     <div className="p-2">
