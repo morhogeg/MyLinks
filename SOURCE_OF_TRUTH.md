@@ -504,6 +504,13 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-05 — Related cards: hide the path you're already on.** Relatedness is
+  symmetric, so opening B from A's Related list put A back at the top of B's list
+  — redundant, doubly so now the Back arrow returns you there. `getRelatedCards`
+  gained an `excludeIds` set (seeds the `used` set); `Feed` passes the current
+  `linkStack`. Cards opened fresh from the feed (empty stack) are unchanged, so
+  global symmetry holds — only the in-session path is trimmed. Live on web +
+  TestFlight build 1036.
 - **2026-07-05 — Detail modal: split back vs close.** The related-card back-stack
   had one X that popped a single level, so escaping a deep back-and-forth took
   many taps. Split it: X + backdrop now `closeActiveLinkStack` (dismiss the whole
