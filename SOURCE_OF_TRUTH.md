@@ -504,6 +504,12 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-05 — Detail modal: split back vs close.** The related-card back-stack
+  had one X that popped a single level, so escaping a deep back-and-forth took
+  many taps. Split it: X + backdrop now `closeActiveLinkStack` (dismiss the whole
+  stack at once); a new back arrow — shown only when `canGoBack` — steps back one
+  card via `goBackOrClose`; iOS edge-swipe-back maps to step-back-one. Live on
+  web + TestFlight build 1035.
 - **2026-07-05 — Related-card nav opens at the top.** The detail modal reuses a
   single scroll container, so tapping a related card (which sits near the bottom)
   opened the next card still scrolled to the bottom. Added a `scrollRef` + an
