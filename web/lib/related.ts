@@ -146,30 +146,27 @@ export function getRelatedCards(link: Link, allLinks: Link[], isRtl: boolean): R
         const otherVec = myVec ? toVector(other.embedding_vector) : null;
         const sim = myVec && otherVec ? cosine(myVec, otherVec) : 0;
 
-        // Two INDEPENDENT paths to "related" — a card qualifies via EITHER, so
-        // a moderate embedding score never vetoes a genuine topical match:
-        //   • semantic — strong similarity (≥0.80) alone, or a softer one
-        //     (≥0.74) backed by a shared concept/tag or the same category;
-        //   • topical  — two shared concepts, two shared tags, or the same
-        //     category plus at least one shared tag/concept.
-        // The old bug: when any embedding existed the code took ONLY the
-        // semantic path, so two same-category cards that shared tags but sat
-        // below 0.74 (e.g. opposing "sun is healthy" vs "sunscreen caution"
-        // takes) were dropped. Topical overlap now always counts.
-        const corroborated = sharedConcepts.length > 0 || sharedTags.length > 0 || sameCategory;
-        const semantic = sim >= SEMANTIC_MIN || (sim >= SEMANTIC_ASSIST_MIN && corroborated);
-        const topical =
-            sharedConcepts.length >= 2 ||
-            sharedTags.length >= 2 ||
-            (sameCategory && (sharedConcepts.length >= 1 || sharedTags.length >= 1));
-        if (!semantic && !topical) continue;
+        // Relatedness must mean "about the same specific thing," NOT "same broad
+        // area." Two paths, both requiring a SPECIFIC signal:
+        //   • semantic — strong embedding similarity (≥0.80, i.e. same precise
+        //     topic), or a softer one (≥0.74) backed by a shared *concept*.
+        //   • conceptual — ≥2 shared concepts (concepts are granular:
+        //     "sun exposure", "UV radiation" — unlike the broad category tags
+        //     HEALTH/SCIENCE that half the library shares).
+        // Deliberately NOT qualifying signals: same category, and shared broad
+        // tags. Otherwise every Health card would relate to every other — the
+        // two sun-exposure cards must stand out from the rest of Health, and
+        // only embedding similarity / specific concepts distinguish them.
+        const semantic = sim >= SEMANTIC_MIN || (sim >= SEMANTIC_ASSIST_MIN && sharedConcepts.length >= 1);
+        const conceptual = sharedConcepts.length >= 2;
+        if (!semantic && !conceptual) continue;
 
-        // Rank: real semantic similarity first, then topical overlap. Semantic
-        // matches (sim ~0.8) naturally outrank pure-topical ones (base 0.45).
-        const score = (semantic && sim > 0 ? sim : 0.45)
+        // Rank by real similarity first; concept overlap and (weakly) tags /
+        // category only break ties among already-qualified cards.
+        const score = (sim > 0 ? sim : 0.5)
             + sharedConcepts.length * 0.05
-            + sharedTags.length * 0.03
-            + (sameCategory ? 0.02 : 0);
+            + sharedTags.length * 0.01
+            + (sameCategory ? 0.01 : 0);
 
         candidates.push({
             score,
