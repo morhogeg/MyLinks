@@ -154,7 +154,7 @@ The multi-user auth work is **fully written but not live**:
 > on iOS (first on build 1033). The native **`claim_workspace` callable→CORS bug
 > is FIXED** — HTTP twins `claim_workspace_http`/`delete_account_http` deployed +
 > curl-verified, native routes to them; a fresh `require_auth=true` TestFlight
-> build carries it. Web login now offers Apple+Google (no cutover). `claim_workspace`
+> build (1037) carries it. Web login now offers Apple+Google (no cutover). `claim_workspace`
 > + `delete_account` (callables + HTTP twins) deployed with flags still OFF. The
 > **top remaining work is the auth cutover (task 2)** and prerequisites (tasks 4/5):
 > before flipping, set the Apple **Services ID + `.p8`** for web Apple sign-in, and
@@ -527,7 +527,7 @@ exact-match, capped.
   from the home header (lives in Settings only); Settings → Account shows "Signed
   in with Apple/Google" (from `providerData`) and Sign out moved to its own row so
   the full email isn't truncated. Web live via Vercel; functions + hosting
-  deployed; iOS via TestFlight (`require_auth=true` build). Deferred (needs
+  deployed; iOS via TestFlight build 1037 (`require_auth=true`). Deferred (needs
   cutover): full brand-new-user claim path (backend `REQUIRE_AUTH` still off).
 - **2026-07-05 — Related cards: hide the path you're already on.** Relatedness is
   symmetric, so opening B from A's Related list put A back at the top of B's list
