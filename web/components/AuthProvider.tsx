@@ -6,9 +6,9 @@ import {
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '@/lib/firebase';
-import { isNativeApp, REQUIRE_AUTH } from '@/lib/api';
+import { isNativeApp, REQUIRE_AUTH, apiUrl, fetchWithTimeout } from '@/lib/api';
 import {
-    onAuthChange, completeRedirectSignIn, signIn, signOutUser,
+    onAuthChange, completeRedirectSignIn, signIn, signOutUser, authHeaders,
 } from '@/lib/auth';
 import { syncShareConfigToNative } from '@/lib/shareConfig';
 import { readLocalAiConsent, writeLocalAiConsent } from '@/lib/aiConsent';
@@ -258,7 +258,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!authUid) {
             return (
                 <AuthContext.Provider value={value}>
-                    <LoginScreen onSignIn={signIn} showApple={REQUIRE_AUTH} />
+                    <LoginScreen onSignIn={signIn} showApple={!native || REQUIRE_AUTH} />
                 </AuthContext.Provider>
             );
         }
@@ -275,7 +275,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         onSignIn={signIn}
                         onSignOut={signOut}
                         onRetry={REQUIRE_AUTH ? () => setRetryNonce((n) => n + 1) : undefined}
-                        showApple={REQUIRE_AUTH}
+                        showApple={!native || REQUIRE_AUTH}
                     />
                 </AuthContext.Provider>
             );
@@ -309,6 +309,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+/** Shape returned by both the claim callable and its HTTP twin. */
+type ClaimResult = { uid: string | null; created?: boolean };
+
+/** Web path: the Firebase callable (works from a real browser origin). */
+async function claimWorkspaceCallable(): Promise<ClaimResult> {
+    const claim = httpsCallable<Record<string, never>, ClaimResult>(functions, 'claim_workspace');
+    const res = await claim({});
+    return res.data ?? { uid: null };
+}
+
+/**
+ * Native path: the HTTP twin (`/api/claim-workspace` → claim_workspace_http),
+ * called with an Authorization: Bearer ID token exactly like the other /api/*
+ * endpoints. Bypasses the Firebase callable, whose CORS preflight the WKWebView
+ * `capacitor://localhost` origin can't clear. apiUrl() prefixes the native
+ * NEXT_PUBLIC_API_BASE (the live Hosting site) so the request lands on the
+ * function's rewrite; a 401 with no linked workspace is treated as "declined".
+ */
+async function claimWorkspaceHttp(): Promise<ClaimResult> {
+    const res = await fetchWithTimeout(apiUrl('/api/claim-workspace'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+        body: '{}',
+    });
+    if (!res.ok) {
+        // Backend rejected the caller (e.g. unverified token) — surface as a
+        // failed claim so the caller shows the restricted screen, same as a
+        // callable throw.
+        throw new Error(`claim-workspace HTTP ${res.status}`);
+    }
+    return (await res.json()) as ClaimResult;
+}
+
 /**
  * Map a Firebase Auth uid to its Firestore data doc.
  * 1. A doc already linked via `authUids array-contains authUid`.
@@ -336,21 +369,29 @@ async function resolveDataDoc(
     //    privileges (bypasses Firestore rules), so it works under the locked
     //    rules; the OWNER_EMAIL allowlist gating lives server-side. The client
     //    no longer reads or writes an arbitrary "first user" doc.
+    //
+    //    Native uses the HTTP twin, NOT the Firebase callable: the callable
+    //    transport's CORS preflight is rejected from the Capacitor
+    //    `capacitor://localhost` WebView origin, so httpsCallable() fails before
+    //    the request ever reaches the function (no execution logs, user lands on
+    //    the restricted screen). The HTTP endpoint sets CORS from the backend
+    //    allowlist that includes capacitor://localhost and verifies the ID token
+    //    via Authorization: Bearer — the same pattern every other /api/* call
+    //    uses. Web keeps the callable (works fine there). Same underlying logic
+    //    server-side, so behavior matches exactly.
     try {
-        const claim = httpsCallable<
-            Record<string, never>,
-            { uid: string | null; created?: boolean }
-        >(functions, 'claim_workspace');
-        const res = await claim({});
-        const claimedUid = res.data?.uid;
+        const claimed = isNativeApp()
+            ? await claimWorkspaceHttp()
+            : await claimWorkspaceCallable();
+        const claimedUid = claimed?.uid;
         if (claimedUid) {
             const fresh = await getDoc(doc(db, 'users', claimedUid));
-            return { id: claimedUid, data: fresh.data() ?? {}, created: res.data?.created === true };
+            return { id: claimedUid, data: fresh.data() ?? {}, created: claimed?.created === true };
         }
-        // Callable ran and declined (pre-cutover non-owner) → restricted.
+        // Backend ran and declined (pre-cutover non-owner) → restricted.
         return null;
     } catch (e) {
-        console.warn('Workspace claim callable unavailable:', e);
+        console.warn('Workspace claim unavailable:', e);
     }
 
     // 3. Soft-mode fallback: if the callable isn't deployed yet (pre-cutover),

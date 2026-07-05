@@ -150,13 +150,14 @@ The multi-user auth work is **fully written but not live**:
 > Rank = (blocks launch) > (App Store hard requirement) > (security/cost exposure)
 > > (product quality) > (growth/differentiators).
 
-> **Live state (2026-07-05):** TestFlight **build 1021** is the current good
-> build — share extension confirmed working on device, save flow working, save
-> percentage restored, List view + header fade + related cards all in. The
-> whole UI-polish arc (List RTL, delete copy, header fade, share bridge) is
-> **done**. The **top remaining work is the auth cutover (task 2)** and its
-> prerequisites (tasks 4/5) — everything else is P2/P3. Start the next session
-> at task 2.
+> **Live state (2026-07-05):** TestFlight **build 1033** is the sign-in-enabled
+> build (`require_auth=true`); Apple **and** Google sign-in are **device-verified**
+> (build 1021 remains the last good pre-auth UI build). `claim_workspace` +
+> `delete_account` are now deployed (flags still OFF). The **top remaining work is
+> the auth cutover (task 2)**, now gated on fixing the **native `claim_workspace`
+> callable bug** (WebView callable never reaches the function — fix in progress,
+> route through an HTTP+bearer endpoint; see the 2026-07-05 session-log entry) and
+> prerequisites (tasks 4/5). Everything else is P2/P3.
 
 ### 🔴 P0 — launch blockers (in order)
 
@@ -504,6 +505,30 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-05 — ✅ Apple + Google sign-in VERIFIED on device (build 1033).**
+  Finalized native auth on iOS. Ran the iOS→TestFlight workflow with
+  `require_auth=true` (first attempt, run #31, died on the Apple **Development
+  cert cap** — owner pruned certs at developer.apple.com; a duplicate concurrent
+  dispatch was cancelled to avoid re-exhausting the cap; clean run #33 = **build
+  1033** uploaded). On device: the Apple/Google login screen shows, **both**
+  Continue-with-Apple and Continue-with-Google sign in successfully and load the
+  feed, and Settings shows the account + Delete account. Firebase Auth has ONE
+  user for morhogeg@gmail.com (`jX2yUZpZtybHuKrAfkCQR0NEzj72`) with BOTH apple.com
+  and google.com providers linked (auto-linked by verified email) — so one uid
+  covers both methods. **Deployed** `claim_workspace` + `delete_account` (they
+  were never on prod — the live backend predated the auth work; deployed from the
+  main checkout with flags still OFF, behavior-safe). Backend `REQUIRE_AUTH`/
+  `OWNER_EMAIL` remain unset. **Bug found (see task 2/3):** the native app's
+  `claim_workspace` CALLABLE call arrives at the function unauthenticated / never
+  reaches it (no execution logs; same class of WebView-callable failure that
+  already forced share-config off its callable) — so the owner-claim never wrote,
+  and the sign-in dead-ended on the restricted screen. **Workaround applied:**
+  manually wrote `authUids:[jX2yUZpZtybHuKrAfkCQR0NEzj72]` + `email` onto
+  `users/+16462440305` via the Admin SDK (exactly what the owner-claim does),
+  which unblocked device sign-in. A proper fix (route claim through an HTTP
+  endpoint with the `capacitor://localhost` CORS allowlist + bearer verify, like
+  `/api/chat`) is **in progress** — REQUIRED before the auth cutover or brand-new
+  sign-ups hit the same restricted screen.
 - **2026-07-05 — Connection insight recoverable + related-card contrast.** Two
   home/detail polish fixes. (i) `ConnectionInsight`: the X used to permanently
   blocklist the concept (localStorage, survived refresh) with no re-entry — an

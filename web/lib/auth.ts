@@ -176,14 +176,30 @@ export async function authHeaders(): Promise<Record<string, string>> {
 }
 
 /**
- * Permanently delete the signed-in user's account and all their data. Calls the
- * `delete_account` Cloud Function (which verifies the ID token, deletes the
- * Firestore workspace + storage, then the Auth user), then signs out locally.
+ * Permanently delete the signed-in user's account and all their data, then sign
+ * out locally. Both paths verify the ID token server-side, delete the Firestore
+ * workspace + storage, then the Auth user.
+ *
+ * Native uses the HTTP twin (`/api/delete-account` → delete_account_http) with
+ * an Authorization: Bearer token, NOT the Firebase callable: the callable
+ * transport's CORS preflight is rejected from the Capacitor `capacitor://localhost`
+ * WebView origin (same reason claim_workspace has an HTTP twin). Web keeps the
+ * callable. Same underlying server logic, so behavior matches.
  */
 export async function deleteAccount(): Promise<void> {
-    const { httpsCallable } = await import('firebase/functions');
-    const { functions } = await import('@/lib/firebase');
-    const callable = httpsCallable(functions, 'delete_account');
-    await callable({});
+    if (isNativeApp()) {
+        const { apiUrl, fetchWithTimeout } = await import('@/lib/api');
+        const res = await fetchWithTimeout(apiUrl('/api/delete-account'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+            body: '{}',
+        });
+        if (!res.ok) throw new Error(`delete-account HTTP ${res.status}`);
+    } else {
+        const { httpsCallable } = await import('firebase/functions');
+        const { functions } = await import('@/lib/firebase');
+        const callable = httpsCallable(functions, 'delete_account');
+        await callable({});
+    }
     await signOutUser();
 }
