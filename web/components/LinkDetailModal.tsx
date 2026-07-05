@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2 } from 'lucide-react';
+import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2, ChevronLeft } from 'lucide-react';
 import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import ReadingView from './ReadingView';
@@ -36,7 +36,9 @@ interface LinkDetailModalProps {
     allCategories: string[];
     uid: string | null;
     isOpen: boolean;
-    onClose: () => void;
+    onClose: () => void;            // dismiss the modal entirely (clears the back-stack)
+    onBack?: () => void;           // step back to the previous card in the back-stack
+    canGoBack?: boolean;           // true when there's a previous card to return to
     onStatusChange: (id: string, status: LinkStatus) => void;
     onReadStatusChange: (id: string, isRead: boolean) => void;
     onUpdateTags: (id: string, tags: string[]) => void;
@@ -55,6 +57,8 @@ export default function LinkDetailModal({
     uid,
     isOpen,
     onClose,
+    onBack,
+    canGoBack,
     onStatusChange,
     onReadStatusChange,
     onUpdateTags,
@@ -105,7 +109,11 @@ export default function LinkDetailModal({
 
     // Swipe in from the left edge to close the card (iOS back gesture). Disabled
     // while the distraction-free reader is on top (it has its own dismissal).
-    useEdgeSwipeBack(onClose, isOpen && !isReading);
+    // The iOS edge-swipe-back gesture steps back one card if there's history,
+    // otherwise dismisses — matching native back behaviour. The X button and
+    // backdrop, by contrast, always close the whole stack.
+    const goBack = onBack ?? onClose;
+    useEdgeSwipeBack(goBack, isOpen && !isReading);
 
     // Clamp the modal to the *visible* viewport so an inline edit (category /
     // tags) can't be hidden behind the on-screen keyboard: the body scrolls the
@@ -181,6 +189,22 @@ export default function LinkDetailModal({
                     while the close button stays pinned and always reachable. */}
                 <div className="flex items-center gap-2 p-3 sm:p-4 safe-pt border-b border-border-subtle/60">
                     <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-1 overflow-x-auto scrollbar-hide">
+                        {/* Back to the previous card — only when opened from another
+                            card's Related list. Distinct from Close (X), which
+                            dismisses the whole stack. */}
+                        {canGoBack && (
+                            <>
+                                <button
+                                    onClick={goBack}
+                                    title="Back to previous card"
+                                    aria-label="Back to previous card"
+                                    className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-text hover:bg-card-hover transition-colors"
+                                >
+                                    <ChevronLeft className="w-5 h-5" />
+                                </button>
+                                <span className="shrink-0 mx-0.5 h-5 w-px bg-border-subtle" aria-hidden="true" />
+                            </>
+                        )}
                         <button
                             onClick={() => onReadStatusChange(link.id, !link.isRead)}
                             title={link.isRead ? 'Mark as unread' : 'Mark as read'}
