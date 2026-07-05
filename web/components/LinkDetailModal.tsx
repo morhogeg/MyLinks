@@ -592,7 +592,7 @@ export default function LinkDetailModal({
                             entry resolves to a live card, so tapping always
                             navigates. */}
                         {relatedCards.length > 0 && (
-                            <div className="mb-8 border-t border-white/5 pt-6">
+                            <div className="mb-8 border-t border-border-subtle pt-6">
                                 <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider mb-4 flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
                                     <Network className="w-4 h-4" />
                                     {isRtl ? 'כרטיסים קשורים' : 'Related cards'}
@@ -602,12 +602,12 @@ export default function LinkDetailModal({
                                         <div
                                             key={rel.id}
                                             onClick={() => onOpenOtherLink?.(rel)}
-                                            className="group p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-accent/20 transition-all cursor-pointer"
+                                            className="group p-3 rounded-xl bg-card-hover border border-border-subtle shadow-sm hover:border-accent/50 transition-all cursor-pointer"
                                         >
                                             <div className="flex justify-between items-start gap-3">
                                                 <h4
                                                     dir={isRtl ? "rtl" : "ltr"}
-                                                    className={`font-medium text-text-secondary group-hover:text-accent transition-colors text-sm ${isRtl ? 'text-right' : ''}`}
+                                                    className={`font-medium text-text group-hover:text-accent transition-colors text-sm ${isRtl ? 'text-right' : ''}`}
                                                 >
                                                     {rel.title}
                                                 </h4>
@@ -619,14 +619,14 @@ export default function LinkDetailModal({
                                             </div>
                                             <p
                                                 dir={isRtl ? "rtl" : "ltr"}
-                                                className={`text-xs text-text-muted/60 mt-1.5 font-normal italic ${isRtl ? 'text-right' : ''}`}
+                                                className={`text-xs text-text-muted mt-1.5 font-normal italic ${isRtl ? 'text-right' : ''}`}
                                             >
                                                 ✨ {reason}
                                             </p>
                                             {sharedConcepts.length > 0 && (
                                                 <div className={`flex flex-wrap gap-1.5 mt-2 ${isRtl ? 'justify-end' : ''}`}>
                                                     {sharedConcepts.map(c => (
-                                                        <span key={c} className="text-[10px] text-text-muted/50 bg-black/20 px-1.5 py-0.5 rounded">
+                                                        <span key={c} className="text-[10px] text-text-secondary bg-card border border-border-subtle px-1.5 py-0.5 rounded">
                                                             {c}
                                                         </span>
                                                     ))}
