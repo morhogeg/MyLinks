@@ -172,6 +172,97 @@ class GraphService:
         logger.info(f"Backfill for {uid}: embedded={embedded} updated={updated} skipped={skipped} failed={failed}")
         return {'embedded': embedded, 'updated': updated, 'skipped': skipped, 'failed': failed}
 
+    def backfill_batch(self, uid: str, phase: str, cursor: Optional[str] = None,
+                       limit: int = 20, force: bool = False) -> dict:
+        """One page of the per-user backfill, driven by the client so no single
+        call risks the callable timeout (the whole-library version can run for
+        minutes on a large brain).
+
+        Two phases the client runs in order:
+          - 'embed': give every card missing an `embedding_vector` one. Must
+            finish for the WHOLE library before 'relate', so neighbour search
+            can see every card.
+          - 'relate': compute `relatedLinks` for cards that lack them (or all
+            when `force`).
+
+        Paginated by document id (`__name__`). Returns the counts for this page,
+        `nextCursor` (last id seen), and `done` (True when the page was short,
+        i.e. the collection is exhausted). Idempotent — safe to re-run.
+        """
+        links_ref = self.db.collection('users').document(uid).collection('links')
+        q = links_ref.order_by('__name__')
+        if cursor:
+            snap = links_ref.document(cursor).get()
+            if snap.exists:
+                q = q.start_after(snap)
+        docs = list(q.limit(limit).stream())
+
+        embedded = updated = skipped = failed = 0
+        for doc in docs:
+            d = doc.to_dict() or {}
+            text = f"{d.get('title', '')}\n{d.get('summary', '')}".strip()
+
+            if phase == 'embed':
+                if d.get('embedding_vector') is not None or not text:
+                    skipped += 1
+                    continue
+                try:
+                    emb = self.ai.embed_text(text)
+                    if emb:
+                        doc.reference.update({'embedding_vector': Vector(emb)})
+                        embedded += 1
+                    else:
+                        failed += 1
+                except Exception as e:
+                    logger.error(f"Backfill embed failed for {doc.id}: {e}")
+                    failed += 1
+                continue
+
+            # phase == 'relate'
+            if d.get('relatedLinks') and not force:
+                skipped += 1
+                continue
+            if not text:
+                failed += 1
+                continue
+            emb = None
+            raw = d.get('embedding_vector')
+            if raw is not None:
+                emb = raw.value if hasattr(raw, 'value') else (list(raw) if not isinstance(raw, list) else raw)
+            if not emb:
+                try:
+                    emb = self.ai.embed_text(text)
+                except Exception as e:
+                    logger.error(f"Backfill query embed failed for {doc.id}: {e}")
+                    emb = None
+            if not emb:
+                failed += 1
+                continue
+            try:
+                related = self.find_related_links(
+                    new_link_id=doc.id,
+                    title=d.get('title', ''),
+                    summary=d.get('summary', ''),
+                    embedding=emb,
+                    new_concepts=d.get('concepts', []),
+                    uid=uid,
+                )
+                doc.reference.update({'relatedLinks': related})
+                updated += 1
+            except Exception as e:
+                logger.error(f"Backfill relatedLinks write failed for {doc.id}: {e}")
+                failed += 1
+
+        return {
+            'done': len(docs) < limit,
+            'nextCursor': docs[-1].id if docs else cursor,
+            'processed': len(docs),
+            'embedded': embedded,
+            'updated': updated,
+            'skipped': skipped,
+            'failed': failed,
+        }
+
     def _verify_relationships_with_llm(self,
                                      title: str, 
                                      summary: str, 
