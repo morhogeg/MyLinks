@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Link2, ChevronDown, X, ArrowRight } from 'lucide-react';
+import { Link2, ChevronDown, ChevronRight, X, ArrowRight } from 'lucide-react';
 import { Link } from '@/lib/types';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
 
@@ -11,13 +11,14 @@ import { hapticLight, hapticMedium } from '@/lib/haptics';
  * Clusters the user's recent saves by the abstract `concepts` already computed
  * on each card (functions/ai_service) and surfaces ONE genuine connection at a
  * time: "3 things you saved connect to Network Effects." Tap expands into the
- * cluster; each member links back to its card. Dismissible.
+ * cluster; each member links back to its card.
  *
  * Deliberately lightweight and rate-limited so it never feels spammy:
  *  - only clusters of ≥ MIN_CLUSTER recent saves qualify (a real pattern, not noise)
  *  - only the single strongest cluster is shown, never a wall of them
- *  - dismissing remembers the concept (so it won't nag) and quiets the module
- *    for the rest of the session
+ *  - closing (X) never destroys the insight — it minimizes to a small pill in
+ *    the same slot, so an accidental close is one tap from being restored. The
+ *    collapsed state persists (across refresh) so it also won't re-nag.
  *
  * No new compute — it reads `link.concepts` the feed already holds in memory.
  */
@@ -29,7 +30,9 @@ const RECENT_FALLBACK_COUNT = 40;
 // A cluster must gather at least this many cards to be worth surfacing.
 const MIN_CLUSTER = 3;
 
-const DISMISSED_KEY = 'connection-insight-dismissed';
+// Persisted: whether the insight is minimized to its pill. Collapsing is fully
+// reversible (tap the pill) and never blocklists the concept.
+const COLLAPSED_KEY = 'connection-insight-collapsed';
 
 function toMs(value: number | string | undefined): number {
     if (typeof value === 'number') return value;
@@ -42,13 +45,13 @@ function toMs(value: number | string | undefined): number {
 
 interface Cluster {
     concept: string;   // original-case display label
-    key: string;       // lowercased key for dedupe/dismissal
+    key: string;       // lowercased key for dedupe
     links: Link[];
 }
 
-/** Find the strongest concept cluster among recent saves, excluding dismissed
- *  concepts. Pure function of its inputs so it memoizes cleanly. */
-function bestCluster(links: Link[], dismissed: Set<string>): Cluster | null {
+/** Find the strongest concept cluster among recent saves. Pure function of its
+ *  inputs so it memoizes cleanly. */
+function bestCluster(links: Link[]): Cluster | null {
     if (!links.length) return null;
 
     const sorted = [...links].sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
@@ -68,7 +71,6 @@ function bestCluster(links: Link[], dismissed: Set<string>): Cluster | null {
             const key = concept.toLowerCase();
             if (seen.has(key)) continue;
             seen.add(key);
-            if (dismissed.has(key)) continue;
             const existing = byConcept.get(key);
             if (existing) existing.links.push(link);
             else byConcept.set(key, { concept, key, links: [link] });
@@ -98,50 +100,79 @@ export default function ConnectionInsight({
     links: Link[];
     onOpenCard: (id: string) => void;
 }) {
-    // Seed dismissed concepts from localStorage lazily (client-only, runs once).
-    const [dismissed, setDismissed] = useState<Set<string>>(() => {
+    // Seed the minimized state from localStorage lazily (client-only, runs once).
+    const [collapsed, setCollapsed] = useState<boolean>(() => {
         try {
             if (typeof window !== 'undefined') {
-                const saved = localStorage.getItem(DISMISSED_KEY);
-                if (saved) return new Set(JSON.parse(saved) as string[]);
+                return localStorage.getItem(COLLAPSED_KEY) === '1';
             }
         } catch {
             // ignore malformed storage
         }
-        return new Set();
+        return false;
     });
-    const [suppressed, setSuppressed] = useState(false);
     const [expanded, setExpanded] = useState(false);
 
-    const cluster = useMemo(() => bestCluster(links, dismissed), [links, dismissed]);
+    const cluster = useMemo(() => bestCluster(links), [links]);
 
-    if (suppressed || !cluster) return null;
+    if (!cluster) return null;
 
     const count = cluster.links.length;
+
+    const persistCollapsed = (v: boolean) => {
+        try {
+            localStorage.setItem(COLLAPSED_KEY, v ? '1' : '0');
+        } catch {
+            // ignore storage failures — the state still holds for the session
+        }
+    };
 
     const toggle = () => {
         hapticLight();
         setExpanded((v) => !v);
     };
 
-    const handleDismiss = (e: React.MouseEvent) => {
+    const collapse = (e: React.MouseEvent) => {
         e.stopPropagation();
         hapticMedium();
-        const next = new Set(dismissed);
-        next.add(cluster.key);
-        setDismissed(next);
-        setSuppressed(true); // don't immediately pop another — stay calm
-        try {
-            localStorage.setItem(DISMISSED_KEY, JSON.stringify([...next]));
-        } catch {
-            // ignore storage failures — dismissal still holds for the session
-        }
+        setExpanded(false);
+        setCollapsed(true);
+        persistCollapsed(true);
+    };
+
+    const reopen = () => {
+        hapticLight();
+        setCollapsed(false);
+        persistCollapsed(false);
     };
 
     const openCard = (id: string) => {
         hapticLight();
         onOpenCard(id);
     };
+
+    // Minimized — a compact pill sitting where the banner was. Tapping it
+    // restores the full insight, so closing is never a dead end.
+    if (collapsed) {
+        return (
+            <div className="mb-4 flex animate-in fade-in duration-300">
+                <button
+                    onClick={reopen}
+                    aria-label={`Show connection to ${cluster.concept}`}
+                    className="group inline-flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full border border-border bg-card text-sm text-text-secondary hover:text-text hover:bg-card-hover transition-colors min-h-[36px] max-w-full"
+                >
+                    <span className="w-6 h-6 shrink-0 rounded-lg bg-accent/15 flex items-center justify-center">
+                        <Link2 className="w-3.5 h-3.5 text-accent" />
+                    </span>
+                    <span className="min-w-0 truncate">
+                        <span className="font-semibold text-text">{count}</span> connect to{' '}
+                        <span className="font-semibold text-accent">{cluster.concept}</span>
+                    </span>
+                    <ChevronRight className="w-4 h-4 shrink-0 opacity-50 group-hover:translate-x-0.5 transition-transform" />
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div className="mb-4 rounded-2xl border border-border bg-card overflow-hidden animate-in fade-in slide-in-from-top-1 duration-300">
@@ -159,8 +190,8 @@ export default function ConnectionInsight({
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                     <button
-                        onClick={handleDismiss}
-                        aria-label="Dismiss connection"
+                        onClick={collapse}
+                        aria-label="Minimize connection"
                         className="w-9 h-9 flex items-center justify-center rounded-lg text-text-muted hover:text-text hover:bg-card-hover transition-colors"
                     >
                         <X className="w-4 h-4" />
