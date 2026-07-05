@@ -146,29 +146,27 @@ export function getRelatedCards(link: Link, allLinks: Link[], isRtl: boolean): R
         const otherVec = myVec ? toVector(other.embedding_vector) : null;
         const sim = myVec && otherVec ? cosine(myVec, otherVec) : 0;
 
-        let qualifies: boolean;
-        let score: number;
-        if (sim > 0) {
-            // A strong semantic match stands alone; a softer one (0.74–0.80)
-            // needs one corroborating signal — a shared concept/tag OR the same
-            // category. Two "sun & skin health" cards land right here: close in
-            // embedding space and same category, but their concepts are worded
-            // differently ("sun exposure" vs "sunscreen"), so without the
-            // same-category assist they were silently dropped.
-            const corroborated = sharedConcepts.length > 0 || sharedTags.length > 0 || sameCategory;
-            qualifies = sim >= SEMANTIC_MIN || (sim >= SEMANTIC_ASSIST_MIN && corroborated);
-            score = sim + sharedConcepts.length * 0.02 + sharedTags.length * 0.01 + (sameCategory ? 0.005 : 0);
-        } else {
-            // No readable embedding on one side: fall back to topical signals.
-            // Same category + any shared tag/concept is a genuine relation;
-            // two shared concepts or two shared tags stand on their own.
-            qualifies =
-                sharedConcepts.length >= 2 ||
-                sharedTags.length >= 2 ||
-                (sameCategory && (sharedConcepts.length >= 1 || sharedTags.length >= 1));
-            score = 0.5 + sharedConcepts.length * 0.05 + sharedTags.length * 0.03 + (sameCategory ? 0.02 : 0);
-        }
-        if (!qualifies) continue;
+        // Relatedness must mean "about the same specific thing," NOT "same broad
+        // area." Two paths, both requiring a SPECIFIC signal:
+        //   • semantic — strong embedding similarity (≥0.80, i.e. same precise
+        //     topic), or a softer one (≥0.74) backed by a shared *concept*.
+        //   • conceptual — ≥2 shared concepts (concepts are granular:
+        //     "sun exposure", "UV radiation" — unlike the broad category tags
+        //     HEALTH/SCIENCE that half the library shares).
+        // Deliberately NOT qualifying signals: same category, and shared broad
+        // tags. Otherwise every Health card would relate to every other — the
+        // two sun-exposure cards must stand out from the rest of Health, and
+        // only embedding similarity / specific concepts distinguish them.
+        const semantic = sim >= SEMANTIC_MIN || (sim >= SEMANTIC_ASSIST_MIN && sharedConcepts.length >= 1);
+        const conceptual = sharedConcepts.length >= 2;
+        if (!semantic && !conceptual) continue;
+
+        // Rank by real similarity first; concept overlap and (weakly) tags /
+        // category only break ties among already-qualified cards.
+        const score = (sim > 0 ? sim : 0.5)
+            + sharedConcepts.length * 0.05
+            + sharedTags.length * 0.01
+            + (sameCategory ? 0.01 : 0);
 
         candidates.push({
             score,
