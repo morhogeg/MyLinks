@@ -3,7 +3,7 @@
 
 
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, LinkStatus, Collection, WeeklySynthesis } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, type PlatformKey } from '@/lib/platform';
@@ -23,6 +23,8 @@ import AskBrain from './AskBrain';
 import LinkDetailModal from './LinkDetailModal';
 import SynthesisCard from './SynthesisCard';
 import ConnectionInsight from './ConnectionInsight';
+import ConnectionsView from './ConnectionsView';
+import { allClusters } from '@/lib/connections';
 import ConfirmDialog from './ConfirmDialog';
 import AddToCollectionSheet from './AddToCollectionSheet';
 import CollectionsGallery from './CollectionsGallery';
@@ -30,7 +32,7 @@ import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
 import { Button } from './ui/Button';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Shapes, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus, RefreshCw } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Shapes, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus, RefreshCw, Link2 } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
@@ -61,14 +63,34 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
     const [filter, setFilter] = useState<FilterType>('all');
     const [selectedCategory, setSelectedCategory] = useState<Set<string>>(new Set());
     const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
+    // Back-stack for related-card navigation: opening a card *from* another card
+    // pushes the current one, so closing returns there instead of dismissing all.
+    const [linkStack, setLinkStack] = useState<string[]>([]);
     const categoryScrollRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
     const isDraggingRef = useRef(false);
     const [startX, setStartX] = useState(0);
     const [scrollLeft, setScrollLeft] = useState(0);
     const activeLink = links.find(l => l.id === activeLinkId) || null;
+
+    // Open a card reached from another card's "Related" list — remember where we
+    // came from so the back-stack can return there.
+    const openRelatedLink = (link: Link) => {
+        if (activeLinkId) setLinkStack(prev => [...prev, activeLinkId]);
+        setActiveLinkId(link.id);
+    };
+    // Close the detail modal: step back to the card we came from if there is one,
+    // otherwise dismiss entirely.
+    const goBackOrClose = () => {
+        if (linkStack.length === 0) {
+            setActiveLinkId(null);
+        } else {
+            setActiveLinkId(linkStack[linkStack.length - 1]);
+            setLinkStack(linkStack.slice(0, -1));
+        }
+    };
     const [isLoading, setIsLoading] = useState(true);
-    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'ask' | 'collections'>('grid');
+    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'ask' | 'collections' | 'connections'>('grid');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
@@ -555,6 +577,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
 
     const performDelete = async (id: string) => {
         if (!uid) return;
+        // If the deleted card is the one open in the modal, step back to whatever
+        // opened it (or dismiss) so we don't leave a dangling back-stack.
+        if (id === activeLinkId) goBackOrClose();
         try {
             await deleteLink(uid, id);
             // No success toast on delete — the card disappearing is feedback enough.
@@ -756,6 +781,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
         { key: 'list', label: 'List', icon: <List className="w-4 h-4" />, hint: 'List view' },
         { key: 'review', label: 'Review', icon: <GalleryHorizontalEnd className="w-4 h-4" />, hint: 'Swipe to review' },
     ];
+    // Connection clusters power the Connections view + its toolbar pill. Relaxed
+    // threshold (2) here so the pill appears — and the view lists — smaller
+    // patterns the strict inline banner would stay quiet about.
+    const connectionClusters = useMemo(() => allClusters(links, 2), [links]);
+
     // The layout the Ask/Collections buttons return you to when you leave them.
     const lastLayout = useRef<'grid' | 'list' | 'review'>('grid');
     if (viewMode === 'grid' || viewMode === 'list' || viewMode === 'review') lastLayout.current = viewMode;
@@ -775,7 +805,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
 
     // Hide the add-link FAB in Ask *and* Collections — neither view captures links.
     useEffect(() => {
-        onHideAddButton?.(viewMode === 'ask' || viewMode === 'collections');
+        onHideAddButton?.(viewMode === 'ask' || viewMode === 'collections' || viewMode === 'connections');
     }, [viewMode, onHideAddButton]);
 
     if (isLoading) {
@@ -868,6 +898,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                 New
                             </button>
                         </MobileSubheader>
+                    </div>
+                ) : viewMode === 'connections' ? (
+                    // Desktop only: the Connections list flows inline beneath this
+                    // subheader. Mobile renders its own full-screen overlay below.
+                    <div className="hidden sm:block">
+                        <MobileSubheader
+                            onBack={() => setViewMode(lastLayout.current)}
+                            backLabel="Back to your library"
+                            icon={<Link2 className="w-5 h-5" />}
+                            title="Connections"
+                        />
                     </div>
                 ) : (
                     // Desktop keeps the full search bar; on mobile it collapses to a
@@ -1166,8 +1207,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                         (right) via three equal columns; on desktop the `sm:contents`
                         wrappers dissolve back into the normal inline cluster. */}
                     <div className="flex items-center w-full gap-2 sm:w-auto">
-                        {/* Left zone — Collections */}
-                        <div className="flex-1 flex justify-start sm:contents">
+                        {/* Left zone — Collections + Connections (the two "browse"
+                            surfaces). Connections only appears once there's a real
+                            pattern to show, so it never clutters an empty library. */}
+                        <div className="flex-1 flex justify-start items-center gap-2 sm:contents">
                             <button
                                 data-tour="collections"
                                 onClick={() => setViewMode('collections')}
@@ -1178,6 +1221,20 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                 <Layers className="w-4 h-4" />
                                 <span className="hidden sm:inline">Collections</span>
                             </button>
+                            {connectionClusters.length > 0 && (
+                                <button
+                                    onClick={() => setViewMode('connections')}
+                                    title="Connections across what you've saved"
+                                    aria-label="Connections"
+                                    className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
+                                >
+                                    <Link2 className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Connections</span>
+                                    <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-accent/15 text-accent">
+                                        {connectionClusters.length}
+                                    </span>
+                                </button>
+                            )}
                         </div>
 
                         {/* Center zone — Ask (a distinct AI mode). */}
@@ -1697,7 +1754,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
 
                 {/* Links Grid / Ask */}
                 <div className="flex-grow min-w-0">
-                    {viewMode === 'collections' ? (
+                    {viewMode === 'connections' ? (
+                        // Desktop only: the Connections list flows inline beneath the
+                        // subheader. Mobile renders the full-screen overlay below.
+                        <div className="hidden sm:block">
+                            <ConnectionsView
+                                links={links}
+                                onOpenCard={(id) => setActiveLinkId(id)}
+                            />
+                        </div>
+                    ) : viewMode === 'collections' ? (
                         // Desktop only: gallery flows inline beneath the inline subheader.
                         // Mobile renders the full-screen overlay below (mirrors Ask).
                         <div className="hidden sm:block">
@@ -1871,6 +1937,24 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                 </div>
             )}
 
+            {/* Connections — mobile full-screen overlay (mirrors Collections). */}
+            {viewMode === 'connections' && (
+                <div className="sm:hidden fixed inset-x-0 top-0 bottom-0 z-50 bg-background flex flex-col animate-fade-in">
+                    <MobileSubheader
+                        onBack={() => setViewMode(lastLayout.current)}
+                        backLabel="Back to your library"
+                        icon={<Link2 className="w-5 h-5" />}
+                        title="Connections"
+                    />
+                    <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+                        <ConnectionsView
+                            links={links}
+                            onOpenCard={(id) => setActiveLinkId(id)}
+                        />
+                    </div>
+                </div>
+            )}
+
             {/* Active Link Modal */}
             {activeLink && (
                 <LinkDetailModal
@@ -1879,14 +1963,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                     allCategories={categories}
                     uid={uid}
                     isOpen={!!activeLink}
-                    onClose={() => setActiveLinkId(null)}
+                    onClose={goBackOrClose}
                     onStatusChange={handleStatusChange}
                     onReadStatusChange={handleReadStatusChange}
                     onUpdateTags={handleUpdateTags}
                     onUpdateCategory={handleUpdateCategory}
                     onUpdateReminder={(link) => handleOpenReminderModal(link)}
                     onDelete={handleDelete}
-                    onOpenOtherLink={(link) => setActiveLinkId(link.id)}
+                    onOpenOtherLink={openRelatedLink}
                     onAddToCollection={(link) => setAddToCollectionLink(link)}
                     onShare={handleShareCard}
                 />

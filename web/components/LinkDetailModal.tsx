@@ -598,7 +598,7 @@ export default function LinkDetailModal({
                                     {isRtl ? 'כרטיסים קשורים' : 'Related cards'}
                                 </h3>
                                 <div className="grid gap-3">
-                                    {relatedCards.map(({ link: rel, reason, strong, sharedConcepts }) => (
+                                    {relatedCards.map(({ link: rel, reason, strong }) => (
                                         <div
                                             key={rel.id}
                                             onClick={() => onOpenOtherLink?.(rel)}
@@ -621,17 +621,8 @@ export default function LinkDetailModal({
                                                 dir={isRtl ? "rtl" : "ltr"}
                                                 className={`text-xs text-text-muted mt-1.5 font-normal italic ${isRtl ? 'text-right' : ''}`}
                                             >
-                                                ✨ {reason}
+                                                {reason}
                                             </p>
-                                            {sharedConcepts.length > 0 && (
-                                                <div className={`flex flex-wrap gap-1.5 mt-2 ${isRtl ? 'justify-end' : ''}`}>
-                                                    {sharedConcepts.map(c => (
-                                                        <span key={c} className="text-[10px] text-text-secondary bg-card border border-border-subtle px-1.5 py-0.5 rounded">
-                                                            {c}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            )}
                                         </div>
                                     ))}
                                 </div>
