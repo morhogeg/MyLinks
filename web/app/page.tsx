@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import Feed from "@/components/Feed";
 import AddLinkForm from "@/components/AddLinkForm";
+import AnalyzingBanner, { AnalyzingState } from "@/components/AnalyzingBanner";
 import InstallPWA from "@/components/InstallPWA";
 import SettingsModal from "@/components/SettingsModal";
 import ProfileAvatar from "@/components/ProfileAvatar";
@@ -22,6 +23,9 @@ export default function Home() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAskMode, setIsAskMode] = useState(false);
   const [hideAddButton, setHideAddButton] = useState(false);
+  // In-flight capture analysis, lifted out of AddLinkForm so the banner
+  // persists after the add sheet is collapsed/closed.
+  const [analyzing, setAnalyzing] = useState<AnalyzingState | null>(null);
   const [isTourOpen, setIsTourOpen] = useState(false);
   // Scroll-scrubbed top bar: opacity rides the scroll itself (down = away,
   // up = back), settling to shown/hidden when the finger rests.
@@ -151,7 +155,8 @@ export default function Home() {
       </main>
 
       {/* Add Link FAB — hidden in Ask & Collections (neither view captures links). */}
-      <AddLinkForm onLinkAdded={handleLinkAdded} hidden={hideAddButton} />
+      <AddLinkForm onLinkAdded={handleLinkAdded} hidden={hideAddButton} onAnalyzingChange={setAnalyzing} />
+      <AnalyzingBanner state={analyzing} />
 
       {/* Settings Modal */}
       {uid && (
