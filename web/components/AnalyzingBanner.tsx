@@ -11,11 +11,32 @@ export interface AnalyzingState {
     kind: 'link' | 'image' | 'video';
 }
 
-const LABEL: Record<AnalyzingState['kind'], string> = {
-    link: 'Analyzing link',
-    image: 'Analyzing screenshot',
-    video: 'Analyzing video',
-};
+/**
+ * Phase label that advances with progress, mirroring the in-panel scan views
+ * (LinkScanProgress / ImageScanProgress / VideoScanProgress) so the banner reads
+ * as genuinely working through stages, not a static "Analyzing".
+ */
+function phaseLabel(kind: AnalyzingState['kind'], pct: number): string {
+    if (kind === 'image') {
+        if (pct >= 95) return 'Finishing up…';
+        if (pct >= 80) return 'Organizing & tagging…';
+        if (pct >= 60) return 'Understanding the content…';
+        if (pct >= 45) return 'Reading the text…';
+        return 'Scanning the image…';
+    }
+    if (kind === 'video') {
+        if (pct >= 92) return 'Organizing & tagging…';
+        if (pct >= 72) return 'Writing the summary…';
+        if (pct >= 40) return 'Understanding the video…';
+        return 'Watching the video…';
+    }
+    // link / web article
+    if (pct >= 92) return 'Organizing & tagging…';
+    if (pct >= 72) return 'Writing the summary…';
+    if (pct >= 50) return 'Understanding the content…';
+    if (pct >= 25) return 'Reading the page…';
+    return 'Fetching the link…';
+}
 
 /**
  * A small, app-level "Analyzing… N%" banner that lives ABOVE the add form —
@@ -77,7 +98,7 @@ export default function AnalyzingBanner({ state }: { state: AnalyzingState | nul
                         <Loader2 className="w-4 h-4 text-accent shrink-0 animate-spin" />
                     )}
                     <span className="flex-1 text-[13px] font-medium text-text truncate">
-                        {done ? 'Saved to Machina' : LABEL[shown.kind]}
+                        {done ? 'Saved to Machina' : phaseLabel(shown.kind, pct)}
                     </span>
                     <span className="text-[13px] font-bold tabular-nums text-text-secondary">
                         {pct}%
