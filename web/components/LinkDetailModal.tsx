@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
 import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2 } from 'lucide-react';
 import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
@@ -84,6 +84,14 @@ export default function LinkDetailModal({
     // Reset the player seek when switching to a different link (related-link nav).
     useEffect(() => {
         setVideoStart(null);
+    }, [link.id]);
+
+    // Scroll back to the top when the card changes. Opening a related card reuses
+    // this same scroll container, so without this it would open scrolled down to
+    // wherever the Related section sat — jump to the top like a fresh open does.
+    const scrollRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (scrollRef.current) scrollRef.current.scrollTop = 0;
     }, [link.id]);
 
     useEffect(() => {
@@ -281,6 +289,7 @@ export default function LinkDetailModal({
                 </div>
 
                 <div
+                    ref={scrollRef}
                     className="flex-1 overflow-y-auto pt-4 px-4 pb-4 sm:px-6 sm:pb-6 md:px-8 md:pb-8 scrollbar-soft"
                     dir="auto"
                 >
