@@ -150,6 +150,14 @@ The multi-user auth work is **fully written but not live**:
 > Rank = (blocks launch) > (App Store hard requirement) > (security/cost exposure)
 > > (product quality) > (growth/differentiators).
 
+> **Live state (2026-07-05):** TestFlight **build 1021** is the current good
+> build — share extension confirmed working on device, save flow working, save
+> percentage restored, List view + header fade + related cards all in. The
+> whole UI-polish arc (List RTL, delete copy, header fade, share bridge) is
+> **done**. The **top remaining work is the auth cutover (task 2)** and its
+> prerequisites (tasks 4/5) — everything else is P2/P3. Start the next session
+> at task 2.
+
 ### 🔴 P0 — launch blockers (in order)
 
 1. **[x] Native auth build green (iOS)** *(code done 2026-07-03 — root cause was
@@ -494,6 +502,9 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-05 — ✅ Build 1021 CONFIRMED working on device** (user verified:
+  "share is working very well," save flow good). This is the current good
+  TestFlight build. Below is how it got there:
 - **2026-07-05 — Share bridge hardened (share STILL failed on 1020) + % restored.**
   Entitlements were verified in 1020, so the failure is the token never being
   written — the bridge's single dependency was the `get_share_config` callable.
