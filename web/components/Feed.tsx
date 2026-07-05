@@ -22,9 +22,8 @@ import SwipeDeck from './SwipeDeck';
 import AskBrain from './AskBrain';
 import LinkDetailModal from './LinkDetailModal';
 import SynthesisCard from './SynthesisCard';
-import ConnectionInsight from './ConnectionInsight';
 import ConnectionsView from './ConnectionsView';
-import { allClusters } from '@/lib/connections';
+import { crossCategoryClusters } from '@/lib/connections';
 import ConfirmDialog from './ConfirmDialog';
 import AddToCollectionSheet from './AddToCollectionSheet';
 import CollectionsGallery from './CollectionsGallery';
@@ -507,8 +506,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
         : [];
 
     // The proactive feed modules, rendered once and reused in both the grid and
-    // list layouts (above pending + real cards). Synthesis first (the weekly
-    // recap), then the lighter connection insight.
+    // list layouts (above pending + real cards). Just the weekly synthesis recap
+    // now — the connection insight moved into the dedicated Connections view/pill,
+    // so the feed no longer carries a redundant inline banner.
     const feedModules = isDefaultLibraryView ? (
         <>
             {latestSynthesis && latestSynthesis.weekId !== dismissedSynthesisWeek && (
@@ -518,7 +518,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                     onDismiss={dismissSynthesis}
                 />
             )}
-            <ConnectionInsight links={links} onOpenCard={(id) => setActiveLinkId(id)} />
         </>
     ) : null;
 
@@ -781,10 +780,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
         { key: 'list', label: 'List', icon: <List className="w-4 h-4" />, hint: 'List view' },
         { key: 'review', label: 'Review', icon: <GalleryHorizontalEnd className="w-4 h-4" />, hint: 'Swipe to review' },
     ];
-    // Connection clusters power the Connections view + its toolbar pill. Relaxed
-    // threshold (2) here so the pill appears — and the view lists — smaller
-    // patterns the strict inline banner would stay quiet about.
-    const connectionClusters = useMemo(() => allClusters(links, 2), [links]);
+    // The Connections view + its toolbar pill surface only *cross-category*
+    // clusters — cards from different categories sharing a thread, which a
+    // category filter can't reproduce. The pill count matches the view exactly.
+    const connectionClusters = useMemo(() => crossCategoryClusters(links, 2), [links]);
 
     // The layout the Ask/Collections buttons return you to when you leave them.
     const lastLayout = useRef<'grid' | 'list' | 'review'>('grid');
