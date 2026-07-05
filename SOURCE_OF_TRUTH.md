@@ -89,6 +89,12 @@ surface in the category and a knowledge graph computed on every save. The path t
   without the popup resolver (gapi crashes under `capacitor://`),
   `experimentalForceLongPolling` for Firestore, emulator gate requires
   `localhost` + `http:` (so `http://127.0.0.1:3000` previews against prod data).
+- **Native detection: never use `Boolean(window.Capacitor)`.** `@capacitor/core`
+  defines `window.Capacitor` in a PLAIN BROWSER too, so that test is truthy on the
+  web and mis-flags web as native (it silently disabled the web sign-in gate for
+  the entire pre-cutover era — fixed 2026-07-06, commit `0acf578`). Detect native
+  via `window.location.protocol === 'capacitor:'` or `Capacitor.isNativePlatform()`
+  (false on web). `isNativeApp()` in `web/lib/api.ts` is the canonical check.
 - CORS allowlist in `functions/main.py` `_allowed_origins()` must include
   `capacitor://localhost` (+ `ionic://`, `https://localhost`) or every native
   `/api/*` call fails with a bare "Load failed".
@@ -520,6 +526,26 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-06 — 🐛 Root-caused why web sign-in never worked: `isNativeApp()`
+  mis-detected the browser as native.** After adding Apple+Google to web, the web
+  app *still* opened straight to the owner's feed with no login (verified on
+  iPhone Safari, fresh incognito, exact Vercel URL). The live bundle WAS current
+  (contained `/api/claim-workspace`, "Continue with Apple"), so not a stale
+  deploy. Cause: `isNativeApp()` returned `true` on the web because it tested
+  `Boolean(window.Capacitor)` — but **`@capacitor/core` defines `window.Capacitor`
+  in a plain browser too**. So every web page took the *legacy native path*
+  (loads the owner workspace, no gate) and never showed the login. **This means
+  web sign-in had NEVER actually engaged.** Fix (`web/lib/api.ts`, commit
+  `0acf578`): detect native via the `capacitor:` origin or
+  `Capacitor.isNativePlatform()` (false on web); native unaffected (keys off the
+  `capacitor:` protocol, so build 1037 is fine). Web now gates → shows
+  Apple/Google login → routes to the web sign-in flow (which already passes
+  `browserPopupRedirectResolver`). **Shipped to web (Vercel) only; no new iOS
+  build.** ⚠️ Gotcha for future code: never treat `window.Capacitor`'s presence
+  as a native signal (added to §2). Note: `firebase.ts` `isCapacitor` has the
+  same pattern but is left as-is (it only picks Firestore long-polling, which
+  works on web either way). Pre-cutover exposure unchanged: a random web sign-in
+  can still claim the junk `Auto-ID` doc until `OWNER_EMAIL` is set + cutover.
 - **2026-07-05 — Native claim/delete CORS fix + web Apple/Google UI + account
   polish (shipped).** Root-caused the restricted-screen bug from the Apple entry
   below: Firebase **callables fail the CORS preflight from `capacitor://localhost`**,
