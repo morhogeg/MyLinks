@@ -504,6 +504,12 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-05 — Related-card nav opens at the top.** The detail modal reuses a
+  single scroll container, so tapping a related card (which sits near the bottom)
+  opened the next card still scrolled to the bottom. Added a `scrollRef` + an
+  effect that resets `scrollTop = 0` on `link.id` change, so a related card opens
+  at the top like a fresh open from the feed. One change, both platforms (iOS is
+  the same Capacitor WebView build). Live on web + TestFlight build 1034.
 - **2026-07-05 — Connections sharpened to cross-category; inline banner removed.**
   Refined the M10 hybrid after the user noted the flat view overlapped with
   browsing by category. `crossCategoryClusters` (in `lib/connections.ts`) now
