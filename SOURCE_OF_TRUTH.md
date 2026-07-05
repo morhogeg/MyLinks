@@ -502,6 +502,19 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-05 — Analyzing banner (both capture paths) + related-cards fix —
+  build 1023.** (1) The in-flight "Analyzing… N%" indicator was trapped inside
+  AddLinkForm (vanished when the sheet closed); lifted to a page-level
+  `AnalyzingBanner`. (2) Extended it to **shares from other apps / WhatsApp**
+  (the priority): those analyze server-side, so `useProcessingBanner` watches
+  the `status:'processing'` cards the feed already streams and synthesizes an
+  eased % that flips to "Saved" when the card resolves. page.tsx merges the two
+  sources into one banner. (3) Restored the save **percentage** in all scan
+  views (build 1021). (4) **Related cards:** same-category now counts as a
+  corroborating signal in `related.ts` (two clearly-related same-category cards
+  in the 0.74–0.80 band were being dropped). Note: OLD cards without embeddings
+  still need the M9 backfill (§4 task 4) for stored relations. All browser/unit
+  verified. Build 1023 green (entitlement tripwire passed).
 - **2026-07-05 — ✅ Build 1021 CONFIRMED working on device** (user verified:
   "share is working very well," save flow good). This is the current good
   TestFlight build. Below is how it got there:

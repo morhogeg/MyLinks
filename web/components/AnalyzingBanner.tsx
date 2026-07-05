@@ -1,0 +1,95 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { Loader2, CheckCircle2 } from 'lucide-react';
+
+export interface AnalyzingState {
+    active: boolean;
+    /** 0–100. */
+    progress: number;
+    /** What's being analyzed, for the label. */
+    kind: 'link' | 'image' | 'video';
+}
+
+const LABEL: Record<AnalyzingState['kind'], string> = {
+    link: 'Analyzing link',
+    image: 'Analyzing screenshot',
+    video: 'Analyzing video',
+};
+
+/**
+ * A small, app-level "Analyzing… N%" banner that lives ABOVE the add form —
+ * so it persists through the form being collapsed or closed, and stays until
+ * the analysis lands (then flashes a brief "Saved" before sliding away). This
+ * is the reassurance that a capture is still being worked on after the user
+ * moves on; it's decoupled from AddLinkForm's open/closed lifecycle on purpose
+ * (that coupling is why the old in-form indicator kept vanishing).
+ *
+ * Pinned bottom-center, above the FAB and safe-area inset. Non-blocking.
+ */
+export default function AnalyzingBanner({ state }: { state: AnalyzingState | null }) {
+    // Keep the banner mounted briefly after `active` flips false so the finish
+    // (100% → "Saved ✓") is visible instead of a hard pop-out.
+    const [visible, setVisible] = useState(false);
+    const [done, setDone] = useState(false);
+    const [shown, setShown] = useState<AnalyzingState | null>(null);
+    const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        if (state?.active) {
+            if (hideTimer.current) { clearTimeout(hideTimer.current); hideTimer.current = null; }
+            setDone(false);
+            setShown(state);
+            setVisible(true);
+            return;
+        }
+        // active just went false — if we were showing, finish gracefully.
+        if (visible && !done) {
+            setDone(true);
+            setShown((s) => (s ? { ...s, progress: 100 } : s));
+            hideTimer.current = setTimeout(() => {
+                setVisible(false);
+                setDone(false);
+                setShown(null);
+            }, 1100);
+        }
+        return () => {
+            if (hideTimer.current) { clearTimeout(hideTimer.current); hideTimer.current = null; }
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [state?.active, state?.progress, state?.kind]);
+
+    if (!visible || !shown) return null;
+
+    const pct = Math.round(Math.min(100, Math.max(0, done ? 100 : shown.progress)));
+
+    return (
+        <div
+            className="fixed inset-x-0 z-40 flex justify-center px-4 pointer-events-none"
+            style={{ bottom: 'calc(env(safe-area-inset-bottom) + 5.5rem)' }}
+            aria-live="polite"
+        >
+            <div className="animate-slide-up pointer-events-auto w-full max-w-xs rounded-2xl bg-card/95 backdrop-blur-xl border border-border-subtle shadow-[var(--shadow-card)] px-3.5 py-2.5">
+                <div className="flex items-center gap-2.5">
+                    {done ? (
+                        <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 animate-fade-in" />
+                    ) : (
+                        <Loader2 className="w-4 h-4 text-accent shrink-0 animate-spin" />
+                    )}
+                    <span className="flex-1 text-[13px] font-medium text-text truncate">
+                        {done ? 'Saved to Machina' : LABEL[shown.kind]}
+                    </span>
+                    <span className="text-[13px] font-bold tabular-nums text-text-secondary">
+                        {pct}%
+                    </span>
+                </div>
+                <div className="mt-2 h-1 w-full rounded-full bg-white/10 overflow-hidden">
+                    <div
+                        className={`h-full rounded-full transition-[width] duration-300 ease-out ${done ? 'bg-green-500' : 'bg-accent'}`}
+                        style={{ width: `${pct}%` }}
+                    />
+                </div>
+            </div>
+        </div>
+    );
+}

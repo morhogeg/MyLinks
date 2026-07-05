@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, FormEvent } from 'react';
-import { Link, Plus, Loader2, X, Upload } from 'lucide-react';
+import { Link, Plus, X, Upload } from 'lucide-react';
 import { saveLink, getUserTags } from '@/lib/storage';
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
@@ -20,6 +20,9 @@ interface AddLinkFormProps {
     onLinkAdded: () => void;
     /** Hide the floating button (e.g. in Ask mode, where it's irrelevant). */
     hidden?: boolean;
+    /** Publish in-flight analysis state so the page can show a persistent
+     *  banner that outlives this form being collapsed/closed. */
+    onAnalyzingChange?: (state: { active: boolean; progress: number; kind: 'link' | 'image' | 'video' }) => void;
 }
 
 const formatUrl = (input: string) => {
@@ -64,7 +67,7 @@ const fetchWithTimeout = async (input: string, init: RequestInit) => {
  * Form for manually adding URLs
  * This replaces WhatsApp ingestion for local testing
  */
-export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkFormProps) {
+export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingChange }: AddLinkFormProps) {
     const { uid } = useAuth();
     const toast = useToast();
     const [url, setUrl] = useState('');
@@ -130,6 +133,16 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
             }
         };
     }, [isLoading, activeTab, isVideo, isPlainLink]);
+
+    // Publish the in-flight state up to the page so it can render a persistent
+    // "Analyzing… N%" banner that survives this form collapsing/closing.
+    useEffect(() => {
+        onAnalyzingChange?.({
+            active: isLoading,
+            progress,
+            kind: activeTab === 'image' ? 'image' : isVideo ? 'video' : 'link',
+        });
+    }, [isLoading, progress, activeTab, isVideo, onAnalyzingChange]);
 
     const parseResponse = async (response: Response) => {
         const responseText = await response.text();
@@ -438,20 +451,9 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
             )}
 
             <div className={`fixed bottom-6 right-4 sm:right-6 z-40 ${hidden ? 'hidden' : 'flex'} flex-col items-end gap-3`} style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-                {/* Persistent "still working" chip: the in-flight analysis promise
-                    survives closing the panel, so show the user it's running and
-                    let them reopen the scan view by tapping it. */}
-                {isLoading && !isExpanded && (
-                    <button
-                        type="button"
-                        onClick={() => setIsExpanded(true)}
-                        className="flex items-center gap-2 pl-3 pr-4 py-2 rounded-full bg-card border border-white/10 shadow-lg text-sm font-medium text-text hover:bg-white/5 active:scale-95 transition-all animate-slide-up"
-                        aria-label="Analysis in progress — tap to view"
-                    >
-                        <Loader2 className="w-4 h-4 animate-spin text-accent" />
-                        <span>Analyzing… <span className="tabular-nums text-text-secondary">{Math.round(Math.min(100, Math.max(0, progress)))}%</span></span>
-                    </button>
-                )}
+                {/* The in-flight "Analyzing… N%" indicator now lives at the page
+                    level (AnalyzingBanner) so it persists after this form is
+                    collapsed or closed — see page.tsx. */}
 
                 {/* FAB Button */}
                 <button
