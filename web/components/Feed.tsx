@@ -32,6 +32,7 @@ import MobileSubheader from './MobileSubheader';
 import { Button } from './ui/Button';
 import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Shapes, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus, RefreshCw } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
+import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
 import { publishCard, publishCollection, unpublishCollection, deleteCollection, removeLinkFromCollection } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
@@ -51,7 +52,7 @@ type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
  * - Two card views (grid / list), plus review, ask, and collections modes
  * - Deep linking to specific links via URL params
  */
-function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void }) {
+function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void }) {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
@@ -111,6 +112,19 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
         }, 500);
         return () => clearTimeout(timer);
     }, [searchQuery]);
+
+    // Server-side captures (Share Extension / WhatsApp) show up as `processing`
+    // cards; surface the same app-level "Analyzing… N%" banner for them. Report
+    // the state up to the page, throttled to meaningful changes so it doesn't
+    // fire every ramp frame.
+    const processingBanner = useProcessingBanner(links);
+    const procSig = processingBanner
+        ? `${processingBanner.active}:${Math.round(processingBanner.progress)}:${processingBanner.kind}`
+        : 'null';
+    useEffect(() => {
+        onProcessingChange?.(processingBanner);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [procSig]);
 
     // Semantic Search Effect
     useEffect(() => {
@@ -1957,14 +1971,14 @@ function FeedContent({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (
     );
 }
 
-export default function Feed({ onAskModeChange, onHideAddButton }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void }) {
+export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void }) {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
             </div>
         }>
-            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} />
+            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} />
         </Suspense>
     );
 }

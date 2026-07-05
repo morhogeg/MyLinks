@@ -23,9 +23,13 @@ export default function Home() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAskMode, setIsAskMode] = useState(false);
   const [hideAddButton, setHideAddButton] = useState(false);
-  // In-flight capture analysis, lifted out of AddLinkForm so the banner
-  // persists after the add sheet is collapsed/closed.
+  // In-flight capture analysis for the one "Analyzing… N%" banner. Two sources:
+  // `analyzing` = the in-app add flow (real progress); `processing` = captures
+  // shared from other apps / WhatsApp (server-side, ramped). Prefer the in-app
+  // one when it's active (it has true milestones); otherwise show the share one.
   const [analyzing, setAnalyzing] = useState<AnalyzingState | null>(null);
+  const [processing, setProcessing] = useState<AnalyzingState | null>(null);
+  const bannerState = analyzing?.active ? analyzing : (processing ?? analyzing);
   const [isTourOpen, setIsTourOpen] = useState(false);
   // Scroll-scrubbed top bar: opacity rides the scroll itself (down = away,
   // up = back), settling to shown/hidden when the finger rests.
@@ -151,12 +155,12 @@ export default function Home() {
       {/* Main Content — Ask mode fills to the viewport bottom, so it drops the
           tall bottom padding the grid uses for the FAB. */}
       <main className={`max-w-[2200px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-2 sm:py-4 ${isAskMode ? 'pb-0 sm:pb-0' : 'pb-24 sm:pb-20'}`}>
-        <Feed key={refreshKey} onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} />
+        <Feed key={refreshKey} onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} />
       </main>
 
       {/* Add Link FAB — hidden in Ask & Collections (neither view captures links). */}
       <AddLinkForm onLinkAdded={handleLinkAdded} hidden={hideAddButton} onAnalyzingChange={setAnalyzing} />
-      <AnalyzingBanner state={analyzing} />
+      <AnalyzingBanner state={bannerState} />
 
       {/* Settings Modal */}
       {uid && (

@@ -149,17 +149,23 @@ export function getRelatedCards(link: Link, allLinks: Link[], isRtl: boolean): R
         let qualifies: boolean;
         let score: number;
         if (sim > 0) {
-            qualifies =
-                sim >= SEMANTIC_MIN ||
-                (sim >= SEMANTIC_ASSIST_MIN && (sharedConcepts.length > 0 || sharedTags.length > 0));
-            score = sim + sharedConcepts.length * 0.02 + sharedTags.length * 0.01;
+            // A strong semantic match stands alone; a softer one (0.74–0.80)
+            // needs one corroborating signal — a shared concept/tag OR the same
+            // category. Two "sun & skin health" cards land right here: close in
+            // embedding space and same category, but their concepts are worded
+            // differently ("sun exposure" vs "sunscreen"), so without the
+            // same-category assist they were silently dropped.
+            const corroborated = sharedConcepts.length > 0 || sharedTags.length > 0 || sameCategory;
+            qualifies = sim >= SEMANTIC_MIN || (sim >= SEMANTIC_ASSIST_MIN && corroborated);
+            score = sim + sharedConcepts.length * 0.02 + sharedTags.length * 0.01 + (sameCategory ? 0.005 : 0);
         } else {
-            // No embedding pair: require a real topical signal, and rank these
-            // below any semantic match.
+            // No readable embedding on one side: fall back to topical signals.
+            // Same category + any shared tag/concept is a genuine relation;
+            // two shared concepts or two shared tags stand on their own.
             qualifies =
                 sharedConcepts.length >= 2 ||
-                (sharedConcepts.length >= 1 && sameCategory) ||
-                sharedTags.length >= 2;
+                sharedTags.length >= 2 ||
+                (sameCategory && (sharedConcepts.length >= 1 || sharedTags.length >= 1));
             score = 0.5 + sharedConcepts.length * 0.05 + sharedTags.length * 0.03 + (sameCategory ? 0.02 : 0);
         }
         if (!qualifies) continue;
