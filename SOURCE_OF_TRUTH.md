@@ -504,6 +504,15 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-05 — Analyzing banner: phase-based label.** The page-level banner
+  showed a static "Analyzing link"; now its label advances with progress,
+  mirroring the in-panel scan views (`phaseLabel(kind, pct)` in
+  `AnalyzingBanner.tsx`): link → Fetching → Reading the page → Understanding →
+  Writing summary → Organizing & tagging; image → Scanning → Reading text →
+  Understanding → Organizing → Finishing up; video → Watching → Understanding →
+  Writing → Organizing; done → "Saved to Machina". Applies to both the in-app
+  add flow and shares from other apps. Live on web via `main`; a TestFlight
+  build was triggered on push (build number = 1000 + run number).
 - **2026-07-05 — Related cards: recall→precision, final (build 1028).** Chased
   this across three commits. (i) Root bug: `getRelatedCards` used an if/else so
   when a card had ANY embedding it took ONLY the semantic path — a moderate
