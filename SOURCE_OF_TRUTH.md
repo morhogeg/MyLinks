@@ -504,6 +504,17 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-05 — Connection insight recoverable + related-card contrast.** Two
+  home/detail polish fixes. (i) `ConnectionInsight`: the X used to permanently
+  blocklist the concept (localStorage, survived refresh) with no re-entry — an
+  accidental close was unrecoverable. Now X *minimizes* the banner to a small
+  persistent pill in the same feed slot; tap it to restore. Collapsed state
+  persists (`connection-insight-collapsed`) so it also won't re-nag; removed the
+  per-concept blocklist entirely. (ii) `LinkDetailModal` related cards used
+  hardcoded `white/5`·`black/20` alphas that were near-invisible on the light
+  modal panel — swapped to theme tokens (`bg-card-hover` over the `bg-card`
+  panel + `border-border-subtle` + `shadow-sm`), matching the Ask-tab citation
+  cards. Web-only; live on `main` via Vercel.
 - **2026-07-05 — Analyzing banner: phase-based label.** The page-level banner
   showed a static "Analyzing link"; now its label advances with progress,
   mirroring the in-panel scan views (`phaseLabel(kind, pct)` in
