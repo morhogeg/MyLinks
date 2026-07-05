@@ -150,14 +150,16 @@ The multi-user auth work is **fully written but not live**:
 > Rank = (blocks launch) > (App Store hard requirement) > (security/cost exposure)
 > > (product quality) > (growth/differentiators).
 
-> **Live state (2026-07-05):** TestFlight **build 1033** is the sign-in-enabled
-> build (`require_auth=true`); Apple **and** Google sign-in are **device-verified**
-> (build 1021 remains the last good pre-auth UI build). `claim_workspace` +
-> `delete_account` are now deployed (flags still OFF). The **top remaining work is
-> the auth cutover (task 2)**, now gated on fixing the **native `claim_workspace`
-> callable bug** (WebView callable never reaches the function — fix in progress,
-> route through an HTTP+bearer endpoint; see the 2026-07-05 session-log entry) and
-> prerequisites (tasks 4/5). Everything else is P2/P3.
+> **Live state (2026-07-05):** Apple **and** Google sign-in are **device-verified**
+> on iOS (first on build 1033). The native **`claim_workspace` callable→CORS bug
+> is FIXED** — HTTP twins `claim_workspace_http`/`delete_account_http` deployed +
+> curl-verified, native routes to them; a fresh `require_auth=true` TestFlight
+> build carries it. Web login now offers Apple+Google (no cutover). `claim_workspace`
+> + `delete_account` (callables + HTTP twins) deployed with flags still OFF. The
+> **top remaining work is the auth cutover (task 2)** and prerequisites (tasks 4/5):
+> before flipping, set the Apple **Services ID + `.p8`** for web Apple sign-in, and
+> device-verify the brand-new-user claim path (needs backend `REQUIRE_AUTH` on).
+> Everything else is P2/P3.
 
 ### 🔴 P0 — launch blockers (in order)
 
@@ -505,6 +507,28 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-05 — Native claim/delete CORS fix + web Apple/Google UI + account
+  polish (shipped).** Root-caused the restricted-screen bug from the Apple entry
+  below: Firebase **callables fail the CORS preflight from `capacitor://localhost`**,
+  so `httpsCallable(claim_workspace)` never reached the function in the WKWebView
+  (no execution logs) — the same wall that moved `get_share_config`/`/api/chat`
+  off managed paths. Fix: added HTTP twins **`claim_workspace_http` +
+  `delete_account_http`** (`@https_fn.on_request`, CORS via `_allowed_origins()`
+  incl. `capacitor://localhost`, auth via `_verify_bearer`), sharing
+  `_claim_workspace_logic`/`_delete_account_logic` with the callables; native
+  routes to them (`/api/claim-workspace`, `/api/delete-account` — `authHeaders()`
+  bearer), web keeps the callable. `firebase.json` + `web/vercel.json` rewrites
+  added. **Deployed + curl-verified:** both endpoints 401 on no-token and the
+  `capacitor://localhost` OPTIONS preflight now returns 204 (the exact call that
+  failed before). Also: **web login now offers Continue with Apple + Google** with
+  NO auth cutover (`showApple` on web; `REQUIRE_AUTH`/rules unchanged) — the web
+  Apple button needs the Apple **Services ID + `.p8`** in the Firebase Apple
+  provider to actually work (native didn't). UI: removed the profile-letter avatar
+  from the home header (lives in Settings only); Settings → Account shows "Signed
+  in with Apple/Google" (from `providerData`) and Sign out moved to its own row so
+  the full email isn't truncated. Web live via Vercel; functions + hosting
+  deployed; iOS via TestFlight (`require_auth=true` build). Deferred (needs
+  cutover): full brand-new-user claim path (backend `REQUIRE_AUTH` still off).
 - **2026-07-05 — Related cards: hide the path you're already on.** Relatedness is
   symmetric, so opening B from A's Related list put A back at the top of B's list
   — redundant, doubly so now the Back arrow returns you there. `getRelatedCards`
@@ -571,8 +595,7 @@ exact-match, capped.
   `users/+16462440305` via the Admin SDK (exactly what the owner-claim does),
   which unblocked device sign-in. A proper fix (route claim through an HTTP
   endpoint with the `capacitor://localhost` CORS allowlist + bearer verify, like
-  `/api/chat`) is **in progress** — REQUIRED before the auth cutover or brand-new
-  sign-ups hit the same restricted screen.
+  `/api/chat`) shipped the same session — **see the entry above.**
 - **2026-07-05 — Connection insight recoverable + related-card contrast.** Two
   home/detail polish fixes. (i) `ConnectionInsight`: the X used to permanently
   blocklist the concept (localStorage, survived refresh) with no re-entry — an
