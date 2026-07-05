@@ -168,13 +168,13 @@ The multi-user auth work is **fully written but not live**:
    `macos-26`/Xcode 26, `sed` strip removed, all three plugins in the committed
    SPM manifest. This also satisfies Apple's current-SDK submission floor —
    former task 10. **CI-confirmed 2026-07-03:** run #7 built all three plugins
-   and uploaded build 1007 to TestFlight.)* Note: build 1007 shows **no sign-in
-   UI** — that's correct; the flag is off pre-cutover. **Remaining:** run the
-   workflow with the **`require_auth` input = true** (Actions → iOS → TestFlight
-   → Run workflow) to get a sign-in-enabled build, then verify Apple + Google
-   sign-in on device. CI now also injects the `REVERSED_CLIENT_ID` URL scheme
-   into Info.plist at build time (was missing — native Google sign-in couldn't
-   return to the app; `NATIVE_AUTH_SETUP.md` §4.2 is automated now).
+   and uploaded build 1007 to TestFlight.)* **✅ Sign-in DEVICE-VERIFIED
+   2026-07-05:** ran the workflow with **`require_auth=true`** and confirmed
+   **both Apple and Google** sign in on device and load the feed (build 1033,
+   then build 1037 which also carries the native claim CORS fix — see task 2).
+   CI injects the `REVERSED_CLIENT_ID` URL scheme into Info.plist at build time
+   (native Google sign-in couldn't return to the app otherwise;
+   `NATIVE_AUTH_SETUP.md` §4.2 automated).
 2. **[ ] Auth cutover** *(code-side prep done 2026-07-03; owner steps remain).*
    Prep completed: `firestore.rules.locked` updated — added `syntheses`;
    **rewrote the `users` read rule** (the old `owns()` `get()` was unprovable for
@@ -182,11 +182,24 @@ The multi-user auth work is **fully written but not live**:
    at cutover); client create/delete on user docs denied. `retryFailedLink` now
    sends the bearer header; `backfill_related_links` is admin-gated; a rules
    test suite exists in `firestore-rules-test/` (**run on the owner machine** —
-   the cloud sandbox can't download the emulator JAR). Owner steps, after task 1
-   is device-verified: flip `REQUIRE_AUTH` + `NEXT_PUBLIC_REQUIRE_AUTH`, redeploy
-   functions + web, `cd firestore-rules-test && npm test`, then
-   `cp firestore.rules.locked firestore.rules && firebase deploy --only
-   firestore:rules`. Flagged decision: `get_article` stays anonymous-callable
+   the cloud sandbox can't download the emulator JAR). **2026-07-05 — code now
+   fully cutover-ready:** fixed the native `claim_workspace`/`delete_account`
+   **callable→CORS bug** (Firebase callables fail the `capacitor://localhost`
+   preflight in the WKWebView) with HTTP twins `claim_workspace_http`/
+   `delete_account_http` (bearer + `_allowed_origins` CORS); native routes to
+   `/api/claim-workspace` + `/api/delete-account`, web keeps the callable —
+   **deployed + curl-verified.** Web login now also shows Apple+Google (no
+   cutover). **Owner steps that REMAIN before flipping** (nothing left in code):
+   (1) configure the Apple **Services ID + `.p8`** in the Firebase Apple provider
+   — REQUIRED for web Apple sign-in (native didn't need it; the web Apple button
+   errors until then); (2) set `OWNER_EMAIL` (+ task 5 env) so only the owner can
+   claim the legacy workspace; (3) flip `REQUIRE_AUTH` +
+   `NEXT_PUBLIC_REQUIRE_AUTH`, redeploy functions + web; (4) `cd
+   firestore-rules-test && npm test`; (5) `cp firestore.rules.locked
+   firestore.rules && firebase deploy --only firestore:rules` (point of no
+   return); (6) device-verify the **brand-new-user** claim path (fresh non-owner
+   account → auto-created workspace — only works once `REQUIRE_AUTH` is on).
+   Flagged decision: `get_article` stays anonymous-callable
    (App Check + rate limit only) — keep or gate deliberately. Closes audit
    blockers B-1/B-2/B-3. Full checklist: `NATIVE_AUTH_SETUP.md` §6.
 3. **[x] New-user path** *(code done 2026-07-03; goes live with the task-2

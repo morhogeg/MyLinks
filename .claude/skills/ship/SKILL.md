@@ -9,6 +9,21 @@ description: Ship Machina AI. Merge the current branch to main, deploy the front
 > source of truth for architecture, deploy gotchas, and the ranked backlog. All
 > post-ship documentation goes THERE (§4 checkboxes + §9 session log) — never
 > create or update HANDOFF/TASKS/spec files; they were consolidated and deleted.
+>
+> 🚨 **MANDATORY — every ship MUST update `SOURCE_OF_TRUTH.md` before it's done.**
+> Not optional, not just the session log. In the SAME ship you must:
+> 1. **§9 session log** — prepend a dated entry covering what advanced (features,
+>    fixes, deploys) AND any **new/known issues, workarounds, or deferred owner
+>    steps** discovered. Name concrete artifacts: commit SHAs, function names,
+>    TestFlight build numbers, endpoints.
+> 2. **§4 backlog** — check off completed items, add newly-discovered tasks/bugs,
+>    re-rank if priorities shifted.
+> 3. **§3 / live-state note / §2 gotchas** — update if the auth state, live build,
+>    or an operational gotcha changed.
+> A ship that deploys code but leaves the source of truth stale is an INCOMPLETE
+> ship. Bugs you couldn't fix, workarounds you shipped, follow-ups you left (a
+> console step, a config the user must set) MUST be written here so the next
+> session isn't blind. Commit + push the doc update to `main` (step 8).
 
 End-to-end release for this repo. Deploy surfaces:
 
@@ -78,10 +93,14 @@ be in a git worktree under `~/MyLinks/.claude/worktrees/<name>` on a `claude/*` 
 7. **Deploy Firebase Hosting** — only if `firebase.json` changed:
    `cd ~/MyLinks && ./deploy-hosting.sh`. Otherwise skip; the iPhone PWA is retired.
 
-8. **Update `SOURCE_OF_TRUTH.md`:** check off completed backlog items in §4
-   (with commit/PR refs), re-rank if priorities shifted, and prepend a short
-   entry to the §9 session log (absolute dates). Commit + push it to `main`
-   (docs, safe to commit directly).
+8. **Update `SOURCE_OF_TRUTH.md` (MANDATORY — see the 🚨 block up top).** Not
+   optional: check off / add / re-rank §4 backlog items (with commit SHAs),
+   prepend a dated §9 session-log entry covering **both what advanced and any new
+   issues / workarounds / deferred owner steps** (name build numbers, function
+   names, endpoints), and update §3 / the live-state note / §2 gotchas if auth
+   state, the live build, or an operational gotcha changed. Commit + push to
+   `main` (docs, safe to commit directly). **A ship is not complete until this is
+   pushed.**
 
 9. **Report.** Tell the user exactly what shipped: desktop (Vercel, ~1–2 min),
    functions (if any), TestFlight (workflow run link + build number 1000+N,
