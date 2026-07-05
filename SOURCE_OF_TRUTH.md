@@ -504,6 +504,18 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-05 — Related cards: recall→precision, final (build 1028).** Chased
+  this across three commits. (i) Root bug: `getRelatedCards` used an if/else so
+  when a card had ANY embedding it took ONLY the semantic path — a moderate
+  embedding score vetoed genuine topical matches. (ii) First fix went too loose
+  (same-category + a shared broad tag → every Health card related). (iii) Final:
+  relatedness requires a SPECIFIC signal — embedding sim ≥ 0.80, or ≥ 0.74 + a
+  shared **concept**, or ≥ 2 shared **concepts** (concepts are granular; broad
+  category/tags no longer qualify, only tie-break ranking). Concept path stays
+  precise even if embeddings are unreadable. Unit-tested both directions (sun
+  pair relates; sun vs unrelated Health card does not). The loose "additive"
+  version (c25c9a2) built as run #27 but was **intentionally not merged**. Build
+  1028 green; live on web via this merge.
 - **2026-07-05 — Desktop banner de-dup (build 1026).** On desktop the open Add
   panel shows its own scan %, so the page-level Analyzing banner was duplicating
   it; now suppressed while the panel is expanded on desktop (`!isMobile &&
