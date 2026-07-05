@@ -504,6 +504,18 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-05 — Connections sharpened to cross-category; inline banner removed.**
+  Refined the M10 hybrid after the user noted the flat view overlapped with
+  browsing by category. `crossCategoryClusters` (in `lib/connections.ts`) now
+  keeps ONLY clusters that bridge 2+ categories — the threads a category filter
+  structurally can't reproduce (e.g. a Science card + a Health card sharing
+  "Data Interpretation"). Within-category clusters are dropped. The view labels
+  each thread with the categories it bridges, rendered as their real colored
+  chips (`getCategoryColorStyle`); the toolbar pill count shares the same source.
+  Then removed the inline `ConnectionInsight` banner + component entirely — the
+  toolbar Connections pill owns this surface now, so the feed no longer carries
+  a redundant proactive banner. Dropped the orphaned `bestCluster` helper.
+  Web-only; live on `main` via Vercel + TestFlight build.
 - **2026-07-05 — Connections view + pill, related-card back-stack, tidy.** Built
   the M10 hybrid the user asked for. (i) Clustering extracted to
   `lib/connections.ts` (shared): the inline feed banner stays strict (≥3,
