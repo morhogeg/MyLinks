@@ -136,13 +136,17 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
 
     // Publish the in-flight state up to the page so it can render a persistent
     // "Analyzing… N%" banner that survives this form collapsing/closing.
+    // On DESKTOP the open panel shows its own scan view, so suppress the banner
+    // while it's expanded (avoids a duplicate %) — it appears the moment the
+    // panel is closed. On mobile the panel behaves differently; leave it as-is.
     useEffect(() => {
+        const suppressed = !isMobile && isExpanded;
         onAnalyzingChange?.({
-            active: isLoading,
+            active: isLoading && !suppressed,
             progress,
             kind: activeTab === 'image' ? 'image' : isVideo ? 'video' : 'link',
         });
-    }, [isLoading, progress, activeTab, isVideo, onAnalyzingChange]);
+    }, [isLoading, progress, activeTab, isVideo, isExpanded, isMobile, onAnalyzingChange]);
 
     const parseResponse = async (response: Response) => {
         const responseText = await response.text();

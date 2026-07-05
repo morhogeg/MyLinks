@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { User, DigestMode, DigestChannel } from '@/lib/types';
-import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight, Compass, LogOut, UserCircle, CalendarClock, Search, ShieldCheck, ExternalLink } from 'lucide-react';
+import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight, Compass, LogOut, UserCircle, CalendarClock, Search, ShieldCheck, ExternalLink, Network } from 'lucide-react';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
 import { policyUrl, openExternal } from '@/lib/share';
 import { readLocalAiConsent } from '@/lib/aiConsent';
 import { getShareBridgeStatus, resyncShareConfig, onShareBridgeStatus, ShareBridgeStatus } from '@/lib/shareConfig';
+import { rebuildConnections } from '@/lib/rebuildConnections';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from './AuthProvider';
 import { deleteAccount } from '@/lib/auth';
@@ -157,6 +158,31 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
             setBridgeStatus(await resyncShareConfig());
         } finally {
             setBridgeFixing(false);
+        }
+    };
+
+    // "Rebuild connections" — backfills the knowledge graph so older cards (saved
+    // before embeddings existed) get their "See also" relations. Runs a page at
+    // a time via the callable, so a big library can't time out.
+    const [rebuilding, setRebuilding] = useState(false);
+    const [rebuildLabel, setRebuildLabel] = useState<string | null>(null);
+    const handleRebuild = async () => {
+        if (!uid || rebuilding) return;
+        setRebuilding(true);
+        setRebuildLabel('Starting…');
+        try {
+            const result = await rebuildConnections(uid, (p) => {
+                setRebuildLabel(
+                    p.phase === 'embed'
+                        ? `Preparing ${p.processed} cards…`
+                        : `Linking cards… ${p.updated} connected`,
+                );
+            });
+            setRebuildLabel(`Done — ${result.updated} card${result.updated === 1 ? '' : 's'} reconnected.`);
+        } catch {
+            setRebuildLabel('Something went wrong — try again.');
+        } finally {
+            setRebuilding(false);
         }
     };
 
@@ -584,6 +610,24 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                             <PolicyLinkButton label="Privacy Policy" path="/privacy" />
                             <PolicyLinkButton label="Terms" path="/terms" />
                         </div>
+                    </Section>
+
+                    {/* Connections — knowledge-graph maintenance */}
+                    <Section icon={<Network className="w-4 h-4" />} title="Connections">
+                        <Row
+                            icon={<Network className="w-5 h-5 text-accent" />}
+                            title="Rebuild connections"
+                            subtitle={rebuildLabel ?? 'Recompute “See also” links across your whole library — useful for cards saved before connections existed.'}
+                        >
+                            <button
+                                onClick={handleRebuild}
+                                disabled={rebuilding}
+                                className="h-9 px-3.5 rounded-full bg-card-hover border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                                <RefreshCw className={`w-4 h-4 ${rebuilding ? 'animate-spin' : ''}`} />
+                                {rebuilding ? 'Rebuilding…' : 'Rebuild'}
+                            </button>
+                        </Row>
                     </Section>
 
                     {/* About */}

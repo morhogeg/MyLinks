@@ -1141,6 +1141,43 @@ def get_share_config(req: https_fn.CallableRequest) -> dict:
 
 
 @https_fn.on_call()
+def rebuild_connections(req: https_fn.CallableRequest) -> dict:
+    """Recompute the knowledge graph for the CALLER's own library, one page at
+    a time (the client loops until `done`). Backfills embeddings for old cards
+    that predate the pipeline, then their `relatedLinks` — so the "See also"
+    connections appear on cards saved before the graph existed. Scoped to the
+    caller's workspace, so no admin token; safe to re-run (idempotent).
+
+    Body: { phase: 'embed'|'relate', cursor?: str, force?: bool, uid?: str }.
+    The `uid` fallback applies only pre-cutover (REQUIRE_AUTH off), matching
+    get_share_config.
+    """
+    uid = find_data_uid_by_auth_uid(req.auth.uid) if req.auth else None
+    if not uid and not REQUIRE_AUTH and req.data:
+        uid = req.data.get("uid") or req.data.get("test_uid")
+    if not uid:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="User must be identified",
+        )
+
+    phase = (req.data or {}).get("phase", "embed")
+    if phase not in ("embed", "relate"):
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT,
+            message="phase must be 'embed' or 'relate'",
+        )
+    cursor = (req.data or {}).get("cursor")
+    force = bool((req.data or {}).get("force"))
+    # 'relate' is heavier (vector search + LLM per card) → smaller page so a
+    # single call stays well under the callable timeout.
+    limit = 20 if phase == "embed" else 8
+
+    graph = GraphService(get_db())
+    return graph.backfill_batch(uid, phase, cursor=cursor, limit=limit, force=force)
+
+
+@https_fn.on_call()
 def claim_workspace(req: https_fn.CallableRequest) -> dict:
     """Resolve (or set up) the data workspace for a signed-in account.
 
