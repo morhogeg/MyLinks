@@ -51,13 +51,23 @@ export async function fetchWithTimeout(
 
 /**
  * True when running inside the bundled native shell (Capacitor's WKWebView)
- * rather than a normal browser tab. The shell serves from capacitor://localhost
- * and injects a global `Capacitor`. Some web APIs behave differently there — most
- * notably streamed (SSE) response bodies, which the WKWebView fetch handles
- * unreliably — so callers branch on this to pick the robust path.
+ * rather than a normal browser tab. The shell serves from capacitor://localhost.
+ * Some web APIs behave differently there — most notably streamed (SSE) response
+ * bodies, which the WKWebView fetch handles unreliably — so callers branch on
+ * this to pick the robust path, and the whole web login gate keys off it.
+ *
+ * IMPORTANT: do NOT treat the mere presence of `window.Capacitor` as native —
+ * `@capacitor/core` (bundled for the plugins) defines that global in a PLAIN
+ * BROWSER too, so `Boolean(window.Capacitor)` is truthy on the web. That bug
+ * made every web page look native, skip the sign-in gate, and auto-load the
+ * owner workspace. The authoritative signals are the `capacitor:` origin and the
+ * runtime's own `isNativePlatform()` (which returns false on the web).
  */
 export function isNativeApp(): boolean {
     if (typeof window === 'undefined') return false;
-    return window.location.protocol === 'capacitor:'
-        || Boolean((window as unknown as { Capacitor?: unknown }).Capacitor);
+    if (window.location.protocol === 'capacitor:') return true;
+    const cap = (window as unknown as {
+        Capacitor?: { isNativePlatform?: () => boolean };
+    }).Capacitor;
+    return cap?.isNativePlatform?.() === true;
 }
