@@ -48,6 +48,14 @@
     {
       "source": "/api/article",
       "destination": "https://secondbrain-app-94da2.web.app/api/article"
+    },
+    {
+      "source": "/api/claim-workspace",
+      "destination": "https://secondbrain-app-94da2.web.app/api/claim-workspace"
+    },
+    {
+      "source": "/api/delete-account",
+      "destination": "https://secondbrain-app-94da2.web.app/api/delete-account"
     }
   ]
 }

@@ -50,6 +50,14 @@
         "function": "get_article"
       },
       {
+        "source": "/api/claim-workspace",
+        "function": "claim_workspace_http"
+      },
+      {
+        "source": "/api/delete-account",
+        "function": "delete_account_http"
+      },
+      {
         "source": "/s",
         "function": "share_page"
       },

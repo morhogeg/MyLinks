@@ -7,7 +7,6 @@ import AddLinkForm from "@/components/AddLinkForm";
 import AnalyzingBanner, { AnalyzingState } from "@/components/AnalyzingBanner";
 import InstallPWA from "@/components/InstallPWA";
 import SettingsModal from "@/components/SettingsModal";
-import ProfileAvatar from "@/components/ProfileAvatar";
 import OnboardingTour, { ONBOARDING_STORAGE_KEY } from "@/components/OnboardingTour";
 import { Settings } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -18,7 +17,7 @@ import { useHeaderFade } from "@/lib/useHeaderFade";
  * Main dashboard page
  */
 export default function Home() {
-  const { uid, loading, authUid, email, displayName, photoURL } = useAuth();
+  const { uid, loading } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAskMode, setIsAskMode] = useState(false);
@@ -137,17 +136,6 @@ export default function Home() {
             >
               <Settings className="w-[18px] h-[18px]" />
             </IconButton>
-            {/* Profile — who's signed in (web). Opens Settings → Account. */}
-            {authUid && (
-              <button
-                onClick={() => setIsSettingsOpen(true)}
-                className="rounded-full transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-                aria-label={`Account: ${displayName || email || 'signed in'}`}
-                title={displayName || email || 'Account'}
-              >
-                <ProfileAvatar email={email} name={displayName} photoURL={photoURL} size={32} />
-              </button>
-            )}
           </div>
         </div>
       </header>

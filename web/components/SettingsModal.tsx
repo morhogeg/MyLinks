@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { User, DigestMode, DigestChannel } from '@/lib/types';
 import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight, Compass, LogOut, UserCircle, CalendarClock, Search, ShieldCheck, ExternalLink, Network } from 'lucide-react';
@@ -12,6 +12,7 @@ import { rebuildConnections } from '@/lib/rebuildConnections';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from './AuthProvider';
 import { deleteAccount } from '@/lib/auth';
+import { auth } from '@/lib/firebase';
 import ProfileAvatar from './ProfileAvatar';
 import ConfirmDialog from './ConfirmDialog';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
@@ -78,6 +79,16 @@ const DEFAULT_SETTINGS: User['settings'] = {
 export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: SettingsModalProps) {
     const { theme, setTheme } = useTheme();
     const { authUid, email: accountEmail, displayName, photoURL, signOut } = useAuth();
+
+    // Which provider the user signed in with — read from Firebase Auth's
+    // providerData so the status line can say "Signed in with Apple/Google".
+    // Recomputed when the sheet opens (the current user is stable by then).
+    const providerLabel = useMemo(() => {
+        const ids = auth.currentUser?.providerData.map((p) => p.providerId) ?? [];
+        if (ids.includes('apple.com')) return 'Signed in with Apple';
+        if (ids.includes('google.com')) return 'Signed in with Google';
+        return 'Signed in';
+    }, [isOpen, authUid]);
 
     const [settings, setSettings] = useState<User['settings']>(DEFAULT_SETTINGS);
     const [isLoading, setIsLoading] = useState(true);
@@ -438,23 +449,25 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                         not on email, so it shows even if the token has no email. */}
                     {authUid && (
                     <Section icon={<UserCircle className="w-4 h-4" />} title="Account">
-                        <div className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-card-hover border border-border-subtle">
-                            <ProfileAvatar email={accountEmail} name={displayName} photoURL={photoURL} size={48} />
-                            <div className="min-w-0 flex-1">
-                                <div className="text-[14px] font-semibold text-text truncate">
-                                    {displayName || accountEmail || 'Signed in'}
-                                </div>
-                                {displayName && accountEmail && (
-                                    <div className="text-[12px] text-text-muted truncate">{accountEmail}</div>
-                                )}
-                                <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-emerald-500">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                    Signed in
+                        <div className="p-3.5 rounded-2xl bg-card-hover border border-border-subtle">
+                            <div className="flex items-center gap-3.5">
+                                <ProfileAvatar email={accountEmail} name={displayName} photoURL={photoURL} size={48} />
+                                <div className="min-w-0 flex-1">
+                                    <div className="text-[14px] font-semibold text-text truncate">
+                                        {displayName || accountEmail || 'Signed in'}
+                                    </div>
+                                    {displayName && accountEmail && (
+                                        <div className="text-[12px] text-text-muted truncate">{accountEmail}</div>
+                                    )}
+                                    <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-emerald-500">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                        {providerLabel}
+                                    </div>
                                 </div>
                             </div>
                             <button
                                 onClick={() => { onClose(); signOut(); }}
-                                className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold border border-border-subtle text-text hover:bg-surface transition-colors"
+                                className="mt-3 w-full inline-flex items-center justify-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold border border-border-subtle text-text hover:bg-surface transition-colors"
                             >
                                 <LogOut className="w-4 h-4" />
                                 Sign out

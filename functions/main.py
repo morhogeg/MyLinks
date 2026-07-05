@@ -1177,13 +1177,13 @@ def rebuild_connections(req: https_fn.CallableRequest) -> dict:
     return graph.backfill_batch(uid, phase, cursor=cursor, limit=limit, force=force)
 
 
-@https_fn.on_call()
-def claim_workspace(req: https_fn.CallableRequest) -> dict:
-    """Resolve (or set up) the data workspace for a signed-in account.
+def _claim_workspace_logic(auth_uid: str, email: str = None) -> dict:
+    """Resolve (or set up) the data workspace for a verified account.
 
-    Runs with Admin privileges (bypasses Firestore rules), so it still works
-    after the rules are locked — unlike a client-side claim, which can't read an
-    arbitrary unclaimed doc under locked rules. Resolution order:
+    Shared core for both the `claim_workspace` callable and the
+    `claim_workspace_http` endpoint — identical behavior, only the transport /
+    auth extraction differs. Runs with Admin privileges (bypasses Firestore
+    rules), so it still works after the rules are locked. Resolution order:
 
     1. Already linked (`authUids array-contains` the caller) → return it.
     2. Legacy owner claim: link the single pre-auth unclaimed doc, gated by the
@@ -1196,14 +1196,6 @@ def claim_workspace(req: https_fn.CallableRequest) -> dict:
     non-owner account still gets `uid: None` (restricted screen) — the live
     app's behavior is unchanged until the flag flips.
     """
-    if not req.auth:
-        raise https_fn.HttpsError(
-            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
-            message="User must be signed in",
-        )
-    auth_uid = req.auth.uid
-    email = req.auth.token.get("email") if getattr(req.auth, "token", None) else None
-
     existing = find_data_uid_by_auth_uid(auth_uid)
     if existing:
         return {"uid": existing, "created": False}
@@ -1234,13 +1226,14 @@ def claim_workspace(req: https_fn.CallableRequest) -> dict:
 
 
 @https_fn.on_call()
-def delete_account(req: https_fn.CallableRequest) -> dict:
-    """Permanently delete the signed-in user's account and all their data.
+def claim_workspace(req: https_fn.CallableRequest) -> dict:
+    """Resolve (or set up) the data workspace for a signed-in account (callable).
 
-    Required in-app by App Store guideline 5.1.1(v). Verifies the caller, then
-    deletes their Firestore workspace, Storage objects, and Firebase Auth user.
-    Idempotent-ish: a missing workspace is not an error (the Auth user is still
-    removed) so a partially-completed deletion can be retried.
+    Web uses this callable. Native uses the `claim_workspace_http` HTTP twin
+    instead — the Firebase callable transport's CORS preflight is rejected from
+    the Capacitor `capacitor://localhost` WebView origin, so the request never
+    reaches the function (same failure that moved get_share_config and /api/chat
+    off the managed callable/Hosting paths). Both share `_claim_workspace_logic`.
     """
     if not req.auth:
         raise https_fn.HttpsError(
@@ -1248,6 +1241,62 @@ def delete_account(req: https_fn.CallableRequest) -> dict:
             message="User must be signed in",
         )
     auth_uid = req.auth.uid
+    email = req.auth.token.get("email") if getattr(req.auth, "token", None) else None
+    return _claim_workspace_logic(auth_uid, email)
+
+
+@https_fn.on_request()
+def claim_workspace_http(req: https_fn.Request) -> https_fn.Response:
+    """HTTP twin of the `claim_workspace` callable, for the native iOS shell.
+
+    The Firebase callable transport issues a CORS preflight that the managed
+    callable endpoint rejects from `capacitor://localhost`, so httpsCallable()
+    silently fails inside the WKWebView (no execution logs, request never lands).
+    This endpoint sets CORS from the same `_allowed_origins()` allowlist (which
+    includes `capacitor://localhost`) and verifies the caller via the Firebase ID
+    token in the Authorization: Bearer header — the exact pattern the other
+    /api/* endpoints use — then runs the identical `_claim_workspace_logic`.
+
+    Body: none required. Returns { uid: str|null, created: bool }.
+    """
+    if req.method == 'OPTIONS':
+        return _cors_preflight(req)
+
+    headers = _cors_headers(req)
+
+    decoded = _verify_bearer(req)
+    if not decoded:
+        return _error_response("User must be signed in", 401, headers)
+
+    try:
+        auth_uid = decoded.get("uid")
+        email = decoded.get("email")
+        result = _claim_workspace_logic(auth_uid, email)
+        return https_fn.Response(
+            json.dumps(result),
+            status=200, headers=headers, mimetype='application/json',
+        )
+    except Exception as e:
+        return _server_error(headers, e, "Workspace claim failed")
+
+
+class _DeleteAccountError(Exception):
+    """Raised by _delete_account_logic when a deletion step fails.
+
+    Carries a client-safe message so each transport (callable / HTTP) can map it
+    to its own error shape without leaking internals.
+    """
+
+
+def _delete_account_logic(auth_uid: str) -> dict:
+    """Permanently delete the account keyed by `auth_uid` and all its data.
+
+    Shared core for the `delete_account` callable and the `delete_account_http`
+    endpoint. Deletes the Firestore workspace, Storage objects, and Firebase Auth
+    user. Idempotent-ish: a missing workspace is not an error (the Auth user is
+    still removed) so a partially-completed deletion can be retried. Raises
+    `_DeleteAccountError` with a client-safe message on a hard failure.
+    """
     uid = find_data_uid_by_auth_uid(auth_uid)
 
     if uid:
@@ -1255,10 +1304,7 @@ def delete_account(req: https_fn.CallableRequest) -> dict:
             delete_user_data(uid)
         except Exception as e:
             logger.error("Failed to delete Firestore data for account: %s", e)
-            raise https_fn.HttpsError(
-                code=https_fn.FunctionsErrorCode.INTERNAL,
-                message="Failed to delete account data",
-            )
+            raise _DeleteAccountError("Failed to delete account data")
         # Best-effort: remove the user's screenshots from Storage.
         try:
             bucket = storage.bucket()
@@ -1272,12 +1318,62 @@ def delete_account(req: https_fn.CallableRequest) -> dict:
         admin_auth.delete_user(auth_uid)
     except Exception as e:
         logger.error("Failed to delete auth user: %s", e)
-        raise https_fn.HttpsError(
-            code=https_fn.FunctionsErrorCode.INTERNAL,
-            message="Failed to delete account",
-        )
+        raise _DeleteAccountError("Failed to delete account")
 
     return {"success": True}
+
+
+@https_fn.on_call()
+def delete_account(req: https_fn.CallableRequest) -> dict:
+    """Permanently delete the signed-in user's account and all their data.
+
+    Required in-app by App Store guideline 5.1.1(v). Web uses this callable;
+    native uses the `delete_account_http` twin (the callable transport's CORS
+    preflight is rejected from `capacitor://localhost` — see claim_workspace).
+    Both share `_delete_account_logic`.
+    """
+    if not req.auth:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.UNAUTHENTICATED,
+            message="User must be signed in",
+        )
+    try:
+        return _delete_account_logic(req.auth.uid)
+    except _DeleteAccountError as e:
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INTERNAL,
+            message=str(e),
+        )
+
+
+@https_fn.on_request()
+def delete_account_http(req: https_fn.Request) -> https_fn.Response:
+    """HTTP twin of the `delete_account` callable, for the native iOS shell.
+
+    Same rationale as claim_workspace_http: the callable transport's CORS
+    preflight fails from `capacitor://localhost`. CORS comes from
+    `_allowed_origins()`; the caller is verified via the Authorization: Bearer ID
+    token. Runs the identical `_delete_account_logic`.
+    """
+    if req.method == 'OPTIONS':
+        return _cors_preflight(req)
+
+    headers = _cors_headers(req)
+
+    decoded = _verify_bearer(req)
+    if not decoded:
+        return _error_response("User must be signed in", 401, headers)
+
+    try:
+        result = _delete_account_logic(decoded.get("uid"))
+        return https_fn.Response(
+            json.dumps(result),
+            status=200, headers=headers, mimetype='application/json',
+        )
+    except _DeleteAccountError as e:
+        return _error_response(str(e), 500, headers)
+    except Exception as e:
+        return _server_error(headers, e, "Account deletion failed")
 
 
 # ─────────────────────────────────────────────
