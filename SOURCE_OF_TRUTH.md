@@ -199,9 +199,11 @@ The multi-user auth work is **fully written but not live**:
 4. **[ ] Pending deploys/verifications from the last sessions** (owner machine):
    - `./deploy-functions.sh` — M12 weekly synthesis backend is written but dark.
    - `firebase deploy --only firestore:rules` — the `syntheses` read rule.
-   - Run the M9 backfill once: `curl -H "X-Admin-Token: $ADMIN_TOKEN"
-     .../backfill_related_links` (idempotent; now admin-gated — set `ADMIN_TOKEN`
-     in the functions env first).
+   - M9 backfill (See-also for old cards): **now a one-tap in-app action** —
+     after the deploy above ships the `rebuild_connections` callable, tap
+     **Settings → Connections → Rebuild** (per-user, no admin token, batched so
+     it can't time out). The admin all-users `backfill_related_links` HTTP fn
+     still exists as a fallback (`curl -H "X-Admin-Token: $ADMIN_TOKEN" …`).
    - Confirm `backfill_youtube_channels` was run (channel-name repair).
    - `/api/analyze` 60s timeout on slow YouTube videos — route around Hosting's
      60s cap like `/api/chat` did (touches all link-saving; test carefully).
@@ -502,6 +504,16 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-05 — One-tap "Rebuild connections" (backfill See-also for old
+  cards).** The client related-cards fix only helps cards that have embeddings;
+  pre-pipeline cards have none. New batched, per-user backfill:
+  `graph_service.backfill_batch` + `rebuild_connections` callable (embed phase
+  then relate phase, paginated so a big library can't hit the callable
+  timeout), driven by `web/lib/rebuildConnections.ts` from a **Settings →
+  Connections → Rebuild** button with live progress. No admin token (scoped to
+  the caller's workspace), idempotent. **Requires one `./deploy-functions.sh`**
+  by the owner to publish the callable (bundles with the pending M12 deploy);
+  then it's a tap. Ships in build 1024 / web. py_compile + tsc clean.
 - **2026-07-05 — Analyzing banner (both capture paths) + related-cards fix —
   build 1023.** (1) The in-flight "Analyzing… N%" indicator was trapped inside
   AddLinkForm (vanished when the sheet closed); lifted to a page-level
