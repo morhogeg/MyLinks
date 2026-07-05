@@ -7,6 +7,7 @@ import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, Re
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
 import { policyUrl, openExternal } from '@/lib/share';
 import { readLocalAiConsent } from '@/lib/aiConsent';
+import { getShareBridgeStatus, resyncShareConfig, onShareBridgeStatus, ShareBridgeStatus } from '@/lib/shareConfig';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from './AuthProvider';
 import { deleteAccount } from '@/lib/auth';
@@ -139,6 +140,25 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
     useEffect(() => {
         if (isOpen) setAiConsentAt(readLocalAiConsent());
     }, [isOpen]);
+
+    // Share-extension bridge diagnostics (native only): live status + manual
+    // retry. Exists because this bridge has silently failed more than once —
+    // now the failure and its reason are one Settings glance away.
+    const [bridgeStatus, setBridgeStatus] = useState<ShareBridgeStatus>({ state: 'n/a' });
+    const [bridgeFixing, setBridgeFixing] = useState(false);
+    useEffect(() => {
+        if (!isOpen) return;
+        setBridgeStatus(getShareBridgeStatus());
+        return onShareBridgeStatus(setBridgeStatus);
+    }, [isOpen]);
+    const handleBridgeFix = async () => {
+        setBridgeFixing(true);
+        try {
+            setBridgeStatus(await resyncShareConfig());
+        } finally {
+            setBridgeFixing(false);
+        }
+    };
 
     // On phones Settings is a real full-screen page (slides in, fills the screen,
     // clears the notch); on desktop it stays a centered modal.
@@ -517,6 +537,30 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                             title="WhatsApp"
                             subtitle="Send any link to the bot — it's saved, summarized, and tagged automatically."
                         />
+                        {bridgeStatus.state !== 'n/a' && (
+                            <Row
+                                icon={<Share2 className={`w-5 h-5 ${bridgeStatus.state === 'ok' ? 'text-green-500' : bridgeStatus.state === 'error' ? 'text-red-500' : 'text-text-muted'}`} />}
+                                title="Share extension"
+                                subtitle={
+                                    bridgeStatus.state === 'ok'
+                                        ? 'Connected — sharing from other apps saves to your Machina.'
+                                        : bridgeStatus.state === 'error'
+                                            ? `Not connected — ${bridgeStatus.detail || 'the last sync failed'}. Tap Fix to retry.`
+                                            : 'Connecting…'
+                                }
+                            >
+                                {bridgeStatus.state !== 'ok' && (
+                                    <button
+                                        onClick={handleBridgeFix}
+                                        disabled={bridgeFixing}
+                                        className="h-9 px-3.5 rounded-full bg-card-hover border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                    >
+                                        <RefreshCw className={`w-4 h-4 ${bridgeFixing ? 'animate-spin' : ''}`} />
+                                        Fix
+                                    </button>
+                                )}
+                            </Row>
+                        )}
                     </Section>
 
                     {/* AI & Privacy — App Review 5.1.1/5.1.2: name the AI
