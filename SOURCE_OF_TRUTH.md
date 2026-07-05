@@ -494,6 +494,20 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-05 — Share bridge hardened (share STILL failed on 1020) + % restored.**
+  Entitlements were verified in 1020, so the failure is the token never being
+  written — the bridge's single dependency was the `get_share_config` callable.
+  Rewrite (`web/lib/shareConfig.ts`): the ingest token now comes straight off
+  the already-loaded user doc (no backend call at all; callable is only a
+  first-launch fallback), 3 retries with backoff, auto re-sync on
+  app-foreground, and every outcome recorded to a new **Settings → Share
+  extension status row** with a Fix button — the next failure diagnoses itself.
+  Also restored the advancing percentage (user request; reverses M6's
+  no-numbers stance): % readout + determinate bar in all three scan views and
+  the minimized "Analyzing… N%" chip, still anchored to the real milestones.
+  If saves from the native app fail IN-APP too, check the functions env for
+  `APPCHECK_ENFORCE=true`/`REQUIRE_AUTH=true` — native can't pass App Check
+  yet; those must stay unset until cutover.
 - **2026-07-04 — ✅ Build 1020: share extension fixed, tripwire-verified — the
   build to install.** Owner pruned the API-created Development certificates;
   run #20 signed the archive properly (App Group entitlement baked in), the

@@ -449,7 +449,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false }: AddLinkForm
                         aria-label="Analysis in progress — tap to view"
                     >
                         <Loader2 className="w-4 h-4 animate-spin text-accent" />
-                        <span>Analyzing…</span>
+                        <span>Analyzing… <span className="tabular-nums text-text-secondary">{Math.round(Math.min(100, Math.max(0, progress)))}%</span></span>
                     </button>
                 )}
 

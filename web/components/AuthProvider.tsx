@@ -65,7 +65,10 @@ export function useAuth() {
  * iOS Share Extension its endpoint/token, and persist the browser timezone.
  */
 function attachUserDoc(docId: string, data: Record<string, unknown> | undefined) {
-    syncShareConfigToNative(docId);
+    // Pass the doc's ingestToken so the bridge needs NO backend call at all
+    // (the callable is only a fallback for a token-less first launch).
+    const docToken = typeof data?.ingestToken === 'string' ? data.ingestToken : undefined;
+    syncShareConfigToNative(docId, docToken);
     try {
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
         if (tz && data?.timezone !== tz) {

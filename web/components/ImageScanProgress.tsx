@@ -48,12 +48,18 @@ export default function ImageScanProgress({ imageSrc, progress }: ImageScanProgr
                     </div>
                 )}
 
-                {/* Center status — icon + honest phase label, no fake % (M6). */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center px-4">
+                {/* Center status — icon, advancing percentage, phase label. The % is
+                    simulated but anchored to real milestones in AddLinkForm. */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-center px-4">
                     {done ? (
                         <CheckCircle2 className="w-10 h-10 text-green-400 animate-fade-in" />
                     ) : (
-                        <ScanText className="w-8 h-8 text-accent" />
+                        <>
+                            <ScanText className="w-7 h-7 text-accent" />
+                            <span className="text-2xl font-bold text-white tabular-nums" aria-hidden>
+                                {Math.round(clamped)}%
+                            </span>
+                        </>
                     )}
                     <p className="text-sm font-medium text-white/90" aria-live="polite">
                         {label}
@@ -65,14 +71,16 @@ export default function ImageScanProgress({ imageSrc, progress }: ImageScanProgr
             <div
                 className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden"
                 role="progressbar"
+                aria-valuenow={Math.round(clamped)}
+                aria-valuemin={0}
+                aria-valuemax={100}
                 aria-label="Image analysis progress"
                 aria-busy={!done}
             >
-                {done ? (
-                    <div className="h-full w-full rounded-full bg-green-400" />
-                ) : (
-                    <div className="h-full w-2/5 rounded-full bg-accent animate-progress-indeterminate" />
-                )}
+                <div
+                    className={`h-full rounded-full transition-[width] duration-300 ease-out ${done ? 'bg-green-400' : 'bg-accent'}`}
+                    style={{ width: `${clamped}%` }}
+                />
             </div>
 
             {/* Analysis is a single foreground request (see AddLinkForm.handleSubmit)
