@@ -109,10 +109,19 @@ function liveReason(
     return isRtl ? 'עוסק בנושא קרוב מאוד' : 'Covers closely related ground';
 }
 
-export function getRelatedCards(link: Link, allLinks: Link[], isRtl: boolean): RelatedCardEntry[] {
+export function getRelatedCards(
+    link: Link,
+    allLinks: Link[],
+    isRtl: boolean,
+    // Cards already behind you in the current navigation path (the back-stack).
+    // Relatedness is symmetric, so the card you arrived *from* would otherwise
+    // top this list — pointless when the Back arrow already returns you there.
+    // Excluding them keeps every slot a genuinely new place to go.
+    excludeIds?: Iterable<string>,
+): RelatedCardEntry[] {
     if (!allLinks?.length) return [];
     const byId = new Map(allLinks.map((l) => [l.id, l]));
-    const used = new Set<string>([link.id]);
+    const used = new Set<string>([link.id, ...(excludeIds ?? [])]);
     const entries: RelatedCardEntry[] = [];
 
     // 1) Stored AI relations — LLM-verified at save time with a curated reason.
