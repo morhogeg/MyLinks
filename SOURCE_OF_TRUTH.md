@@ -504,6 +504,19 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-05 — Connections view + pill, related-card back-stack, tidy.** Built
+  the M10 hybrid the user asked for. (i) Clustering extracted to
+  `lib/connections.ts` (shared): the inline feed banner stays strict (≥3,
+  strongest only — the proactive moment), while a new `ConnectionsView` + a
+  toolbar **Connections** pill (peer to Collections/Ask, with a cluster count,
+  shown only when clusters exist) relaxes to ≥2 and lists every concept cluster.
+  Desktop renders inline under a back-subheader; mobile is a full-screen overlay,
+  mirroring Collections. (ii) **Related-card back-stack** in `Feed.tsx`: opening a
+  card from another card's Related list pushes the current one (`linkStack`);
+  closing (`goBackOrClose`) returns there instead of dismissing everything.
+  Delete is stack-aware. (iii) Related cards: removed the redundant shared-concept
+  chips + the generic ✨ icon (the "Also explores …" reason already names them).
+  Web-only; live on `main` via Vercel.
 - **2026-07-05 — Connection insight recoverable + related-card contrast.** Two
   home/detail polish fixes. (i) `ConnectionInsight`: the X used to permanently
   blocklist the concept (localStorage, survived refresh) with no re-entry — an
