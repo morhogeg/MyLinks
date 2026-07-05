@@ -42,6 +42,12 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     // MARK: Close (✕) button on the scan card
     private let scanCloseButton = UIButton(type: .system)
 
+    // MARK: "Open Machina" button — dismisses the share sheet, opens the app, and
+    // hands off to the in-app "Analyzing… N%" banner (the same one shown when the
+    // in-app add dialog is closed). The upload keeps running on the background
+    // session, so opening the app doesn't cancel the save.
+    private let openAppButton = UIButton(type: .system)
+
     // MARK: Background upload session (survives the extension being dismissed)
     // A foreground URLSession is cancelled when the extension UI goes away, so we
     // hand the upload to a *background* session that the system finishes for us.
@@ -166,6 +172,70 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         finish()
     }
 
+    /// Styling for the accent-filled "Open Machina" pill.
+    private func configureOpenAppButton() {
+        openAppButton.translatesAutoresizingMaskIntoConstraints = false
+        openAppButton.accessibilityLabel = "Open Machina"
+        if #available(iOS 15.0, *) {
+            var cfg = UIButton.Configuration.filled()
+            cfg.baseBackgroundColor = Self.accent
+            cfg.baseForegroundColor = .white
+            cfg.cornerStyle = .medium
+            cfg.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20)
+            cfg.attributedTitle = AttributedString("Open Machina", attributes: AttributeContainer([
+                .font: UIFont.systemFont(ofSize: 14, weight: .semibold)
+            ]))
+            openAppButton.configuration = cfg
+        } else {
+            openAppButton.setTitle("Open Machina", for: .normal)
+            openAppButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
+            openAppButton.setTitleColor(.white, for: .normal)
+            openAppButton.backgroundColor = Self.accent
+            openAppButton.layer.cornerRadius = 10
+            openAppButton.clipsToBounds = true
+        }
+        openAppButton.addTarget(self, action: #selector(openAppTapped), for: .touchUpInside)
+    }
+
+    /// "Open Machina": record a pending-share hint in the App Group (so the app
+    /// can flash the in-app "Analyzing…" banner the instant it opens, before the
+    /// server's `processing` card streams in), open the app via its URL scheme,
+    /// then dismiss the share sheet. The upload is on a background session, so it
+    /// keeps going regardless.
+    @objc private func openAppTapped() {
+        writePendingShareHint()
+        openMainApp()
+    }
+
+    /// Stamp a short-lived "a capture was just shared" flag in the shared App
+    /// Group. `ShareConfigPlugin.consumePendingShare` reads + clears it on the app
+    /// side to seed the optimistic banner.
+    private func writePendingShareHint() {
+        guard let defaults = UserDefaults(suiteName: Self.appGroup) else { return }
+        defaults.set(Date().timeIntervalSince1970, forKey: "pendingShareAt")
+        defaults.set(isImageFlow ? "image" : "link", forKey: "pendingShareKind")
+    }
+
+    /// Open the main app from the extension. Share extensions can't touch
+    /// `UIApplication.shared`, so walk the responder chain to the object that
+    /// implements `openURL:` (that's UIApplication) and invoke it — the
+    /// established way to launch the host app from a share extension.
+    private func openMainApp() {
+        let kind = isImageFlow ? "image" : "link"
+        guard let url = URL(string: "machina://shared?kind=\(kind)") else { finish(); return }
+        let selector = NSSelectorFromString("openURL:")
+        var responder: UIResponder? = self
+        while let r = responder {
+            if r.responds(to: selector) {
+                r.perform(selector, with: url)
+                break
+            }
+            responder = r.next
+        }
+        // Give the system a beat to switch apps before tearing down the sheet.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.finish() }
+    }
+
     // MARK: - Scan UI (images)
 
     private func setupScanUI() {
@@ -253,6 +323,11 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         hintLabel.translatesAutoresizingMaskIntoConstraints = false
         scanContainer.addSubview(hintLabel)
 
+        // "Open Machina" call-to-action, below the hint. Opens the app so the user
+        // can watch the rest of the analysis on the in-app banner.
+        configureOpenAppButton()
+        scanContainer.addSubview(openAppButton)
+
         // Close (✕) button, top-trailing corner of the scan card. Added last so it
         // sits above the preview / progress views.
         configureCloseButton(scanCloseButton)
@@ -307,7 +382,13 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             hintLabel.topAnchor.constraint(equalTo: barTrack.bottomAnchor, constant: 12),
             hintLabel.leadingAnchor.constraint(equalTo: scanContainer.leadingAnchor, constant: 16),
             hintLabel.trailingAnchor.constraint(equalTo: scanContainer.trailingAnchor, constant: -16),
-            hintLabel.bottomAnchor.constraint(equalTo: scanContainer.bottomAnchor, constant: -16),
+
+            openAppButton.topAnchor.constraint(equalTo: hintLabel.bottomAnchor, constant: 12),
+            openAppButton.centerXAnchor.constraint(equalTo: scanContainer.centerXAnchor),
+            openAppButton.leadingAnchor.constraint(greaterThanOrEqualTo: scanContainer.leadingAnchor, constant: 16),
+            openAppButton.trailingAnchor.constraint(lessThanOrEqualTo: scanContainer.trailingAnchor, constant: -16),
+            openAppButton.bottomAnchor.constraint(equalTo: scanContainer.bottomAnchor, constant: -16),
+            openAppButton.heightAnchor.constraint(equalToConstant: 38),
 
             scanCloseButton.topAnchor.constraint(equalTo: scanContainer.topAnchor, constant: 8),
             scanCloseButton.trailingAnchor.constraint(equalTo: scanContainer.trailingAnchor, constant: -8),
@@ -544,9 +625,12 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                     if neutral {
                         // Neutral terminal state: the save may still be finishing on
                         // the background session. Keep the card up with the ✕ close
-                        // affordance instead of auto-dismissing, and never a check.
+                        // affordance (and the Open Machina button) instead of
+                        // auto-dismissing, and never a check.
                         self.hintLabel.text = "The save is still finishing — you can close this."
                     } else {
+                        // Hard failure — opening the app would show nothing to track.
+                        self.openAppButton.isHidden = true
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { self.finish() }
                     }
                 }

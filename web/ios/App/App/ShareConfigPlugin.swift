@@ -13,7 +13,8 @@ public class ShareConfigPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "ShareConfigPlugin"
     public let jsName = "ShareConfig"
     public let pluginMethods: [CAPPluginMethod] = [
-        CAPPluginMethod(name: "save", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "save", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "consumePendingShare", returnType: CAPPluginReturnPromise)
     ]
 
     /// Must match the App Group enabled on BOTH the app and the extension,
@@ -36,5 +37,29 @@ public class ShareConfigPlugin: CAPPlugin, CAPBridgedPlugin {
         defaults.set(endpoint, forKey: "shareEndpoint")
         defaults.set(token, forKey: "ingestToken")
         call.resolve()
+    }
+
+    /// Read (and clear) the "a capture was just shared" hint the Share Extension
+    /// writes when the user taps "Open Machina" on the share progress HUD. Lets
+    /// the app flash the in-app "Analyzing…" banner immediately on open, before
+    /// the server's `processing` card streams into the feed. Cleared on read so
+    /// it fires exactly once.
+    ///
+    /// Resolves `{ pending: Bool, kind: String, ageMs: Double }`.
+    @objc func consumePendingShare(_ call: CAPPluginCall) {
+        guard let defaults = UserDefaults(suiteName: ShareConfigPlugin.appGroup) else {
+            call.resolve(["pending": false])
+            return
+        }
+        let at = defaults.double(forKey: "pendingShareAt")
+        guard at > 0 else {
+            call.resolve(["pending": false])
+            return
+        }
+        let kind = defaults.string(forKey: "pendingShareKind") ?? "link"
+        let ageMs = max(0, (Date().timeIntervalSince1970 - at) * 1000.0)
+        defaults.removeObject(forKey: "pendingShareAt")
+        defaults.removeObject(forKey: "pendingShareKind")
+        call.resolve(["pending": true, "kind": kind, "ageMs": ageMs])
     }
 }
