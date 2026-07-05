@@ -3,18 +3,20 @@
 import { useMemo, useState } from 'react';
 import { Link2, ChevronDown, ChevronRight, X, ArrowRight } from 'lucide-react';
 import { Link } from '@/lib/types';
+import { bestCluster } from '@/lib/connections';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
 
 /**
  * Proactive connections on the home feed (M10) — the brain speaking first.
  *
- * Clusters the user's recent saves by the abstract `concepts` already computed
- * on each card (functions/ai_service) and surfaces ONE genuine connection at a
- * time: "3 things you saved connect to Network Effects." Tap expands into the
- * cluster; each member links back to its card.
+ * Surfaces the single strongest concept cluster among recent saves (clustering
+ * lives in `lib/connections.ts`, shared with the Connections view): "3 things
+ * you saved connect to Network Effects." Tap expands into the cluster; each
+ * member links back to its card.
  *
  * Deliberately lightweight and rate-limited so it never feels spammy:
- *  - only clusters of ≥ MIN_CLUSTER recent saves qualify (a real pattern, not noise)
+ *  - only clusters of ≥3 recent saves qualify (a real pattern, not noise) —
+ *    stricter than the opted-in Connections view, which relaxes to ≥2
  *  - only the single strongest cluster is shown, never a wall of them
  *  - closing (X) never destroys the insight — it minimizes to a small pill in
  *    the same slot, so an accidental close is one tap from being restored. The
@@ -23,75 +25,9 @@ import { hapticLight, hapticMedium } from '@/lib/haptics';
  * No new compute — it reads `link.concepts` the feed already holds in memory.
  */
 
-// Only consider recent saves — a connection is interesting when it's fresh.
-const RECENT_WINDOW_DAYS = 30;
-// Fallback when the 30-day window is thin (new/quiet libraries): the N newest.
-const RECENT_FALLBACK_COUNT = 40;
-// A cluster must gather at least this many cards to be worth surfacing.
-const MIN_CLUSTER = 3;
-
 // Persisted: whether the insight is minimized to its pill. Collapsing is fully
 // reversible (tap the pill) and never blocklists the concept.
 const COLLAPSED_KEY = 'connection-insight-collapsed';
-
-function toMs(value: number | string | undefined): number {
-    if (typeof value === 'number') return value;
-    if (typeof value === 'string') {
-        const n = Date.parse(value);
-        return Number.isNaN(n) ? 0 : n;
-    }
-    return 0;
-}
-
-interface Cluster {
-    concept: string;   // original-case display label
-    key: string;       // lowercased key for dedupe
-    links: Link[];
-}
-
-/** Find the strongest concept cluster among recent saves. Pure function of its
- *  inputs so it memoizes cleanly. */
-function bestCluster(links: Link[]): Cluster | null {
-    if (!links.length) return null;
-
-    const sorted = [...links].sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
-    const cutoff = Date.now() - RECENT_WINDOW_DAYS * 86_400_000;
-    let recent = sorted.filter((l) => toMs(l.createdAt) >= cutoff);
-    if (recent.length < RECENT_FALLBACK_COUNT) {
-        recent = sorted.slice(0, RECENT_FALLBACK_COUNT);
-    }
-
-    // concept key -> { label, links }
-    const byConcept = new Map<string, Cluster>();
-    for (const link of recent) {
-        const seen = new Set<string>(); // guard against a card repeating a concept
-        for (const raw of link.concepts ?? []) {
-            const concept = (raw ?? '').trim();
-            if (!concept) continue;
-            const key = concept.toLowerCase();
-            if (seen.has(key)) continue;
-            seen.add(key);
-            const existing = byConcept.get(key);
-            if (existing) existing.links.push(link);
-            else byConcept.set(key, { concept, key, links: [link] });
-        }
-    }
-
-    let best: Cluster | null = null;
-    for (const cluster of byConcept.values()) {
-        if (cluster.links.length < MIN_CLUSTER) continue;
-        if (
-            !best ||
-            cluster.links.length > best.links.length ||
-            // tie-break: prefer the cluster with the most recent activity
-            (cluster.links.length === best.links.length &&
-                toMs(cluster.links[0].createdAt) > toMs(best.links[0].createdAt))
-        ) {
-            best = cluster;
-        }
-    }
-    return best;
-}
 
 export default function ConnectionInsight({
     links,
