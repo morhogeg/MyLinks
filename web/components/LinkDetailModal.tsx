@@ -46,6 +46,7 @@ interface LinkDetailModalProps {
     onDelete: (id: string) => void;
     onUpdateReminder: (link: Link) => void;
     onOpenOtherLink?: (link: Link) => void;
+    excludeRelatedIds?: string[];  // cards already behind you in the back-stack
     onAddToCollection?: (link: Link) => void;
     onShare?: (link: Link) => void;
 }
@@ -66,6 +67,7 @@ export default function LinkDetailModal({
     onDelete,
     onUpdateReminder,
     onOpenOtherLink,
+    excludeRelatedIds,
     onAddToCollection,
     onShare,
 }: LinkDetailModalProps) {
@@ -128,7 +130,7 @@ export default function LinkDetailModal({
     // Live related cards: stored AI relations merged with fresh embedding /
     // concept matches (see lib/related.ts). Computed here, below the isOpen
     // guard, so the closed modal costs nothing.
-    const relatedCards = getRelatedCards(link, allLinks, isRtl);
+    const relatedCards = getRelatedCards(link, allLinks, isRtl, excludeRelatedIds);
 
     // Branded source credit, matching the card: YouTube channel in red, X
     // author (@handle from the URL) in the X grey, everything else muted.

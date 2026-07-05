@@ -1978,6 +1978,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                     onUpdateReminder={(link) => handleOpenReminderModal(link)}
                     onDelete={handleDelete}
                     onOpenOtherLink={openRelatedLink}
+                    excludeRelatedIds={linkStack}
                     onAddToCollection={(link) => setAddToCollectionLink(link)}
                     onShare={handleShareCard}
                 />
