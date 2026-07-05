@@ -504,6 +504,11 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-05 — Desktop banner de-dup (build 1026).** On desktop the open Add
+  panel shows its own scan %, so the page-level Analyzing banner was duplicating
+  it; now suppressed while the panel is expanded on desktop (`!isMobile &&
+  isExpanded`), appears on close, rides to completion. Mobile unchanged. Build
+  1026 green (tripwire passed) — carries this + the rebuild button below.
 - **2026-07-05 — One-tap "Rebuild connections" (backfill See-also for old
   cards).** The client related-cards fix only helps cards that have embeddings;
   pre-pipeline cards have none. New batched, per-user backfill:
