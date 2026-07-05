@@ -12,6 +12,15 @@ import { Settings } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { IconButton } from "@/components/ui/Button";
 import { useHeaderFade } from "@/lib/useHeaderFade";
+import { useSharedCaptureBanner } from "@/lib/useSharedCaptureBanner";
+
+/** Pick the banner to show: prefer an active source in priority order, else the
+ *  first non-null (for the graceful "Saved" finish frame). */
+function pickBanner(...states: (AnalyzingState | null)[]): AnalyzingState | null {
+  for (const s of states) if (s?.active) return s;
+  for (const s of states) if (s) return s;
+  return null;
+}
 
 /**
  * Main dashboard page
@@ -28,7 +37,11 @@ export default function Home() {
   // one when it's active (it has true milestones); otherwise show the share one.
   const [analyzing, setAnalyzing] = useState<AnalyzingState | null>(null);
   const [processing, setProcessing] = useState<AnalyzingState | null>(null);
-  const bannerState = analyzing?.active ? analyzing : (processing ?? analyzing);
+  // Optimistic banner for a capture shared from the iOS Share Extension via its
+  // "Open Machina" button — shows instantly on open, then hands off to the real
+  // Firestore-driven `processing` banner once the card streams in.
+  const sharedSignal = useSharedCaptureBanner(!!processing?.active);
+  const bannerState = pickBanner(analyzing, processing, sharedSignal);
   const [isTourOpen, setIsTourOpen] = useState(false);
   // Scroll-scrubbed top bar: opacity rides the scroll itself (down = away,
   // up = back), settling to shown/hidden when the finger rests.

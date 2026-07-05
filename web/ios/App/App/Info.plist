@@ -47,5 +47,20 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- Custom URL scheme so the Share Extension can open the app ("Open Machina"
+	     button on the share progress HUD → machina://shared). The CI build also
+	     appends the Google REVERSED_CLIENT_ID scheme as a second entry; the two
+	     coexist (see .github/workflows/ios-testflight.yml). -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.morhogeg.machina</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>machina</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

@@ -11,9 +11,40 @@ import { apiUrl } from './api';
  */
 interface ShareConfigPlugin {
     save(options: { endpoint: string; token: string }): Promise<void>;
+    consumePendingShare(): Promise<{ pending: boolean; kind?: string; ageMs?: number }>;
 }
 
 const ShareConfigNative = registerPlugin<ShareConfigPlugin>('ShareConfig');
+
+/** Kind hint for the optimistic share banner, normalized to AnalyzingState. */
+export type PendingShareKind = 'link' | 'image' | 'video';
+
+export interface PendingShare {
+    pending: boolean;
+    kind: PendingShareKind;
+    /** How long ago the share was handed over, in ms. */
+    ageMs: number;
+}
+
+/**
+ * Read (and clear) the "a capture was just shared" hint the iOS Share Extension
+ * leaves in the App Group when the user taps "Open Machina" on the share
+ * progress HUD. Native iOS only — resolves `{ pending: false }` everywhere else.
+ * Fires exactly once per share (the native side clears the flag on read).
+ */
+export async function consumePendingShare(): Promise<PendingShare> {
+    if (!isNativeIos()) return { pending: false, kind: 'link', ageMs: 0 };
+    try {
+        const res = await ShareConfigNative.consumePendingShare();
+        if (!res?.pending) return { pending: false, kind: 'link', ageMs: 0 };
+        const kind: PendingShareKind =
+            res.kind === 'image' ? 'image' : res.kind === 'video' ? 'video' : 'link';
+        return { pending: true, kind, ageMs: Math.max(0, res.ageMs ?? 0) };
+    } catch {
+        // Older builds without the native method, or no App Group — treat as none.
+        return { pending: false, kind: 'link', ageMs: 0 };
+    }
+}
 
 export type ShareBridgeState = 'ok' | 'error' | 'pending' | 'n/a';
 export interface ShareBridgeStatus {

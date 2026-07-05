@@ -526,6 +526,25 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-06 — "Open Machina" from the share sheet → in-app progress banner.**
+  When sharing into Machina from another app, the Share Extension HUD now offers
+  an **Open Machina** button next to the ✕ (`ShareViewController.swift`). Tapping
+  it stamps a short-lived `pendingShareAt`/`pendingShareKind` hint in the App
+  Group, opens the app via a new **`machina://` URL scheme** (registered in
+  `Info.plist`; coexists with the CI-injected `REVERSED_CLIENT_ID` scheme —
+  extension launches the host app by walking the responder chain to `openURL:`),
+  and dismisses the sheet (the upload keeps running on its background session).
+  On open, the app flashes the **same "Analyzing… N%" banner** the in-app add
+  flow shows when its dialog is closed: `ShareConfigPlugin.consumePendingShare`
+  reads+clears the hint, `web/lib/useSharedCaptureBanner.ts` seeds an optimistic
+  ramp on mount + every foreground (visibilitychange/focus), and it hands off
+  seamlessly to the real Firestore-driven `useProcessingBanner` the instant the
+  `processing` card streams in (`page.tsx` `pickBanner` merges the three
+  sources). Deduped re-shares (server no-op, no card) ease to the ceiling then
+  finish gracefully. No new Capacitor/SPM plugin (reused the existing
+  `ShareConfig` custom plugin). Web-safe no-op in a plain browser. tsc clean;
+  `next build` compiles. Needs an iOS build (Info.plist + ShareExt + app plugin
+  changed) — ship via TestFlight.
 - **2026-07-06 — 🐛 Root-caused why web sign-in never worked: `isNativeApp()`
   mis-detected the browser as native.** After adding Apple+Google to web, the web
   app *still* opened straight to the owner's feed with no login (verified on
