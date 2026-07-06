@@ -322,7 +322,9 @@ The multi-user auth work is **fully written but not live**:
 ### 🟢 P3 — product roadmap (post-launch)
 
 20. **[ ] M17 Voice capture + voice ask** (mic in AskBrain; WKWebView speech quirks).
-21. **[ ] M18 Proactive brain** (contradiction/reinforcement observations; needs push notifications — also not implemented).
+21. **[ ] M18 Proactive brain** (contradiction/reinforcement observations). Push
+    notifications now EXIST (shipped 2026-07-06: reminder + digest push over
+    FCM/APNs, see §9) — M18 only needs the observation engine on top.
 22. **[ ] M19 Shareable cited answers** (growth surface; `share_page` backend exists).
 23. **[ ] M20 Auto-collections** (cluster `concepts`/embeddings into suggested collections).
 24. **[ ] T10 export** (MD/PDF/HTML from ReadingView), **T11 highlights**, T5/T6
@@ -336,6 +338,15 @@ The multi-user auth work is **fully written but not live**:
 
 ### ✅ Done — verified against code (do not redo)
 
+- **iOS push notifications + in-app Digest section (2026-07-06):** FCM/APNs push
+  for reminders + curated digests (`functions/push_service.py`, token endpoints
+  `/api/register-device-token` + `/api/unregister-device-token`, channel wiring in
+  `reminder_service.py`/`digest_service.py`); curated digests now ALWAYS persist to
+  `users/{uid}/digests/{period-id}` (30-doc retention) and render in a dedicated
+  Digest section (`viewMode 'digest'` in Feed, `DigestCard.tsx`, `lib/digest.ts`);
+  Settings Notifications toggle + Push channel chips; `@capacitor-firebase/messaging`
+  plugin, APNs AppDelegate hooks, `aps-environment` entitlement + CI tripwire.
+  Owner console steps pending (see §9 entry) before pushes actually deliver.
 - **Product spec Phases 1–2 complete:** M1 (one name), M2 (share-ext never lies),
   M3 (processing→ready|failed lifecycle + Retry), M4 (deep-link opens once), M5
   (visual-viewport everywhere), M6 (honest progress), M7 (settings dirty-guard),
@@ -526,6 +537,47 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-06 — iOS push notifications (FCM/APNs) + in-app Digest section**
+  (branch `claude/ios-push-digest-5y8fj8`). Machina goes native-first on
+  notifications: WhatsApp is no longer the only outbound channel (it stays as an
+  opt-in legacy channel, default OFF for new users; push defaults ON after
+  permission). Backend: new `push_service.py` (`send_each_for_multicast`, APNs
+  sound/badge, dead-token pruning via `ArrayRemove`); bearer-authed HTTP twins
+  `register_device_token_http`/`unregister_device_token_http` (+ `firebase.json`
+  rewrites) write `users/{uid}.fcmTokens` — the ONLY write path for that field;
+  `run_reminder_check` now processes phone-less users (channel resolution:
+  missing `reminders_channel` = legacy `["whatsapp"]`, new default `["push"]`);
+  `build_and_send_digest` now ALWAYS persists curated digests to
+  `users/{uid}/digests/{YYYY-MM-DD | YYYY-Www}` (denormalized cards, 30-doc
+  retention, `is_due` no longer requires outbound channels) and `push` is a valid
+  digest/reminder channel (synthesis path too). Rules: `digests` subcollection
+  added to BOTH `firestore.rules` (open, mirrors siblings) and
+  `firestore.rules.locked` (`owns(uid)` read, client write denied) + emulator
+  test cases — deploys with the next rules ship (§4 task 2 cutover). Frontend:
+  `lib/push.ts` (native-only dynamic plugin import, permission via user gesture,
+  token register/rotate/unregister on sign-out, deep-link intents
+  `{view:'digest'}`/`{linkId}` with cold-start stash), first-run `PushNudge`
+  (dual persistence `push-prompt-v1` + `pushPromptedAt`, reconciled in
+  AuthProvider), Digest section (`viewMode 'digest'`, `DigestCard.tsx`,
+  `lib/digest.ts` subscription, synthesis card on top, toolbar button beside
+  Connections, desktop inline + mobile overlay), Settings: Notifications toggle
+  (fires OS prompt), WhatsApp reminder toggle (legacy), Push digest chip,
+  `DEFAULT_SETTINGS` synced with backend `DEFAULT_USER_SETTINGS`
+  (`push_enabled=false`, `reminders_channel=["push"]`, `digest_channels=["push"]`).
+  iOS: `@capacitor-firebase/messaging@8.3.0` (SPM manifest regenerated),
+  AppDelegate APNs→Capacitor hooks, `aps-environment` entitlement +
+  `UIBackgroundModes remote-notification`, CI tripwire now fails the build if
+  `aps-environment` is missing from the exported IPA, PrivacyInfo DeviceID
+  declaration. Verified: `tsc --noEmit`, full `next build`, `py_compile` all
+  green; rules emulator suite not run here (owner machine).
+  **⚠️ OWNER PREREQUISITES before pushes deliver:** (1) Apple Developer portal →
+  enable Push Notifications capability on App ID `com.morhogeg.machina`;
+  (2) create an APNs Auth Key (.p8) and upload to Firebase Console →
+  `secondbrain-app-94da2` → Cloud Messaging → Apple app config; (3) confirm
+  Cloud Messaging enabled. Then deploy functions (`./deploy-functions.sh` with
+  explicit targets incl. the two new token endpoints + `check_reminders` +
+  `send_digests`), redeploy Hosting (firebase.json rewrites changed), and ship
+  iOS via the TestFlight workflow.
 - **2026-07-06 — Card ↔ open unified into one thought at two zoom levels
   (commit `51bd9fa`).** Follow-up to the summary-quality ship below: the card
   `summary` and the open `detailedSummary` were two independent paraphrases, so

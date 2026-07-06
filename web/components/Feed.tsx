@@ -4,7 +4,7 @@
 
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Link, LinkStatus, Collection, WeeklySynthesis } from '@/lib/types';
+import { Link, LinkStatus, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, type PlatformKey } from '@/lib/platform';
 import Dropdown from './Dropdown';
@@ -31,12 +31,17 @@ import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
 import { Button } from './ui/Button';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Shapes, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus, RefreshCw, Link2 } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Shapes, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus, RefreshCw, Link2, Newspaper } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
+import { subscribeDigests } from '@/lib/digest';
+import DigestCard from './DigestCard';
+import { PUSH_INTENT_EVENT, PUSH_FOREGROUND_EVENT, consumePendingPushIntent, readLocalPushPrompt, type PushIntent } from '@/lib/push';
+import { isNativeApp } from '@/lib/api';
+import PushNudge from './PushNudge';
 import { publishCard, publishCollection, unpublishCollection, deleteCollection, removeLinkFromCollection } from '@/lib/collections';
-import { shareLink, shareUrlFor } from '@/lib/share';
+import { shareLink, shareUrlFor, openExternal } from '@/lib/share';
 import TagExplorer from './TagExplorer';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -95,7 +100,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
         setActiveLinkId(null);
     };
     const [isLoading, setIsLoading] = useState(true);
-    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'ask' | 'collections' | 'connections'>('grid');
+    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'ask' | 'collections' | 'connections' | 'digest'>('grid');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
@@ -125,6 +130,19 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
     // Weekly synthesis (M12) — the in-app "What you learned" special card.
     const [latestSynthesis, setLatestSynthesis] = useState<WeeklySynthesis | null>(null);
     const [dismissedSynthesisWeek, setDismissedSynthesisWeek] = useState<string | null>(null);
+
+    // Curated digest history — the dedicated Digest section (written
+    // server-side to users/{uid}/digests; the in-app view is the always-on
+    // surface, push/WhatsApp/email are extra delivery channels).
+    const [digests, setDigests] = useState<CuratedDigest[]>([]);
+
+    // First-run notifications nudge (native only, once per account). By the
+    // time Feed mounts, AuthProvider has reconciled the user-doc mirror
+    // (pushPromptedAt) into localStorage, so the local record is trustworthy.
+    const [showPushNudge, setShowPushNudge] = useState(false);
+    useEffect(() => {
+        setShowPushNudge(isNativeApp() && readLocalPushPrompt() === null);
+    }, []);
 
     // Semantic Search State
     const [isSearching, setIsSearching] = useState(false);
@@ -217,6 +235,50 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
         if (!uid) return;
         return subscribeLatestSynthesis(uid, setLatestSynthesis);
     }, [uid]);
+
+    // Subscribe to the curated digest history for the Digest section.
+    useEffect(() => {
+        if (!uid) return;
+        return subscribeDigests(uid, setDigests);
+    }, [uid]);
+
+    // Push-notification deep links (native): a tapped notification carries
+    // {view: 'digest'} or {linkId}. Handle both the live event (app already
+    // running) and the intent stashed before this component mounted (cold
+    // start from the lock screen). Foreground pushes surface as a toast —
+    // iOS shows no OS banner while the app is frontmost.
+    useEffect(() => {
+        const applyIntent = (intent: PushIntent | null) => {
+            if (!intent) return;
+            if (intent.view === 'digest') setViewMode('digest');
+            else if (intent.linkId) setActiveLinkId(intent.linkId);
+        };
+        applyIntent(consumePendingPushIntent());
+        const onIntent = (e: Event) => applyIntent((e as CustomEvent<PushIntent>).detail);
+        const onForeground = (e: Event) => {
+            const message = (e as CustomEvent<{ message?: string }>).detail?.message;
+            if (message) toast.info(message);
+        };
+        window.addEventListener(PUSH_INTENT_EVENT, onIntent);
+        window.addEventListener(PUSH_FOREGROUND_EVENT, onForeground);
+        return () => {
+            window.removeEventListener(PUSH_INTENT_EVENT, onIntent);
+            window.removeEventListener(PUSH_FOREGROUND_EVENT, onForeground);
+        };
+    }, [toast]);
+
+    // Open a card referenced by a digest: prefer the live card (detail modal);
+    // if it was deleted since the digest was written, fall back to the
+    // denormalized source URL so the tap still lands somewhere useful.
+    const openDigestCard = (card: DigestCardRef) => {
+        if (links.some((l) => l.id === card.id)) {
+            setActiveLinkId(card.id);
+        } else if (card.url) {
+            openExternal(card.url);
+        } else {
+            toast.info('That card is no longer in your library.');
+        }
+    };
 
     const dismissSynthesis = () => {
         if (latestSynthesis) {
@@ -517,6 +579,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
     // so the feed no longer carries a redundant inline banner.
     const feedModules = isDefaultLibraryView ? (
         <>
+            {showPushNudge && uid && (
+                <PushNudge uid={uid} onDone={() => setShowPushNudge(false)} />
+            )}
             {latestSynthesis && latestSynthesis.weekId !== dismissedSynthesisWeek && (
                 <SynthesisCard
                     synthesis={latestSynthesis}
@@ -803,6 +868,41 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
     const activeMobileFilters =
         (filter !== 'all' ? 1 : 0) + selectedPlatforms.size + (screenshotOnly ? 1 : 0) + selectedTags.size + selectedCollections.size;
 
+    // The Digest section's scrollable history — the weekly synthesis rides on
+    // top, then every curated digest, newest first. Built once and rendered in
+    // both layouts (desktop inline / mobile full-screen overlay).
+    const digestContent = (
+        <div className="max-w-3xl mx-auto flex flex-col gap-3">
+            {latestSynthesis && latestSynthesis.weekId !== dismissedSynthesisWeek && (
+                <SynthesisCard
+                    synthesis={latestSynthesis}
+                    onOpenCard={(id) => setActiveLinkId(id)}
+                    onDismiss={dismissSynthesis}
+                />
+            )}
+            {digests.map((digest, i) => (
+                <DigestCard
+                    key={digest.id}
+                    digest={digest}
+                    defaultExpanded={i === 0}
+                    onOpenCard={openDigestCard}
+                />
+            ))}
+            {digests.length === 0 && (!latestSynthesis || latestSynthesis.weekId === dismissedSynthesisWeek) && (
+                <div className="text-center py-16 animate-fade-in">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-accent/20">
+                        <Newspaper className="w-8 h-8 text-white" />
+                    </div>
+                    <h3 className="text-lg font-medium text-text mb-2">No digests yet</h3>
+                    <p className="text-text-secondary text-sm">
+                        Turn on the curated digest in Settings and your hand-picked
+                        batches will collect here.
+                    </p>
+                </div>
+            )}
+        </div>
+    );
+
     // Tell the page when we're in Ask mode (drives the full-height chat layout).
     useEffect(() => {
         onAskModeChange?.(viewMode === 'ask');
@@ -810,7 +910,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
 
     // Hide the add-link FAB in Ask *and* Collections — neither view captures links.
     useEffect(() => {
-        onHideAddButton?.(viewMode === 'ask' || viewMode === 'collections' || viewMode === 'connections');
+        onHideAddButton?.(viewMode === 'ask' || viewMode === 'collections' || viewMode === 'connections' || viewMode === 'digest');
     }, [viewMode, onHideAddButton]);
 
     if (isLoading) {
@@ -913,6 +1013,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                             backLabel="Back to your library"
                             icon={<Link2 className="w-5 h-5" />}
                             title="Connections"
+                        />
+                    </div>
+                ) : viewMode === 'digest' ? (
+                    // Desktop only: the digest history flows inline beneath this
+                    // subheader. Mobile renders its own full-screen overlay below.
+                    <div className="hidden sm:block">
+                        <MobileSubheader
+                            onBack={() => setViewMode(lastLayout.current)}
+                            backLabel="Back to your library"
+                            icon={<Newspaper className="w-5 h-5" />}
+                            title="Digest"
                         />
                     </div>
                 ) : (
@@ -1238,6 +1349,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                     <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-accent/15 text-accent">
                                         {connectionClusters.length}
                                     </span>
+                                </button>
+                            )}
+                            {(digests.length > 0 || latestSynthesis) && (
+                                <button
+                                    onClick={() => setViewMode('digest')}
+                                    title="Your curated digests"
+                                    aria-label="Digest"
+                                    className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
+                                >
+                                    <Newspaper className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Digest</span>
                                 </button>
                             )}
                         </div>
@@ -1768,6 +1890,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                 onOpenCard={(id) => setActiveLinkId(id)}
                             />
                         </div>
+                    ) : viewMode === 'digest' ? (
+                        // Desktop only: the digest history flows inline beneath the
+                        // subheader. Mobile renders the full-screen overlay below.
+                        <div className="hidden sm:block">
+                            {digestContent}
+                        </div>
                     ) : viewMode === 'collections' ? (
                         // Desktop only: gallery flows inline beneath the inline subheader.
                         // Mobile renders the full-screen overlay below (mirrors Ask).
@@ -1956,6 +2084,21 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                             links={links}
                             onOpenCard={(id) => setActiveLinkId(id)}
                         />
+                    </div>
+                </div>
+            )}
+
+            {/* Digest — mobile full-screen overlay (mirrors Connections). */}
+            {viewMode === 'digest' && (
+                <div className="sm:hidden fixed inset-x-0 top-0 bottom-0 z-50 bg-background flex flex-col animate-fade-in">
+                    <MobileSubheader
+                        onBack={() => setViewMode(lastLayout.current)}
+                        backLabel="Back to your library"
+                        icon={<Newspaper className="w-5 h-5" />}
+                        title="Digest"
+                    />
+                    <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+                        {digestContent}
                     </div>
                 </div>
             )}

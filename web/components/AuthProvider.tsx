@@ -12,6 +12,10 @@ import {
 } from '@/lib/auth';
 import { syncShareConfigToNative } from '@/lib/shareConfig';
 import { readLocalAiConsent, writeLocalAiConsent } from '@/lib/aiConsent';
+import {
+    initPushListeners, refreshPushRegistration, unregisterPush,
+    readLocalPushPrompt, writeLocalPushPrompt,
+} from '@/lib/push';
 import LoginScreen from '@/components/LoginScreen';
 import Onboarding from '@/components/Onboarding';
 import AIConsentNotice from '@/components/AIConsentNotice';
@@ -134,6 +138,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         [],
     );
 
+    // Same dual-persistence reconcile for the first-run notifications nudge
+    // (push-prompt-v1 ↔ pushPromptedAt), so a reinstall doesn't re-nudge —
+    // plus the native push bootstrap: attach the messaging listeners
+    // (deep-links, foreground toasts, token rotation) and silently re-register
+    // the device token when permission was already granted. Never prompts.
+    const attachPush = useCallback(
+        (docId: string, data: Record<string, unknown> | undefined) => {
+            const docTs = typeof data?.pushPromptedAt === 'number' ? data.pushPromptedAt : null;
+            if (docTs) {
+                writeLocalPushPrompt(docTs);
+            } else {
+                const localTs = readLocalPushPrompt();
+                if (localTs !== null) {
+                    updateDoc(doc(db, 'users', docId), { pushPromptedAt: localTs }).catch(() => {});
+                }
+            }
+            if (isNativeApp()) {
+                initPushListeners().then(refreshPushRegistration).catch(() => {});
+            }
+        },
+        [],
+    );
+
     // Explicit acceptance from the notice: persist locally + on the user doc.
     const acceptAiConsent = useCallback(() => {
         const now = Date.now();
@@ -145,6 +172,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [uid]);
 
     const signOut = useCallback(async () => {
+        // Remove this device's push token BEFORE signing out — the unregister
+        // endpoint verifies the caller's ID token, which is gone afterwards.
+        try {
+            await unregisterPush();
+        } catch {
+            // Dead tokens are also pruned server-side on the next send.
+        }
         await signOutUser();
         setUid(null);
         setAuthUid(null);
@@ -168,6 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     setUid(userDoc.id);
                     attachUserDoc(userDoc.id, userDoc.data());
                     reconcileAiConsent(userDoc.id, userDoc.data());
+                    attachPush(userDoc.id, userDoc.data());
                 }
             } catch (err) {
                 console.error('Failed to look up user:', err);
@@ -213,6 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     setUid(dataDoc.id);
                     attachUserDoc(dataDoc.id, dataDoc.data);
                     reconcileAiConsent(dataDoc.id, dataDoc.data);
+                    attachPush(dataDoc.id, dataDoc.data);
                     // First run for a fresh workspace: the backend returns
                     // `created` on creation and stamps `onboarded: false` on
                     // the doc (covers a reload before dismissal).

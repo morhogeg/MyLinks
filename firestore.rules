@@ -47,6 +47,12 @@ service cloud.firestore {
       match /syntheses/{weekId} {
         allow read, write: if true;
       }
+
+      // Curated digests (in-app Digest section). Written by Cloud Functions
+      // (admin SDK); the client only reads to render the digest history.
+      match /digests/{digestId} {
+        allow read, write: if true;
+      }
     }
 
     // Shared collections & cards: public, read-only snapshots for share links.

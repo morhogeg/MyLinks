@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
-import { User, DigestMode, DigestChannel } from '@/lib/types';
+import { User, DigestMode, DigestChannel, ReminderChannel } from '@/lib/types';
 import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight, Compass, LogOut, UserCircle, CalendarClock, Search, ShieldCheck, ExternalLink, Network } from 'lucide-react';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
+import { registerPush, unregisterPush } from '@/lib/push';
+import { isNativeApp } from '@/lib/api';
 import { policyUrl, openExternal } from '@/lib/share';
 import { readLocalAiConsent } from '@/lib/aiConsent';
 import { getShareBridgeStatus, resyncShareConfig, onShareBridgeStatus, ShareBridgeStatus } from '@/lib/shareConfig';
@@ -59,14 +61,17 @@ const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
 }));
 const COUNT_OPTIONS = ['3', '5', '7', '10'].map((c) => ({ value: c, label: `${c} cards` }));
 
+// Mirrors DEFAULT_USER_SETTINGS in functions/link_service.py — keep in sync.
 const DEFAULT_SETTINGS: User['settings'] = {
     theme: 'dark',
     daily_digest: false,
     reminders_enabled: true,
     reminder_frequency: 'smart',
+    push_enabled: false,
+    reminders_channel: ['push'],
     digest_enabled: false,
     digest_frequency: 'weekly',
-    digest_channels: ['whatsapp'],
+    digest_channels: ['push'],
     digest_mode: 'smart',
     digest_topics: [],
     digest_topic: null,
@@ -283,6 +288,12 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                     daily_digest: userSettings.daily_digest || false,
                     reminders_enabled: userSettings.reminders_enabled ?? true,
                     reminder_frequency: userSettings.reminder_frequency || 'smart',
+                    push_enabled: userSettings.push_enabled ?? false,
+                    // Accounts predating push only ever had WhatsApp reminders —
+                    // that's the legacy default (matches the backend's fallback).
+                    reminders_channel: userSettings.reminders_channel?.length
+                        ? userSettings.reminders_channel
+                        : ['whatsapp'],
                     digest_enabled: userSettings.digest_enabled ?? false,
                     digest_frequency: userSettings.digest_frequency || 'weekly',
                     digest_channels: userSettings.digest_channels?.length ? userSettings.digest_channels : ['whatsapp'],
@@ -313,6 +324,8 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
             await updateUserSettings(uid, {
                 reminders_enabled: settings.reminders_enabled,
                 reminder_frequency: settings.reminder_frequency,
+                push_enabled: settings.push_enabled,
+                reminders_channel: settings.reminders_channel,
                 digest_enabled: settings.digest_enabled,
                 digest_frequency: settings.digest_frequency,
                 digest_channels: settings.digest_channels,
@@ -332,6 +345,54 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
         } finally {
             setIsSaving(false);
         }
+    };
+
+    // Notifications toggle. Enabling MUST run inside this click handler — iOS
+    // shows the OS permission dialog only from a user gesture (and only once).
+    // registerPush() is a no-op that resolves false on the web, where the
+    // setting still saves (it applies to the user's iOS devices).
+    const [pushBusy, setPushBusy] = useState(false);
+    const [pushNote, setPushNote] = useState<string | null>(null);
+
+    const togglePush = async () => {
+        if (pushBusy) return;
+        if (settings.push_enabled) {
+            void unregisterPush();
+            setPushNote(null);
+            setSettings((p) => ({
+                ...p,
+                push_enabled: false,
+                reminders_channel: p.reminders_channel.filter((c) => c !== 'push'),
+            }));
+            return;
+        }
+        setPushBusy(true);
+        setPushNote(null);
+        try {
+            const granted = await registerPush();
+            if (!granted && isNativeApp()) {
+                setPushNote('Notifications are turned off for Machina — allow them in iOS Settings, then flip this on again.');
+                return;
+            }
+            setSettings((p) => ({
+                ...p,
+                push_enabled: true,
+                reminders_channel: p.reminders_channel.includes('push')
+                    ? p.reminders_channel
+                    : [...p.reminders_channel, 'push'],
+            }));
+        } finally {
+            setPushBusy(false);
+        }
+    };
+
+    const toggleReminderChannel = (channel: ReminderChannel) => {
+        setSettings((p) => ({
+            ...p,
+            reminders_channel: p.reminders_channel.includes(channel)
+                ? p.reminders_channel.filter((c) => c !== channel)
+                : [...p.reminders_channel, channel],
+        }));
     };
 
     const toggleChannel = (channel: DigestChannel) => {
@@ -362,8 +423,8 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
             ? `${DAYS[settings.digest_day]} ${HOUR_OPTIONS[settings.digest_hour].label}`
             : `Daily ${HOUR_OPTIONS[settings.digest_hour].label}`;
         const where = settings.digest_channels
-            .map((c) => (c === 'whatsapp' ? 'WhatsApp' : 'Email'))
-            .join(' & ') || 'no channel';
+            .map((c) => (c === 'whatsapp' ? 'WhatsApp' : c === 'email' ? 'Email' : 'Push'))
+            .join(' & ') || 'in-app only';
         return `${mode} · ${settings.digest_count} cards · ${when} · ${where}`;
     })();
 
@@ -492,7 +553,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                     {/* Reminders */}
                     <Section icon={<Bell className="w-4 h-4" />} title="Reminders">
                         <Row
-                            title="WhatsApp reminders"
+                            title="Reminders"
                             subtitle="Resurface saved items so you actually revisit them"
                         >
                             <Toggle
@@ -500,6 +561,33 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                                 onChange={() => setSettings((p) => ({ ...p, reminders_enabled: !p.reminders_enabled }))}
                             />
                         </Row>
+
+                        {/* Notifications (iOS push) — the primary delivery channel.
+                            Enabling fires the OS permission request (user gesture). */}
+                        <Row
+                            title="Notifications"
+                            subtitle="Reminders and digests as push notifications on your iPhone"
+                        >
+                            <Toggle
+                                on={settings.push_enabled}
+                                onChange={() => { void togglePush(); }}
+                            />
+                        </Row>
+                        {pushNote && (
+                            <p className="text-[11px] text-amber-500 leading-relaxed">{pushNote}</p>
+                        )}
+
+                        {settings.reminders_enabled && (
+                            <Row
+                                title="WhatsApp reminders"
+                                subtitle="Legacy channel — needs a linked phone number"
+                            >
+                                <Toggle
+                                    on={settings.reminders_channel.includes('whatsapp')}
+                                    onChange={() => toggleReminderChannel('whatsapp')}
+                                />
+                            </Row>
+                        )}
 
                         {settings.reminders_enabled && (() => {
                             // Two front-and-center choices (M14): "Smart (spaced)" is
@@ -878,7 +966,16 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                             <div className="rounded-2xl border border-border-subtle divide-y divide-border-subtle">
                                 <div className="p-4 space-y-2.5">
                                     <div className="text-sm font-semibold text-text">Where to send it</div>
+                                    <p className="text-[12px] text-text-muted leading-relaxed">
+                                        Every digest also lands in the in-app Digest section automatically.
+                                    </p>
                                     <div className="flex gap-2">
+                                        <ChannelChip
+                                            active={settings.digest_channels.includes('push')}
+                                            onClick={() => toggleChannel('push')}
+                                            icon={<Bell className="w-4 h-4" />}
+                                            label="Push"
+                                        />
                                         <ChannelChip
                                             active={settings.digest_channels.includes('whatsapp')}
                                             onClick={() => toggleChannel('whatsapp')}

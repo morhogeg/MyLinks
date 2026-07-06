@@ -152,7 +152,8 @@ export interface RelatedLink {
 }
 
 export type DigestFrequency = 'daily' | 'weekly';
-export type DigestChannel = 'email' | 'whatsapp';
+export type DigestChannel = 'push' | 'email' | 'whatsapp';
+export type ReminderChannel = 'push' | 'whatsapp';
 export type DigestMode = 'smart' | 'random' | 'topic' | 'unread' | 'favorites' | 'rediscover' | 'synthesis';
 
 // ── Weekly "What you learned" synthesis (M12) ────────────────────────────────
@@ -186,6 +187,34 @@ export interface WeeklySynthesis {
   createdAt: number;         // Unix ms
 }
 
+// ── Curated digest (in-app Digest section) ───────────────────────────────────
+// Every curated digest is persisted server-side (digest_service) to
+// users/{uid}/digests/{digestId} — the always-on surface; push/WhatsApp/email
+// are additional opt-in delivery channels.
+
+/** A card denormalized into the digest doc, so it renders even if the source
+ *  link is later deleted (the app still deep-links by id when it exists). */
+export interface DigestCardRef {
+  id: string;
+  title: string;
+  category?: string;
+  summary?: string;
+  thumbnailUrl?: string | null;
+  sourceName?: string | null;
+  url?: string | null;
+}
+
+export interface CuratedDigest {
+  id: string;              // deterministic per period: "2026-07-06" / "2026-W28"
+  createdAt: number;       // Unix ms
+  mode: DigestMode;
+  frequency: DigestFrequency;
+  title: string;
+  topics: string[];
+  cards: DigestCardRef[];
+  cardCount: number;
+}
+
 // TODO: Replace with Firebase Auth user type
 export interface User {
   id: string;
@@ -197,6 +226,9 @@ export interface User {
     daily_digest: boolean;
     reminders_enabled: boolean;
     reminder_frequency: 'smart' | 'daily' | 'weekly' | 'off';
+    // iOS push notifications — flips true after the OS permission is granted.
+    push_enabled: boolean;
+    reminders_channel: ReminderChannel[];
     // Curated digest delivery
     digest_enabled: boolean;
     digest_frequency: DigestFrequency;

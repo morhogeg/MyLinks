@@ -229,7 +229,11 @@ jobs:
           done
           echo "$(codesign -d --entitlements :- Payload/App.app 2>/dev/null)" | grep -q "com.apple.developer.applesignin" \
             || echo "::warning::App is missing the Sign in with Apple entitlement — required before the auth cutover build."
-          echo "Entitlements OK: App Group present in app + extension."
+          echo "$(codesign -d --entitlements :- Payload/App.app 2>/dev/null)" | grep -q "aps-environment" || {
+            echo "::error::App is missing the aps-environment entitlement — push notifications would silently never register. Refusing to upload."
+            exit 1
+          }
+          echo "Entitlements OK: App Group present in app + extension; aps-environment present in app."
 
       - name: Upload to TestFlight
         env:
