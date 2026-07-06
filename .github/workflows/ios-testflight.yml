@@ -36,6 +36,12 @@ concurrency:
   group: ios-testflight
   cancel-in-progress: false
 
+# Least privilege: this workflow only reads the repo and talks to Apple via the
+# ASC key — it never writes back to GitHub, so drop the default token to
+# read-only.
+permissions:
+  contents: read
+
 jobs:
   build:
     # macos-26 ships Xcode 26. The Capacitor 8 SPM binary (capacitor-swift-pm)

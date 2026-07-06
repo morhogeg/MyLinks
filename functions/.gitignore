@@ -4,3 +4,11 @@ __pycache__/
 # Python virtual environment
 venv/
 *.local
+
+# Secrets — plain env vars for Gemini/Twilio/etc. live here in prod. Do NOT
+# commit. Covered by the root .gitignore too; kept here belt-and-suspenders in
+# case this dir is ever used standalone.
+.env
+.env.*
+!.env.example
+serviceAccount*.json
