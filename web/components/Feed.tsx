@@ -10,11 +10,11 @@ import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, type P
 import Dropdown from './Dropdown';
 import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
 import { useLibraryData, getTimestampNumber } from '@/lib/useLibraryData';
+import { useSearch } from '@/lib/useSearch';
 import { collection, query, orderBy, getDocsFromServer, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
-import { db, functions } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
-import { httpsCallable } from 'firebase/functions';
 import Card from './Card';
 import ListCard from './ListCard';
 import Masonry from './Masonry';
@@ -59,7 +59,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
     const { uid } = useAuth();
     const toast = useToast();
     const { links, setLinks, collections, isLoading } = useLibraryData(uid);
-    const [searchQuery, setSearchQuery] = useState('');
+    const { searchQuery, setSearchQuery, debouncedQuery, isSearching, searchResults } = useSearch();
     const [filter, setFilter] = useState<FilterType>('all');
     const [selectedCategory, setSelectedCategory] = useState<Set<string>>(new Set());
     const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
@@ -125,20 +125,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
     const [latestSynthesis, setLatestSynthesis] = useState<WeeklySynthesis | null>(null);
     const [dismissedSynthesisWeek, setDismissedSynthesisWeek] = useState<string | null>(null);
 
-    // Semantic Search State
-    const [isSearching, setIsSearching] = useState(false);
-    const [searchResults, setSearchResults] = useState<Link[]>([]);
-    const [searchError, setSearchError] = useState<string | null>(null);
-    const [debouncedQuery, setDebouncedQuery] = useState('');
-
-    // Debounce search query
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedQuery(searchQuery);
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [searchQuery]);
-
     // Server-side captures (Share Extension / WhatsApp) show up as `processing`
     // cards; surface the same app-level "Analyzing… N%" banner for them. Report
     // the state up to the page, throttled to meaningful changes so it doesn't
@@ -151,55 +137,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
         onProcessingChange?.(processingBanner);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [procSig]);
-
-    // Semantic Search Effect
-    useEffect(() => {
-        if (!debouncedQuery.trim()) {
-            setIsSearching(false);
-            setSearchResults([]);
-            setSearchError(null);
-            return;
-        }
-
-        const performSearch = async () => {
-            setIsSearching(true);
-            setSearchError(null);
-            try {
-                const searchFn = httpsCallable(functions, 'search_links');
-                const result = await searchFn({
-                    query: debouncedQuery,
-                    limit: 20
-                    // We can pass uid here if needed for dev, but auth context should handle it
-                });
-                const data = result.data as { links: Link[] };
-                setSearchResults(data.links || []);
-            } catch (err: any) {
-                console.error("Search failed:", err);
-                // Extract error message from the Firebase callable error
-                let errorMessage = 'Search failed. Please try again.';
-                if (err?.message) {
-                    if (err.message.includes('SEMANTIC_SEARCH_NOT_CONFIGURED')) {
-                        errorMessage = 'Semantic search is not configured. Please set GEMINI_API_KEY in Firebase Functions.';
-                    } else if (err.message.includes('SEMANTIC_SEARCH_ERROR')) {
-                        errorMessage = 'Failed to generate search embeddings. Check your API key.';
-                    } else if (err.message.includes('VECTOR_SEARCH_ERROR')) {
-                        errorMessage = 'Vector search failed. Please ensure Firestore vector index is deployed.';
-                    } else if (err.message.includes('GEMINI_API_KEY')) {
-                        errorMessage = 'API key not configured for semantic search.';
-                    } else {
-                        errorMessage = err.message;
-                    }
-                }
-                setSearchError(errorMessage);
-                // Fall back to local filtering only - semantic search errors shouldn't break the app
-                setSearchResults([]);
-            } finally {
-                setIsSearching(false);
-            }
-        };
-
-        performSearch();
-    }, [debouncedQuery]);
 
     // Load collapsed state from localStorage
     useEffect(() => {
