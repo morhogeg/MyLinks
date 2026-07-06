@@ -3,7 +3,7 @@
 
 
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, cloneElement, type ReactElement } from 'react';
 import { Link, LinkStatus, Collection, WeeklySynthesis } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, type PlatformKey } from '@/lib/platform';
@@ -1356,6 +1356,43 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                 </div>
                 )}
             </div>
+
+            {/* Active "Show by" status filter — pill + clear, mirroring the tag
+                filter row so Archive/Favorites/Unread/etc. are visible and
+                dismissable (previously the status filter left no on-page trace). */}
+            {isLibraryView && filter !== 'all' && (() => {
+                const active = filterButtons.find(b => b.key === filter);
+                if (!active) return null;
+                return (
+                    <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent/5 border border-accent/10">
+                            {cloneElement(
+                                active.icon as ReactElement<{ className?: string }>,
+                                { className: 'w-3 h-3 text-accent' }
+                            )}
+                            <span className="text-[10px] font-bold text-accent uppercase tracking-wider">Showing:</span>
+                        </div>
+                        <div className="group flex items-center gap-1 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm">
+                            <span>{active.label}</span>
+                            <button
+                                type="button"
+                                onClick={() => setFilter('all')}
+                                aria-label={`Clear ${active.label} filter`}
+                                title="Clear filter"
+                                className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                        <button
+                            onClick={() => setFilter('all')}
+                            className="text-[10px] font-bold text-text-muted/60 hover:text-accent hover:underline px-2 transition-colors uppercase tracking-tight"
+                        >
+                            Clear All
+                        </button>
+                    </div>
+                );
+            })()}
 
             {/* Active Tag Filters — shown above the cards (not in Ask mode). */}
             {isLibraryView && selectedTags.size > 0 && (
