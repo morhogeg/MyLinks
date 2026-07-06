@@ -2254,7 +2254,7 @@ def force_check_reminders(req: https_fn.Request) -> https_fn.Response:
         return https_fn.Response(json.dumps(report, indent=2), status=200, mimetype="application/json")
     except Exception as e:
         logger.error(f"Manual trigger failed: {e}")
-        return https_fn.Response(f"Error: {e}", status=500)
+        return https_fn.Response("Internal error", status=500)
 
 
 # ─────────────────────────────────────────────
@@ -2280,7 +2280,7 @@ def force_send_digests(req: https_fn.Request) -> https_fn.Response:
         return https_fn.Response(json.dumps(report, indent=2), status=200, mimetype="application/json")
     except Exception as e:
         logger.error(f"Manual digest trigger failed: {e}")
-        return https_fn.Response(f"Error: {e}", status=500)
+        return https_fn.Response("Internal error", status=500)
 
 
 @https_fn.on_call()
@@ -2330,4 +2330,7 @@ def send_digest_now(req: https_fn.CallableRequest) -> dict:
         return result
     except Exception as e:
         logger.error(f"send_digest_now failed for {uid}: {e}")
-        raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=str(e))
+        raise https_fn.HttpsError(
+            code=https_fn.FunctionsErrorCode.INTERNAL,
+            message="Failed to send digest",
+        )
