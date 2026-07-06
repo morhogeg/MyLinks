@@ -309,8 +309,13 @@ def _scrape_twitter_url(url: str) -> dict:
                     has_text = bool(tweet.get('text'))
                     has_quote = bool(tweet.get('quote'))
                     has_media = bool(tweet.get('media'))
+                    # X Articles (long-form posts) carry NO tweet.text — the body
+                    # lives in tweet.article.content.blocks. Without this, an
+                    # article would look "empty" here and fall through to a thin
+                    # OG-metadata scrape (which makes the AI hallucinate).
+                    has_article = bool(tweet.get('article'))
 
-                    if has_text or has_quote or has_media:
+                    if has_text or has_quote or has_media or has_article:
                         return _format_twitter_data(tweet, 'fxtwitter')
         except Exception as e:
             logger.warning(f"fxtwitter failed: {e}")
@@ -393,8 +398,82 @@ Description: {desc}
         return {"html": "", "title": "", "text": ""}
 
 
+def _format_twitter_article(tweet: dict, article: dict, source: str) -> dict:
+    """Format an X (Twitter) long-form Article for AI analysis.
+
+    X Articles carry their body in ``article.content.blocks`` (Draft.js blocks),
+    NOT in ``tweet.text`` (which is empty). We reconstruct readable, structured
+    text — preserving headings and the numbering of ordered lists — so the AI
+    sees the real content instead of a "[no text content available]" placeholder.
+    """
+    title = (article.get('title') or '').strip()
+
+    blocks = (article.get('content') or {}).get('blocks') or []
+    lines = []
+    ordered_index = 0
+    for block in blocks:
+        btype = block.get('type') or 'unstyled'
+        # Restart list numbering whenever a non-list block interrupts the run.
+        if btype != 'ordered-list-item':
+            ordered_index = 0
+
+        text = (block.get('text') or '').strip()
+        if not text:
+            continue
+
+        if btype in ('header-one', 'header-two', 'header-three'):
+            lines.append(f"\n## {text}")
+        elif btype == 'ordered-list-item':
+            ordered_index += 1
+            lines.append(f"{ordered_index}. {text}")
+        elif btype == 'unordered-list-item':
+            lines.append(f"- {text}")
+        elif btype == 'blockquote':
+            lines.append(f"> {text}")
+        else:
+            lines.append(text)
+
+    body = "\n".join(lines).strip()
+
+    # Safety net: if the blocks were unexpectedly empty, use the API preview.
+    if not body:
+        body = (article.get('preview_text') or '').strip()
+
+    author = tweet.get('author', {})
+    author_name = author.get('name', 'Unknown')
+    author_handle = author.get('screen_name', '')
+    created_at = tweet.get('created_at', '')
+    likes = tweet.get('likes', 0)
+    retweets = tweet.get('retweets', 0)
+
+    formatted_text = f"""X ARTICLE (long-form post)
+Title: {title}
+
+{body}
+
+---
+METADATA:
+Author: {author_name} (@{author_handle})
+Date: {created_at}
+Engagement: {likes} likes, {retweets} retweets
+Source: {source} API (article)
+"""
+
+    return {
+        "html": formatted_text,
+        "title": title or f"Article by {author_name}",
+        "text": formatted_text,
+    }
+
+
 def _format_twitter_data(tweet: dict, source: str) -> dict:
     """Format fxtwitter API tweet data for AI analysis."""
+    # X Articles (long-form posts) store their body in tweet.article, not in
+    # tweet.text — handle them separately so we don't emit an empty placeholder.
+    article = tweet.get('article')
+    if article:
+        return _format_twitter_article(tweet, article, source)
+
     content_parts = []
 
     if tweet.get('text'):

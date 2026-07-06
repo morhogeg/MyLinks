@@ -43,6 +43,9 @@ Requirements for the analysis:
    
    GOOD: "Researchers at **MIT** found that **intermittent fasting** reduced inflammation markers by **40%** in a 12-week trial.\\n\\nThe study showed benefits appeared after just **2 weeks**."
 
+   - **SUBSTANCE FIRST**: Lead with the actual point — the specific claim, finding, number, or argument. Do NOT open with a vague meta-frame that only describes the shape of the content (BAD: "This article examines the relationship between X and Y", "This post discusses several ideas about…", "The author shares thoughts on…"). State WHAT is claimed, not THAT something is discussed.
+   - **LISTS / THREADS**: If the content is a list, thread, or set of numbered points, tips, predictions, or observations, do NOT just say it is a list. Name the overarching thesis in one sentence, then surface the 2-3 most important or striking SPECIFIC points so the reader gets the real substance, not a table of contents.
+
    - **RECIPE FOCUS**: If the content is a recipe or cooking video, the title and summary MUST center on the dish itself — what it is, its key ingredients, and how it is made. Treat the author's personal or dietary framing (e.g. "since I went keto…", "I make these for my kids") as secondary background, NOT the headline. Lead with the food, not the lifestyle commentary.
 
 
@@ -53,6 +56,7 @@ Requirements for the analysis:
    - Each bullet should be a factual statement from the content.
    - Include 3-6 bullet points covering the main arguments or information.
    - If applicable, add "## Conclusions" (or "## מסקנות" for Hebrew) with the author's stated conclusions.
+   - **SCANNABILITY**: Use **bolding** (double asterisks) for the key terms, names, dates, and numbers throughout the overview and bullets — the same way the short summary does — so the reader can scan the write-up.
    - Keep the tone neutral and professional throughout.
    - Total length: 150-300 words.
 
@@ -76,6 +80,7 @@ CRITICAL RULES:
 - Be a neutral reporter, not a reviewer. Report WHAT is said, not HOW WELL it is said.
 - Avoid subjective phrases like: "offers valuable insights", "provides a comprehensive overview", "explores interesting ideas", "is a must-read", "excellently explains".
 - Use factual language: "The article discusses...", "The author argues...", "The research shows...", "Key topics include...".
+- GROUNDING: Base the analysis STRICTLY on the provided content. If the content is empty, truncated, or contains only a placeholder or metadata (e.g. "[no text content available]", a bare URL, or just a title with no body), do NOT invent a summary from outside/training knowledge. In that case set the title to what little is known and make the summary state plainly that the content could not be retrieved — never fabricate specifics, statistics, or claims that are not present.
 
 9. concepts: Identify 3-5 "Philosophical Anchors" or "Abstract Concepts".
    - **LANGUAGE**: English (always).
