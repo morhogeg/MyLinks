@@ -2,10 +2,18 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Screenshots: users can read their own; only Cloud Functions write
+    // Screenshots: only Cloud Functions (Admin SDK) read or write here. The
+    // app never fetches these through the Storage SDK — it loads them via the
+    // unguessable tokenized download URLs the backend stores on each card
+    // (public-by-URL, 128-bit token). The old rule here allowed
+    // `request.auth.uid == uid`, but `{uid}` is the phone-number DATA id while
+    // `request.auth.uid` is the Firebase AUTH uid, so it could never match —
+    // a dead rule that only implied guarding that didn't exist (audit L1).
+    // Explicit deny is behavior-identical and honest. Do NOT "fix" it to
+    // compare against the data id without a custom-claims mapping.
     match /screenshots/{uid}/{allPaths=**} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false; // Only admin SDK (Cloud Functions) writes here
+      allow read: if false;  // clients use tokenized URLs, never the SDK
+      allow write: if false; // only the Admin SDK (Cloud Functions) writes
     }
 
     // Deny everything else

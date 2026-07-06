@@ -60,9 +60,11 @@ jobs:
       BUNDLE_ID: com.morhogeg.machina
 
     steps:
-      - uses: actions/checkout@v4
+      # Third-party actions are SHA-pinned (audit L3): a tag like @v4 is
+      # mutable, so a compromised upstream repo could swap its contents.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           # Capacitor 8's CLI requires Node >= 22.
           node-version: '22'
@@ -232,10 +234,18 @@ jobs:
               echo "$ENT"
               exit 1
             }
+            # The ingest token now lives in a shared Keychain group (audit H3);
+            # without this entitlement in BOTH binaries the extension can't read
+            # the token and every share fails the same silent way.
+            echo "$ENT" | grep -q "com.morhogeg.machina.shared" || {
+              echo "::error::$TARGET is missing the keychain access group (com.morhogeg.machina.shared) — the Share Extension could not read the ingest token. Refusing to upload."
+              echo "$ENT"
+              exit 1
+            }
           done
           echo "$(codesign -d --entitlements :- Payload/App.app 2>/dev/null)" | grep -q "com.apple.developer.applesignin" \
             || echo "::warning::App is missing the Sign in with Apple entitlement — required before the auth cutover build."
-          echo "Entitlements OK: App Group present in app + extension."
+          echo "Entitlements OK: App Group + keychain access group present in app + extension."
 
       - name: Upload to TestFlight
         env:
