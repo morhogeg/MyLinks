@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { Collection, Link } from '@/lib/types';
 import { MoreHorizontal, Pencil, Share2, Trash2, Globe, LayoutGrid } from 'lucide-react';
 import { getColorStyleByKey } from '@/lib/colors';
+import { httpsImageSrc } from '@/lib/safeUrl';
 
 interface CollectionsGalleryProps {
     collections: Collection[];
@@ -49,8 +50,9 @@ export default function CollectionsGallery({
         for (const link of links) {
             for (const cid of link.collectionIds ?? []) {
                 counts[cid] = (counts[cid] || 0) + 1;
-                if (!covers[cid] && link.metadata?.thumbnailUrl) {
-                    covers[cid] = link.metadata.thumbnailUrl;
+                const thumb = httpsImageSrc(link.metadata?.thumbnailUrl);
+                if (!covers[cid] && thumb) {
+                    covers[cid] = thumb;
                 }
             }
         }
@@ -68,7 +70,7 @@ export default function CollectionsGallery({
                 const style = getColorStyleByKey(c.color || c.name);
                 const count = meta.counts[c.id] || 0;
                 const cover = c.coverLinkId
-                    ? links.find((l) => l.id === c.coverLinkId)?.metadata?.thumbnailUrl
+                    ? httpsImageSrc(links.find((l) => l.id === c.coverLinkId)?.metadata?.thumbnailUrl)
                     : meta.covers[c.id];
                 const open = menu?.collection.id === c.id;
                 return (

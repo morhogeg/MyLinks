@@ -80,7 +80,9 @@ export default function LinkDetailModal({
     const [videoStart, setVideoStart] = useState<number | null>(null);
     const [imgFailed, setImgFailed] = useState(false);
     useEffect(() => { setImgFailed(false); }, [link.id]);
-    const hasValidImage = !!link.url && /^https?:\/\//.test(link.url);
+    // https-only: screenshots are always Firebase Storage https URLs, so a
+    // non-https value here is corrupt/hostile data, not a real image (audit L6).
+    const hasValidImage = !!link.url && /^https:\/\//.test(link.url);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {

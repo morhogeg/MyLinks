@@ -11,6 +11,7 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import CardActionSheet from './CardActionSheet';
 import { hasHebrew } from '@/lib/rtl';
+import { httpsImageSrc } from '@/lib/safeUrl';
 
 interface CardProps {
     link: Link;
@@ -217,10 +218,10 @@ export default function Card({
             }}
         >
             {/* Video thumbnail header — gives YouTube cards a real video shape. */}
-            {link.sourceType === 'youtube' && link.metadata?.thumbnailUrl && (
+            {link.sourceType === 'youtube' && httpsImageSrc(link.metadata?.thumbnailUrl) && (
                 <div className="relative w-full aspect-video bg-black/40 overflow-hidden">
                     <img
-                        src={link.metadata.thumbnailUrl}
+                        src={httpsImageSrc(link.metadata?.thumbnailUrl)}
                         alt=""
                         loading="lazy"
                         className="w-full h-full object-cover transition-transform duration-300 [@media(hover:hover)]:group-hover:scale-[1.03]"

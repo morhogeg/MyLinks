@@ -7,6 +7,7 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import { addLinkToCollection, removeLinkFromCollection } from '@/lib/collections';
 import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
+import { httpsImageSrc } from '@/lib/safeUrl';
 
 interface ManageCollectionCardsSheetProps {
     uid: string | null;
@@ -128,7 +129,7 @@ export default function ManageCollectionCardsSheet({
                     ) : rows.map((l) => {
                         const isMember = (l.collectionIds ?? []).includes(collection.id);
                         const colorStyle = getCategoryColorStyle(l.category || '');
-                        const thumb = l.metadata?.thumbnailUrl;
+                        const thumb = httpsImageSrc(l.metadata?.thumbnailUrl);
                         return (
                             <button
                                 key={l.id}
