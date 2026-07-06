@@ -322,6 +322,10 @@ The multi-user auth work is **fully written but not live**:
     `run_digest_check` hourly, `get_user_tags` reads ALL a user's links per
     analysis — redesign with indexed due-user queries + a one-off migration
     before the base grows (needs owner-deployed composite indexes).
+    **Re-assessed 2026-07-06 refactor pass: confirmed NOT doable as a pure
+    refactor** — needs composite indexes deployed before the query change plus
+    a settings-field backfill (legacy user docs missing the flag would silently
+    drop out of an indexed query). Stays here as owner-gated work.
 14. **[x] README ↔ reality (M-P5/T12).** *Done 2026-07-06:* rewrote `README.md`
     to the real product (recall engine, capture surface, synthesis); removed the
     false Graph-Visualization / Insights-Dashboard / Works-Offline / Table
@@ -335,20 +339,27 @@ The multi-user auth work is **fully written but not live**:
     — `lib/useOnlineStatus.ts` + `OfflineBanner` so optimistic writes no longer
     look silently saved while disconnected. No service worker / read-cache
     (explicitly not built).
-17. **[ ] Light theme decision (M-P1).** Give light mode the dark theme's material
-    care, or ship dark-only intentionally. Decide, don't leave half-done. Related
-    debt surfaced 2026-07-06: **~180 hardcoded white/black color utilities** across
-    31 tsx files violate the token rule — an ESLint guard now WARNS on them; sweep
-    to tokens then flip the rule to error.
+17. **[~] Light theme decision (M-P1).** Give light mode the dark theme's material
+    care, or ship dark-only intentionally. Decide, don't leave half-done.
+    **Color-debt half DONE 2026-07-06 (refactor pass):** all hardcoded
+    white/black utilities (276 across 35 tsx files) swept to theme-invariant
+    tokens `white-fixed`/`black-fixed` (exact aliases of white/black — compiled
+    CSS proven identical, zero pixel change) and the ESLint guard is now an
+    **error**. The tokens make every intentionally theme-invariant color
+    explicit and greppable; when the light-theme decision is made, re-point
+    call sites to semantic tokens individually. The *decision* itself is still open.
 18. **[~] Test harness (T3) — bootstrapped 2026-07-06.** Was only a debug script
     (`test_yt_scrape.py`, now deleted). **Added:** `functions/test_scraper.py`
     (SSRF guard + hostname routing), `functions/test_rate_limit.py` (XFF/identity),
     `web/lib/time.test.ts` + `rtl.test.ts` (Vitest) — 18 pytest + 14 vitest green
     — and a **`.github/workflows/ci.yml`** running web typecheck/build/vitest,
     functions py_compile/pytest, and the firestore-rules emulator suite on every
-    PR (there was NO PR CI before). **Remaining:** `ai_service` schema-contract
-    tests, `search.py`/digest curation tests, WhatsApp payload smoke test, and
-    wider component coverage.
+    PR (there was NO PR CI before). **Component coverage started 2026-07-06
+    (refactor pass):** `web/components/Feed.test.tsx` characterization test
+    (Feed rendered with mocked Firestore/Auth — 4 tests) + `web/vitest.config.ts`
+    + @testing-library/react/jsdom devDeps; 18 pytest + 18 vitest green.
+    **Remaining:** `ai_service` schema-contract tests, `search.py`/digest
+    curation tests, WhatsApp payload smoke test, wider component coverage.
 19. **[ ] Cost guardrails.** Budget alerts on the Firebase/GCP project; per-user
     monthly quotas (see §7); email digest provider decision (SendGrid key or cut
     the email channel).
@@ -367,24 +378,43 @@ The multi-user auth work is **fully written but not live**:
     `overflow:'unset'` on close), F-21 (offline signal — task 16). **STILL OPEN:**
     F-20 ReminderModal past-times/date-rollover, F-24/25/26 SimpleMarkdown + RTL
     unification (two markdown renderers — hand-rolled `SimpleMarkdown` vs
-    `react-markdown` in AskBrain; consolidate to one themed `<Markdown>`), F-29
+    `react-markdown` in AskBrain; consolidate to one themed `<Markdown>`.
+    **Assessed 2026-07-06 refactor pass: full unification is a BEHAVIOR change,
+    not a refactor** — SimpleMarkdown deliberately renders only headings/bullets/
+    bold, translates "KEY POINTS"/"CONCLUSIONS" to Hebrew for RTL, and does
+    compact sentence-splitting; react-markdown would start rendering links/
+    italics/code in summaries. `MarkdownMessage` was extracted from AskBrain
+    into its own component as the safe structural half; unify only with intent
+    + Hebrew/compact test coverage), F-29
     SwipeDeck undo doesn't cancel reminders, F-31 Reader "Listen" reliability,
     F-32 SwipeDeck stale snapshot, L-5 unbounded `deleteCollection` batch.
-26. **[ ] God-file decomposition (surfaced 2026-07-06).** Two files concentrate
-    almost all change-risk: `web/components/Feed.tsx` (**2,109 lines**, 39
-    `useState`, six view modes, inline Firestore subscriptions — extract
-    `useLibraryData`/`useFacets`, split Collections/Connections/Ask into feature
-    modules) and `functions/main.py` (**2,334 lines** — split the HTML/OG share
-    renderer + hand-rolled markdown parser, the WhatsApp state machine, the
-    background worker, and the HTTP API into separate modules). Also consolidate
-    the two embedding implementations (`ai_service.embed_text` vs
-    `search.EmbeddingService`, independently hardcoded model/dim). Large, do
-    behind tests.
+26. **[x] God-file decomposition — DONE 2026-07-06 (refactor pass, zero behavior
+    change, adversarially diff-reviewed).** `functions/main.py` 2,375 → 1,398
+    lines: share renderer + markdown parser → `share_render.py`, WhatsApp webhook
+    → `webhook.py`, background worker → `background.py`, shared transforms →
+    `analysis_shared.py`; deployed entry points re-exported from main.py for
+    Firebase discovery (all 25 names verified importable), lazy imports kept
+    lazy. HTTP/callable endpoints deliberately stay in main.py (shared
+    CORS/auth middleware + discovery). Embeddings: `embeddings.py` is the single
+    source of truth for model/dims/raw call; `ai_service.embed_text` keeps
+    `[:9000]`+fail-soft, `search.generate_embedding` keeps full-text+raise —
+    the two wrappers' semantics differ **deliberately** (fail-soft link saves
+    vs fail-fast search); unifying them = behavior change, not done. Note the
+    latent quirk for a future *behavior* pass: links saved during a Gemini
+    outage get mock `[1e-9]` embeddings that search then can't find.
+    `web/components/Feed.tsx` 2,103 → 1,861 lines: Firestore subscriptions →
+    `lib/useLibraryData.ts`, debounce+semantic search → `lib/useSearch.ts`,
+    filters/facets/derivations → `lib/useFacets.ts`; `MarkdownMessage` extracted
+    from AskBrain. The six views were already separate components — no further
+    split needed. JSX byte-identical throughout.
 27. **[ ] A11y follow-up (surfaced 2026-07-06).** Most overlays already carry
     `role`/`aria-modal` (better than the audit assumed) and Escape handling;
     remaining gap is a **shared focus-trap** hook applied to every overlay (only
     AskBrain manages focus today). Zoom re-enabled 2026-07-06 (removed
-    `userScalable:false`).
+    `userScalable:false`). **Assessed in the 2026-07-06 refactor pass and left
+    open on purpose:** a focus trap changes Tab/Shift-Tab cycling and focus
+    restoration — inherently behavioral (WCAG-positive, but not a refactor).
+    9 modals inventoried, none trap focus today.
 
 ### ✅ Done — verified against code (do not redo)
 
@@ -578,6 +608,24 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-06 — Structural refactor pass (same branch,
+  `claude/codebase-audit-production-ej8juu`) — ZERO behavior change.** Paid down
+  the organization debt the hardening pass deferred (task 26 + the sweep half of
+  17): split `functions/main.py` (2,375 → 1,398) into `share_render.py` /
+  `webhook.py` / `background.py` / `analysis_shared.py` with entry points
+  re-exported for Firebase discovery; single-sourced the embedding model/call in
+  `embeddings.py` (wrapper semantics deliberately kept different — see task 26);
+  extracted `useLibraryData`/`useSearch`/`useFacets` from `Feed.tsx` (2,103 →
+  1,861, JSX byte-identical) plus `MarkdownMessage` from AskBrain; swept all 276
+  hardcoded white/black utilities to new theme-invariant `white-fixed`/
+  `black-fixed` tokens and flipped the ESLint guard to **error**. Every move was
+  verified (tsc/vitest/build + py_compile/pytest green per commit; compiled-CSS
+  semantic diff = zero differences across 1,006 selectors; live light+dark
+  screenshots + computed styles unchanged) and two independent adversarial
+  diff-reviews returned PURE. Added `Feed.test.tsx` characterization test
+  (+@testing-library/jsdom devDeps). Assessed-and-skipped as inherently
+  behavioral: markdown renderer unification (task 25), O(N) scheduler redesign
+  (task 13), shared focus-trap (task 27). iOS Keychain (task 12) untouched.
 - **2026-07-06 — Production-readiness audit + hardening pass (branch
   `claude/codebase-audit-production-ej8juu`).** Ran a full three-part codebase
   audit (backend / frontend / infra-iOS-extension) and implemented the safe,
