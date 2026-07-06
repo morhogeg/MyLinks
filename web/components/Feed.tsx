@@ -1357,9 +1357,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                 )}
             </div>
 
-            {/* Active "Show by" status filter — pill + clear, mirroring the tag
-                filter row so Archive/Favorites/Unread/etc. are visible and
-                dismissable (previously the status filter left no on-page trace). */}
+            {/* Active "Show by" status filter — a single dismissable pill so
+                Archive/Favorites/Unread/etc. are visible and clearable (previously
+                the status filter left no on-page trace). It's single-select, so the
+                chip's ✕ is the clear — no separate "Clear All" (unlike the
+                multi-select tag row below). */}
             {isLibraryView && filter !== 'all' && (() => {
                 const active = filterButtons.find(b => b.key === filter);
                 if (!active) return null;
@@ -1384,12 +1386,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                 <X className="w-3.5 h-3.5" />
                             </button>
                         </div>
-                        <button
-                            onClick={() => setFilter('all')}
-                            className="text-[10px] font-bold text-text-muted/60 hover:text-accent hover:underline px-2 transition-colors uppercase tracking-tight"
-                        >
-                            Clear All
-                        </button>
                     </div>
                 );
             })()}
