@@ -3,7 +3,6 @@ import json
 from typing import List, Dict, Optional
 from firebase_admin import firestore
 from google.cloud.firestore_v1.vector import Vector
-from models import LinkDocument, RelatedLink
 from ai_service import GeminiService, GEMINI_ANALYSIS_MODEL
 
 logger = logging.getLogger(__name__)

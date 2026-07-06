@@ -108,8 +108,13 @@ def _to_ms(value) -> int:
 def fetch_candidate_links(uid: str) -> List[dict]:
     """Load the user's links (excluding archived) as plain dicts with `id`."""
     db = get_db()
+    from google.cloud import firestore as _fs
     links_ref = db.collection("users").document(uid).collection("links")
-    docs = links_ref.limit(CANDIDATE_LIMIT).get()
+    # Order by createdAt DESC before limiting: without it Firestore returns an
+    # arbitrary CANDIDATE_LIMIT slice, so for a library larger than the cap the
+    # "last 7 days" synthesis window (synthesis_window_cards) could silently miss
+    # recent saves. Single-field order_by needs no composite index.
+    docs = links_ref.order_by("createdAt", direction=_fs.Query.DESCENDING).limit(CANDIDATE_LIMIT).get()
 
     links = []
     for doc in docs:

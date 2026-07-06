@@ -228,28 +228,29 @@ _RATE_LIMITS = {
     "whatsapp": (60, 60),
 }
 
+# Buckets whose calls spend money on Gemini. A Firestore error while checking
+# these must NOT silently disable throttling (that turns a transient blip into
+# unbounded spend), so their limiter fails CLOSED. Cheap buckets fail open so a
+# read-only endpoint stays available during a Firestore hiccup.
+_PAID_BUCKETS = frozenset({"analyze", "image", "chat", "share"})
+
 
 def _rate_limited(bucket: str, identity: str, headers: dict = None):
     """Return a 429 Response if `identity` exceeds the bucket's limit, else None."""
     limit, window = _RATE_LIMITS[bucket]
-    if not check_rate_limit(f"{bucket}:{identity}", limit, window):
+    fail_closed = bucket in _PAID_BUCKETS
+    if not check_rate_limit(f"{bucket}:{identity}", limit, window, fail_closed=fail_closed):
         logger.warning("Rate limit exceeded: %s:%s", bucket, identity)
         return _error_response("Too many requests. Please slow down.", 429, headers)
     return None
 
 
-# App Check enforcement flag. When falsy, verification is attempted and logged
-# but never blocks (soft rollout) — lets us confirm the web client is sending
-# tokens before flipping APPCHECK_ENFORCE=true to start rejecting.
-APPCHECK_ENFORCE = os.environ.get("APPCHECK_ENFORCE", "").lower() in ("1", "true", "yes")
-
-# Auth enforcement flag for the staged multi-user rollout. When OFF (default),
-# the backend still accepts a client-supplied uid so the current app keeps
-# working; a verified ID token is preferred when present. When ON, every data
-# endpoint/callable REQUIRES a valid ID token and derives the workspace uid from
-# it (client-supplied uids are rejected). Flip to true only after sign-in is
-# confirmed working end-to-end. See NATIVE_AUTH_SETUP.md ("Cutover order").
-REQUIRE_AUTH = os.environ.get("REQUIRE_AUTH", "").lower() in ("1", "true", "yes")
+# Runtime flags are defined in config.py so leaf modules (search.py, etc.) can
+# read them without importing this entrypoint. Re-exported here under the same
+# names so existing references in this file keep working.
+#   APPCHECK_ENFORCE — soft (log-only) App Check unless true, then reject.
+#   REQUIRE_AUTH     — staged multi-user cutover; see NATIVE_AUTH_SETUP.md.
+from config import APPCHECK_ENFORCE, REQUIRE_AUTH
 
 
 def _require_app_check(req, headers: dict = None) -> bool:
@@ -2014,8 +2015,49 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     from_number = data.get("fromNumber")
     original_body = data.get("body")
 
+    # Idempotency guard. Firestore triggers are at-least-once: the same
+    # `pending_processing` create can be delivered more than once, and without a
+    # guard each redelivery writes a second placeholder card and re-runs the
+    # full scrape + Gemini analysis + embedding (duplicate cards, duplicate
+    # spend). Atomically claim the task: only the first delivery — where status
+    # is still "queued" and attempts are under the cap — flips it to
+    # "processing" and proceeds; every later delivery sees a non-"queued" status
+    # and bails.
+    from google.cloud import firestore as _fs
+    _MAX_ATTEMPTS = 3
+    _db_claim = get_db()
+
+    @_fs.transactional
+    def _claim(txn):
+        snap = ref.get(transaction=txn)
+        if not snap.exists:
+            return False
+        d = snap.to_dict() or {}
+        if d.get("status") != "queued":
+            return False
+        attempts = d.get("attempts", 0)
+        if attempts >= _MAX_ATTEMPTS:
+            return False
+        txn.update(ref, {
+            "status": "processing",
+            "attempts": attempts + 1,
+            "startedAt": datetime.now(timezone.utc).isoformat(),
+        })
+        return True
+
+    try:
+        claimed = _claim(_db_claim.transaction())
+    except Exception as claim_err:
+        # If the claim transaction itself errors, fail closed (skip) rather than
+        # risk a duplicate run — the original delivery will have claimed it, or a
+        # later redelivery will retry the claim.
+        logger.error(f"process_link_background claim failed for {task_id}: {claim_err}", exc_info=True)
+        return
+    if not claimed:
+        logger.warning("process_link_background: task %s already claimed/exhausted — skipping redelivery", task_id)
+        return
+
     log_to_firestore(task_id, "Background processing started", data={"url": url, "uid": uid, "isImage": is_image})
-    ref.update({"status": "processing", "startedAt": datetime.now(timezone.utc).isoformat()})
 
     # The URL we were handed before any reassignment (the image path rewrites `url`
     # to the stored Storage URL below). Kept so a FAILED card records the original.

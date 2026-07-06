@@ -63,9 +63,18 @@ def sync_link_embedding(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]
         link_id = snapshot.id
         uid = event.params["uid"]
 
-        title = data.get("title", "")
-        summary = data.get("summary", "")
+        title = (data.get("title") or "").strip()
+        summary = (data.get("summary") or "").strip()
         tags = ", ".join(data.get("tags", []))
+
+        # Skip placeholder cards. The capture pipeline first writes a
+        # `processing` card with no real content, then overwrites it with the
+        # analyzed title/summary AND its own embedding. Embedding the empty
+        # placeholder here is a wasted Gemini call whose vector is immediately
+        # discarded — bail until there's actual text to embed.
+        if data.get("status") == "processing" or (not title and not summary):
+            logger.info(f"Skipping embedding for placeholder link {link_id} (no content yet).")
+            return
 
         text_to_embed = f"Title: {title}\nSummary: {summary}\nTags: {tags}"
 
@@ -110,19 +119,13 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
     db = get_db()
     links_ref = db.collection("users").document(uid).collection("links")
 
-    # First, check if any links have embeddings
-    # This helps diagnose if the issue is missing embeddings vs. other problems
-    all_links = list(links_ref.limit(1).stream())
-    has_any_embeddings = False
-    if all_links:
-        sample_doc = all_links[0].to_dict()
-        has_any_embeddings = "embedding_vector" in sample_doc
-    
-    if not has_any_embeddings:
-        logger.warning(f"No embeddings found for user {uid}. Run backfill_embeddings.py to generate embeddings for existing links.")
-        # Don't fail the search, just return empty results with a helpful message
-        return []
-
+    # NOTE: we deliberately do NOT pre-check "does any link have an embedding?"
+    # by sampling one doc. That sample used `limit(1)`, whose first row is
+    # frequently a `processing` placeholder card (no embedding yet) — so a whole
+    # user's search would short-circuit to [] purely because of which doc got
+    # sampled. `find_nearest` already matches only documents that carry the
+    # `embedding_vector` field and returns [] when none do, so we run it directly
+    # and let a genuinely empty library return no results.
     try:
         vector_query = links_ref.find_nearest(
             vector_field="embedding_vector",
@@ -164,7 +167,7 @@ def search_links(req: https_fn.CallableRequest) -> Any:
         # Prefer the verified caller; fall back to the client uid only while
         # REQUIRE_AUTH is off (staged rollout).
         from link_service import find_data_uid_by_auth_uid
-        from main import REQUIRE_AUTH
+        from config import REQUIRE_AUTH
         uid = find_data_uid_by_auth_uid(req.auth.uid) if req.auth else None
         if not uid and not REQUIRE_AUTH and req.data:
             uid = req.data.get("uid") or req.data.get("test_uid")

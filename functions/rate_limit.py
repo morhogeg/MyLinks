@@ -27,11 +27,19 @@ def _safe_key(key: str) -> str:
     return key.replace("/", "_")[:1400]
 
 
-def check_rate_limit(key: str, limit: int, window_seconds: int) -> bool:
+def check_rate_limit(
+    key: str, limit: int, window_seconds: int, fail_closed: bool = False
+) -> bool:
     """Return True if the call is allowed, False if the limit is exceeded.
 
-    Fails OPEN (returns True) on any backend error, so a transient Firestore
-    problem degrades to "no rate limiting" rather than taking the endpoint down.
+    On a backend error the behavior depends on `fail_closed`:
+    - `fail_closed=False` (default): fail OPEN (return True) so a transient
+      Firestore problem degrades to "no rate limiting" rather than taking a
+      cheap endpoint down.
+    - `fail_closed=True`: fail CLOSED (return False). Use this for the paid
+      Gemini buckets — a Firestore blip must NOT silently disable throttling on
+      the money-spending endpoints (that turns a transient error into unbounded
+      spend).
     """
     try:
         db = get_db()
@@ -60,13 +68,38 @@ def check_rate_limit(key: str, limit: int, window_seconds: int) -> bool:
 
         return _txn(db.transaction())
     except Exception as e:
-        logger.error("Rate limit check failed (failing open): %s", e)
-        return True
+        mode = "failing closed" if fail_closed else "failing open"
+        logger.error("Rate limit check failed (%s): %s", mode, e)
+        return not fail_closed
 
 
 def client_ip(req) -> str:
-    """Best-effort client IP from a Cloud Functions (Flask) request."""
+    """Best-effort client IP for rate-limit keying.
+
+    NOTE: `X-Forwarded-For` is a chain `<client-supplied…>, <infra-appended>`.
+    The LEFTMOST entries are attacker-controlled (a client can send any
+    `X-Forwarded-For` and the platform appends to the right), so keying on the
+    leftmost value lets an attacker rotate it to defeat every limit. We instead
+    take the RIGHTMOST hop, which is appended by Google's front end and cannot
+    be forged by the client. This is still only best-effort — the durable fix is
+    per-uid keying on authenticated endpoints (see `rate_limit_identity`).
+    """
     fwd = req.headers.get("X-Forwarded-For", "")
     if fwd:
-        return fwd.split(",")[0].strip()
+        hops = [h.strip() for h in fwd.split(",") if h.strip()]
+        if hops:
+            return hops[-1]
     return getattr(req, "remote_addr", None) or "unknown"
+
+
+def rate_limit_identity(req, uid: str = None) -> str:
+    """Identity to key a rate-limit bucket on.
+
+    Prefer the verified workspace `uid` when the caller is authenticated (a
+    stable, un-spoofable identity that also stops one abuser behind a shared IP
+    from exhausting everyone's budget). Fall back to the spoof-resistant client
+    IP for anonymous callers.
+    """
+    if uid:
+        return f"uid:{uid}"
+    return f"ip:{client_ip(req)}"

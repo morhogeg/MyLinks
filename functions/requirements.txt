@@ -1,8 +1,12 @@
-firebase-functions>=0.4.0
-firebase-admin>=6.4.0
-google-genai>=1.0.0
-beautifulsoup4>=4.12.0
-requests>=2.31.0
-pydantic>=2.0.0
-flask>=3.0.0
-twilio>=8.0.0
+# Bounded ranges: keep the known-working lower bounds (do not lower these — the
+# deploy is sensitive, see SOURCE_OF_TRUTH.md §2) but cap the next major so a
+# surprise breaking release can't silently break a deploy. Tighten to exact
+# pins once a resolved lockfile is captured on the owner machine.
+firebase-functions>=0.4.0,<1.0.0
+firebase-admin>=6.4.0,<7.0.0
+google-genai>=1.0.0,<2.0.0
+beautifulsoup4>=4.12.0,<5.0.0
+requests>=2.31.0,<3.0.0
+pydantic>=2.0.0,<3.0.0
+flask>=3.0.0,<4.0.0
+twilio>=8.0.0,<10.0.0
