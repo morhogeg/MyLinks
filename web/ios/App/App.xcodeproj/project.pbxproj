@@ -22,6 +22,8 @@
 		ED0000000000000000000027 /* ShareExt.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = ED0000000000000000000010 /* ShareExt.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		ED00000000000000000000B1 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = ED00000000000000000000B0 /* PrivacyInfo.xcprivacy */; };
 		ED00000000000000000000B3 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = ED00000000000000000000B2 /* PrivacyInfo.xcprivacy */; };
+		ED00000000000000000000C1 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED00000000000000000000C0 /* KeychainHelper.swift */; };
+		ED00000000000000000000C2 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED00000000000000000000C0 /* KeychainHelper.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -62,6 +64,7 @@
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		ED0000000000000000000001 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		ED0000000000000000000002 /* ShareConfigPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareConfigPlugin.swift; sourceTree = "<group>"; };
+		ED00000000000000000000C0 /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
 		ED0000000000000000000005 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		ED0000000000000000000010 /* ShareExt.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExt.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED0000000000000000000011 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
@@ -115,6 +118,7 @@
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				ED0000000000000000000002 /* ShareConfigPlugin.swift */,
+				ED00000000000000000000C0 /* KeychainHelper.swift */,
 				ED0000000000000000000005 /* MainViewController.swift */,
 				ED0000000000000000000001 /* App.entitlements */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -257,6 +261,7 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				ED0000000000000000000003 /* ShareConfigPlugin.swift in Sources */,
+				ED00000000000000000000C1 /* KeychainHelper.swift in Sources */,
 				ED0000000000000000000004 /* MainViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -266,6 +271,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				ED0000000000000000000012 /* ShareViewController.swift in Sources */,
+				ED00000000000000000000C2 /* KeychainHelper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

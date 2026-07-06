@@ -848,9 +848,30 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
 
     // MARK: - Networking
 
+    /// The ingest token lives in the shared Keychain access group (see
+    /// KeychainHelper, compiled into both targets; security finding H3).
+    /// One-time migration: builds before the Keychain move wrote the token to
+    /// the App Group's UserDefaults in plaintext — if the Keychain is empty
+    /// but that legacy copy exists (app not yet reopened since the update),
+    /// promote it to the Keychain, scrub it from the defaults, and use it.
+    /// Returns nil when no token exists anywhere (signed out / fresh install)
+    /// so the caller shows "Open Machina and sign in first".
+    private static func resolveIngestToken(defaults: UserDefaults?) -> String? {
+        if let token = KeychainHelper.get(account: "ingestToken"), !token.isEmpty {
+            return token
+        }
+        guard let legacy = defaults?.string(forKey: "ingestToken"), !legacy.isEmpty else {
+            return nil
+        }
+        if KeychainHelper.set(legacy, account: "ingestToken") {
+            defaults?.removeObject(forKey: "ingestToken")
+        }
+        return legacy
+    }
+
     private func upload(payload: [String: String]) {
         let defaults = UserDefaults(suiteName: Self.appGroup)
-        let token = defaults?.string(forKey: "ingestToken")
+        let token = Self.resolveIngestToken(defaults: defaults)
         let endpoint = defaults?.string(forKey: "shareEndpoint") ?? Self.defaultEndpoint
 
         guard let token = token, !token.isEmpty else {

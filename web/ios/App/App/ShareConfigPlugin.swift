@@ -2,9 +2,12 @@ import Foundation
 import Capacitor
 
 /// Bridges the share-ingest endpoint + token from the WebView (where the
-/// Firebase session lives) into the App Group's shared UserDefaults, so the
-/// Share Extension — which runs in its own process and can't see the WebView —
-/// can authenticate uploads to the backend.
+/// Firebase session lives) to the Share Extension — which runs in its own
+/// process and can't see the WebView — so it can authenticate uploads to the
+/// backend. The endpoint (non-secret) goes into the App Group's shared
+/// UserDefaults; the token (secret) goes into the shared Keychain access
+/// group via KeychainHelper (security finding H3 — it used to sit in the App
+/// Group defaults plist in plaintext).
 ///
 /// JS side: registerPlugin('ShareConfig').save({ endpoint, token })  (see
 /// web/lib/shareConfig.ts).
@@ -21,6 +24,10 @@ public class ShareConfigPlugin: CAPPlugin, CAPBridgedPlugin {
     /// and the suite name read by ShareViewController.
     static let appGroup = "group.com.morhogeg.machina"
 
+    /// Keychain account under which the ingest token is stored (service +
+    /// access group live in KeychainHelper). Must match ShareViewController.
+    static let ingestTokenAccount = "ingestToken"
+
     @objc func save(_ call: CAPPluginCall) {
         guard let endpoint = call.getString("endpoint"),
               let token = call.getString("token"),
@@ -34,8 +41,15 @@ public class ShareConfigPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        guard KeychainHelper.set(token, account: ShareConfigPlugin.ingestTokenAccount) else {
+            call.reject("Failed to store the ingest token in the Keychain")
+            return
+        }
+
         defaults.set(endpoint, forKey: "shareEndpoint")
-        defaults.set(token, forKey: "ingestToken")
+        // Scrub the legacy plaintext copy left behind by builds that stored
+        // the token in the App Group defaults (pre-Keychain).
+        defaults.removeObject(forKey: "ingestToken")
         call.resolve()
     }
 
