@@ -6,11 +6,11 @@
 import { useState, useEffect, useRef, useMemo, cloneElement, type ReactElement } from 'react';
 import { Link, LinkStatus, Collection, WeeklySynthesis } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { toMillis, type TimestampLike } from '@/lib/time';
 import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, type PlatformKey } from '@/lib/platform';
 import Dropdown from './Dropdown';
 import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
-import { collection, query, orderBy, onSnapshot, getDocsFromServer, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { useLibraryData, getTimestampNumber } from '@/lib/useLibraryData';
+import { collection, query, orderBy, getDocsFromServer, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
@@ -58,7 +58,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
-    const [links, setLinks] = useState<Link[]>([]);
+    const { links, setLinks, collections, isLoading } = useLibraryData(uid);
     const [searchQuery, setSearchQuery] = useState('');
     const [filter, setFilter] = useState<FilterType>('all');
     const [selectedCategory, setSelectedCategory] = useState<Set<string>>(new Set());
@@ -95,7 +95,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
         setLinkStack([]);
         setActiveLinkId(null);
     };
-    const [isLoading, setIsLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'ask' | 'collections' | 'connections'>('grid');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -115,7 +114,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
     const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
     // Collections
-    const [collections, setCollections] = useState<Collection[]>([]);
     const [selectedCollections, setSelectedCollections] = useState<Set<string>>(new Set());
     const [addToCollectionLink, setAddToCollectionLink] = useState<Link | null>(null);
     const [collectionFormOpen, setCollectionFormOpen] = useState(false);
@@ -234,47 +232,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
     };
 
     // uid comes from AuthProvider — no mock lookup needed
-
-    // 2. Real-time sync from Firestore
-    useEffect(() => {
-        if (!uid) return;
-
-        const linksRef = collection(db, 'users', uid, 'links');
-        const q = query(linksRef, orderBy('createdAt', 'desc'));
-
-        const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
-            const fetchedLinks = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
-                id: doc.id,
-                ...doc.data()
-            } as Link));
-            setLinks(fetchedLinks);
-            setIsLoading(false);
-        }, (error: Error) => {
-            console.error("Firestore sync error:", error);
-            toast.error("Lost connection to your library. Reconnecting…");
-            setIsLoading(false);
-        });
-
-        return () => unsubscribe();
-    }, [uid, toast]);
-
-    // 2b. Real-time sync of collections from Firestore
-    useEffect(() => {
-        if (!uid) return;
-        const ref = collection(db, 'users', uid, 'collections');
-        const unsubscribe = onSnapshot(ref, (snapshot: QuerySnapshot<DocumentData>) => {
-            setCollections(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({
-                id: d.id,
-                ...d.data()
-            } as Collection)));
-        }, (error: Error) => {
-            console.error("Collections sync error:", error);
-        });
-        return () => unsubscribe();
-    }, [uid]);
-
-    // Helper to get consistent number for timestamps (handles number, string, or Firestore Timestamp)
-    const getTimestampNumber = (val: TimestampLike): number => toMillis(val);
+    // (links/collections stream in live via useLibraryData above)
 
     // 3. Handle deep linking
     //
