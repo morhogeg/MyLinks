@@ -526,16 +526,19 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
-- **2026-07-06 — "Show by" status filter now has a dismissable pill + Clear All
-  (commit `f575529`).** The status filter (Archive/Favorites/Unread/Read/Reminders)
-  changed the feed but left no on-page indicator — unlike tags, which show a
-  "Filtered By:" pill row with per-chip X + Clear All. Added a matching row in
-  `Feed.tsx` (above the cards, before the tag row): a contextual icon + "Showing:"
-  label + the active filter's name as a pill with an X, plus a Clear All button,
-  all resetting `setFilter('all')`. Shows whenever `filter !== 'all'` in
-  `isLibraryView`; renders on **both web and iOS** (shared code path, same as the
-  tag row). Frontend-only. **SHIPPED:** web via Vercel; TestFlight **run #40 →
-  build 1040**.
+- **2026-07-06 — "Show by" status filter now has a dismissable pill (commits
+  `f575529`, `c77f873`).** The status filter (Archive/Favorites/Unread/Read/
+  Reminders) changed the feed but left no on-page indicator — unlike tags. Added a
+  row in `Feed.tsx` (above the cards, before the tag row): a contextual icon +
+  "Showing:" label + the active filter's name as a pill with an X, shown whenever
+  `filter !== 'all'` in `isLibraryView`; renders on **both web and iOS** (shared
+  path, same as the tag row). **Design decision:** Show stays **single-select**
+  (its options are mutually-exclusive view lenses; multi-select combos like
+  "Favorites OR Archived" are confusing and rarely wanted), so the chip's X is the
+  clear — **no separate "Clear All"** (that was in the first cut `f575529`, removed
+  in `c77f873` as redundant). The tag row keeps Clear All because it's genuinely
+  multi-select. Frontend-only. **SHIPPED:** web via Vercel; TestFlight **run #41 →
+  build 1041** (superseding the interim build 1040).
 - **2026-07-06 — Card ↔ open unified into one thought at two zoom levels
   (commit `51bd9fa`).** Follow-up to the summary-quality ship below: the card
   `summary` and the open `detailedSummary` were two independent paraphrases, so
