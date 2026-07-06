@@ -78,6 +78,14 @@
   --color-text-muted: var(--text-muted);
   --color-border-subtle: var(--border);
   --color-accent: var(--accent);
+  /* Theme-invariant colors — deliberately the SAME in dark and light mode.
+     white-fixed: glass borders/surfaces and text sitting on images, scrims, or
+     the accent gradient. black-fixed: scrims/backdrops over content. These are
+     exact aliases of Tailwind's white/black so swapping a hardcoded utility to
+     the token never changes a rendered pixel; when a real light-theme pass
+     happens (SOURCE_OF_TRUTH §4 task 17), re-point call sites individually. */
+  --color-white-fixed: #fff;
+  --color-black-fixed: #000;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
