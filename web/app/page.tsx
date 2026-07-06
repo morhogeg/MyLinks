@@ -5,7 +5,8 @@ import { useAuth } from '@/components/AuthProvider';
 import Feed from "@/components/Feed";
 import AddLinkForm from "@/components/AddLinkForm";
 import AnalyzingBanner, { AnalyzingState } from "@/components/AnalyzingBanner";
-import InstallPWA from "@/components/InstallPWA";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import OfflineBanner from "@/components/OfflineBanner";
 import SettingsModal from "@/components/SettingsModal";
 import OnboardingTour, { ONBOARDING_STORAGE_KEY } from "@/components/OnboardingTour";
 import { Settings } from "lucide-react";
@@ -27,7 +28,6 @@ function pickBanner(...states: (AnalyzingState | null)[]): AnalyzingState | null
  */
 export default function Home() {
   const { uid, loading } = useAuth();
-  const [refreshKey, setRefreshKey] = useState(0);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAskMode, setIsAskMode] = useState(false);
   const [hideAddButton, setHideAddButton] = useState(false);
@@ -47,9 +47,10 @@ export default function Home() {
   // up = back), settling to shown/hidden when the finger rests.
   const headerRef = useHeaderFade<HTMLElement>();
 
-  const handleLinkAdded = () => {
-    setRefreshKey(prev => prev + 1);
-  };
+  // The Feed subscribes to Firestore in real time, so a newly-saved card
+  // streams in on its own — no manual refresh/remount needed. Kept as a hook
+  // point for post-save side effects (currently none).
+  const handleLinkAdded = () => {};
 
   // First-run onboarding: once auth resolves and the feed is on screen, show the
   // guided tour if this browser hasn't seen it yet. A short delay lets the
@@ -156,7 +157,9 @@ export default function Home() {
       {/* Main Content — Ask mode fills to the viewport bottom, so it drops the
           tall bottom padding the grid uses for the FAB. */}
       <main className={`max-w-[2200px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-2 sm:py-4 ${isAskMode ? 'pb-0 sm:pb-0' : 'pb-24 sm:pb-20'}`}>
-        <Feed key={refreshKey} onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} />
+        <ErrorBoundary label="Feed">
+          <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} />
+        </ErrorBoundary>
       </main>
 
       {/* Add Link FAB — hidden in Ask & Collections (neither view captures links). */}
@@ -176,8 +179,8 @@ export default function Home() {
       {/* First-run guided tour */}
       <OnboardingTour open={isTourOpen} onClose={() => setIsTourOpen(false)} />
 
-      {/* iOS Install Banner */}
-      <InstallPWA />
+      {/* Connectivity signal — optimistic writes look successful offline. */}
+      <OfflineBanner />
     </div>
   );
 }

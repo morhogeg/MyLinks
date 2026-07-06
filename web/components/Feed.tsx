@@ -6,6 +6,7 @@
 import { useState, useEffect, useRef, useMemo, cloneElement, type ReactElement } from 'react';
 import { Link, LinkStatus, Collection, WeeklySynthesis } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
+import { toMillis, type TimestampLike } from '@/lib/time';
 import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, type PlatformKey } from '@/lib/platform';
 import Dropdown from './Dropdown';
 import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
@@ -273,14 +274,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
     }, [uid]);
 
     // Helper to get consistent number for timestamps (handles number, string, or Firestore Timestamp)
-    const getTimestampNumber = (val: any): number => {
-        if (!val) return 0;
-        if (typeof val === 'number') return val;
-        if (typeof val === 'string') return new Date(val).getTime();
-        if (val.toMillis && typeof val.toMillis === 'function') return val.toMillis();
-        if (val.seconds) return val.seconds * 1000;
-        return 0;
-    };
+    const getTimestampNumber = (val: TimestampLike): number => toMillis(val);
 
     // 3. Handle deep linking
     //

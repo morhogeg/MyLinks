@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useScrollLock } from '@/lib/useScrollLock';
 import { Collection } from '@/lib/types';
 import { X, Check, Layers, Shuffle } from 'lucide-react';
 import { COLOR_KEYS, getColorStyleByKey } from '@/lib/colors';
@@ -56,17 +57,17 @@ export default function CollectionFormModal({
         }
     }, [isOpen, collection]);
 
+    useScrollLock(isOpen);
+
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
         };
         if (isOpen) {
             window.addEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'hidden';
         }
         return () => {
             window.removeEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'unset';
         };
     }, [isOpen, onClose]);
 

@@ -13,12 +13,9 @@ const geistMono = GeistMono;
 export const metadata: Metadata = {
   title: "Machina AI",
   description: "Your AI-powered knowledge capture and retrieval system",
-  manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "Machina AI",
-  },
+  // The iPhone PWA / add-to-home-screen surface is retired in favor of the
+  // native app (SOURCE_OF_TRUTH §15), so no web manifest / appleWebApp.capable
+  // — those advertise a standalone install we no longer support.
   icons: {
     apple: "/apple-touch-icon.png",
   },
@@ -27,8 +24,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  // Do NOT disable user scaling: `maximumScale: 1` / `userScalable: false` block
+  // pinch-zoom, failing WCAG 1.4.4 (Resize Text). Let users zoom.
   themeColor: "#050505",
   viewportFit: "cover",
 };
@@ -57,10 +54,6 @@ export default function RootLayout({
             __html: `(function(){try{var t=localStorage.getItem('theme');var isLight=t==='light'||(t==='system'&&!window.matchMedia('(prefers-color-scheme: dark)').matches);if(isLight){document.documentElement.classList.add('light');}}catch(e){}})();`,
           }}
         />
-        {/* PWA iOS meta tags */}
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Machina AI" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body

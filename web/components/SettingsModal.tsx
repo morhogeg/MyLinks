@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { User, DigestMode, DigestChannel } from '@/lib/types';
 import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight, Compass, LogOut, UserCircle, CalendarClock, Search, ShieldCheck, ExternalLink, Network } from 'lucide-react';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
+import { useScrollLock } from '@/lib/useScrollLock';
 import { policyUrl, openExternal } from '@/lib/share';
 import { readLocalAiConsent } from '@/lib/aiConsent';
 import { getShareBridgeStatus, resyncShareConfig, onShareBridgeStatus, ShareBridgeStatus } from '@/lib/shareConfig';
@@ -208,15 +209,10 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
         return () => mq.removeEventListener('change', onChange);
     }, []);
 
-    // Lock the page behind Settings while it's open. Settings is a fixed
-    // full-screen overlay, so without this the underlying feed keeps its own
-    // scrollbar — you'd see two scrollbars and the page could scroll behind.
-    useEffect(() => {
-        if (!isOpen) return;
-        const prev = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = prev; };
-    }, [isOpen]);
+    // Lock the page behind Settings while it's open (ref-counted, shared across
+    // all overlays — F-16). Settings is a fixed full-screen overlay, so without
+    // this the underlying feed keeps its own scrollbar.
+    useScrollLock(isOpen);
 
     // Swipe in from the left edge to leave Settings — the digest sub-screen pops
     // back to the main list first, then the page closes.

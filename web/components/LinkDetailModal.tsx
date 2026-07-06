@@ -10,6 +10,7 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import TagInput from './TagInput';
 import { hasHebrew } from '@/lib/rtl';
+import { formatTimeAgo, type TimestampLike } from '@/lib/time';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { getRelatedCards } from '@/lib/related';
@@ -143,20 +144,8 @@ export default function LinkDetailModal({
     const isLinkedIn = platform === 'linkedin';
     const isFacebook = platform === 'facebook';
 
-    const getTimeAgo = (timestamp: any, now: number): string => {
-        if (!timestamp || !now) return '...';
-        const time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
-        if (isNaN(time)) return isRtl ? 'לאחרונה' : 'recently';
-
-        const seconds = Math.floor((now - time) / 1000);
-        if (seconds < 60) return isRtl ? 'זה עתה' : 'just now';
-        const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return isRtl ? `לפני ${minutes} דק׳` : `${minutes}m ago`;
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) return isRtl ? `לפני ${hours} שע׳` : `${hours}h ago`;
-        const days = Math.floor(hours / 24);
-        return isRtl ? `לפני ${days} ימים` : `${days}d ago`;
-    };
+    const getTimeAgo = (timestamp: TimestampLike, now: number): string =>
+        formatTimeAgo(timestamp, now, isRtl);
 
     const isReminderActive = link.reminderStatus === 'pending';
     const nextReminderDate = link.nextReminderAt ? new Date(link.nextReminderAt) : null;

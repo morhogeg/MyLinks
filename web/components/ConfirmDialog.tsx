@@ -2,6 +2,7 @@
 
 import { X, AlertTriangle } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { useScrollLock } from '@/lib/useScrollLock';
 import { hapticWarning, hapticMedium } from '@/lib/haptics';
 
 interface ConfirmDialogProps {
@@ -47,6 +48,10 @@ export default function ConfirmDialog({
         onClose();
     };
 
+    // Ref-counted body scroll lock (F-16): shared across all overlays so a
+    // nested sheet closing can't unlock a still-open parent modal.
+    useScrollLock(isOpen);
+
     // Handle Escape key to close
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
@@ -54,11 +59,9 @@ export default function ConfirmDialog({
         };
         if (isOpen) {
             window.addEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'hidden';
         }
         return () => {
             window.removeEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'unset';
         };
     }, [isOpen, onClose]);
 

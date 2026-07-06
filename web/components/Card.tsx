@@ -6,6 +6,7 @@ import { Link, LinkStatus } from '@/lib/types';
 import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Play, Youtube, ExternalLink, Layers, Share2, X, Loader2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
+import { formatTimeAgo, type TimestampLike } from '@/lib/time';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
@@ -102,22 +103,8 @@ export default function Card({
     }, []);
 
     // Format relative time (e.g., "2h ago")
-    const getTimeAgo = (timestamp: any, now: number): string => {
-        if (!timestamp || !now) return '...';
-
-        // Handle ISO string or number
-        const time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
-        if (isNaN(time)) return isRtl ? 'לאחרונה' : 'recently';
-
-        const seconds = Math.floor((now - time) / 1000);
-        if (seconds < 60) return isRtl ? 'זה עתה' : 'just now';
-        const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return isRtl ? `לפני ${minutes} דק׳` : `${minutes}m ago`;
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) return isRtl ? `לפני ${hours} שע׳` : `${hours}h ago`;
-        const days = Math.floor(hours / 24);
-        return isRtl ? `לפני ${days} ימים` : `${days}d ago`;
-    };
+    const getTimeAgo = (timestamp: TimestampLike, now: number): string =>
+        formatTimeAgo(timestamp, now, isRtl);
 
     // M3 — async-capture lifecycle. A card queued via the share sheet / WhatsApp
     // is written as `processing` and flips to `failed` if analysis errors. Render

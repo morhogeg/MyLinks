@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useScrollLock } from '@/lib/useScrollLock';
 import { Collection, Link } from '@/lib/types';
 import { Check, X, Search, LayoutGrid } from 'lucide-react';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -35,16 +36,16 @@ export default function ManageCollectionCardsSheet({
     // doesn't push the card list under the keys. No-op on desktop.
     const vp = useVisualViewport();
 
+    useScrollLock(isOpen);
+
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
         if (isOpen) {
             window.addEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'hidden';
             setQ('');
         }
         return () => {
             window.removeEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'unset';
         };
     }, [isOpen, onClose]);
 

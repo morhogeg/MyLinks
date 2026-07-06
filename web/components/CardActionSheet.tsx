@@ -3,6 +3,7 @@
 import { Link, LinkStatus } from '@/lib/types';
 import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink, Layers, Share2, FolderMinus } from 'lucide-react';
 import { useEffect } from 'react';
+import { useScrollLock } from '@/lib/useScrollLock';
 import { IconButton } from './ui/Button';
 
 interface CardActionSheetProps {
@@ -41,17 +42,17 @@ export default function CardActionSheet({
     onShare,
     removeFromCollection,
 }: CardActionSheetProps) {
+    useScrollLock(isOpen);
+
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
         };
         if (isOpen) {
             window.addEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'hidden';
         }
         return () => {
             window.removeEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'unset';
         };
     }, [isOpen, onClose]);
 
