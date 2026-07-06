@@ -17,6 +17,23 @@ logger = logging.getLogger(__name__)
 
 _COLLECTION = "rate_limits"
 
+# Per-bucket rate limits: (max_requests, window_seconds). The analyze / image /
+# chat buckets are deliberately tight because each call spends money on Gemini.
+_RATE_LIMITS = {
+    "analyze": (30, 3600),
+    "image": (30, 3600),
+    "chat": (60, 3600),
+    "article": (120, 3600),
+    "share": (120, 3600),
+    "whatsapp": (60, 60),
+}
+
+# Buckets whose calls spend money on Gemini. A Firestore error while checking
+# these must NOT silently disable throttling (that turns a transient blip into
+# unbounded spend), so their limiter fails CLOSED. Cheap buckets fail open so a
+# read-only endpoint stays available during a Firestore hiccup.
+_PAID_BUCKETS = frozenset({"analyze", "image", "chat", "share"})
+
 
 def _safe_key(key: str) -> str:
     # Firestore document IDs can't contain '/' and have a length cap.
