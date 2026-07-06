@@ -47,20 +47,21 @@ hygiene (§4.2). Remaining medium/low items are hardening, not blockers.
 
 ### Severity tally
 
-| Severity | Count | Of which fixed this pass |
+| Severity | Count | Of which fixed in code (audit pass + hardening session, §4.2/§4.5) |
 |---|---|---|
 | 🔴 Critical | 3 | 0 (gated on owner-run auth cutover) |
-| 🟠 High | 4 | 2 |
-| 🟡 Medium | 8 | 4 |
-| 🟢 Low | 7 | 3 |
+| 🟠 High | 4 | 3 (H4 is owner ops) |
+| 🟡 Medium | 8 | 7 (M5 closes with the cutover) |
+| 🟢 Low | 7 | 5 (L2 belongs to the cutover session; L4 accepted) |
 
 ---
 
 ## 2. Findings at a glance
 
-Status legend: **FIXED** (in this branch) · **CUTOVER** (closes when the staged
-auth cutover ships — code ready, owner action needed) · **OWNER** (owner
-configuration/ops action) · **BACKLOG** (documented hardening, no code yet).
+Status legend: **FIXED** (code landed — audit pass §4.2 or hardening session
+§4.5) · **CUTOVER** (closes when the staged auth cutover ships — code ready,
+owner action needed) · **OWNER** (owner configuration/ops action) ·
+**BACKLOG** (documented hardening, no code yet).
 
 | ID | Sev | OWASP | Surface | Finding | Status |
 |----|-----|-------|---------|---------|--------|
@@ -69,22 +70,22 @@ configuration/ops action) · **BACKLOG** (documented hardening, no code yet).
 | C3 | 🔴 | A01 | Backend | Client-supplied `uid` trusted (`REQUIRE_AUTH` off) → IDOR | CUTOVER |
 | H1 | 🟠 | A10 | Backend | SSRF via redirect on platform scrapers | **FIXED** |
 | H2 | 🟠 | A04 | Backend | Rate-limit bypass via spoofed `X-Forwarded-For` + soft App Check | **FIXED** (App Check = OWNER) |
-| H3 | 🟠 | A04/A02 | iOS | Ingest token in App Group UserDefaults, long-lived, no rotation | BACKLOG |
+| H3 | 🟠 | A04/A02 | iOS | Ingest token in App Group UserDefaults, long-lived, no rotation | **FIXED** (Keychain; rotation still BACKLOG) |
 | H4 | 🟠 | A05 | Backend | WhatsApp impersonation if `TWILIO_AUTH_TOKEN` unset (uid = phone) | OWNER |
-| M1 | 🟡 | A05 | Web | CSP allows `unsafe-inline` + `unsafe-eval` | BACKLOG |
+| M1 | 🟡 | A05 | Web | CSP allows `unsafe-inline` + `unsafe-eval` | **FIXED** (`unsafe-eval` dropped; `unsafe-inline` residue) |
 | M2 | 🟡 | A05 | CI | Workflow had no `permissions:` block | **FIXED** |
 | M3 | 🟡 | A05 | Repo | `.gitignore` missed signing/service-account secrets | **FIXED** |
 | M4 | 🟡 | A02/A05 | Extension | Bearer token in `chrome.storage.sync`; unpinned `baseUrl` | **FIXED** |
 | M5 | 🟡 | A01 | Web | `/api/chat` open proxy; enforcement delegated to backend | CUTOVER |
 | M6 | 🟡 | A09 | Backend | Admin endpoints returned raw `str(e)` | **FIXED** |
-| M7 | 🟡 | A04 | Backend | Rate limiter fails open on Firestore error | BACKLOG |
-| M8 | 🟡 | A06 | Backend | `>=`-only dependency pins (non-reproducible builds) | BACKLOG |
-| L1 | 🟢 | A05 | Storage | `screenshots` read rule can never match; images token-URL public | BACKLOG |
-| L2 | 🟢 | A05 | Tests | Rule tests validate the un-deployed `.locked` file | BACKLOG |
-| L3 | 🟢 | A06 | CI | Actions pinned to tags, not SHAs | BACKLOG |
-| L4 | 🟢 | A04 | iOS | `machina://` scheme invokable by any app (UI-spoof only) | BACKLOG |
+| M7 | 🟡 | A04 | Backend | Rate limiter fails open on Firestore error | **FIXED** (fail-closed on paid buckets) |
+| M8 | 🟡 | A06 | Backend | `>=`-only dependency pins (non-reproducible builds) | **FIXED** (needs one owner deploy test) |
+| L1 | 🟢 | A05 | Storage | `screenshots` read rule can never match; images token-URL public | **FIXED** (dead rule → explicit deny + doc) |
+| L2 | 🟢 | A05 | Tests | Rule tests validate the un-deployed `.locked` file | BACKLOG (cutover session) |
+| L3 | 🟢 | A06 | CI | Actions pinned to tags, not SHAs | **FIXED** |
+| L4 | 🟢 | A04 | iOS | `machina://` scheme invokable by any app (UI-spoof only) | BACKLOG (accepted) |
 | L5 | 🟢 | A03 | Web | `openExternal()` didn't scheme-guard before `window.open` | **FIXED** |
-| L6 | 🟢 | A03 | Web | `img src` from scraped data unsanitized (non-executing) | BACKLOG |
+| L6 | 🟢 | A03 | Web | `img src` from scraped data unsanitized (non-executing) | **FIXED** (https-only) |
 | L7 | 🟢 | A05 | Repo | `functions/.gitignore` didn't list `.env` | **FIXED** |
 
 ---
@@ -171,19 +172,34 @@ skipping internal hops, falling back to the socket peer. A client can prepend
 spoofed entries but cannot control the infra-appended rightmost value.
 **Owner action:** set `APPCHECK_ENFORCE=true` so App Check is hard-enforced
 (`SOURCE_OF_TRUTH.md` §4 task 5). Consider per-uid quotas after cutover
-(backlog task 13/19). *Related — M7:* the limiter fails **open** on a Firestore
-error (`rate_limit.py`); consider fail-closed on the paid buckets.
+(backlog task 13/19). *Related — M7 (since fixed):* the limiter now fails
+**closed** on the paid buckets when Firestore errors (`rate_limit.py`).
 
-### 🟠 H3 — Ingest token stored in App Group UserDefaults, not Keychain — BACKLOG
-**OWASP A04/A02.** The iOS share-extension bearer token is written to and read
-from App Group `UserDefaults` (`web/ios/App/App/ShareConfigPlugin.swift:37`,
-`web/ios/App/ShareExt/ShareViewController.swift:852`) — an unencrypted plist in
-the shared container. It is high-entropy (`secrets.token_urlsafe(24)`,
-`link_service.py:197`) but **long-lived, never rotated or expired**, and grants
-full write-append to the account (`main.py:1031`). Move it to the Keychain
-(`kSecAttrAccessGroup` + `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`),
-copy the server side into a functions-only collection, and add rotation. Tracked
-as `SOURCE_OF_TRUTH.md` §4 task 12 (native change — needs Xcode).
+### 🟠 H3 — Ingest token stored in App Group UserDefaults, not Keychain — **FIXED** (rotation still open)
+**OWASP A04/A02.** The iOS share-extension bearer token was written to and read
+from App Group `UserDefaults` (`ShareConfigPlugin.swift`,
+`ShareViewController.swift`) — an unencrypted plist in the shared container. It
+is high-entropy (`secrets.token_urlsafe(24)`, `link_service.py:197`) but
+**long-lived, never rotated or expired**, and grants full write-append to the
+account (`main.py:1031`).
+
+**Fix applied (hardening session).** The token now lives in a
+`kSecClassGenericPassword` Keychain item
+(`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`) in a shared keychain
+access group (`$(AppIdentifierPrefix)com.morhogeg.machina.shared`) so both the
+app and the Share Extension can read it — see the new shared
+`web/ios/App/App/KeychainHelper.swift` (compiled into both targets).
+`ShareConfigPlugin.save` writes to the Keychain and scrubs the legacy defaults
+copy; `ShareViewController` reads Keychain-first with a one-time migration of
+the legacy UserDefaults value. Both entitlements files gained
+`keychain-access-groups`, and the CI entitlement tripwire now fails the build
+if either binary loses the group. **Needs on-device TestFlight verification**
+(share from another app saves without re-auth; survives relaunch) — a wrong
+entitlement fails silently as "Open Machina and sign in first".
+*Residual (BACKLOG, task 12):* server-side copy of the token into a
+functions-only collection + a `rotate_ingest_token` path — the token is still
+long-lived and, until the auth cutover locks the rules, client-readable in
+Firestore.
 
 ### 🟠 H4 — WhatsApp impersonation gated solely on `TWILIO_AUTH_TOKEN` — OWNER
 **OWASP A05.** Twilio signature verification is correct and **fails closed**
@@ -196,12 +212,22 @@ links/commands into any account. Security here rests entirely on one env var.
 startup assertion that refuses to serve the webhook if it's missing outside the
 emulator.
 
-### 🟡 M1 — CSP allows `unsafe-inline` + `unsafe-eval` — BACKLOG
-**OWASP A05.** `vercel.json` / `firebase.json:112` set an otherwise strong CSP
-but `script-src` includes both `'unsafe-inline'` and `'unsafe-eval'`, which
-negate CSP as an XSS backstop. Not auto-changed: Next.js inline bootstrap +
-some deps may require them, so removal needs a runtime test. Move to a
-nonce/hash strategy and drop `unsafe-eval` if the bundle allows.
+### 🟡 M1 — CSP allows `unsafe-inline` + `unsafe-eval` — **FIXED** (`unsafe-inline` residue documented)
+**OWASP A05.** `web/vercel.json` / `firebase.json:112` set an otherwise strong
+CSP but `script-src` included both `'unsafe-inline'` and `'unsafe-eval'`.
+
+**Fix applied (hardening session).** `'unsafe-eval'` removed from `script-src`
+in both configs (kept in sync). Runtime-verified: served the static export
+with the new header and drove `/`, `/privacy`, `/terms` in Chromium — zero CSP
+violations, app renders, and the theme bootstrap still executes (light class
+applied before paint). *Residual:* `'unsafe-inline'` must stay — the Next.js
+app router streams its flight data as many per-page inline
+`self.__next_f.push(...)` scripts whose contents embed per-build chunk hashes,
+so a static hash list can't cover them (and CSP3 ignores `'unsafe-inline'`
+the moment any hash/nonce is present, so hashing just the first-party theme
+script would break the Next runtime). Revisit if Next's static export grows
+nonce/hash support. Dropping eval still kills the main gadget class (string
+`eval`/`Function` payloads).
 
 ### 🟡 M2 — CI workflow had no `permissions:` block — **FIXED**
 **OWASP A05.** `.github/workflows/ios-testflight.yml` declared no `permissions:`,
@@ -248,41 +274,73 @@ server-side, generic message returned). *Related (BACKLOG):*
 `process_link_background` still surfaces `str(e)[:300]` into the user's failed
 card and `str(e)[:50]` over WhatsApp — diagnostic UX; soften if desired.
 
-### 🟡 M7 — Rate limiter fails open — BACKLOG
-See H2. `functions/rate_limit.py` `check_rate_limit()` returns `True` (allowed)
-on any Firestore error. A transient backend issue disables limiting entirely.
-Acceptable as availability-over-security today; reconsider fail-closed on the
-paid buckets once per-uid quotas exist.
+### 🟡 M7 — Rate limiter fails open — **FIXED** (fail-closed on paid buckets)
+See H2. `functions/rate_limit.py` `check_rate_limit()` returned `True`
+(allowed) on any Firestore error, so a transient backend issue disabled
+limiting entirely — on the paid Gemini endpoints, a cost-abuse hole.
 
-### 🟡 M8 — Dependencies use `>=` pins only — BACKLOG
-**OWASP A06.** `functions/requirements.txt` pins everything with `>=` (e.g.
-`requests>=2.31.0`, `beautifulsoup4>=4.12.0`), so deploys pull latest and builds
-are non-reproducible — a regressed/vulnerable release could land silently. Pin
-exact versions or add a lockfile; run SCA (`pip-audit`). Web deps are current
-majors (`next 16.1.6`, `react 19.2.3`, `firebase 12.9.0`) — run `npm audit`
-against the committed lockfile too. Not auto-changed: pinning needs a deploy test.
+**Fix applied (hardening session).** `check_rate_limit` gained a
+`fail_closed: bool = False` param (exception path returns `not fail_closed`);
+`_rate_limited` in `main.py` passes `fail_closed=True` for the paid buckets
+(`analyze`, `image`, `chat`) via `_FAIL_CLOSED_BUCKETS`. Success path is
+unchanged. **Tradeoff (deliberate):** during a Firestore outage the paid
+endpoints deny with 429 instead of running unmetered — cost safety over
+availability. The cheap buckets (`article`, `share`, `whatsapp`) stay
+fail-open so a limiter blip never breaks saving links.
+
+### 🟡 M8 — Dependencies use `>=` pins only — **FIXED** (owner: one deploy test)
+**OWASP A06.** `functions/requirements.txt` pinned everything with `>=`, so
+deploys pulled latest and builds were non-reproducible.
+
+**Fix applied (hardening session).** All 8 top-level backend packages pinned
+`==` to the versions resolved on Python 3.13 (the Functions runtime):
+`firebase-functions==0.6.0`, `firebase-admin==7.5.0`, `google-genai==2.10.0`,
+`beautifulsoup4==4.15.0`, `requests==2.34.2`, `pydantic==2.13.4`,
+`flask==3.1.3`, `twilio==9.10.9`. `pip-audit` against the installed tree:
+**zero advisories** (top-level and transitive). Web: `npm audit fix` cleared
+10 of 12 advisories (incl. the critical protobufjs chain), and `next` was
+bumped `16.1.6 → 16.2.10` (minor) to clear its ~20 advisories (HTTP request
+smuggling, middleware bypasses, etc.); `tsc` + full build green. *Residual:*
+a **moderate** postcss advisory (GHSA-qx2v-qp2m-jg93) bundled inside `next`'s
+own vendored copy — fixed upstream only in a 16.3 canary; build-time surface,
+accepted until the next stable Next release. **Owner action:** run one real
+`./deploy-functions.sh` against the pinned set before relying on it (the
+cloud sandbox can't deploy).
 
 ### 🟢 Low findings
-- **L1** — `storage.rules:7` `screenshots/{uid}` read rule checks
+- **L1** — `storage.rules:7` `screenshots/{uid}` read rule checked
   `request.auth.uid == uid`, but `{uid}` is the phone-number data id while
-  `request.auth.uid` is the random Auth uid, so it can never match. Images are in
-  practice served via unguessable tokenized download URLs (128-bit,
-  `main.py:322`), i.e. public-by-URL. Acceptable but not rule-enforced; note it.
+  `request.auth.uid` is the random Auth uid, so it could never match — a dead
+  rule implying a guard that didn't exist. Images are in practice served via
+  unguessable tokenized download URLs (128-bit, `main.py:322`), i.e.
+  public-by-URL. **FIXED** (hardening session): replaced with an explicit
+  `allow read: if false` plus a comment documenting the tokenized-URL model and
+  warning not to "fix" the comparison without a custom-claims mapping.
+  Behavior-identical, now honest.
 - **L2** — `firestore-rules-test/rules.test.mjs:40` loads
   `firestore.rules.locked`, **not** the deployed `firestore.rules`, so a green run
   gives false assurance about production. Run against both, or gate the deploy on
-  the locked file becoming live.
-- **L3** — `ios-testflight.yml` pins `actions/checkout@v4` / `setup-node@v4` to
-  mutable tags. SHA-pin for supply-chain integrity (first-party, low risk).
+  the locked file becoming live. (Deferred to the cutover session, which flips
+  the deployed file to the locked ruleset.)
+- **L3** — `ios-testflight.yml` pinned `actions/checkout@v4` / `setup-node@v4`
+  to mutable tags. **FIXED** (hardening session): both SHA-pinned to the
+  commits the `v4` tags resolved to (`34e11487…` = checkout v4.3.1,
+  `49933ea5…` = setup-node v4.4.0, verified via `git ls-remote`), with
+  version comments for future bumps.
 - **L4** — `machina://` custom scheme (`web/ios/App/App/Info.plist:54`) is
   invokable by any app; it only opens the app + flashes a banner, no sensitive
   action or secret in the URL. UI-spoof nuisance only.
 - **L5** — `web/lib/share.ts` `openExternal()` didn't scheme-check before
   `window.open`. **FIXED**: now parses the URL and only opens `http(s)`.
-- **L6** — `img src` from scraped `thumbnailUrl`/`url` is unsanitized
-  (`Card.tsx:223`, `LinkDetailModal.tsx:327`). `javascript:`/`data:` in `img src`
-  doesn't execute; minor referer/exfil concern only. Constrain to `https:` if
-  tightening.
+- **L6** — `img src` from scraped `thumbnailUrl`/`url` was unsanitized
+  (`Card.tsx`, `LinkDetailModal.tsx`). `javascript:`/`data:` in `img src`
+  doesn't execute; minor referer/exfil concern only. **FIXED** (hardening
+  session): new `web/lib/safeUrl.ts` `httpsImageSrc()` constrains scraped
+  image URLs to `https:` at every thumbnail sink — `Card.tsx`,
+  `LinkDetailModal.tsx` (screenshot regex tightened to https-only), plus the
+  two additional sinks found on sweep: `CollectionsGallery.tsx` and
+  `ManageCollectionCardsSheet.tsx`. Non-https values fall back to the existing
+  placeholder rendering.
 - **L7** — `functions/.gitignore` didn't list `.env` (relied on root). **FIXED**:
   added `.env`/`.env.*` (keeping `.env.example`) belt-and-suspenders.
 
@@ -316,9 +374,22 @@ leaks), L5 (openExternal guard). Verified: `python -m py_compile *.py` (backend)
 - Add GCP/Firebase budget alerts (cost-abuse backstop).
 
 ### 4.4 Hardening backlog (no code yet)
-H3 (Keychain + token rotation, task 12), M1 (CSP nonce/hash), M7 (fail-closed
-rate limiting), M8 (pin deps + SCA), L1/L2/L3/L4/L6, per-uid quotas (task 13/19),
-DNS-rebinding pin in `safe_get`.
+Ingest-token rotation + server-side copy in a functions-only collection (H3
+residue, task 12), per-uid quotas (task 13/19), DNS-rebinding pin in
+`safe_get` (H1 residue), L2 (run rule tests against the deployed file — with
+the cutover), L4 (accepted, documented-only), CSP `unsafe-inline` residue (M1,
+blocked on Next).
+
+### 4.5 Fixed in the hardening session (branch `claude/security-hardening-czdyj4`, 2026-07-06)
+H3 (ingest token → shared Keychain group + migration + CI tripwire — **needs
+owner on-device TestFlight verification**), M1 (dropped `unsafe-eval`,
+runtime-verified), M7 (rate limiter fail-closed on paid buckets), M8 (exact
+`==` pins + pip-audit clean + `npm audit fix` + next 16.2.10 — **owner: one
+deploy test**), L1 (dead storage rule → explicit deny), L3 (SHA-pinned
+actions), L6 (https-only scraped images). Verified: `py_compile`,
+`tsc --noEmit`, full `next build`, Chromium runtime CSP check. The iOS change
+compiles only on CI (no Xcode in the sandbox) — build must go through the
+"iOS → TestFlight" workflow before it reaches a device.
 
 ---
 

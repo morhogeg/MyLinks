@@ -301,11 +301,15 @@ The multi-user auth work is **fully written but not live**:
 > CI perms). Owner key-hygiene is **task 5**; the remaining hardening items map
 > to tasks 12/13/19 below. Re-audit after the cutover.
 
-12. **[ ] Ingest token hardening (audit H-1).** Move from App Group UserDefaults
-    to Keychain; server copy to a functions-only collection; add rotation.
-13. **[ ] Remaining audit mediums:** per-uid rate limits post-auth + fail-closed
-    on paid buckets (M-3), cap `ask_brain` history (M-5), mask remaining phone
-    logs in `link_service.py`/`whatsapp_handler.py` (H-4 residue).
+12. **[~] Ingest token hardening (audit H-1).** ~~Move from App Group UserDefaults
+    to Keychain~~ — DONE 2026-07-06 (shared Keychain group + one-time migration +
+    CI tripwire; **needs owner on-device TestFlight verify**: share from another
+    app saves without re-auth, survives relaunch). Still open: server copy to a
+    functions-only collection; add rotation.
+13. **[~] Remaining audit mediums:** ~~fail-closed on paid buckets~~ — DONE
+    2026-07-06 (audit M7). Still open: per-uid rate limits post-auth, cap
+    `ask_brain` history (M-5), mask remaining phone logs in
+    `link_service.py`/`whatsapp_handler.py` (H-4 residue).
 14. **[ ] README ↔ reality (M-P5/T12) — still false.** Verified 2026-07-03: README
     claims Graph *Visualization*, Insights Dashboard, "Works Offline", Table view —
     none exist. Rewrite to describe the real product (recall engine, capture
@@ -534,7 +538,32 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
-- **2026-07-06 — "Show by" status filter now has a dismissable pill (commits
+- **2026-07-06 — Security hardening: the code-doable audit backlog shipped
+  (branch `claude/security-hardening-czdyj4`; audit statuses flipped in
+  `SECURITY_AUDIT.md` §2/§3, new §4.5).** Merged the audit baseline branch in
+  first (it was never merged to main — the report + H1/H2/M2/M3/M4/M6/L5/L7
+  fixes now ride this branch). Then: **H3** — iOS ingest token moved from App
+  Group UserDefaults to a shared Keychain access group
+  (`KeychainHelper.swift`, both targets, `AfterFirstUnlockThisDeviceOnly`,
+  one-time migration from the legacy defaults copy, entitlements + CI
+  tripwire extended); **NEEDS OWNER DEVICE VERIFY** on the next TestFlight
+  build — share from another app must save without re-auth and survive
+  relaunch. **M1** — dropped `unsafe-eval` from the CSP in `web/vercel.json` +
+  `firebase.json`; runtime-verified in Chromium against the static export
+  (zero violations, theme bootstrap intact); `unsafe-inline` must remain (Next
+  flight-data inline scripts; hashing would disable it under CSP3). **M7** —
+  rate limiter fails CLOSED on the paid buckets (analyze/image/chat) on
+  Firestore errors, cheap buckets stay fail-open. **M8** — backend deps pinned
+  `==` (py3.13 resolve, pip-audit clean); web `npm audit fix` + next
+  `16.1.6→16.2.10` cleared everything but a moderate postcss advisory vendored
+  inside next (16.3-canary-only fix; accepted); **owner: one
+  `./deploy-functions.sh` test** before trusting the pins. **L1** — dead
+  screenshots read rule → explicit deny + doc. **L3** — SHA-pinned checkout /
+  setup-node. **L6** — scraped `thumbnailUrl`/image URLs constrained to https
+  at all four sinks via `web/lib/safeUrl.ts`. Out of scope by design: C1/C2/C3
+  + REQUIRE_AUTH flags + firestore.rules (auth cutover, task 2). Verified:
+  `py_compile`, `tsc`, full `next build`, Chromium CSP run; the iOS side
+  compiles only on CI.
   `f575529`, `c77f873`).** The status filter (Archive/Favorites/Unread/Read/
   Reminders) changed the feed but left no on-page indicator — unlike tags. Added a
   row in `Feed.tsx` (above the cards, before the tag row): a contextual icon +
