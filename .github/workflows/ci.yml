@@ -1,0 +1,91 @@
+name: CI
+
+# Fast correctness gates on every PR and push to main. The iOS build lives in
+# ios-testflight.yml; this is the lightweight "does it compile / typecheck /
+# pass the rules tests" gate that was previously missing entirely.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Web — typecheck, lint, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      # Hard gate: types must be sound.
+      - name: Typecheck
+        run: npx tsc --noEmit
+      # Report-only for now: the repo carries pre-existing eslint findings and a
+      # backlog of theme-token violations (SOURCE_OF_TRUTH §4). Surfaces issues
+      # without blocking until the sweep lands; flip to a gate afterwards.
+      - name: Lint (report-only)
+        run: npx eslint . || true
+      # Build with placeholder public Firebase config: the values are only used
+      # to initialize the client SDK during static prerender, never to reach a
+      # real project at build time. Real values come from Vercel env at deploy.
+      - name: Build
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ci-placeholder-key
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: example.firebaseapp.com
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ci-placeholder
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: example.appspot.com
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
+          NEXT_PUBLIC_FIREBASE_APP_ID: "1:000000000000:web:0000000000000000000000"
+        run: npx next build
+
+  functions:
+    name: Functions — compile & tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Byte-compile
+        run: python -m py_compile *.py
+      - name: Install test deps
+        run: pip install pytest requests pydantic
+      # Unit tests for the pure, high-risk helpers (SSRF guard, hostname
+      # routing, rate-limit fail mode, digest curation). No network / Firebase.
+      - name: Pytest
+        run: pytest -q
+
+  firestore-rules:
+    name: Firestore rules — emulator tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firestore-rules-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: npm ci
+      # Runs the suite against firestore.rules.locked in the Firestore emulator.
+      # This is the ruleset the auth cutover deploys — a green run here is the
+      # gate that the locked rules actually enforce ownership before go-live.
+      - name: Rules tests
+        run: npm test

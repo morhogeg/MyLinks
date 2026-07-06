@@ -40,7 +40,10 @@ echo "  (if that's not the latest, Ctrl-C and run: git pull origin main)"
 # `npm run build` fail, the script aborts before `cap sync`, and — if the error
 # scrolls past — the next Archive silently ships the OLD web bundle.
 echo "→ Installing web deps"
-npm install
+# npm ci (not npm install) so a local iOS build resolves the EXACT lockfile the
+# CI/TestFlight build uses — no silent drift between what you test on device and
+# what ships.
+npm ci
 
 echo "→ Building Next.js static export (API base: $API_BASE)"
 NEXT_PUBLIC_API_BASE="$API_BASE" NEXT_PUBLIC_SHARE_BASE="$SHARE_BASE" npm run build

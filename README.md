@@ -1,260 +1,125 @@
-# 🌟 Machina AI — Your AI-Powered Knowledge Brain
+# Machina AI — Ask Your Saves
 
-<p align="center">
-  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js">
-  <img src="https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black" alt="Firebase">
-  <img src="https://img.shields.io/badge/PWA-5A0FC8?style=for-the-badge&logo=pwa&logoColor=white" alt="PWA">
-  <img src="https://img.shields.io/badge/AI-Gemini-8E8E8E?style=for-the-badge&logo=google&logoColor=white" alt="Gemini AI">
-</p>
+> Save a link, image, or video from anywhere; Machina reads it with AI and later
+> you just **ask**. "What did I save about mortgage rates?" → an answer, with
+> sources. It's not a bookmark manager — it's recall over your own knowledge.
 
-> Transform your saved links into intelligent, searchable knowledge. Machina AI captures content from anywhere, analyzes it with AI, and transforms it into a personal knowledge base you can actually use.
-
----
-
-## 🚀 Why Machina AI?
-
-### The Problem
-
-You save hundreds of links every month — articles, videos, resources — with the intention of reading them "later." But:
-
-- 📚 **Bookmark overload** — Links pile up in browser bookmarks, never to be seen again
-- 🔍 **Can't find what you need** — No context, no search, no retrieval system
-- ⏰ **Lost insights** — Forgot what that article was actually about
-- 📱 **Scattered everywhere** — Links in WhatsApp, emails, social media, nowhere unified
-
-### The Solution
-
-**Machina AI** automatically captures, analyzes, and organizes your web content using AI. It's not just a bookmark manager — it's a **personal knowledge base** that understands what you save.
+Machina AI (`com.morhogeg.machina`) is an AI-powered personal knowledge base:
+capture content from the iOS share sheet, WhatsApp, the web UI, or a browser
+extension → a Python Cloud Function scrapes it and Google Gemini analyzes it → a
+structured card (summary, category, tags, concepts, embedding, related links)
+lands in a real-time feed with semantic search, cited RAG answers, spaced
+reminders, curated digests, weekly synthesis, and collections.
 
 ---
 
-## ✨ Key Features
+## What it actually does
 
-### 🤖 AI-Powered Intelligence
-- **Automatic Analysis** — Every link is analyzed using Google Gemini AI
-- **Smart Summaries** — Get concise summaries of any article or video
-- **Auto-Categorization** — Automatically categorizes content (Tech, Health, Business, Philosophy, etc.)
-- **Intelligent Tagging** — AI suggests relevant tags for easy organization
+### Capture from anywhere
+- **iOS Share Extension** — share links, text, or images into Machina from any
+  app; a native scan HUD shows real progress and never falsely reports success.
+- **WhatsApp** — forward a link (English/Hebrew) to the Machina number; reply
+  `DIGEST`, `STOP DIGEST` / `START DIGEST` for digest controls.
+- **Web** — add a URL or upload an image/screenshot from the web app.
+- **Browser extension** — save the current page from Chrome/Edge/Brave (a Safari
+  converter is included).
 
-### 📥 Multi-Channel Capture
-- **WhatsApp Integration** — Forward links directly from WhatsApp
-- **Manual Entry** — Add URLs via the intuitive UI
-- **Image Upload** — Upload screenshots — AI reads and analyzes them
-- **YouTube Deep Analysis** — Extracts transcripts, timestamps, and key insights from videos
+### Understand every save
+- **AI analysis** (Google Gemini) — a real summary, category, tags, and concepts
+  for each link, image, or YouTube video (native video understanding).
+- **Connections** — every save is checked against your library; cross-category
+  concept clusters surface threads a category filter can't reproduce.
 
-### 🔍 Powerful Search & Discovery
-- **Full-Text Search** — Search through titles, summaries, content
-- **Tag-Based Filtering** — Filter by tags, categories, date
-- **Graph Visualization** — See how your knowledge connects
-- **Insights Dashboard** — Analytics on your reading habits
+### Recall
+- **Ask Machina** — hybrid RAG chat that answers *only* from what you saved and
+  cites the cards it used (streaming on web, chat history kept).
+- **Semantic search** — vector search over your saves, not just keyword match.
+- **Reading view + text-to-speech**, reminders, favorites, archive, collections
+  with public share pages, and a **weekly synthesis** written from your week's
+  saves.
 
-### 📱 Modern PWA Experience
-- **Installable App** — Add to home screen on iOS & Android
-- **Works Offline** — Access your saved links without internet
-- **Dark/Light Theme** — Beautiful themes for day and night
-- **Responsive Design** — Works perfectly on mobile and desktop
-
-### 📊 Organization & Productivity
-- **Card & Table Views** — Choose your preferred display mode
-- **Reminders** — Set reminders to revisit important links
-- **Favorites** — Star your most important content
-- **Archive** — Keep your library clean
-
-### 📬 Curated Digest
-- **Scheduled delivery** — Get a hand-picked set of cards **daily or weekly**
-- **Email and/or WhatsApp** — Choose one or both channels
-- **Curation modes** — *Smart mix*, *Surprise me* (random), *By topic*, *Backlog* (oldest unread), *Favorites*, or *Rediscover* (resurface old saves you forgot)
-- **Your schedule** — Pick the day/hour in your own timezone
-- **Send one now** — Preview your digest instantly from Settings
-- **Skip-when-empty** — Never sends a hollow digest
-- **WhatsApp controls** — Reply `DIGEST` for an on-demand batch, or `STOP DIGEST` / `START DIGEST` to pause and resume
+### Stay engaged
+- **Curated digest** — a hand-picked set of cards **daily or weekly** over email
+  and/or WhatsApp, with several curation modes (smart mix, backlog, rediscover,
+  random, by topic, favorites), on your own schedule; never sends an empty one.
 
 ---
 
-## 🏆 What Makes Machina AI Different?
+## Architecture
 
-| Feature | Machina AI | Pocket | Instapaper | Notion | Raindrop.io |
-|---------|---------|--------|------------|--------|-------------|
-| AI Analysis | ✅ Gemini | ❌ | ❌ | ❌ | ❌ |
-| WhatsApp Capture | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Image Analysis | ✅ | ❌ | ❌ | ❌ | ❌ |
-| YouTube Deep Analysis | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Knowledge Graph | ✅ | ❌ | ❌ | ❌ | ❌ |
-| PWA (Offline) | ✅ | ✅ | ✅ | ❌ | ✅ |
-| Free & Open Source | ✅ | ❌ | ❌ | ❌ | ❌ |
+- **Frontend** — Next.js 16 + React 19 + Tailwind v4 (`web/`). One bundle serves
+  desktop web (Vercel) and the native iOS shell.
+- **iOS app** — Capacitor 8 shell (`web/ios/`) + a native Share Extension
+  bridged through an App Group; shipped to TestFlight via GitHub Actions.
+- **Backend** — Python 3.13 Firebase Cloud Functions (`functions/`), Gemini for
+  analysis/vision and embeddings, Twilio for WhatsApp, SendGrid/SMTP for email
+  digests.
+- **Data** — Firestore (`users/{uid}/…` with `links`, `chats`, `collections`,
+  `syntheses` subcollections); public `shared_cards` / `shared_collections`
+  snapshots for share pages.
 
----
-
-## 🛠️ Tech Stack
-
-- **Frontend**: Next.js 15, TypeScript, React
-- **UI**: Tailwind CSS, Shadcn UI components
-- **Database**: Firebase Firestore
-- **Storage**: Firebase Storage
-- **AI**: Google Gemini
-- **Backend**: Python Cloud Functions
-- **PWA**: Service Workers, Web App Manifest
+Deploy surfaces: **desktop web** → Vercel (auto on push to `main`); **iOS** →
+the "iOS → TestFlight" GitHub Actions workflow; **Functions** →
+`./deploy-functions.sh`; **Firebase Hosting** backs the `/api/*` rewrites and the
+`/s`, `/c` share pages.
 
 ---
 
-## 🚦 Quick Start
-
-### Prerequisites
-- Node.js 18+
-- Python 3.9+ (for backend functions)
-- Firebase account (for production)
-
-### Development Setup
+## Development
 
 ```bash
-# Clone the repository
-git clone https://github.com/morhogeg/MyLinks.git
-cd MyLinks
-
-# Install web dependencies
+# Web
 cd web
-npm install
+npm ci
+npm run dev            # http://localhost:3000
+npx tsc --noEmit       # typecheck
 
-# Start the development server
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-### Running Backend Functions (Optional)
-
-```bash
+# Functions
 cd functions
-pip install -r requirements.txt
-python main.py
+python3.13 -m venv venv && venv/bin/pip install -r requirements.txt
+python -m py_compile *.py
 ```
 
-### Test WhatsApp Webhook
+Configuration lives in env, never in the bundle:
 
-```bash
-curl -X POST http://localhost:5001/webhook/whatsapp \
-  -d "From=+1234567890&Body=https://example.com"
-```
+- `web/.env.local` — `NEXT_PUBLIC_FIREBASE_*` client config (see
+  `web/VERCEL.md`).
+- `functions/.env` (gitignored) — `GEMINI_API_KEY`, `TWILIO_*`, etc. as plain
+  env vars (not Secret Manager — see `SOURCE_OF_TRUTH.md` §2).
+
+The single source of truth for product state, the ranked backlog, the auth
+cutover, and the ship process is **`SOURCE_OF_TRUTH.md`** — start there.
 
 ---
 
-## 📁 Project Structure
+## Project structure
 
 ```
 MyLinks/
-├── web/                    # Next.js 15 PWA (TypeScript)
-│   ├── app/                # Pages and API routes
-│   │   ├── page.tsx       # Main dashboard
-│   │   └── api/           # API endpoints
-│   ├── components/        # React components
-│   │   ├── AddLinkForm.tsx      # Link submission form
-│   │   ├── Card.tsx             # Link card display
-│   │   ├── Feed.tsx              # Main content feed
-│   │   ├── GraphView.tsx         # Knowledge graph
-│   │   ├── InsightsFeed.tsx      # Analytics dashboard
-│   │   ├── LinkDetailModal.tsx   # Link details view
-│   │   ├── ReminderModal.tsx     # Reminder settings
-│   │   ├── TagExplorer.tsx       # Tag browser
-│   │   └── ThemeToggle.tsx       # Dark/light mode
-│   ├── lib/               # Utilities and services
-│   │   ├── ai-service.ts  # AI analysis integration
-│   │   ├── firebase.ts    # Firebase configuration
-│   │   ├── types.ts       # TypeScript definitions
-│   │   └── storage.ts     # Storage utilities
-│   └── public/            # Static assets & PWA manifest
-│       └── manifest.json  # PWA configuration
-└── functions/             # Python Cloud Functions
-    ├── ai_service.py      # Gemini AI integration
-    ├── scraper.py         # Web content extraction
-    ├── graph_service.py   # Knowledge graph logic
-    ├── link_service.py    # Link CRUD operations
-    └── whatsapp_handler.py # WhatsApp webhook handler
+├── web/                       # Next.js frontend + Capacitor iOS shell
+│   ├── app/                   # Routes (page.tsx, /privacy, /terms, api proxies)
+│   ├── components/            # Feed, Card, LinkDetailModal, AskBrain, Settings…
+│   ├── lib/                   # api, firebase, auth, storage, search helpers
+│   └── ios/                   # Capacitor shell + native Share Extension
+├── functions/                 # Python Cloud Functions
+│   ├── main.py                # HTTP endpoints, WhatsApp webhook, schedulers
+│   ├── ai_service.py          # Gemini analysis / RAG / synthesis
+│   ├── scraper.py             # SSRF-guarded content extraction
+│   ├── search.py              # Embeddings + vector search
+│   ├── graph_service.py       # Connections / related links
+│   ├── digest_service.py      # Curated digest + weekly synthesis
+│   └── whatsapp_handler.py    # Twilio webhook handling
+├── extension/                 # Browser extension (Chrome/Edge/Brave)
+├── firestore.rules(.locked)   # Live rules + the staged post-cutover ruleset
+└── SOURCE_OF_TRUTH.md         # Product/architecture/backlog — read first
 ```
 
 ---
 
-## 🔧 Configuration
+## Status & license
 
-### Environment Variables
+Machina AI is a commercial product heading to the App Store — see
+`SOURCE_OF_TRUTH.md` §4 for the launch backlog. This repository is **not** open
+source; all rights reserved. Not currently accepting external contributions.
 
-Create `web/.env.local`:
-
-```bash
-# Firebase
-NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
-
-# AI Service
-USE_MOCK_AI=false
-GEMINI_API_KEY=your_gemini_key
-```
-
-### Firebase Setup
-
-```bash
-# Install Firebase CLI
-npm install -g firebase-tools
-
-# Login and initialize
-firebase login
-firebase init
-
-# Deploy
-firebase deploy
-```
-
----
-
-## 📈 Roadmap & Future Features
-
-Based on competitor analysis (Pocket, Instapaper, Notion, Obsidian, Readwise, Raindrop.io), here are planned enhancements:
-
-### High Priority
-- [ ] **Browser Extensions** — Save links from any website
-- [ ] **Text-to-Speech** — Listen to articles
-- [ ] **Clean Reading View** — Distraction-free article display
-- [ ] **Export Options** — PDF, Markdown, HTML export
-
-### Medium Priority
-- [ ] **Reading Time Estimates** — Show estimated read time
-- [ ] **Reading Progress** — Track how much you've read
-- [ ] **Highlights & Annotations** — Like Readwise
-- [ ] **Public Profile** — Share your favorite links
-
-### Lower Priority
-- [ ] **API Access** — Third-party integrations
-- [ ] **RSS Feed Import** — Import from feed readers
-- [x] **Curated Digest** — Scheduled email/WhatsApp digest of curated cards (random, by topic, backlog, rediscover & more)
-- [ ] **Social Sharing** — Share to Twitter, LinkedIn
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
----
-
-## 📄 License
-
-MIT License — feel free to use this project for any purpose.
-
----
-
-## 🙏 Acknowledgments
-
-- [Google Gemini](https://gemini.google.com) — AI analysis
-- [Firebase](https://firebase.google.com) — Database & Auth
-- [Next.js](https://nextjs.org) — React framework
-- [Shadcn UI](https://ui.shadcn.com) — Beautiful components
-
----
-
-<p align="center">
-  <strong>⭐ Star this repo if you find it useful!</strong>
-</p>
+Built with Google Gemini, Firebase, Next.js, and Capacitor.

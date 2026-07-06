@@ -1,15 +1,28 @@
-// MyLinks — Save to Second Brain
+// Machina AI — Save to Machina
 // Service worker: all capture logic lives here. The popup only manages settings.
 
 const DEFAULT_BASE_URL = "https://secondbrain-app-94da2.web.app";
-const CONTEXT_MENU_ID = "mylinks-save";
-const CONTEXT_SETTINGS_ID = "mylinks-settings";
+const CONTEXT_MENU_ID = "machina-save";
+const CONTEXT_SETTINGS_ID = "machina-settings";
 const BADGE_RESET_MS = 2000;
 
 // ── Settings ────────────────────────────────────────────────────────────────
 
+// The ingest token is a long-lived bearer credential, so it lives in
+// chrome.storage.LOCAL — NOT storage.sync, which replicates it to the user's
+// Google account and every signed-in Chrome profile. Migrate any token an older
+// build wrote to sync, then clear it from sync so it stops replicating.
 async function getSettings() {
-  const { token = "", baseUrl = "" } = await chrome.storage.sync.get(["token", "baseUrl"]);
+  let { token = "", baseUrl = "" } = await chrome.storage.local.get(["token", "baseUrl"]);
+  if (!token) {
+    const synced = await chrome.storage.sync.get(["token", "baseUrl"]);
+    if (synced.token) {
+      token = synced.token;
+      baseUrl = baseUrl || synced.baseUrl || "";
+      await chrome.storage.local.set({ token, baseUrl });
+      await chrome.storage.sync.remove(["token", "baseUrl"]);
+    }
+  }
   return {
     token: (token || "").trim(),
     baseUrl: (baseUrl || "").trim().replace(/\/+$/, "") || DEFAULT_BASE_URL,
@@ -41,7 +54,7 @@ const badgeError = () => setBadge("✗", "#ef4444"); // ✗ red
 // A persistent toast confirms the save with the page title — sturdier than the
 // 2s badge. A stable id means each new save replaces the previous toast.
 
-const NOTIF_ID = "mylinks-save";
+const NOTIF_ID = "machina-save";
 
 function notify(title, message) {
   try {
@@ -114,25 +127,25 @@ async function saveAndReport({ url, note, label }) {
 
   if (result.error === "no-token") {
     await badgeError();
-    notify("Set your token first", "Click to open MyLinks settings and paste your ingest token.");
+    notify("Set your token first", "Click to open Machina settings and paste your ingest token.");
     chrome.runtime.openOptionsPage().catch(() => {});
     return result;
   }
   if (result.ok && result.body) {
     if (result.body.duplicate) {
       await badgeDuplicate();
-      notify("Already in MyLinks", name);
+      notify("Already in Machina", name);
     } else {
       await badgeSaved();
       const extra = note ? " (with your selection)" : "";
-      notify("Saved to MyLinks ✓", `${name}${extra} — analyzing now, it'll appear in your app shortly.`);
+      notify("Saved to Machina ✓", `${name}${extra} — analyzing now, it'll appear in your app shortly.`);
     }
   } else {
     await badgeError();
     const reason =
       result.status === 403 ? "Invalid token — check it in settings." :
       result.status === 401 ? "No token sent — check it in settings." :
-      "Couldn't reach MyLinks. Check your connection.";
+      "Couldn't reach Machina. Check your connection.";
     notify("Couldn't save", reason);
   }
   return result;
@@ -172,12 +185,12 @@ function createMenus() {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: CONTEXT_MENU_ID,
-      title: "Save to MyLinks",
+      title: "Save to Machina",
       contexts: ["page", "link", "selection"],
     });
     chrome.contextMenus.create({
       id: CONTEXT_SETTINGS_ID,
-      title: "MyLinks settings…",
+      title: "Machina settings…",
       contexts: ["action"],
     });
   });

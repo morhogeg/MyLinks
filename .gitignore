@@ -42,5 +42,19 @@ firebase-debug.log*
 firestore-debug.log*
 ui-debug.log*
 
+# Firebase native config — contains the API key / OAuth client id. Injected in
+# CI from a base64 secret; must never be committed even if dropped in for a
+# local ./build-ios.sh run.
+**/GoogleService-Info.plist
+google-services.json
+
+# Apple signing material
+*.p8
+*.p12
+*.mobileprovision
+
+# Leftover captured API responses / debug dumps
+web/output.json
+
 # Claude Code agent worktrees (transient, auto-cleaned)
 .claude/worktrees/

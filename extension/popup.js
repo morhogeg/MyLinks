@@ -1,5 +1,7 @@
-// Settings popup. Reads/writes chrome.storage.sync and talks to the service
-// worker for "Test connection" / "Save this page now". No capture logic here.
+// Settings popup. Reads/writes chrome.storage.local (the token is a bearer
+// credential — never storage.sync, which replicates across profiles) and talks
+// to the service worker for "Test connection" / "Save this page now". No
+// capture logic here.
 
 const DEFAULT_BASE_URL = "https://secondbrain-app-94da2.web.app";
 
@@ -24,11 +26,21 @@ function showBanner(text) {
 }
 
 async function load() {
-  const { token = "", baseUrl = "" } = await chrome.storage.sync.get(["token", "baseUrl"]);
+  let { token = "", baseUrl = "" } = await chrome.storage.local.get(["token", "baseUrl"]);
+  if (!token) {
+    // One-time migration from an older build that used storage.sync.
+    const synced = await chrome.storage.sync.get(["token", "baseUrl"]);
+    if (synced.token) {
+      token = synced.token;
+      baseUrl = baseUrl || synced.baseUrl || "";
+      await chrome.storage.local.set({ token, baseUrl });
+      await chrome.storage.sync.remove(["token", "baseUrl"]);
+    }
+  }
   tokenInput.value = token;
   baseUrlInput.value = baseUrl;
   if (!token) {
-    showBanner("Paste your MyLinks token to start saving.");
+    showBanner("Paste your Machina token to start saving.");
   } else {
     showBanner("");
   }
@@ -37,9 +49,9 @@ async function load() {
 async function saveSettings() {
   const token = tokenInput.value.trim();
   const baseUrl = baseUrlInput.value.trim().replace(/\/+$/, "");
-  await chrome.storage.sync.set({ token, baseUrl });
+  await chrome.storage.local.set({ token, baseUrl });
   if (!token) {
-    showBanner("Paste your MyLinks token to start saving.");
+    showBanner("Paste your Machina token to start saving.");
     setStatus("Token cleared.", "");
   } else {
     showBanner("");
