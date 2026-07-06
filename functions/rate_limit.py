@@ -13,10 +13,6 @@ path), so there's nothing to add to firestore.rules.
 import time
 import logging
 
-from google.cloud import firestore
-
-from db import get_db
-
 logger = logging.getLogger(__name__)
 
 _COLLECTION = "rate_limits"
@@ -42,6 +38,11 @@ def check_rate_limit(
       spend).
     """
     try:
+        # Imported lazily so the pure helpers below (client_ip / identity) can be
+        # imported and unit-tested without the Firebase/GCP client deps.
+        from google.cloud import firestore
+        from db import get_db
+
         db = get_db()
         doc_ref = db.collection(_COLLECTION).document(_safe_key(key))
         now = int(time.time())

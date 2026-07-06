@@ -30,6 +30,9 @@ jobs:
       # Hard gate: types must be sound.
       - name: Typecheck
         run: npx tsc --noEmit
+      # Unit tests for the pure lib helpers (time normalization, RTL detection).
+      - name: Unit tests
+        run: npm test
       # Report-only for now: the repo carries pre-existing eslint findings and a
       # backlog of theme-token violations (SOURCE_OF_TRUTH §4). Surfaces issues
       # without blocking until the sweep lands; flip to a gate afterwards.
