@@ -28,11 +28,15 @@ def _safe_key(key: str) -> str:
     return key.replace("/", "_")[:1400]
 
 
-def check_rate_limit(key: str, limit: int, window_seconds: int) -> bool:
+def check_rate_limit(key: str, limit: int, window_seconds: int,
+                     fail_closed: bool = False) -> bool:
     """Return True if the call is allowed, False if the limit is exceeded.
 
-    Fails OPEN (returns True) on any backend error, so a transient Firestore
-    problem degrades to "no rate limiting" rather than taking the endpoint down.
+    On a backend error the default is to fail OPEN (return True), so a transient
+    Firestore problem degrades to "no rate limiting" rather than taking the
+    endpoint down. Pass `fail_closed=True` for buckets where unlimited traffic
+    is worse than downtime — the paid Gemini endpoints deny requests during a
+    Firestore outage instead of becoming a cost-abuse hole (audit M7).
     """
     try:
         db = get_db()
@@ -61,8 +65,9 @@ def check_rate_limit(key: str, limit: int, window_seconds: int) -> bool:
 
         return _txn(db.transaction())
     except Exception as e:
-        logger.error("Rate limit check failed (failing open): %s", e)
-        return True
+        logger.error("Rate limit check failed (failing %s): %s",
+                     "closed" if fail_closed else "open", e)
+        return not fail_closed
 
 
 def client_ip(req) -> str:

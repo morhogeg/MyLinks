@@ -228,11 +228,18 @@ _RATE_LIMITS = {
     "whatsapp": (60, 60),
 }
 
+# Buckets that spend money on Gemini per call fail CLOSED when the Firestore
+# limiter errors: during an outage they deny requests rather than run unmetered
+# (audit M7 — cost safety over availability). The cheap buckets keep failing
+# open so a limiter blip never breaks saving links.
+_FAIL_CLOSED_BUCKETS = {"analyze", "image", "chat"}
+
 
 def _rate_limited(bucket: str, identity: str, headers: dict = None):
     """Return a 429 Response if `identity` exceeds the bucket's limit, else None."""
     limit, window = _RATE_LIMITS[bucket]
-    if not check_rate_limit(f"{bucket}:{identity}", limit, window):
+    if not check_rate_limit(f"{bucket}:{identity}", limit, window,
+                            fail_closed=bucket in _FAIL_CLOSED_BUCKETS):
         logger.warning("Rate limit exceeded: %s:%s", bucket, identity)
         return _error_response("Too many requests. Please slow down.", 429, headers)
     return None
