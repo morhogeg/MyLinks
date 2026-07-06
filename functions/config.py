@@ -27,3 +27,7 @@ REQUIRE_AUTH = _flag("REQUIRE_AUTH")
 # App Check enforcement. When falsy, verification is attempted and logged but
 # never blocks (soft rollout); when true, a missing/invalid token is rejected.
 APPCHECK_ENFORCE = _flag("APPCHECK_ENFORCE")
+
+# Public origin of the web app. Shared by the entrypoint (CORS defaults, share
+# config) and the share-page renderer without either importing `main`.
+APP_URL = os.environ.get("APP_URL", "https://secondbrain-app-94da2.web.app")
