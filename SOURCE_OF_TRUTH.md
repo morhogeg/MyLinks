@@ -548,8 +548,13 @@ exact-match, capped.
   itself; for **existing** cards (no bold in detailedSummary) `LinkDetailModal`
   now leads with the highlighted short summary (auto-suppressed once the detailed
   body carries its own `**`, so no redundancy for new cards). tsc + py_compile
-  clean. Backend changed → needs `./deploy-functions.sh` (analyze/scrape fns) to
-  go live; web via Vercel; iOS picks up the web change on next TestFlight build.
+  clean. **SHIPPED (commit `54c33dc`):** merged to `main` (web live via Vercel);
+  **deployed `analyze_link` + `process_link_background`** — so the summary-quality
+  fix is live on BOTH web and iOS immediately (they call the same functions);
+  TestFlight **run #38 → build 1038** triggered for the iOS modal-highlight fix.
+  Note: existing cards keep their stored summaries until re-saved/re-analyzed —
+  only the open-state highlight *lead* is retroactive; re-saving the bayeslord
+  link now yields the corrected article summary.
 - **2026-07-06 — "Open Machina" from the share sheet → in-app progress banner.**
   When sharing into Machina from another app, the Share Extension HUD now offers
   an **Open Machina** button next to the ✕ (`ShareViewController.swift`). Tapping
