@@ -205,7 +205,11 @@ The multi-user auth work is **fully written but not live**:
    firestore.rules && firebase deploy --only firestore:rules` (point of no
    return); (6) device-verify the **brand-new-user** claim path (fresh non-owner
    account → auto-created workspace — only works once `REQUIRE_AUTH` is on).
-   Flagged decision: `get_article` stays anonymous-callable
+   **⚠️ Also fix `storage.rules` before the lock (audit M13):** the
+   `screenshots/{uid}` read rule keys on `request.auth.uid == uid`, but `{uid}`
+   is the phone-number workspace id, so post-cutover a signed-in user can't read
+   their own screenshots — reconcile it with the `authUids` model (comment in
+   `storage.rules`). Flagged decision: `get_article` stays anonymous-callable
    (App Check + rate limit only) — keep or gate deliberately. Closes audit
    blockers B-1/B-2/B-3. Full checklist: `NATIVE_AUTH_SETUP.md` §6.
 3. **[x] New-user path** *(code done 2026-07-03; goes live with the task-2
@@ -293,28 +297,58 @@ The multi-user auth work is **fully written but not live**:
 
 ### 🟡 P2 — security/cost hardening & honest product surface
 
-12. **[ ] Ingest token hardening (audit H-1).** Move from App Group UserDefaults
-    to Keychain; server copy to a functions-only collection; add rotation.
-13. **[ ] Remaining audit mediums:** per-uid rate limits post-auth + fail-closed
-    on paid buckets (M-3), cap `ask_brain` history (M-5), mask remaining phone
-    logs in `link_service.py`/`whatsapp_handler.py` (H-4 residue).
-14. **[ ] README ↔ reality (M-P5/T12) — still false.** Verified 2026-07-03: README
-    claims Graph *Visualization*, Insights Dashboard, "Works Offline", Table view —
-    none exist. Rewrite to describe the real product (recall engine, capture
-    surface, synthesis). Also remove the PWA badge/positioning.
-15. **[ ] Retire the iPhone-PWA surface deliberately.** The native app replaced
-    it: remove `InstallPWA.tsx` (or gate to Android only), stop advertising
-    install-to-home-screen, and stop routine `./deploy-hosting.sh` runs (already
-    removed from the ship skill). Keep Hosting alive solely for `/api/*` rewrites +
-    share pages.
-16. **[ ] Offline decision (M15).** No service worker exists. Either build
-    read-cache offline for opened articles or (cheaper) drop every offline claim
-    (fold into 14).
+12. **[ ] Ingest token hardening (audit H-1) — NOW THE TOP P2 (2026-07-06 audit
+    re-confirmed).** The Share Extension writes the long-lived bearer ingest
+    token to plaintext App Group **UserDefaults** (`ShareConfigPlugin.swift:38`,
+    `ShareViewController.swift:853`) — exposed in unencrypted backups /
+    jailbroken devices, and combined with the still-open live rules = full
+    workspace access. Fix: **Keychain** with a shared `kSecAttrAccessGroup`
+    readable by both app + extension + one-time migration; server copy to a
+    functions-only collection; add rotation. **Deliberately deferred from the
+    2026-07-06 hardening pass:** untested Swift on the fragile share-token bridge
+    (see the 1018/1020 history above) — needs Xcode + on-device verification, not
+    a blind edit. Also here: delete ShareExt temp JSON files (incl. base64
+    images) on completion (`ShareViewController.swift:885`); drop the stale
+    `armv7` `UIRequiredDeviceCapabilities`.
+13. **[~] Remaining audit mediums — partly done 2026-07-06.** **DONE:** paid
+    buckets (`analyze`/`image`/`chat`/`share`) now **fail closed**; `client_ip`
+    keys on the un-spoofable **rightmost** XFF hop; `rate_limit_identity(req,
+    uid)` helper added; `ask_brain` history already capped (`[-6]`). **REMAINING:**
+    call `rate_limit_identity` from the endpoints so authed calls key per-uid
+    (helper exists, not yet wired); mask remaining phone logs in
+    `link_service.py`/`whatsapp_handler.py` (H-4 residue). **New — O(N) scheduler
+    sweeps (M3):** `run_reminder_check` loads EVERY user doc every 2 min +
+    rewrites `nextReminderAt` per tick (`reminder_service.py:143,174`),
+    `run_digest_check` hourly, `get_user_tags` reads ALL a user's links per
+    analysis — redesign with indexed due-user queries + a one-off migration
+    before the base grows (needs owner-deployed composite indexes).
+14. **[x] README ↔ reality (M-P5/T12).** *Done 2026-07-06:* rewrote `README.md`
+    to the real product (recall engine, capture surface, synthesis); removed the
+    false Graph-Visualization / Insights-Dashboard / Works-Offline / Table
+    claims, the PWA badge, and the MIT/open-source positioning (commercial app).
+15. **[x] Retire the iPhone-PWA surface.** *Done 2026-07-06:* deleted
+    `InstallPWA.tsx` + its mount, stripped the web manifest /
+    `appleWebApp.capable` metadata + apple-mobile-web-app meta tags from
+    `layout.tsx`. Hosting stays alive solely for `/api/*` rewrites + share pages.
+16. **[x] Offline decision (M15/F-21).** *Done 2026-07-06 (the cheaper path):*
+    dropped the offline claims (task 14) and added an honest connectivity signal
+    — `lib/useOnlineStatus.ts` + `OfflineBanner` so optimistic writes no longer
+    look silently saved while disconnected. No service worker / read-cache
+    (explicitly not built).
 17. **[ ] Light theme decision (M-P1).** Give light mode the dark theme's material
-    care, or ship dark-only intentionally. Decide, don't leave half-done.
-18. **[ ] Test harness (T3).** Only `functions/test_yt_scrape.py` exists. Add
-    scraper fixtures, `ai_service` schema-contract tests, `search.py` tests,
-    WhatsApp payload smoke test; wire into CI/SessionStart.
+    care, or ship dark-only intentionally. Decide, don't leave half-done. Related
+    debt surfaced 2026-07-06: **~180 hardcoded white/black color utilities** across
+    31 tsx files violate the token rule — an ESLint guard now WARNS on them; sweep
+    to tokens then flip the rule to error.
+18. **[~] Test harness (T3) — bootstrapped 2026-07-06.** Was only a debug script
+    (`test_yt_scrape.py`, now deleted). **Added:** `functions/test_scraper.py`
+    (SSRF guard + hostname routing), `functions/test_rate_limit.py` (XFF/identity),
+    `web/lib/time.test.ts` + `rtl.test.ts` (Vitest) — 18 pytest + 14 vitest green
+    — and a **`.github/workflows/ci.yml`** running web typecheck/build/vitest,
+    functions py_compile/pytest, and the firestore-rules emulator suite on every
+    PR (there was NO PR CI before). **Remaining:** `ai_service` schema-contract
+    tests, `search.py`/digest curation tests, WhatsApp payload smoke test, and
+    wider component coverage.
 19. **[ ] Cost guardrails.** Budget alerts on the Firebase/GCP project; per-user
     monthly quotas (see §7); email digest provider decision (SendGrid key or cut
     the email channel).
@@ -328,11 +362,29 @@ The multi-user auth work is **fully written but not live**:
 24. **[ ] T10 export** (MD/PDF/HTML from ReadingView), **T11 highlights**, T5/T6
     connector framework + YouTube liked-videos sync (pull connectors; IG/FB saved
     have no legitimate API — won't do), Chrome Web Store listing for the extension.
-25. **[ ] QA backlog leftovers** (from the F-series, still open): F-16 ref-counted
-    scroll locks, F-20 ReminderModal past-times/date-rollover, F-21 offline signal
-    for optimistic writes, F-24/25/26 SimpleMarkdown + RTL unification, F-29
+25. **[~] QA backlog leftovers** (F-series). **DONE 2026-07-06:** F-16 (shared
+    ref-counted `lib/useScrollLock.ts` replaces the 5 overlays that forced
+    `overflow:'unset'` on close), F-21 (offline signal — task 16). **STILL OPEN:**
+    F-20 ReminderModal past-times/date-rollover, F-24/25/26 SimpleMarkdown + RTL
+    unification (two markdown renderers — hand-rolled `SimpleMarkdown` vs
+    `react-markdown` in AskBrain; consolidate to one themed `<Markdown>`), F-29
     SwipeDeck undo doesn't cancel reminders, F-31 Reader "Listen" reliability,
     F-32 SwipeDeck stale snapshot, L-5 unbounded `deleteCollection` batch.
+26. **[ ] God-file decomposition (surfaced 2026-07-06).** Two files concentrate
+    almost all change-risk: `web/components/Feed.tsx` (**2,109 lines**, 39
+    `useState`, six view modes, inline Firestore subscriptions — extract
+    `useLibraryData`/`useFacets`, split Collections/Connections/Ask into feature
+    modules) and `functions/main.py` (**2,334 lines** — split the HTML/OG share
+    renderer + hand-rolled markdown parser, the WhatsApp state machine, the
+    background worker, and the HTTP API into separate modules). Also consolidate
+    the two embedding implementations (`ai_service.embed_text` vs
+    `search.EmbeddingService`, independently hardcoded model/dim). Large, do
+    behind tests.
+27. **[ ] A11y follow-up (surfaced 2026-07-06).** Most overlays already carry
+    `role`/`aria-modal` (better than the audit assumed) and Escape handling;
+    remaining gap is a **shared focus-trap** hook applied to every overlay (only
+    AskBrain manages focus today). Zoom re-enabled 2026-07-06 (removed
+    `userScalable:false`).
 
 ### ✅ Done — verified against code (do not redo)
 
@@ -526,6 +578,35 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-06 — Production-readiness audit + hardening pass (branch
+  `claude/codebase-audit-production-ej8juu`).** Ran a full three-part codebase
+  audit (backend / frontend / infra-iOS-extension) and implemented the safe,
+  high-impact fixes; the big refactors are staged in §4 (tasks 26/27), and the
+  owner-only cutover items (C1 open rules, C2 uid-fallback removal, C3 App Check)
+  are unchanged — still the top launch blockers (§4 tasks 2/5). **Backend
+  (functions/):** rate limiter now **fails closed** on the paid buckets and
+  keys on the un-spoofable rightmost XFF hop (+ `rate_limit_identity` for per-uid
+  keying); all per-platform scrapers routed through the SSRF-guarded `safe_get`;
+  hostname routing fixed (`'x.com'` no longer matches `netflix.com`);
+  `process_link_background` got a **transactional idempotency claim** + attempts
+  cap (redelivery no longer duplicates the card/spend); digest reads
+  `order_by(createdAt DESC)` before the 500 cap; semantic search dropped the
+  1-doc-sample short-circuit; placeholder cards skip embedding; RAG/analysis
+  prompts label scraped content as untrusted DATA (prompt-injection) and the
+  duplicated RAG builders were extracted; `config.py` centralizes the auth flags;
+  dead code removed; requirements bounded. **Frontend (web/):** added error
+  boundaries (route + global + a component boundary around Feed) so one throw no
+  longer white-screens the SPA; a shared **ref-counted `useScrollLock`** (F-16);
+  retired the PWA surface (deleted `InstallPWA`, stripped manifest/apple-web-app
+  meta); re-enabled pinch-zoom; **offline banner** (F-21); dropped the
+  `<Feed key>` remount; consolidated the copy-pasted `getTimeAgo` into
+  `lib/time.ts`; ESLint guards for `console`/hardcoded colors (warn). **Repo:**
+  first-ever **PR CI** (`.github/workflows/ci.yml`), `.gitignore` now covers
+  `GoogleService-Info.plist`/`*.p8`/`output.json`, **README rewritten** to
+  reality, browser extension token moved to `storage.local` + rebranded to
+  Machina, `build-ios.sh` uses `npm ci`. **Tests:** bootstrapped pytest (SSRF +
+  rate-limit) and Vitest (time + rtl) — 18 + 14 green, wired into CI. Verified:
+  `tsc --noEmit` + `next build` clean, `py_compile` clean, both suites green.
 - **2026-07-06 — "Show by" status filter now has a dismissable pill (commits
   `f575529`, `c77f873`).** The status filter (Archive/Favorites/Unread/Read/
   Reminders) changed the feed but left no on-page indicator — unlike tags. Added a

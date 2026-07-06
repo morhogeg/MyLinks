@@ -2,7 +2,13 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Screenshots: users can read their own; only Cloud Functions write
+    // Screenshots: users can read their own; only Cloud Functions write.
+    // ⚠️ CUTOVER BUG (audit M13): {uid} here is the workspace id = the PHONE
+    // NUMBER, but request.auth.uid is the random Firebase Auth uid — so once
+    // REQUIRE_AUTH is on, `request.auth.uid == uid` is never true and a signed-in
+    // user can't read their own screenshots. Reconcile with the authUids-based
+    // ownership model (like firestore.rules.locked) BEFORE the rules lock — see
+    // §4 task 2 cutover checklist in SOURCE_OF_TRUTH.md.
     match /screenshots/{uid}/{allPaths=**} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false; // Only admin SDK (Cloud Functions) writes here
