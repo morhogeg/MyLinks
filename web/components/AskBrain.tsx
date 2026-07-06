@@ -2,9 +2,6 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { MessageCircleQuestion, ArrowUp, FileText, Brain, Plus, MessagesSquare, Copy, Check } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkBreaks from 'remark-breaks';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS, xHandle, linkedinDisplayName } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
@@ -14,6 +11,7 @@ import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { ChatMessage, ChatSource, ChatSession } from '@/lib/types';
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
 import ConfirmDialog from './ConfirmDialog';
+import MarkdownMessage from './MarkdownMessage';
 import ChatHistorySidebar from './ChatHistorySidebar';
 import MobileSubheader from './MobileSubheader';
 import { IconButton } from './ui/Button';
@@ -46,35 +44,6 @@ function sourceTag(s: ChatSource): { label: string; platform: ReturnType<typeof 
     if (name) return { label: name, platform: null };
     if (s.category) return { label: s.category, platform: null };
     return null;
-}
-
-/** Renders an assistant answer as Markdown, styled to match the chat. GFM gives
- *  us tables/strikethrough; remark-breaks turns single newlines into <br> so the
- *  model's line breaks survive (like the old whitespace-pre-wrap). */
-function MarkdownMessage({ content }: { content: string }) {
-    return (
-        <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkBreaks]}
-            components={{
-                // dir="auto" per block so each line/item aligns by its own first
-                // strong character — an English answer that cites a Hebrew title
-                // stays left-aligned, while a Hebrew line renders RTL.
-                p: ({ children }) => <p dir="auto" className="mb-2 last:mb-0">{children}</p>,
-                ul: ({ children }) => <ul dir="auto" className="list-disc ps-5 mb-2 last:mb-0 space-y-1">{children}</ul>,
-                ol: ({ children }) => <ol dir="auto" className="list-decimal ps-5 mb-2 last:mb-0 space-y-1">{children}</ol>,
-                li: ({ children }) => <li dir="auto" className="leading-relaxed">{children}</li>,
-                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                a: ({ children, href }) => (
-                    <a href={href} target="_blank" rel="noopener noreferrer" className="text-accent underline underline-offset-2 hover:text-accent-hover">
-                        {children}
-                    </a>
-                ),
-                code: ({ children }) => <code className="px-1 py-0.5 rounded bg-card-hover text-[13px] font-mono">{children}</code>,
-            }}
-        >
-            {content}
-        </ReactMarkdown>
-    );
 }
 
 /** Subtle "copy this answer" affordance shown under each assistant bubble. */
