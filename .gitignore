@@ -23,6 +23,19 @@ yarn-error.log*
 .DS_Store
 *.pem
 
+# Secrets & signing material — never commit these (belt-and-suspenders even
+# though none are currently tracked). Firebase client config, Apple signing
+# keys/profiles, and service-account JSON.
+GoogleService-Info.plist
+google-services.json
+*.p8
+*.p12
+*.mobileprovision
+*.keystore
+*.jks
+serviceAccount*.json
+**/serviceAccountKey.json
+
 # Python
 __pycache__/
 *.py[cod]

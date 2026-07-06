@@ -2,6 +2,18 @@
 // worker for "Test connection" / "Save this page now". No capture logic here.
 
 const DEFAULT_BASE_URL = "https://secondbrain-app-94da2.web.app";
+// Keep in sync with background.js — the token may only be sent to these hosts.
+const ALLOWED_HOSTS = ["secondbrain-app-94da2.web.app"];
+
+function isAllowedBaseUrl(raw) {
+  if (!raw) return true; // empty means "use the default", which is allowed
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" && ALLOWED_HOSTS.includes(u.hostname);
+  } catch (_) {
+    return false;
+  }
+}
 
 const $ = (id) => document.getElementById(id);
 const tokenInput = $("token");
@@ -24,7 +36,14 @@ function showBanner(text) {
 }
 
 async function load() {
-  const { token = "", baseUrl = "" } = await chrome.storage.sync.get(["token", "baseUrl"]);
+  // Read from storage.local (where the token now lives); fall back to the legacy
+  // storage.sync location for installs that predate the migration.
+  let { token = "", baseUrl = "" } = await chrome.storage.local.get(["token", "baseUrl"]);
+  if (!token && !baseUrl) {
+    const legacy = await chrome.storage.sync.get(["token", "baseUrl"]);
+    token = legacy.token || "";
+    baseUrl = legacy.baseUrl || "";
+  }
   tokenInput.value = token;
   baseUrlInput.value = baseUrl;
   if (!token) {
@@ -35,9 +54,16 @@ async function load() {
 }
 
 async function saveSettings() {
-  const token = tokenInput.value.trim();
   const baseUrl = baseUrlInput.value.trim().replace(/\/+$/, "");
-  await chrome.storage.sync.set({ token, baseUrl });
+  if (!isAllowedBaseUrl(baseUrl)) {
+    setStatus("That backend URL isn't allowed. Leave it blank to use the default.", "err");
+    return;
+  }
+  const token = tokenInput.value.trim();
+  // Store the token device-locally, never in synced storage, and purge any
+  // legacy synced copy.
+  await chrome.storage.local.set({ token, baseUrl });
+  chrome.storage.sync.remove(["token", "baseUrl"]).catch(() => {});
   if (!token) {
     showBanner("Paste your MyLinks token to start saving.");
     setStatus("Token cleared.", "");

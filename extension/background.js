@@ -2,18 +2,58 @@
 // Service worker: all capture logic lives here. The popup only manages settings.
 
 const DEFAULT_BASE_URL = "https://secondbrain-app-94da2.web.app";
+// The ingest token is a bearer secret; only ever send it to these hosts. This
+// is defense in depth on top of the manifest's scoped host_permissions.
+const ALLOWED_HOSTS = ["secondbrain-app-94da2.web.app"];
 const CONTEXT_MENU_ID = "mylinks-save";
 const CONTEXT_SETTINGS_ID = "mylinks-settings";
 const BADGE_RESET_MS = 2000;
 
 // ── Settings ────────────────────────────────────────────────────────────────
 
+// Never let a user-typed (or corrupted) baseUrl send the token to an arbitrary
+// origin. Require https + an allowlisted host, else fall back to the default.
+function sanitizeBaseUrl(raw) {
+  const trimmed = (raw || "").trim().replace(/\/+$/, "");
+  if (!trimmed) return DEFAULT_BASE_URL;
+  try {
+    const u = new URL(trimmed);
+    if (u.protocol === "https:" && ALLOWED_HOSTS.includes(u.hostname)) {
+      return `${u.protocol}//${u.host}`;
+    }
+  } catch (_) {
+    // fall through
+  }
+  return DEFAULT_BASE_URL;
+}
+
 async function getSettings() {
-  const { token = "", baseUrl = "" } = await chrome.storage.sync.get(["token", "baseUrl"]);
+  // Token lives in storage.local (device-local) — NOT storage.sync, which would
+  // replicate the bearer secret to every signed-in Chrome profile/device.
+  const { token = "", baseUrl = "" } = await chrome.storage.local.get(["token", "baseUrl"]);
   return {
     token: (token || "").trim(),
-    baseUrl: (baseUrl || "").trim().replace(/\/+$/, "") || DEFAULT_BASE_URL,
+    baseUrl: sanitizeBaseUrl(baseUrl),
   };
+}
+
+// One-time migration: earlier builds stored the token in storage.sync. Move any
+// existing values into storage.local and purge the synced copy.
+async function migrateSyncToLocal() {
+  try {
+    const local = await chrome.storage.local.get(["token", "baseUrl"]);
+    if (local.token || local.baseUrl) return;
+    const legacy = await chrome.storage.sync.get(["token", "baseUrl"]);
+    if (legacy.token || legacy.baseUrl) {
+      await chrome.storage.local.set({
+        token: legacy.token || "",
+        baseUrl: legacy.baseUrl || "",
+      });
+      await chrome.storage.sync.remove(["token", "baseUrl"]);
+    }
+  } catch (_) {
+    // best-effort; getSettings still works off whatever is in local.
+  }
 }
 
 // ── Badge feedback ───────────────────────────────────────────────────────────
@@ -183,6 +223,8 @@ function createMenus() {
   });
 }
 
+chrome.runtime.onInstalled.addListener(migrateSyncToLocal);
+chrome.runtime.onStartup.addListener(migrateSyncToLocal);
 chrome.runtime.onInstalled.addListener(createMenus);
 chrome.runtime.onStartup.addListener(createMenus);
 

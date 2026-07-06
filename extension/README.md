@@ -26,7 +26,9 @@ No build step, no dependencies — plain HTML/CSS/JS.
 4. Click **Save settings**, then **Test connection** to confirm the token works.
    (The test sends a tokens-only request that saves nothing.)
 
-Settings are stored in `chrome.storage.sync`, so they follow your Chrome profile.
+Your ingest token is stored in `chrome.storage.local` (this device only) so the
+bearer secret is never replicated across your synced Chrome profiles. The
+Backend URL is restricted to the official host.
 
 ## How to save
 
