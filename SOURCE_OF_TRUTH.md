@@ -526,6 +526,21 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-06 — Card ↔ open unified into one thought at two zoom levels
+  (commit `51bd9fa`).** Follow-up to the summary-quality ship below: the card
+  `summary` and the open `detailedSummary` were two independent paraphrases, so
+  the closed text was never a subset of the open text — and the open view's own
+  overview paragraph was a second, differently-worded gist. Fix: `detailedSummary`
+  no longer writes an overview (prompt now forces it to START at "## Key Points"
+  and complement, not restate, the summary); `LinkDetailModal` leads the open view
+  with the bolded card `summary`, then the Key Points/Conclusions expand below.
+  Backward-compat: legacy cards whose `detailedSummary` still has a leading
+  overview are sliced to the first "## " so the open view never shows two
+  overviews; section-less legacy prose is shown alone (no lead) to avoid dup.
+  **SHIPPED:** merged to `main` (web via Vercel); redeployed `analyze_link` +
+  `process_link_background`; TestFlight **run #39 → build 1039**. Existing cards
+  keep stored text until re-saved (their detailedSummary still has an overview,
+  but it's now stripped on open — so old cards already read correctly).
 - **2026-07-06 — Summary quality: X Articles fixed + tighter prompts + open-state
   highlights.** Root-caused a bad card (a bayeslord post — "46 thoughts on the near
   future," 46 numbered observations — summarized as a generic, hallucinated
