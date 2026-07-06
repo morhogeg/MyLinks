@@ -293,6 +293,14 @@ The multi-user auth work is **fully written but not live**:
 
 ### 🟡 P2 — security/cost hardening & honest product surface
 
+> **Security audit (2026-07-06):** full OWASP sweep in **`SECURITY_AUDIT.md`**
+> (the tracked source for security findings). The launch-gating criticals
+> (open Firestore rules, backend trusting client `uid`) are **task 2** (auth
+> cutover). Safe fixes already applied that session (SSRF redirect guard, XFF
+> rate-limit spoofing, extension token storage, admin error leaks, gitignore +
+> CI perms). Owner key-hygiene is **task 5**; the remaining hardening items map
+> to tasks 12/13/19 below. Re-audit after the cutover.
+
 12. **[ ] Ingest token hardening (audit H-1).** Move from App Group UserDefaults
     to Keychain; server copy to a functions-only collection; add rotation.
 13. **[ ] Remaining audit mediums:** per-uid rate limits post-auth + fail-closed
@@ -525,6 +533,29 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
+
+- **2026-07-06 — OWASP security audit + safe hardening (`SECURITY_AUDIT.md`).**
+  Full OWASP sweep across web, iOS, Cloud Functions, Firestore/Storage rules,
+  extensions, and CI (three parallel explorers, key findings code-verified).
+  Report lives in `SECURITY_AUDIT.md` (the tracked source for security issues).
+  **The dominant risk is unchanged and remains the launch gate:** the live
+  `firestore.rules` are `allow read, write: if true` (C1/C2) and the backend
+  trusts client `uid` while `REQUIRE_AUTH` is off (C3) — all close with the
+  staged auth cutover (task 2), which needs owner-only Firebase/Apple steps.
+  **Fixed this session (branch `claude/security-owasp-audit-r1vo9h`, no behavior
+  change):** SSRF redirect bypass on the platform scrapers — they now use
+  `safe_get` + hostname-based dispatch (`scraper.py`); rate-limit `X-Forwarded-For`
+  spoofing — `client_ip` now reads the trusted rightmost hop (`rate_limit.py`);
+  admin endpoints no longer echo raw exceptions (`main.py`); extension bearer
+  token moved from `chrome.storage.sync`→`.local` with a `baseUrl` host allowlist
+  (`extension/`); `openExternal` scheme guard (`web/lib/share.ts`); `.gitignore`
+  now covers signing/service-account secrets + CI workflow got
+  `permissions: contents: read`. Verified via `py_compile`, `tsc --noEmit`,
+  `node --check`. Remaining hardening (Keychain for the ingest token, CSP
+  `unsafe-eval`, dep pinning, per-uid quotas) is logged in the report §4.4 and
+  maps to §4 tasks 12/13/19. **Owner still must** (task 5) rotate the Gemini key
+  + ASC `.p8` and set `APPCHECK_ENFORCE`/`OWNER_EMAIL`/`ADMIN_TOKEN`, and confirm
+  `TWILIO_AUTH_TOKEN` is set in prod (WhatsApp impersonation guard, H4).
 
 - **2026-07-06 — "Open Machina" from the share sheet → in-app progress banner.**
   When sharing into Machina from another app, the Share Extension HUD now offers
