@@ -15,6 +15,7 @@ from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
 from google import genai
 
 from db import get_db
+from embeddings import EMBEDDING_MODEL, embed_content_raw
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class EmbeddingService:
                 logger.error(f"Failed to initialize Gemini client: {e}")
         else:
             logger.warning("GEMINI_API_KEY environment variable not set!")
-        self.model = "models/gemini-embedding-001"
+        self.model = EMBEDDING_MODEL
         logger.info(f"EmbeddingService initialized with model: {self.model}, client initialized: {self.client is not None}")
 
     def generate_embedding(self, text: str) -> List[float]:
@@ -40,12 +41,7 @@ class EmbeddingService:
             raise Exception("GEMINI_API_KEY not configured. Please set the GEMINI_API_KEY environment variable in Firebase Cloud Functions.")
 
         try:
-            result = self.client.models.embed_content(
-                model=self.model,
-                contents=text,
-                config={"output_dimensionality": 768}
-            )
-            return result.embeddings[0].values
+            return embed_content_raw(self.client, text)
         except Exception as e:
             logger.error(f"Embedding generation failed: {e}")
             raise Exception(f"Gemini Embedding failed: {str(e)}")

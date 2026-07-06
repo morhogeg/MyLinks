@@ -11,8 +11,9 @@ logger = logging.getLogger(__name__)
 # Single source of truth for the analysis/generation model. Flows to text
 # analysis, image vision, and graph_service. Change here to swap tiers everywhere.
 GEMINI_ANALYSIS_MODEL = "gemini-3.1-flash-lite"
-EMBEDDING_MODEL = "models/gemini-embedding-001"
-EMBEDDING_DIMENSIONS = 768
+# Embedding model/dimensions + the raw embed call live in embeddings.py (shared
+# with search.py). Re-imported here so this module's references keep working.
+from embeddings import EMBEDDING_MODEL, EMBEDDING_DIMENSIONS, embed_content_raw
 
 
 class AnalysisError(Exception):
@@ -582,12 +583,7 @@ Return ONLY a JSON object matching the schema (title, narrative, themes[title,in
             return [1e-9] * EMBEDDING_DIMENSIONS
 
         try:
-            result = self.client.models.embed_content(
-                model=EMBEDDING_MODEL,
-                contents=text[:9000],
-                config={"output_dimensionality": EMBEDDING_DIMENSIONS}
-            )
-            return result.embeddings[0].values
+            return embed_content_raw(self.client, text[:9000])
         except Exception as e:
             logger.error(f"Embedding generation failed: {str(e)}")
             return [1e-9] * EMBEDDING_DIMENSIONS
