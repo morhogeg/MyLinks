@@ -39,9 +39,22 @@ export function policyUrl(path: string): string {
  * Open a URL outside the app: the system browser on native (Capacitor routes
  * `window.open` of an external URL to Safari), a new tab on the web. noopener
  * so the opened page can't reach `window.opener`.
+ *
+ * Only http(s) URLs are opened — an unguarded `window.open` is a sink for
+ * `javascript:`/`data:` schemes if this helper is ever called with untrusted
+ * input, so we reject anything that isn't a normal web URL.
  */
 export function openExternal(url: string): void {
-    if (typeof window !== 'undefined') window.open(url, '_blank', 'noopener,noreferrer');
+    if (typeof window === 'undefined') return;
+    let safe: string;
+    try {
+        const parsed = new URL(url, window.location.href);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return;
+        safe = parsed.href;
+    } catch {
+        return;
+    }
+    window.open(safe, '_blank', 'noopener,noreferrer');
 }
 
 export type ShareOutcome = 'shared' | 'copied' | 'cancelled' | 'failed';
