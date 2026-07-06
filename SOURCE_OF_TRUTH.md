@@ -526,6 +526,30 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-06 — Summary quality: X Articles fixed + tighter prompts + open-state
+  highlights.** Root-caused a bad card (a bayeslord post — "46 thoughts on the near
+  future," 46 numbered observations — summarized as a generic, hallucinated
+  "algorithmic transparency" blurb). Cause was **not** the prompt: the post is an
+  **X Article** (long-form), whose body lives in `tweet.article.content.blocks`
+  (Draft.js), NOT `tweet.text` (empty). `_scrape_twitter_url` treated it as
+  empty → fell through to a thin OG-metadata scrape → Gemini invented content.
+  Fix (`functions/scraper.py`): `has_article` now triggers the fxtwitter path, and
+  new `_format_twitter_article()` reconstructs the article (title + headings +
+  **numbered** ordered-list items) — verified live: 22K chars of real content
+  instead of a placeholder. Prompt hardening (`functions/ai_service.py`,
+  SYSTEM_PROMPT): summary must **lead with substance** (banned vague meta-openers
+  like "This article examines the relationship between…"), **lists/threads** must
+  surface 2-3 specific points not just "this is a list," a **GROUNDING** rule
+  forbids fabricating when content is empty/placeholder, and `detailedSummary` now
+  gets the same **`**bold**` scannability** as the short summary. Open-state
+  highlights (repeat user ask): `SimpleMarkdown` already renders `**bold**`, but
+  the detail modal shows `detailedSummary`, which never carried bold — so
+  highlights vanished on open. Two-part fix: new cards bold the detailedSummary
+  itself; for **existing** cards (no bold in detailedSummary) `LinkDetailModal`
+  now leads with the highlighted short summary (auto-suppressed once the detailed
+  body carries its own `**`, so no redundancy for new cards). tsc + py_compile
+  clean. Backend changed → needs `./deploy-functions.sh` (analyze/scrape fns) to
+  go live; web via Vercel; iOS picks up the web change on next TestFlight build.
 - **2026-07-06 — "Open Machina" from the share sheet → in-app progress banner.**
   When sharing into Machina from another app, the Share Extension HUD now offers
   an **Open Machina** button next to the ✕ (`ShareViewController.swift`). Tapping

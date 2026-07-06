@@ -528,14 +528,29 @@ export default function LinkDetailModal({
                         {/* Lead straight into the full write-up (its own OVERVIEW /
                             KEY POINTS sections). The short gist is already shown on
                             the collapsed card, so repeating it here is redundant —
-                            fall back to it only when there's no detailed summary. */}
+                            fall back to it only when there's no detailed summary.
+                            EXCEPTION: older cards' detailedSummary has no **bold**
+                            highlights, so the scannable terms the card shows would
+                            vanish here. When the detailed write-up carries no
+                            highlights, lead with the highlighted gist so the open
+                            state keeps them. Newer cards bold the detailedSummary
+                            itself, so the lead is suppressed to avoid redundancy. */}
                         <div className="mb-6">
                             {link.detailedSummary ? (
-                                <SimpleMarkdown
-                                    content={link.detailedSummary}
-                                    isRtl={isRtl}
-                                    className="text-base"
-                                />
+                                <>
+                                    {link.summary && !link.detailedSummary.includes('**') && (
+                                        <SimpleMarkdown
+                                            content={link.summary}
+                                            isRtl={isRtl}
+                                            className="text-lg mb-6"
+                                        />
+                                    )}
+                                    <SimpleMarkdown
+                                        content={link.detailedSummary}
+                                        isRtl={isRtl}
+                                        className="text-base"
+                                    />
+                                </>
                             ) : link.summary ? (
                                 <SimpleMarkdown
                                     content={link.summary}
