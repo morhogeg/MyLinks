@@ -6,15 +6,16 @@
 import { useState, useEffect, useRef, useMemo, cloneElement, type ReactElement } from 'react';
 import { Link, LinkStatus, Collection, WeeklySynthesis } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { toMillis, type TimestampLike } from '@/lib/time';
-import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, type PlatformKey } from '@/lib/platform';
+import { PLATFORM_LABELS, platformIcon, platformActiveStyle } from '@/lib/platform';
 import Dropdown from './Dropdown';
 import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
-import { collection, query, orderBy, onSnapshot, getDocsFromServer, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
-import { db, functions } from '@/lib/firebase';
+import { useLibraryData, getTimestampNumber } from '@/lib/useLibraryData';
+import { useSearch } from '@/lib/useSearch';
+import { useFacets, type FilterType, type SortType } from '@/lib/useFacets';
+import { collection, query, orderBy, getDocsFromServer, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
-import { httpsCallable } from 'firebase/functions';
 import Card from './Card';
 import ListCard from './ListCard';
 import Masonry from './Masonry';
@@ -42,9 +43,6 @@ import TagExplorer from './TagExplorer';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
-type FilterType = 'all' | 'unread' | 'read' | 'archived' | 'favorite' | 'reminders';
-type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
-
 /**
  * Main feed component displaying saved links
  * Features:
@@ -58,10 +56,27 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
-    const [links, setLinks] = useState<Link[]>([]);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filter, setFilter] = useState<FilterType>('all');
-    const [selectedCategory, setSelectedCategory] = useState<Set<string>>(new Set());
+    const { links, setLinks, collections, isLoading } = useLibraryData(uid);
+    const { searchQuery, setSearchQuery, debouncedQuery, isSearching, searchResults } = useSearch();
+    // Pending captures (M3) — processing/failed cards. They're excluded from the
+    // normal filtered feed and from every facet derivation (so a still-empty
+    // card never spawns a phantom "Processing" category/tag), then surfaced
+    // separately, pinned at the top of the library, so a capture is always visible.
+    const isPending = (l: Link) => l.status === 'processing' || l.status === 'failed';
+    const contentLinks = links.filter((l) => !isPending(l));
+    const {
+        filter, setFilter,
+        selectedCategory, setSelectedCategory,
+        sortBy, setSortBy,
+        selectedTags, setSelectedTags,
+        selectedPlatforms, setSelectedPlatforms,
+        screenshotOnly, setScreenshotOnly,
+        selectedCollections, setSelectedCollections,
+        filteredLinks,
+        categoryCounts, categories, tagCounts, allTags,
+        platformCounts, availablePlatforms, screenshotCount, reminderCount,
+        handleToggleTag, handleTogglePlatform,
+    } = useFacets({ contentLinks, searchResults, debouncedQuery });
     const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
     // Back-stack for related-card navigation: opening a card *from* another card
     // pushes the current one, so closing returns there instead of dismissing all.
@@ -95,14 +110,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
         setLinkStack([]);
         setActiveLinkId(null);
     };
-    const [isLoading, setIsLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'ask' | 'collections' | 'connections'>('grid');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
-    const [sortBy, setSortBy] = useState<SortType>('date-desc');
-    const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
-    const [selectedPlatforms, setSelectedPlatforms] = useState<Set<PlatformKey>>(new Set());
-    const [screenshotOnly, setScreenshotOnly] = useState(false);
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
     const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
@@ -115,8 +125,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
     const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
     // Collections
-    const [collections, setCollections] = useState<Collection[]>([]);
-    const [selectedCollections, setSelectedCollections] = useState<Set<string>>(new Set());
     const [addToCollectionLink, setAddToCollectionLink] = useState<Link | null>(null);
     const [collectionFormOpen, setCollectionFormOpen] = useState(false);
     const [editingCollection, setEditingCollection] = useState<Collection | null>(null);
@@ -126,20 +134,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
     // Weekly synthesis (M12) — the in-app "What you learned" special card.
     const [latestSynthesis, setLatestSynthesis] = useState<WeeklySynthesis | null>(null);
     const [dismissedSynthesisWeek, setDismissedSynthesisWeek] = useState<string | null>(null);
-
-    // Semantic Search State
-    const [isSearching, setIsSearching] = useState(false);
-    const [searchResults, setSearchResults] = useState<Link[]>([]);
-    const [searchError, setSearchError] = useState<string | null>(null);
-    const [debouncedQuery, setDebouncedQuery] = useState('');
-
-    // Debounce search query
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedQuery(searchQuery);
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [searchQuery]);
 
     // Server-side captures (Share Extension / WhatsApp) show up as `processing`
     // cards; surface the same app-level "Analyzing… N%" banner for them. Report
@@ -153,55 +147,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
         onProcessingChange?.(processingBanner);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [procSig]);
-
-    // Semantic Search Effect
-    useEffect(() => {
-        if (!debouncedQuery.trim()) {
-            setIsSearching(false);
-            setSearchResults([]);
-            setSearchError(null);
-            return;
-        }
-
-        const performSearch = async () => {
-            setIsSearching(true);
-            setSearchError(null);
-            try {
-                const searchFn = httpsCallable(functions, 'search_links');
-                const result = await searchFn({
-                    query: debouncedQuery,
-                    limit: 20
-                    // We can pass uid here if needed for dev, but auth context should handle it
-                });
-                const data = result.data as { links: Link[] };
-                setSearchResults(data.links || []);
-            } catch (err: any) {
-                console.error("Search failed:", err);
-                // Extract error message from the Firebase callable error
-                let errorMessage = 'Search failed. Please try again.';
-                if (err?.message) {
-                    if (err.message.includes('SEMANTIC_SEARCH_NOT_CONFIGURED')) {
-                        errorMessage = 'Semantic search is not configured. Please set GEMINI_API_KEY in Firebase Functions.';
-                    } else if (err.message.includes('SEMANTIC_SEARCH_ERROR')) {
-                        errorMessage = 'Failed to generate search embeddings. Check your API key.';
-                    } else if (err.message.includes('VECTOR_SEARCH_ERROR')) {
-                        errorMessage = 'Vector search failed. Please ensure Firestore vector index is deployed.';
-                    } else if (err.message.includes('GEMINI_API_KEY')) {
-                        errorMessage = 'API key not configured for semantic search.';
-                    } else {
-                        errorMessage = err.message;
-                    }
-                }
-                setSearchError(errorMessage);
-                // Fall back to local filtering only - semantic search errors shouldn't break the app
-                setSearchResults([]);
-            } finally {
-                setIsSearching(false);
-            }
-        };
-
-        performSearch();
-    }, [debouncedQuery]);
 
     // Load collapsed state from localStorage
     useEffect(() => {
@@ -234,47 +179,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
     };
 
     // uid comes from AuthProvider — no mock lookup needed
-
-    // 2. Real-time sync from Firestore
-    useEffect(() => {
-        if (!uid) return;
-
-        const linksRef = collection(db, 'users', uid, 'links');
-        const q = query(linksRef, orderBy('createdAt', 'desc'));
-
-        const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
-            const fetchedLinks = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
-                id: doc.id,
-                ...doc.data()
-            } as Link));
-            setLinks(fetchedLinks);
-            setIsLoading(false);
-        }, (error: Error) => {
-            console.error("Firestore sync error:", error);
-            toast.error("Lost connection to your library. Reconnecting…");
-            setIsLoading(false);
-        });
-
-        return () => unsubscribe();
-    }, [uid, toast]);
-
-    // 2b. Real-time sync of collections from Firestore
-    useEffect(() => {
-        if (!uid) return;
-        const ref = collection(db, 'users', uid, 'collections');
-        const unsubscribe = onSnapshot(ref, (snapshot: QuerySnapshot<DocumentData>) => {
-            setCollections(snapshot.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({
-                id: d.id,
-                ...d.data()
-            } as Collection)));
-        }, (error: Error) => {
-            console.error("Collections sync error:", error);
-        });
-        return () => unsubscribe();
-    }, [uid]);
-
-    // Helper to get consistent number for timestamps (handles number, string, or Firestore Timestamp)
-    const getTimestampNumber = (val: TimestampLike): number => toMillis(val);
+    // (links/collections stream in live via useLibraryData above)
 
     // 3. Handle deep linking
     //
@@ -336,153 +241,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
         onRefresh: handlePullRefresh,
         enabled: (viewMode === 'grid' || viewMode === 'list') && !anyOverlayOpen,
     });
-
-    // Pending captures (M3) — processing/failed cards. They're excluded from the
-    // normal filtered feed and from every facet derivation below (so a still-empty
-    // card never spawns a phantom "Processing" category/tag), then surfaced
-    // separately, pinned at the top of the library, so a capture is always visible.
-    const isPending = (l: Link) => l.status === 'processing' || l.status === 'failed';
-    const contentLinks = links.filter((l) => !isPending(l));
-
-    // 4. Hybrid Search Logic
-    const filteredLinks = contentLinks
-        .filter((link) => {
-            // Apply status filters
-            if (filter === 'reminders') return link.reminderStatus === 'pending';
-            if (filter === 'unread') return !link.isRead;
-            if (filter === 'read') return !!link.isRead;
-            if (filter !== 'all') return link.status === filter;
-            return true;
-        })
-        .filter((link) => {
-            // Apply category filters
-            if (selectedCategory.size === 0) return true;
-            return selectedCategory.has(link.category);
-        })
-        .filter((link) => {
-            // Apply tag filters
-            if (selectedTags.size === 0) return true;
-            return link.tags.some(tag => {
-                return Array.from(selectedTags).some(selected => {
-                    return tag === selected || tag.startsWith(`${selected}/`);
-                });
-            });
-        })
-        .filter((link) => {
-            // Apply collection filters — keep cards in ANY selected collection.
-            if (selectedCollections.size === 0) return true;
-            return (link.collectionIds ?? []).some(id => selectedCollections.has(id));
-        })
-        .filter((link) => {
-            // Apply source filters (platforms + screenshots), OR across selections
-            if (selectedPlatforms.size === 0 && !screenshotOnly) return true;
-            const platform = getPlatform(link.url);
-            const matchesPlatform = platform != null && selectedPlatforms.has(platform);
-            const matchesScreenshot = screenshotOnly && link.sourceType === 'image';
-            return matchesPlatform || matchesScreenshot;
-        })
-        .filter((link) => {
-            // Apply search (Hybrid: keyword OR semantic result)
-            if (!debouncedQuery.trim()) return true;
-
-            const query = debouncedQuery.toLowerCase();
-
-            // If it's in the semantic search results, it's a match
-            const isSemanticMatch = searchResults.some(r => r.id === link.id);
-            if (isSemanticMatch) return true;
-
-            // Otherwise check keyword matching
-            return (
-                link.title.toLowerCase().includes(query) ||
-                link.summary.toLowerCase().includes(query) ||
-                link.tags.some((tag) => tag.toLowerCase().includes(query)) ||
-                link.category.toLowerCase().includes(query)
-            );
-        })
-        .sort((a, b) => {
-            // Prioritize semantic matches at the top if they exist
-            if (debouncedQuery.trim()) {
-                const aIdx = searchResults.findIndex(r => r.id === a.id);
-                const bIdx = searchResults.findIndex(r => r.id === b.id);
-
-                if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
-                if (aIdx !== -1) return -1;
-                if (bIdx !== -1) return 1;
-            }
-
-            if (filter === 'reminders') {
-                const timeA = a.nextReminderAt || Number.MAX_SAFE_INTEGER;
-                const timeB = b.nextReminderAt || Number.MAX_SAFE_INTEGER;
-                return timeA - timeB;
-            }
-            switch (sortBy) {
-                case 'date-desc':
-                    return getTimestampNumber(b.createdAt) - getTimestampNumber(a.createdAt);
-                case 'date-asc':
-                    return getTimestampNumber(a.createdAt) - getTimestampNumber(b.createdAt);
-                case 'title-asc':
-                    return a.title.toLowerCase().localeCompare(b.title.toLowerCase());
-                case 'category':
-                    return a.category.localeCompare(b.category);
-                default:
-                    return 0;
-            }
-        });
-
-    // Does a link carry any of the currently selected tags? (parent tags match
-    // their children, e.g. "ai" matches "ai/agents"). Shared by the faceted counts.
-    const matchesSelectedTags = (link: Link) =>
-        link.tags.some(tag => Array.from(selectedTags).some(s => tag === s || tag.startsWith(`${s}/`)));
-
-    // Faceted counts — the numbers update live as you tap. Each facet's counts are
-    // computed against the OTHER facet's current selection (but never its own), so
-    // picking the "Tech" category instantly drops a non-overlapping tag like
-    // "politics" to 0, while the category chips keep reflecting the tag selection.
-    // Pure client-side derivation — no extra reads, no backend cost.
-    const linksForCategoryCounts = selectedTags.size === 0 ? contentLinks : contentLinks.filter(matchesSelectedTags);
-    const categoryCounts = linksForCategoryCounts.reduce((acc, link) => {
-        acc[link.category] = (acc[link.category] || 0) + 1;
-        return acc;
-    }, {} as Record<string, number>);
-
-    // Category chips stay derived from the whole library so they never vanish —
-    // they just read 0 when nothing matches the current tag selection.
-    const categories = Array.from(new Set(contentLinks.map(l => l.category).filter(Boolean))).sort();
-
-    const linksForTagCounts = selectedCategory.size === 0 ? contentLinks : contentLinks.filter(link => selectedCategory.has(link.category));
-    const tagCounts = linksForTagCounts.reduce((acc, link) => {
-        link.tags.forEach(tag => {
-            acc[tag] = (acc[tag] || 0) + 1;
-        });
-        return acc;
-    }, {} as Record<string, number>);
-
-    const allTags = Array.from(new Set(contentLinks.flatMap(l => l.tags))).sort();
-
-    const handleToggleTag = (tag: string) => {
-        const next = new Set(selectedTags);
-        if (next.has(tag)) next.delete(tag);
-        else next.add(tag);
-        setSelectedTags(next);
-    };
-
-    // Source/platform filter: only surface platforms actually present in the library.
-    const platformCounts = contentLinks.reduce((acc, link) => {
-        const p = getPlatform(link.url);
-        if (p) acc[p] = (acc[p] || 0) + 1;
-        return acc;
-    }, {} as Record<PlatformKey, number>);
-    const availablePlatforms = (Object.keys(PLATFORM_LABELS) as PlatformKey[]).filter(p => platformCounts[p]);
-    const screenshotCount = contentLinks.filter(l => l.sourceType === 'image').length;
-
-    const handleTogglePlatform = (p: PlatformKey) => {
-        const next = new Set(selectedPlatforms);
-        if (next.has(p)) next.delete(p);
-        else next.add(p);
-        setSelectedPlatforms(next);
-    };
-
-    const reminderCount = contentLinks.filter(l => l.reminderStatus === 'pending').length;
 
     // Pending capture cards to surface, pinned above the feed. Only shown on the
     // default library views (All/Unread, no active facet/search) so they're always
