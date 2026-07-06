@@ -85,7 +85,7 @@ export default function CollectionsGallery({
                             <div className="absolute inset-0 bg-gradient-to-t from-card/90 to-transparent" />
                             {/* Public badge */}
                             {c.isPublic && (
-                                <span className="absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-black/55 backdrop-blur-sm text-[9px] font-bold uppercase tracking-wide text-white">
+                                <span className="absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-black-fixed/55 backdrop-blur-sm text-[9px] font-bold uppercase tracking-wide text-white-fixed">
                                     <Globe className="w-2.5 h-2.5" /> Shared
                                 </span>
                             )}
@@ -100,9 +100,9 @@ export default function CollectionsGallery({
                             aria-label="Collection actions"
                             aria-haspopup="menu"
                             aria-expanded={open}
-                            className="group/menu absolute top-1 end-1 w-11 h-11 flex items-center justify-center text-white/90 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
+                            className="group/menu absolute top-1 end-1 w-11 h-11 flex items-center justify-center text-white-fixed/90 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
                         >
-                            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm group-hover/menu:bg-black/70 transition-colors">
+                            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-black-fixed/45 backdrop-blur-sm group-hover/menu:bg-black-fixed/70 transition-colors">
                                 <MoreHorizontal className="w-4 h-4" />
                             </span>
                         </button>
@@ -185,7 +185,7 @@ function CollectionMenu({
             <div
                 role="menu"
                 style={{ position: 'fixed', left, width: WIDTH, ...vertical }}
-                className="z-[91] rounded-xl bg-card border border-white/10 shadow-2xl overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-150"
+                className="z-[91] rounded-xl bg-card border border-white-fixed/10 shadow-2xl overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-150"
                 onClick={(e) => e.stopPropagation()}
             >
                 <MenuRow icon={<LayoutGrid className="w-4 h-4" />} label="Manage cards" onClick={onManageCards} />
@@ -203,7 +203,7 @@ function MenuRow({ icon, label, onClick, danger }: { icon: React.ReactNode; labe
         <button
             role="menuitem"
             onClick={onClick}
-            className={`w-full flex items-center gap-2.5 px-3 py-3 min-h-[44px] text-sm font-medium transition-colors ${danger ? 'text-red-400 hover:bg-red-500/10' : 'text-text hover:bg-white/5'}`}
+            className={`w-full flex items-center gap-2.5 px-3 py-3 min-h-[44px] text-sm font-medium transition-colors ${danger ? 'text-red-400 hover:bg-red-500/10' : 'text-text hover:bg-white-fixed/5'}`}
         >
             <span className="shrink-0">{icon}</span>
             {label}

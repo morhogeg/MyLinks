@@ -125,17 +125,17 @@ export default function ListCard({
             style={{ ['--enter-delay' as string]: enterDelay }}
             className={`group animate-card-enter surface-card rounded-xl border shadow-[var(--shadow-card)] overflow-hidden relative transition-[transform,box-shadow,border-color] duration-200 [@media(hover:hover)]:hover:-translate-y-px [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] ${isSelected
                 ? 'border-accent ring-1 ring-accent'
-                : 'border-white/5 hover:border-accent/30'
+                : 'border-white-fixed/5 hover:border-accent/30'
                 } ${link.isRead ? 'opacity-60' : ''}`}
         >
             {/* Swipe action revealed behind the row: delete (right) / favourite (left). */}
             {offset > 0 && (
-                <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-start ps-5 bg-red-500 text-white">
+                <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-start ps-5 bg-red-500 text-white-fixed">
                     <Trash2 className={`w-5 h-5 transition-transform ${armed ? 'scale-125' : 'scale-100'}`} />
                 </div>
             )}
             {offset < 0 && (
-                <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-end pe-5 bg-yellow-500 text-white">
+                <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-end pe-5 bg-yellow-500 text-white-fixed">
                     <Star className={`w-5 h-5 fill-current transition-transform ${armed ? 'scale-125' : 'scale-100'}`} />
                 </div>
             )}
@@ -170,7 +170,7 @@ export default function ListCard({
 
                 {isSelectionMode && (
                     <span
-                        className={`shrink-0 self-center w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'bg-accent border-accent text-white' : 'border-text-muted/40 text-transparent'
+                        className={`shrink-0 self-center w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'bg-accent border-accent text-white-fixed' : 'border-text-muted/40 text-transparent'
                             }`}
                     >
                         <Check className="w-3 h-3" />

@@ -568,23 +568,23 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
     if (isLoading) {
         return (
             <div className="space-y-4" aria-busy="true" aria-label="Loading your links">
-                <div className="h-11 rounded-xl bg-card border border-white/5 relative overflow-hidden skeleton-shimmer" />
+                <div className="h-11 rounded-xl bg-card border border-white-fixed/5 relative overflow-hidden skeleton-shimmer" />
                 <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))' }}>
                     {Array.from({ length: 6 }).map((_, i) => (
                         <div
                             key={i}
-                            className="bg-card border border-white/5 rounded-2xl p-5 relative overflow-hidden skeleton-shimmer surface-card shadow-[var(--shadow-card)]"
+                            className="bg-card border border-white-fixed/5 rounded-2xl p-5 relative overflow-hidden skeleton-shimmer surface-card shadow-[var(--shadow-card)]"
                         >
-                            <div className="h-3 w-20 bg-white/10 rounded-full mb-4" />
-                            <div className="h-5 w-3/4 bg-white/10 rounded mb-3" />
+                            <div className="h-3 w-20 bg-white-fixed/10 rounded-full mb-4" />
+                            <div className="h-5 w-3/4 bg-white-fixed/10 rounded mb-3" />
                             <div className="space-y-2 mb-5">
-                                <div className="h-3 w-full bg-white/5 rounded" />
-                                <div className="h-3 w-5/6 bg-white/5 rounded" />
-                                <div className="h-3 w-2/3 bg-white/5 rounded" />
+                                <div className="h-3 w-full bg-white-fixed/5 rounded" />
+                                <div className="h-3 w-5/6 bg-white-fixed/5 rounded" />
+                                <div className="h-3 w-2/3 bg-white-fixed/5 rounded" />
                             </div>
                             <div className="flex gap-2">
-                                <div className="h-5 w-14 bg-white/5 rounded-full" />
-                                <div className="h-5 w-16 bg-white/5 rounded-full" />
+                                <div className="h-5 w-14 bg-white-fixed/5 rounded-full" />
+                                <div className="h-5 w-16 bg-white-fixed/5 rounded-full" />
                             </div>
                         </div>
                     ))}
@@ -682,7 +682,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                         {searchQuery && (
                             <button
                                 onClick={() => setSearchQuery('')}
-                                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-white/10 rounded-full transition-all"
+                                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-white-fixed/10 rounded-full transition-all"
                             >
                                 <X className="w-4 h-4 text-text-muted" />
                             </button>
@@ -742,7 +742,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                 setSelectedCategory(new Set());
                             }}
                             className={`px-3 py-1.5 rounded-full text-[13px] font-bold transition-all border whitespace-nowrap min-h-[34px] flex-shrink-0 ${selectedCategory.size === 0
-                                ? 'bg-accent text-white border-accent shadow-sm'
+                                ? 'bg-accent text-white-fixed border-accent shadow-sm'
                                 : 'bg-card border-border-subtle text-text-muted hover:border-text-secondary hover:text-text-secondary'}`}
                         >
                             All Categories
@@ -805,7 +805,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                     <button
                                         onClick={() => setSearchQuery('')}
                                         aria-label="Clear search"
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-white/10 transition-colors"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-white-fixed/10 transition-colors"
                                     >
                                         <X className="w-4 h-4" />
                                     </button>
@@ -825,7 +825,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                 onClick={() => setIsCategoriesOpen(true)}
                                 aria-label="Filter by categories and tags"
                                 className={`${ctrlBase} flex-1 min-w-0 justify-between px-3.5 ${(selectedCategory.size + selectedTags.size) > 0
-                                    ? 'bg-accent text-white border border-accent shadow-sm'
+                                    ? 'bg-accent text-white-fixed border border-accent shadow-sm'
                                     : ctrlIdle
                                     }`}
                             >
@@ -850,7 +850,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                             onClick={() => setIsFiltersOpen(true)}
                             aria-label="Filters and sort"
                             className={`${ctrlBase} shrink-0 px-3 gap-1.5 ${activeMobileFilters > 0
-                                ? 'bg-accent text-white border border-accent shadow-sm'
+                                ? 'bg-accent text-white-fixed border border-accent shadow-sm'
                                 : ctrlIdle
                                 }`}
                         >
@@ -867,7 +867,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                             onClick={() => setMobileSearchOpen(true)}
                             aria-label="Search"
                             className={`${ctrlBase} shrink-0 w-9 px-0 ${searchQuery
-                                ? 'bg-accent text-white border border-accent shadow-sm'
+                                ? 'bg-accent text-white-fixed border border-accent shadow-sm'
                                 : ctrlIdle
                                 }`}
                         >
@@ -909,14 +909,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                             aria-pressed={filter === 'reminders'}
                             title="Show items with reminders"
                             className={`${ctrlBase} px-3.5 ${filter === 'reminders'
-                                ? 'bg-blue-500 text-white border border-blue-500 shadow-sm'
+                                ? 'bg-blue-500 text-white-fixed border border-blue-500 shadow-sm'
                                 : ctrlIdle + ' hover:text-blue-500 hover:border-blue-500/40'
                                 }`}
                         >
                             <Bell className={`w-4 h-4 ${filter === 'reminders' ? 'fill-current' : ''}`} />
                             <span className="hidden sm:inline">Reminders</span>
                             {reminderCount > 0 && (
-                                <span className={`flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${filter === 'reminders' ? 'bg-white/25 text-white' : 'bg-blue-500/15 text-blue-500'
+                                <span className={`flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${filter === 'reminders' ? 'bg-white-fixed/25 text-white-fixed' : 'bg-blue-500/15 text-blue-500'
                                     }`}>
                                     {reminderCount}
                                 </span>
@@ -948,7 +948,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                         title={`Screenshots (${screenshotCount})`}
                                         aria-label="Filter by screenshots"
                                         aria-pressed={screenshotOnly}
-                                        className={`${ctrlBase} w-9 px-0 border ${screenshotOnly ? 'bg-accent text-white border-accent shadow-sm' : ctrlIdle}`}
+                                        className={`${ctrlBase} w-9 px-0 border ${screenshotOnly ? 'bg-accent text-white-fixed border-accent shadow-sm' : ctrlIdle}`}
                                     >
                                         <ImageIcon className="w-4 h-4" />
                                     </button>
@@ -1024,7 +1024,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                         aria-pressed={active}
                                         aria-label={vm.hint}
                                         className={`h-7 inline-flex items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${active
-                                            ? 'bg-accent text-white shadow-sm px-2 sm:px-3'
+                                            ? 'bg-accent text-white-fixed shadow-sm px-2 sm:px-3'
                                             : 'w-7 text-text-muted hover:text-text hover:bg-card-hover'
                                             }`}
                                     >
@@ -1060,7 +1060,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                             onClick={() => setIsTagExplorerOpen(!isTagExplorerOpen)}
                             title="Filter by tags"
                             className={`${ctrlBase} px-3.5 ${selectedTags.size > 0
-                                ? 'bg-accent text-white border border-accent shadow-sm'
+                                ? 'bg-accent text-white-fixed border border-accent shadow-sm'
                                 : ctrlIdle
                                 }`}
                         >
@@ -1078,7 +1078,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                     onClick={handleBulkArchive}
                                     disabled={selectedIds.size === 0}
                                     title="Archive selected"
-                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-white-fixed transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                 >
                                     <Archive className="w-4 h-4" />
                                 </button>
@@ -1086,7 +1086,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                     onClick={() => setConfirmBulkDelete(true)}
                                     disabled={selectedIds.size === 0}
                                     title="Delete selected"
-                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-red-500 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-red-500 hover:text-white-fixed transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </button>
@@ -1269,7 +1269,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                 {isFiltersOpen && (
                     <div className="sm:hidden fixed inset-0 z-50 flex flex-col justify-end isolate">
                         <div
-                            className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+                            className="absolute inset-0 bg-black-fixed/40 backdrop-blur-sm animate-in fade-in duration-200"
                             onClick={() => setIsFiltersOpen(false)}
                         />
                         <div className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
@@ -1315,7 +1315,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                     onClick={() => setFilter(filter === 'reminders' ? 'all' : 'reminders')}
                                     aria-pressed={filter === 'reminders'}
                                     className={`${ctrlBase} w-full justify-start px-3.5 ${filter === 'reminders'
-                                        ? 'bg-blue-500 text-white border border-blue-500 shadow-sm'
+                                        ? 'bg-blue-500 text-white-fixed border border-blue-500 shadow-sm'
                                         : ctrlIdle
                                         }`}
                                 >
@@ -1348,7 +1348,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                                     onClick={() => setScreenshotOnly(v => !v)}
                                                     aria-pressed={screenshotOnly}
                                                     title={`Screenshots (${screenshotCount})`}
-                                                    className={`${ctrlBase} w-10 px-0 border ${screenshotOnly ? 'bg-accent text-white border-accent shadow-sm' : ctrlIdle}`}
+                                                    className={`${ctrlBase} w-10 px-0 border ${screenshotOnly ? 'bg-accent text-white-fixed border-accent shadow-sm' : ctrlIdle}`}
                                                 >
                                                     <ImageIcon className="w-4 h-4" />
                                                 </button>
@@ -1369,7 +1369,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                     )}
                                     <button
                                         onClick={() => setIsFiltersOpen(false)}
-                                        className="ms-auto px-6 h-10 rounded-full bg-accent text-white font-semibold text-sm shadow-sm hover:bg-accent-hover transition-colors"
+                                        className="ms-auto px-6 h-10 rounded-full bg-accent text-white-fixed font-semibold text-sm shadow-sm hover:bg-accent-hover transition-colors"
                                     >
                                         Done
                                     </button>
@@ -1385,7 +1385,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                 {isCategoriesOpen && (
                     <div className="sm:hidden fixed inset-0 z-50 flex flex-col justify-end isolate">
                         <div
-                            className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+                            className="absolute inset-0 bg-black-fixed/40 backdrop-blur-sm animate-in fade-in duration-200"
                             onClick={() => setIsCategoriesOpen(false)}
                         />
                         <div className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 max-h-[88vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
@@ -1419,7 +1419,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                 <button
                                     onClick={() => setSelectedCategory(new Set())}
                                     className={`px-3.5 py-1.5 rounded-full text-[13px] font-semibold border transition-colors ${selectedCategory.size === 0
-                                        ? 'bg-accent text-white border-accent shadow-sm'
+                                        ? 'bg-accent text-white-fixed border-accent shadow-sm'
                                         : 'bg-card border-border-subtle text-text-secondary hover:border-text-muted/40 hover:text-text'
                                         }`}
                                 >
@@ -1499,7 +1499,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                 )}
                                 <button
                                     onClick={() => setIsCategoriesOpen(false)}
-                                    className="ms-auto px-6 h-10 rounded-full bg-accent text-white font-semibold text-sm shadow-sm hover:bg-accent-hover transition-colors"
+                                    className="ms-auto px-6 h-10 rounded-full bg-accent text-white-fixed font-semibold text-sm shadow-sm hover:bg-accent-hover transition-colors"
                                 >
                                     Done
                                 </button>
@@ -1515,15 +1515,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                             className="absolute inset-0 bg-background/80 backdrop-blur-sm"
                             onClick={() => setIsTagExplorerOpen(false)}
                         />
-                        <div className="relative w-full sm:w-80 h-[100dvh] bg-card border-l border-white/10 flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
-                            <div className="flex-none p-4 border-b border-white/10 flex justify-between items-center bg-card/50 backdrop-blur-xl z-10 safe-pt">
+                        <div className="relative w-full sm:w-80 h-[100dvh] bg-card border-l border-white-fixed/10 flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+                            <div className="flex-none p-4 border-b border-white-fixed/10 flex justify-between items-center bg-card/50 backdrop-blur-xl z-10 safe-pt">
                                 <h2 className="text-base font-bold flex items-center gap-2">
                                     <TagIcon className="w-4 h-4 text-accent" />
                                     Filter Tags
                                 </h2>
                                 <button
                                     onClick={() => setIsTagExplorerOpen(false)}
-                                    className="p-2 hover:bg-white/5 rounded-full touch-manipulation"
+                                    className="p-2 hover:bg-white-fixed/5 rounded-full touch-manipulation"
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
@@ -1579,13 +1579,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                         <div className="text-center py-16 animate-fade-in">
                             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-accent/20">
                                 {filter === 'favorite' ? (
-                                    <Star className="w-8 h-8 text-white" />
+                                    <Star className="w-8 h-8 text-white-fixed" />
                                 ) : filter === 'archived' ? (
-                                    <Archive className="w-8 h-8 text-white" />
+                                    <Archive className="w-8 h-8 text-white-fixed" />
                                 ) : filter === 'reminders' ? (
-                                    <Bell className="w-8 h-8 text-white" />
+                                    <Bell className="w-8 h-8 text-white-fixed" />
                                 ) : (
-                                    <Inbox className="w-8 h-8 text-white" />
+                                    <Inbox className="w-8 h-8 text-white-fixed" />
                                 )}
                             </div>
                             <h3 className="text-lg font-medium text-text mb-2">
@@ -1622,7 +1622,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                         setScreenshotOnly(false);
                                         setSearchQuery('');
                                     }}
-                                    className="mt-4 px-4 py-2 bg-accent text-white rounded-xl text-sm font-bold hover:bg-accent-hover transition-all"
+                                    className="mt-4 px-4 py-2 bg-accent text-white-fixed rounded-xl text-sm font-bold hover:bg-accent-hover transition-all"
                                 >
                                     Reset Filters
                                 </button>
@@ -1852,7 +1852,7 @@ export default function Feed({ onAskModeChange, onHideAddButton, onProcessingCha
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
-                <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                <div className="w-8 h-8 border-2 border-white-fixed/20 border-t-white rounded-full animate-spin" />
             </div>
         }>
             <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} />

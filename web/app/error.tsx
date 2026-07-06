@@ -30,7 +30,7 @@ export default function Error({
         </p>
         <button
           onClick={reset}
-          className="inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-medium text-white"
+          className="inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-medium text-white-fixed"
           style={{ background: 'var(--accent-gradient)' }}
         >
           Try again

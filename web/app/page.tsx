@@ -80,7 +80,7 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg shadow-purple-500/20 animate-pulse ring-1 ring-white/15">
+          <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg shadow-purple-500/20 animate-pulse ring-1 ring-white-fixed/15">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
           </div>
@@ -118,7 +118,7 @@ export default function Home() {
         <div className="w-full max-w-[2200px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 flex items-center justify-between">
           {/* Brand */}
           <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl overflow-hidden shadow-lg shadow-black/10 ring-1 ring-black/5 dark:ring-white/10">
+            <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl overflow-hidden shadow-lg shadow-black/10 ring-1 ring-black-fixed/5 dark:ring-white-fixed/10">
               {/* The exact app icon, so the in-app mark matches the home-screen icon. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />

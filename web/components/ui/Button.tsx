@@ -38,7 +38,7 @@ const RADIUS: Record<ButtonRadius, string> = {
 // so nothing regresses where those constants were used.
 const VARIANT: Record<ButtonVariant, string> = {
     primary:
-        'bg-accent text-white shadow-sm shadow-accent/20 hover:bg-accent-hover',
+        'bg-accent text-white-fixed shadow-sm shadow-accent/20 hover:bg-accent-hover',
     secondary:
         'bg-card border border-border-subtle text-text-secondary hover:bg-card-hover hover:text-text hover:border-text-muted/40',
     ghost:

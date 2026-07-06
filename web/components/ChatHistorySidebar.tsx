@@ -158,7 +158,7 @@ function ChatRow({
                     aria-label="Chat actions"
                     aria-haspopup="menu"
                     aria-expanded={menuOpen}
-                    className={`relative z-10 p-1.5 rounded-lg text-text-muted hover:text-text active:bg-card-hover sm:hover:bg-black/5 sm:dark:hover:bg-white/10 transition-all sm:opacity-0 sm:group-hover:opacity-100 ${menuOpen ? 'opacity-100 sm:opacity-100 text-text bg-card-hover' : ''}`}
+                    className={`relative z-10 p-1.5 rounded-lg text-text-muted hover:text-text active:bg-card-hover sm:hover:bg-black-fixed/5 sm:dark:hover:bg-white-fixed/10 transition-all sm:opacity-0 sm:group-hover:opacity-100 ${menuOpen ? 'opacity-100 sm:opacity-100 text-text bg-card-hover' : ''}`}
                 >
                     <MoreHorizontal className="w-4 h-4" />
                 </button>
@@ -313,8 +313,8 @@ export default function ChatHistorySidebar(props: ChatHistorySidebarProps) {
 
     return (
         <div className="fixed inset-0 z-[60] flex animate-fade-in">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-[82%] max-w-xs h-full bg-card border-e border-white/10 shadow-2xl flex flex-col safe-pt safe-pb animate-slide-in-left">
+            <div className="absolute inset-0 bg-black-fixed/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative w-[82%] max-w-xs h-full bg-card border-e border-white-fixed/10 shadow-2xl flex flex-col safe-pt safe-pb animate-slide-in-left">
                 <div className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-border-subtle">
                     <span className="font-semibold text-text">Chat history</span>
                     <button

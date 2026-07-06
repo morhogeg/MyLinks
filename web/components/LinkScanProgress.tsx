@@ -44,7 +44,7 @@ export default function LinkScanProgress({ url, progress }: LinkScanProgressProp
 
     return (
         <div className="space-y-3">
-            <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-white/10 bg-card">
+            <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-white-fixed/10 bg-card">
                 {/* Faux page being read */}
                 <div className="absolute inset-0 p-4 flex flex-col gap-2.5">
                     <div className="flex items-center gap-2">
@@ -62,15 +62,15 @@ export default function LinkScanProgress({ url, progress }: LinkScanProgressProp
                         <span className="text-xs font-medium text-text-secondary truncate max-w-[70%]">{host}</span>
                     </div>
                     {/* Skeleton title + body lines */}
-                    <div className="h-3 w-3/4 rounded bg-white/10" />
-                    <div className="h-2 w-full rounded bg-white/5" />
-                    <div className="h-2 w-11/12 rounded bg-white/5" />
-                    <div className="h-2 w-5/6 rounded bg-white/5" />
-                    <div className="h-2 w-2/3 rounded bg-white/5" />
+                    <div className="h-3 w-3/4 rounded bg-white-fixed/10" />
+                    <div className="h-2 w-full rounded bg-white-fixed/5" />
+                    <div className="h-2 w-11/12 rounded bg-white-fixed/5" />
+                    <div className="h-2 w-5/6 rounded bg-white-fixed/5" />
+                    <div className="h-2 w-2/3 rounded bg-white-fixed/5" />
                 </div>
 
                 {/* Dim + subtle blur so the scan line and status read clearly */}
-                <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" />
+                <div className="absolute inset-0 bg-black-fixed/50 backdrop-blur-[1px]" />
 
                 {/* Sweeping scan line (hidden once complete) */}
                 {!done && (
@@ -89,12 +89,12 @@ export default function LinkScanProgress({ url, progress }: LinkScanProgressProp
                     ) : (
                         <>
                             <LinkIcon className="w-7 h-7 text-accent" />
-                            <span className="text-2xl font-bold text-white tabular-nums" aria-hidden>
+                            <span className="text-2xl font-bold text-white-fixed tabular-nums" aria-hidden>
                                 {Math.round(clamped)}%
                             </span>
                         </>
                     )}
-                    <p className="text-sm font-medium text-white/90" aria-live="polite">
+                    <p className="text-sm font-medium text-white-fixed/90" aria-live="polite">
                         {label}
                     </p>
                 </div>
@@ -102,7 +102,7 @@ export default function LinkScanProgress({ url, progress }: LinkScanProgressProp
 
             {/* Determinate progress bar, driven by the same value as the %. */}
             <div
-                className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden"
+                className="h-1.5 w-full rounded-full bg-white-fixed/10 overflow-hidden"
                 role="progressbar"
                 aria-label="Link analysis progress"
                 aria-valuenow={Math.round(clamped)}

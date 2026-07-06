@@ -30,7 +30,7 @@ export default function AIConsentNotice({ onAccept }: { onAccept: () => void }) 
         >
             <div className="w-full max-w-sm flex flex-col items-center animate-slide-up">
                 {/* Brand mark — same lockup as LoginScreen/Onboarding. */}
-                <div className="w-16 h-16 rounded-3xl overflow-hidden shadow-lg shadow-purple-500/20 ring-1 ring-white/15">
+                <div className="w-16 h-16 rounded-3xl overflow-hidden shadow-lg shadow-purple-500/20 ring-1 ring-white-fixed/15">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
                 </div>

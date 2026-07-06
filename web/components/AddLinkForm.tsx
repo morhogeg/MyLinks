@@ -285,7 +285,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             {/* Backdrop for mobile focus - now covering the header completely */}
             {isExpanded && (
                 <div
-                    className="fixed inset-0 bg-black/80 backdrop-blur-xl z-[60] sm:hidden animate-fade-in"
+                    className="fixed inset-0 bg-black-fixed/80 backdrop-blur-xl z-[60] sm:hidden animate-fade-in"
                     onClick={() => setIsExpanded(false)}
                 />
             )}
@@ -308,14 +308,14 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 >
                     <form
                         onSubmit={handleSubmit}
-                        className="bg-card border border-white/10 rounded-3xl p-6 shadow-2xl relative overflow-hidden animate-fade-in"
+                        className="bg-card border border-white-fixed/10 rounded-3xl p-6 shadow-2xl relative overflow-hidden animate-fade-in"
                         noValidate
                     >
                         {/* Close button */}
                         <button
                             type="button"
                             onClick={() => setIsExpanded(false)}
-                            className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 text-text-muted transition-colors z-10"
+                            className="absolute top-4 right-4 p-2 rounded-full hover:bg-white-fixed/10 text-text-muted transition-colors z-10"
                             aria-label="Close"
                         >
                             <X className="w-5 h-5" />
@@ -332,7 +332,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                         </div>
 
                         {/* Tabs */}
-                        <div className="flex bg-white/5 p-1 rounded-xl mb-6 border border-white/5">
+                        <div className="flex bg-white-fixed/5 p-1 rounded-xl mb-6 border border-white-fixed/5">
                             <button
                                 type="button"
                                 onClick={() => setActiveTab('link')}
@@ -376,7 +376,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                             value={url || ''}
                                             onChange={(e) => setUrl(e.target.value)}
                                             placeholder="example.com or https://..."
-                                            className="w-full px-4 py-4 bg-background border border-white/5 rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-base"
+                                            className="w-full px-4 py-4 bg-background border border-white-fixed/5 rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-base"
                                             disabled={isLoading}
                                             autoFocus
                                         />
@@ -406,7 +406,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                     />
                                     <label
                                         htmlFor="image-upload"
-                                        className={`w-full aspect-video rounded-xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer transition-all hover:border-accent/50 hover:bg-white/5 ${imagePreview ? 'p-0 border-none overflow-hidden' : 'p-8'
+                                        className={`w-full aspect-video rounded-xl border-2 border-dashed border-white-fixed/10 flex flex-col items-center justify-center cursor-pointer transition-all hover:border-accent/50 hover:bg-white-fixed/5 ${imagePreview ? 'p-0 border-none overflow-hidden' : 'p-8'
                                             }`}
                                     >
                                         {imagePreview ? (
@@ -416,13 +416,13 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                                     alt="Preview"
                                                     className="w-full h-full object-cover"
                                                 />
-                                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                    <p className="text-white font-medium">Change Image</p>
+                                                <div className="absolute inset-0 bg-black-fixed/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                    <p className="text-white-fixed font-medium">Change Image</p>
                                                 </div>
                                             </div>
                                         ) : (
                                             <>
-                                                <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3">
+                                                <div className="w-12 h-12 rounded-full bg-white-fixed/5 flex items-center justify-center mb-3">
                                                     <Upload className="w-6 h-6 text-accent" />
                                                 </div>
                                                 <p className="text-text font-medium text-sm">Tap to add an image</p>
@@ -438,7 +438,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                 <button
                                     type="submit"
                                     disabled={activeTab === 'link' ? !url.trim() : !imageFile}
-                                    className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-100 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
+                                    className="w-full py-4 bg-white-fixed text-black-fixed font-bold rounded-xl hover:bg-gray-100 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
                                 >
                                     Save
                                 </button>
@@ -464,11 +464,11 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                     data-tour="add"
                     onClick={() => setIsExpanded(!isExpanded)}
                     className={`w-14 h-14 min-h-[44px] min-w-[44px] rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${isExpanded
-                        ? 'bg-card border border-white/10 rotate-45 scale-90 opacity-0 pointer-events-none'
+                        ? 'bg-card border border-white-fixed/10 rotate-45 scale-90 opacity-0 pointer-events-none'
                         : 'bg-accent hover:scale-105 active:scale-95'
                         }`}
                 >
-                    <Plus className={`w-7 h-7 transition-colors ${isExpanded ? 'text-text' : 'text-white'}`} />
+                    <Plus className={`w-7 h-7 transition-colors ${isExpanded ? 'text-text' : 'text-white-fixed'}`} />
                 </button>
             </div>
         </>

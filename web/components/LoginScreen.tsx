@@ -46,7 +46,7 @@ export default function LoginScreen({
         <div className="min-h-screen bg-background text-text flex items-center justify-center px-6">
             <div className="w-full max-w-sm flex flex-col items-center text-center">
                 {/* Brand mark */}
-                <div className="w-16 h-16 rounded-3xl overflow-hidden shadow-lg shadow-purple-500/20 ring-1 ring-white/15">
+                <div className="w-16 h-16 rounded-3xl overflow-hidden shadow-lg shadow-purple-500/20 ring-1 ring-white-fixed/15">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
                 </div>
@@ -70,7 +70,7 @@ export default function LoginScreen({
                                 </p>
                                 <button
                                     onClick={onRetry}
-                                    className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-full bg-accent text-white px-5 py-2.5 text-sm font-semibold shadow-sm shadow-accent/20 hover:bg-accent-hover transition-colors"
+                                    className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-full bg-accent text-white-fixed px-5 py-2.5 text-sm font-semibold shadow-sm shadow-accent/20 hover:bg-accent-hover transition-colors"
                                 >
                                     Try again
                                 </button>
@@ -104,7 +104,7 @@ export default function LoginScreen({
                             <button
                                 onClick={() => handleSignIn('apple')}
                                 disabled={busy !== null}
-                                className="mt-5 w-full inline-flex items-center justify-center gap-2.5 rounded-full bg-black text-white px-5 py-3 text-sm font-semibold shadow-sm ring-1 ring-white/10 hover:bg-gray-900 disabled:opacity-60 transition-colors"
+                                className="mt-5 w-full inline-flex items-center justify-center gap-2.5 rounded-full bg-black-fixed text-white-fixed px-5 py-3 text-sm font-semibold shadow-sm ring-1 ring-white-fixed/10 hover:bg-gray-900 disabled:opacity-60 transition-colors"
                             >
                                 <AppleGlyph />
                                 {busy === 'apple' ? 'Signing in…' : 'Continue with Apple'}
@@ -113,7 +113,7 @@ export default function LoginScreen({
                         <button
                             onClick={() => handleSignIn('google')}
                             disabled={busy !== null}
-                            className={`${showApple ? 'mt-3' : 'mt-5'} w-full inline-flex items-center justify-center gap-3 rounded-full bg-white text-gray-800 px-5 py-3 text-sm font-semibold shadow-sm ring-1 ring-black/5 hover:bg-gray-50 disabled:opacity-60 transition-colors`}
+                            className={`${showApple ? 'mt-3' : 'mt-5'} w-full inline-flex items-center justify-center gap-3 rounded-full bg-white-fixed text-gray-800 px-5 py-3 text-sm font-semibold shadow-sm ring-1 ring-black-fixed/5 hover:bg-gray-50 disabled:opacity-60 transition-colors`}
                         >
                             <GoogleGlyph />
                             {busy === 'google' ? 'Signing in…' : 'Continue with Google'}

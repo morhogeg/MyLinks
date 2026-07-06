@@ -107,19 +107,19 @@ export default function CollectionFormModal({
             className="fixed inset-x-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
             style={{ top: vp.offsetTop || 0, height: vp.height || '100%', bottom: 'auto' }}
         >
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="absolute inset-0 bg-black-fixed/60 backdrop-blur-sm" onClick={onClose} />
 
             <div
                 role="dialog"
                 aria-modal="true"
                 aria-label={isEdit ? 'Edit collection' : 'New collection'}
-                className="relative w-full sm:max-w-md max-h-full overflow-y-auto bg-card border-t sm:border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up sm:animate-scale-up safe-pb"
+                className="relative w-full sm:max-w-md max-h-full overflow-y-auto bg-card border-t sm:border border-white-fixed/10 rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up sm:animate-scale-up safe-pb"
             >
                 <div className="sm:hidden flex justify-center pt-3 pb-1">
-                    <div className="h-1.5 w-10 rounded-full bg-white/15" />
+                    <div className="h-1.5 w-10 rounded-full bg-white-fixed/15" />
                 </div>
 
-                <div className="flex items-center gap-3 px-5 pt-3 pb-4 border-b border-white/5">
+                <div className="flex items-center gap-3 px-5 pt-3 pb-4 border-b border-white-fixed/5">
                     <Layers className="w-5 h-5 text-accent" />
                     <h3 className="flex-1 text-lg font-bold text-text">
                         {isEdit ? 'Edit collection' : 'New collection'}
@@ -127,7 +127,7 @@ export default function CollectionFormModal({
                     <button
                         onClick={onClose}
                         aria-label="Close"
-                        className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-white/5 transition-colors"
+                        className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-white-fixed/5 transition-colors"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -189,7 +189,7 @@ export default function CollectionFormModal({
                                         className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform ${active ? 'scale-110 ring-2 ring-offset-2 ring-offset-card' : 'hover:scale-105'}`}
                                         style={{ backgroundColor: style.color, boxShadow: active ? `0 0 0 2px ${style.color}` : undefined }}
                                     >
-                                        {active && <Check className="w-4 h-4 text-white" />}
+                                        {active && <Check className="w-4 h-4 text-white-fixed" />}
                                     </button>
                                 );
                             })}
@@ -200,14 +200,14 @@ export default function CollectionFormModal({
                 <div className="flex gap-3 px-5 pb-5">
                     <button
                         onClick={onClose}
-                        className="flex-1 px-4 py-2.5 rounded-xl bg-white/5 text-text font-medium hover:bg-white/10 transition-colors"
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-white-fixed/5 text-text font-medium hover:bg-white-fixed/10 transition-colors"
                     >
                         Cancel
                     </button>
                     <button
                         onClick={handleSave}
                         disabled={!name.trim() || busy}
-                        className="flex-1 px-4 py-2.5 rounded-xl bg-accent text-white font-semibold hover:bg-accent-hover transition-colors disabled:opacity-40"
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-accent text-white-fixed font-semibold hover:bg-accent-hover transition-colors disabled:opacity-40"
                     >
                         {isEdit ? 'Save' : 'Create'}
                     </button>

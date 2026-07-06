@@ -204,13 +204,13 @@ export default function SwipeDeck({ links, onFavorite, onArchive, onRemind, onOp
                 <DeckAction label="Undo" onClick={undo} disabled={!lastAction} buttonClassName="text-text-muted hover:text-text">
                     <RotateCcw className="w-5 h-5" />
                 </DeckAction>
-                <DeckAction label="← Archive" onClick={() => fling('left')} buttonClassName="text-blue-500 hover:bg-blue-500 hover:text-white border-blue-500/30">
+                <DeckAction label="← Archive" onClick={() => fling('left')} buttonClassName="text-blue-500 hover:bg-blue-500 hover:text-white-fixed border-blue-500/30">
                     <Archive className="w-6 h-6" />
                 </DeckAction>
-                <DeckAction label="↑ Remind" onClick={() => fling('up')} buttonClassName="text-accent hover:bg-accent hover:text-white border-accent/30">
+                <DeckAction label="↑ Remind" onClick={() => fling('up')} buttonClassName="text-accent hover:bg-accent hover:text-white-fixed border-accent/30">
                     <Bell className="w-6 h-6" />
                 </DeckAction>
-                <DeckAction label="Keep →" onClick={() => fling('right')} buttonClassName="text-green-500 hover:bg-green-500 hover:text-white border-green-500/30">
+                <DeckAction label="Keep →" onClick={() => fling('right')} buttonClassName="text-green-500 hover:bg-green-500 hover:text-white-fixed border-green-500/30">
                     <Star className="w-6 h-6" />
                 </DeckAction>
             </div>
@@ -332,9 +332,9 @@ function CardFace({ link }: { link: Link }) {
 
             {/* Tags */}
             {link.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-white/5">
+                <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-white-fixed/5">
                     {link.tags.slice(0, 4).map((tag) => (
-                        <span key={tag} className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-white/5 text-text-muted/60">
+                        <span key={tag} className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-white-fixed/5 text-text-muted/60">
                             {tag.split('/').pop()}
                         </span>
                     ))}

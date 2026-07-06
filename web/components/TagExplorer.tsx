@@ -87,7 +87,7 @@ export default function TagExplorer({
                             <button
                                 onClick={(e) => toggleExpand(node.fullName, e)}
                                 aria-label={isExpanded ? 'Collapse' : 'Expand'}
-                                className="p-0.5 -m-0.5 rounded-md text-text-muted hover:text-text hover:bg-white/10 transition-colors"
+                                className="p-0.5 -m-0.5 rounded-md text-text-muted hover:text-text hover:bg-white-fixed/10 transition-colors"
                             >
                                 {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5 rtl:rotate-180" />}
                             </button>
@@ -165,7 +165,7 @@ export default function TagExplorer({
                     {onCollapse && (
                         <button
                             onClick={onCollapse}
-                            className="p-1 hover:bg-white/5 rounded-md text-text-muted hover:text-text transition-all"
+                            className="p-1 hover:bg-white-fixed/5 rounded-md text-text-muted hover:text-text transition-all"
                             title="Collapse Sidebar"
                         >
                             <ChevronLeft className="w-4 h-4" />
@@ -182,7 +182,7 @@ export default function TagExplorer({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Filter tags..."
-                    className="w-full bg-white/5 border border-white/5 rounded-xl pl-8 pr-3 py-1.5 text-xs text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent/30 transition-all"
+                    className="w-full bg-white-fixed/5 border border-white-fixed/5 rounded-xl pl-8 pr-3 py-1.5 text-xs text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent/30 transition-all"
                 />
             </div>
 

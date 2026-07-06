@@ -33,7 +33,7 @@ export default function VideoScanProgress({ thumbnailSrc, progress }: VideoScanP
 
     return (
         <div className="space-y-3">
-            <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-white/10 bg-black">
+            <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-white-fixed/10 bg-black-fixed">
                 {thumbnailSrc ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={thumbnailSrc} alt="Analyzing video" className="w-full h-full object-cover" />
@@ -42,7 +42,7 @@ export default function VideoScanProgress({ thumbnailSrc, progress }: VideoScanP
                 )}
 
                 {/* Dim + subtle blur so the scan line and status read clearly */}
-                <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" />
+                <div className="absolute inset-0 bg-black-fixed/50 backdrop-blur-[1px]" />
 
                 {/* Sweeping scan line (hidden once complete) */}
                 {!done && (
@@ -60,12 +60,12 @@ export default function VideoScanProgress({ thumbnailSrc, progress }: VideoScanP
                     ) : (
                         <>
                             <Youtube className="w-7 h-7 text-red-500/90" />
-                            <span className="text-2xl font-bold text-white tabular-nums" aria-hidden>
+                            <span className="text-2xl font-bold text-white-fixed tabular-nums" aria-hidden>
                                 {Math.round(clamped)}%
                             </span>
                         </>
                     )}
-                    <p className="text-sm font-medium text-white/90" aria-live="polite">
+                    <p className="text-sm font-medium text-white-fixed/90" aria-live="polite">
                         {label}
                     </p>
                 </div>
@@ -73,7 +73,7 @@ export default function VideoScanProgress({ thumbnailSrc, progress }: VideoScanP
 
             {/* Determinate progress bar, driven by the same value as the %. */}
             <div
-                className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden"
+                className="h-1.5 w-full rounded-full bg-white-fixed/10 overflow-hidden"
                 role="progressbar"
                 aria-label="Video analysis progress"
                 aria-valuenow={Math.round(clamped)}

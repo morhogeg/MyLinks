@@ -55,7 +55,7 @@ export default function SynthesisCard({
                 aria-expanded={expanded}
             >
                 <div className="w-9 h-9 shrink-0 rounded-xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-md shadow-accent/20">
-                    <Sparkles className="w-[18px] h-[18px] text-white" />
+                    <Sparkles className="w-[18px] h-[18px] text-white-fixed" />
                 </div>
                 <div className="flex-grow min-w-0">
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-accent">

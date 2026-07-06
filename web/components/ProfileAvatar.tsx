@@ -30,7 +30,7 @@ export default function ProfileAvatar({
                 height={size}
                 // Google avatar URLs 403 when a referrer is sent.
                 referrerPolicy="no-referrer"
-                className={`rounded-full object-cover ring-1 ring-black/5 dark:ring-white/10 ${className}`}
+                className={`rounded-full object-cover ring-1 ring-black-fixed/5 dark:ring-white-fixed/10 ${className}`}
                 style={dimension}
             />
         );
@@ -39,7 +39,7 @@ export default function ProfileAvatar({
     return (
         <div
             aria-hidden="true"
-            className={`rounded-full flex items-center justify-center bg-[image:var(--accent-gradient)] text-white font-bold ring-1 ring-white/15 ${className}`}
+            className={`rounded-full flex items-center justify-center bg-[image:var(--accent-gradient)] text-white-fixed font-bold ring-1 ring-white-fixed/15 ${className}`}
             style={{ ...dimension, fontSize: Math.round(size * 0.42) }}
         >
             {initial}

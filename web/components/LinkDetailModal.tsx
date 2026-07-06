@@ -173,7 +173,7 @@ export default function LinkDetailModal({
                 role="dialog"
                 aria-modal="true"
                 aria-label="Link details"
-                className="relative bg-card border-0 sm:border border-white/10 w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-up"
+                className="relative bg-card border-0 sm:border border-white-fixed/10 w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-up"
             >
                 {/* Header Actions — a single compact row: the item actions scroll
                     horizontally if they don't all fit (so nothing is ever clipped),
@@ -325,8 +325,8 @@ export default function LinkDetailModal({
                                         }
                                     }}
                                 />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                                    <span className="text-white text-xs font-bold px-3 py-1.5 bg-black/60 rounded-full backdrop-blur-md border border-white/20">
+                                <div className="absolute inset-0 bg-black-fixed/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                    <span className="text-white-fixed text-xs font-bold px-3 py-1.5 bg-black-fixed/60 rounded-full backdrop-blur-md border border-white-fixed/20">
                                         Click to View Original
                                     </span>
                                 </div>
@@ -345,7 +345,7 @@ export default function LinkDetailModal({
                     {/* YouTube: embedded player + clickable key moments + speakers */}
                     {link.sourceType === 'youtube' && link.metadata?.videoId && (
                         <div className="mb-6 space-y-4">
-                            <div className="rounded-2xl overflow-hidden border border-white/10 bg-black aspect-video">
+                            <div className="rounded-2xl overflow-hidden border border-white-fixed/10 bg-black-fixed aspect-video">
                                 <iframe
                                     key={videoStart ?? 'start'}
                                     src={`https://www.youtube-nocookie.com/embed/${link.metadata.videoId}?rel=0${videoStart != null ? `&start=${videoStart}&autoplay=1` : ''}`}
@@ -357,7 +357,7 @@ export default function LinkDetailModal({
                             </div>
 
                             {!!link.metadata.videoHighlights?.length && (
-                                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                                <div className="rounded-2xl border border-white-fixed/10 bg-white-fixed/[0.03] p-4">
                                     <h4 className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-text-muted mb-3">
                                         <Play className="w-3.5 h-3.5 text-accent" /> Key moments
                                     </h4>
@@ -369,7 +369,7 @@ export default function LinkDetailModal({
                                                     <button
                                                         onClick={() => seconds != null && setVideoStart(seconds)}
                                                         disabled={seconds == null}
-                                                        className={`w-full text-start flex items-start gap-3 rounded-lg px-2 py-1.5 transition-colors ${seconds != null ? 'hover:bg-white/5 cursor-pointer' : 'cursor-default'}`}
+                                                        className={`w-full text-start flex items-start gap-3 rounded-lg px-2 py-1.5 transition-colors ${seconds != null ? 'hover:bg-white-fixed/5 cursor-pointer' : 'cursor-default'}`}
                                                     >
                                                         {seconds != null && (
                                                             <span className="shrink-0 mt-0.5 text-[11px] font-bold text-accent tabular-nums bg-accent/10 px-1.5 py-0.5 rounded">
@@ -391,7 +391,7 @@ export default function LinkDetailModal({
                                         <Users className="w-3.5 h-3.5" /> Speakers
                                     </span>
                                     {link.metadata.speakers.map((s, i) => (
-                                        <span key={i} className="text-xs font-medium text-text-secondary bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
+                                        <span key={i} className="text-xs font-medium text-text-secondary bg-white-fixed/5 border border-white-fixed/10 px-2.5 py-1 rounded-full">
                                             {s}
                                         </span>
                                     ))}
@@ -439,7 +439,7 @@ export default function LinkDetailModal({
                                                         e.stopPropagation();
                                                         setIsEditingCategory(true);
                                                     }}
-                                                    className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1.5 -ms-1.5 hover:bg-white/5 rounded-md"
+                                                    className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1.5 -ms-1.5 hover:bg-white-fixed/5 rounded-md"
                                                 >
                                                     <Pencil className="w-3.5 h-3.5 text-text-muted/40 hover:text-text-muted" />
                                                 </button>
@@ -495,7 +495,7 @@ export default function LinkDetailModal({
                                         </span>
                                     ) : link.sourceName && link.sourceName !== 'None' ? (
                                         <span
-                                            className="text-[10px] font-black text-text-muted/60 bg-black/5 border border-black/10 dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest px-2.5 py-1.5 rounded-lg shadow-lg shadow-black/5 transition-all"
+                                            className="text-[10px] font-black text-text-muted/60 bg-black-fixed/5 border border-black-fixed/10 dark:bg-white-fixed/5 dark:border dark:border-white-fixed/10 uppercase tracking-widest px-2.5 py-1.5 rounded-lg shadow-lg shadow-black/5 transition-all"
                                             title={link.sourceName}
                                         >
                                             {link.sourceName}
@@ -555,11 +555,11 @@ export default function LinkDetailModal({
 
 
                         <div className="flex flex-wrap items-center gap-4 text-sm text-text-muted mb-8">
-                            <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/5">
+                            <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white-fixed/5 border border-white-fixed/5">
                                 <Clock className="w-3.5 h-3.5" />
                                 {link.metadata.estimatedReadTime} {isRtl ? 'דק׳ קריאה' : 'min read'}
                             </span>
-                            <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/5">
+                            <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white-fixed/5 border border-white-fixed/5">
                                 <Tag className="w-3.5 h-3.5 text-accent" />
                                 {getTimeAgo(link.createdAt, now)}
                             </span>
@@ -592,7 +592,7 @@ export default function LinkDetailModal({
                                 return (
                                     <span
                                         key={tag}
-                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/70 hover:text-accent transition-all group/tag bg-white/5 hover:bg-white/10 px-2 py-1 rounded-lg border border-transparent hover:border-accent/10"
+                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/70 hover:text-accent transition-all group/tag bg-white-fixed/5 hover:bg-white-fixed/10 px-2 py-1 rounded-lg border border-transparent hover:border-accent/10"
                                     >
                                         <span className="flex items-center">
                                             {parents && <span className="opacity-30 font-normal mr-0.5">{parents}/</span>}
@@ -622,7 +622,7 @@ export default function LinkDetailModal({
                             ) : (
                                 <button
                                     onClick={() => setIsAddingTag(true)}
-                                    className="inline-flex items-center gap-1 text-xs font-bold text-text-muted/50 hover:text-accent transition-all bg-white/5 hover:bg-white/10 px-2 py-1 rounded-lg border border-dashed border-white/10 hover:border-accent/30"
+                                    className="inline-flex items-center gap-1 text-xs font-bold text-text-muted/50 hover:text-accent transition-all bg-white-fixed/5 hover:bg-white-fixed/10 px-2 py-1 rounded-lg border border-dashed border-white-fixed/10 hover:border-accent/30"
                                 >
                                     <Plus className="w-3 h-3" />
                                     <span>Add Tag</span>

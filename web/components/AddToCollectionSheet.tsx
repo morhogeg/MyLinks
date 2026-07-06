@@ -113,27 +113,27 @@ export default function AddToCollectionSheet({
             className="fixed inset-x-0 z-[95] flex items-end sm:items-center justify-center animate-fade-in"
             style={{ top: vp.offsetTop || 0, height: vp.height || '100%', bottom: 'auto' }}
         >
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="absolute inset-0 bg-black-fixed/60 backdrop-blur-sm" onClick={onClose} />
 
             <div
                 role="dialog"
                 aria-modal="true"
                 aria-label="Add to collection"
-                className="relative w-full sm:max-w-sm bg-card border-t sm:border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up overflow-hidden safe-pb max-h-full sm:max-h-[80vh] flex flex-col"
+                className="relative w-full sm:max-w-sm bg-card border-t sm:border border-white-fixed/10 rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up overflow-hidden safe-pb max-h-full sm:max-h-[80vh] flex flex-col"
             >
                 {/* Grab handle (mobile) */}
                 <div className="sm:hidden flex justify-center pt-3 pb-1">
-                    <div className="h-1.5 w-10 rounded-full bg-white/15" />
+                    <div className="h-1.5 w-10 rounded-full bg-white-fixed/15" />
                 </div>
 
                 {/* Header */}
-                <div className="flex items-center gap-3 px-5 pt-2 pb-3 border-b border-white/5">
+                <div className="flex items-center gap-3 px-5 pt-2 pb-3 border-b border-white-fixed/5">
                     <Layers className="w-4 h-4 text-accent shrink-0" />
                     <p className="flex-1 text-sm font-semibold text-text truncate">Add to collection</p>
                     <button
                         onClick={onClose}
                         aria-label="Close"
-                        className="p-2 -me-2 rounded-full text-text-muted hover:text-text hover:bg-white/5 transition-colors"
+                        className="p-2 -me-2 rounded-full text-text-muted hover:text-text hover:bg-white-fixed/5 transition-colors"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -155,7 +155,7 @@ export default function AddToCollectionSheet({
                                 role="menuitemcheckbox"
                                 aria-checked={isMember}
                                 onClick={() => toggle(c)}
-                                className="w-full flex items-center gap-3 px-5 py-3 min-h-[52px] text-[15px] font-medium text-text transition-colors active:bg-white/10 hover:bg-white/5"
+                                className="w-full flex items-center gap-3 px-5 py-3 min-h-[52px] text-[15px] font-medium text-text transition-colors active:bg-white-fixed/10 hover:bg-white-fixed/5"
                             >
                                 <span
                                     className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -165,8 +165,8 @@ export default function AddToCollectionSheet({
                                 <span
                                     className={`flex items-center justify-center w-6 h-6 rounded-full border transition-colors ${
                                         isMember
-                                            ? 'bg-accent border-accent text-white'
-                                            : 'border-white/15 text-transparent'
+                                            ? 'bg-accent border-accent text-white-fixed'
+                                            : 'border-white-fixed/15 text-transparent'
                                     }`}
                                 >
                                     <Check className="w-3.5 h-3.5" />
@@ -177,7 +177,7 @@ export default function AddToCollectionSheet({
                 </div>
 
                 {/* Create new */}
-                <div className="border-t border-white/5 p-3">
+                <div className="border-t border-white-fixed/5 p-3">
                     {creating ? (
                         <div className="flex items-center gap-2">
                             <input
@@ -194,7 +194,7 @@ export default function AddToCollectionSheet({
                             <button
                                 onClick={handleCreate}
                                 disabled={!newName.trim() || busy}
-                                className="px-4 h-9 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent-hover transition-colors disabled:opacity-40"
+                                className="px-4 h-9 rounded-xl bg-accent text-white-fixed text-sm font-semibold hover:bg-accent-hover transition-colors disabled:opacity-40"
                             >
                                 Create
                             </button>

@@ -466,7 +466,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         return (
             <div className="text-center py-20 animate-fade-in">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-accent/20">
-                    <Brain className="w-8 h-8 text-white" />
+                    <Brain className="w-8 h-8 text-white-fixed" />
                 </div>
                 <h3 className="text-lg font-medium text-text mb-2">Nothing in Machina yet</h3>
                 <p className="text-text-secondary text-sm">Save a few links first, then ask Machina anything about them.</p>
@@ -520,7 +520,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                 {isEmpty ? (
                     <div className="h-full flex flex-col items-center justify-center text-center px-4">
                         <div className="w-14 h-14 mb-4 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-accent/20">
-                            <MessageCircleQuestion className="w-7 h-7 text-white" />
+                            <MessageCircleQuestion className="w-7 h-7 text-white-fixed" />
                         </div>
                         <h2 className="text-xl font-semibold text-text mb-1.5">Ask Machina</h2>
                         <p className="text-text-secondary text-sm max-w-md mb-6">
@@ -552,7 +552,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                                         className={
                                             m.role === 'user'
                                                 // User message: a compact accent pill.
-                                                ? 'px-4 py-2.5 rounded-2xl rounded-br-md bg-accent text-white text-[15px] leading-relaxed'
+                                                ? 'px-4 py-2.5 rounded-2xl rounded-br-md bg-accent text-white-fixed text-[15px] leading-relaxed'
                                                 : m.error
                                                     // Errors keep a subtle container so they stand out.
                                                     ? 'px-4 py-3 rounded-2xl rounded-bl-md text-[15px] leading-relaxed bg-red-500/10 border border-red-500/20 text-text whitespace-pre-wrap'

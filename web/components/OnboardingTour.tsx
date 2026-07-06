@@ -272,7 +272,7 @@ export default function OnboardingTour({
                 Swallows clicks so the app underneath can't be touched mid-tour —
                 exiting is deliberate, via Skip or the ✕. */}
             <div
-                className={`absolute inset-0 ${rect ? '' : 'bg-black/70 backdrop-blur-[2px]'}`}
+                className={`absolute inset-0 ${rect ? '' : 'bg-black-fixed/70 backdrop-blur-[2px]'}`}
                 onClick={(e) => e.stopPropagation()}
             />
 
@@ -367,7 +367,7 @@ export default function OnboardingTour({
 
                     <button
                         onClick={next}
-                        className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-accent text-white text-[13px] font-semibold shadow-sm shadow-accent/20 hover:bg-accent-hover active:scale-95 transition-all cursor-pointer"
+                        className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-accent text-white-fixed text-[13px] font-semibold shadow-sm shadow-accent/20 hover:bg-accent-hover active:scale-95 transition-all cursor-pointer"
                     >
                         {isLast ? 'Start saving' : isFirst ? 'Take the tour' : 'Next'}
                         {!isLast && <ArrowRight className="w-4 h-4" />}

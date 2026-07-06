@@ -43,7 +43,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
           </p>
           <button
             onClick={this.reset}
-            className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium text-white"
+            className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium text-white-fixed"
             style={{ background: 'var(--accent-gradient)' }}
           >
             Try again

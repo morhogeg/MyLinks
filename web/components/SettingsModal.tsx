@@ -400,8 +400,8 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                                 <ChevronLeft className="w-5 h-5" />
                             </button>
                         ) : (
-                            <div className="w-9 h-9 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-purple-500/25 ring-1 ring-white/15">
-                                <BrainCircuit className="w-5 h-5 text-white" />
+                            <div className="w-9 h-9 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-purple-500/25 ring-1 ring-white-fixed/15">
+                                <BrainCircuit className="w-5 h-5 text-white-fixed" />
                             </div>
                         )}
                         <div className="leading-tight">
@@ -672,8 +672,8 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                             <div className="absolute inset-0 bg-[image:var(--accent-gradient)] opacity-[0.08]" />
                             <div className="absolute inset-x-0 top-0 h-px bg-[image:var(--accent-gradient)] opacity-40" />
                             <div className="relative flex items-start gap-3">
-                                <div className="w-11 h-11 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-purple-500/25 ring-1 ring-white/15 shrink-0">
-                                    <Newspaper className="w-[22px] h-[22px] text-white" />
+                                <div className="w-11 h-11 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-purple-500/25 ring-1 ring-white-fixed/15 shrink-0">
+                                    <Newspaper className="w-[22px] h-[22px] text-white-fixed" />
                                 </div>
                                 <div className="min-w-0">
                                     <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-accent">Your digest</div>
@@ -931,7 +931,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                     <button
                         onClick={handleSave}
                         disabled={isSaving || isLoading}
-                        className="h-10 px-5 rounded-full text-sm font-semibold bg-accent text-white hover:bg-accent/90 transition-colors disabled:opacity-50 shadow-lg shadow-accent/20 cursor-pointer disabled:cursor-not-allowed"
+                        className="h-10 px-5 rounded-full text-sm font-semibold bg-accent text-white-fixed hover:bg-accent/90 transition-colors disabled:opacity-50 shadow-lg shadow-accent/20 cursor-pointer disabled:cursor-not-allowed"
                     >
                         {isSaving ? 'Saving…' : 'Save changes'}
                     </button>
@@ -1000,10 +1000,10 @@ function DigestModeButton({ mode, active, onClick }: { mode: { value: DigestMode
         >
             {active && (
                 <span className="absolute top-2 right-2 w-4 h-4 rounded-full bg-accent flex items-center justify-center">
-                    <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                    <Check className="w-2.5 h-2.5 text-white-fixed" strokeWidth={3} />
                 </span>
             )}
-            <span className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${active ? 'bg-[image:var(--accent-gradient)] text-white shadow-md shadow-purple-500/25 ring-1 ring-white/15' : 'bg-card border border-border-subtle text-text-secondary'}`}>
+            <span className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${active ? 'bg-[image:var(--accent-gradient)] text-white-fixed shadow-md shadow-purple-500/25 ring-1 ring-white-fixed/15' : 'bg-card border border-border-subtle text-text-secondary'}`}>
                 {mode.icon}
             </span>
             <span className={`text-[12.5px] font-semibold ${active ? 'text-accent' : 'text-text-secondary'}`}>{mode.label}</span>
@@ -1085,7 +1085,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
             aria-checked={on}
             className={`relative w-12 h-7 rounded-full transition-colors duration-200 shrink-0 cursor-pointer ${on ? 'bg-accent' : 'bg-text-muted/25'}`}
         >
-            <span className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${on ? 'translate-x-5' : 'translate-x-0'}`} />
+            <span className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white-fixed shadow-sm transition-transform duration-200 ${on ? 'translate-x-5' : 'translate-x-0'}`} />
         </button>
     );
 }
@@ -1101,7 +1101,7 @@ function Segmented<T extends string>({ value, options, onChange, iconOnly = fals
                         onClick={() => onChange(o.value)}
                         aria-label={iconOnly ? o.label : undefined}
                         title={iconOnly ? o.label : undefined}
-                        className={`inline-flex items-center justify-center gap-1.5 h-9 rounded-xl text-[13px] font-semibold transition-colors cursor-pointer ${iconOnly ? 'w-10' : 'flex-1'} ${active ? 'bg-accent text-white shadow-sm' : 'text-text-secondary hover:text-text'}`}
+                        className={`inline-flex items-center justify-center gap-1.5 h-9 rounded-xl text-[13px] font-semibold transition-colors cursor-pointer ${iconOnly ? 'w-10' : 'flex-1'} ${active ? 'bg-accent text-white-fixed shadow-sm' : 'text-text-secondary hover:text-text'}`}
                     >
                         {o.icon}
                         {!iconOnly && o.label}

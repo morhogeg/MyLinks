@@ -241,7 +241,7 @@ export default function ReadingView({ link, onClose }: ReadingViewProps) {
                             <h3 className="text-lg font-medium text-text mb-1.5">Reader unavailable</h3>
                             <p className="text-text-secondary text-sm max-w-md mx-auto mb-5">{error}</p>
                             {!!link.url && /^https?:\/\//.test(link.url) && (
-                                <a href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent-hover transition-colors">
+                                <a href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-accent text-white-fixed text-sm font-semibold hover:bg-accent-hover transition-colors">
                                     <ExternalLink className="w-4 h-4" /> Open original
                                 </a>
                             )}
