@@ -526,6 +526,24 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-06 — CLAUDE.md rewritten as an operating manual + 3 new skills**
+  (branch `claude/claude-md-operating-manual-k70gz3`). `CLAUDE.md` is now the
+  full process manual (SOURCE_OF_TRUTH stays the state doc): session workflow,
+  per-area conventions (frontend tokens/native-split/modal recipe/RTL, backend
+  auth/CORS/twin-pattern/fail-direction, iOS signing/SPM/rules-file discipline),
+  **28 named mistakes with the rule preventing each**, checkable quality bars
+  per deliverable type, and exact escalation rules (proceed / verify-then-
+  proceed / always-ask lists). Grounded in a full code read, which also
+  surfaced token-system debt to fix-on-touch, not copy: `SimpleMarkdown.tsx:85`
+  stray `border-red-500`, hardcoded `bg-white text-black` in `ConfirmDialog`/
+  `AddLinkForm`, and four `dark:` usages that only follow the OS theme, not the
+  in-app toggle. New skills in `.claude/skills/`: **`/verify-ui`** (Chromium
+  screenshot matrix — dark+light × EN+HE × phone+desktop — via a throwaway
+  fixture harness deleted before commit), **`/testflight`** (trigger + babysit
+  the iOS CI run with the accumulated failure playbook: cert cap, entitlement
+  tripwire, Xcode floor, stale bundle, queue), **`/card-autopsy`** (bad-card
+  root-cause: reproduce the scrape FIRST, then scraper-vs-prompt-vs-pipeline
+  fix + live re-save verification). Docs/skills only — no deploys.
 - **2026-07-06 — "Show by" status filter now has a dismissable pill (commits
   `f575529`, `c77f873`).** The status filter (Archive/Favorites/Unread/Read/
   Reminders) changed the feed but left no on-page indicator — unlike tags. Added a
