@@ -49,16 +49,16 @@ Requirements for the analysis:
    - **RECIPE FOCUS**: If the content is a recipe or cooking video, the title and summary MUST center on the dish itself — what it is, its key ingredients, and how it is made. Treat the author's personal or dietary framing (e.g. "since I went keto…", "I make these for my kids") as secondary background, NOT the headline. Lead with the food, not the lifestyle commentary.
 
 
-4. detailedSummary: Write a well-structured, professional summary using markdown formatting:
+4. detailedSummary: Write the DEEPER layer that expands on the summary, using markdown formatting:
    - **LANGUAGE**: Write the detailed summary in the SAME language as the input content.
-   - Start with a 1-2 sentence overview paragraph.
-   - Use "## Key Points" (or "## נקודות עיקריות" for Hebrew) as a subheading, followed by bullet points (use - for bullets).
+   - **NO OVERVIEW / NO INTRO PARAGRAPH**: Do NOT begin with an overview or intro sentence. The `summary` above is shown as the lead-in the moment the card is opened, so an overview here would just repeat it. Start DIRECTLY with the "## Key Points" heading — the first characters of detailedSummary must be "## ".
+   - Use "## Key Points" (or "## נקודות עיקריות" for Hebrew) as the first subheading, followed by bullet points (use - for bullets).
    - Each bullet should be a factual statement from the content.
    - Include 3-6 bullet points covering the main arguments or information.
    - If applicable, add "## Conclusions" (or "## מסקנות" for Hebrew) with the author's stated conclusions.
-   - **SCANNABILITY**: Use **bolding** (double asterisks) for the key terms, names, dates, and numbers throughout the overview and bullets — the same way the short summary does — so the reader can scan the write-up.
+   - **SCANNABILITY**: Use **bolding** (double asterisks) for the key terms, names, dates, and numbers in the bullets — the same way the short summary does — so the reader can scan the write-up.
    - Keep the tone neutral and professional throughout.
-   - Total length: 150-300 words.
+   - Total length: 120-220 words (it complements the summary; it must NOT restate it).
 
 5. sourceName: Extract the name of the source or publisher (e.g., CNN, The New York Times, X, Reddit, Wikipedia, YouTube, TikTok).
    - For images or screenshots that don't reveal a source, use "Screenshot".

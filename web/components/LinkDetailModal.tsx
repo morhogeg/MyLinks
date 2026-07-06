@@ -525,39 +525,43 @@ export default function LinkDetailModal({
                     </h2>
 
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        {/* Lead straight into the full write-up (its own OVERVIEW /
-                            KEY POINTS sections). The short gist is already shown on
-                            the collapsed card, so repeating it here is redundant —
-                            fall back to it only when there's no detailed summary.
-                            EXCEPTION: older cards' detailedSummary has no **bold**
-                            highlights, so the scannable terms the card shows would
-                            vanish here. When the detailed write-up carries no
-                            highlights, lead with the highlighted gist so the open
-                            state keeps them. Newer cards bold the detailedSummary
-                            itself, so the lead is suppressed to avoid redundancy. */}
+                        {/* Card ↔ open are ONE thought at two zoom levels: the card
+                            summary is the canonical lead, shown (bolded) at the top of
+                            the open view, then the deeper Key Points / Conclusions
+                            expand below it. New cards' detailedSummary starts straight
+                            at "## Key Points" (no overview). Older cards still carry a
+                            leading overview paragraph — drop everything before the
+                            first "## " so the open view never shows two overviews.
+                            Prose-only legacy detailedSummary (no headings) has no gist
+                            to strip, so we show it alone to avoid duplicating it. */}
                         <div className="mb-6">
-                            {link.detailedSummary ? (
-                                <>
-                                    {link.summary && !link.detailedSummary.includes('**') && (
-                                        <SimpleMarkdown
-                                            content={link.summary}
-                                            isRtl={isRtl}
-                                            className="text-lg mb-6"
-                                        />
-                                    )}
-                                    <SimpleMarkdown
-                                        content={link.detailedSummary}
-                                        isRtl={isRtl}
-                                        className="text-base"
-                                    />
-                                </>
-                            ) : link.summary ? (
-                                <SimpleMarkdown
-                                    content={link.summary}
-                                    isRtl={isRtl}
-                                    className="text-lg"
-                                />
-                            ) : null}
+                            {(() => {
+                                const detailed = link.detailedSummary || '';
+                                const headingIdx = detailed.indexOf('## ');
+                                const hasSections = headingIdx >= 0;
+                                const detailBody = hasSections ? detailed.slice(headingIdx) : detailed;
+                                // Lead with the summary unless doing so would duplicate
+                                // a legacy overview-only (section-less) detailedSummary.
+                                const showLead = !!link.summary && (hasSections || !detailed);
+                                return (
+                                    <>
+                                        {showLead && (
+                                            <SimpleMarkdown
+                                                content={link.summary}
+                                                isRtl={isRtl}
+                                                className={`text-lg ${detailBody ? 'mb-6' : ''}`}
+                                            />
+                                        )}
+                                        {detailBody && (
+                                            <SimpleMarkdown
+                                                content={detailBody}
+                                                isRtl={isRtl}
+                                                className="text-base"
+                                            />
+                                        )}
+                                    </>
+                                );
+                            })()}
                         </div>
 
 
