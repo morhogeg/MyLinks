@@ -622,14 +622,17 @@ exact-match, capped.
   `secondbrain-app-94da2` → Cloud Messaging → Apple app config; (3) confirm
   Cloud Messaging enabled — owner confirmed these done 2026-07-07 (APNs .p8
   uploaded to FCM for both dev+prod slots; Push capability on the App ID).
-  **SHIP STATUS (this session, cloud — can't run firebase CLI):** merged to
-  `main` (web live via Vercel), TestFlight workflow triggered. **OWNER MUST run
-  the backend deploys locally** — they can't run from the cloud session:
-  `./deploy-functions.sh functions:register_device_token_http,functions:unregister_device_token_http,functions:check_reminders,functions:send_digests,functions:send_digest_now,functions:force_check_reminders,functions:force_send_digests`,
-  then `./deploy-hosting.sh` (firebase.json rewrites changed — the two /api
-  token routes need it), and deploy the live `firestore.rules` (now carries the
-  open `digests` match) so the Digest section can read. Until the functions +
-  hosting deploy, token registration 404s and no digests are written.
+  **SHIP STATUS (2026-07-07, cloud session — can't run firebase CLI or dispatch
+  workflows):** merged to `main` as `b4d86df` (rebased onto `7279258`; **web
+  live via Vercel**). **OWNER TODO — three manual steps the cloud session can't
+  do:** (a) **TestFlight** — Actions → "iOS → TestFlight" → Run workflow on
+  `main`, `require_auth` OFF (GitHub integration lacked `actions:write`, got 403;
+  will be build 1046 = run #46); (b) **Cloud Functions** —
+  `./deploy-functions.sh functions:register_device_token_http,functions:unregister_device_token_http,functions:check_reminders,functions:send_digests,functions:send_digest_now,functions:force_check_reminders,functions:force_send_digests`;
+  (c) **Hosting** — `./deploy-hosting.sh` (firebase.json rewrites changed — the
+  two /api token routes need it), and deploy the live `firestore.rules` (now
+  carries the open `digests` match) so the Digest section can read. Until (b)+(c),
+  token registration 404s and no digests are written.
 - **2026-07-07 — Summary accuracy + reliability hardening (prompt + temperature).**
   Card summaries occasionally reversed fine details and drifted generic. Concrete
   trigger: a Hebrew Austria travel post where the author said Munich was the OLD
