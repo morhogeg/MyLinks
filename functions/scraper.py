@@ -683,6 +683,21 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
     }
 
 
+def _looks_like_fb_login_wall(text: str) -> bool:
+    """True when the text is Facebook's logged-out login-wall boilerplate rather
+    than real post content. FB serves this intermittently to server-side fetches
+    (same URL can return the post one minute and the wall the next). Its
+    og:description is a generic CTA — "Log into Facebook to start sharing and
+    connecting with your friends, family, and people you know." — which is >20
+    chars and not a generic *title*, so it would otherwise sail through as a
+    caption and get summarized into a bogus "Facebook Login Page" card. Detect it
+    so we can fail honestly instead."""
+    t = (text or "").lower()
+    return ("log into facebook" in t or "log in to facebook" in t
+            or "to start sharing and connecting" in t
+            or "see posts, photos and more on facebook" in t)
+
+
 def _clean_fb_title(raw: Optional[str]) -> tuple:
     """Split a Facebook ``og:title`` into ``(caption, author)``.
 
@@ -766,9 +781,10 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
                 source_name = author
 
             def _is_real_caption(c: str) -> bool:
-                # Reject login-wall titles and bare author-name lines; a real
-                # caption is longer than a name and not a generic FB string.
-                return bool(c) and c.split('|')[0].strip() not in generic_titles and len(c) > 20
+                # Reject login-wall boilerplate, generic FB titles, and bare
+                # author-name lines; a real caption is longer than a name.
+                return (bool(c) and c.split('|')[0].strip() not in generic_titles
+                        and len(c) > 20 and not _looks_like_fb_login_wall(c))
 
             og_desc = _meta('og:description', 'twitter:description', 'description')
             candidates = [title_caption, og_desc]
@@ -782,7 +798,8 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
             # (reels already get theirs from the "| Author |" wrapper).
             if not source_name and title_caption and title_caption != body:
                 tc = title_caption.split('|')[0].strip()
-                if tc and '\n' not in tc and 2 <= len(tc) <= 60 and tc not in generic_titles:
+                if (tc and '\n' not in tc and 2 <= len(tc) <= 60
+                        and tc not in generic_titles and not _looks_like_fb_login_wall(tc)):
                     source_name = tc
 
             # FB truncates og:description with a trailing "..."; when that preview
@@ -814,7 +831,12 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
                 best_title = caption_guess[:100].split('\n')[0]
 
     if not metadata_lines and not best_desc:
-        return {"html": "", "title": "Facebook Link", "text": "Facebook content (metadata extraction failed)"}
+        # No readable caption — FB served a login wall or nothing. Return a
+        # placeholder (the grounding rule turns this into an honest "content could
+        # not be retrieved" card instead of summarizing the login page) and flag
+        # truncated=True so the caller adds the "save a screenshot" note.
+        return {"html": "", "title": "Facebook post", "text": "[no text content available]",
+                "source_name": source_name, "truncated": True}
 
     final_text = "\n\n---\n\n".join(metadata_lines)
     return {"html": final_text, "title": best_title, "text": final_text,
