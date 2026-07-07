@@ -571,6 +571,40 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-07 — Summary accuracy + reliability hardening (prompt + temperature).**
+  Card summaries occasionally reversed fine details and drifted generic. Concrete
+  trigger: a Hebrew Austria travel post where the author said Munich was the OLD
+  landing choice and Salzburg is now better — the summary led with Munich (reversed
+  the recommendation) and described the guide in the abstract instead of naming the
+  actual attractions. Two root causes: (1) **no `temperature` was ever set**, so
+  Gemini ran extraction at its ~1.0 default (max variance → vagueness + occasional
+  claim-flips); (2) the prompt had no rule preserving claim *direction*. Fix in
+  `functions/ai_service.py` (commit `2446e34`): added a **DIRECTIONALITY** rule +
+  "lead with the current recommendation" to `SYSTEM_PROMPT`; converted forced counts
+  to ceilings (`concepts` up to 5 / empty ok, `actionableTakeaway` degrades to an
+  insight when content isn't actionable, `tags` 3–5 to match schema `max_length=5`);
+  `detailedSummary` "must NOT restate" → "stand on its own, completeness beats
+  non-overlap"; section headings now follow the content language; video addendum
+  explicitly overrides the "Key Points first" rule; fixed a summary newline
+  instruction that taught a literal `\n`. **Set `temperature: 0.2`** on all
+  extraction paths (text/image/video/Q&A) via the shared `_generate_json` config;
+  the **streaming Q&A path was bypassing that config** (ran at ~1.0) → now 0.2 to
+  match its non-streaming twin; **weekly synthesis held at 0.6** (intentional warm
+  narrative, goes flat at 0.2). Verified live against the model on the Austria post
+  + a directionality case + a non-actionable case: reversal fixed and stable across
+  3 runs, summaries markedly more specific (named Hallein salt mine / Werfen /
+  Hallstatt / SalzburgLand Card vs. old "recommendations and tips" mush). **Deployed:**
+  `process_link_background`, `analyze_link`, `analyze_image`, `ask_brain`,
+  `send_digests`, `send_digest_now` (all `Successful update`). **Known follow-ups /
+  not-yet-done:** (a) specificity now leans mostly on temperature, not a bulletproof
+  prompt rule — if a future post reads generic, add a firmer "name specific entities"
+  clause; (b) the fix was verified via the **text** path (`analyze_text`); the
+  **image** path (`analyze_image`, OCR) shares the identical prompt/temp but was not
+  run end-to-end here (couldn't get the pasted screenshot bytes) — worth an eyeball
+  after re-saving a real screenshot; (c) `concepts` still returns mildly abstract
+  picks for travel posts (low stakes); (d) `graph_service.py:312` still runs at the
+  ~1.0 default on its connection-inference call — same variance issue, left as-is
+  (out of scope, one-line fix if graph connections look noisy).
 - **2026-07-07 — Killed the TestFlight cert-cap treadmill (durable CI fix).**
   Root-caused why iOS builds kept dying on "maximum number of certificates":
   automatic signing on ephemeral runners mints a *new* Apple Development cert
