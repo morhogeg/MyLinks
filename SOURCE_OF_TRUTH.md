@@ -111,13 +111,20 @@ surface in the category and a knowledge graph computed on every save. The path t
   Extension token bridge ("Open Machina and sign in first") — entitlements are
   baked at archive-time codesign and export re-signing doesn't restore them.
   A CI step now cracks open every exported IPA and fails if the App Group
-  entitlement is missing from the app or the extension. Known cost of signed
-  archives: each ephemeral runner mints an Apple *Development* cert, and
-  Apple caps those — when archive fails with "maximum number of certificates"
-  (runs #15/#16), **prune Development certs at developer.apple.com →
-  Certificates** (safe; they regenerate). A global `CODE_SIGN_IDENTITY`
-  override is also not an option — it leaks onto every SPM target (run #17).
-  Durable fix candidate (backlog): import one stable dev cert as a CI secret.
+  entitlement is missing from the app or the extension. **Certificate cap —
+  DURABLE FIX SHIPPED 2026-07-07:** the old cost of signed archives was that each
+  ephemeral runner *minted a new Apple Development cert* (empty keychain → no
+  identity to reuse), and Apple caps those at 2, so builds periodically died with
+  "maximum number of certificates" (runs #15/#16/#31/#42) until you revoked by
+  hand. The workflow now has an **"Install signing certificate"** step that
+  imports one **persistent** `.p12` (secrets `BUILD_CERTIFICATE_P12_BASE64` +
+  `BUILD_CERTIFICATE_PASSWORD`) into a temp keychain so automatic signing REUSES
+  it and never mints — **once the owner adds those secrets** (one-time export +
+  base64; steps in `docs/IOS_CICD.md` → "Stable signing certificate"). Until the
+  secret exists the step warns and falls back to the old minting behavior (so it's
+  safe to land before setup). A global `CODE_SIGN_IDENTITY` override is still not
+  an option — it leaks onto every SPM target (run #17) — which is why the fix is
+  keychain import, not a project signing change.
 - **Two parallel Claude sessions:** TestFlight runs share one concurrency group
   and one build-number sequence (1000 + run number) — runs queue, numbers never
   collide, but a build only contains its own branch's code. Sync with
@@ -563,6 +570,19 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-07 — Killed the TestFlight cert-cap treadmill (durable CI fix).**
+  Root-caused why iOS builds kept dying on "maximum number of certificates":
+  automatic signing on ephemeral runners mints a *new* Apple Development cert
+  every run (empty keychain → nothing to reuse), and Apple caps them at 2. Added
+  an **"Install signing certificate"** step to `ios-testflight.yml` that imports a
+  persistent `.p12` (secrets `BUILD_CERTIFICATE_P12_BASE64` +
+  `BUILD_CERTIFICATE_PASSWORD`) into a temp keychain so signing reuses it — no more
+  minting, no more manual revoking. Import-if-present (warns + falls back to the
+  old behavior when unset), so it's safe already-landed. **Owner one-time step to
+  activate:** export the Distribution+Development certs as one `.p12`, base64, add
+  the two secrets — exact steps in `docs/IOS_CICD.md` → "Stable signing
+  certificate". Also re-ran the build after the manual cert prune: run #44 →
+  build 1044 (in flight). §2 gotcha updated.
 - **2026-07-07 — Production-readiness audit + remediation sweep (5-agent audit,
   4-agent fix; ~19 issues fixed, rest tracked in `AUDIT_FINDINGS.md`).** A deep
   five-agent audit (backend, React components, frontend data layer, security,
