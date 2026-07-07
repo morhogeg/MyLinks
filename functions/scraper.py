@@ -734,6 +734,7 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
     best_title = "Facebook Post"
     best_desc = ""
     source_name = None
+    truncated = False
 
     try:
         headers = {
@@ -769,12 +770,17 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
                 # caption is longer than a name and not a generic FB string.
                 return bool(c) and c.split('|')[0].strip() not in generic_titles and len(c) > 20
 
-            candidates = [
-                title_caption,
-                _meta('og:description', 'twitter:description', 'description'),
-            ]
+            og_desc = _meta('og:description', 'twitter:description', 'description')
+            candidates = [title_caption, og_desc]
             reals = [c.strip() for c in candidates if _is_real_caption(c)]
             body = max(reals, key=len) if reals else ""
+
+            # FB truncates og:description with a trailing "..."; when that preview
+            # is the best we got (og:title carried no full caption — i.e. a text
+            # post, not a reel), the AI is summarizing only a fragment. Flag it so
+            # the caller can tell the user the full post wasn't available.
+            truncated = (bool(body) and body == og_desc.strip()
+                         and body.rstrip().endswith(("...", "…")))
 
             if body:
                 # Title = the caption's first line (far better than "Facebook Post").
@@ -802,7 +808,7 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
 
     final_text = "\n\n---\n\n".join(metadata_lines)
     return {"html": final_text, "title": best_title, "text": final_text,
-            "source_name": source_name}
+            "source_name": source_name, "truncated": truncated}
 
 
 def _extract_youtube_id(url: str) -> Optional[str]:

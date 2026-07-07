@@ -291,6 +291,24 @@ def _estimate_read_time(text: str, words_per_minute: int = 200) -> int:
     return max(1, round(words / words_per_minute))
 
 
+def _append_capture_note(detailed: str, language: str) -> str:
+    """Append an honest 'preview only' note to detailedSummary when the source
+    exposed only a truncated caption (e.g. a Facebook text post — FB serves apps
+    just a ~200-char og:description preview, never the full body). Without this
+    the card looks thin for no visible reason; the note explains why and tells the
+    user how to get the full summary. Rendered as a trailing blockquote, so it
+    never violates the 'start with ## Key Points' rule."""
+    he = (language or "").lower().startswith("he")
+    if he:
+        note = ("> ⚠️ **הערה:** תצוגה מקדימה בלבד — הטקסט המלא של הפוסט לא היה זמין מהקישור. "
+                "לסיכום מלא, שמרו צילום מסך של הפוסט במקום את הקישור.")
+    else:
+        note = ("> ⚠️ **Note:** Preview only — the full text of this post wasn't available "
+                "from the link. For a complete summary, save a screenshot of the post instead.")
+    detailed = (detailed or "").rstrip()
+    return f"{detailed}\n\n{note}" if detailed else note
+
+
 def _analyze_scraped(ai, scraped: dict, existing_tags: list):
     """Run the right analysis for scraped content.
 
@@ -309,7 +327,14 @@ def _analyze_scraped(ai, scraped: dict, existing_tags: list):
         # Fallback: analyze the lightweight oEmbed metadata text honestly.
         return ai.analyze_text(scraped.get("text") or scraped.get("html", ""), existing_tags=existing_tags)
 
-    return ai.analyze_text(scraped.get("text") or scraped.get("html", ""), existing_tags=existing_tags, content_type=content_type)
+    analysis = ai.analyze_text(scraped.get("text") or scraped.get("html", ""),
+                               existing_tags=existing_tags, content_type=content_type)
+    # When the scraper could only get a truncated preview (Facebook text posts),
+    # tell the user plainly rather than presenting a thin summary as complete.
+    if isinstance(analysis, dict) and scraped.get("truncated"):
+        analysis["detailedSummary"] = _append_capture_note(
+            analysis.get("detailedSummary"), analysis.get("language"))
+    return analysis
 
 
 def _format_duration(minutes: int) -> str:
