@@ -33,6 +33,7 @@ DEFAULT_USER_SETTINGS = {
     "digest_topic": None,
     "digest_count": 5,
     "digest_hour": 9,
+    "digest_minute": 0,
     "digest_day": 0,
     "digest_skip_empty": True,
 }

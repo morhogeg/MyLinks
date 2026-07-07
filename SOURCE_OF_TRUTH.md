@@ -589,6 +589,49 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-07 — Reworked Reminders + Digest settings into one Notifications
+  section + native minute-precise digest time.** The Settings screen had two
+  overlapping sections ("Reminders" and "Curated digest") that both re-declared
+  the push toggle (`push_enabled`/`reminders_channel:['push']` vs a separate
+  `digest_channels:['push']` chip). **UX unification** (`SettingsModal.tsx`):
+  collapsed both into one **"Notifications"** section — a single shared **"Push
+  notifications"** toggle at the top (the one push control, fires the OS
+  permission), then **Reminders** (frequency + legacy "Also send to WhatsApp")
+  and **Curated digest** (enable + "Customize digest ›") as two independently
+  switchable blocks separated by dividers. Push is now authoritative via a
+  `withPush()` helper that keeps `'push'` in lockstep in BOTH channel arrays
+  (`togglePush` syncs both; `loadSettings` normalizes both to `push_enabled` so
+  the toggle and delivery never disagree — reconciles old accounts that had push
+  on for reminders but off for digest). The digest sub-screen's redundant **Push
+  chip was removed** (WhatsApp + Email remain as opt-in extras; caption now says
+  push is on when notifications are on). No backend delivery-logic change — the
+  arrays still drive delivery, and push is still gated on `fcmTokens`. **Native
+  minute-precise time** (task 2): new `digest_minute` (0–59) field added to
+  `types.ts`, web `DEFAULT_SETTINGS`, and `link_service.py`
+  `DEFAULT_USER_SETTINGS` (the two DEFAULTS kept in sync); the whole-hour
+  `Dropdown` for delivery time is replaced by a native `<input type="time">`
+  (`TimeInput`) → the iOS wheel picker in the WKWebView, OS picker on desktop,
+  minute-accurate (e.g. 16:24). The weekly day-of-week stays a `Dropdown`
+  (recurring selector, not a calendar date). **Backend minute precision:**
+  `digest_service.is_due` now fires on the first scheduler tick in `[target,
+  target+DIGEST_CADENCE_MINUTES)` using datetime-window math (correct across
+  midnight + weekly day-of-week — verified with a standalone test incl. a 23:58
+  Tue→Wed-00:00-tick case), and `send_digests` (`main.py`) drops from **every 60
+  min → every 5 min** (constant `DIGEST_CADENCE_MINUTES=5` in `digest_service`
+  must stay in sync with the cron). The existing 20h-daily / 6d-weekly dup-guard
+  (`lastDigestSentAt`) is unchanged, so the faster tick can't double-send.
+  **⚠️ Cost trade-off:** the digest scheduler now runs **12× more often** (288
+  vs 24 invocations/day), each walking every user doc — negligible at current
+  scale (well within free tier), revisit if the user base grows (e.g. move to a
+  query on due users, or widen cadence to 15 min for ≤15-min latency at 4× cost).
+  No "send one now" button was added (non-goal); `send_digest_now` callable
+  untouched. `tsc` clean (only pre-existing `push.ts` native-plugin errors),
+  `py_compile` clean. **NOT DEPLOYED — owner action:** frontend ships via Vercel
+  on merge; **the backend (`send_digests` cadence + `is_due` + new default) MUST
+  be deployed from the owner machine** — `./deploy-functions.sh
+  functions:send_digests` (the Firestore default only affects brand-new
+  workspaces; existing users get `digest_minute` via the `?? 0` fallback). Device
+  QA (native wheel + a 16:24 round-trip) pending on TestFlight.
 - **2026-07-07 — FB login-wall handling + hover-toolbar order + TestFlight 1048.**
   Closing out the Facebook/summary work. **(1) Login wall (`fd6c9fe`, deployed
   `analyze_link` + `process_link_background`):** FB intermittently serves logged-out
@@ -609,7 +652,6 @@ exact-match, capped.
   `ios-testflight.yml`), so it needed a rebuild — **triggered run #48 → build 1048**
   to ship them to the phone. Known FB limit still stands: text-post detail depends
   on FB not gating the fetch; author name comes only from a non-gated `og:title`.
-
 - **2026-07-07 — Facebook author byline + honest save-dialog copy (commits
   `2258fd4`, `453299e`).** Two small UX fixes. **(1) FB author byline:** the scraper
   now captures the post author for text posts too (bare `og:title` name, not just the

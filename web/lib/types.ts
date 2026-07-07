@@ -239,8 +239,9 @@ export interface User {
     digest_topics: string[];
     digest_topic?: string | null; // legacy single-topic (kept for back-compat)
     digest_count: number;
-    digest_hour: number; // 0-23, local time
-    digest_day: number;  // 0=Mon … 6=Sun (weekly)
+    digest_hour: number;   // 0-23, local time
+    digest_minute: number; // 0-59, local time
+    digest_day: number;    // 0=Mon … 6=Sun (weekly)
     digest_skip_empty: boolean;
   };
 }

@@ -13,7 +13,7 @@ The user controls, from Settings:
   • what to curate                             (digest_mode)
   • a topic to focus on                        (digest_topic, when mode=topic)
   • how many cards                             (digest_count)
-  • when, in their local time                  (digest_hour, digest_day)
+  • when, in their local time                  (digest_hour, digest_minute, digest_day)
 
 Curation modes (digest_mode). The Settings UI surfaces the first three as the
 primary choices and tucks the rest behind an "advanced" disclosure (M14); the
@@ -36,7 +36,7 @@ import random
 import logging
 import smtplib
 from email.message import EmailMessage
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 
 import requests
@@ -54,6 +54,13 @@ APP_URL = os.environ.get("APP_URL", "https://secondbrain-app-94da2.web.app")
 REDISCOVER_MIN_AGE_DAYS = 14
 # Cap how many links we pull per user when curating (keeps reads bounded).
 CANDIDATE_LIMIT = 500
+
+# How often the `send_digests` scheduler ticks (functions/main.py). is_due()
+# fires on the first tick at or after the user's target hour:minute, so this is
+# also the worst-case delivery latency and the width of the is_due match window.
+# MUST stay in sync with the cron in send_digests. Smaller = tighter to the
+# chosen minute but proportionally more scheduler invocations (cost).
+DIGEST_CADENCE_MINUTES = 5
 
 VALID_MODES = {"smart", "random", "topic", "unread", "favorites", "rediscover", "synthesis"}
 
@@ -1024,8 +1031,9 @@ def _local_now(tz_name: Optional[str]) -> datetime:
 
 def is_due(settings: dict, tz_name: Optional[str], last_sent_ms: Optional[int]) -> bool:
     """
-    Decide whether a user's digest is due *right now*. Designed to be called
-    by an hourly scheduler — fires once when the local hour matches, and uses
+    Decide whether a user's digest is due *right now*. Designed to be called by
+    the `send_digests` scheduler every DIGEST_CADENCE_MINUTES — fires once on the
+    first tick at or after the user's exact local hour:minute, and uses
     last_sent_ms to avoid duplicate sends within the same period.
     """
     if not settings.get("digest_enabled"):
@@ -1036,7 +1044,22 @@ def is_due(settings: dict, tz_name: Optional[str], last_sent_ms: Optional[int]) 
 
     local = _local_now(tz_name)
     target_hour = int(settings.get("digest_hour", 9))
-    if local.hour != target_hour:
+    target_minute = int(settings.get("digest_minute", 0))
+
+    # Fire on the first scheduler tick in [target, target + cadence). Comparing
+    # actual datetimes (not raw hour/minute) makes this correct across midnight:
+    # a target of 23:58 is caught by the 00:00 tick, and `fired` still reports
+    # the day the window opened on — which is what the weekly day check needs.
+    target_today = local.replace(
+        hour=target_hour, minute=target_minute, second=0, microsecond=0
+    )
+    window = timedelta(minutes=DIGEST_CADENCE_MINUTES)
+    fired = None
+    for candidate in (target_today, target_today - timedelta(days=1)):
+        if timedelta(0) <= (local - candidate) < window:
+            fired = candidate
+            break
+    if fired is None:
         return False
 
     frequency = settings.get("digest_frequency", "weekly")
@@ -1047,9 +1070,9 @@ def is_due(settings: dict, tz_name: Optional[str], last_sent_ms: Optional[int]) 
         # Guard window: at least 20h since the last send.
         return (now_ms - last) >= 20 * 3600 * 1000
 
-    # weekly
+    # weekly — the day-of-week is the day the target window opened on.
     target_day = int(settings.get("digest_day", 0))
-    if local.weekday() != target_day:
+    if fired.weekday() != target_day:
         return False
     return (now_ms - last) >= 6 * 86_400 * 1000
 

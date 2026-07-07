@@ -56,10 +56,6 @@ const ADVANCED_DIGEST_MODES = DIGEST_MODES.filter((m) => m.advanced);
 const ADVANCED_MODE_VALUES = new Set<DigestMode>(ADVANCED_DIGEST_MODES.map((m) => m.value));
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => ({
-    value: String(h),
-    label: h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`,
-}));
 const COUNT_OPTIONS = ['3', '5', '7', '10'].map((c) => ({ value: c, label: `${c} cards` }));
 
 // Mirrors DEFAULT_USER_SETTINGS in functions/link_service.py — keep in sync.
@@ -78,8 +74,27 @@ const DEFAULT_SETTINGS: User['settings'] = {
     digest_topic: null,
     digest_count: 5,
     digest_hour: 9,
+    digest_minute: 0,
     digest_day: 0,
     digest_skip_empty: true,
+};
+
+// Push is ONE shared control (the "Push notifications" toggle) that governs both
+// reminders and digests. `push_enabled` is authoritative; this keeps 'push'
+// present/absent in a delivery-channel array to match — so the two channel lists
+// never disagree with the toggle the user sees.
+function withPush<T extends ReminderChannel | DigestChannel>(channels: T[], on: boolean): T[] {
+    const has = channels.includes('push' as T);
+    if (on && !has) return [...channels, 'push' as T];
+    if (!on && has) return channels.filter((c) => c !== 'push');
+    return channels;
+}
+
+// "4:24 PM" / "9:00 AM" — 12-hour local formatting for the digest summary.
+const formatTime = (hour: number, minute: number) => {
+    const h12 = hour % 12 === 0 ? 12 : hour % 12;
+    const ampm = hour < 12 ? 'AM' : 'PM';
+    return `${h12}:${String(minute).padStart(2, '0')} ${ampm}`;
 };
 
 export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: SettingsModalProps) {
@@ -289,7 +304,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
         setLoadError(false);
         try {
             const userSettings = await getUserSettings(uid);
-            const loaded: User['settings'] = userSettings
+            let loaded: User['settings'] = userSettings
                 ? {
                     theme: userSettings.theme || 'dark',
                     daily_digest: userSettings.daily_digest || false,
@@ -311,10 +326,19 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                     digest_topic: userSettings.digest_topic ?? null,
                     digest_count: userSettings.digest_count ?? 5,
                     digest_hour: userSettings.digest_hour ?? 9,
+                    digest_minute: userSettings.digest_minute ?? 0,
                     digest_day: userSettings.digest_day ?? 0,
                     digest_skip_empty: userSettings.digest_skip_empty ?? true,
                 }
                 : DEFAULT_SETTINGS;
+            // Push is one shared control now — reconcile both channel arrays to the
+            // single push_enabled flag so the toggle and delivery never disagree
+            // (e.g. an old account with push on for reminders but off for digest).
+            loaded = {
+                ...loaded,
+                reminders_channel: withPush(loaded.reminders_channel, loaded.push_enabled),
+                digest_channels: withPush(loaded.digest_channels, loaded.push_enabled),
+            };
             setSettings(loaded);
             // Baseline for dirty-tracking (M7): the exact state we just loaded.
             setSettingsBaseline(JSON.stringify(loaded));
@@ -349,6 +373,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                 digest_topics: settings.digest_topics,
                 digest_count: settings.digest_count,
                 digest_hour: settings.digest_hour,
+                digest_minute: settings.digest_minute,
                 digest_day: settings.digest_day,
                 digest_skip_empty: settings.digest_skip_empty,
             });
@@ -380,7 +405,8 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
             setSettings((p) => ({
                 ...p,
                 push_enabled: false,
-                reminders_channel: p.reminders_channel.filter((c) => c !== 'push'),
+                reminders_channel: withPush(p.reminders_channel, false),
+                digest_channels: withPush(p.digest_channels, false),
             }));
             return;
         }
@@ -395,9 +421,8 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
             setSettings((p) => ({
                 ...p,
                 push_enabled: true,
-                reminders_channel: p.reminders_channel.includes('push')
-                    ? p.reminders_channel
-                    : [...p.reminders_channel, 'push'],
+                reminders_channel: withPush(p.reminders_channel, true),
+                digest_channels: withPush(p.digest_channels, true),
             }));
         } finally {
             setPushBusy(false);
@@ -437,9 +462,10 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
     // One-line summary of the current digest config (shown on the main screen).
     const digestSummary = (() => {
         const mode = DIGEST_MODES.find((m) => m.value === settings.digest_mode)?.label ?? 'Smart mix';
+        const time = formatTime(settings.digest_hour, settings.digest_minute);
         const when = settings.digest_frequency === 'weekly'
-            ? `${DAYS[settings.digest_day]} ${HOUR_OPTIONS[settings.digest_hour].label}`
-            : `Daily ${HOUR_OPTIONS[settings.digest_hour].label}`;
+            ? `${DAYS[settings.digest_day]} ${time}`
+            : `Daily ${time}`;
         const where = settings.digest_channels
             .map((c) => (c === 'whatsapp' ? 'WhatsApp' : c === 'email' ? 'Email' : 'Push'))
             .join(' & ') || 'in-app only';
@@ -568,23 +594,19 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                     </Section>
                     )}
 
-                    {/* Reminders */}
-                    <Section icon={<Bell className="w-4 h-4" />} title="Reminders">
+                    {/* Notifications — one home for how Machina reaches out. Push is
+                        the single shared delivery channel; Reminders and Curated
+                        digest are the two things it delivers, each independently
+                        switchable. This replaces the old split Reminders / Curated
+                        digest sections that both re-declared the push toggle. */}
+                    <Section icon={<Bell className="w-4 h-4" />} title="Notifications">
+                        {/* Shared push channel — enabling fires the OS permission
+                            request (must run in this user gesture). Governs both
+                            reminders and digests; withPush() keeps both channel
+                            arrays in lockstep with this one flag. */}
                         <Row
-                            title="Reminders"
-                            subtitle="Resurface saved items so you actually revisit them"
-                        >
-                            <Toggle
-                                on={settings.reminders_enabled}
-                                onChange={() => setSettings((p) => ({ ...p, reminders_enabled: !p.reminders_enabled }))}
-                            />
-                        </Row>
-
-                        {/* Notifications (iOS push) — the primary delivery channel.
-                            Enabling fires the OS permission request (user gesture). */}
-                        <Row
-                            title="Notifications"
-                            subtitle="Reminders and digests as push notifications on your iPhone"
+                            title="Push notifications"
+                            subtitle="Deliver reminders and digests to your iPhone"
                         >
                             <Toggle
                                 on={settings.push_enabled}
@@ -595,17 +617,18 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                             <p className="text-[11px] text-amber-500 leading-relaxed">{pushNote}</p>
                         )}
 
-                        {settings.reminders_enabled && (
-                            <Row
-                                title="WhatsApp reminders"
-                                subtitle="Legacy channel — needs a linked phone number"
-                            >
-                                <Toggle
-                                    on={settings.reminders_channel.includes('whatsapp')}
-                                    onChange={() => toggleReminderChannel('whatsapp')}
-                                />
-                            </Row>
-                        )}
+                        <SettingsDivider />
+
+                        {/* Reminders */}
+                        <Row
+                            title="Reminders"
+                            subtitle="Resurface saved items so you actually revisit them"
+                        >
+                            <Toggle
+                                on={settings.reminders_enabled}
+                                onChange={() => setSettings((p) => ({ ...p, reminders_enabled: !p.reminders_enabled }))}
+                            />
+                        </Row>
 
                         {settings.reminders_enabled && (() => {
                             // Two front-and-center choices (M14): "Smart (spaced)" is
@@ -647,13 +670,27 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                             </div>
                             );
                         })()}
-                    </Section>
 
-                    {/* Curated Digest */}
-                    <Section icon={<Newspaper className="w-4 h-4" />} title="Curated digest">
+                        {/* WhatsApp is a legacy extra channel for reminders (needs a
+                            linked phone). Push is handled by the shared toggle above. */}
+                        {settings.reminders_enabled && (
+                            <Row
+                                title="Also send to WhatsApp"
+                                subtitle="Legacy channel — needs a linked phone number"
+                            >
+                                <Toggle
+                                    on={settings.reminders_channel.includes('whatsapp')}
+                                    onChange={() => toggleReminderChannel('whatsapp')}
+                                />
+                            </Row>
+                        )}
+
+                        <SettingsDivider />
+
+                        {/* Curated digest */}
                         <Row
-                            title="Send me a curated set of cards"
-                            subtitle="A hand-picked batch of your saves, delivered on a schedule"
+                            title="Curated digest"
+                            subtitle="A hand-picked batch of your saves, on a schedule"
                         >
                             <Toggle
                                 on={settings.digest_enabled}
@@ -954,8 +991,10 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                                     />
                                 </div>
                                 <div className="p-4">
-                                    <Row title="Delivery time" subtitle={settings.digest_frequency === 'weekly' ? 'Day & hour (your local time)' : 'Hour (your local time)'}>
+                                    <Row title="Delivery time" subtitle={settings.digest_frequency === 'weekly' ? 'Day & time (your local time)' : 'Time (your local time)'}>
                                         <div className="flex items-center gap-2">
+                                            {/* Day-of-week is a recurring selector, not a
+                                                calendar date — stays a Dropdown. */}
                                             {settings.digest_frequency === 'weekly' && (
                                                 <Dropdown
                                                     ariaLabel="Digest day"
@@ -965,12 +1004,14 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                                                     options={DAYS.map((d, i) => ({ value: String(i), label: d }))}
                                                 />
                                             )}
-                                            <Dropdown
-                                                ariaLabel="Digest hour"
-                                                align="right"
-                                                value={String(settings.digest_hour)}
-                                                onChange={(v) => setSettings((p) => ({ ...p, digest_hour: Number(v) }))}
-                                                options={HOUR_OPTIONS}
+                                            {/* Native time input → the iOS wheel picker in the
+                                                Capacitor WKWebView, the OS time picker on desktop
+                                                web. Minute-precise (e.g. 16:24); value is always
+                                                24h "HH:MM" regardless of the locale display. */}
+                                            <TimeInput
+                                                hour={settings.digest_hour}
+                                                minute={settings.digest_minute}
+                                                onChange={(hour, minute) => setSettings((p) => ({ ...p, digest_hour: hour, digest_minute: minute }))}
                                             />
                                         </div>
                                     </Row>
@@ -984,16 +1025,15 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                             <div className="rounded-2xl border border-border-subtle divide-y divide-border-subtle">
                                 <div className="p-4 space-y-2.5">
                                     <div className="text-sm font-semibold text-text">Where to send it</div>
+                                    {/* Push isn't a chip here — it's the shared
+                                        "Push notifications" toggle on the main screen,
+                                        so it isn't declared twice. These are the
+                                        extra opt-in channels on top of push + in-app. */}
                                     <p className="text-[12px] text-text-muted leading-relaxed">
-                                        Every digest also lands in the in-app Digest section automatically.
+                                        Every digest lands in the in-app Digest section, and as a push
+                                        notification when notifications are on. Add extra channels below.
                                     </p>
                                     <div className="flex gap-2">
-                                        <ChannelChip
-                                            active={settings.digest_channels.includes('push')}
-                                            onClick={() => toggleChannel('push')}
-                                            icon={<Bell className="w-4 h-4" />}
-                                            label="Push"
-                                        />
                                         <ChannelChip
                                             active={settings.digest_channels.includes('whatsapp')}
                                             onClick={() => toggleChannel('whatsapp')}
@@ -1107,6 +1147,11 @@ function Section({ icon, title, children }: { icon: ReactNode; title: string; ch
     );
 }
 
+/** Full-bleed divider between logical blocks inside a padded <Section>. */
+function SettingsDivider() {
+    return <div className="-mx-4 border-t border-border-subtle" />;
+}
+
 function GroupLabel({ icon, title, action }: { icon: ReactNode; title: string; action?: ReactNode }) {
     return (
         <div className="flex items-center justify-between px-0.5">
@@ -1187,6 +1232,32 @@ function PolicyLinkButton({ label, path }: { label: string; path: string }) {
             {label}
             <ExternalLink className="w-3.5 h-3.5" />
         </button>
+    );
+}
+
+/**
+ * Native time picker for the digest delivery time. `<input type="time">` renders
+ * the iOS wheel picker inside the Capacitor WKWebView and the OS time picker on
+ * desktop web — the low-effort cross-platform native path. The element's value is
+ * always 24-hour "HH:MM" (the browser localizes the *display* to 12/24h); step=60
+ * keeps it minute-granular with no seconds field.
+ */
+function TimeInput({ hour, minute, onChange }: { hour: number; minute: number; onChange: (hour: number, minute: number) => void }) {
+    const value = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    return (
+        <input
+            type="time"
+            aria-label="Digest delivery time"
+            value={value}
+            step={60}
+            onChange={(e) => {
+                // A cleared field yields "" — ignore it and keep the last value.
+                const [h, m] = e.target.value.split(':');
+                if (h === undefined || m === undefined || e.target.value === '') return;
+                onChange(Number(h), Number(m));
+            }}
+            className="h-9 rounded-full px-3 text-[13px] font-semibold bg-card border border-border-subtle text-text hover:border-text-muted/40 focus:outline-none focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/40 transition-colors cursor-pointer [color-scheme:inherit]"
+        />
     );
 }
 
