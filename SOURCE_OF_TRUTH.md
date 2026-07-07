@@ -589,6 +589,28 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-07 — Share Extension: reliable "Open Machina" + continuous progress
+  into the app (`bd824d3`, merge `88466f6`; TestFlight run #53 → build 1053).**
+  Two native+web fixes to the iOS share hand-off. (A) **Open Machina button:**
+  `ShareViewController.openMainApp()` now launches via `NSExtensionContext.open()`
+  first (the forward-compatible API that still works from the share sheet on
+  modern iOS) and only falls back to the legacy walk-the-responder-chain-to-
+  `openURL:` hack if the system declines — the hack had become an unreliable
+  no-op, which is why the button appeared dead. The extension request now
+  completes AFTER the switch attempt so the context isn't torn down mid-open.
+  (B) **Progress parity:** the extension writes the EXACT HUD percentage at
+  hand-off (`pendingShareProgress` in App Group `group.com.morhogeg.machina`;
+  `ShareConfigPlugin.consumePendingShare` reads+clears it and returns `progress`),
+  and `useSharedCaptureBanner` anchors its optimistic ramp to that % (inverts the
+  ease-out to find the ramp origin) so the in-app banner resumes from the same
+  value + phase label instead of snapping back to ~6%. The give-up timer moved to
+  a real wall-clock (`openedAt`) so a high hand-off % can't trip it early; older
+  extension builds with no % fall back to the previous age offset. **⚠️ Deferred
+  owner step:** native share flow can't be verified off-device — on build 1053,
+  share a link/image into Machina, tap **Open Machina**, and confirm (1) the app
+  actually foregrounds, and (2) the in-app banner picks up at roughly the % the
+  share sheet showed (no jump back to zero). If `NSExtensionContext.open` still
+  declines on your iOS, the fallback keeps prior behavior (no regression).
 - **2026-07-07 — Settings redesign follow-ups + Digest/Collections swipe-back
   (`bcd4945`, merge `952162a`; TestFlight run #52 → build 1052, UI-only).**
   Round-two polish on the new Settings (`SettingsModal.tsx`) plus two page-level
@@ -612,10 +634,8 @@ exact-match, capped.
   Collections pages now honor the iOS left-edge `useEdgeSwipeBack` (pops to
   `lastLayout.current`), gated on a new `isMobileView` matchMedia flag in Feed.
   Typecheck + `next build` clean (same env-only `/_not-found` prerender error).
-  **↩ In progress this session (not yet shipped):** the iOS **Share Extension**
-  "Open Machina" button should actually launch the app, and the extension's
-  progress/status should mirror the in-app AnalyzingBanner — under investigation,
-  native `web/ios` work.
+  **↩ Done (shipped as build 1053 — see the newest entry above):** the iOS
+  **Share Extension** "Open Machina" launch + progress-parity work.
 - **2026-07-07 — Settings redesigned as a flat iOS grouped-list; Reminders +
   Digest merged into one drill-in screen (`0a8e521`, merge `01b9be6`; TestFlight
   run #51 → build 1051, UI-only).** Full presentation + IA rebuild of
