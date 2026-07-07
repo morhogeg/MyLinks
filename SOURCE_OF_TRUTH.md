@@ -589,6 +589,18 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-07 — Honest "preview only" note for truncated Facebook links (commit
+  `d64183f`).** Follow-up to the FB extraction work below: for text posts FB serves
+  only a truncated ~200-char `og:description` (ends in "..."), so those cards were
+  thin with no explanation. `_scrape_facebook_url` now returns a `truncated` flag
+  (True when the chosen caption is the og:description preview ending in "..."; False
+  for reels, which carry the full og:title caption — verified on both real URLs).
+  `_analyze_scraped` (the shared choke-point for `analyze_link` +
+  `process_link_background`) appends a language-aware (he/en) blockquote note to
+  `detailedSummary` telling the user it's a preview and to save a screenshot for the
+  full summary. Trailing blockquote, so it never breaks the "start with ## Key Points"
+  rule. Deployed both functions. Only FB sets `truncated` today; the note wording is
+  source-agnostic so it stays correct if other scrapers adopt the flag.
 - **2026-07-07 — Facebook caption extraction: og:title fix + generalized across
   URL shapes (commits `b389b7d`, `3a4c6f7`).** Facebook links summarized generically
   because `_scrape_facebook_url` fed the AI only `og:description` — which FB
