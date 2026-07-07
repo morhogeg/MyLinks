@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, Children } from 'react';
 import type { ReactNode } from 'react';
 import { User, DigestMode, DigestChannel, ReminderChannel } from '@/lib/types';
-import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, Palette, BrainCircuit, Mail, Send, Shuffle, Tag, Inbox, Star, History, Newspaper, ChevronLeft, ChevronRight, Compass, LogOut, UserCircle, CalendarClock, Search, ShieldCheck, ExternalLink, Network } from 'lucide-react';
+import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, BrainCircuit, Mail, Shuffle, Tag, Inbox, Star, History, ChevronLeft, ChevronRight, Compass, LogOut, Search, ShieldCheck, ExternalLink, Network, Clock, Info } from 'lucide-react';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
 import { registerPush, unregisterPush } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
@@ -19,7 +19,6 @@ import ProfileAvatar from './ProfileAvatar';
 import ConfirmDialog from './ConfirmDialog';
 import { useToast } from './Toast';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
-import Dropdown from './Dropdown';
 import { Trash2 } from 'lucide-react';
 
 interface SettingsModalProps {
@@ -32,31 +31,48 @@ interface SettingsModalProps {
 
 type Frequency = User['settings']['reminder_frequency'];
 
+// One home for "how Machina brings your saves back": the main list plus the
+// drill-in sub-screens. Navigation is a simple stack (push/pop) so Back always
+// returns to wherever you came from and the edge-swipe pops one level.
+type View = 'main' | 'account' | 'resurfacing' | 'cadence' | 'style' | 'schedule' | 'cards' | 'delivery';
+
+const VIEW_TITLE: Record<View, string> = {
+    main: 'Settings',
+    account: 'Account',
+    resurfacing: 'Reminders & Digest',
+    cadence: 'Reminder cadence',
+    style: 'Digest style',
+    schedule: 'Schedule',
+    cards: 'Cards per digest',
+    delivery: 'Delivery',
+};
+
 const FREQUENCY_NOTE: Record<string, string> = {
     smart: 'Spaced repetition (1 day → 1 week → 1 month) for long-term retention.',
     daily: 'One reminder per day for items with an active reminder.',
     weekly: 'A weekly nudge to revisit what you saved.',
 };
 
-// The three primary modes cover the common cases; the rest live behind an
-// "Advanced" disclosure so the picker isn't six equal-weight choices (M14).
-// The backend still curates every mode — this is presentation only.
-const DIGEST_MODES: { value: DigestMode; label: string; icon: ReactNode; note: string; advanced?: boolean }[] = [
+const CADENCE_LABEL: Record<string, string> = { smart: 'Smart', daily: 'Daily', weekly: 'Weekly' };
+
+// Every mode is curated server-side; this is presentation only.
+const DIGEST_MODES: { value: DigestMode; label: string; icon: ReactNode; note: string }[] = [
     { value: 'smart', label: 'Smart mix', icon: <Sparkles className="w-[18px] h-[18px]" />, note: 'A balanced blend of your backlog and older gems worth a second look.' },
     { value: 'synthesis', label: 'Weekly synthesis', icon: <BrainCircuit className="w-[18px] h-[18px]" />, note: 'A short "what you learned" recap that ties your week\'s saves together — themes, a standout, and an open question.' },
     { value: 'unread', label: 'Backlog', icon: <Inbox className="w-[18px] h-[18px]" />, note: 'Chip away at what you saved but never read (oldest first).' },
     { value: 'rediscover', label: 'Rediscover', icon: <History className="w-[18px] h-[18px]" />, note: 'Resurface older saves you haven\'t opened in a while.' },
-    { value: 'random', label: 'Surprise me', icon: <Shuffle className="w-[18px] h-[18px]" />, note: 'A random handful from across your whole library.', advanced: true },
-    { value: 'topic', label: 'By topic', icon: <Tag className="w-[18px] h-[18px]" />, note: 'Only cards from a category or tag you choose.', advanced: true },
-    { value: 'favorites', label: 'Favorites', icon: <Star className="w-[18px] h-[18px]" />, note: 'Bring your starred cards back for an encore.', advanced: true },
+    { value: 'random', label: 'Surprise me', icon: <Shuffle className="w-[18px] h-[18px]" />, note: 'A random handful from across your whole library.' },
+    { value: 'topic', label: 'By topic', icon: <Tag className="w-[18px] h-[18px]" />, note: 'Only cards from a category or tag you choose.' },
+    { value: 'favorites', label: 'Favorites', icon: <Star className="w-[18px] h-[18px]" />, note: 'Bring your starred cards back for an encore.' },
 ];
 
-const PRIMARY_DIGEST_MODES = DIGEST_MODES.filter((m) => !m.advanced);
-const ADVANCED_DIGEST_MODES = DIGEST_MODES.filter((m) => m.advanced);
-const ADVANCED_MODE_VALUES = new Set<DigestMode>(ADVANCED_DIGEST_MODES.map((m) => m.value));
-
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const COUNT_OPTIONS = ['3', '5', '7', '10'].map((c) => ({ value: c, label: `${c} cards` }));
+const COUNT_OPTIONS = [3, 5, 7, 10];
+
+// Wheel-picker columns (Schedule). Hour index 0 = "12" (12 AM / 12 PM).
+const HOURS12 = Array.from({ length: 12 }, (_, i) => (i === 0 ? '12' : String(i)));
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+const AMPM = ['AM', 'PM'];
 
 // Mirrors DEFAULT_USER_SETTINGS in functions/link_service.py — keep in sync.
 const DEFAULT_SETTINGS: User['settings'] = {
@@ -104,7 +120,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
 
     // Which provider the user signed in with — read from Firebase Auth's
     // providerData so the status line can say "Signed in with Apple/Google".
-    // Recomputed when the sheet opens (the current user is stable by then).
     const providerLabel = useMemo(() => {
         const ids = auth.currentUser?.providerData.map((p) => p.providerId) ?? [];
         if (ids.includes('apple.com')) return 'Signed in with Apple';
@@ -119,8 +134,12 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
     // must NOT let the user Save them over their real config — so Save is disabled
     // and an inline notice offers a retry until a load succeeds.
     const [loadError, setLoadError] = useState(false);
-    // 'main' = the settings list; 'digest' = the curation sub-screen.
-    const [view, setView] = useState<'main' | 'digest'>('main');
+
+    // Navigation stack; the last entry is the visible screen.
+    const [stack, setStack] = useState<View[]>(['main']);
+    const view = stack[stack.length - 1];
+    const go = (v: View) => setStack((s) => [...s, v]);
+    const back = () => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s));
 
     const [email, setEmail] = useState('');
     // Topic options, split by origin and de-duped case-insensitively (the
@@ -128,9 +147,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
     const [categoryTopics, setCategoryTopics] = useState<string[]>([]);
     const [tagTopics, setTagTopics] = useState<string[]>([]);
     const [topicQuery, setTopicQuery] = useState('');
-    // Advanced digest modes (Surprise me / By topic / Favorites) stay tucked
-    // behind a disclosure until the user asks for them — or is already using one.
-    const [showAdvancedModes, setShowAdvancedModes] = useState(false);
 
     // Dirty-tracking (M7): baselines captured when the form loads, so closing
     // with unsaved edits warns instead of silently discarding the user's work.
@@ -171,17 +187,13 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
         }
     };
 
-    // AI-consent timestamp for the "AI & privacy" section. The local record is
-    // kept in sync with the user doc's `aiConsentAt` by AuthProvider, so
-    // reading it here is enough (re-read each open in case it just changed).
+    // AI-consent timestamp for the "Privacy & AI" section.
     const [aiConsentAt, setAiConsentAt] = useState<number | null>(null);
     useEffect(() => {
         if (isOpen) setAiConsentAt(readLocalAiConsent());
     }, [isOpen]);
 
-    // Share-extension bridge diagnostics (native only): live status + manual
-    // retry. Exists because this bridge has silently failed more than once —
-    // now the failure and its reason are one Settings glance away.
+    // Share-extension bridge diagnostics (native only): live status + manual retry.
     const [bridgeStatus, setBridgeStatus] = useState<ShareBridgeStatus>({ state: 'n/a' });
     const [bridgeFixing, setBridgeFixing] = useState(false);
     useEffect(() => {
@@ -199,8 +211,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
     };
 
     // "Rebuild connections" — backfills the knowledge graph so older cards (saved
-    // before embeddings existed) get their "See also" relations. Runs a page at
-    // a time via the callable, so a big library can't time out.
+    // before embeddings existed) get their "See also" relations.
     const [rebuilding, setRebuilding] = useState(false);
     const [rebuildLabel, setRebuildLabel] = useState<string | null>(null);
     const handleRebuild = async () => {
@@ -234,9 +245,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
         return () => mq.removeEventListener('change', onChange);
     }, []);
 
-    // Lock the page behind Settings while it's open. Settings is a fixed
-    // full-screen overlay, so without this the underlying feed keeps its own
-    // scrollbar — you'd see two scrollbars and the page could scroll behind.
+    // Lock the page behind Settings while it's open.
     useEffect(() => {
         if (!isOpen) return;
         const prev = document.body.style.overflow;
@@ -244,27 +253,20 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
         return () => { document.body.style.overflow = prev; };
     }, [isOpen]);
 
-    // Swipe in from the left edge to leave Settings — the digest sub-screen pops
-    // back to the main list first, then the page closes.
+    // Swipe in from the left edge to leave: pop one screen, or close from the root.
     useEdgeSwipeBack(() => {
-        if (view === 'digest') setView('main');
+        if (stack.length > 1) back();
         else handleClose();
     }, isMobile && isOpen);
 
     useEffect(() => {
         if (isOpen && uid) {
-            setView('main');
+            setStack(['main']);
             setTopicQuery('');
             loadSettings();
             loadDigestExtras();
         }
     }, [isOpen, uid]);
-
-    // Keep the advanced disclosure open whenever an advanced mode is selected,
-    // so the current choice is never hidden behind a collapsed section.
-    useEffect(() => {
-        if (ADVANCED_MODE_VALUES.has(settings.digest_mode)) setShowAdvancedModes(true);
-    }, [settings.digest_mode]);
 
     const loadDigestExtras = async () => {
         try {
@@ -332,8 +334,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                 }
                 : DEFAULT_SETTINGS;
             // Push is one shared control now — reconcile both channel arrays to the
-            // single push_enabled flag so the toggle and delivery never disagree
-            // (e.g. an old account with push on for reminders but off for digest).
+            // single push_enabled flag so the toggle and delivery never disagree.
             loaded = {
                 ...loaded,
                 reminders_channel: withPush(loaded.reminders_channel, loaded.push_enabled),
@@ -344,8 +345,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
             setSettingsBaseline(JSON.stringify(loaded));
         } catch (error) {
             // A failed load must NOT silently present defaults that a subsequent
-            // Save would then write over the user's real config. Flag the error,
-            // surface it inline, and keep Save disabled until a load succeeds.
+            // Save would then write over the user's real config.
             console.error('Failed to load settings:', error);
             setLoadError(true);
         } finally {
@@ -392,8 +392,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
 
     // Notifications toggle. Enabling MUST run inside this click handler — iOS
     // shows the OS permission dialog only from a user gesture (and only once).
-    // registerPush() is a no-op that resolves false on the web, where the
-    // setting still saves (it applies to the user's iOS devices).
     const [pushBusy, setPushBusy] = useState(false);
     const [pushNote, setPushNote] = useState<string | null>(null);
 
@@ -459,18 +457,13 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
         });
     };
 
-    // One-line summary of the current digest config (shown on the main screen).
-    const digestSummary = (() => {
-        const mode = DIGEST_MODES.find((m) => m.value === settings.digest_mode)?.label ?? 'Smart mix';
-        const time = formatTime(settings.digest_hour, settings.digest_minute);
-        const when = settings.digest_frequency === 'weekly'
-            ? `${DAYS[settings.digest_day]} ${time}`
-            : `Daily ${time}`;
-        const where = settings.digest_channels
-            .map((c) => (c === 'whatsapp' ? 'WhatsApp' : c === 'email' ? 'Email' : 'Push'))
-            .join(' & ') || 'in-app only';
-        return `${mode} · ${settings.digest_count} cards · ${when} · ${where}`;
-    })();
+    // ---- value-row summaries (shown on parent screens) ----
+    const modeLabel = DIGEST_MODES.find((m) => m.value === settings.digest_mode)?.label ?? 'Smart mix';
+    const scheduleValue = settings.digest_frequency === 'weekly'
+        ? `${DAYS[settings.digest_day]} · ${formatTime(settings.digest_hour, settings.digest_minute)}`
+        : `Daily · ${formatTime(settings.digest_hour, settings.digest_minute)}`;
+    const deliveryValue = ['In-app', settings.push_enabled && 'Push', settings.digest_channels.includes('whatsapp') && 'WhatsApp', settings.digest_channels.includes('email') && 'Email']
+        .filter(Boolean).join(' · ');
 
     // Derived topic-picker state (only meaningful in topic mode).
     const totalTopics = categoryTopics.length + tagTopics.length;
@@ -482,597 +475,145 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
 
     if (!isOpen) return null;
 
+    const showBack = stack.length > 1;
+    const backLabel = showBack ? (VIEW_TITLE[stack[stack.length - 2]] || 'Back') : '';
+
     return (
         <div className="fixed inset-0 z-50">
-            {/* Full-screen settings page — fills the viewport on every device; the
-                content sits in a centered, readable column (max-w-2xl). */}
             <div
                 role="dialog"
                 aria-modal="true"
                 aria-label="Settings"
                 className={`relative w-full h-full bg-background overflow-hidden flex flex-col ${isMobile ? 'animate-ios-push' : 'animate-fade-in'}`}
             >
-                {/* Header */}
+                {/* Header — main: big title inline with the close button; sub-screens:
+                    back + close, with the large title in the scrolling body. */}
                 <div
-                    className="relative px-6 py-5 border-b border-border-subtle"
-                    style={isMobile ? { paddingTop: 'calc(env(safe-area-inset-top) + 1.25rem)' } : undefined}
+                    className="relative flex items-center gap-2.5 px-[18px] pt-4 pb-1 min-h-[44px]"
+                    style={isMobile ? { paddingTop: 'calc(env(safe-area-inset-top) + 1rem)' } : undefined}
                 >
-                    <div className="absolute inset-x-0 bottom-0 h-px bg-[image:var(--accent-gradient)] opacity-30" />
-                    <div className="w-full max-w-2xl mx-auto flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        {view === 'digest' ? (
-                            <button
-                                onClick={() => setView('main')}
-                                className="w-9 h-9 rounded-2xl bg-card-hover border border-border-subtle flex items-center justify-center text-text-secondary hover:text-text transition-colors cursor-pointer"
-                                aria-label="Back to settings"
-                            >
-                                <ChevronLeft className="w-5 h-5" />
-                            </button>
-                        ) : (
-                            <div className="w-9 h-9 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-purple-500/25 ring-1 ring-white/15">
-                                <BrainCircuit className="w-5 h-5 text-white" />
-                            </div>
-                        )}
-                        <div className="leading-tight">
-                            <h2 className="text-lg font-bold text-text">{view === 'digest' ? 'Curated digest' : 'Settings'}</h2>
-                            <p className="text-[11px] text-text-muted">{view === 'digest' ? 'Choose what, when & where' : 'Tune your Machina'}</p>
-                        </div>
-                    </div>
+                    {showBack ? (
+                        <button
+                            onClick={back}
+                            className="inline-flex items-center gap-0.5 -ml-1.5 pr-2 py-1 rounded-2xl text-[16px] font-medium text-accent hover:opacity-80 transition-opacity cursor-pointer"
+                            aria-label="Back"
+                        >
+                            <ChevronLeft className="w-[22px] h-[22px]" strokeWidth={2.4} />
+                            <span className="truncate max-w-[9rem]">{backLabel.length > 12 ? 'Back' : backLabel}</span>
+                        </button>
+                    ) : (
+                        <h1 className="text-[30px] font-extrabold tracking-[-0.024em] text-text leading-tight">Settings</h1>
+                    )}
+                    <div className="flex-1" />
                     <button
                         onClick={handleClose}
-                        className="h-9 w-9 rounded-full flex items-center justify-center text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
+                        className="h-8 w-8 flex items-center justify-center text-text-muted hover:text-text transition-colors cursor-pointer"
                         aria-label="Close settings"
                     >
-                        <X className="w-5 h-5" />
+                        <X className="w-[17px] h-[17px]" strokeWidth={2.3} />
                     </button>
-                    </div>
                 </div>
 
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto">
-                  <div className="w-full max-w-2xl mx-auto px-6 py-6 space-y-7">
-                  {view === 'main' && (
-                    <>
-                    {/* Appearance */}
-                    <Section icon={<Palette className="w-4 h-4" />} title="Appearance">
-                        <Row title="Theme" subtitle="Applies instantly across the app">
-                            <Segmented
-                                value={theme}
-                                onChange={(v) => setTheme(v as typeof theme)}
-                                iconOnly
-                                options={[
-                                    { value: 'light', label: 'Light', icon: <Sun className="w-[18px] h-[18px]" /> },
-                                    { value: 'system', label: 'Auto', icon: <Monitor className="w-[18px] h-[18px]" /> },
-                                    { value: 'dark', label: 'Dark', icon: <Moon className="w-[18px] h-[18px]" /> },
-                                ]}
+                    <div className="w-full max-w-2xl mx-auto px-[18px] pt-1.5 pb-8">
+                        {view === 'main' && (
+                            <MainView
+                                authUid={authUid}
+                                accountEmail={accountEmail}
+                                displayName={displayName}
+                                photoURL={photoURL}
+                                providerLabel={providerLabel}
+                                settings={settings}
+                                theme={theme}
+                                setTheme={setTheme}
+                                togglePush={togglePush}
+                                pushNote={pushNote}
+                                aiConsentAt={aiConsentAt}
+                                bridgeStatus={bridgeStatus}
+                                bridgeFixing={bridgeFixing}
+                                handleBridgeFix={handleBridgeFix}
+                                rebuilding={rebuilding}
+                                rebuildLabel={rebuildLabel}
+                                handleRebuild={handleRebuild}
+                                onReplayTour={onReplayTour}
+                                go={go}
                             />
-                        </Row>
-                    </Section>
+                        )}
 
-                    {/* Account — only on the web, where Google Sign-In is live
-                        (native has no signed-in user). Gated on being signed in,
-                        not on email, so it shows even if the token has no email. */}
-                    {authUid && (
-                    <Section icon={<UserCircle className="w-4 h-4" />} title="Account">
-                        <div className="p-3.5 rounded-2xl bg-card-hover border border-border-subtle">
-                            <div className="flex items-center gap-3.5">
-                                <ProfileAvatar email={accountEmail} name={displayName} photoURL={photoURL} size={48} />
-                                <div className="min-w-0 flex-1">
-                                    <div className="text-[14px] font-semibold text-text truncate">
-                                        {displayName || accountEmail || 'Signed in'}
-                                    </div>
-                                    {displayName && accountEmail && (
-                                        <div className="text-[12px] text-text-muted truncate">{accountEmail}</div>
-                                    )}
-                                    <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-emerald-500">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                        {providerLabel}
-                                    </div>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => { onClose(); signOut(); }}
-                                className="mt-3 w-full inline-flex items-center justify-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold border border-border-subtle text-text hover:bg-surface transition-colors"
-                            >
-                                <LogOut className="w-4 h-4" />
-                                Sign out
-                            </button>
-                        </div>
-                        {/* Account deletion — required in-app when account creation
-                            is offered (App Store guideline 5.1.1(v)). */}
-                        <button
-                            onClick={() => { setDeleteError(null); setShowDeleteConfirm(true); }}
-                            className="mt-2.5 w-full inline-flex items-center justify-center gap-2 rounded-2xl px-3.5 py-3 text-[13px] font-semibold border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                            Delete account
-                        </button>
-                        <p className="mt-1.5 text-[11px] text-text-muted leading-relaxed">
-                            Permanently deletes your account and all saved links, collections, and chats. This can’t be undone.
-                        </p>
-                        {deleteError && <p className="mt-1.5 text-[12px] text-red-500">{deleteError}</p>}
-                    </Section>
-                    )}
-
-                    {/* Notifications — one home for how Machina reaches out. Push is
-                        the single shared delivery channel; Reminders and Curated
-                        digest are the two things it delivers, each independently
-                        switchable. This replaces the old split Reminders / Curated
-                        digest sections that both re-declared the push toggle. */}
-                    <Section icon={<Bell className="w-4 h-4" />} title="Notifications">
-                        {/* Shared push channel — enabling fires the OS permission
-                            request (must run in this user gesture). Governs both
-                            reminders and digests; withPush() keeps both channel
-                            arrays in lockstep with this one flag. */}
-                        <Row
-                            title="Push notifications"
-                            subtitle="Deliver reminders and digests to your iPhone"
-                        >
-                            <Toggle
-                                on={settings.push_enabled}
-                                onChange={() => { void togglePush(); }}
+                        {view === 'account' && (
+                            <AccountView
+                                accountEmail={accountEmail}
+                                displayName={displayName}
+                                photoURL={photoURL}
+                                providerLabel={providerLabel}
+                                signOut={signOut}
+                                onClose={onClose}
+                                onDelete={() => { setDeleteError(null); setShowDeleteConfirm(true); }}
+                                deleteError={deleteError}
                             />
-                        </Row>
-                        {pushNote && (
-                            <p className="text-[11px] text-amber-500 leading-relaxed">{pushNote}</p>
                         )}
 
-                        <SettingsDivider />
-
-                        {/* Reminders */}
-                        <Row
-                            title="Reminders"
-                            subtitle="Resurface saved items so you actually revisit them"
-                        >
-                            <Toggle
-                                on={settings.reminders_enabled}
-                                onChange={() => setSettings((p) => ({ ...p, reminders_enabled: !p.reminders_enabled }))}
+                        {view === 'resurfacing' && (
+                            <ResurfacingView
+                                settings={settings}
+                                setSettings={setSettings}
+                                toggleReminderChannel={toggleReminderChannel}
+                                cadenceLabel={CADENCE_LABEL[settings.reminder_frequency] ?? 'Smart'}
+                                modeLabel={modeLabel}
+                                scheduleValue={scheduleValue}
+                                deliveryValue={deliveryValue}
+                                go={go}
                             />
-                        </Row>
-
-                        {settings.reminders_enabled && (() => {
-                            // Two front-and-center choices (M14): "Smart (spaced)" is
-                            // the recommended default; "Custom" reveals the fixed
-                            // Daily / Weekly cadences — still reachable, not up front.
-                            const isCustom = settings.reminder_frequency === 'daily' || settings.reminder_frequency === 'weekly';
-                            return (
-                            <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                                <Segmented
-                                    value={isCustom ? 'custom' : 'smart'}
-                                    onChange={(v) => setSettings((p) => ({
-                                        ...p,
-                                        // Entering Custom keeps an existing fixed cadence, else defaults to weekly.
-                                        reminder_frequency: v === 'smart'
-                                            ? 'smart'
-                                            : (p.reminder_frequency === 'daily' || p.reminder_frequency === 'weekly' ? p.reminder_frequency : 'weekly'),
-                                    }))}
-                                    options={[
-                                        { value: 'smart', label: 'Smart (spaced)' },
-                                        { value: 'custom', label: 'Custom' },
-                                    ]}
-                                />
-                                {isCustom && (
-                                    <Segmented
-                                        value={settings.reminder_frequency as Frequency}
-                                        onChange={(v) => setSettings((p) => ({ ...p, reminder_frequency: v as Frequency }))}
-                                        options={[
-                                            { value: 'daily', label: 'Daily' },
-                                            { value: 'weekly', label: 'Weekly' },
-                                        ]}
-                                    />
-                                )}
-                                <div className="flex gap-2 p-3 rounded-xl bg-accent/5 border border-accent/10">
-                                    <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-                                    <p className="text-[12px] text-text-secondary leading-relaxed">
-                                        {FREQUENCY_NOTE[settings.reminder_frequency || 'smart']}
-                                    </p>
-                                </div>
-                            </div>
-                            );
-                        })()}
-
-                        {/* WhatsApp is a legacy extra channel for reminders (needs a
-                            linked phone). Push is handled by the shared toggle above. */}
-                        {settings.reminders_enabled && (
-                            <Row
-                                title="Also send to WhatsApp"
-                                subtitle="Legacy channel — needs a linked phone number"
-                            >
-                                <Toggle
-                                    on={settings.reminders_channel.includes('whatsapp')}
-                                    onChange={() => toggleReminderChannel('whatsapp')}
-                                />
-                            </Row>
                         )}
 
-                        <SettingsDivider />
-
-                        {/* Curated digest */}
-                        <Row
-                            title="Curated digest"
-                            subtitle="A hand-picked batch of your saves, on a schedule"
-                        >
-                            <Toggle
-                                on={settings.digest_enabled}
-                                onChange={() => setSettings((p) => ({ ...p, digest_enabled: !p.digest_enabled }))}
+                        {view === 'cadence' && (
+                            <PickerView
+                                title="Reminder cadence"
+                                options={(['smart', 'daily', 'weekly'] as Frequency[]).map((f) => ({ value: f as string, label: f === 'smart' ? 'Smart (spaced)' : CADENCE_LABEL[f] }))}
+                                value={settings.reminder_frequency}
+                                onSelect={(v) => { setSettings((p) => ({ ...p, reminder_frequency: v as Frequency })); back(); }}
+                                footnote={FREQUENCY_NOTE[settings.reminder_frequency]}
                             />
-                        </Row>
-
-                        {settings.digest_enabled && (
-                            <button
-                                onClick={() => setView('digest')}
-                                className="w-full flex items-center justify-between gap-3 p-3 rounded-xl bg-card-hover border border-border-subtle hover:border-accent/40 transition-colors cursor-pointer text-left animate-in fade-in slide-in-from-top-1 duration-200"
-                            >
-                                <div className="min-w-0">
-                                    <div className="text-[13px] font-semibold text-text">Customize digest</div>
-                                    <div className="text-[12px] text-text-muted truncate mt-0.5">{digestSummary}</div>
-                                </div>
-                                <ChevronRight className="w-5 h-5 text-text-muted shrink-0" />
-                            </button>
-                        )}
-                    </Section>
-
-                    {/* Capture */}
-                    <Section icon={<Share2 className="w-4 h-4" />} title="Capture links">
-                        <Row
-                            icon={<MessageCircle className="w-5 h-5 text-green-500" />}
-                            title="WhatsApp"
-                            subtitle="Send any link to the bot — it's saved, summarized, and tagged automatically."
-                        />
-                        {bridgeStatus.state !== 'n/a' && (
-                            <Row
-                                icon={<Share2 className={`w-5 h-5 ${bridgeStatus.state === 'ok' ? 'text-green-500' : bridgeStatus.state === 'error' ? 'text-red-500' : 'text-text-muted'}`} />}
-                                title="Share extension"
-                                subtitle={
-                                    bridgeStatus.state === 'ok'
-                                        ? 'Connected — sharing from other apps saves to your Machina.'
-                                        : bridgeStatus.state === 'error'
-                                            ? `Not connected — ${bridgeStatus.detail || 'the last sync failed'}. Tap Fix to retry.`
-                                            : 'Connecting…'
-                                }
-                            >
-                                {bridgeStatus.state !== 'ok' && (
-                                    <button
-                                        onClick={handleBridgeFix}
-                                        disabled={bridgeFixing}
-                                        className="h-9 px-3.5 rounded-full bg-card-hover border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                    >
-                                        <RefreshCw className={`w-4 h-4 ${bridgeFixing ? 'animate-spin' : ''}`} />
-                                        Fix
-                                    </button>
-                                )}
-                            </Row>
-                        )}
-                    </Section>
-
-                    {/* AI & Privacy — App Review 5.1.1/5.1.2: name the AI
-                        provider, show when the user consented, and link the
-                        policy pages (opened externally under Capacitor). */}
-                    <Section icon={<ShieldCheck className="w-4 h-4" />} title="AI & privacy">
-                        <Row
-                            icon={<Sparkles className="w-5 h-5 text-accent" />}
-                            title="Content analysis is powered by Google Gemini"
-                            subtitle="Content you save (links, page text, images) and questions you ask are sent to Google Gemini for summaries, tags, and answers. Machina does not use your content to train AI models."
-                        />
-                        {aiConsentAt !== null && (
-                            <p className="text-[11px] text-text-muted leading-relaxed">
-                                You agreed to this on{' '}
-                                {new Date(aiConsentAt).toLocaleDateString(undefined, {
-                                    year: 'numeric', month: 'long', day: 'numeric',
-                                })}.
-                            </p>
-                        )}
-                        <div className="flex gap-2">
-                            <PolicyLinkButton label="Privacy Policy" path="/privacy" />
-                            <PolicyLinkButton label="Terms" path="/terms" />
-                        </div>
-                    </Section>
-
-                    {/* Connections — knowledge-graph maintenance */}
-                    <Section icon={<Network className="w-4 h-4" />} title="Connections">
-                        <Row
-                            icon={<Network className="w-5 h-5 text-accent" />}
-                            title="Rebuild connections"
-                            subtitle={rebuildLabel ?? 'Recompute “See also” links across your whole library — useful for cards saved before connections existed.'}
-                        >
-                            <button
-                                onClick={handleRebuild}
-                                disabled={rebuilding}
-                                className="h-9 px-3.5 rounded-full bg-card-hover border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            >
-                                <RefreshCw className={`w-4 h-4 ${rebuilding ? 'animate-spin' : ''}`} />
-                                {rebuilding ? 'Rebuilding…' : 'Rebuild'}
-                            </button>
-                        </Row>
-                    </Section>
-
-                    {/* About */}
-                    <Section icon={<RefreshCw className="w-4 h-4" />} title="About">
-                        {onReplayTour && (
-                            <Row title="Take the tour" subtitle="Replay the guided intro to Machina's features.">
-                                <button
-                                    onClick={onReplayTour}
-                                    className="h-9 px-3.5 rounded-full bg-card-hover border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer"
-                                >
-                                    <Compass className="w-4 h-4" />
-                                    Start
-                                </button>
-                            </Row>
-                        )}
-                        <Row title="Machina AI" subtitle="Capture. Connect. Recall.">
-                            <button
-                                onClick={() => typeof window !== 'undefined' && window.location.reload()}
-                                className="h-9 px-3.5 rounded-full bg-card-hover border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer"
-                            >
-                                <RefreshCw className="w-4 h-4" />
-                                Reload
-                            </button>
-                        </Row>
-                    </Section>
-                    </>
-                  )}
-
-                  {view === 'digest' && (
-                    <div className="space-y-7 animate-in fade-in slide-in-from-right-2 duration-200">
-                        {/* Live preview — what the next digest will look like */}
-                        <div className="relative overflow-hidden rounded-2xl border border-border-subtle p-4">
-                            <div className="absolute inset-0 bg-[image:var(--accent-gradient)] opacity-[0.08]" />
-                            <div className="absolute inset-x-0 top-0 h-px bg-[image:var(--accent-gradient)] opacity-40" />
-                            <div className="relative flex items-start gap-3">
-                                <div className="w-11 h-11 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-purple-500/25 ring-1 ring-white/15 shrink-0">
-                                    <Newspaper className="w-[22px] h-[22px] text-white" />
-                                </div>
-                                <div className="min-w-0">
-                                    <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-accent">Your digest</div>
-                                    <div className="text-[13px] font-semibold text-text leading-relaxed mt-1">{digestSummary}</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* What to send — three primary modes up front, the rest
-                            behind an Advanced disclosure (M14). */}
-                        <div className="space-y-3">
-                            <GroupLabel icon={<Sparkles className="w-4 h-4" />} title="What to send" />
-                            <div className="grid grid-cols-2 gap-2.5">
-                                {PRIMARY_DIGEST_MODES.map((m) => (
-                                    <DigestModeButton
-                                        key={m.value}
-                                        mode={m}
-                                        active={settings.digest_mode === m.value}
-                                        onClick={() => setSettings((p) => ({ ...p, digest_mode: m.value }))}
-                                    />
-                                ))}
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={() => setShowAdvancedModes((v) => !v)}
-                                aria-expanded={showAdvancedModes}
-                                className="w-full flex items-center justify-center gap-1.5 text-[12px] font-semibold text-text-muted hover:text-text transition-colors cursor-pointer py-1"
-                            >
-                                {showAdvancedModes ? 'Hide advanced modes' : 'More ways to curate'}
-                                <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showAdvancedModes ? 'rotate-90' : ''}`} />
-                            </button>
-
-                            {showAdvancedModes && (
-                                <div className="grid grid-cols-2 gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                                    {ADVANCED_DIGEST_MODES.map((m) => (
-                                        <DigestModeButton
-                                            key={m.value}
-                                            mode={m}
-                                            active={settings.digest_mode === m.value}
-                                            onClick={() => setSettings((p) => ({ ...p, digest_mode: m.value }))}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-
-                            <div className="flex gap-2.5 items-start p-3 rounded-xl bg-accent/5 border border-accent/10">
-                                <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-                                <p className="text-[12px] text-text-secondary leading-relaxed">
-                                    {DIGEST_MODES.find((m) => m.value === settings.digest_mode)?.note}
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Topic picker — searchable, grouped by categories & tags */}
-                        {settings.digest_mode === 'topic' && (
-                            <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                                <GroupLabel
-                                    icon={<Tag className="w-4 h-4" />}
-                                    title="Topics"
-                                    action={
-                                        settings.digest_topics.length > 0 ? (
-                                            <button
-                                                onClick={() => setSettings((p) => ({ ...p, digest_topics: [] }))}
-                                                className="text-[11px] font-semibold text-text-muted hover:text-text transition-colors cursor-pointer"
-                                            >
-                                                Clear{' '}<span className="text-accent">{settings.digest_topics.length}</span>
-                                            </button>
-                                        ) : undefined
-                                    }
-                                />
-                                {totalTopics === 0 ? (
-                                    <div className="rounded-2xl border border-dashed border-border-subtle p-4 text-center">
-                                        <p className="text-[12px] text-text-muted">Save some links first to build topics.</p>
-                                    </div>
-                                ) : (
-                                    <div className="rounded-2xl border border-border-subtle bg-card-hover/40 p-4 space-y-4">
-                                        {/* Selected — always visible, removable */}
-                                        {settings.digest_topics.length > 0 && (
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {settings.digest_topics.map((t) => (
-                                                    <button
-                                                        key={t}
-                                                        onClick={() => toggleTopic(t)}
-                                                        className="inline-flex items-center gap-1 pl-2.5 pr-1.5 h-7 rounded-full bg-accent/15 border border-accent/40 text-[12px] font-semibold text-accent hover:bg-accent/25 transition-colors cursor-pointer"
-                                                        aria-label={`Remove ${t}`}
-                                                    >
-                                                        {t}
-                                                        <X className="w-3 h-3" />
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {/* Search — appears once the list is long enough to warrant it */}
-                                        {totalTopics > 8 && (
-                                            <div className="relative">
-                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
-                                                <input
-                                                    type="text"
-                                                    value={topicQuery}
-                                                    onChange={(e) => setTopicQuery(e.target.value)}
-                                                    placeholder="Search topics…"
-                                                    className="w-full h-9 pl-9 pr-8 rounded-xl bg-card border border-border-subtle text-[13px] text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
-                                                />
-                                                {topicQuery && (
-                                                    <button
-                                                        onClick={() => setTopicQuery('')}
-                                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text transition-colors cursor-pointer"
-                                                        aria-label="Clear search"
-                                                    >
-                                                        <X className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {/* Available — grouped, filtered, scrollable */}
-                                        {visibleCategories.length === 0 && visibleTags.length === 0 ? (
-                                            <p className="text-[12px] text-text-muted text-center py-3">No topics match “{topicQuery}”.</p>
-                                        ) : (
-                                            <div className="max-h-[22rem] overflow-y-auto scrollbar-subtle pr-1 space-y-4">
-                                                {visibleCategories.length > 0 && (
-                                                    <TopicGroup label="Categories">
-                                                        {visibleCategories.map((t) => (
-                                                            <TopicPill key={t} label={t} active={isTopicActive(t)} onClick={() => toggleTopic(t)} />
-                                                        ))}
-                                                    </TopicGroup>
-                                                )}
-                                                {visibleTags.length > 0 && (
-                                                    <TopicGroup label="Tags">
-                                                        {visibleTags.map((t) => (
-                                                            <TopicPill key={t} label={t} active={isTopicActive(t)} onClick={() => toggleTopic(t)} />
-                                                        ))}
-                                                    </TopicGroup>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
                         )}
 
-                        {/* Schedule — how many, how often, when */}
-                        <div className="space-y-3">
-                            <GroupLabel icon={<CalendarClock className="w-4 h-4" />} title="Schedule" />
-                            <div className="rounded-2xl border border-border-subtle divide-y divide-border-subtle">
-                                <div className="p-4">
-                                    <Row title="How many" subtitle="Cards per digest">
-                                        <Dropdown
-                                            ariaLabel="Cards per digest"
-                                            align="right"
-                                            value={String(settings.digest_count)}
-                                            onChange={(v) => setSettings((p) => ({ ...p, digest_count: Number(v) }))}
-                                            options={COUNT_OPTIONS}
-                                        />
-                                    </Row>
-                                </div>
-                                <div className="p-4 space-y-2.5">
-                                    <div className="text-sm font-semibold text-text">How often</div>
-                                    <Segmented
-                                        value={settings.digest_frequency}
-                                        onChange={(v) => setSettings((p) => ({ ...p, digest_frequency: v as 'daily' | 'weekly' }))}
-                                        options={[
-                                            { value: 'daily', label: 'Daily' },
-                                            { value: 'weekly', label: 'Weekly' },
-                                        ]}
-                                    />
-                                </div>
-                                <div className="p-4">
-                                    <Row title="Delivery time" subtitle={settings.digest_frequency === 'weekly' ? 'Day & time (your local time)' : 'Time (your local time)'}>
-                                        <div className="flex items-center gap-2">
-                                            {/* Day-of-week is a recurring selector, not a
-                                                calendar date — stays a Dropdown. */}
-                                            {settings.digest_frequency === 'weekly' && (
-                                                <Dropdown
-                                                    ariaLabel="Digest day"
-                                                    align="right"
-                                                    value={String(settings.digest_day)}
-                                                    onChange={(v) => setSettings((p) => ({ ...p, digest_day: Number(v) }))}
-                                                    options={DAYS.map((d, i) => ({ value: String(i), label: d }))}
-                                                />
-                                            )}
-                                            {/* Native time input → the iOS wheel picker in the
-                                                Capacitor WKWebView, the OS time picker on desktop
-                                                web. Minute-precise (e.g. 16:24); value is always
-                                                24h "HH:MM" regardless of the locale display. */}
-                                            <TimeInput
-                                                hour={settings.digest_hour}
-                                                minute={settings.digest_minute}
-                                                onChange={(hour, minute) => setSettings((p) => ({ ...p, digest_hour: hour, digest_minute: minute }))}
-                                            />
-                                        </div>
-                                    </Row>
-                                </div>
-                            </div>
-                        </div>
+                        {view === 'style' && (
+                            <StyleView
+                                settings={settings}
+                                setSettings={setSettings}
+                                back={back}
+                                toggleTopic={toggleTopic}
+                                topicQuery={topicQuery}
+                                setTopicQuery={setTopicQuery}
+                                totalTopics={totalTopics}
+                                visibleCategories={visibleCategories}
+                                visibleTags={visibleTags}
+                                isTopicActive={isTopicActive}
+                            />
+                        )}
 
-                        {/* Delivery — where, email, skip empty */}
-                        <div className="space-y-3">
-                            <GroupLabel icon={<Send className="w-4 h-4" />} title="Delivery" />
-                            <div className="rounded-2xl border border-border-subtle divide-y divide-border-subtle">
-                                <div className="p-4 space-y-2.5">
-                                    <div className="text-sm font-semibold text-text">Where to send it</div>
-                                    {/* Push isn't a chip here — it's the shared
-                                        "Push notifications" toggle on the main screen,
-                                        so it isn't declared twice. These are the
-                                        extra opt-in channels on top of push + in-app. */}
-                                    <p className="text-[12px] text-text-muted leading-relaxed">
-                                        Every digest lands in the in-app Digest section, and as a push
-                                        notification when notifications are on. Add extra channels below.
-                                    </p>
-                                    <div className="flex gap-2">
-                                        <ChannelChip
-                                            active={settings.digest_channels.includes('whatsapp')}
-                                            onClick={() => toggleChannel('whatsapp')}
-                                            icon={<MessageCircle className="w-4 h-4" />}
-                                            label="WhatsApp"
-                                        />
-                                        <ChannelChip
-                                            active={settings.digest_channels.includes('email')}
-                                            onClick={() => toggleChannel('email')}
-                                            icon={<Mail className="w-4 h-4" />}
-                                            label="Email"
-                                        />
-                                    </div>
-                                    {settings.digest_channels.includes('email') && (
-                                        <div className="space-y-1.5 pt-1 animate-in fade-in slide-in-from-top-1 duration-200">
-                                            <label className="text-[12px] font-semibold text-text-secondary">Email address</label>
-                                            <input
-                                                type="email"
-                                                value={email}
-                                                onChange={(e) => setEmail(e.target.value)}
-                                                placeholder="you@example.com"
-                                                className="w-full h-10 px-3 rounded-xl bg-card-hover border border-border-subtle text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="p-4">
-                                    <Row title="Skip when empty" subtitle="Don't send if there's nothing fresh to show">
-                                        <Toggle
-                                            on={settings.digest_skip_empty}
-                                            onChange={() => setSettings((p) => ({ ...p, digest_skip_empty: !p.digest_skip_empty }))}
-                                        />
-                                    </Row>
-                                </div>
-                            </div>
-                        </div>
+                        {view === 'schedule' && (
+                            <ScheduleView settings={settings} setSettings={setSettings} />
+                        )}
+
+                        {view === 'cards' && (
+                            <PickerView
+                                title="Cards per digest"
+                                options={COUNT_OPTIONS.map((c) => ({ value: String(c), label: `${c} cards` }))}
+                                value={String(settings.digest_count)}
+                                onSelect={(v) => { setSettings((p) => ({ ...p, digest_count: Number(v) })); back(); }}
+                            />
+                        )}
+
+                        {view === 'delivery' && (
+                            <DeliveryView
+                                settings={settings}
+                                toggleChannel={toggleChannel}
+                                email={email}
+                                setEmail={setEmail}
+                            />
+                        )}
                     </div>
-                  )}
-                  </div>
                 </div>
 
                 {/* Footer */}
@@ -1080,32 +621,33 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                     className="px-6 py-4 border-t border-border-subtle bg-background"
                     style={isMobile ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' } : undefined}
                 >
-                  <div className="w-full max-w-2xl mx-auto flex items-center justify-end gap-2">
-                    {loadError && (
+                    <div className="w-full max-w-2xl mx-auto flex items-center justify-end gap-2">
+                        {loadError && (
+                            <button
+                                onClick={() => loadSettings()}
+                                className="mr-auto inline-flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                            >
+                                <RefreshCw className="w-4 h-4" />
+                                Couldn&apos;t load settings — retry
+                            </button>
+                        )}
                         <button
-                            onClick={() => loadSettings()}
-                            className="mr-auto inline-flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                            onClick={handleClose}
+                            className="h-10 px-4 rounded-full text-sm font-semibold text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
                         >
-                            <RefreshCw className="w-4 h-4" />
-                            Couldn&apos;t load settings — retry
+                            Cancel
                         </button>
-                    )}
-                    <button
-                        onClick={handleClose}
-                        className="h-10 px-4 rounded-full text-sm font-semibold text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        disabled={isSaving || isLoading || loadError}
-                        className="h-10 px-5 rounded-full text-sm font-semibold bg-accent text-white hover:bg-accent/90 transition-colors disabled:opacity-50 shadow-lg shadow-accent/20 cursor-pointer disabled:cursor-not-allowed"
-                    >
-                        {isSaving ? 'Saving…' : 'Save changes'}
-                    </button>
-                  </div>
+                        <button
+                            onClick={handleSave}
+                            disabled={isSaving || isLoading || loadError}
+                            className="h-10 px-5 rounded-full text-sm font-semibold bg-accent text-white hover:bg-accent/90 transition-colors disabled:opacity-50 shadow-lg shadow-accent/20 cursor-pointer disabled:cursor-not-allowed"
+                        >
+                            {isSaving ? 'Saving…' : 'Save changes'}
+                        </button>
+                    </div>
                 </div>
             </div>
+
             <ConfirmDialog
                 isOpen={showDeleteConfirm}
                 onClose={() => { if (!deleting) setShowDeleteConfirm(false); }}
@@ -1133,54 +675,577 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
     );
 }
 
-/* ---------- small building blocks ---------- */
+/* ============================ SCREENS ============================ */
 
-function Section({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+type Settings = User['settings'];
+type SetSettings = React.Dispatch<React.SetStateAction<Settings>>;
+
+function MainView({
+    authUid, accountEmail, displayName, photoURL, providerLabel, settings, theme, setTheme,
+    togglePush, pushNote, aiConsentAt, bridgeStatus, bridgeFixing, handleBridgeFix,
+    rebuilding, rebuildLabel, handleRebuild, onReplayTour, go,
+}: {
+    authUid: string | null;
+    accountEmail: string | null;
+    displayName: string | null;
+    photoURL: string | null;
+    providerLabel: string;
+    settings: Settings;
+    theme: 'light' | 'dark' | 'system';
+    setTheme: (t: 'light' | 'dark' | 'system') => void;
+    togglePush: () => void;
+    pushNote: string | null;
+    aiConsentAt: number | null;
+    bridgeStatus: ShareBridgeStatus;
+    bridgeFixing: boolean;
+    handleBridgeFix: () => void;
+    rebuilding: boolean;
+    rebuildLabel: string | null;
+    handleRebuild: () => void;
+    onReplayTour?: () => void;
+    go: (v: View) => void;
+}) {
+    const remindersOrDigest = settings.reminders_enabled || settings.digest_enabled;
     return (
-        <section className="space-y-3">
-            <div className="flex items-center gap-2 text-text-muted">
-                {icon}
-                <h3 className="text-[11px] font-bold uppercase tracking-[0.15em]">{title}</h3>
-            </div>
-            <div className="rounded-2xl border border-border-subtle p-4 space-y-4">{children}</div>
-        </section>
+        <>
+            {/* Account (web only — native has no signed-in user) */}
+            {authUid && (
+                <List>
+                    <RowShell onClick={() => go('account')} className="py-3">
+                        <ProfileAvatar email={accountEmail} name={displayName} photoURL={photoURL} size={44} />
+                        <div className="flex-1 min-w-0 py-0.5">
+                            <div className="text-[19px] font-semibold text-text truncate leading-tight">{displayName || accountEmail || 'Signed in'}</div>
+                            <div className="text-[13px] text-text-muted truncate mt-0.5">{providerLabel}{accountEmail ? ` · ${accountEmail}` : ''}</div>
+                        </div>
+                        <Chevron />
+                    </RowShell>
+                </List>
+            )}
+
+            <SectionHeader first={!authUid}>Notifications</SectionHeader>
+            <List>
+                <RowShell tile={<Bell className="w-[17px] h-[17px]" />} tileClass="bg-accent">
+                    <RowText title="Push notifications" />
+                    <Toggle on={settings.push_enabled} onChange={togglePush} />
+                </RowShell>
+                <NavRow tile={<Clock className="w-[17px] h-[17px]" />} tileClass="bg-pink-500" title="Reminders & Digest" value={remindersOrDigest ? 'On' : 'Off'} onClick={() => go('resurfacing')} />
+            </List>
+            {pushNote && <p className="text-[12px] text-amber-500 leading-snug px-2 pt-1.5">{pushNote}</p>}
+
+            <SectionHeader>Appearance</SectionHeader>
+            <List>
+                <RowShell>
+                    <RowText title="Theme" />
+                    <Segmented
+                        value={theme}
+                        onChange={(v) => setTheme(v as typeof theme)}
+                        iconOnly
+                        options={[
+                            { value: 'light', label: 'Light', icon: <Sun className="w-[18px] h-[18px]" /> },
+                            { value: 'system', label: 'Auto', icon: <Monitor className="w-[18px] h-[18px]" /> },
+                            { value: 'dark', label: 'Dark', icon: <Moon className="w-[18px] h-[18px]" /> },
+                        ]}
+                    />
+                </RowShell>
+            </List>
+
+            <SectionHeader>Capture links</SectionHeader>
+            <List>
+                <RowShell tile={<MessageCircle className="w-[17px] h-[17px]" />} tileClass="bg-green-500">
+                    <RowText title="WhatsApp" />
+                </RowShell>
+                {bridgeStatus.state !== 'n/a' && (
+                    <RowShell tile={<Share2 className="w-[16px] h-[16px]" />} tileClass="bg-accent">
+                        <RowText title="Share extension" />
+                        {bridgeStatus.state === 'ok' ? (
+                            <span className="ml-auto text-[15px] text-green-500 whitespace-nowrap">Connected</span>
+                        ) : (
+                            <button
+                                onClick={handleBridgeFix}
+                                disabled={bridgeFixing}
+                                className="ml-auto h-8 px-3 rounded-full bg-card-hover border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                                <RefreshCw className={`w-4 h-4 ${bridgeFixing ? 'animate-spin' : ''}`} />
+                                Fix
+                            </button>
+                        )}
+                    </RowShell>
+                )}
+            </List>
+            <Footnote>Send any link to the WhatsApp bot and it&apos;s saved, summarized, and tagged. The share extension saves from other apps.</Footnote>
+
+            <SectionHeader>Privacy &amp; AI</SectionHeader>
+            <List>
+                <ExternalRow title="Privacy Policy" onClick={() => openExternal(policyUrl('/privacy'))} />
+                <ExternalRow title="Terms of Service" onClick={() => openExternal(policyUrl('/terms'))} />
+            </List>
+            <Footnote>
+                <b className="text-text-secondary font-semibold">Powered by Google Gemini.</b> Saved content and your questions are sent to Gemini for summaries and answers.
+                {aiConsentAt !== null && ` You agreed on ${new Date(aiConsentAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}.`}
+            </Footnote>
+
+            <SectionHeader>Advanced</SectionHeader>
+            <List>
+                <RowShell tile={<Network className="w-[16px] h-[16px]" />} tileClass="bg-indigo-500">
+                    <RowText title="Rebuild connections" />
+                    <button
+                        onClick={handleRebuild}
+                        disabled={rebuilding}
+                        className="ml-auto h-8 px-3 rounded-full bg-card-hover border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${rebuilding ? 'animate-spin' : ''}`} />
+                        {rebuilding ? 'Rebuilding…' : 'Rebuild'}
+                    </button>
+                </RowShell>
+                {onReplayTour && (
+                    <NavRow tile={<Compass className="w-[16px] h-[16px]" />} tileClass="bg-slate-500" title="Take the tour again" onClick={onReplayTour} />
+                )}
+            </List>
+            <Footnote>{rebuildLabel ?? 'Recompute “See also” links across your whole library — useful for cards saved before connections existed.'}</Footnote>
+        </>
     );
 }
 
-/** Full-bleed divider between logical blocks inside a padded <Section>. */
-function SettingsDivider() {
-    return <div className="-mx-4 border-t border-border-subtle" />;
+function AccountView({
+    accountEmail, displayName, photoURL, providerLabel, signOut, onClose, onDelete, deleteError,
+}: {
+    accountEmail: string | null;
+    displayName: string | null;
+    photoURL: string | null;
+    providerLabel: string;
+    signOut: () => void;
+    onClose: () => void;
+    onDelete: () => void;
+    deleteError: string | null;
+}) {
+    return (
+        <>
+            <LargeTitle>Account</LargeTitle>
+            <div className="p-3.5 rounded-2xl bg-card border border-border-subtle">
+                <div className="flex items-center gap-3.5">
+                    <ProfileAvatar email={accountEmail} name={displayName} photoURL={photoURL} size={48} />
+                    <div className="min-w-0 flex-1">
+                        <div className="text-[15px] font-semibold text-text truncate">{displayName || accountEmail || 'Signed in'}</div>
+                        {displayName && accountEmail && <div className="text-[12px] text-text-muted truncate">{accountEmail}</div>}
+                        <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-emerald-500">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            {providerLabel}
+                        </div>
+                    </div>
+                </div>
+                <button
+                    onClick={() => { onClose(); signOut(); }}
+                    className="mt-3 w-full inline-flex items-center justify-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold border border-border-subtle text-text hover:bg-card-hover transition-colors cursor-pointer"
+                >
+                    <LogOut className="w-4 h-4" />
+                    Sign out
+                </button>
+            </div>
+
+            <button
+                onClick={onDelete}
+                className="mt-2.5 w-full inline-flex items-center justify-center gap-2 rounded-2xl px-3.5 py-3 text-[13px] font-semibold border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+            >
+                <Trash2 className="w-4 h-4" />
+                Delete account
+            </button>
+            <Footnote>Permanently deletes your account and all saved links, collections, and chats. This can&apos;t be undone.</Footnote>
+            {deleteError && <p className="mt-1.5 text-[12px] text-red-500 px-2">{deleteError}</p>}
+        </>
+    );
 }
 
-function GroupLabel({ icon, title, action }: { icon: ReactNode; title: string; action?: ReactNode }) {
+function ResurfacingView({
+    settings, setSettings, toggleReminderChannel, cadenceLabel, modeLabel, scheduleValue, deliveryValue, go,
+}: {
+    settings: Settings;
+    setSettings: SetSettings;
+    toggleReminderChannel: (c: ReminderChannel) => void;
+    cadenceLabel: string;
+    modeLabel: string;
+    scheduleValue: string;
+    deliveryValue: string;
+    go: (v: View) => void;
+}) {
     return (
-        <div className="flex items-center justify-between px-0.5">
-            <div className="flex items-center gap-2 text-text-muted">
-                {icon}
-                <h3 className="text-[11px] font-bold uppercase tracking-[0.15em]">{title}</h3>
+        <>
+            <LargeTitle>Reminders &amp; Digest</LargeTitle>
+
+            <SectionHeader first>Reminders</SectionHeader>
+            <List tight>
+                <RowShell>
+                    <RowText title="Reminders" sub="Nudge me to revisit an individual saved card" />
+                    <Toggle on={settings.reminders_enabled} onChange={() => setSettings((p) => ({ ...p, reminders_enabled: !p.reminders_enabled }))} />
+                </RowShell>
+                {settings.reminders_enabled && (
+                    <NavRow title="Cadence" value={cadenceLabel} onClick={() => go('cadence')} />
+                )}
+                {settings.reminders_enabled && (
+                    <RowShell>
+                        <RowText title="Also send to WhatsApp" sub="Legacy channel — needs a linked phone number" />
+                        <Toggle on={settings.reminders_channel.includes('whatsapp')} onChange={() => toggleReminderChannel('whatsapp')} />
+                    </RowShell>
+                )}
+            </List>
+            <Footnote>Smart spacing surfaces each card when you&apos;re most likely to want it — not on a fixed clock.</Footnote>
+
+            <SectionHeader>Curated digest</SectionHeader>
+            <List tight>
+                <RowShell>
+                    <RowText title="Curated digest" sub="An automated batch of picks, delivered together" />
+                    <Toggle on={settings.digest_enabled} onChange={() => setSettings((p) => ({ ...p, digest_enabled: !p.digest_enabled }))} />
+                </RowShell>
+                {settings.digest_enabled && <NavRow title="Style" value={modeLabel} onClick={() => go('style')} />}
+                {settings.digest_enabled && <NavRow title="Schedule" value={scheduleValue} onClick={() => go('schedule')} />}
+                {settings.digest_enabled && <NavRow title="Cards per digest" value={String(settings.digest_count)} onClick={() => go('cards')} />}
+                {settings.digest_enabled && <NavRow title="Delivery" value={deliveryValue} onClick={() => go('delivery')} />}
+                {settings.digest_enabled && (
+                    <RowShell>
+                        <div className="flex-1 min-w-0 py-[11px]">
+                            <SkipEmptyLabel />
+                        </div>
+                        <Toggle on={settings.digest_skip_empty} onChange={() => setSettings((p) => ({ ...p, digest_skip_empty: !p.digest_skip_empty }))} />
+                    </RowShell>
+                )}
+            </List>
+            <Footnote>In-app and push delivery are always on. Push is toggled on the main screen.</Footnote>
+        </>
+    );
+}
+
+/** "Skip when empty" label with an inline info disclosure. */
+function SkipEmptyLabel() {
+    const [open, setOpen] = useState(false);
+    return (
+        <>
+            <div className="flex items-center gap-1.5">
+                <span className="text-[16px] text-text tracking-[-0.01em]">Skip when empty</span>
+                <button onClick={() => setOpen((v) => !v)} aria-label="What does this do?" className="text-text-muted/70 hover:text-accent transition-colors cursor-pointer">
+                    <Info className="w-4 h-4" />
+                </button>
             </div>
-            {action}
+            {open && (
+                <p className="text-[12.5px] text-text-muted mt-1.5 leading-snug max-w-[30ch] animate-in fade-in slide-in-from-top-1 duration-200">
+                    When there&apos;s nothing new worth surfacing, no digest is sent — so you never get an empty notification.
+                </p>
+            )}
+        </>
+    );
+}
+
+function StyleView({
+    settings, setSettings, back, toggleTopic, topicQuery, setTopicQuery,
+    totalTopics, visibleCategories, visibleTags, isTopicActive,
+}: {
+    settings: Settings;
+    setSettings: SetSettings;
+    back: () => void;
+    toggleTopic: (t: string) => void;
+    topicQuery: string;
+    setTopicQuery: (q: string) => void;
+    totalTopics: number;
+    visibleCategories: string[];
+    visibleTags: string[];
+    isTopicActive: (t: string) => boolean;
+}) {
+    const note = DIGEST_MODES.find((m) => m.value === settings.digest_mode)?.note;
+    return (
+        <>
+            <LargeTitle>Digest style</LargeTitle>
+            <List tight>
+                {DIGEST_MODES.map((m) => (
+                    <RowShell
+                        key={m.value}
+                        onClick={() => {
+                            setSettings((p) => ({ ...p, digest_mode: m.value }));
+                            // Stay on this screen for topic mode so the picker below is usable.
+                            if (m.value !== 'topic') back();
+                        }}
+                    >
+                        <span className="text-text-secondary shrink-0">{m.icon}</span>
+                        <RowText title={m.label} />
+                        {settings.digest_mode === m.value && <Check className="ml-auto w-[18px] h-[18px] text-accent shrink-0" strokeWidth={2.6} />}
+                    </RowShell>
+                ))}
+            </List>
+            {note && <Footnote>{note}</Footnote>}
+
+            {/* Topic picker — searchable, grouped by categories & tags */}
+            {settings.digest_mode === 'topic' && (
+                <>
+                    <div className="flex items-center justify-between px-1.5 pt-6 pb-2">
+                        <span className="text-[12px] font-semibold uppercase tracking-[0.06em] text-text-muted">Topics</span>
+                        {settings.digest_topics.length > 0 && (
+                            <button
+                                onClick={() => setSettings((p) => ({ ...p, digest_topics: [] }))}
+                                className="text-[11px] font-semibold text-text-muted hover:text-text transition-colors cursor-pointer"
+                            >
+                                Clear <span className="text-accent">{settings.digest_topics.length}</span>
+                            </button>
+                        )}
+                    </div>
+                    {totalTopics === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-border-subtle p-4 text-center">
+                            <p className="text-[12px] text-text-muted">Save some links first to build topics.</p>
+                        </div>
+                    ) : (
+                        <div className="rounded-2xl border border-border-subtle bg-card p-4 space-y-4">
+                            {settings.digest_topics.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                    {settings.digest_topics.map((t) => (
+                                        <button
+                                            key={t}
+                                            onClick={() => toggleTopic(t)}
+                                            className="inline-flex items-center gap-1 pl-2.5 pr-1.5 h-7 rounded-full bg-accent/15 border border-accent/40 text-[12px] font-semibold text-accent hover:bg-accent/25 transition-colors cursor-pointer"
+                                            aria-label={`Remove ${t}`}
+                                        >
+                                            {t}
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                            {totalTopics > 8 && (
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
+                                    <input
+                                        type="text"
+                                        value={topicQuery}
+                                        onChange={(e) => setTopicQuery(e.target.value)}
+                                        placeholder="Search topics…"
+                                        className="w-full h-9 pl-9 pr-8 rounded-xl bg-card-hover border border-border-subtle text-[13px] text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
+                                    />
+                                    {topicQuery && (
+                                        <button
+                                            onClick={() => setTopicQuery('')}
+                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text transition-colors cursor-pointer"
+                                            aria-label="Clear search"
+                                        >
+                                            <X className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                            {visibleCategories.length === 0 && visibleTags.length === 0 ? (
+                                <p className="text-[12px] text-text-muted text-center py-3">No topics match “{topicQuery}”.</p>
+                            ) : (
+                                <div className="max-h-[22rem] overflow-y-auto scrollbar-subtle pr-1 space-y-4">
+                                    {visibleCategories.length > 0 && (
+                                        <TopicGroup label="Categories">
+                                            {visibleCategories.map((t) => (
+                                                <TopicPill key={t} label={t} active={isTopicActive(t)} onClick={() => toggleTopic(t)} />
+                                            ))}
+                                        </TopicGroup>
+                                    )}
+                                    {visibleTags.length > 0 && (
+                                        <TopicGroup label="Tags">
+                                            {visibleTags.map((t) => (
+                                                <TopicPill key={t} label={t} active={isTopicActive(t)} onClick={() => toggleTopic(t)} />
+                                            ))}
+                                        </TopicGroup>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </>
+            )}
+        </>
+    );
+}
+
+function ScheduleView({ settings, setSettings }: { settings: Settings; setSettings: SetSettings }) {
+    const weekly = settings.digest_frequency === 'weekly';
+    const hourIdx = settings.digest_hour % 12;         // 0 => "12"
+    const ampmIdx = settings.digest_hour < 12 ? 0 : 1;
+    const commitTime = (h12: number, minute: number, pm: number) => {
+        const hour = (h12 % 12) + (pm === 1 ? 12 : 0);
+        setSettings((p) => ({ ...p, digest_hour: hour, digest_minute: minute }));
+    };
+    return (
+        <>
+            <LargeTitle>Schedule</LargeTitle>
+            <List tight>
+                <RowShell>
+                    <RowText title="Frequency" />
+                    <Segmented
+                        value={settings.digest_frequency}
+                        onChange={(v) => setSettings((p) => ({ ...p, digest_frequency: v as 'daily' | 'weekly' }))}
+                        options={[{ value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }]}
+                        widthClass="w-[154px]"
+                    />
+                </RowShell>
+            </List>
+
+            <div className="relative mt-3 rounded-[14px] border border-border-subtle bg-card overflow-hidden">
+                <div className="pointer-events-none absolute left-2.5 right-2.5 top-[calc(50%-18px)] h-9 rounded-[10px] bg-card-hover" />
+                <div className="relative flex px-1.5">
+                    {weekly && (
+                        <Wheel
+                            items={DAYS}
+                            index={settings.digest_day}
+                            onChange={(i) => setSettings((p) => ({ ...p, digest_day: i }))}
+                            className="flex-[1.7]"
+                        />
+                    )}
+                    <Wheel items={HOURS12} index={hourIdx} onChange={(i) => commitTime(i, settings.digest_minute, ampmIdx)} className="flex-1" />
+                    <Wheel items={MINUTES} index={settings.digest_minute} onChange={(i) => commitTime(hourIdx, i, ampmIdx)} className="flex-1" />
+                    <Wheel items={AMPM} index={ampmIdx} onChange={(i) => commitTime(hourIdx, settings.digest_minute, i)} className="flex-1" />
+                </div>
+            </div>
+            <Footnote>Your digest arrives around this time. Delivery may vary by a few minutes.</Footnote>
+        </>
+    );
+}
+
+function DeliveryView({
+    settings, toggleChannel, email, setEmail,
+}: {
+    settings: Settings;
+    toggleChannel: (c: DigestChannel) => void;
+    email: string;
+    setEmail: (e: string) => void;
+}) {
+    return (
+        <>
+            <LargeTitle>Delivery</LargeTitle>
+            <List tight>
+                <RowShell tile={<MessageCircle className="w-[17px] h-[17px]" />} tileClass="bg-green-500">
+                    <RowText title="WhatsApp" sub="Needs a linked phone number" />
+                    <Toggle on={settings.digest_channels.includes('whatsapp')} onChange={() => toggleChannel('whatsapp')} />
+                </RowShell>
+                <RowShell tile={<Mail className="w-[16px] h-[16px]" />} tileClass="bg-indigo-500">
+                    <RowText title="Email" />
+                    <Toggle on={settings.digest_channels.includes('email')} onChange={() => toggleChannel('email')} />
+                </RowShell>
+            </List>
+            {settings.digest_channels.includes('email') && (
+                <div className="mt-2.5 px-1 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <label className="text-[12px] font-semibold text-text-secondary">Email address</label>
+                    <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="you@example.com"
+                        className="w-full h-10 px-3 rounded-xl bg-card border border-border-subtle text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
+                    />
+                </div>
+            )}
+            <Footnote>Every digest lands in the in-app Digest section, and as a push notification when notifications are on. These are extra channels on top of that.</Footnote>
+        </>
+    );
+}
+
+/** Single-select list screen (Cadence, Cards). */
+function PickerView({
+    title, options, value, onSelect, footnote,
+}: {
+    title: string;
+    options: { value: string; label: string }[];
+    value: string;
+    onSelect: (v: string) => void;
+    footnote?: string;
+}) {
+    return (
+        <>
+            <LargeTitle>{title}</LargeTitle>
+            <List tight>
+                {options.map((o) => (
+                    <RowShell key={o.value} onClick={() => onSelect(o.value)}>
+                        <RowText title={o.label} />
+                        {o.value === value && <Check className="ml-auto w-[18px] h-[18px] text-accent shrink-0" strokeWidth={2.6} />}
+                    </RowShell>
+                ))}
+            </List>
+            {footnote && <Footnote>{footnote}</Footnote>}
+        </>
+    );
+}
+
+/* ============================ PRIMITIVES ============================ */
+
+const TILE_BASE = 'w-[29px] h-[29px] rounded-[7px] flex items-center justify-center text-white shrink-0';
+
+function LargeTitle({ children }: { children: ReactNode }) {
+    return <h1 className="text-[28px] font-extrabold tracking-[-0.024em] text-text px-1 mb-2 leading-tight">{children}</h1>;
+}
+
+function SectionHeader({ children, first }: { children: ReactNode; first?: boolean }) {
+    return (
+        <div className={`text-[12px] font-semibold uppercase tracking-[0.06em] text-text-muted px-1.5 pb-1.5 ${first ? 'pt-2' : 'pt-[34px]'}`}>
+            {children}
         </div>
     );
 }
 
-function DigestModeButton({ mode, active, onClick }: { mode: { value: DigestMode; label: string; icon: ReactNode }; active: boolean; onClick: () => void }) {
+function Footnote({ children }: { children: ReactNode }) {
+    return <p className="text-[12.5px] text-text-muted leading-snug px-2 pt-1.5">{children}</p>;
+}
+
+/** Rounded grouped container with inset hairline dividers between rows. `tight`
+    insets the divider to the text (rows without a leading tile). */
+function List({ children, tight }: { children: ReactNode; tight?: boolean }) {
+    const items = Children.toArray(children).filter(Boolean);
     return (
-        <button
-            onClick={onClick}
-            aria-pressed={active}
-            className={`relative flex flex-col items-center justify-center gap-2 py-3.5 rounded-2xl border transition-all duration-150 cursor-pointer ${active ? 'bg-accent/10 border-accent/50 shadow-[0_0_0_1px_var(--accent-ring)]' : 'bg-card-hover border-border-subtle hover:border-text-muted/40 hover:-translate-y-px'}`}
-        >
-            {active && (
-                <span className="absolute top-2 right-2 w-4 h-4 rounded-full bg-accent flex items-center justify-center">
-                    <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
-                </span>
-            )}
-            <span className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${active ? 'bg-[image:var(--accent-gradient)] text-white shadow-md shadow-purple-500/25 ring-1 ring-white/15' : 'bg-card border border-border-subtle text-text-secondary'}`}>
-                {mode.icon}
-            </span>
-            <span className={`text-[12.5px] font-semibold ${active ? 'text-accent' : 'text-text-secondary'}`}>{mode.label}</span>
-        </button>
+        <div className="rounded-[14px] border border-border-subtle bg-card overflow-hidden">
+            {items.map((child, i) => (
+                <div key={i} className="relative">
+                    {i > 0 && <div className={`absolute top-0 right-0 h-px bg-border-subtle ${tight ? 'left-[15px]' : 'left-[54px]'}`} />}
+                    {child}
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function RowShell({
+    tile, tileClass, onClick, children, className,
+}: {
+    tile?: ReactNode;
+    tileClass?: string;
+    onClick?: () => void;
+    children: ReactNode;
+    className?: string;
+}) {
+    const cls = `w-full flex items-center gap-3 px-[14px] min-h-[46px] text-left ${onClick ? 'hover:bg-card-hover transition-colors cursor-pointer' : ''} ${className || ''}`;
+    const inner = (
+        <>
+            {tile && <span className={`${TILE_BASE} ${tileClass || 'bg-accent'}`}>{tile}</span>}
+            {children}
+        </>
+    );
+    return onClick ? <button onClick={onClick} className={cls}>{inner}</button> : <div className={cls}>{inner}</div>;
+}
+
+function RowText({ title, sub }: { title: string; sub?: string }) {
+    return (
+        <div className="flex-1 min-w-0 py-[11px]">
+            <div className="text-[16px] text-text tracking-[-0.01em] leading-tight">{title}</div>
+            {sub && <div className="text-[12.5px] text-text-muted mt-1 leading-snug">{sub}</div>}
+        </div>
+    );
+}
+
+function Chevron() {
+    return <ChevronRight className="w-[18px] h-[18px] text-text-muted/60 shrink-0" />;
+}
+
+function NavRow({ tile, tileClass, title, value, onClick }: { tile?: ReactNode; tileClass?: string; title: string; value?: string; onClick: () => void }) {
+    return (
+        <RowShell tile={tile} tileClass={tileClass} onClick={onClick}>
+            <RowText title={title} />
+            {value && <span className="ml-auto text-[15px] text-text-muted whitespace-nowrap tabular-nums">{value}</span>}
+            <Chevron />
+        </RowShell>
+    );
+}
+
+function ExternalRow({ title, onClick }: { title: string; onClick: () => void }) {
+    return (
+        <RowShell tile={<ShieldCheck className="w-[16px] h-[16px]" />} tileClass="bg-slate-500" onClick={onClick}>
+            <RowText title={title} />
+            <ExternalLink className="ml-auto w-[15px] h-[15px] text-text-muted/60 shrink-0" />
+        </RowShell>
     );
 }
 
@@ -1198,80 +1263,10 @@ function TopicPill({ label, active, onClick }: { label: string; active: boolean;
         <button
             onClick={onClick}
             aria-pressed={active}
-            className={`inline-flex items-center gap-1.5 px-3 h-8 rounded-full border text-[12px] font-semibold transition-colors cursor-pointer ${active ? 'bg-accent/10 border-accent/40 text-accent' : 'bg-card border-border-subtle text-text-secondary hover:text-text hover:border-text-muted/40'}`}
+            className={`inline-flex items-center gap-1.5 px-3 h-8 rounded-full border text-[12px] font-semibold transition-colors cursor-pointer ${active ? 'bg-accent/10 border-accent/40 text-accent' : 'bg-card-hover border-border-subtle text-text-secondary hover:text-text hover:border-text-muted/40'}`}
         >
             {active && <Check className="w-3 h-3" strokeWidth={3} />}
             {label}
-        </button>
-    );
-}
-
-function Row({ icon, title, subtitle, children }: { icon?: ReactNode; title: string; subtitle?: string; children?: ReactNode }) {
-    return (
-        <div className="flex items-center justify-between gap-4">
-            <div className="flex items-start gap-3 min-w-0">
-                {icon && <div className="shrink-0 mt-0.5">{icon}</div>}
-                <div className="min-w-0">
-                    <div className="text-sm font-semibold text-text">{title}</div>
-                    {subtitle && <div className="text-[12px] text-text-muted leading-relaxed mt-0.5">{subtitle}</div>}
-                </div>
-            </div>
-            {children && <div className="shrink-0">{children}</div>}
-        </div>
-    );
-}
-
-/** Policy-page link that stays native-safe: relative link on the web, the
-    public Vercel origin opened in Safari inside the Capacitor shell. */
-function PolicyLinkButton({ label, path }: { label: string; path: string }) {
-    return (
-        <button
-            onClick={() => openExternal(policyUrl(path))}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-xl bg-card-hover border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
-        >
-            {label}
-            <ExternalLink className="w-3.5 h-3.5" />
-        </button>
-    );
-}
-
-/**
- * Native time picker for the digest delivery time. `<input type="time">` renders
- * the iOS wheel picker inside the Capacitor WKWebView and the OS time picker on
- * desktop web — the low-effort cross-platform native path. The element's value is
- * always 24-hour "HH:MM" (the browser localizes the *display* to 12/24h); step=60
- * keeps it minute-granular with no seconds field.
- */
-function TimeInput({ hour, minute, onChange }: { hour: number; minute: number; onChange: (hour: number, minute: number) => void }) {
-    const value = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-    return (
-        <input
-            type="time"
-            aria-label="Digest delivery time"
-            value={value}
-            step={60}
-            onChange={(e) => {
-                // A cleared field yields "" — ignore it and keep the last value.
-                const [h, m] = e.target.value.split(':');
-                if (h === undefined || m === undefined || e.target.value === '') return;
-                onChange(Number(h), Number(m));
-            }}
-            className="h-9 rounded-full px-3 text-[13px] font-semibold bg-card border border-border-subtle text-text hover:border-text-muted/40 focus:outline-none focus:border-accent/50 focus-visible:ring-2 focus-visible:ring-accent/40 transition-colors cursor-pointer [color-scheme:inherit]"
-        />
-    );
-}
-
-function ChannelChip({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: ReactNode; label: string }) {
-    return (
-        <button
-            onClick={onClick}
-            role="switch"
-            aria-checked={active}
-            className={`flex-1 inline-flex items-center justify-center gap-2 h-11 rounded-xl border text-[13px] font-semibold transition-colors cursor-pointer ${active ? 'bg-accent/10 border-accent/40 text-accent' : 'bg-card-hover border-border-subtle text-text-secondary hover:text-text hover:border-text-muted/40'}`}
-        >
-            {icon}
-            {label}
-            {active && <Check className="w-3.5 h-3.5" />}
         </button>
     );
 }
@@ -1289,9 +1284,9 @@ function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
     );
 }
 
-function Segmented<T extends string>({ value, options, onChange, iconOnly = false }: { value: T; options: { value: T; label: string; icon?: ReactNode }[]; onChange: (v: T) => void; iconOnly?: boolean }) {
+function Segmented<T extends string>({ value, options, onChange, iconOnly = false, widthClass }: { value: T; options: { value: T; label: string; icon?: ReactNode }[]; onChange: (v: T) => void; iconOnly?: boolean; widthClass?: string }) {
     return (
-        <div className={`flex items-center gap-1.5 p-1 rounded-2xl bg-card-hover border border-border-subtle ${iconOnly ? '' : 'w-full'}`}>
+        <div className={`flex items-center gap-1 p-1 rounded-2xl bg-card-hover border border-border-subtle ml-auto ${iconOnly ? '' : (widthClass || 'w-full')}`}>
             {options.map((o) => {
                 const active = o.value === value;
                 return (
@@ -1307,6 +1302,54 @@ function Segmented<T extends string>({ value, options, onChange, iconOnly = fals
                     </button>
                 );
             })}
+        </div>
+    );
+}
+
+const ITEM_H = 36;
+
+/** iOS-style drum wheel. Scroll-snaps under the centered selection band; commits
+    the settled index a beat after scrolling stops. */
+function Wheel({ items, index, onChange, className }: { items: string[]; index: number; onChange: (i: number) => void; className?: string }) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [active, setActive] = useState(index);
+
+    // Center the initial selection once, on mount.
+    useEffect(() => {
+        if (ref.current) ref.current.scrollTop = index * ITEM_H;
+        setActive(index);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        let t: ReturnType<typeof setTimeout>;
+        const onScroll = () => {
+            const i = Math.max(0, Math.min(items.length - 1, Math.round(el.scrollTop / ITEM_H)));
+            setActive(i);
+            clearTimeout(t);
+            t = setTimeout(() => { if (i !== index) onChange(i); }, 130);
+        };
+        el.addEventListener('scroll', onScroll, { passive: true });
+        return () => { el.removeEventListener('scroll', onScroll); clearTimeout(t); };
+    }, [items.length, index, onChange]);
+
+    return (
+        <div
+            ref={ref}
+            className={`h-[180px] overflow-y-scroll snap-y snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch] [mask-image:linear-gradient(180deg,transparent,#000_26%,#000_74%,transparent)] [-webkit-mask-image:linear-gradient(180deg,transparent,#000_26%,#000_74%,transparent)] ${className || ''}`}
+        >
+            <div className="h-[72px]" />
+            {items.map((it, i) => (
+                <div
+                    key={i}
+                    className={`h-[36px] snap-center flex items-center justify-center text-[22px] tabular-nums tracking-[-0.01em] transition-colors ${i === active ? 'text-text font-semibold' : 'text-text-muted'}`}
+                >
+                    {it}
+                </div>
+            ))}
+            <div className="h-[72px]" />
         </div>
     );
 }
