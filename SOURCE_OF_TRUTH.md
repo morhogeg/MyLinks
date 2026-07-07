@@ -589,6 +589,34 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-07 — Settings redesigned as a flat iOS grouped-list; Reminders +
+  Digest merged into one drill-in screen (`0a8e521`, merge `01b9be6`; TestFlight
+  run #51 → build 1051, UI-only).** Full presentation + IA rebuild of
+  `SettingsModal.tsx` (still one file, ~776/733 +/− lines). **Main screen** is now
+  Apple-style grouped-inset lists: flat solid icon tiles (accent/pink/green/
+  indigo/slate via Tailwind color utils), inset hairline dividers, quiet section
+  **footnotes** instead of per-row subtitles, and the large "Settings" title
+  inline with the close button. Account (profile + sign-out + delete) moved to its
+  own `account` sub-screen. **Reminders & Digest** are now ONE screen (replaces
+  the old `'main'|'digest'` two-view split) reached from a single "Reminders &
+  Digest ›" row under Notifications; it uses value rows that drill into focused
+  pickers — **Cadence** (smart/daily/weekly), **Style** (the 7 digest modes +
+  topic picker), **Schedule**, **Cards**, **Delivery** (WhatsApp/Email + email
+  input). **Schedule** is a custom **iOS drum-wheel** (day + hour/minute/AM-PM,
+  scroll-snap under a centered band, `Wheel` component) replacing the
+  `<input type="time">`/`Dropdown`. **Skip when empty** gained an inline ⓘ
+  disclosure. Navigation is a simple `stack: View[]` (push/pop) reused by the
+  edge-swipe-back. **No logic change** — settings state, `withPush()` push
+  reconciliation, dirty-tracking/discard guard, save, delete-account, load-error
+  retry, share-bridge + rebuild-connections all preserved verbatim; the Save
+  payload in `updateUserSettings` is byte-identical. Verified: `tsc --noEmit`
+  clean on the merged tree + `next build` compiled successfully (the only build
+  error is `/_not-found` prerender failing on a missing local Firebase API key —
+  env-only, unrelated; Vercel has the key). **⚠️ Deferred owner step:** the new
+  drum-**wheel** picker's touch/momentum feel and time-commit could only be
+  verified via typecheck + desktop reasoning here (Settings is behind auth) — 
+  **sanity-check the Schedule wheel on TestFlight build 1051** (spin each column,
+  confirm the digest time saves correctly, incl. 12 AM/PM edge and weekly day).
 - **2026-07-07 — Cut the standalone Connections page (`60c01b4`).** The
   cross-category cluster view (M10) was removed: it clustered on EXACT concept-string
   matches across 2+ categories within a 30-day window — criteria that rarely fire, so
