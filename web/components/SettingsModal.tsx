@@ -3,13 +3,13 @@
 import { useState, useEffect, useMemo, useRef, Children } from 'react';
 import type { ReactNode } from 'react';
 import { User, DigestMode, DigestChannel, ReminderChannel } from '@/lib/types';
-import { X, Bell, Sparkles, Share2, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, BrainCircuit, Mail, Shuffle, Tag, Inbox, Star, History, ChevronLeft, ChevronRight, Compass, LogOut, Search, ShieldCheck, ExternalLink, Network, Clock, Info } from 'lucide-react';
+import { X, Bell, Sparkles, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, BrainCircuit, Mail, Shuffle, Tag, Inbox, Star, History, ChevronLeft, ChevronRight, Compass, LogOut, Search, ShieldCheck, ExternalLink, Network, Clock, Info } from 'lucide-react';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
 import { registerPush, unregisterPush } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
 import { policyUrl, openExternal } from '@/lib/share';
 import { readLocalAiConsent } from '@/lib/aiConsent';
-import { getShareBridgeStatus, resyncShareConfig, onShareBridgeStatus, ShareBridgeStatus } from '@/lib/shareConfig';
+import { hapticSelection } from '@/lib/haptics';
 import { rebuildConnections } from '@/lib/rebuildConnections';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from './AuthProvider';
@@ -27,6 +27,9 @@ interface SettingsModalProps {
     onClose: () => void;
     /** Replay the first-run product tour. */
     onReplayTour?: () => void;
+    /** Deep-link the sheet straight to a sub-screen on open (e.g. the digest
+        settings, reached as main → Reminders & Digest). */
+    initialSection?: 'digest';
 }
 
 type Frequency = User['settings']['reminder_frequency'];
@@ -113,7 +116,7 @@ const formatTime = (hour: number, minute: number) => {
     return `${h12}:${String(minute).padStart(2, '0')} ${ampm}`;
 };
 
-export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: SettingsModalProps) {
+export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, initialSection }: SettingsModalProps) {
     const toast = useToast();
     const { theme, setTheme } = useTheme();
     const { authUid, email: accountEmail, displayName, photoURL, signOut } = useAuth();
@@ -193,23 +196,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
         if (isOpen) setAiConsentAt(readLocalAiConsent());
     }, [isOpen]);
 
-    // Share-extension bridge diagnostics (native only): live status + manual retry.
-    const [bridgeStatus, setBridgeStatus] = useState<ShareBridgeStatus>({ state: 'n/a' });
-    const [bridgeFixing, setBridgeFixing] = useState(false);
-    useEffect(() => {
-        if (!isOpen) return;
-        setBridgeStatus(getShareBridgeStatus());
-        return onShareBridgeStatus(setBridgeStatus);
-    }, [isOpen]);
-    const handleBridgeFix = async () => {
-        setBridgeFixing(true);
-        try {
-            setBridgeStatus(await resyncShareConfig());
-        } finally {
-            setBridgeFixing(false);
-        }
-    };
-
     // "Rebuild connections" — backfills the knowledge graph so older cards (saved
     // before embeddings existed) get their "See also" relations.
     const [rebuilding, setRebuilding] = useState(false);
@@ -261,12 +247,14 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
 
     useEffect(() => {
         if (isOpen && uid) {
-            setStack(['main']);
+            // Deep-link: open straight to the digest screen (main → Reminders &
+            // Digest) so Back still walks out one level at a time.
+            setStack(initialSection === 'digest' ? ['main', 'resurfacing'] : ['main']);
             setTopicQuery('');
             loadSettings();
             loadDigestExtras();
         }
-    }, [isOpen, uid]);
+    }, [isOpen, uid, initialSection]);
 
     const loadDigestExtras = async () => {
         try {
@@ -505,13 +493,16 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                         <h1 className="text-[30px] font-extrabold tracking-[-0.024em] text-text leading-tight">Settings</h1>
                     )}
                     <div className="flex-1" />
-                    <button
-                        onClick={handleClose}
-                        className="h-8 w-8 flex items-center justify-center text-text-muted hover:text-text transition-colors cursor-pointer"
-                        aria-label="Close settings"
-                    >
-                        <X className="w-[17px] h-[17px]" strokeWidth={2.3} />
-                    </button>
+                    {/* Close lives only on the root screen; sub-screens use Back / Done. */}
+                    {!showBack && (
+                        <button
+                            onClick={handleClose}
+                            className="h-8 w-8 flex items-center justify-center text-text-muted hover:text-text transition-colors cursor-pointer"
+                            aria-label="Close settings"
+                        >
+                            <X className="w-[17px] h-[17px]" strokeWidth={2.3} />
+                        </button>
+                    )}
                 </div>
 
                 {/* Body */}
@@ -530,9 +521,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                                 togglePush={togglePush}
                                 pushNote={pushNote}
                                 aiConsentAt={aiConsentAt}
-                                bridgeStatus={bridgeStatus}
-                                bridgeFixing={bridgeFixing}
-                                handleBridgeFix={handleBridgeFix}
                                 rebuilding={rebuilding}
                                 rebuildLabel={rebuildLabel}
                                 handleRebuild={handleRebuild}
@@ -572,7 +560,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                                 title="Reminder cadence"
                                 options={(['smart', 'daily', 'weekly'] as Frequency[]).map((f) => ({ value: f as string, label: f === 'smart' ? 'Smart (spaced)' : CADENCE_LABEL[f] }))}
                                 value={settings.reminder_frequency}
-                                onSelect={(v) => { setSettings((p) => ({ ...p, reminder_frequency: v as Frequency })); back(); }}
+                                onSelect={(v) => setSettings((p) => ({ ...p, reminder_frequency: v as Frequency }))}
                                 footnote={FREQUENCY_NOTE[settings.reminder_frequency]}
                             />
                         )}
@@ -581,7 +569,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                             <StyleView
                                 settings={settings}
                                 setSettings={setSettings}
-                                back={back}
                                 toggleTopic={toggleTopic}
                                 topicQuery={topicQuery}
                                 setTopicQuery={setTopicQuery}
@@ -601,7 +588,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                                 title="Cards per digest"
                                 options={COUNT_OPTIONS.map((c) => ({ value: String(c), label: `${c} cards` }))}
                                 value={String(settings.digest_count)}
-                                onSelect={(v) => { setSettings((p) => ({ ...p, digest_count: Number(v) })); back(); }}
+                                onSelect={(v) => setSettings((p) => ({ ...p, digest_count: Number(v) }))}
                             />
                         )}
 
@@ -622,28 +609,42 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                     style={isMobile ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' } : undefined}
                 >
                     <div className="w-full max-w-2xl mx-auto flex items-center justify-end gap-2">
-                        {loadError && (
+                        {showBack ? (
+                            // On a sub-screen the change is already applied to the form
+                            // in memory; Done just returns to the parent screen (as does
+                            // the Back button). It's persisted by Save on the root screen.
                             <button
-                                onClick={() => loadSettings()}
-                                className="mr-auto inline-flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                                onClick={back}
+                                className="h-10 px-6 rounded-full text-sm font-semibold bg-accent text-white hover:bg-accent/90 transition-colors shadow-lg shadow-accent/20 cursor-pointer"
                             >
-                                <RefreshCw className="w-4 h-4" />
-                                Couldn&apos;t load settings — retry
+                                Done
                             </button>
+                        ) : (
+                            <>
+                                {loadError && (
+                                    <button
+                                        onClick={() => loadSettings()}
+                                        className="mr-auto inline-flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                                    >
+                                        <RefreshCw className="w-4 h-4" />
+                                        Couldn&apos;t load settings — retry
+                                    </button>
+                                )}
+                                <button
+                                    onClick={handleClose}
+                                    className="h-10 px-4 rounded-full text-sm font-semibold text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleSave}
+                                    disabled={isSaving || isLoading || loadError}
+                                    className="h-10 px-5 rounded-full text-sm font-semibold bg-accent text-white hover:bg-accent/90 transition-colors disabled:opacity-50 shadow-lg shadow-accent/20 cursor-pointer disabled:cursor-not-allowed"
+                                >
+                                    {isSaving ? 'Saving…' : 'Save changes'}
+                                </button>
+                            </>
                         )}
-                        <button
-                            onClick={handleClose}
-                            className="h-10 px-4 rounded-full text-sm font-semibold text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            disabled={isSaving || isLoading || loadError}
-                            className="h-10 px-5 rounded-full text-sm font-semibold bg-accent text-white hover:bg-accent/90 transition-colors disabled:opacity-50 shadow-lg shadow-accent/20 cursor-pointer disabled:cursor-not-allowed"
-                        >
-                            {isSaving ? 'Saving…' : 'Save changes'}
-                        </button>
                     </div>
                 </div>
             </div>
@@ -682,7 +683,7 @@ type SetSettings = React.Dispatch<React.SetStateAction<Settings>>;
 
 function MainView({
     authUid, accountEmail, displayName, photoURL, providerLabel, settings, theme, setTheme,
-    togglePush, pushNote, aiConsentAt, bridgeStatus, bridgeFixing, handleBridgeFix,
+    togglePush, pushNote, aiConsentAt,
     rebuilding, rebuildLabel, handleRebuild, onReplayTour, go,
 }: {
     authUid: string | null;
@@ -696,9 +697,6 @@ function MainView({
     togglePush: () => void;
     pushNote: string | null;
     aiConsentAt: number | null;
-    bridgeStatus: ShareBridgeStatus;
-    bridgeFixing: boolean;
-    handleBridgeFix: () => void;
     rebuilding: boolean;
     rebuildLabel: string | null;
     handleRebuild: () => void;
@@ -748,31 +746,6 @@ function MainView({
                     />
                 </RowShell>
             </List>
-
-            <SectionHeader>Capture links</SectionHeader>
-            <List>
-                <RowShell tile={<MessageCircle className="w-[17px] h-[17px]" />} tileClass="bg-green-500">
-                    <RowText title="WhatsApp" />
-                </RowShell>
-                {bridgeStatus.state !== 'n/a' && (
-                    <RowShell tile={<Share2 className="w-[16px] h-[16px]" />} tileClass="bg-accent">
-                        <RowText title="Share extension" />
-                        {bridgeStatus.state === 'ok' ? (
-                            <span className="ml-auto text-[15px] text-green-500 whitespace-nowrap">Connected</span>
-                        ) : (
-                            <button
-                                onClick={handleBridgeFix}
-                                disabled={bridgeFixing}
-                                className="ml-auto h-8 px-3 rounded-full bg-card-hover border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            >
-                                <RefreshCw className={`w-4 h-4 ${bridgeFixing ? 'animate-spin' : ''}`} />
-                                Fix
-                            </button>
-                        )}
-                    </RowShell>
-                )}
-            </List>
-            <Footnote>Send any link to the WhatsApp bot and it&apos;s saved, summarized, and tagged. The share extension saves from other apps.</Footnote>
 
             <SectionHeader>Privacy &amp; AI</SectionHeader>
             <List>
@@ -934,12 +907,11 @@ function SkipEmptyLabel() {
 }
 
 function StyleView({
-    settings, setSettings, back, toggleTopic, topicQuery, setTopicQuery,
+    settings, setSettings, toggleTopic, topicQuery, setTopicQuery,
     totalTopics, visibleCategories, visibleTags, isTopicActive,
 }: {
     settings: Settings;
     setSettings: SetSettings;
-    back: () => void;
     toggleTopic: (t: string) => void;
     topicQuery: string;
     setTopicQuery: (q: string) => void;
@@ -956,11 +928,7 @@ function StyleView({
                 {DIGEST_MODES.map((m) => (
                     <RowShell
                         key={m.value}
-                        onClick={() => {
-                            setSettings((p) => ({ ...p, digest_mode: m.value }));
-                            // Stay on this screen for topic mode so the picker below is usable.
-                            if (m.value !== 'topic') back();
-                        }}
+                        onClick={() => setSettings((p) => ({ ...p, digest_mode: m.value }))}
                     >
                         <span className="text-text-secondary shrink-0">{m.icon}</span>
                         <RowText title={m.label} />
@@ -1272,14 +1240,16 @@ function TopicPill({ label, active, onClick }: { label: string; active: boolean;
 }
 
 function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
+    // iOS spec: 51×31 track, 27px knob, 2px inset → 20px travel. The knob nearly
+    // fills the track height so there's no visible gap on the sides.
     return (
         <button
             onClick={onChange}
             role="switch"
             aria-checked={on}
-            className={`relative w-12 h-7 rounded-full transition-colors duration-200 shrink-0 cursor-pointer ${on ? 'bg-accent' : 'bg-text-muted/25'}`}
+            className={`relative w-[51px] h-[31px] rounded-full transition-colors duration-200 shrink-0 cursor-pointer ${on ? 'bg-accent' : 'bg-text-muted/30'}`}
         >
-            <span className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${on ? 'translate-x-5' : 'translate-x-0'}`} />
+            <span className={`absolute top-[2px] left-[2px] w-[27px] h-[27px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.2),0_2px_5px_rgba(0,0,0,0.18)] transition-transform duration-200 ease-out ${on ? 'translate-x-[20px]' : 'translate-x-0'}`} />
         </button>
     );
 }
@@ -1313,11 +1283,15 @@ const ITEM_H = 36;
 function Wheel({ items, index, onChange, className }: { items: string[]; index: number; onChange: (i: number) => void; className?: string }) {
     const ref = useRef<HTMLDivElement>(null);
     const [active, setActive] = useState(index);
+    // Detent the finger has last rolled onto — drives the per-tick haptic without
+    // depending on `active` state (which lags a render behind the scroll event).
+    const detent = useRef(index);
 
     // Center the initial selection once, on mount.
     useEffect(() => {
         if (ref.current) ref.current.scrollTop = index * ITEM_H;
         setActive(index);
+        detent.current = index;
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -1327,7 +1301,11 @@ function Wheel({ items, index, onChange, className }: { items: string[]; index: 
         let t: ReturnType<typeof setTimeout>;
         const onScroll = () => {
             const i = Math.max(0, Math.min(items.length - 1, Math.round(el.scrollTop / ITEM_H)));
-            setActive(i);
+            if (i !== detent.current) {
+                detent.current = i;
+                setActive(i);
+                hapticSelection();   // a crisp tick as each value rolls under the band
+            }
             clearTimeout(t);
             t = setTimeout(() => { if (i !== index) onChange(i); }, 130);
         };

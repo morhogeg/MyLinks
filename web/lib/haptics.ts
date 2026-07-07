@@ -31,6 +31,12 @@ export function hapticLight(): void {
     swallow(Haptics.impact({ style: ImpactStyle.Light }));
 }
 
+/** A crisp selection tick — for each detent as a picker wheel rolls past a value. */
+export function hapticSelection(): void {
+    if (!isNative()) return;
+    swallow(Haptics.selectionChanged());
+}
+
 /** A medium tap — a touch more presence than light, for a committed toggle. */
 export function hapticMedium(): void {
     if (!isNative()) return;

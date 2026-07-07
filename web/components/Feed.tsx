@@ -40,6 +40,7 @@ import { isNativeApp } from '@/lib/api';
 import PushNudge from './PushNudge';
 import { publishCard, publishCollection, unpublishCollection, deleteCollection, removeLinkFromCollection } from '@/lib/collections';
 import { shareLink, shareUrlFor, openExternal } from '@/lib/share';
+import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import TagExplorer from './TagExplorer';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -56,7 +57,7 @@ type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
  * - Two card views (grid / list), plus review, ask, and collections modes
  * - Deep linking to specific links via URL params
  */
-function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void }) {
+function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void }) {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
@@ -849,6 +850,21 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
     // The layout the Ask/Collections buttons return you to when you leave them.
     const lastLayout = useRef<'grid' | 'list' | 'review'>('grid');
     if (viewMode === 'grid' || viewMode === 'list' || viewMode === 'review') lastLayout.current = viewMode;
+
+    // Swipe in from the left edge to leave the Digest / Collections pages —
+    // the same iOS-style back gesture used by the card detail and Ask screens.
+    const [isMobileView, setIsMobileView] = useState(false);
+    useEffect(() => {
+        const mq = window.matchMedia('(min-width: 640px)');
+        const onChange = () => setIsMobileView(!mq.matches);
+        onChange();
+        mq.addEventListener('change', onChange);
+        return () => mq.removeEventListener('change', onChange);
+    }, []);
+    useEdgeSwipeBack(
+        () => setViewMode(lastLayout.current),
+        isMobileView && (viewMode === 'digest' || viewMode === 'collections'),
+    );
     // True for the card-browsing layouts (everything except the full-screen
     // Ask chat and the Collections gallery), which share the search/filter chrome.
     const isLibraryView = viewMode === 'grid' || viewMode === 'list' || viewMode === 'review';
@@ -885,8 +901,18 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                     </div>
                     <h3 className="text-lg font-medium text-text mb-2">No digests yet</h3>
                     <p className="text-text-secondary text-sm">
-                        Turn on the curated digest in Settings and your hand-picked
-                        batches will collect here.
+                        Your hand-picked batches will collect here once the curated
+                        digest is on.{onOpenDigestSettings && (
+                            <>
+                                {' '}
+                                <button
+                                    onClick={onOpenDigestSettings}
+                                    className="text-accent font-medium hover:underline cursor-pointer"
+                                >
+                                    Set up your digest
+                                </button>
+                            </>
+                        )}
                     </p>
                 </div>
             )}
@@ -2180,14 +2206,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
     );
 }
 
-export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void }) {
+export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void }) {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
             </div>
         }>
-            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} />
+            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onOpenDigestSettings={onOpenDigestSettings} />
         </Suspense>
     );
 }
