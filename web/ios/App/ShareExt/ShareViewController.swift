@@ -1,6 +1,7 @@
 import UIKit
 import Social
 import MobileCoreServices
+import ImageIO
 
 /// Share Extension entry point. Pulls the shared item (link, text, or image)
 /// out of the share sheet, reads the user's ingest endpoint + token from the
@@ -680,11 +681,17 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                 if let url = item as? URL {
                     // A file:// URL is usually a shared file (e.g. an image) — try image.
                     if url.isFileURL, let data = try? Data(contentsOf: url) {
-                        if let img = UIImage(data: data) {
+                        // Downsample before base64 to stay under the ~120MB
+                        // extension memory cap (48MP HEIC → jetsam otherwise).
+                        // Fall back to the original bytes if downsampling fails.
+                        let small = self?.downsampledJPEG(from: data)
+                        let outData = small ?? data
+                        let outMime = small != nil ? "image/jpeg" : Self.mime(for: url)
+                        if let img = UIImage(data: outData) {
                             DispatchQueue.main.async { self?.presentScan(with: img) }
                         }
-                        self?.upload(payload: ["image": data.base64EncodedString(),
-                                               "mimeType": Self.mime(for: url)])
+                        self?.upload(payload: ["image": outData.base64EncodedString(),
+                                               "mimeType": outMime])
                     } else {
                         DispatchQueue.main.async { self?.presentLinkScan(urlString: url.absoluteString) }
                         self?.upload(payload: ["url": url.absoluteString])
@@ -742,10 +749,13 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         if let host = host { loadFavicon(host: host) }
     }
 
-    /// Load the site favicon for the host (best-effort, cosmetic). Falls back to
-    /// a globe glyph on any failure.
+    /// Load the site favicon for the host (best-effort, cosmetic). Fetches the
+    /// site's OWN /favicon.ico directly rather than proxying through Google's
+    /// s2/favicons service — the latter would leak every shared link's hostname
+    /// to a third party, contradicting the extension's privacy manifest ("no
+    /// third-party data collection"). Falls back to a globe glyph on any failure.
     private func loadFavicon(host: String) {
-        guard let url = URL(string: "https://www.google.com/s2/favicons?domain=\(host)&sz=64") else {
+        guard let url = URL(string: "https://\(host)/favicon.ico") else {
             setGlobeFavicon(); return
         }
         var req = URLRequest(url: url)
@@ -800,6 +810,27 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         return nil
     }
 
+    /// Downsample image bytes to a bounded pixel size and JPEG-encode, WITHOUT
+    /// ever allocating the full-resolution bitmap. `UIImage(data:)` on a 48MP
+    /// HEIC decodes a ~200MB ARGB bitmap; base64-ing that into an in-memory JSON
+    /// body blows past the ~120MB extension memory cap → jetsam. ImageIO's
+    /// thumbnail path decodes straight to the target size instead. Returns nil if
+    /// the bytes aren't a decodable image (callers fall back to the original).
+    private func downsampledJPEG(from data: Data, maxPixel: CGFloat = 2048, quality: CGFloat = 0.8) -> Data? {
+        let srcOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let src = CGImageSourceCreateWithData(data as CFData, srcOptions) else { return nil }
+        let thumbOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+        ]
+        guard let cgThumb = CGImageSourceCreateThumbnailAtIndex(src, 0, thumbOptions as CFDictionary) else {
+            return nil
+        }
+        return UIImage(cgImage: cgThumb).jpegData(compressionQuality: quality)
+    }
+
     private func uploadImage(from item: NSSecureCoding?) {
         var data: Data?
         var mime = "image/jpeg"
@@ -807,30 +838,30 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
 
         if let img = item as? UIImage {
             preview = img
-            data = img.jpegData(compressionQuality: 0.8)
+            // Downsample via the encoded bytes when possible; fall back to a
+            // direct JPEG encode of the (already in-memory) UIImage.
+            if let raw = img.jpegData(compressionQuality: 1.0),
+               let small = downsampledJPEG(from: raw) {
+                data = small
+            } else {
+                data = img.jpegData(compressionQuality: 0.8)
+            }
         } else if let raw = item as? Data {
-            // Re-encode through UIImage to normalise + shrink large screenshots.
-            if let img = UIImage(data: raw) {
-                preview = img
-                if let jpeg = img.jpegData(compressionQuality: 0.8) {
-                    data = jpeg
-                } else {
-                    data = raw
-                }
+            // Downsample straight from the source bytes (no full-res bitmap).
+            if let small = downsampledJPEG(from: raw) {
+                data = small
+                preview = UIImage(data: small)
             } else {
                 data = raw
+                preview = UIImage(data: raw)
             }
         } else if let url = item as? URL, let raw = try? Data(contentsOf: url) {
-            if let img = UIImage(data: raw) {
-                preview = img
-                if let jpeg = img.jpegData(compressionQuality: 0.8) {
-                    data = jpeg
-                } else {
-                    data = raw
-                    mime = Self.mime(for: url)
-                }
+            if let small = downsampledJPEG(from: raw) {
+                data = small
+                preview = UIImage(data: small)
             } else {
                 data = raw
+                preview = UIImage(data: raw)
                 mime = Self.mime(for: url)
             }
         }

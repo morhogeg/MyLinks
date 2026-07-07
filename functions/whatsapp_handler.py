@@ -48,15 +48,21 @@ def _extract_key_points(detailed: str, limit: int = 3) -> list:
     return points
 
 
-def send_whatsapp_message(to_number: str, body: str):
-    """Send a WhatsApp message via Twilio."""
+def send_whatsapp_message(to_number: str, body: str) -> bool:
+    """Send a WhatsApp message via Twilio.
+
+    Returns True only when Twilio accepted the message (a real SID came back),
+    and False on any failure or the no-creds no-op branch. Callers rely on this
+    to avoid advancing state (reminder counts, digest delivery flags) when a
+    send didn't actually reach the user.
+    """
     account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
     auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
     from_number = os.environ.get("TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238886")
 
     if not account_sid or not auth_token:
         logger.warning(f"Twilio credentials missing. Would have sent to {to_number}: {body[:100]}...")
-        return
+        return False
 
     try:
         client = Client(account_sid, auth_token)
@@ -66,8 +72,10 @@ def send_whatsapp_message(to_number: str, body: str):
             to=to_number
         )
         logger.info(f"Sent message: {message.sid}")
+        return bool(message.sid)
     except Exception as e:
         logger.error(f"Twilio error: {e}")
+        return False
 
 
 def format_success_message(

@@ -2,9 +2,10 @@
 
 `.github/workflows/ios-testflight.yml` builds the web bundle, syncs it into the
 Capacitor iOS app, archives, and uploads to TestFlight **on a macOS runner** —
-so no one has to open Xcode. It runs automatically on pushes to `main` that touch
-`web/**`, and can be run by hand from the **Actions** tab → *iOS → TestFlight* →
-*Run workflow*.
+so no one has to open Xcode. During the auth cutover the automatic push trigger
+is **commented out**, so today it runs **manually only**: from the **Actions**
+tab → *iOS → TestFlight* → *Run workflow*. (Re-enable the `push` trigger in the
+workflow once the native auth setup is confirmed — see the note in the workflow.)
 
 The build number is `1000 + <run number>`, so it always increases and stays well
 clear of the manual builds.

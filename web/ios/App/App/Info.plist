@@ -30,7 +30,7 @@
 	<string>Main</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<string>arm64</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
@@ -62,5 +62,13 @@
 			</array>
 		</dict>
 	</array>
+	<!-- Privacy usage strings. The in-app image picker (an
+	     <input type="file" accept="image/*"> in WKWebView) can offer "Take Photo"
+	     and "Photo Library"; iOS TCC-kills any app that touches the camera or
+	     photo library without a declared purpose string, so both are required. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Machina uses the camera when you choose 'Take Photo' to capture an image to save and analyze.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Machina accesses your photo library when you choose an image to save and analyze.</string>
 </dict>
 </plist>

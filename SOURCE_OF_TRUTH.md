@@ -233,6 +233,17 @@ The multi-user auth work is **fully written but not live**:
    `APPCHECK_ENFORCE=true`, `OWNER_EMAIL` in functions env. **Rotate the Gemini
    key** (was pasted in chat 2026-06-23) and the **App Store Connect API `.p8`**
    (pasted in plaintext during CI setup).
+5a. **[ ] Share-doc `ownerUid` PII leak (owner decision — do before publishing any
+    share post-cutover).** `shared_cards`/`shared_collections` are world-readable
+    (`allow read: if true`) and store `ownerUid`, which for the owner's phone-keyed
+    workspace **is the phone number** — any client can `getDoc` a share ID and read
+    it. Rules can't hide a field. Two fixes: (a) publish snapshots via an Admin-SDK
+    function that omits `ownerUid` (store the owner mapping in a functions-only
+    collection), or (b) migrate the owner data doc off phone-number keying so
+    `ownerUid` is an opaque Auth uid. New-user workspaces already use Auth uids, so
+    (b) mainly affects the legacy owner doc. Details: `AUDIT_FINDINGS.md` #2. (The
+    UPDATE-takeover half of this finding is already **fixed** in
+    `firestore.rules.locked` — ships with task 2.)
 
 ### 🟠 P1 — App Store submission requirements (see §6 for the full readiness review)
 
@@ -318,6 +329,32 @@ The multi-user auth work is **fully written but not live**:
 19. **[ ] Cost guardrails.** Budget alerts on the Firebase/GCP project; per-user
     monthly quotas (see §7); email digest provider decision (SendGrid key or cut
     the email channel).
+19a. **[ ] Deferred audit remediations (from the 2026-07-07 sweep — full detail +
+    file:line in `AUDIT_FINDINGS.md`).** The high-value fixes shipped that session;
+    these remain, roughly high→low: **(data integrity)** embedding schema-drift +
+    zero-vector poisoning — cards permanently invisible to search with no repair
+    path (stop round-tripping embeddings through the client; make
+    `sync_link_embedding` repair array/updated docs; on embed failure omit the field
+    + set `needsEmbedding`); **(reliability)** a scheduled janitor to flip
+    `processing` cards older than ~15 min to `FAILED` (timeout/OOM kills bypass the
+    except); **(perf)** Feed re-render storm — throttle `useProcessingBanner`'s 200ms
+    tick, memoize the `filteredLinks`/facet-count chain, `React.memo` Card/ListCard,
+    move drag-scroll to refs, one shared "now" tick (currently 5 Hz full-tree
+    re-renders during any capture + per-card `setInterval`s); **(security
+    hardening)** SSRF scraper-branch dispatch (platform fetchers bypass `safe_get`;
+    substring routing); **(correctness)** semantic-search stale-response guard,
+    `/api/chat` `maxDuration`; **(a11y)** modal focus-trap/Escape + FAB `aria-label`;
+    **(polish)** light-theme solid `text-white`/`bg-white` in ConfirmDialog +
+    AddLinkForm Save; **(debt)** decompose `Feed.tsx` (2109 L) + `SettingsModal.tsx`
+    (1117 L) + extract `share_service.py` from `main.py` (2333 L), dedup the verbatim
+    RAG prompt across `answer_from_context`/`_stream` (+ fix the stream path citing
+    *all* cards when the `[[CITED:]]` marker is missing), fix/delete the dead-stale
+    `models.py` `LinkDocument`/`RelatedLink`, consolidate the two markdown stacks;
+    **(hygiene)** scrub owner PII from `models.py`/docs, add extension token-copy UI
+    + rename the stale "MyLinks" manifest, run the `firestore-rules-test` suite in
+    CI, `altool`→`-exportArchive`, filter the Xcode beta glob, lockstep the
+    App/ShareExt build numbers, ShareExt background-upload pending-record
+    reconciliation.
 
 ### 🟢 P3 — product roadmap (post-launch)
 
@@ -526,6 +563,57 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-07 — Production-readiness audit + remediation sweep (5-agent audit,
+  4-agent fix; ~19 issues fixed, rest tracked in `AUDIT_FINDINGS.md`).** A deep
+  five-agent audit (backend, React components, frontend data layer, security,
+  iOS/CI) surfaced ~30 verified issues beyond the existing §4 backlog; the detailed
+  reproduction/fix notes and full status table live in the new **`AUDIT_FINDINGS.md`**
+  (a remediation tracker, not a second source of truth — this file stays canonical).
+  Fixed this sweep across four non-overlapping workstreams (all builds green: `tsc
+  --noEmit` clean, `py_compile` clean, plist/YAML lint OK):
+  · **Security rules (`firestore.rules.locked`):** the staged ruleset had a
+  public-share **takeover** bug — `shared_cards`/`shared_collections` UPDATE was
+  authorized against the *incoming* doc's `ownerUid`, so any signed-in user could
+  `setDoc`-overwrite anyone's public share (phishing repoint). Split create/update
+  so update requires owning the *existing* owner and forbids changing `ownerUid`;
+  regression test added. **Ships at cutover** (task 2). Left a `SECURITY TODO`: the
+  world-readable share docs still store `ownerUid` (= owner phone number) — needs a
+  data-model fix (Admin-SDK publish without `ownerUid`, or move owner off
+  phone-keying); **owner decision, see §4 task 5a below.**
+  · **Backend (`functions/`):** account deletion now also removes the `syntheses`
+  subcollection + `task_logs` (was leaving user data → App Review 5.1.1(v) risk);
+  `send_whatsapp_message` returns `bool` and reminder/digest callers only advance
+  state on a real send (was marking reminders COMPLETED / digests sent on Twilio
+  failure); rate-limit `client_ip` uses the GFE-appended **last** XFF hop (first hop
+  was client-spoofable → bucket bypass); WhatsApp webhook now dedups on `MessageSid`
+  + URL (Twilio retries were duplicating sends/Gemini spend); the `processing`-status
+  write moved inside the try (was losing captures on throw); `requirements.txt`
+  capped to next-major (was fully floor-pinned).
+  · **Frontend (`web/`):** added `app/error.tsx` + `app/global-error.tsx` (zero
+  error boundaries before — one bad doc white-screened the app); `toLink()`
+  normalizer at every snapshot boundary (defaults `tags`/`metadata`); AskBrain
+  stream lifecycle guard (generation counter + AbortController — New/switch/re-send
+  mid-stream no longer crashes or corrupts saved history); removed the destructive
+  `key={refreshKey}` Feed remount; SettingsModal error toasts + guard against
+  overwriting real config with defaults on a failed load; `persistentLocalCache`
+  (IndexedDB — no more whole-library re-read every launch); replaced the two
+  remaining `Boolean(window.Capacitor)` native checks; `retryFailedLink` gets a
+  60s timeout + preserves `createdAt`; new saves use `serverTimestamp()`;
+  `confidence?: string | number`; `@capacitor/cli` → devDeps; deleted committed
+  `web/output.json`.
+  · **iOS/CI:** added `NSCameraUsageDescription` + `NSPhotoLibraryUsageDescription`
+  (missing → camera tap from the in-app picker was a **guaranteed crash + App Review
+  reject**); `UIRequiredDeviceCapabilities` `armv7`→`arm64`; Share Extension now
+  downsamples images (ImageIO thumbnail ≤2048px) before base64 (was jetsamming on
+  large photos); favicon fetch hits the site's own `/favicon.ico` instead of Google
+  (privacy-manifest mismatch); CI fails fast on empty `NEXT_PUBLIC_FIREBASE_*`
+  secrets and verifies the `machina`/`REVERSED_CLIENT_ID` URL schemes survive into
+  the archived Info.plist; `GoogleService-Info.plist` actually gitignored now (docs
+  claimed it was); `docs/IOS_CICD.md` corrected.
+  **Not yet shipped — needs owner deploy** (Vercel auto on push; `./deploy-functions.sh`
+  for backend; TestFlight for iOS; the rules fix only goes live with the task-2
+  cutover). Deferred (higher-risk, own passes) are logged in `AUDIT_FINDINGS.md` and
+  the new §4 P2 items below.
 - **2026-07-06 — "Show by" status filter now has a dismissable pill (commits
   `f575529`, `c77f873`).** The status filter (Archive/Favorites/Unread/Read/
   Reminders) changed the feed but left no on-page indicator — unlike tags. Added a

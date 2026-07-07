@@ -1,9 +1,40 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, getDocs, getDoc, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, getDocs, getDoc, serverTimestamp, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { db, appCheckHeaders } from './firebase';
 import { authHeaders } from './auth';
-import { apiUrl } from './api';
+import { apiUrl, fetchWithTimeout } from './api';
 
-import { Link, LinkStatus, User } from './types';
+import { Link, LinkMetadata, LinkStatus, User } from './types';
+
+/**
+ * Normalize a Firestore link doc into a safe `Link`.
+ *
+ * `tags`, `metadata`, `title`, `category`, and `summary` are typed required in
+ * lib/types.ts, but Firestore doesn't guarantee them — a legacy or malformed
+ * doc can omit them, and code like `link.tags.some(...)` / `link.title.toLowerCase()`
+ * then throws during render and whites out the whole feed. Defaulting the
+ * required fields at the snapshot boundary (mirroring how lib/chats.ts's
+ * toSession normalizes) keeps the UI resilient. Reused by every reader so no
+ * code path produces an un-normalized Link.
+ */
+export function toLink(doc: QueryDocumentSnapshot<DocumentData>): Link {
+    const data = doc.data();
+    const md = (data.metadata ?? {}) as Partial<LinkMetadata>;
+    return {
+        ...data,
+        id: doc.id,
+        title: typeof data.title === 'string' ? data.title : '',
+        summary: typeof data.summary === 'string' ? data.summary : '',
+        category: typeof data.category === 'string' ? data.category : 'General',
+        tags: Array.isArray(data.tags) ? data.tags : [],
+        status: data.status ?? 'unread',
+        createdAt: data.createdAt ?? 0,
+        metadata: {
+            originalTitle: md.originalTitle ?? '',
+            estimatedReadTime: md.estimatedReadTime ?? 0,
+            ...md,
+        },
+    } as Link;
+}
 
 /**
  * Get all links from Firestore (one-time fetch)
@@ -14,10 +45,7 @@ export async function getLinksFromFirestore(uid: string): Promise<Link[]> {
     const q = query(linksRef, orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
 
-    return snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
-        id: doc.id,
-        ...doc.data()
-    } as Link));
+    return snapshot.docs.map(toLink);
 }
 
 /**
@@ -52,7 +80,11 @@ export async function saveLink(uid: string, linkData: Partial<Link>): Promise<vo
 
     await addDoc(linksRef, {
         ...cleanData,
-        createdAt: Date.now(),
+        // serverTimestamp() so ordering is consistent across devices/clocks and
+        // survives offline replay. Feed's getTimestampNumber already tolerates a
+        // Firestore Timestamp (via toMillis), so sorting stays correct; the
+        // pending-write value simply reads as 0 until the server resolves it.
+        createdAt: serverTimestamp(),
         status: 'unread',
         isRead: false
     });
@@ -80,11 +112,11 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
             // Tag context is a non-critical optimization.
         }
 
-        const response = await fetch(apiUrl('/api/analyze'), {
+        const response = await fetchWithTimeout(apiUrl('/api/analyze'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
             body: JSON.stringify({ url: link.url, existingTags, uid }),
-        });
+        }, 60_000);
         const text = await response.text();
         let data: any;
         try {
@@ -119,15 +151,23 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
             isRead: false,
             error: null,
             failedAt: null,
-            createdAt: Date.now(),
+            // Preserve the original createdAt — a successful retry should update
+            // the card in place, not teleport it to the top of the feed.
         });
     } catch (err) {
         // Re-mark as failed so it stays a visible, retryable card — never lost.
-        await updateDoc(linkRef, {
-            status: 'failed',
-            error: err instanceof Error ? err.message.slice(0, 300) : 'Retry failed',
-            failedAt: Date.now(),
-        });
+        // Guard this write in its own try: if it also fails (e.g. offline), we
+        // must not swallow the original error or leave the throw un-reached.
+        try {
+            await updateDoc(linkRef, {
+                status: 'failed',
+                error: err instanceof Error ? err.message.slice(0, 300) : 'Retry failed',
+                failedAt: Date.now(),
+            });
+        } catch {
+            // Best-effort: the card stays in `processing`, but the caller still
+            // learns the retry failed via the re-throw below.
+        }
         throw err;
     }
 }

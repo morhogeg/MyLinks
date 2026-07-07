@@ -134,12 +134,20 @@ def delete_user_data(uid: str) -> int:
     db = get_db()
     user_ref = db.collection('users').document(uid)
     deleted = 0
-    for sub in ('links', 'chats', 'collections'):
+    # 'syntheses' holds the M12 weekly recaps at users/{uid}/syntheses/{week_id};
+    # they're a subcollection so they survive the parent user doc's deletion and
+    # must be swept explicitly.
+    for sub in ('links', 'chats', 'collections', 'syntheses'):
         for doc in user_ref.collection(sub).stream():
             doc.reference.delete()
             deleted += 1
     # Any queued processing rows for this user.
     for doc in db.collection('pending_processing').where('uid', '==', uid).stream():
+        doc.reference.delete()
+        deleted += 1
+    # Background-processing heartbeats for this user. The uid is stored nested
+    # under `data.uid` (see log_to_firestore in main.py), so query on that path.
+    for doc in db.collection('task_logs').where('data.uid', '==', uid).stream():
         doc.reference.delete()
         deleted += 1
     user_ref.delete()

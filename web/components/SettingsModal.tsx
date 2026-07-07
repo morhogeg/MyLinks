@@ -15,6 +15,7 @@ import { deleteAccount } from '@/lib/auth';
 import { auth } from '@/lib/firebase';
 import ProfileAvatar from './ProfileAvatar';
 import ConfirmDialog from './ConfirmDialog';
+import { useToast } from './Toast';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import Dropdown from './Dropdown';
 import { Trash2 } from 'lucide-react';
@@ -77,6 +78,7 @@ const DEFAULT_SETTINGS: User['settings'] = {
 };
 
 export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: SettingsModalProps) {
+    const toast = useToast();
     const { theme, setTheme } = useTheme();
     const { authUid, email: accountEmail, displayName, photoURL, signOut } = useAuth();
 
@@ -93,6 +95,10 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
     const [settings, setSettings] = useState<User['settings']>(DEFAULT_SETTINGS);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    // True when the last settings load failed. We then show DEFAULT_SETTINGS but
+    // must NOT let the user Save them over their real config — so Save is disabled
+    // and an inline notice offers a retry until a load succeeds.
+    const [loadError, setLoadError] = useState(false);
     // 'main' = the settings list; 'digest' = the curation sub-screen.
     const [view, setView] = useState<'main' | 'digest'>('main');
 
@@ -275,6 +281,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
 
     const loadSettings = async () => {
         setIsLoading(true);
+        setLoadError(false);
         try {
             const userSettings = await getUserSettings(uid);
             const loaded: User['settings'] = userSettings
@@ -301,13 +308,22 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
             // Baseline for dirty-tracking (M7): the exact state we just loaded.
             setSettingsBaseline(JSON.stringify(loaded));
         } catch (error) {
+            // A failed load must NOT silently present defaults that a subsequent
+            // Save would then write over the user's real config. Flag the error,
+            // surface it inline, and keep Save disabled until a load succeeds.
             console.error('Failed to load settings:', error);
+            setLoadError(true);
         } finally {
             setIsLoading(false);
         }
     };
 
     const handleSave = async () => {
+        // Never overwrite real config with defaults after a failed load.
+        if (loadError) {
+            toast.error("Can't save — settings didn't load. Reload and try again.");
+            return;
+        }
         setIsSaving(true);
         try {
             await updateUserSettings(uid, {
@@ -328,7 +344,9 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
             }
             onClose();
         } catch (error) {
+            // Keep the modal open so the user's edits aren't lost, and tell them.
             console.error('Failed to save settings:', error);
+            toast.error("Couldn't save your settings. Please try again.");
         } finally {
             setIsSaving(false);
         }
@@ -926,6 +944,15 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                     style={isMobile ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' } : undefined}
                 >
                   <div className="w-full max-w-2xl mx-auto flex items-center justify-end gap-2">
+                    {loadError && (
+                        <button
+                            onClick={() => loadSettings()}
+                            className="mr-auto inline-flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                        >
+                            <RefreshCw className="w-4 h-4" />
+                            Couldn&apos;t load settings — retry
+                        </button>
+                    )}
                     <button
                         onClick={handleClose}
                         className="h-10 px-4 rounded-full text-sm font-semibold text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
@@ -934,7 +961,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour }: Se
                     </button>
                     <button
                         onClick={handleSave}
-                        disabled={isSaving || isLoading}
+                        disabled={isSaving || isLoading || loadError}
                         className="h-10 px-5 rounded-full text-sm font-semibold bg-accent text-white hover:bg-accent/90 transition-colors disabled:opacity-50 shadow-lg shadow-accent/20 cursor-pointer disabled:cursor-not-allowed"
                     >
                         {isSaving ? 'Saving…' : 'Save changes'}
