@@ -610,10 +610,17 @@ exact-match, capped.
   secrets and verifies the `machina`/`REVERSED_CLIENT_ID` URL schemes survive into
   the archived Info.plist; `GoogleService-Info.plist` actually gitignored now (docs
   claimed it was); `docs/IOS_CICD.md` corrected.
-  **Not yet shipped — needs owner deploy** (Vercel auto on push; `./deploy-functions.sh`
-  for backend; TestFlight for iOS; the rules fix only goes live with the task-2
-  cutover). Deferred (higher-risk, own passes) are logged in `AUDIT_FINDINGS.md` and
-  the new §4 P2 items below.
+  **SHIPPED (commit `c6e31b1`, merged to `main` as `52d4da7`):** web live via Vercel;
+  **all 23 affected Cloud Functions redeployed** (`./deploy-functions.sh` — the
+  rate-limit/whatsapp/delete/dedup/process_link_background changes are live: analyze_*,
+  ask_brain, get_article, share_ingest, claim/delete (+_http), whatsapp_webhook,
+  check_reminders, send_digests (+force twins), send_digest_now, rebuild_connections,
+  get_share_config, share_page, backfills, ping, debug_status, process_link_background);
+  TestFlight **run #42 → build 1042** triggered on `main`. **NOT live:** the
+  `firestore.rules.locked` takeover fix — it only deploys with the task-2 cutover
+  (`cp firestore.rules.locked firestore.rules && firebase deploy --only firestore:rules`).
+  Deferred (higher-risk, own passes) are logged in `AUDIT_FINDINGS.md` and the new §4
+  task 19a below.
 - **2026-07-06 — "Show by" status filter now has a dismissable pill (commits
   `f575529`, `c77f873`).** The status filter (Archive/Favorites/Unread/Read/
   Reminders) changed the feed but left no on-page indicator — unlike tags. Added a
