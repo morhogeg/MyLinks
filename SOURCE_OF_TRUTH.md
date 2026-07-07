@@ -589,6 +589,22 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-08 — Sources filter regrouped by platform + account sub-sections
+  (`20e6a91`; TestFlight run #56 → build 1056; Vercel live).** Resolves the
+  collision noted in the previous entry the right way: rather than duplicating the
+  parallel session's live Sources feature, this **layers a platform-grouped
+  presentation on top of their `source.ts` foundation**. New `SourceFacetList.tsx`
+  (used by both the desktop Sources popover and the mobile Filters sheet) groups
+  the flat `buildSourceFacets()` list into one row per platform (YouTube, X, …)
+  plus **Websites** and **Screenshots** buckets, each expandable to the specific
+  accounts/publishers under it. A single-facet group renders as a plain leaf.
+  Selecting a group header toggles all its facet keys via new
+  `handleToggleSourceKeys`; a partial-selection dot shows when only some accounts
+  are on. Purely presentational — their `selectedSources` state, the source
+  filter predicate, search-by-source, and clear-all handlers are all unchanged.
+  tsc + `next build` clean. **Still pending the user's screenshots:** the reported
+  Settings **toggle side-gap** (component is already at iOS spec) and **top-chip
+  alignment** (uniform 36px, Ask centered) — no code change made for either yet.
 - **2026-07-08 — Share "Open Machina" switched to Apple's supported path
   (`2502123`, merge `45b93ab`; TestFlight run #55 → build 1055).** The button
   never worked because iOS **forbids app extensions from launching the host app**
