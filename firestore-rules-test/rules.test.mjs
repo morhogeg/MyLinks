@@ -185,7 +185,12 @@ test('stranger and anon cannot read syntheses', async () => {
   await assertFails(getDoc(doc(anonDb(), 'users', OWNER_DOC, 'syntheses', '2026-W27')));
 });
 
-// ── shared_cards / shared_collections: public read, owner-only write ─────────
+// ── shared_cards / shared_collections: public read, Admin-SDK-only write ──────
+//
+// Writes now go exclusively through publish_share_http / unpublish_share_http
+// (Admin SDK) so the world-readable snapshot never carries `ownerUid` (PII). The
+// rules therefore deny ALL client writes — including the owner's. This also makes
+// the public-share takeover impossible by construction.
 
 for (const col of ['shared_cards', 'shared_collections']) {
   const existing = col === 'shared_cards' ? 'card-share-1' : 'col-share-1';
@@ -195,30 +200,25 @@ for (const col of ['shared_cards', 'shared_collections']) {
     await assertSucceeds(getDoc(doc(strangerDb(), col, existing)));
   });
 
-  test(`${col}: owner can create/update/delete their snapshot`, async () => {
-    const db = ownerDb();
-    await assertSucceeds(setDoc(doc(db, col, 'new-share'), { ownerUid: OWNER_DOC, x: 1 }));
-    await assertSucceeds(updateDoc(doc(db, col, existing), { x: 2 }));
-    await assertSucceeds(deleteDoc(doc(db, col, existing)));
+  test(`${col}: NO client can write — not even the owner (Admin SDK only)`, async () => {
+    // The owner publishes via the Admin-SDK endpoint, never a direct write.
+    await assertFails(setDoc(doc(ownerDb(), col, 'new-share'), { x: 1 }));
+    await assertFails(updateDoc(doc(ownerDb(), col, existing), { x: 2 }));
+    await assertFails(deleteDoc(doc(ownerDb(), col, existing)));
   });
 
-  test(`${col}: non-owners cannot write`, async () => {
-    // Forged ownerUid pointing at someone else's workspace.
+  test(`${col}: strangers and anon cannot write`, async () => {
     await assertFails(setDoc(doc(strangerDb(), col, 'forged'), { ownerUid: OWNER_DOC }));
-    // ownerUid pointing at a nonexistent workspace.
-    await assertFails(setDoc(doc(strangerDb(), col, 'forged2'), { ownerUid: 'nope' }));
     await assertFails(updateDoc(doc(strangerDb(), col, existing), { x: 3 }));
     await assertFails(deleteDoc(doc(strangerDb(), col, existing)));
-    await assertFails(setDoc(doc(anonDb(), col, 'anon-share'), { ownerUid: OWNER_DOC }));
+    await assertFails(setDoc(doc(anonDb(), col, 'anon-share'), { x: 1 }));
     await assertFails(deleteDoc(doc(anonDb(), col, existing)));
   });
 
-  test(`${col}: stranger cannot overwrite an existing share with their own ownerUid`, async () => {
-    // Public-share takeover: shareIds are public (they appear in /s?id= and
-    // /c?id= URLs). The existing `${existing}` doc is owned by OWNER_DOC (seeded
-    // above). A signed-in stranger owns their own workspace, so a naive
-    // owns(request.resource.data.ownerUid) rule would let this setDoc-overwrite
-    // succeed. The update rule must check the EXISTING owner, so this must fail.
+  test(`${col}: public-share takeover is impossible (all client writes denied)`, async () => {
+    // shareIds are public (they appear in /s?id= and /c?id= URLs). Even a
+    // signed-in stranger who forges their own ownerUid cannot overwrite the
+    // existing share, because client writes to shared_* are denied outright.
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'users', STRANGER_AUTH), {
         authUids: [STRANGER_AUTH],
@@ -233,6 +233,15 @@ for (const col of ['shared_cards', 'shared_collections']) {
     );
   });
 }
+
+// ── shared_owners: functions-only shareId → ownerUid map, never client-visible ─
+
+test('shared_owners: denied for owner, stranger, and anon (read and write)', async () => {
+  for (const db of [ownerDb(), strangerDb(), anonDb()]) {
+    await assertFails(getDoc(doc(db, 'shared_owners', 'card-share-1')));
+    await assertFails(setDoc(doc(db, 'shared_owners', 'x'), { ownerUid: OWNER_DOC }));
+  }
+});
 
 // ── Functions-only collections: always denied ────────────────────────────────
 

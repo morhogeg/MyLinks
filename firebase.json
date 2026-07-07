@@ -58,6 +58,14 @@
         "function": "delete_account_http"
       },
       {
+        "source": "/api/publish-share",
+        "function": "publish_share_http"
+      },
+      {
+        "source": "/api/unpublish-share",
+        "function": "unpublish_share_http"
+      },
+      {
         "source": "/s",
         "function": "share_page"
       },

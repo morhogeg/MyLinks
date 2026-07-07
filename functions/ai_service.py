@@ -2,11 +2,42 @@ import os
 import json
 import logging
 import time
-from typing import List
+from typing import List, Optional
 from google import genai
+from google.cloud.firestore_v1.vector import Vector
 from models import AIAnalysis, BrainAnswer, WeeklySynthesis
 
 logger = logging.getLogger(__name__)
+
+
+def embedding_needs_repair(raw) -> bool:
+    """True when a stored `embedding_vector` can't serve semantic search and
+    must be (re)generated.
+
+    Three failure shapes, all of which make a card silently invisible to
+    `find_nearest` (or make its neighbours meaningless) with no error:
+
+    - **Missing** — never embedded (or dropped after an embed failure).
+    - **Schema drift** — a plain `list`, not a Firestore `Vector`. Happens when
+      an embedding is round-tripped through the client or written by an `update`
+      that didn't wrap it. `find_nearest` only indexes real `Vector` fields, so
+      a list-typed embedding is dead weight the card can never be found by.
+    - **Degenerate / poisoned** — an all-near-zero vector (the legacy
+      embed-failure sentinel was `[1e-9]*768`). It indexes fine but ranks
+      against everything at random, so the card pollutes results instead of
+      being findable.
+
+    Centralised so the create trigger, the background pipeline, and both
+    backfills all agree on what "needs an embedding" means.
+    """
+    if raw is None:
+        return True
+    if not isinstance(raw, Vector):
+        return True
+    values = list(raw)
+    if not values or all(abs(v) < 1e-6 for v in values):
+        return True
+    return False
 
 # Single source of truth for the analysis/generation model. Flows to text
 # analysis, image vision, and graph_service. Change here to swap tiers everywhere.
@@ -568,16 +599,21 @@ Return ONLY a JSON object matching the schema (title, narrative, themes[title,in
             "openQuestion": data.get("openQuestion") or "",
         }
 
-    def embed_text(self, text: str) -> List[float]:
-        """Generate vector embedding for text using Gemini.
+    def embed_text(self, text: str) -> Optional[List[float]]:
+        """Generate a vector embedding for text using Gemini.
 
-        Embeddings are non-critical (semantic search / related links degrade
-        gracefully), so a zero-ish vector is returned on failure rather than
-        raising — that keeps a good analysis from being thrown away.
+        Returns `None` on failure (no client, or the API errored) rather than a
+        zero-ish sentinel. Callers MUST treat `None` as "no embedding": omit the
+        `embedding_vector` field and set `needsEmbedding=True` so a backfill can
+        find and repair the card later. Writing a fake near-zero vector instead
+        (the old behaviour) poisoned search — the card looked embedded, ranked
+        against everything at random, and no backfill could tell it apart from a
+        real embedding. Embeddings are non-critical (search/related links
+        degrade gracefully), so failure never throws away a good analysis.
         """
         if not self.client:
-            logger.warning("Gemini client not initialized, returning mock embedding")
-            return [1e-9] * EMBEDDING_DIMENSIONS
+            logger.warning("Gemini client not initialized — skipping embedding")
+            return None
 
         try:
             result = self.client.models.embed_content(
@@ -588,7 +624,7 @@ Return ONLY a JSON object matching the schema (title, narrative, themes[title,in
             return result.embeddings[0].values
         except Exception as e:
             logger.error(f"Embedding generation failed: {str(e)}")
-            return [1e-9] * EMBEDDING_DIMENSIONS
+            return None
 
 
 # Backward compatibility alias

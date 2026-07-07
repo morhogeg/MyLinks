@@ -78,24 +78,25 @@ service cloud.firestore {
     }
 
     // Shared collections & cards: public, read-only snapshots for share links so
-    // logged-out visitors can open /c?id= and /s?id= pages. Writes are limited to
-    // the owner of the referenced workspace (docs carry `ownerUid`).
+    // logged-out visitors can open /c?id= and /s?id= pages. Writes are Admin-SDK
+    // ONLY (via publish_share_http / unpublish_share_http) — never client-direct.
+    // This is the fix for the PII leak: the world-readable snapshot must not carry
+    // `ownerUid` (for the phone-keyed owner it's a phone number, and any client can
+    // read a public share doc). Rules can't hide a field, so the owner mapping
+    // lives in `shared_owners` (denied to clients, below) and clients can't write
+    // these docs to sneak `ownerUid` back in.
     match /shared_collections/{shareId} {
       allow read: if true;
-      allow create: if owns(request.resource.data.ownerUid);
-      allow update: if owns(resource.data.ownerUid) && request.resource.data.ownerUid == resource.data.ownerUid;
-      allow delete: if owns(resource.data.ownerUid);
+      allow write: if false;
     }
-    // SECURITY TODO: these share docs are world-readable (`allow read: if true`) yet
-    // store `ownerUid`, which for the owner is a phone number (PII). Rules alone
-    // can't hide a field (reads are all-or-nothing per doc) — keep `ownerUid` OUT of
-    // the world-readable snapshot: publish via the Admin SDK to a doc without it, or
-    // migrate the owner doc off phone-number keying. Tracked separately.
     match /shared_cards/{shareId} {
       allow read: if true;
-      allow create: if owns(request.resource.data.ownerUid);
-      allow update: if owns(resource.data.ownerUid) && request.resource.data.ownerUid == resource.data.ownerUid;
-      allow delete: if owns(resource.data.ownerUid);
+      allow write: if false;
+    }
+    // shared_owners: functions-only shareId → ownerUid map. Never client-readable
+    // (that would re-expose the PII we just removed) or client-writable.
+    match /shared_owners/{shareId} {
+      allow read, write: if false;
     }
 
     // pending_processing: only Cloud Functions (admin SDK)

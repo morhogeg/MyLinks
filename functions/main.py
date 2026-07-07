@@ -20,6 +20,7 @@ import hmac
 import html as _html
 import logging
 import requests
+from typing import Optional
 from datetime import datetime, timezone
 
 # Firebase Functions framework
@@ -601,7 +602,12 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
                 "actionableTakeaway": analysis.get("actionableTakeaway")
             },
             "concepts": analysis.get("concepts", []),
-            "embedding_vector": embedding,
+            # NB: no `embedding_vector` here on purpose. It used to be returned
+            # and round-tripped through the client, which stored it as a plain
+            # list — invisible to `find_nearest`. The `sync_link_embedding`
+            # Firestore trigger now owns the embedding server-side (writes a real
+            # Vector on create AND on the retry update). The `embedding` computed
+            # above is still used locally for `find_related_links`.
             "relatedLinks": related_links,
             "sourceType": "youtube" if is_youtube else "web",
             "sourceName": scraped.get("source_name") or analysis.get("sourceName"),
@@ -1688,6 +1694,138 @@ def _share_not_found_html() -> str:
     )
 
 
+# ─────────────────────────────────────────────
+# Publishing public shares (Admin-SDK; keeps ownerUid out of world-readable docs)
+# ─────────────────────────────────────────────
+#
+# The world-readable `shared_cards`/`shared_collections` docs must NOT carry
+# `ownerUid` — for the phone-keyed owner workspace that value is a phone number
+# (PII), and any client could `getDoc` a share id and read it. Rules can't hide a
+# field, so the fix is structural: publish via these Admin-SDK endpoints, which
+# write the public snapshot WITHOUT `ownerUid` and keep the owner mapping in the
+# functions-only `shared_owners/{shareId}` collection (rules deny all client
+# access). The locked ruleset denies direct client writes to `shared_*`, so these
+# endpoints (Admin SDK bypasses rules) are the only writers.
+
+_SHARE_COLLECTIONS = {"card": "shared_cards", "collection": "shared_collections"}
+
+
+def _share_owner_uid(db, share_id: str, public_coll: str) -> Optional[str]:
+    """Resolve who owns a share id. Prefers the functions-only `shared_owners`
+    mapping; falls back to a legacy public doc's `ownerUid` (pre-migration shares
+    still carry it) so ownership checks keep working during the transition."""
+    owner_snap = db.collection("shared_owners").document(share_id).get()
+    if owner_snap.exists:
+        return (owner_snap.to_dict() or {}).get("ownerUid")
+    legacy = db.collection(public_coll).document(share_id).get()
+    if legacy.exists:
+        return (legacy.to_dict() or {}).get("ownerUid")
+    return None
+
+
+def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict) -> dict:
+    """Write a public share snapshot for `uid` WITHOUT `ownerUid`, plus the
+    functions-only owner mapping. Rejects overwriting a share id owned by someone
+    else (the server-side equivalent of the rules' anti-takeover guard)."""
+    public_coll = _SHARE_COLLECTIONS.get(share_type)
+    if not public_coll:
+        raise ValueError("invalid share type")
+    if not share_id or not isinstance(payload, dict):
+        raise ValueError("shareId and payload are required")
+
+    db = get_db()
+    existing_owner = _share_owner_uid(db, share_id, public_coll)
+    if existing_owner is not None and existing_owner != uid:
+        raise PermissionError("This share id belongs to another account")
+
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    doc = {k: v for k, v in payload.items() if v is not None}
+    doc.pop("ownerUid", None)  # never persist PII in the world-readable doc
+    doc["shareId"] = share_id
+    doc["publishedAt"] = now_ms
+
+    db.collection(public_coll).document(share_id).set(doc)
+    db.collection("shared_owners").document(share_id).set({
+        "ownerUid": uid, "type": share_type, "publishedAt": now_ms,
+    })
+    return {"shareId": share_id}
+
+
+def _unpublish_share_logic(uid: str, share_type: str, share_id: str) -> dict:
+    """Delete a public share + its owner mapping, if `uid` owns it."""
+    public_coll = _SHARE_COLLECTIONS.get(share_type)
+    if not public_coll:
+        raise ValueError("invalid share type")
+    if not share_id:
+        raise ValueError("shareId is required")
+
+    db = get_db()
+    owner = _share_owner_uid(db, share_id, public_coll)
+    if owner is not None and owner != uid:
+        raise PermissionError("This share id belongs to another account")
+
+    db.collection(public_coll).document(share_id).delete()
+    db.collection("shared_owners").document(share_id).delete()
+    return {"success": True}
+
+
+@https_fn.on_request()
+def publish_share_http(req: https_fn.Request) -> https_fn.Response:
+    """Publish (or re-publish) a card/collection as a public snapshot.
+
+    HTTP (not callable) so the native WKWebView can reach it (callable CORS
+    preflight fails from `capacitor://localhost` — see claim_workspace_http).
+    Body: { type: 'card'|'collection', shareId: str, payload: object, uid?: str }.
+    `payload` is the snapshot the client built (e.g. toSharedCard); the server
+    strips any `ownerUid` and stamps shareId/publishedAt. Returns { shareId }."""
+    if req.method == 'OPTIONS':
+        return _cors_preflight(req)
+    headers = _cors_headers(req)
+    try:
+        data = req.get_json(silent=True) or {}
+    except Exception:
+        data = {}
+    uid, auth_err = _authed_uid(req, headers, data.get("uid"))
+    if auth_err:
+        return auth_err
+    try:
+        result = _publish_share_logic(
+            uid, data.get("type"), data.get("shareId"), data.get("payload"),
+        )
+        return https_fn.Response(json.dumps(result), status=200, headers=headers, mimetype='application/json')
+    except PermissionError as e:
+        return _error_response(str(e), 403, headers)
+    except ValueError as e:
+        return _error_response(str(e), 400, headers)
+    except Exception as e:
+        return _server_error(headers, e, "Publish failed")
+
+
+@https_fn.on_request()
+def unpublish_share_http(req: https_fn.Request) -> https_fn.Response:
+    """Stop sharing a card/collection (delete the public snapshot + owner map).
+    Body: { type: 'card'|'collection', shareId: str, uid?: str }."""
+    if req.method == 'OPTIONS':
+        return _cors_preflight(req)
+    headers = _cors_headers(req)
+    try:
+        data = req.get_json(silent=True) or {}
+    except Exception:
+        data = {}
+    uid, auth_err = _authed_uid(req, headers, data.get("uid"))
+    if auth_err:
+        return auth_err
+    try:
+        result = _unpublish_share_logic(uid, data.get("type"), data.get("shareId"))
+        return https_fn.Response(json.dumps(result), status=200, headers=headers, mimetype='application/json')
+    except PermissionError as e:
+        return _error_response(str(e), 403, headers)
+    except ValueError as e:
+        return _error_response(str(e), 400, headers)
+    except Exception as e:
+        return _server_error(headers, e, "Unpublish failed")
+
+
 @https_fn.on_request()
 def share_page(req: https_fn.Request) -> https_fn.Response:
     """Server-rendered public page for a shared card (/s) or collection (/c).
@@ -2090,6 +2228,9 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             "status": LinkStatus.PROCESSING.value,
             "sourceType": "image" if is_image else "web",
             "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+            # When processing began — the janitor uses this (not createdAt, which
+            # a retry preserves) to age out cards stuck in `processing`.
+            "processingStartedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
             "metadata": {"originalTitle": "", "estimatedReadTime": 0},
         })
         ref.update({"cardId": card_id})
@@ -2195,7 +2336,6 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             "detailedSummary": analysis.get("detailedSummary"),
             "tags": analysis.get("tags", []),
             "concepts": analysis.get("concepts", []),
-            "embedding_vector": Vector(embedding),
             "relatedLinks": related_links,
             "category": analysis.get("category", "General"),
             "sourceName": scraped.get("source_name") or analysis.get("sourceName") or ("Screenshot" if is_image else None),
@@ -2209,6 +2349,14 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
                 "actionableTakeaway": analysis.get("actionableTakeaway")
             }
         }
+
+        # Embedding: only store a real Vector. If the embed failed (None), omit
+        # the field and flag the card so a backfill repairs it later — never
+        # write a poisoned near-zero vector that looks embedded but isn't.
+        if embedding:
+            link_data["embedding_vector"] = Vector(embedding)
+        else:
+            link_data["needsEmbedding"] = True
 
         # Add YouTube-specific metadata
         if is_youtube:
@@ -2299,6 +2447,99 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
 def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
     """Scheduled function that runs every 2 minutes to check for pending reminders."""
     run_reminder_check()
+
+
+# How long a card may sit in `processing` before the janitor rules it dead.
+# Real analysis finishes in seconds to ~1 min; 15 min is comfortably past any
+# legitimate run, so this only catches genuinely-stuck captures.
+_PROCESSING_TIMEOUT_MS = 15 * 60 * 1000
+
+
+def _to_ms(value) -> Optional[int]:
+    """Coerce a Firestore timestamp field to epoch-ms. Handles our int-ms writes
+    and Firestore `Timestamp`/`datetime` (from `serverTimestamp()`); returns None
+    for anything unrecognised (or a still-unresolved pending server timestamp)."""
+    if isinstance(value, (int, float)):
+        return int(value)
+    if hasattr(value, "timestamp"):
+        try:
+            return int(value.timestamp() * 1000)
+        except Exception:
+            return None
+    return None
+
+
+def run_processing_janitor() -> dict:
+    """Flip cards stuck in `processing` past the timeout to a retryable FAILED.
+
+    A timeout/OOM kill of `process_link_background` (or a client that dies mid
+    `/api/analyze` retry) never reaches the `except` that marks the card FAILED,
+    so the placeholder rots at `processing` forever — an eternal spinner the user
+    can't retry. This sweep is the backstop: it ages those out so they become
+    visible, retryable failed cards.
+
+    Uses a collection-group query (equality-only → served by the default
+    single-field index) so it doesn't scan every user. Age is measured from
+    `processingStartedAt` when present (a retry preserves the old `createdAt`),
+    falling back to `createdAt`.
+    """
+    db = get_db()
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    cutoff = now_ms - _PROCESSING_TIMEOUT_MS
+    report = {"scanned": 0, "failed_out": 0, "errors": []}
+
+    try:
+        stuck = db.collection_group("links").where(
+            "status", "==", LinkStatus.PROCESSING.value
+        ).limit(200).stream()
+    except Exception as e:
+        logger.error(f"Janitor query failed: {e}")
+        report["errors"].append(str(e))
+        return report
+
+    for doc in stuck:
+        report["scanned"] += 1
+        d = doc.to_dict() or {}
+        started = _to_ms(d.get("processingStartedAt")) or _to_ms(d.get("createdAt"))
+        # No usable timestamp → treat as stuck (a processing card with no age is
+        # already anomalous); otherwise only act once it's past the cutoff.
+        if started is not None and started > cutoff:
+            continue
+        try:
+            doc.reference.update({
+                "status": LinkStatus.FAILED.value,
+                "error": "Processing timed out — tap to retry.",
+                "failedAt": now_ms,
+            })
+            report["failed_out"] += 1
+        except Exception as e:
+            logger.error(f"Janitor failed to update {doc.id}: {e}")
+            report["errors"].append(f"{doc.id}: {e}")
+
+    if report["failed_out"]:
+        logger.info(f"Processing janitor: {report}")
+    return report
+
+
+@scheduler_fn.on_schedule(schedule="every 5 minutes")
+def sweep_stuck_processing(event: scheduler_fn.ScheduledEvent) -> None:
+    """Every 5 min: age out captures stuck in `processing` (see run_processing_janitor)."""
+    run_processing_janitor()
+
+
+@https_fn.on_request()
+def force_sweep_stuck_processing(req: https_fn.Request) -> https_fn.Response:
+    """Manual trigger for the processing janitor (admin-gated) — verify without
+    waiting for the schedule."""
+    guard = _require_admin(req)
+    if guard:
+        return guard
+    try:
+        report = run_processing_janitor()
+        return https_fn.Response(json.dumps(report, indent=2), status=200, mimetype="application/json")
+    except Exception as e:
+        logger.error(f"Manual janitor trigger failed: {e}")
+        return https_fn.Response(f"Error: {e}", status=500)
 
 
 @https_fn.on_request()

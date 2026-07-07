@@ -101,8 +101,10 @@ export async function saveLink(uid: string, linkData: Partial<Link>): Promise<vo
  */
 export async function retryFailedLink(uid: string, link: Link): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', link.id);
-    // Optimistic: show the processing skeleton immediately.
-    await updateDoc(linkRef, { status: 'processing', error: null });
+    // Optimistic: show the processing skeleton immediately. Stamp when this retry
+    // began so the server-side janitor ages the card out from *now* (not its
+    // original createdAt) if this attempt dies before completing.
+    await updateDoc(linkRef, { status: 'processing', error: null, processingStartedAt: Date.now() });
 
     try {
         let existingTags: string[] = [];
@@ -144,13 +146,17 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
             },
             sourceType: l.sourceType || 'web',
             sourceName: l.sourceName ?? null,
-            embedding_vector: l.embedding_vector ?? null,
+            // Intentionally NOT writing embedding_vector here. The API no longer
+            // returns it, and a client write would store it as a plain array
+            // (invisible to vector search). The `sync_link_embedding` Firestore
+            // trigger re-embeds this card server-side on this very update.
             concepts: l.concepts ?? [],
             relatedLinks: l.relatedLinks ?? [],
             status: 'unread',
             isRead: false,
             error: null,
             failedAt: null,
+            processingStartedAt: null,
             // Preserve the original createdAt — a successful retry should update
             // the card in place, not teleport it to the top of the feed.
         });

@@ -15,6 +15,7 @@ from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
 from google import genai
 
 from db import get_db
+from ai_service import embedding_needs_repair
 
 logger = logging.getLogger(__name__)
 
@@ -51,38 +52,68 @@ class EmbeddingService:
             raise Exception(f"Gemini Embedding failed: {str(e)}")
 
 
-@firestore_fn.on_document_created(document="users/{uid}/links/{linkId}")
-def sync_link_embedding(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
-    """Trigger: When a new link is created, generate its embedding."""
-    try:
-        snapshot = event.data
-        if not snapshot:
-            return
+@firestore_fn.on_document_written(document="users/{uid}/links/{linkId}")
+def sync_link_embedding(event: firestore_fn.Event[firestore_fn.Change[firestore_fn.DocumentSnapshot]]) -> None:
+    """Trigger: keep every link's `embedding_vector` a valid, searchable Vector.
 
-        data = snapshot.to_dict()
+    Fires on any write (create OR update), not just create, so the two paths
+    that previously produced un-searchable embeddings are now self-healing:
+      - a **retry** re-runs `/api/analyze` and updates the card in place — an
+        `update`, which the old create-only trigger never saw, so the retried
+        card was left with no (or a client-round-tripped list) embedding.
+      - a client-written **list** embedding (schema drift) or a legacy
+        **degenerate** vector never got repaired.
+
+    Loop-safe: we only (re)embed when `embedding_needs_repair` says the stored
+    vector is missing/list/degenerate or `needsEmbedding` is set. Our own write
+    stores a real Vector and clears the flag, so the write it re-fires no-ops.
+    """
+    try:
+        change = event.data
+        snapshot = change.after if change else None
+        if snapshot is None or not snapshot.exists:
+            return  # deletion — nothing to embed
+
+        data = snapshot.to_dict() or {}
         link_id = snapshot.id
         uid = event.params["uid"]
 
+        # Only embed cards in a settled, searchable state. Skip mid-flight
+        # (`processing` placeholder / retry optimistic write — content isn't
+        # final and the terminal write re-fires this trigger) and `failed` cards
+        # (not searchable; they re-embed when a retry flips them to `unread`).
+        if data.get("status") in ("processing", "failed"):
+            return
+
+        if not (data.get("needsEmbedding") or embedding_needs_repair(data.get("embedding_vector"))):
+            return  # already has a valid Vector — no-op (also breaks the loop)
+
         title = data.get("title", "")
         summary = data.get("summary", "")
-        tags = ", ".join(data.get("tags", []))
-
+        tags = ", ".join(data.get("tags", []) or [])
         text_to_embed = f"Title: {title}\nSummary: {summary}\nTags: {tags}"
+        if not (title or summary):
+            return  # placeholder/empty card — wait for real content before embedding
+
+        db = get_db()
+        doc_ref = db.collection("users").document(uid).collection("links").document(link_id)
 
         logger.info(f"Generating embedding for link {link_id}...")
-
         service = EmbeddingService()
-        vector = service.generate_embedding(text_to_embed)
+        try:
+            vector = service.generate_embedding(text_to_embed)
+        except Exception as embed_err:
+            # Embed failed: flag for backfill and drop any drift/degenerate value
+            # rather than leaving something un-searchable in place silently.
+            logger.error(f"Embedding failed for {link_id}, flagging needsEmbedding: {embed_err}")
+            doc_ref.update({"needsEmbedding": True, "embedding_vector": firestore.DELETE_FIELD})
+            return
 
         if vector:
             logger.info(f"Vector generated (len={len(vector)}). Updating document...")
-            db = get_db()
-            doc_ref = db.collection("users").document(uid).collection("links").document(link_id)
-            doc_ref.update({
-                "embedding_vector": Vector(vector)
-            })
+            doc_ref.update({"embedding_vector": Vector(vector), "needsEmbedding": firestore.DELETE_FIELD})
         else:
-            logger.warning("Failed to generate vector, skipping update.")
+            doc_ref.update({"needsEmbedding": True, "embedding_vector": firestore.DELETE_FIELD})
 
     except Exception as e:
         logger.error(f"Error in sync_link_embedding: {e}")

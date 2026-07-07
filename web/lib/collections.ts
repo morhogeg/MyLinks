@@ -4,7 +4,6 @@ import {
     updateDoc,
     deleteDoc,
     doc,
-    setDoc,
     getDocs,
     query,
     where,
@@ -12,7 +11,9 @@ import {
     arrayUnion,
     arrayRemove,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, appCheckHeaders } from './firebase';
+import { authHeaders } from './auth';
+import { apiUrl, fetchWithTimeout } from './api';
 import { Collection, Link, SharedCard } from './types';
 
 /**
@@ -78,7 +79,9 @@ export async function deleteCollection(uid: string, id: string, shareId?: string
         await batch.commit();
     }
     if (shareId) {
-        await deleteDoc(doc(db, 'shared_collections', shareId)).catch(() => {});
+        // Public snapshot is Admin-SDK-owned now (locked rules deny client
+        // writes to shared_*), so tear it down via the endpoint, not deleteDoc.
+        await callShareApi('/api/unpublish-share', { uid, type: 'collection', shareId }).catch(() => {});
     }
     await deleteDoc(doc(db, 'users', uid, 'collections', id));
 }
@@ -113,6 +116,29 @@ export function toSharedCard(link: Link): SharedCard {
     return card;
 }
 
+/**
+ * POST to a share publish/unpublish endpoint.
+ *
+ * Publishing goes through an Admin-SDK Cloud Function (not a direct Firestore
+ * write) so the world-readable snapshot never carries `ownerUid` — for the
+ * phone-keyed owner workspace that value is PII, and any client can read a
+ * public share doc. The server keeps the owner mapping in a functions-only
+ * collection. HTTP (not a callable) so native's WKWebView can reach it.
+ */
+async function callShareApi(path: string, body: Record<string, unknown>): Promise<{ shareId?: string }> {
+    const res = await fetchWithTimeout(apiUrl(path), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
+        body: JSON.stringify(body),
+    }, 30_000);
+    if (!res.ok) {
+        let msg = `Request failed (HTTP ${res.status})`;
+        try { const j = await res.json(); if (j?.error) msg = j.error; } catch { /* non-JSON error body */ }
+        throw new Error(msg);
+    }
+    return res.json().catch(() => ({}));
+}
+
 /** Generate an unguessable share id. */
 function newShareId(): string {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID().replace(/-/g, '');
@@ -130,14 +156,16 @@ export async function publishCollection(
     memberLinks: Link[]
 ): Promise<string> {
     const shareId = collectionDoc.shareId || newShareId();
-    await setDoc(doc(db, 'shared_collections', shareId), clean({
+    await callShareApi('/api/publish-share', {
+        uid,
+        type: 'collection',
         shareId,
-        ownerUid: uid,
-        name: collectionDoc.name,
-        description: collectionDoc.description,
-        publishedAt: Date.now(),
-        cards: memberLinks.map(toSharedCard),
-    }));
+        payload: clean({
+            name: collectionDoc.name,
+            description: collectionDoc.description,
+            cards: memberLinks.map(toSharedCard),
+        }),
+    });
     await updateDoc(doc(db, 'users', uid, 'collections', collectionDoc.id), {
         shareId,
         isPublic: true,
@@ -149,7 +177,9 @@ export async function publishCollection(
 /** Stop sharing a collection: delete the snapshot and clear the share flags. */
 export async function unpublishCollection(uid: string, collectionDoc: Collection): Promise<void> {
     if (collectionDoc.shareId) {
-        await deleteDoc(doc(db, 'shared_collections', collectionDoc.shareId)).catch(() => {});
+        await callShareApi('/api/unpublish-share', {
+            uid, type: 'collection', shareId: collectionDoc.shareId,
+        }).catch(() => {});
     }
     await updateDoc(doc(db, 'users', uid, 'collections', collectionDoc.id), {
         isPublic: false,
@@ -161,11 +191,11 @@ export async function unpublishCollection(uid: string, collectionDoc: Collection
 /** Publish a single card as a public Machina page; returns the shareId. */
 export async function publishCard(uid: string, link: Link): Promise<string> {
     const shareId = newShareId();
-    await setDoc(doc(db, 'shared_cards', shareId), clean({
+    await callShareApi('/api/publish-share', {
+        uid,
+        type: 'card',
         shareId,
-        ownerUid: uid,
-        publishedAt: Date.now(),
-        card: toSharedCard(link),
-    }));
+        payload: { card: toSharedCard(link) },
+    });
     return shareId;
 }
