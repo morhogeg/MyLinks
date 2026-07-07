@@ -589,6 +589,15 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-08 — Sources popover fixed + redundant platform icons removed
+  (`ebef8ae`; TestFlight run #57 → build 1057; Vercel live).** The desktop Sources
+  popover was transparent (it used `surface-card`, which only paints a sheen and
+  no background color) so the feed bled through — added `bg-card` for an opaque
+  surface. Also removed the now-redundant round platform quick-filter icons
+  (X / in / f / screenshot) from the desktop toolbar and the mobile Filters sheet;
+  the grouped Sources list (platform→account, with a Screenshots bucket) covers
+  that filtering. `selectedPlatforms`/`screenshotOnly` state is now vestigial
+  (never set) but harmless — screenshots filter via the `screenshot` source facet.
 - **2026-07-08 — Sources filter regrouped by platform + account sub-sections
   (`20e6a91`; TestFlight run #56 → build 1056; Vercel live).** Resolves the
   collision noted in the previous entry the right way: rather than duplicating the
