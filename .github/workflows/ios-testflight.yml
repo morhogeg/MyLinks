@@ -17,9 +17,6 @@ on:
           Default OFF = legacy pre-cutover behavior (no sign-in UI).
         type: boolean
         default: false
-  # TEMPORARY: trigger the Digest-button-visibility fix build (build 1047). Remove after green.
-  push:
-    branches: [claude/ios-push-digest-5y8fj8]
   # AUTO-BUILD TEMPORARILY GATED during the multi-user auth cutover.
   # The build now includes the Sign in with Apple entitlement and the
   # @capacitor-firebase/authentication pod (native Firebase SDK). Archiving
