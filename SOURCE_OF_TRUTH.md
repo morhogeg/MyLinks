@@ -589,6 +589,25 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-07 — Facebook caption extraction: og:title fix + generalized across
+  URL shapes (commits `b389b7d`, `3a4c6f7`).** Facebook links summarized generically
+  because `_scrape_facebook_url` fed the AI only `og:description` — which FB
+  truncates. **Reels:** the FULL caption is in `og:title` (wrapped
+  `"<caption> | <Author> | Facebook"`); new `_clean_fb_title()` unwraps it and
+  recovers the author as `source_name`. Verified live on
+  `facebook.com/reel/1357476399649801`: 199 → 1383 chars, summary now names every
+  attraction/hotel/the SalzburgLand Card. **Generalized (`3a4c6f7`):** gather ALL
+  meta candidates (cleaned og:title/twitter:title + og:description/twitter:desc),
+  reject login-wall + bare author-name strings, keep the LONGEST real one — handles
+  every shape, cannot regress. **EMPIRICAL LIMIT (important):** for **text posts**
+  (`/posts/`, `/share/p/`) FB puts only the author in `og:title` and a **truncated
+  ~200-char preview** in `og:description`; the full body is NOT in the HTML at all
+  (checked `facebook.com/share/p/1BRsoQ2RXt` — text past the truncation absent even
+  from 366KB bot-UA HTML). So detailed summaries work for **reels**, but FB-text-post
+  links are capped at the preview by Facebook itself — no scraper/prompt fix exists.
+  **Workaround for detailed post summaries: save a screenshot** (image path sees the
+  whole caption). Deployed: `analyze_link`, `process_link_background`. Instagram uses
+  a separate path, unchanged.
 - **2026-07-07 — iOS ship finished (build 1043) + data-integrity cluster + share
   PII fix (task 5a option a). Merge `4fb3d20`.** Three things landed. **(1) iOS
   ship:** re-ran "iOS → TestFlight" on `main` after the owner pruned the Apple
