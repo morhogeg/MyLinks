@@ -1348,17 +1348,20 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                     </span>
                                 </button>
                             )}
-                            {(digests.length > 0 || latestSynthesis) && (
-                                <button
-                                    onClick={() => setViewMode('digest')}
-                                    title="Your curated digests"
-                                    aria-label="Digest"
-                                    className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
-                                >
-                                    <Newspaper className="w-4 h-4" />
-                                    <span className="hidden sm:inline">Digest</span>
-                                </button>
-                            )}
+                            <button
+                                onClick={() => setViewMode('digest')}
+                                title="Your curated digests"
+                                aria-label="Digest"
+                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
+                            >
+                                <Newspaper className="w-4 h-4" />
+                                <span className="hidden sm:inline">Digest</span>
+                                {digests.length > 0 && (
+                                    <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-accent/15 text-accent">
+                                        {digests.length}
+                                    </span>
+                                )}
+                            </button>
                         </div>
 
                         {/* Center zone — Ask (a distinct AI mode). */}
