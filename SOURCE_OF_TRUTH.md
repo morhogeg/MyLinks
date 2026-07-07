@@ -589,6 +589,19 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-07 — Cut the standalone Connections page (`60c01b4`).** The
+  cross-category cluster view (M10) was removed: it clustered on EXACT concept-string
+  matches across 2+ categories within a 30-day window — criteria that rarely fire, so
+  it recomputed live yet barely changed as cards were added and read as "stale," while
+  taking a full nav view's worth of attention (the user's own read: overwhelming).
+  Decision was subtraction per §1's north star; the connection value that lands — the
+  **in-card "Related" section** (`lib/related.ts`, backend `relatedLinks`,
+  `graph_service`, the SettingsModal rebuild) — is untouched. Removed
+  `ConnectionsView.tsx`, `lib/connections.ts`, the `'connections'` viewMode + toolbar
+  pill/badge + desktop-inline + mobile-overlay branches in `Feed.tsx`, and the unused
+  `Link2` import. `tsc --noEmit` clean; frontend-only (Vercel). NOTE: M10 in §4 "Done"
+  is now partially rolled back — in-card Related stays, the standalone page is gone.
+
 - **2026-07-07 — Reworked Reminders + Digest settings into one Notifications
   section + native minute-precise digest time.** The Settings screen had two
   overlapping sections ("Reminders" and "Curated digest") that both re-declared
