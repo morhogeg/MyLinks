@@ -58,8 +58,12 @@ public class ShareConfigPlugin: CAPPlugin, CAPBridgedPlugin {
         }
         let kind = defaults.string(forKey: "pendingShareKind") ?? "link"
         let ageMs = max(0, (Date().timeIntervalSince1970 - at) * 1000.0)
+        // The % the share HUD was showing at hand-off (0 if an older extension
+        // build didn't write it), so the in-app banner can resume from there.
+        let progress = defaults.double(forKey: "pendingShareProgress")
         defaults.removeObject(forKey: "pendingShareAt")
         defaults.removeObject(forKey: "pendingShareKind")
-        call.resolve(["pending": true, "kind": kind, "ageMs": ageMs])
+        defaults.removeObject(forKey: "pendingShareProgress")
+        call.resolve(["pending": true, "kind": kind, "ageMs": ageMs, "progress": progress])
     }
 }

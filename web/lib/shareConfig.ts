@@ -11,7 +11,7 @@ import { apiUrl } from './api';
  */
 interface ShareConfigPlugin {
     save(options: { endpoint: string; token: string }): Promise<void>;
-    consumePendingShare(): Promise<{ pending: boolean; kind?: string; ageMs?: number }>;
+    consumePendingShare(): Promise<{ pending: boolean; kind?: string; ageMs?: number; progress?: number }>;
 }
 
 const ShareConfigNative = registerPlugin<ShareConfigPlugin>('ShareConfig');
@@ -24,6 +24,9 @@ export interface PendingShare {
     kind: PendingShareKind;
     /** How long ago the share was handed over, in ms. */
     ageMs: number;
+    /** The % (0–100) the Share Extension HUD showed at hand-off, if known — lets
+        the in-app banner resume from the same value. Undefined on older builds. */
+    progress?: number;
 }
 
 /**
@@ -39,7 +42,8 @@ export async function consumePendingShare(): Promise<PendingShare> {
         if (!res?.pending) return { pending: false, kind: 'link', ageMs: 0 };
         const kind: PendingShareKind =
             res.kind === 'image' ? 'image' : res.kind === 'video' ? 'video' : 'link';
-        return { pending: true, kind, ageMs: Math.max(0, res.ageMs ?? 0) };
+        const progress = typeof res.progress === 'number' && res.progress > 0 ? res.progress : undefined;
+        return { pending: true, kind, ageMs: Math.max(0, res.ageMs ?? 0), progress };
     } catch {
         // Older builds without the native method, or no App Group — treat as none.
         return { pending: false, kind: 'link', ageMs: 0 };

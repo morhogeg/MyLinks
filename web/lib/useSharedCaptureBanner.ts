@@ -25,7 +25,10 @@ const CEILING = 90;
 const MAX_MS = 28_000; // give up the optimistic banner if no real card lands
 
 export function useSharedCaptureBanner(processingActive: boolean): AnalyzingState | null {
-    const [signal, setSignal] = useState<{ startedAt: number; kind: AnalyzingState['kind'] } | null>(null);
+    // `startedAt` anchors the progress RAMP (may sit in the past so the ramp
+    // resumes at the hand-off %); `openedAt` is the real wall-clock the app
+    // foregrounded, used only for the give-up timer.
+    const [signal, setSignal] = useState<{ startedAt: number; openedAt: number; kind: AnalyzingState['kind'] } | null>(null);
     const [, tick] = useState(0);
     const finishedOnce = useRef(false);
     // Latest processingActive, readable inside the async check without re-binding.
@@ -47,10 +50,21 @@ export function useSharedCaptureBanner(processingActive: boolean): AnalyzingStat
             // The real card already covers this save — consume the flag but don't
             // show a second banner on top of it.
             if (procRef.current) return;
-            // Account for time already elapsed since the share so the ramp doesn't
-            // restart from zero if the app opens a moment later.
-            const age = Math.max(0, Math.min(res.ageMs, EXPECTED_MS * 0.6));
-            setSignal((cur) => cur ?? { startedAt: now() - age, kind: res.kind });
+            // Resume from the EXACT % the share sheet was showing at hand-off, so
+            // the two screens read as one continuous progress. Invert the ease-out
+            // to find the ramp origin that yields that %, then let it keep rising.
+            // Older extension builds don't report a %, so fall back to the elapsed-
+            // time offset (keeps the ramp from restarting at zero).
+            const t = now();
+            let startedAt: number;
+            if (res.progress !== undefined) {
+                const frac = Math.min(0.999, Math.max(0, (res.progress - 6) / (CEILING - 6)));
+                startedAt = t + EXPECTED_MS * 0.6 * Math.log(1 - frac); // log(...) ≤ 0 → origin in the past
+            } else {
+                const age = Math.max(0, Math.min(res.ageMs, EXPECTED_MS * 0.6));
+                startedAt = t - age;
+            }
+            setSignal((cur) => cur ?? { startedAt, openedAt: t, kind: res.kind });
         };
         void check();
         const onVis = () => {
@@ -80,8 +94,10 @@ export function useSharedCaptureBanner(processingActive: boolean): AnalyzingStat
 
     if (!signal) return null;
 
-    const elapsed = Math.max(0, now() - signal.startedAt);
-    if (elapsed > MAX_MS) {
+    // Give-up timer runs on the real clock since the app opened — not the ramp
+    // anchor, which can start well in the past when the hand-off % was high.
+    const elapsedReal = Math.max(0, now() - signal.openedAt);
+    if (elapsedReal > MAX_MS) {
         // No real card ever arrived. Emit exactly one inactive frame so the banner
         // flashes "Saved" and slides away, then clear.
         if (!finishedOnce.current) {
@@ -93,6 +109,7 @@ export function useSharedCaptureBanner(processingActive: boolean): AnalyzingStat
     }
 
     // Ease-out toward the ceiling: fast at first, slowing as it approaches.
+    const elapsed = Math.max(0, now() - signal.startedAt);
     const frac = 1 - Math.exp(-elapsed / (EXPECTED_MS * 0.6));
     const progress = Math.min(CEILING, 6 + frac * (CEILING - 6));
     return { active: true, progress, kind: signal.kind };

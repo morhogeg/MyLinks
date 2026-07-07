@@ -215,26 +215,47 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         guard let defaults = UserDefaults(suiteName: Self.appGroup) else { return }
         defaults.set(Date().timeIntervalSince1970, forKey: "pendingShareAt")
         defaults.set(isImageFlow ? "image" : "link", forKey: "pendingShareKind")
+        // Hand off the EXACT percentage the HUD is showing right now, so the
+        // in-app banner picks up from the same value instead of restarting near
+        // zero — the user sees one continuous progress across the two screens.
+        defaults.set(Double(progress), forKey: "pendingShareProgress")
     }
 
-    /// Open the main app from the extension. Share extensions can't touch
-    /// `UIApplication.shared`, so walk the responder chain to the object that
-    /// implements `openURL:` (that's UIApplication) and invoke it — the
-    /// established way to launch the host app from a share extension.
+    /// Open the main app from the extension.
+    ///
+    /// Primary path is `NSExtensionContext.open(_:)` — the sanctioned,
+    /// forward-compatible API that still launches the host from the share sheet
+    /// on modern iOS, where the classic "walk the responder chain to
+    /// `UIApplication.openURL:`" hack has become an unreliable no-op. We fall back
+    /// to that hack only if the system declines, and complete the extension
+    /// request AFTER the switch attempt so we never tear the context down mid-open.
     private func openMainApp() {
         let kind = isImageFlow ? "image" : "link"
         guard let url = URL(string: "machina://shared?kind=\(kind)") else { finish(); return }
+        if let ctx = extensionContext {
+            ctx.open(url) { [weak self] opened in
+                if !opened { self?.openViaResponderChain(url) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.finish() }
+            }
+        } else {
+            openViaResponderChain(url)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.finish() }
+        }
+    }
+
+    /// Legacy fallback: invoke `openURL:` on the first responder-chain object that
+    /// implements it (that's `UIApplication`). Deprecated, but the only route left
+    /// when `extensionContext.open` declines on a given iOS version.
+    private func openViaResponderChain(_ url: URL) {
         let selector = NSSelectorFromString("openURL:")
         var responder: UIResponder? = self
         while let r = responder {
             if r.responds(to: selector) {
                 r.perform(selector, with: url)
-                break
+                return
             }
             responder = r.next
         }
-        // Give the system a beat to switch apps before tearing down the sheet.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.finish() }
     }
 
     // MARK: - Scan UI (images)
