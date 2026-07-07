@@ -589,6 +589,33 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-07 — Settings redesign follow-ups + Digest/Collections swipe-back
+  (`bcd4945`, merge `952162a`; TestFlight run #52 → build 1052, UI-only).**
+  Round-two polish on the new Settings (`SettingsModal.tsx`) plus two page-level
+  adds (`Feed.tsx`, `page.tsx`, `lib/haptics.ts`). **Pickers no longer auto-pop**
+  on tap — Cadence/Style/Cards selecting a row just checks it and updates the
+  live footnote; the user leaves via **Back** or a new footer **"Done"** button
+  (sub-screens now show Done instead of Cancel/Save; the root screen keeps Save
+  changes; persistence is still the root Save into the in-memory form).
+  **Close (X) is root-screen only** now; sub-screens use Back/Done. **"Capture
+  links" section removed entirely** (WhatsApp info + share-extension bridge
+  diagnostic/Fix) along with its dead `shareConfig` state/imports — ⚠️ note the
+  share-extension self-diagnostic UI is now gone from Settings; the bridge logic
+  in `lib/shareConfig.ts` still runs, only the Settings surface was cut. **Wheel
+  haptics**: new `hapticSelection()` (`Haptics.selectionChanged`, native-only
+  no-op) fires per detent as the Schedule wheels roll. **Toggles** rebuilt to the
+  iOS 51×31 / 27px-knob spec (knob fills the track, softer shadow). **Digest
+  deep-link**: `SettingsModal` gained an `initialSection?: 'digest'` prop that
+  opens the sheet at stack `['main','resurfacing']`; the empty Digest page's
+  microcopy now has a **"Set up your digest"** link wired through
+  `page.tsx` `onOpenDigestSettings` → `Feed`. **Swipe-back**: the Digest and
+  Collections pages now honor the iOS left-edge `useEdgeSwipeBack` (pops to
+  `lastLayout.current`), gated on a new `isMobileView` matchMedia flag in Feed.
+  Typecheck + `next build` clean (same env-only `/_not-found` prerender error).
+  **↩ In progress this session (not yet shipped):** the iOS **Share Extension**
+  "Open Machina" button should actually launch the app, and the extension's
+  progress/status should mirror the in-app AnalyzingBanner — under investigation,
+  native `web/ios` work.
 - **2026-07-07 — Settings redesigned as a flat iOS grouped-list; Reminders +
   Digest merged into one drill-in screen (`0a8e521`, merge `01b9be6`; TestFlight
   run #51 → build 1051, UI-only).** Full presentation + IA rebuild of
