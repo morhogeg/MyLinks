@@ -683,16 +683,45 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
     }
 
 
+def _clean_fb_title(raw: Optional[str]) -> tuple:
+    """Split a Facebook ``og:title`` into ``(caption, author)``.
+
+    Key insight (verified against live reels/posts): Facebook carries the
+    **full** post caption in ``og:title`` — formatted as
+    ``"<caption> | <Author> | Facebook"`` and sometimes prefixed with an
+    ``"45K views · 389 reactions | "`` engagement blurb — while ``og:description``
+    is truncated to ~1–2 lines. So ``og:title`` is by far the richer source for
+    analysis; this strips the wrapper so we're left with the real caption (and
+    recovers the author name as a bonus). Returns ``("", None)`` for empty input.
+    """
+    if not raw:
+        return "", None
+    t = raw.strip()
+    # Strip a leading "45K views · 389 reactions | " engagement prefix.
+    t = re.sub(r"^\s*[\d.,]+[KM]?\s*views?\s*·\s*[\d.,]+[KM]?\s*reactions?\s*\|\s*",
+               "", t, flags=re.I)
+    # Strip a trailing " | Facebook".
+    t = re.sub(r"\s*\|\s*Facebook\s*$", "", t)
+    # A remaining short, single-line trailing " | <Author>" is the author name
+    # (real captions put items on newlines / use "/" — they won't match this).
+    author = None
+    m = re.search(r"\s*\|\s*([^|\n]{2,60})\s*$", t)
+    if m:
+        author = m.group(1).strip()
+        t = t[:m.start()].rstrip()
+    return t.strip(), author
+
+
 def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
     """Scrape Facebook post/reel/video URLs.
 
-    Facebook serves a JS-only login wall to server-side requests, so the
-    generic article path comes up empty and falls back to raw HTML — which
-    only surfaces the truncated og:description (the caption's first line). For
-    a recipe post that first line is usually the author's personal framing
-    ("since I went keto…"), not the dish, so we pull the FULL og:description
-    caption and fold in any shared caption text from the message body. The
-    actual recipe (ingredients/steps) typically lives lower in that caption.
+    Facebook serves a JS-only login wall to server-side requests, so there's no
+    post body in the HTML — only Open Graph meta tags. The trap: ``og:description``
+    is a truncated preview (~1–2 lines), but the **full caption lives in
+    ``og:title``** (see ``_clean_fb_title``). We prefer the cleaned ``og:title``
+    so the AI sees the whole post (all itinerary items / recipe steps / tips that
+    live below the fold), falling back to ``og:description`` only when og:title is
+    missing or generic. Any shared caption from the message body is folded in too.
     """
     logger.info(f"Analyzing Facebook URL: {url}")
 
@@ -704,6 +733,7 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
     metadata_lines = []
     best_title = "Facebook Post"
     best_desc = ""
+    source_name = None
 
     try:
         headers = {
@@ -723,14 +753,25 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
                         return tag['content'].strip()
                 return ""
 
-            d_title = _meta('og:title', 'twitter:title', 'title')
             d_desc = _meta('og:description', 'twitter:description', 'description')
+            # The full caption lives in og:title; og:description is truncated.
+            caption, author = _clean_fb_title(_meta('og:title', 'twitter:title', 'title'))
+            if author and author not in generic_titles:
+                source_name = author
 
-            if d_title and d_title.split('|')[0].strip() not in generic_titles:
-                best_title = d_title.split('|')[0].strip()
-            if d_desc and len(d_desc) > 20:
-                best_desc = d_desc
-                metadata_lines.append(f"POST CAPTION:\n{d_desc}")
+            # Use the cleaned og:title caption when it's real (not a login-wall
+            # title) and at least as complete as the description; else fall back.
+            caption_ok = caption and caption.split('|')[0].strip() not in generic_titles
+            body = caption if (caption_ok and len(caption) >= len(d_desc)) else d_desc
+
+            if body:
+                # Title = the caption's first line (far better than "Facebook Post").
+                first_line = body.split('\n', 1)[0].strip()
+                if first_line and first_line not in generic_titles:
+                    best_title = first_line[:120]
+                if len(body) > 20:
+                    best_desc = body
+                    metadata_lines.append(f"POST CAPTION:\n{body}")
     except Exception as e:
         logger.warning(f"Facebook scrape failed: {e}")
 
@@ -749,7 +790,8 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
         return {"html": "", "title": "Facebook Link", "text": "Facebook content (metadata extraction failed)"}
 
     final_text = "\n\n---\n\n".join(metadata_lines)
-    return {"html": final_text, "title": best_title, "text": final_text}
+    return {"html": final_text, "title": best_title, "text": final_text,
+            "source_name": source_name}
 
 
 def _extract_youtube_id(url: str) -> Optional[str]:
