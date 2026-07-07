@@ -632,6 +632,26 @@ exact-match, capped.
   functions:send_digests` (the Firestore default only affects brand-new
   workspaces; existing users get `digest_minute` via the `?? 0` fallback). Device
   QA (native wheel + a 16:24 round-trip) pending on TestFlight.
+- **2026-07-07 — FB login-wall handling + hover-toolbar order + TestFlight 1048.**
+  Closing out the Facebook/summary work. **(1) Login wall (`fd6c9fe`, deployed
+  `analyze_link` + `process_link_background`):** FB intermittently serves logged-out
+  server fetches a login wall; its og:description CTA ("Log into Facebook to start
+  sharing…") was being summarized into a bogus "Facebook Login Page" card.
+  `_looks_like_fb_login_wall()` now rejects it; when nothing readable remains we
+  return `text="[no text content available]"` + `truncated=True` so the card is an
+  honest "couldn't read — save a screenshot" instead. Compatible with the shared-
+  caption path (message_body still wins). NOTE: scraping is server-side (no FB
+  session), so a *device's* sign-in state can't change it — the real variable is
+  whether the capture sends the post text (iPhone share does) vs URL-only (desktop
+  Add-Link), plus intermittent FB gating. **(2) Hover-toolbar order (`f25e356`):**
+  the card action toolbar lived inside the card's `dir` (rtl for Hebrew) so buttons
+  mirrored per language; pinned to `dir="ltr"` for one consistent order everywhere.
+  **(3) TestFlight:** frontend changes this session (FB author byline, save-dialog
+  copy "you can close this…", toolbar order) are live on desktop via Vercel but the
+  iOS app bundles the web at build time (`npm run build` → `cap sync` in
+  `ios-testflight.yml`), so it needed a rebuild — **triggered run #48 → build 1048**
+  to ship them to the phone. Known FB limit still stands: text-post detail depends
+  on FB not gating the fetch; author name comes only from a non-gated `og:title`.
 - **2026-07-07 — Facebook author byline + honest save-dialog copy (commits
   `2258fd4`, `453299e`).** Two small UX fixes. **(1) FB author byline:** the scraper
   now captures the post author for text posts too (bare `og:title` name, not just the
