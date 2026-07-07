@@ -647,17 +647,20 @@ exact-match, capped.
   `secondbrain-app-94da2` → Cloud Messaging → Apple app config; (3) confirm
   Cloud Messaging enabled — owner confirmed these done 2026-07-07 (APNs .p8
   uploaded to FCM for both dev+prod slots; Push capability on the App ID).
-  **SHIP STATUS (2026-07-07, cloud session — can't run firebase CLI or dispatch
-  workflows):** merged to `main` as `b4d86df` (rebased onto `7279258`; **web
-  live via Vercel**). **OWNER TODO — three manual steps the cloud session can't
-  do:** (a) **TestFlight** — Actions → "iOS → TestFlight" → Run workflow on
-  `main`, `require_auth` OFF (GitHub integration lacked `actions:write`, got 403;
-  will be build 1046 = run #46); (b) **Cloud Functions** —
+  **SHIP STATUS (2026-07-07, cloud session):** merged to `main` (via `b4d86df`,
+  rebased onto the audit-remediation main; **web live via Vercel**). **iOS
+  TestFlight build 1046 IS BUILDING** — the GitHub API dispatch is 403 from a
+  cloud session (integration lacks `actions:write`), so used the repo's
+  established temp-`push`-trigger pattern: added a `push` trigger scoped to
+  `claude/ios-push-digest-5y8fj8`, pushed (fired **run #46 → build 1046**), then
+  removed the trigger. Confirmed `in_progress`. **OWNER TODO — the two Firebase
+  deploys the cloud session physically can't reach (no creds/secrets; egress to
+  firebase.googleapis.com is blocked):** (a) **Cloud Functions** —
   `./deploy-functions.sh functions:register_device_token_http,functions:unregister_device_token_http,functions:check_reminders,functions:send_digests,functions:send_digest_now,functions:force_check_reminders,functions:force_send_digests`;
-  (c) **Hosting** — `./deploy-hosting.sh` (firebase.json rewrites changed — the
-  two /api token routes need it), and deploy the live `firestore.rules` (now
-  carries the open `digests` match) so the Digest section can read. Until (b)+(c),
-  token registration 404s and no digests are written.
+  (b) **Hosting + rules** — `./deploy-hosting.sh` (firebase.json rewrites changed —
+  the two /api token routes need it) and `firebase deploy --only firestore:rules`
+  (live rules now carry the open `digests` match). Until (a)+(b), token
+  registration 404s and no digests are written — do them before testing build 1046.
 - **2026-07-07 — Summary accuracy + reliability hardening (prompt + temperature).**
   Card summaries occasionally reversed fine details and drifted generic. Concrete
   trigger: a Hebrew Austria travel post where the author said Munich was the OLD
