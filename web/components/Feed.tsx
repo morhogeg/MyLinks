@@ -6,7 +6,8 @@
 import { useState, useEffect, useRef, useMemo, cloneElement, type ReactElement } from 'react';
 import { Link, LinkStatus, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, type PlatformKey } from '@/lib/platform';
+import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, platformColor, prettyHost, type PlatformKey } from '@/lib/platform';
+import { getSourceInfo, buildSourceFacets } from '@/lib/source';
 import Dropdown from './Dropdown';
 import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus, retryFailedLink, toLink } from '@/lib/storage';
 import { collection, query, orderBy, onSnapshot, getDocsFromServer, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
@@ -22,8 +23,6 @@ import SwipeDeck from './SwipeDeck';
 import AskBrain from './AskBrain';
 import LinkDetailModal from './LinkDetailModal';
 import SynthesisCard from './SynthesisCard';
-import ConnectionsView from './ConnectionsView';
-import { crossCategoryClusters } from '@/lib/connections';
 import ConfirmDialog from './ConfirmDialog';
 import AddToCollectionSheet from './AddToCollectionSheet';
 import CollectionsGallery from './CollectionsGallery';
@@ -31,7 +30,7 @@ import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
 import { Button } from './ui/Button';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Shapes, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus, RefreshCw, Link2, Newspaper } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Shapes, Check, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus, RefreshCw, Newspaper } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
@@ -101,12 +100,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         setActiveLinkId(null);
     };
     const [isLoading, setIsLoading] = useState(true);
-    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'ask' | 'collections' | 'connections' | 'digest'>('grid');
+    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'ask' | 'collections' | 'digest'>('grid');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
     const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
     const [selectedPlatforms, setSelectedPlatforms] = useState<Set<PlatformKey>>(new Set());
+    // Source (publisher/site) facet — keyed by getSourceInfo().key, e.g. a card
+    // from Ynet, an MKBHD video, or @naval on X. Sits alongside the coarse
+    // platform quick-filters and is unioned with them (see the filter chain).
+    const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
+    const [isSourcesOpen, setIsSourcesOpen] = useState(false);
     const [screenshotOnly, setScreenshotOnly] = useState(false);
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
@@ -440,12 +444,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             return (link.collectionIds ?? []).some(id => selectedCollections.has(id));
         })
         .filter((link) => {
-            // Apply source filters (platforms + screenshots), OR across selections
-            if (selectedPlatforms.size === 0 && !screenshotOnly) return true;
+            // Apply source filters — platforms + screenshots + publisher sources,
+            // OR across every selection (picking Ynet AND YouTube shows both).
+            if (selectedPlatforms.size === 0 && !screenshotOnly && selectedSources.size === 0) return true;
             const platform = getPlatform(link.url);
             const matchesPlatform = platform != null && selectedPlatforms.has(platform);
             const matchesScreenshot = screenshotOnly && link.sourceType === 'image';
-            return matchesPlatform || matchesScreenshot;
+            const matchesSource = selectedSources.size > 0 && selectedSources.has(getSourceInfo(link).key);
+            return matchesPlatform || matchesScreenshot || matchesSource;
         })
         .filter((link) => {
             // Apply search (Hybrid: keyword OR semantic result)
@@ -457,12 +463,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             const isSemanticMatch = searchResults.some(r => r.id === link.id);
             if (isSemanticMatch) return true;
 
-            // Otherwise check keyword matching
+            // Otherwise check keyword matching — including the card's source, so
+            // typing a publisher name ("ynet") surfaces its cards even without a
+            // semantic hit.
             return (
                 link.title.toLowerCase().includes(query) ||
                 link.summary.toLowerCase().includes(query) ||
                 link.tags.some((tag) => tag.toLowerCase().includes(query)) ||
-                link.category.toLowerCase().includes(query)
+                link.category.toLowerCase().includes(query) ||
+                getSourceInfo(link).label.toLowerCase().includes(query) ||
+                prettyHost(link.url).toLowerCase().includes(query)
             );
         })
         .sort((a, b) => {
@@ -548,6 +558,35 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         setSelectedPlatforms(next);
     };
 
+    // Source (publisher/site) facet — every distinct source in the library, ranked
+    // by count. Drives the Sources submenu and the search "Sources" suggestions.
+    const sourceFacets = useMemo(() => buildSourceFacets(contentLinks), [contentLinks]);
+    const sourceLabelByKey = useMemo(() => {
+        const m = new Map<string, string>();
+        sourceFacets.forEach(s => m.set(s.key, s.label));
+        return m;
+    }, [sourceFacets]);
+
+    const handleToggleSource = (key: string) => {
+        const next = new Set(selectedSources);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        setSelectedSources(next);
+    };
+    // Render the brand icon for a source row (platform logo, screenshot, or a
+    // generic globe for plain websites), tinted in the platform's brand color.
+    const sourceIconFor = (s: { platform: PlatformKey | null; isScreenshot: boolean }, size = 'w-4 h-4') => {
+        if (s.platform) return <span style={{ color: platformColor(s.platform) }}>{platformIcon(s.platform, size)}</span>;
+        if (s.isScreenshot) return <ImageIcon className={`${size} text-text-secondary`} />;
+        return <Globe className={`${size} text-text-secondary`} />;
+    };
+
+    // Search "Sources" suggestions — the sources whose label matches the live
+    // query, so a search splits into a Sources row (tap to filter) + the Cards grid.
+    const matchingSources = debouncedQuery.trim()
+        ? sourceFacets.filter(s => s.label.toLowerCase().includes(debouncedQuery.trim().toLowerCase())).slice(0, 8)
+        : [];
+
     const reminderCount = contentLinks.filter(l => l.reminderStatus === 'pending').length;
 
     // Pending capture cards to surface, pinned above the feed. Only shown on the
@@ -564,6 +603,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         && selectedCategory.size === 0
         && selectedTags.size === 0
         && selectedPlatforms.size === 0
+        && selectedSources.size === 0
         && !screenshotOnly
         && !debouncedQuery.trim();
 
@@ -849,11 +889,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         { key: 'list', label: 'List', icon: <List className="w-4 h-4" />, hint: 'List view' },
         { key: 'review', label: 'Review', icon: <GalleryHorizontalEnd className="w-4 h-4" />, hint: 'Swipe to review' },
     ];
-    // The Connections view + its toolbar pill surface only *cross-category*
-    // clusters — cards from different categories sharing a thread, which a
-    // category filter can't reproduce. The pill count matches the view exactly.
-    const connectionClusters = useMemo(() => crossCategoryClusters(links, 2), [links]);
-
     // The layout the Ask/Collections buttons return you to when you leave them.
     const lastLayout = useRef<'grid' | 'list' | 'review'>('grid');
     if (viewMode === 'grid' || viewMode === 'list' || viewMode === 'review') lastLayout.current = viewMode;
@@ -879,7 +914,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const activeCollectionId = selectedCollections.size === 1 ? Array.from(selectedCollections)[0] : undefined;
     // Count of active grid filters — badges the mobile "Filters" button.
     const activeMobileFilters =
-        (filter !== 'all' ? 1 : 0) + selectedPlatforms.size + (screenshotOnly ? 1 : 0) + selectedTags.size + selectedCollections.size;
+        (filter !== 'all' ? 1 : 0) + selectedPlatforms.size + selectedSources.size + (screenshotOnly ? 1 : 0) + selectedTags.size + selectedCollections.size;
 
     // The Digest section's scrollable history — the weekly synthesis rides on
     // top, then every curated digest, newest first. Built once and rendered in
@@ -933,7 +968,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
     // Hide the add-link FAB in Ask *and* Collections — neither view captures links.
     useEffect(() => {
-        onHideAddButton?.(viewMode === 'ask' || viewMode === 'collections' || viewMode === 'connections' || viewMode === 'digest');
+        onHideAddButton?.(viewMode === 'ask' || viewMode === 'collections' || viewMode === 'digest');
     }, [viewMode, onHideAddButton]);
 
     if (isLoading) {
@@ -1026,17 +1061,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 New
                             </button>
                         </MobileSubheader>
-                    </div>
-                ) : viewMode === 'connections' ? (
-                    // Desktop only: the Connections list flows inline beneath this
-                    // subheader. Mobile renders its own full-screen overlay below.
-                    <div className="hidden sm:block">
-                        <MobileSubheader
-                            onBack={() => setViewMode(lastLayout.current)}
-                            backLabel="Back to your library"
-                            icon={<Link2 className="w-5 h-5" />}
-                            title="Connections"
-                        />
                     </div>
                 ) : viewMode === 'digest' ? (
                     // Desktop only: the digest history flows inline beneath this
@@ -1337,6 +1361,73 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 )}
                             </div>
                         )}
+
+                        {/* Sources submenu — the full publisher/site list (Ynet, CNN,
+                            a YouTube channel, @handle…), one popover from the toolbar.
+                            Complements the coarse platform icons above. */}
+                        {sourceFacets.length > 0 && (
+                            <div className="relative">
+                                <button
+                                    onClick={() => setIsSourcesOpen(o => !o)}
+                                    aria-haspopup="menu"
+                                    aria-expanded={isSourcesOpen}
+                                    title="Filter by source"
+                                    className={`${ctrlBase} px-3.5 border ${selectedSources.size > 0
+                                        ? 'bg-accent text-white border-accent shadow-sm'
+                                        : ctrlIdle}`}
+                                >
+                                    <Globe className="w-4 h-4" />
+                                    <span>Sources</span>
+                                    {selectedSources.size > 0 && (
+                                        <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-white/25 text-white">
+                                            {selectedSources.size}
+                                        </span>
+                                    )}
+                                    <ChevronDown className={`w-4 h-4 opacity-60 transition-transform ${isSourcesOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                {isSourcesOpen && (
+                                    <>
+                                        {/* Click-away layer */}
+                                        <div className="fixed inset-0 z-40" onClick={() => setIsSourcesOpen(false)} />
+                                        <div className="absolute z-50 mt-2 end-0 w-72 max-h-[60vh] overflow-y-auto surface-card rounded-2xl border border-border-subtle shadow-[var(--shadow-card)] p-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                                            <div className="flex items-center justify-between px-2 py-1.5">
+                                                <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">
+                                                    {sourceFacets.length} source{sourceFacets.length === 1 ? '' : 's'}
+                                                </span>
+                                                {selectedSources.size > 0 && (
+                                                    <button
+                                                        onClick={() => setSelectedSources(new Set())}
+                                                        className="text-[11px] font-semibold text-text-muted hover:text-accent transition-colors"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="flex flex-col">
+                                                {sourceFacets.map(s => {
+                                                    const active = selectedSources.has(s.key);
+                                                    return (
+                                                        <button
+                                                            key={s.key}
+                                                            onClick={() => handleToggleSource(s.key)}
+                                                            aria-pressed={active}
+                                                            className={`flex items-center gap-2.5 px-2 py-2 rounded-xl text-[13px] text-start transition-colors ${active
+                                                                ? 'bg-accent/12 text-text'
+                                                                : 'text-text-secondary hover:bg-card-hover hover:text-text'}`}
+                                                        >
+                                                            <span className="shrink-0">{sourceIconFor(s)}</span>
+                                                            <span className="flex-1 min-w-0 truncate font-medium">{s.label}</span>
+                                                            <span className="shrink-0 tabular-nums text-text-muted">{s.count}</span>
+                                                            {active && <Check className="w-4 h-4 shrink-0 text-accent" />}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
                         </>)}
                     </div>
 
@@ -1360,20 +1451,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 <Layers className="w-4 h-4" />
                                 <span className="hidden sm:inline">Collections</span>
                             </button>
-                            {connectionClusters.length > 0 && (
-                                <button
-                                    onClick={() => setViewMode('connections')}
-                                    title="Connections across what you've saved"
-                                    aria-label="Connections"
-                                    className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
-                                >
-                                    <Link2 className="w-4 h-4" />
-                                    <span className="hidden sm:inline">Connections</span>
-                                    <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-accent/15 text-accent">
-                                        {connectionClusters.length}
-                                    </span>
-                                </button>
-                            )}
                             <button
                                 onClick={() => setViewMode('digest')}
                                 title="Your curated digests"
@@ -1753,11 +1830,50 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     </div>
                                 )}
 
+                                {/* Sources — the full publisher/site list as a tappable
+                                    checklist (Ynet, CNN, a channel…). Each row toggles
+                                    that source into the feed filter. */}
+                                {sourceFacets.length > 0 && (
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted">Sources</label>
+                                            {selectedSources.size > 0 && (
+                                                <button
+                                                    onClick={() => setSelectedSources(new Set())}
+                                                    className="text-[11px] font-semibold text-text-muted hover:text-accent transition-colors"
+                                                >
+                                                    Clear
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col gap-1 max-h-[38vh] overflow-y-auto overscroll-contain -mx-1 px-1">
+                                            {sourceFacets.map(s => {
+                                                const active = selectedSources.has(s.key);
+                                                return (
+                                                    <button
+                                                        key={s.key}
+                                                        onClick={() => handleToggleSource(s.key)}
+                                                        aria-pressed={active}
+                                                        className={`flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-[14px] text-start border transition-colors ${active
+                                                            ? 'bg-accent/12 border-accent/40 text-text'
+                                                            : 'bg-card border-border-subtle text-text-secondary'}`}
+                                                    >
+                                                        <span className="shrink-0">{sourceIconFor(s)}</span>
+                                                        <span className="flex-1 min-w-0 truncate font-medium">{s.label}</span>
+                                                        <span className="shrink-0 tabular-nums text-text-muted text-[13px]">{s.count}</span>
+                                                        {active && <Check className="w-4 h-4 shrink-0 text-accent" />}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Footer */}
                                 <div className="flex items-center gap-3 pt-1">
                                     {activeMobileFilters > 0 && (
                                         <button
-                                            onClick={() => { setFilter('all'); setSelectedPlatforms(new Set()); setScreenshotOnly(false); setSelectedTags(new Set()); }}
+                                            onClick={() => { setFilter('all'); setSelectedPlatforms(new Set()); setSelectedSources(new Set()); setScreenshotOnly(false); setSelectedTags(new Set()); }}
                                             className="text-sm font-semibold text-text-muted hover:text-accent transition-colors"
                                         >
                                             Clear all
@@ -1940,16 +2056,49 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
                 {/* Links Grid / Ask */}
                 <div className="flex-grow min-w-0">
-                    {viewMode === 'connections' ? (
-                        // Desktop only: the Connections list flows inline beneath the
-                        // subheader. Mobile renders the full-screen overlay below.
-                        <div className="hidden sm:block">
-                            <ConnectionsView
-                                links={links}
-                                onOpenCard={(id) => setActiveLinkId(id)}
-                            />
+                    {/* Search typeahead — split the live results into a "Sources" row
+                        (tap a publisher to jump straight to its cards) above the
+                        "Cards" grid below, so searching "ynet" offers both. */}
+                    {(viewMode === 'grid' || viewMode === 'list') && debouncedQuery.trim() && matchingSources.length > 0 && (
+                        <div className="mb-5 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="flex items-center gap-2 mb-2.5">
+                                <Globe className="w-3.5 h-3.5 text-accent/70" />
+                                <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">Sources</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {matchingSources.map(s => {
+                                    const active = selectedSources.has(s.key);
+                                    return (
+                                        <button
+                                            key={s.key}
+                                            onClick={() => {
+                                                handleToggleSource(s.key);
+                                                // Jump to the source's library view: filter, drop the query.
+                                                setSearchQuery('');
+                                                setMobileSearchOpen(false);
+                                            }}
+                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[13px] font-semibold border transition-colors ${active
+                                                ? 'bg-accent/12 border-accent/40 text-text'
+                                                : 'bg-card border-border-subtle text-text-secondary hover:border-text-muted/40 hover:text-text'}`}
+                                        >
+                                            <span className="shrink-0">{sourceIconFor(s, 'w-3.5 h-3.5')}</span>
+                                            <span className="truncate max-w-[12rem]">{s.label}</span>
+                                            <span className="tabular-nums text-text-muted">{s.count}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            {filteredLinks.length > 0 && (
+                                <div className="flex items-center gap-2 mt-5 mb-1">
+                                    <LayoutGrid className="w-3.5 h-3.5 text-accent/70" />
+                                    <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">
+                                        Cards<span className="ms-1 normal-case tracking-normal font-semibold text-text-muted/70">· {filteredLinks.length}</span>
+                                    </span>
+                                </div>
+                            )}
                         </div>
-                    ) : viewMode === 'digest' ? (
+                    )}
+                    {viewMode === 'digest' ? (
                         // Desktop only: the digest history flows inline beneath the
                         // subheader. Mobile renders the full-screen overlay below.
                         <div className="hidden sm:block">
@@ -2016,11 +2165,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                                         selectedTags.size > 0 ? 'Try clearing some tag filters' :
                                                             'Add your first link using the + button below'}
                             </p>
-                            {(selectedTags.size > 0 || selectedPlatforms.size > 0 || screenshotOnly || searchQuery) && (
+                            {(selectedTags.size > 0 || selectedPlatforms.size > 0 || selectedSources.size > 0 || screenshotOnly || searchQuery) && (
                                 <button
                                     onClick={() => {
                                         setSelectedTags(new Set());
                                         setSelectedPlatforms(new Set());
+                                        setSelectedSources(new Set());
                                         setScreenshotOnly(false);
                                         setSearchQuery('');
                                     }}
@@ -2129,25 +2279,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 </div>
             )}
 
-            {/* Connections — mobile full-screen overlay (mirrors Collections). */}
-            {viewMode === 'connections' && (
-                <div className="sm:hidden fixed inset-x-0 top-0 bottom-0 z-50 bg-background flex flex-col animate-fade-in">
-                    <MobileSubheader
-                        onBack={() => setViewMode(lastLayout.current)}
-                        backLabel="Back to your library"
-                        icon={<Link2 className="w-5 h-5" />}
-                        title="Connections"
-                    />
-                    <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
-                        <ConnectionsView
-                            links={links}
-                            onOpenCard={(id) => setActiveLinkId(id)}
-                        />
-                    </div>
-                </div>
-            )}
-
-            {/* Digest — mobile full-screen overlay (mirrors Connections). */}
+            {/* Digest — mobile full-screen overlay (mirrors Collections). */}
             {viewMode === 'digest' && (
                 <div className="sm:hidden fixed inset-x-0 top-0 bottom-0 z-50 bg-background flex flex-col animate-fade-in">
                     <MobileSubheader

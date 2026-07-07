@@ -589,6 +589,151 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-08 — Share "Open Machina" switched to Apple's supported path
+  (`2502123`, merge `45b93ab`; TestFlight run #55 → build 1055).** The button
+  never worked because iOS **forbids app extensions from launching the host app**
+  — the `UIApplication.openURL:` responder hack hard-fails on iOS 17+ ("BUG IN
+  CLIENT OF UIKIT … Force returning false") and `NSExtensionContext.open` is
+  Today-widget-only (confirmed via Apple DTS, forums thread 764570; two earlier
+  builds 1051/1053 that tried the hack/`extensionContext.open` could not have
+  worked). `ShareViewController.openMainApp()` now posts an **immediate local
+  notification** the user taps to foreground Machina (needs notification auth;
+  dismisses silently otherwise). Plus the App-Group hand-off flag is now seeded at
+  scan start and updated (throttled) as the % rises, so opening Machina any time —
+  notification or Home Screen — resumes the exact progress. **⚠️ On-device
+  verify (build 1055):** share → tap Open Machina → confirm the notification
+  appears and tapping it opens Machina to the resuming banner; if the two-tap feel
+  is unwanted, the alternative is dropping the button and relying on the
+  Home-Screen-open hand-off. **⚠️ PARALLEL-SESSION COLLISION (unresolved):** this
+  session also built a Sources filter reorg — **platform-grouped rows with
+  expandable per-account sub-sections** + a desktop Sources popover
+  (`SourceFilter.tsx`, `platformAccount()` in `platform.tsx`) — but a parallel
+  session shipped a *different* Sources feature first (build 1054, `source.ts`
+  `getSourceInfo`/`buildSourceFacets`, a **flat ranked source list** + search).
+  To avoid clobbering their live work, my duplicate was **dropped, not merged**.
+  Open question for next session: the user asked for **platform + account
+  subsections** (grouped/expandable), which the shipped 1054 flat list does NOT
+  do — decide whether to layer the platform-grouping UI on top of their
+  `source.ts` foundation. Two other user asks are pending visual confirmation: a
+  reported **toggle side-gap** (the Settings `Toggle` is already at the iOS 51×31 /
+  27px-knob spec — need a screenshot of the remaining gap, possibly a stale build)
+  and **top-toolbar chip alignment** (chips are a uniform 36px and Ask is centered
+  in its zone — likely fine; awaiting a screenshot).
+- **2026-07-07 — Filter + search by source / publisher (`21bfa2d`, merge
+  `5baf2a1`; TestFlight run #54 → build 1054, UI-only).** New feed capability:
+  filter and find cards by their **source** (publisher/site/channel), e.g.
+  "Ynet", an MKBHD video, `@naval` on X. **New `web/lib/source.ts`** —
+  `getSourceInfo(link)` canonicalizes a card to a stable source identity in a
+  fixed order (X `@handle` → LinkedIn author → real `sourceName` (skips the
+  generic `None`/`Screenshot` placeholders) → known platform label → `Screenshot`
+  → pretty hostname), deliberately mirroring what `ListCard` already renders so
+  the filter list matches the labels users see on cards; `buildSourceFacets()`
+  ranks the distinct sources by count. **`Feed.tsx`** gained a `selectedSources`
+  Set facet **unioned** (OR) with the existing coarse platform/screenshot source
+  block (picking Ynet + YouTube shows both), wired into `activeMobileFilters`,
+  `isDefaultLibraryView`, and every Clear-all. UI: a desktop **"Sources" popover
+  submenu** (Globe button in the toolbar cluster, click-away layer, brand
+  icon + count + check per row) and a **mobile Filters-sheet "Sources"
+  checklist**. **Search upgrade:** keyword matching now also matches
+  `sourceName` + hostname (so typing "ynet" surfaces its cards even without a
+  semantic hit), and the live results **split into a tappable "Sources"
+  suggestion row above the "Cards" grid** — tapping a source clears the query and
+  jumps to that source's filtered library view. Frontend-only (Vercel + the iOS
+  Capacitor shell carries the same web UI). `tsc --noEmit` clean (only the
+  pre-existing `auth.ts`/`push.ts` native-plugin module errors). **⚠️ Deferred
+  owner check:** the feed is behind the web auth gate, so this was verified by
+  typecheck + concrete-case re-derivation, not a live UI pass — on desktop web
+  (live in ~1–2 min) or TestFlight build 1054, confirm the Sources popover lists
+  your publishers with correct counts, toggling one narrows the grid, and
+  searching a source name shows the Sources row + jumps on tap.
+- **2026-07-07 — Share Extension: reliable "Open Machina" + continuous progress
+  into the app (`bd824d3`, merge `88466f6`; TestFlight run #53 → build 1053).**
+  Two native+web fixes to the iOS share hand-off. (A) **Open Machina button:**
+  `ShareViewController.openMainApp()` now launches via `NSExtensionContext.open()`
+  first (the forward-compatible API that still works from the share sheet on
+  modern iOS) and only falls back to the legacy walk-the-responder-chain-to-
+  `openURL:` hack if the system declines — the hack had become an unreliable
+  no-op, which is why the button appeared dead. The extension request now
+  completes AFTER the switch attempt so the context isn't torn down mid-open.
+  (B) **Progress parity:** the extension writes the EXACT HUD percentage at
+  hand-off (`pendingShareProgress` in App Group `group.com.morhogeg.machina`;
+  `ShareConfigPlugin.consumePendingShare` reads+clears it and returns `progress`),
+  and `useSharedCaptureBanner` anchors its optimistic ramp to that % (inverts the
+  ease-out to find the ramp origin) so the in-app banner resumes from the same
+  value + phase label instead of snapping back to ~6%. The give-up timer moved to
+  a real wall-clock (`openedAt`) so a high hand-off % can't trip it early; older
+  extension builds with no % fall back to the previous age offset. **⚠️ Deferred
+  owner step:** native share flow can't be verified off-device — on build 1053,
+  share a link/image into Machina, tap **Open Machina**, and confirm (1) the app
+  actually foregrounds, and (2) the in-app banner picks up at roughly the % the
+  share sheet showed (no jump back to zero). If `NSExtensionContext.open` still
+  declines on your iOS, the fallback keeps prior behavior (no regression).
+- **2026-07-07 — Settings redesign follow-ups + Digest/Collections swipe-back
+  (`bcd4945`, merge `952162a`; TestFlight run #52 → build 1052, UI-only).**
+  Round-two polish on the new Settings (`SettingsModal.tsx`) plus two page-level
+  adds (`Feed.tsx`, `page.tsx`, `lib/haptics.ts`). **Pickers no longer auto-pop**
+  on tap — Cadence/Style/Cards selecting a row just checks it and updates the
+  live footnote; the user leaves via **Back** or a new footer **"Done"** button
+  (sub-screens now show Done instead of Cancel/Save; the root screen keeps Save
+  changes; persistence is still the root Save into the in-memory form).
+  **Close (X) is root-screen only** now; sub-screens use Back/Done. **"Capture
+  links" section removed entirely** (WhatsApp info + share-extension bridge
+  diagnostic/Fix) along with its dead `shareConfig` state/imports — ⚠️ note the
+  share-extension self-diagnostic UI is now gone from Settings; the bridge logic
+  in `lib/shareConfig.ts` still runs, only the Settings surface was cut. **Wheel
+  haptics**: new `hapticSelection()` (`Haptics.selectionChanged`, native-only
+  no-op) fires per detent as the Schedule wheels roll. **Toggles** rebuilt to the
+  iOS 51×31 / 27px-knob spec (knob fills the track, softer shadow). **Digest
+  deep-link**: `SettingsModal` gained an `initialSection?: 'digest'` prop that
+  opens the sheet at stack `['main','resurfacing']`; the empty Digest page's
+  microcopy now has a **"Set up your digest"** link wired through
+  `page.tsx` `onOpenDigestSettings` → `Feed`. **Swipe-back**: the Digest and
+  Collections pages now honor the iOS left-edge `useEdgeSwipeBack` (pops to
+  `lastLayout.current`), gated on a new `isMobileView` matchMedia flag in Feed.
+  Typecheck + `next build` clean (same env-only `/_not-found` prerender error).
+  **↩ Done (shipped as build 1053 — see the newest entry above):** the iOS
+  **Share Extension** "Open Machina" launch + progress-parity work.
+- **2026-07-07 — Settings redesigned as a flat iOS grouped-list; Reminders +
+  Digest merged into one drill-in screen (`0a8e521`, merge `01b9be6`; TestFlight
+  run #51 → build 1051, UI-only).** Full presentation + IA rebuild of
+  `SettingsModal.tsx` (still one file, ~776/733 +/− lines). **Main screen** is now
+  Apple-style grouped-inset lists: flat solid icon tiles (accent/pink/green/
+  indigo/slate via Tailwind color utils), inset hairline dividers, quiet section
+  **footnotes** instead of per-row subtitles, and the large "Settings" title
+  inline with the close button. Account (profile + sign-out + delete) moved to its
+  own `account` sub-screen. **Reminders & Digest** are now ONE screen (replaces
+  the old `'main'|'digest'` two-view split) reached from a single "Reminders &
+  Digest ›" row under Notifications; it uses value rows that drill into focused
+  pickers — **Cadence** (smart/daily/weekly), **Style** (the 7 digest modes +
+  topic picker), **Schedule**, **Cards**, **Delivery** (WhatsApp/Email + email
+  input). **Schedule** is a custom **iOS drum-wheel** (day + hour/minute/AM-PM,
+  scroll-snap under a centered band, `Wheel` component) replacing the
+  `<input type="time">`/`Dropdown`. **Skip when empty** gained an inline ⓘ
+  disclosure. Navigation is a simple `stack: View[]` (push/pop) reused by the
+  edge-swipe-back. **No logic change** — settings state, `withPush()` push
+  reconciliation, dirty-tracking/discard guard, save, delete-account, load-error
+  retry, share-bridge + rebuild-connections all preserved verbatim; the Save
+  payload in `updateUserSettings` is byte-identical. Verified: `tsc --noEmit`
+  clean on the merged tree + `next build` compiled successfully (the only build
+  error is `/_not-found` prerender failing on a missing local Firebase API key —
+  env-only, unrelated; Vercel has the key). **⚠️ Deferred owner step:** the new
+  drum-**wheel** picker's touch/momentum feel and time-commit could only be
+  verified via typecheck + desktop reasoning here (Settings is behind auth) — 
+  **sanity-check the Schedule wheel on TestFlight build 1051** (spin each column,
+  confirm the digest time saves correctly, incl. 12 AM/PM edge and weekly day).
+- **2026-07-07 — Cut the standalone Connections page (`60c01b4`).** The
+  cross-category cluster view (M10) was removed: it clustered on EXACT concept-string
+  matches across 2+ categories within a 30-day window — criteria that rarely fire, so
+  it recomputed live yet barely changed as cards were added and read as "stale," while
+  taking a full nav view's worth of attention (the user's own read: overwhelming).
+  Decision was subtraction per §1's north star; the connection value that lands — the
+  **in-card "Related" section** (`lib/related.ts`, backend `relatedLinks`,
+  `graph_service`, the SettingsModal rebuild) — is untouched. Removed
+  `ConnectionsView.tsx`, `lib/connections.ts`, the `'connections'` viewMode + toolbar
+  pill/badge + desktop-inline + mobile-overlay branches in `Feed.tsx`, and the unused
+  `Link2` import. `tsc --noEmit` clean; frontend-only (Vercel). NOTE: M10 in §4 "Done"
+  is now partially rolled back — in-card Related stays, the standalone page is gone.
+
 - **2026-07-07 — Reworked Reminders + Digest settings into one Notifications
   section + native minute-precise digest time.** The Settings screen had two
   overlapping sections ("Reminders" and "Curated digest") that both re-declared
@@ -626,12 +771,14 @@ exact-match, capped.
   query on due users, or widen cadence to 15 min for ≤15-min latency at 4× cost).
   No "send one now" button was added (non-goal); `send_digest_now` callable
   untouched. `tsc` clean (only pre-existing `push.ts` native-plugin errors),
-  `py_compile` clean. **NOT DEPLOYED — owner action:** frontend ships via Vercel
-  on merge; **the backend (`send_digests` cadence + `is_due` + new default) MUST
-  be deployed from the owner machine** — `./deploy-functions.sh
-  functions:send_digests` (the Firestore default only affects brand-new
-  workspaces; existing users get `digest_minute` via the `?? 0` fallback). Device
-  QA (native wheel + a 16:24 round-trip) pending on TestFlight.
+  `py_compile` clean. **SHIPPED + LIVE:** merged to `main` (`d1061d7`) → desktop
+  web live via Vercel; **`send_digests` deployed** by owner (`Successful update
+  operation`, us-central1) so the new `is_due` minute-window + every-5-min cadence
+  are **live**; **iOS → TestFlight run #49 → build 1049** carries the new Settings
+  UI + native time picker. The `link_service.py` default only affects brand-new
+  workspaces; existing users get `digest_minute` via the `?? 0` / `.get(...,0)`
+  fallback, so no backfill was needed. **Only remaining:** device QA on build 1049
+  (native wheel renders + a 16:24 round-trips + saves).
 - **2026-07-07 — FB login-wall handling + hover-toolbar order + TestFlight 1048.**
   Closing out the Facebook/summary work. **(1) Login wall (`fd6c9fe`, deployed
   `analyze_link` + `process_link_background`):** FB intermittently serves logged-out
