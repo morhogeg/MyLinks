@@ -89,8 +89,14 @@ export default function Card({
     // LinkedIn: show only the brand logo. Author/source name from scraping is
     // unreliable (often the first words of the post), so we don't render text.
     const isLinkedIn = platform === 'linkedin';
-    // Facebook: same treatment as LinkedIn — brand logo only, no scraped name.
+    // Facebook: credit the author/page name (recovered by the scraper from
+    // og:title) next to the brand logo — same byline style as X, minus the @
+    // since it's a real name, not a handle. Falls back to logo-only when we
+    // couldn't recover a name (or it's a generic placeholder).
     const isFacebook = platform === 'facebook';
+    const fbAuthor = isFacebook && link.sourceName
+        && !['facebook', 'screenshot', 'none'].includes(link.sourceName.trim().toLowerCase())
+        ? link.sourceName : null;
 
     useEffect(() => {
         const initialTimer = setTimeout(() => setNow(Date.now()), 0);
@@ -455,14 +461,15 @@ export default function Card({
                         )}
                         {!isYouTube && !xAuthor && !isLinkedIn && isFacebook && (
                             <span
-                                dir="ltr"
-                                className="flex items-center gap-1.5 min-w-0 text-xs font-semibold whitespace-nowrap"
-                                title="Facebook"
-                                aria-label="Facebook"
+                                dir="auto"
+                                className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-text-secondary whitespace-nowrap max-w-[220px]"
+                                title={fbAuthor || 'Facebook'}
+                                aria-label={fbAuthor || 'Facebook'}
                             >
                                 <span className="shrink-0 inline-flex" style={{ color: platformColor('facebook') }}>
-                                    {platformIcon('facebook', 'w-4 h-4')}
+                                    {platformIcon('facebook', fbAuthor ? 'w-3.5 h-3.5' : 'w-4 h-4')}
                                 </span>
+                                {fbAuthor && <span className="truncate">{fbAuthor}</span>}
                             </span>
                         )}
                         {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && link.sourceType === 'image' && (

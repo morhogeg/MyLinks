@@ -775,6 +775,16 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
             reals = [c.strip() for c in candidates if _is_real_caption(c)]
             body = max(reals, key=len) if reals else ""
 
+            # Text posts put ONLY the author's name in og:title (no caption
+            # wrapper), so _clean_fb_title finds no explicit author. When the body
+            # came from og:description and og:title is a short single line, that
+            # line IS the author/page name — capture it so posts get a byline too
+            # (reels already get theirs from the "| Author |" wrapper).
+            if not source_name and title_caption and title_caption != body:
+                tc = title_caption.split('|')[0].strip()
+                if tc and '\n' not in tc and 2 <= len(tc) <= 60 and tc not in generic_titles:
+                    source_name = tc
+
             # FB truncates og:description with a trailing "..."; when that preview
             # is the best we got (og:title carried no full caption — i.e. a text
             # post, not a reel), the AI is summarizing only a fragment. Flag it so

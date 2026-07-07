@@ -141,7 +141,12 @@ export default function LinkDetailModal({
     const youtubeChannel = link.metadata?.youtubeChannel || link.sourceName;
     const xAuthor = platform === 'x' ? xHandle(link.url) : null;
     const isLinkedIn = platform === 'linkedin';
+    // Facebook: credit the author/page name (recovered by the scraper from
+    // og:title) next to the logo — same byline style as X, minus the @.
     const isFacebook = platform === 'facebook';
+    const fbAuthor = isFacebook && link.sourceName
+        && !['facebook', 'screenshot', 'none'].includes(link.sourceName.trim().toLowerCase())
+        ? link.sourceName : null;
 
     const getTimeAgo = (timestamp: any, now: number): string => {
         if (!timestamp || !now) return '...';
@@ -490,14 +495,15 @@ export default function LinkDetailModal({
                                         </span>
                                     ) : isFacebook ? (
                                         <span
-                                            dir="ltr"
-                                            className="flex items-center gap-1.5 min-w-0 text-sm font-semibold whitespace-nowrap"
-                                            title="Facebook"
-                                            aria-label="Facebook"
+                                            dir="auto"
+                                            className="flex items-center gap-1.5 min-w-0 text-sm font-semibold text-text-secondary whitespace-nowrap max-w-[240px]"
+                                            title={fbAuthor || 'Facebook'}
+                                            aria-label={fbAuthor || 'Facebook'}
                                         >
                                             <span className="shrink-0 inline-flex" style={{ color: platformColor('facebook') }}>
                                                 {platformIcon('facebook', 'w-4 h-4')}
                                             </span>
+                                            {fbAuthor && <span className="truncate">{fbAuthor}</span>}
                                         </span>
                                     ) : link.sourceType === 'image' ? (
                                         <span className="flex items-center gap-1.5 text-sm font-semibold text-accent whitespace-nowrap" title="Screenshot">
