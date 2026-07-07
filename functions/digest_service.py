@@ -970,11 +970,18 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
         if phone:
             try:
                 messages = format_digest_whatsapp_messages(cards, mode, topics, frequency)
+                # Only count the channel as delivered if every part actually sent.
+                all_sent = True
                 for body in messages:
-                    send_whatsapp_message(f"whatsapp:{phone}", body)
-                result["channels"].append("whatsapp")
-                result["whatsapp_parts"] = len(messages)
-                delivered_any = True
+                    if not send_whatsapp_message(f"whatsapp:{phone}", body):
+                        all_sent = False
+                        break
+                if all_sent and messages:
+                    result["channels"].append("whatsapp")
+                    result["whatsapp_parts"] = len(messages)
+                    delivered_any = True
+                else:
+                    logger.error(f"Digest WhatsApp send failed for {uid} (no message SID)")
             except Exception as e:
                 logger.error(f"Digest WhatsApp send failed for {uid}: {e}")
         else:

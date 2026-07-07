@@ -11,7 +11,6 @@
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",
     "@capacitor-firebase/messaging": "^8.3.0",
-    "@capacitor/cli": "^8.4.1",
     "@capacitor/core": "^8.4.1",
     "@capacitor/haptics": "^8.0.2",
     "@capacitor/ios": "^8.4.1",
@@ -27,6 +26,7 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.4.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

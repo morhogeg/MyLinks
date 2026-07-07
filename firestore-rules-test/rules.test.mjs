@@ -236,6 +236,26 @@ for (const col of ['shared_cards', 'shared_collections']) {
     await assertFails(setDoc(doc(anonDb(), col, 'anon-share'), { ownerUid: OWNER_DOC }));
     await assertFails(deleteDoc(doc(anonDb(), col, existing)));
   });
+
+  test(`${col}: stranger cannot overwrite an existing share with their own ownerUid`, async () => {
+    // Public-share takeover: shareIds are public (they appear in /s?id= and
+    // /c?id= URLs). The existing `${existing}` doc is owned by OWNER_DOC (seeded
+    // above). A signed-in stranger owns their own workspace, so a naive
+    // owns(request.resource.data.ownerUid) rule would let this setDoc-overwrite
+    // succeed. The update rule must check the EXISTING owner, so this must fail.
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users', STRANGER_AUTH), {
+        authUids: [STRANGER_AUTH],
+        email: 'stranger@example.com',
+      });
+    });
+    await assertFails(
+      setDoc(doc(strangerDb(), col, existing), {
+        ownerUid: STRANGER_AUTH,
+        card: { title: 'Phishing' },
+      }),
+    );
+  });
 }
 
 // ── Functions-only collections: always denied ────────────────────────────────

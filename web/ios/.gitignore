@@ -11,3 +11,7 @@ capacitor-cordova-ios-plugins
 # Generated Config files
 App/App/capacitor.config.json
 App/App/config.xml
+
+# Firebase iOS config — contains OAuth client IDs; CI injects it from a secret
+# at build time (see .github/workflows/ios-testflight.yml). Never commit it.
+App/App/GoogleService-Info.plist

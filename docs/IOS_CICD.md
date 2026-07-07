@@ -2,9 +2,10 @@
 
 `.github/workflows/ios-testflight.yml` builds the web bundle, syncs it into the
 Capacitor iOS app, archives, and uploads to TestFlight **on a macOS runner** —
-so no one has to open Xcode. It runs automatically on pushes to `main` that touch
-`web/**`, and can be run by hand from the **Actions** tab → *iOS → TestFlight* →
-*Run workflow*.
+so no one has to open Xcode. During the auth cutover the automatic push trigger
+is **commented out**, so today it runs **manually only**: from the **Actions**
+tab → *iOS → TestFlight* → *Run workflow*. (Re-enable the `push` trigger in the
+workflow once the native auth setup is confirmed — see the note in the workflow.)
 
 The build number is `1000 + <run number>`, so it always increases and stays well
 clear of the manual builds.
@@ -22,11 +23,41 @@ I can't add these for you: they're your private Apple + Firebase credentials.
 | `ASC_ISSUER_ID` | Issuer ID | Same page, shown above the keys list. |
 | `ASC_KEY_P8_BASE64` | The `.p8` key file, base64 | Download the key once (`AuthKey_XXXX.p8`), then: `base64 -i AuthKey_XXXX.p8 \| pbcopy` |
 
-**No exported distribution certificate is needed.** Signing uses Apple's
-cloud-managed distribution: `xcodebuild -allowProvisioningUpdates` with the API
-key above creates/reuses the signing certificate and provisioning profile
-automatically. (This relies on the project's automatic signing, which the app
-already uses.)
+### Stable signing certificate (one-time — this is what stops the cert-cap failures)
+
+**Why you need this.** Without it, every CI run signs with a *throwaway*
+certificate: a GitHub runner starts with an empty keychain, so automatic signing
+asks Apple to **mint a new Apple Development certificate each run**, and that cert
+dies with the runner. Apple only allows **2 Development certificates per account**,
+so every few builds the Archive step fails with *"maximum number of certificates"*
+and you have to revoke certs by hand at developer.apple.com. Importing one
+**persistent** certificate that CI reuses ends this for good — no more revoking.
+
+Do this once, on your Mac:
+
+1. **Create the certificate(s).** Xcode → **Settings → Accounts** → pick your team
+   → **Manage Certificates…** → click **+** and add **Apple Distribution** (if you
+   don't already have one). If there's no **Apple Development** entry, add that too.
+   Both now live in your **login keychain** with their private keys.
+2. **Export them together.** Open **Keychain Access** → **login** keychain →
+   category **My Certificates**. Select **Apple Distribution: … (8Y2M94RUHG)** *and*
+   **Apple Development: …** (⌘-click both) → right-click → **Export 2 items…** →
+   save as `signing.p12` → set a password when prompted. Exporting both covers the
+   archive (Development) and the store export (Distribution) so neither step mints.
+3. **Base64 it:** `base64 -i signing.p12 | pbcopy`
+4. **Add two repo secrets:**
+
+| Secret | What it is |
+| --- | --- |
+| `BUILD_CERTIFICATE_P12_BASE64` | the base64 from step 3 |
+| `BUILD_CERTIFICATE_PASSWORD` | the password you set in step 2 |
+
+The workflow's **Install signing certificate** step imports this into a temporary
+keychain each run; automatic signing then **reuses** it (`-allowProvisioningUpdates`
++ the API key still auto-manage the *profiles*, which are uncapped). Until the
+secret exists the workflow logs a warning and falls back to the old minting
+behavior, so adding it is safe to do anytime. **Don't revoke these two certs** —
+they're the ones CI now depends on.
 
 ### Native Firebase / Sign in with Apple (from the auth cutover)
 

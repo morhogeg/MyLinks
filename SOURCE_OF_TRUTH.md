@@ -111,13 +111,21 @@ surface in the category and a knowledge graph computed on every save. The path t
   Extension token bridge ("Open Machina and sign in first") — entitlements are
   baked at archive-time codesign and export re-signing doesn't restore them.
   A CI step now cracks open every exported IPA and fails if the App Group
-  entitlement is missing from the app or the extension. Known cost of signed
-  archives: each ephemeral runner mints an Apple *Development* cert, and
-  Apple caps those — when archive fails with "maximum number of certificates"
-  (runs #15/#16), **prune Development certs at developer.apple.com →
-  Certificates** (safe; they regenerate). A global `CODE_SIGN_IDENTITY`
-  override is also not an option — it leaks onto every SPM target (run #17).
-  Durable fix candidate (backlog): import one stable dev cert as a CI secret.
+  entitlement is missing from the app or the extension. **Certificate cap —
+  DURABLE FIX SHIPPED 2026-07-07:** the old cost of signed archives was that each
+  ephemeral runner *minted a new Apple Development cert* (empty keychain → no
+  identity to reuse), and Apple caps those at 2, so builds periodically died with
+  "maximum number of certificates" (runs #15/#16/#31/#42) until you revoked by
+  hand. The workflow now has an **"Install signing certificate"** step that
+  imports one **persistent** `.p12` (secrets `BUILD_CERTIFICATE_P12_BASE64` +
+  `BUILD_CERTIFICATE_PASSWORD`) into a temp keychain so automatic signing REUSES
+  it and never mints. **Secrets added + VERIFIED 2026-07-07** — build 1045
+  imported both identities and archived with no minting; setup in
+  `docs/IOS_CICD.md` → "Stable signing certificate". Until the
+  secret exists the step warns and falls back to the old minting behavior (so it's
+  safe to land before setup). A global `CODE_SIGN_IDENTITY` override is still not
+  an option — it leaks onto every SPM target (run #17) — which is why the fix is
+  keychain import, not a project signing change.
 - **Two parallel Claude sessions:** TestFlight runs share one concurrency group
   and one build-number sequence (1000 + run number) — runs queue, numbers never
   collide, but a build only contains its own branch's code. Sync with
@@ -233,6 +241,17 @@ The multi-user auth work is **fully written but not live**:
    `APPCHECK_ENFORCE=true`, `OWNER_EMAIL` in functions env. **Rotate the Gemini
    key** (was pasted in chat 2026-06-23) and the **App Store Connect API `.p8`**
    (pasted in plaintext during CI setup).
+5a. **[ ] Share-doc `ownerUid` PII leak (owner decision — do before publishing any
+    share post-cutover).** `shared_cards`/`shared_collections` are world-readable
+    (`allow read: if true`) and store `ownerUid`, which for the owner's phone-keyed
+    workspace **is the phone number** — any client can `getDoc` a share ID and read
+    it. Rules can't hide a field. Two fixes: (a) publish snapshots via an Admin-SDK
+    function that omits `ownerUid` (store the owner mapping in a functions-only
+    collection), or (b) migrate the owner data doc off phone-number keying so
+    `ownerUid` is an opaque Auth uid. New-user workspaces already use Auth uids, so
+    (b) mainly affects the legacy owner doc. Details: `AUDIT_FINDINGS.md` #2. (The
+    UPDATE-takeover half of this finding is already **fixed** in
+    `firestore.rules.locked` — ships with task 2.)
 
 ### 🟠 P1 — App Store submission requirements (see §6 for the full readiness review)
 
@@ -318,6 +337,32 @@ The multi-user auth work is **fully written but not live**:
 19. **[ ] Cost guardrails.** Budget alerts on the Firebase/GCP project; per-user
     monthly quotas (see §7); email digest provider decision (SendGrid key or cut
     the email channel).
+19a. **[ ] Deferred audit remediations (from the 2026-07-07 sweep — full detail +
+    file:line in `AUDIT_FINDINGS.md`).** The high-value fixes shipped that session;
+    these remain, roughly high→low: **(data integrity)** embedding schema-drift +
+    zero-vector poisoning — cards permanently invisible to search with no repair
+    path (stop round-tripping embeddings through the client; make
+    `sync_link_embedding` repair array/updated docs; on embed failure omit the field
+    + set `needsEmbedding`); **(reliability)** a scheduled janitor to flip
+    `processing` cards older than ~15 min to `FAILED` (timeout/OOM kills bypass the
+    except); **(perf)** Feed re-render storm — throttle `useProcessingBanner`'s 200ms
+    tick, memoize the `filteredLinks`/facet-count chain, `React.memo` Card/ListCard,
+    move drag-scroll to refs, one shared "now" tick (currently 5 Hz full-tree
+    re-renders during any capture + per-card `setInterval`s); **(security
+    hardening)** SSRF scraper-branch dispatch (platform fetchers bypass `safe_get`;
+    substring routing); **(correctness)** semantic-search stale-response guard,
+    `/api/chat` `maxDuration`; **(a11y)** modal focus-trap/Escape + FAB `aria-label`;
+    **(polish)** light-theme solid `text-white`/`bg-white` in ConfirmDialog +
+    AddLinkForm Save; **(debt)** decompose `Feed.tsx` (2109 L) + `SettingsModal.tsx`
+    (1117 L) + extract `share_service.py` from `main.py` (2333 L), dedup the verbatim
+    RAG prompt across `answer_from_context`/`_stream` (+ fix the stream path citing
+    *all* cards when the `[[CITED:]]` marker is missing), fix/delete the dead-stale
+    `models.py` `LinkDocument`/`RelatedLink`, consolidate the two markdown stacks;
+    **(hygiene)** scrub owner PII from `models.py`/docs, add extension token-copy UI
+    + rename the stale "MyLinks" manifest, run the `firestore-rules-test` suite in
+    CI, `altool`→`-exportArchive`, filter the Xcode beta glob, lockstep the
+    App/ShareExt build numbers, ShareExt background-upload pending-record
+    reconciliation.
 
 ### 🟢 P3 — product roadmap (post-launch)
 
@@ -537,8 +582,9 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
-- **2026-07-06 — iOS push notifications (FCM/APNs) + in-app Digest section**
-  (branch `claude/ios-push-digest-5y8fj8`). Machina goes native-first on
+- **2026-07-07 — iOS push notifications (FCM/APNs) + in-app Digest section**
+  (branch `claude/ios-push-digest-5y8fj8`, rebased onto the audit-remediation
+  main). Machina goes native-first on
   notifications: WhatsApp is no longer the only outbound channel (it stays as an
   opt-in legacy channel, default OFF for new users; push defaults ON after
   permission). Backend: new `push_service.py` (`send_each_for_multicast`, APNs
@@ -574,10 +620,142 @@ exact-match, capped.
   enable Push Notifications capability on App ID `com.morhogeg.machina`;
   (2) create an APNs Auth Key (.p8) and upload to Firebase Console →
   `secondbrain-app-94da2` → Cloud Messaging → Apple app config; (3) confirm
-  Cloud Messaging enabled. Then deploy functions (`./deploy-functions.sh` with
-  explicit targets incl. the two new token endpoints + `check_reminders` +
-  `send_digests`), redeploy Hosting (firebase.json rewrites changed), and ship
-  iOS via the TestFlight workflow.
+  Cloud Messaging enabled — owner confirmed these done 2026-07-07 (APNs .p8
+  uploaded to FCM for both dev+prod slots; Push capability on the App ID).
+  **SHIP STATUS (this session, cloud — can't run firebase CLI):** merged to
+  `main` (web live via Vercel), TestFlight workflow triggered. **OWNER MUST run
+  the backend deploys locally** — they can't run from the cloud session:
+  `./deploy-functions.sh functions:register_device_token_http,functions:unregister_device_token_http,functions:check_reminders,functions:send_digests,functions:send_digest_now,functions:force_check_reminders,functions:force_send_digests`,
+  then `./deploy-hosting.sh` (firebase.json rewrites changed — the two /api
+  token routes need it), and deploy the live `firestore.rules` (now carries the
+  open `digests` match) so the Digest section can read. Until the functions +
+  hosting deploy, token registration 404s and no digests are written.
+- **2026-07-07 — Summary accuracy + reliability hardening (prompt + temperature).**
+  Card summaries occasionally reversed fine details and drifted generic. Concrete
+  trigger: a Hebrew Austria travel post where the author said Munich was the OLD
+  landing choice and Salzburg is now better — the summary led with Munich (reversed
+  the recommendation) and described the guide in the abstract instead of naming the
+  actual attractions. Two root causes: (1) **no `temperature` was ever set**, so
+  Gemini ran extraction at its ~1.0 default (max variance → vagueness + occasional
+  claim-flips); (2) the prompt had no rule preserving claim *direction*. Fix in
+  `functions/ai_service.py` (commit `2446e34`): added a **DIRECTIONALITY** rule +
+  "lead with the current recommendation" to `SYSTEM_PROMPT`; converted forced counts
+  to ceilings (`concepts` up to 5 / empty ok, `actionableTakeaway` degrades to an
+  insight when content isn't actionable, `tags` 3–5 to match schema `max_length=5`);
+  `detailedSummary` "must NOT restate" → "stand on its own, completeness beats
+  non-overlap"; section headings now follow the content language; video addendum
+  explicitly overrides the "Key Points first" rule; fixed a summary newline
+  instruction that taught a literal `\n`. **Set `temperature: 0.2`** on all
+  extraction paths (text/image/video/Q&A) via the shared `_generate_json` config;
+  the **streaming Q&A path was bypassing that config** (ran at ~1.0) → now 0.2 to
+  match its non-streaming twin; **weekly synthesis held at 0.6** (intentional warm
+  narrative, goes flat at 0.2). Verified live against the model on the Austria post
+  + a directionality case + a non-actionable case: reversal fixed and stable across
+  3 runs, summaries markedly more specific (named Hallein salt mine / Werfen /
+  Hallstatt / SalzburgLand Card vs. old "recommendations and tips" mush). **Deployed:**
+  `process_link_background`, `analyze_link`, `analyze_image`, `ask_brain`,
+  `send_digests`, `send_digest_now` (all `Successful update`). **Known follow-ups /
+  not-yet-done:** (a) specificity now leans mostly on temperature, not a bulletproof
+  prompt rule — if a future post reads generic, add a firmer "name specific entities"
+  clause; (b) the fix was verified via the **text** path (`analyze_text`); the
+  **image** path (`analyze_image`, OCR) shares the identical prompt/temp but was not
+  run end-to-end here (couldn't get the pasted screenshot bytes) — worth an eyeball
+  after re-saving a real screenshot; (c) `concepts` still returns mildly abstract
+  picks for travel posts (low stakes); (d) `graph_service.py:312` still runs at the
+  ~1.0 default on its connection-inference call — same variance issue, left as-is
+  (out of scope, one-line fix if graph connections look noisy).
+- **2026-07-07 — Killed the TestFlight cert-cap treadmill (durable CI fix).**
+  Root-caused why iOS builds kept dying on "maximum number of certificates":
+  automatic signing on ephemeral runners mints a *new* Apple Development cert
+  every run (empty keychain → nothing to reuse), and Apple caps them at 2. Added
+  an **"Install signing certificate"** step to `ios-testflight.yml` that imports a
+  persistent `.p12` (secrets `BUILD_CERTIFICATE_P12_BASE64` +
+  `BUILD_CERTIFICATE_PASSWORD`) into a temp keychain so signing reuses it — no more
+  minting, no more manual revoking. Import-if-present (warns + falls back to the
+  old behavior when unset). **VERIFIED ACTIVE 2026-07-07:** owner added the secrets
+  (`BUILD_CERTIFICATE_P12_BASE64` from a combined Distribution+Development `.p12` +
+  `BUILD_CERTIFICATE_PASSWORD`); run #45 → build 1045 imported BOTH identities
+  ("2 valid identities found … no new cert is minted") and archived + uploaded
+  clean. Also shipped the audit-fix build after the manual prune: run #44 →
+  **build 1044** (success — camera-string/downsample/favicon/arm64). Exact owner
+  setup lives in `docs/IOS_CICD.md` → "Stable signing certificate". §2 gotcha updated.
+- **2026-07-07 — Production-readiness audit + remediation sweep (5-agent audit,
+  4-agent fix; ~19 issues fixed, rest tracked in `AUDIT_FINDINGS.md`).** A deep
+  five-agent audit (backend, React components, frontend data layer, security,
+  iOS/CI) surfaced ~30 verified issues beyond the existing §4 backlog; the detailed
+  reproduction/fix notes and full status table live in the new **`AUDIT_FINDINGS.md`**
+  (a remediation tracker, not a second source of truth — this file stays canonical).
+  Fixed this sweep across four non-overlapping workstreams (all builds green: `tsc
+  --noEmit` clean, `py_compile` clean, plist/YAML lint OK):
+  · **Security rules (`firestore.rules.locked`):** the staged ruleset had a
+  public-share **takeover** bug — `shared_cards`/`shared_collections` UPDATE was
+  authorized against the *incoming* doc's `ownerUid`, so any signed-in user could
+  `setDoc`-overwrite anyone's public share (phishing repoint). Split create/update
+  so update requires owning the *existing* owner and forbids changing `ownerUid`;
+  regression test added. **Ships at cutover** (task 2). Left a `SECURITY TODO`: the
+  world-readable share docs still store `ownerUid` (= owner phone number) — needs a
+  data-model fix (Admin-SDK publish without `ownerUid`, or move owner off
+  phone-keying); **owner decision, see §4 task 5a below.**
+  · **Backend (`functions/`):** account deletion now also removes the `syntheses`
+  subcollection + `task_logs` (was leaving user data → App Review 5.1.1(v) risk);
+  `send_whatsapp_message` returns `bool` and reminder/digest callers only advance
+  state on a real send (was marking reminders COMPLETED / digests sent on Twilio
+  failure); rate-limit `client_ip` uses the GFE-appended **last** XFF hop (first hop
+  was client-spoofable → bucket bypass); WhatsApp webhook now dedups on `MessageSid`
+  + URL (Twilio retries were duplicating sends/Gemini spend); the `processing`-status
+  write moved inside the try (was losing captures on throw); `requirements.txt`
+  capped to next-major (was fully floor-pinned).
+  · **Frontend (`web/`):** added `app/error.tsx` + `app/global-error.tsx` (zero
+  error boundaries before — one bad doc white-screened the app); `toLink()`
+  normalizer at every snapshot boundary (defaults `tags`/`metadata`); AskBrain
+  stream lifecycle guard (generation counter + AbortController — New/switch/re-send
+  mid-stream no longer crashes or corrupts saved history); removed the destructive
+  `key={refreshKey}` Feed remount; SettingsModal error toasts + guard against
+  overwriting real config with defaults on a failed load; `persistentLocalCache`
+  (IndexedDB — no more whole-library re-read every launch); replaced the two
+  remaining `Boolean(window.Capacitor)` native checks; `retryFailedLink` gets a
+  60s timeout + preserves `createdAt`; new saves use `serverTimestamp()`;
+  `confidence?: string | number`; `@capacitor/cli` → devDeps; deleted committed
+  `web/output.json`.
+  · **iOS/CI:** added `NSCameraUsageDescription` + `NSPhotoLibraryUsageDescription`
+  (missing → camera tap from the in-app picker was a **guaranteed crash + App Review
+  reject**); `UIRequiredDeviceCapabilities` `armv7`→`arm64`; Share Extension now
+  downsamples images (ImageIO thumbnail ≤2048px) before base64 (was jetsamming on
+  large photos); favicon fetch hits the site's own `/favicon.ico` instead of Google
+  (privacy-manifest mismatch); CI fails fast on empty `NEXT_PUBLIC_FIREBASE_*`
+  secrets and verifies the `machina`/`REVERSED_CLIENT_ID` URL schemes survive into
+  the archived Info.plist; `GoogleService-Info.plist` actually gitignored now (docs
+  claimed it was); `docs/IOS_CICD.md` corrected.
+  **SHIPPED (commit `c6e31b1`, merged to `main` as `52d4da7`):** web live via Vercel;
+  **all 23 affected Cloud Functions redeployed** (`./deploy-functions.sh` — the
+  rate-limit/whatsapp/delete/dedup/process_link_background changes are live: analyze_*,
+  ask_brain, get_article, share_ingest, claim/delete (+_http), whatsapp_webhook,
+  check_reminders, send_digests (+force twins), send_digest_now, rebuild_connections,
+  get_share_config, share_page, backfills, ping, debug_status, process_link_background);
+  TestFlight **run #42 (build 1042) FAILED on the Apple Development cert cap**
+  ("maximum number of certificates" — the §2/§3 outage, NOT this session's code;
+  the archive died at signing before the new CI tripwires ran). **Owner action:
+  prune Development certs at developer.apple.com → Certificates, then re-run the
+  "iOS → TestFlight" workflow on `main`** to get the iOS build (camera-string /
+  downsample / favicon / arm64 fixes). Web + functions are unaffected and live.
+  **NOT live:** the
+  `firestore.rules.locked` takeover fix — it only deploys with the task-2 cutover
+  (`cp firestore.rules.locked firestore.rules && firebase deploy --only firestore:rules`).
+  Deferred (higher-risk, own passes) are logged in `AUDIT_FINDINGS.md` and the new §4
+  task 19a below.
+- **2026-07-06 — "Show by" status filter now has a dismissable pill (commits
+  `f575529`, `c77f873`).** The status filter (Archive/Favorites/Unread/Read/
+  Reminders) changed the feed but left no on-page indicator — unlike tags. Added a
+  row in `Feed.tsx` (above the cards, before the tag row): a contextual icon +
+  "Showing:" label + the active filter's name as a pill with an X, shown whenever
+  `filter !== 'all'` in `isLibraryView`; renders on **both web and iOS** (shared
+  path, same as the tag row). **Design decision:** Show stays **single-select**
+  (its options are mutually-exclusive view lenses; multi-select combos like
+  "Favorites OR Archived" are confusing and rarely wanted), so the chip's X is the
+  clear — **no separate "Clear All"** (that was in the first cut `f575529`, removed
+  in `c77f873` as redundant). The tag row keeps Clear All because it's genuinely
+  multi-select. Frontend-only. **SHIPPED:** web via Vercel; TestFlight **run #41 →
+  build 1041** (superseding the interim build 1040).
 - **2026-07-06 — Card ↔ open unified into one thought at two zoom levels
   (commit `51bd9fa`).** Follow-up to the summary-quality ship below: the card
   `summary` and the open `detailedSummary` were two independent paraphrases, so

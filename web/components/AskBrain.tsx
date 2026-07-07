@@ -134,6 +134,22 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
     // (empty) render doesn't create a stray chat.
     const hydratedRef = useRef(false);
 
+    // Stream lifecycle guard. Every send() captures the current generation; any
+    // action that invalidates the in-flight stream (New chat, switching chats, or
+    // starting another send) bumps `streamGenRef` and aborts the live fetch. The
+    // reader loop re-checks its captured generation before each setMessages, so a
+    // stale stream can't patch the wrong conversation or index past its bubble.
+    const streamGenRef = useRef(0);
+    const streamAbortRef = useRef<AbortController | null>(null);
+
+    /** Invalidate any in-flight stream and return the new generation to capture. */
+    const bumpStreamGen = () => {
+        streamAbortRef.current?.abort();
+        streamAbortRef.current = null;
+        streamGenRef.current += 1;
+        return streamGenRef.current;
+    };
+
     // Suggested prompts built from the user's own categories so they're always
     // relevant to what's actually saved. Rotated by a per-open random offset for
     // light variety — all client-side, no extra tokens.
@@ -304,6 +320,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
 
     // ── Conversation actions ──────────────────────────────────────────────────
     const newChat = () => {
+        bumpStreamGen();            // abandon any in-flight stream from the old chat
+        setIsThinking(false);
         setActiveChatId(null);
         activeChatIdRef.current = null;
         setMessages([]);
@@ -315,6 +333,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
     const selectChat = (id: string) => {
         const chat = chats.find(c => c.id === id);
         if (!chat) return;
+        bumpStreamGen();            // abandon any in-flight stream before swapping
+        setIsThinking(false);
         setActiveChatId(id);
         activeChatIdRef.current = id;
         setMessages(chat.messages);
@@ -369,6 +389,13 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         const question = text.trim();
         if (!question || isThinking || !uid) return;
 
+        // Start a fresh stream generation — aborts any prior in-flight stream and
+        // gives us a token every downstream update re-checks before touching state.
+        const gen = bumpStreamGen();
+        const controller = new AbortController();
+        streamAbortRef.current = controller;
+        const isStale = () => streamGenRef.current !== gen;
+
         // History = the conversation so far (before this turn), trimmed server-side.
         const history = messages.map(m => ({ role: m.role, content: m.content }));
 
@@ -394,26 +421,35 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                     ...(await authHeaders()),
                 },
                 body: JSON.stringify({ uid, question, history, stream: wantStream }),
+                signal: controller.signal,
             }, 30_000);
+
+            if (isStale()) return; // superseded while the request was in flight
 
             const contentType = res.headers.get('content-type') || '';
             if (contentType.includes('text/event-stream') && res.body) {
-                // Streaming backend: drop an empty in-progress bubble, then fold each
-                // SSE event into it. We mutate the *last* message (this assistant turn)
-                // immutably so React re-renders as tokens land.
-                setMessages(prev => [...prev, { role: 'assistant', content: '', sources: [] }]);
-                const patchLast = (patch: Partial<ChatMessage>) =>
+                // Streaming backend: append an empty in-progress bubble and remember
+                // ITS index, so every subsequent patch targets that exact message —
+                // not "the last one", which a concurrent action could have changed.
+                let assistantIdx = -1;
+                setMessages(prev => {
+                    assistantIdx = prev.length;
+                    return [...prev, { role: 'assistant', content: '', sources: [] }];
+                });
+                // Patch the tracked assistant bubble by index; no-op if it's gone
+                // (e.g. the conversation was swapped out from under us).
+                const patchAt = (patch: Partial<ChatMessage>) =>
                     setMessages(prev => {
+                        if (assistantIdx < 0 || assistantIdx >= prev.length) return prev;
                         const next = [...prev];
-                        const last = next[next.length - 1];
-                        next[next.length - 1] = { ...last, ...patch };
+                        next[assistantIdx] = { ...next[assistantIdx], ...patch };
                         return next;
                     });
-                const appendText = (text: string) =>
+                const appendText = (chunk: string) =>
                     setMessages(prev => {
+                        if (assistantIdx < 0 || assistantIdx >= prev.length) return prev;
                         const next = [...prev];
-                        const last = next[next.length - 1];
-                        next[next.length - 1] = { ...last, content: last.content + text };
+                        next[assistantIdx] = { ...next[assistantIdx], content: next[assistantIdx].content + chunk };
                         return next;
                     });
 
@@ -423,8 +459,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                 let firstToken = true;
                 let done = false;
                 while (!done) {
+                    // Bail the moment this stream is superseded: stop reading and
+                    // release the connection so a stale stream never mutates state.
+                    if (isStale()) { try { await reader.cancel(); } catch { /* ignore */ } return; }
                     const { value, done: streamDone } = await reader.read();
                     if (streamDone) break;
+                    if (isStale()) { try { await reader.cancel(); } catch { /* ignore */ } return; }
                     buffer += decoder.decode(value, { stream: true });
                     // Events are separated by a blank line; keep the trailing partial.
                     const chunks = buffer.split('\n\n');
@@ -436,14 +476,15 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                         try {
                             evt = JSON.parse(line.slice(line.indexOf(':') + 1).trim());
                         } catch { continue; }
+                        if (isStale()) { try { await reader.cancel(); } catch { /* ignore */ } return; }
                         if (evt.type === 'token') {
                             if (firstToken) { setIsThinking(false); firstToken = false; }
                             appendText(evt.text || '');
                         } else if (evt.type === 'sources') {
-                            patchLast({ sources: evt.sources || [] });
+                            patchAt({ sources: evt.sources || [] });
                         } else if (evt.type === 'error') {
                             setIsThinking(false);
-                            patchLast({ content: evt.error || 'Something went wrong reaching Machina. Please try again.', error: true });
+                            patchAt({ content: evt.error || 'Something went wrong reaching Machina. Please try again.', error: true });
                             done = true;
                         } else if (evt.type === 'done') {
                             done = true;
@@ -455,6 +496,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
 
             // Non-streaming backend (current prod): existing JSON behavior unchanged.
             const data = await res.json();
+            if (isStale()) return; // superseded while parsing the response
 
             if (data.success) {
                 setMessages(prev => [...prev, {
@@ -470,13 +512,20 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                 }]);
             }
         } catch {
+            // A deliberate abort (New/switch/re-send) is not a user-facing error.
+            if (isStale()) return;
             setMessages(prev => [...prev, {
                 role: 'assistant',
                 content: 'Couldn’t reach Machina. Check your connection and try again.',
                 error: true,
             }]);
         } finally {
-            setIsThinking(false);
+            // Only the current generation owns these — a superseded run must not
+            // clear the newer stream's thinking state or abort controller.
+            if (!isStale()) {
+                setIsThinking(false);
+                if (streamAbortRef.current === controller) streamAbortRef.current = null;
+            }
             // Intentionally do NOT refocus the textarea here. Auto-focusing forced
             // the iOS keyboard open after every answer, so the user had to dismiss
             // it before tapping a source card. Leaving focus as-is keeps the

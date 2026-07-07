@@ -65,8 +65,16 @@ def check_rate_limit(key: str, limit: int, window_seconds: int) -> bool:
 
 
 def client_ip(req) -> str:
-    """Best-effort client IP from a Cloud Functions (Flask) request."""
+    """Best-effort client IP from a Cloud Functions (Flask) request.
+
+    On Cloud Run the only trustworthy entry in X-Forwarded-For is the LAST hop,
+    which Google's front end (GFE) appends itself. Everything before it is
+    client-supplied and therefore spoofable, so a caller could forge the first
+    element to dodge or poison rate limiting. We take the last element instead.
+    """
     fwd = req.headers.get("X-Forwarded-For", "")
     if fwd:
-        return fwd.split(",")[0].strip()
+        parts = [p.strip() for p in fwd.split(",") if p.strip()]
+        if parts:
+            return parts[-1]
     return getattr(req, "remote_addr", None) or "unknown"

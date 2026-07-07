@@ -1,14 +1,21 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, initializeFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentSingleTabManager } from "firebase/firestore";
 import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, connectAuthEmulator } from "firebase/auth";
 
 // Inside the native iOS shell (Capacitor) the page is served from
 // capacitor://localhost. Firestore's default WebChannel transport fails to
 // establish over that custom scheme inside WKWebView and hangs every read, so
 // we force long-polling there. Plain browsers keep the default transport.
+//
+// Detection mirrors api.ts's isNativeApp(): do NOT treat the mere presence of
+// window.Capacitor as native — @capacitor/core defines that global in a plain
+// browser too. The authoritative signals are the capacitor:// origin and the
+// runtime's own isNativePlatform(). Replicated inline (not imported) so this
+// low-level module stays dependency-free and safe to evaluate at import time.
 const isCapacitor = typeof window !== 'undefined'
     && (window.location.protocol === 'capacitor:'
-        || Boolean((window as unknown as { Capacitor?: unknown }).Capacitor));
+        || (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
+            .Capacitor?.isNativePlatform?.() === true);
 
 // Firebase web config comes from NEXT_PUBLIC_* env vars (Vercel has them; local
 // builds read web/.env.local). These values aren't secret — they ship in the
@@ -26,10 +33,21 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore
-export const db = isCapacitor
-    ? initializeFirestore(app, { experimentalForceLongPolling: true })
-    : getFirestore(app);
+// Initialize Firestore.
+//
+// localCache: persistentLocalCache() switches the SDK from memory-only to
+// IndexedDB-backed persistence, so a relaunch reads cached docs instead of
+// re-fetching the whole library over the network every time. Single-tab
+// manager (rather than multi-tab) matches this app: the native shell is a
+// single WebView, and it avoids the extra cross-tab coordination overhead.
+//
+// The WebView fix (experimentalForceLongPolling on Capacitor) is preserved and
+// coexists with the cache in this SDK version — both are plain
+// initializeFirestore settings.
+export const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentSingleTabManager(undefined) }),
+    ...(isCapacitor ? { experimentalForceLongPolling: true } : {}),
+});
 
 // Initialize Auth WITHOUT a popup/redirect resolver. getAuth() eagerly loads
 // Google's gapi iframe (apis.google.com/js/api.js) to check for redirect

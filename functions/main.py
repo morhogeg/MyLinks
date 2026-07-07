@@ -1873,6 +1873,39 @@ def _verify_twilio_signature(request) -> bool:
     return validator.validate(url, params, signature)
 
 
+def _seen_message_sid(sid: str) -> bool:
+    """Idempotency guard for Twilio webhook retries.
+
+    Twilio re-POSTs the same message (same MessageSid) ~15s later if it doesn't
+    get a fast 200, so without a guard every retry re-runs the whole handler —
+    duplicate sends and, for the `digest` command, a duplicate multi-second
+    Gemini synthesis + spend. We record each MessageSid in `processed_messages`
+    the first time we see it and treat any later sighting as a no-op.
+
+    Returns True if this sid was already processed (caller should no-op), False
+    if it's new (and now recorded). Fails OPEN (returns False) on any backend
+    error so a transient Firestore issue degrades to "process it" rather than
+    dropping the message.
+    """
+    if not sid:
+        return False
+    try:
+        from google.api_core import exceptions as gcloud_exceptions
+        db = get_db()
+        doc_ref = db.collection('processed_messages').document(sid)
+        # create() fails if the doc already exists → atomic first-writer-wins.
+        try:
+            doc_ref.create({"seenAt": datetime.now(timezone.utc).isoformat()})
+            return False
+        except gcloud_exceptions.AlreadyExists:
+            # Doc already present → this is a Twilio retry of a message we've
+            # already processed.
+            return True
+    except Exception as e:
+        logger.error(f"MessageSid dedup check failed (failing open): {e}")
+        return False
+
+
 @https_fn.on_request()
 def whatsapp_webhook(request):
     """
@@ -1913,6 +1946,14 @@ def whatsapp_webhook(request):
     except Exception as e:
         logger.error(f"Payload parse error: {e}")
         return https_fn.Response(json.dumps({"error": "Invalid payload"}), status=400, mimetype="application/json")
+
+    # Idempotency: Twilio retries the same MessageSid (~15s) until it gets a
+    # fast 200. Without this guard each retry re-runs everything — duplicate
+    # sends and a duplicate synchronous Gemini digest synthesis. No-op on a sid
+    # we've already handled and just ack 200 so Twilio stops retrying.
+    if _seen_message_sid(payload.message_sid):
+        logger.info("Duplicate WhatsApp webhook (MessageSid already processed) — no-op")
+        return https_fn.Response(json.dumps({"success": True, "duplicate": True}), status=200, mimetype="application/json")
 
     db = get_db()
 
@@ -2046,6 +2087,19 @@ def whatsapp_webhook(request):
 
     # URL FOUND -> Save to pending_processing for Background Processing
     url = url_match.group(0)
+
+    # Dedup: skip if already saved or already queued for this user (mirrors the
+    # share_ingest path). Prevents Twilio dupes / re-sent links from stacking.
+    if link_exists_for_url(uid, url) or pending_exists_for_url(uid, url):
+        logger.info(f"WhatsApp ingest skipped (duplicate): {url}")
+        msg = ("✅ הלינק הזה כבר שמור אצלך." if user_msg_is_hebrew
+               else "✅ You've already saved that link.")
+        send_whatsapp_message(payload.from_number, msg)
+        return https_fn.Response(
+            json.dumps({"success": True, "duplicate": True, "url": url}),
+            status=200, mimetype="application/json"
+        )
+
     logger.info(f"Queueing URL for processing: {url}")
 
     process_ref = db.collection('pending_processing').document()
@@ -2124,7 +2178,6 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     original_body = data.get("body")
 
     log_to_firestore(task_id, "Background processing started", data={"url": url, "uid": uid, "isImage": is_image})
-    ref.update({"status": "processing", "startedAt": datetime.now(timezone.utc).isoformat()})
 
     # The URL we were handed before any reassignment (the image path rewrites `url`
     # to the stored Storage URL below). Kept so a FAILED card records the original.
@@ -2157,8 +2210,13 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
 
     analysis = {}
     scraped = {"html": "", "title": "", "text": ""}
-    
+
     try:
+        # Mark the queue doc as in-flight. Kept inside the try so that if this
+        # write throws, the failure hits the except below and the visible card
+        # is marked FAILED — rather than the capture being lost silently.
+        ref.update({"status": "processing", "startedAt": datetime.now(timezone.utc).isoformat()})
+
         # 1. Scrape content (only once)
         log_to_firestore(task_id, f"Scraping content for: {url}")
         ref.update({"status": "scraping"})

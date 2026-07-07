@@ -27,7 +27,6 @@ function pickBanner(...states: (AnalyzingState | null)[]): AnalyzingState | null
  */
 export default function Home() {
   const { uid, loading } = useAuth();
-  const [refreshKey, setRefreshKey] = useState(0);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAskMode, setIsAskMode] = useState(false);
   const [hideAddButton, setHideAddButton] = useState(false);
@@ -46,10 +45,6 @@ export default function Home() {
   // Scroll-scrubbed top bar: opacity rides the scroll itself (down = away,
   // up = back), settling to shown/hidden when the finger rests.
   const headerRef = useHeaderFade<HTMLElement>();
-
-  const handleLinkAdded = () => {
-    setRefreshKey(prev => prev + 1);
-  };
 
   // First-run onboarding: once auth resolves and the feed is on screen, show the
   // guided tour if this browser hasn't seen it yet. A short delay lets the
@@ -156,11 +151,16 @@ export default function Home() {
       {/* Main Content — Ask mode fills to the viewport bottom, so it drops the
           tall bottom padding the grid uses for the FAB. */}
       <main className={`max-w-[2200px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-2 sm:py-4 ${isAskMode ? 'pb-0 sm:pb-0' : 'pb-24 sm:pb-20'}`}>
-        <Feed key={refreshKey} onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} />
+        {/* The feed is already live via onSnapshot, so a new save streams in on
+            its own — no remount needed. (Previously keyed on refreshKey, which
+            tore down listeners and wiped view/filter/search on every add.) */}
+        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} />
       </main>
 
       {/* Add Link FAB — hidden in Ask & Collections (neither view captures links). */}
-      <AddLinkForm onLinkAdded={handleLinkAdded} hidden={hideAddButton} onAnalyzingChange={setAnalyzing} />
+      {/* onLinkAdded is a no-op: the form resets itself and the feed is live via
+          onSnapshot, so nothing extra is needed here on a successful save. */}
+      <AddLinkForm onLinkAdded={() => {}} hidden={hideAddButton} onAnalyzingChange={setAnalyzing} />
       <AnalyzingBanner state={bannerState} />
 
       {/* Settings Modal */}

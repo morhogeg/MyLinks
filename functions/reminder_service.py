@@ -240,12 +240,20 @@ def run_reminder_check() -> dict:
                         delivered = True
 
                 if wants_whatsapp:
-                    send_whatsapp_message(f"whatsapp:{phone_number}", message)
-                    delivered = True
+                    # send_whatsapp_message returns the message SID; a falsy
+                    # return means Twilio rejected the send (reliability fix).
+                    sent = send_whatsapp_message(f"whatsapp:{phone_number}", message)
+                    if sent:
+                        delivered = True
+                    else:
+                        err_msg = f"WhatsApp send failed for link {link_id} (no message SID)"
+                        logger.error(err_msg)
+                        report["errors"].append(err_msg)
 
                 if not delivered:
-                    # e.g. push-only user whose tokens all just went dead —
-                    # leave the reminder pending so the next sweep retries.
+                    # e.g. push-only user whose tokens all just went dead, or the
+                    # sole WhatsApp send failed — leave the reminder pending so
+                    # the next sweep retries it.
                     logger.warning(f"Reminder for link {link_id} not delivered on any channel")
                     continue
 
