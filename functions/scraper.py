@@ -753,25 +753,36 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
                         return tag['content'].strip()
                 return ""
 
-            d_desc = _meta('og:description', 'twitter:description', 'description')
-            # The full caption lives in og:title; og:description is truncated.
-            caption, author = _clean_fb_title(_meta('og:title', 'twitter:title', 'title'))
+            # WHERE the full caption lands depends on the URL shape: reels put it
+            # in og:title (wrapped "<caption> | <Author> | Facebook"), while
+            # posts/videos/photos often keep the fuller text in og:description and
+            # put only the author in og:title. Rather than bet on one tag, gather
+            # every candidate, strip the reel-style wrapper off each, and keep the
+            # LONGEST real one — this handles all shapes and can never regress
+            # (worst case it lands on the same og:description we used before).
+            title_caption, author = _clean_fb_title(_meta('og:title', 'twitter:title', 'title'))
             if author and author not in generic_titles:
                 source_name = author
 
-            # Use the cleaned og:title caption when it's real (not a login-wall
-            # title) and at least as complete as the description; else fall back.
-            caption_ok = caption and caption.split('|')[0].strip() not in generic_titles
-            body = caption if (caption_ok and len(caption) >= len(d_desc)) else d_desc
+            def _is_real_caption(c: str) -> bool:
+                # Reject login-wall titles and bare author-name lines; a real
+                # caption is longer than a name and not a generic FB string.
+                return bool(c) and c.split('|')[0].strip() not in generic_titles and len(c) > 20
+
+            candidates = [
+                title_caption,
+                _meta('og:description', 'twitter:description', 'description'),
+            ]
+            reals = [c.strip() for c in candidates if _is_real_caption(c)]
+            body = max(reals, key=len) if reals else ""
 
             if body:
                 # Title = the caption's first line (far better than "Facebook Post").
                 first_line = body.split('\n', 1)[0].strip()
                 if first_line and first_line not in generic_titles:
                     best_title = first_line[:120]
-                if len(body) > 20:
-                    best_desc = body
-                    metadata_lines.append(f"POST CAPTION:\n{body}")
+                best_desc = body
+                metadata_lines.append(f"POST CAPTION:\n{body}")
     except Exception as e:
         logger.warning(f"Facebook scrape failed: {e}")
 
