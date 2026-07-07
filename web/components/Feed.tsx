@@ -8,6 +8,7 @@ import { Link, LinkStatus, Collection, WeeklySynthesis, CuratedDigest, DigestCar
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, platformColor, prettyHost, type PlatformKey } from '@/lib/platform';
 import { getSourceInfo, buildSourceFacets } from '@/lib/source';
+import SourceFacetList from './SourceFacetList';
 import Dropdown from './Dropdown';
 import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus, retryFailedLink, toLink } from '@/lib/storage';
 import { collection, query, orderBy, onSnapshot, getDocsFromServer, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
@@ -572,6 +573,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         if (next.has(key)) next.delete(key);
         else next.add(key);
         setSelectedSources(next);
+    };
+    // Toggle a whole platform group at once: if every key is already on, clear
+    // them; otherwise select them all (used by the grouped Sources list headers).
+    const handleToggleSourceKeys = (keys: string[]) => {
+        setSelectedSources((prev) => {
+            const next = new Set(prev);
+            if (keys.every((k) => next.has(k))) keys.forEach((k) => next.delete(k));
+            else keys.forEach((k) => next.add(k));
+            return next;
+        });
     };
     // Render the brand icon for a source row (platform logo, screenshot, or a
     // generic globe for plain websites), tinted in the platform's brand color.
@@ -1403,26 +1414,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                                     </button>
                                                 )}
                                             </div>
-                                            <div className="flex flex-col">
-                                                {sourceFacets.map(s => {
-                                                    const active = selectedSources.has(s.key);
-                                                    return (
-                                                        <button
-                                                            key={s.key}
-                                                            onClick={() => handleToggleSource(s.key)}
-                                                            aria-pressed={active}
-                                                            className={`flex items-center gap-2.5 px-2 py-2 rounded-xl text-[13px] text-start transition-colors ${active
-                                                                ? 'bg-accent/12 text-text'
-                                                                : 'text-text-secondary hover:bg-card-hover hover:text-text'}`}
-                                                        >
-                                                            <span className="shrink-0">{sourceIconFor(s)}</span>
-                                                            <span className="flex-1 min-w-0 truncate font-medium">{s.label}</span>
-                                                            <span className="shrink-0 tabular-nums text-text-muted">{s.count}</span>
-                                                            {active && <Check className="w-4 h-4 shrink-0 text-accent" />}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
+                                            <SourceFacetList
+                                                facets={sourceFacets}
+                                                selected={selectedSources}
+                                                onToggleKey={handleToggleSource}
+                                                onToggleKeys={handleToggleSourceKeys}
+                                            />
                                         </div>
                                     </>
                                 )}
@@ -1846,25 +1843,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                                 </button>
                                             )}
                                         </div>
-                                        <div className="flex flex-col gap-1 max-h-[38vh] overflow-y-auto overscroll-contain -mx-1 px-1">
-                                            {sourceFacets.map(s => {
-                                                const active = selectedSources.has(s.key);
-                                                return (
-                                                    <button
-                                                        key={s.key}
-                                                        onClick={() => handleToggleSource(s.key)}
-                                                        aria-pressed={active}
-                                                        className={`flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-[14px] text-start border transition-colors ${active
-                                                            ? 'bg-accent/12 border-accent/40 text-text'
-                                                            : 'bg-card border-border-subtle text-text-secondary'}`}
-                                                    >
-                                                        <span className="shrink-0">{sourceIconFor(s)}</span>
-                                                        <span className="flex-1 min-w-0 truncate font-medium">{s.label}</span>
-                                                        <span className="shrink-0 tabular-nums text-text-muted text-[13px]">{s.count}</span>
-                                                        {active && <Check className="w-4 h-4 shrink-0 text-accent" />}
-                                                    </button>
-                                                );
-                                            })}
+                                        <div className="max-h-[38vh] overflow-y-auto overscroll-contain -mx-1 px-1">
+                                            <SourceFacetList
+                                                facets={sourceFacets}
+                                                selected={selectedSources}
+                                                onToggleKey={handleToggleSource}
+                                                onToggleKeys={handleToggleSourceKeys}
+                                            />
                                         </div>
                                     </div>
                                 )}
