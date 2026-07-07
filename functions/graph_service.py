@@ -4,7 +4,7 @@ from typing import List, Dict, Optional
 from firebase_admin import firestore
 from google.cloud.firestore_v1.vector import Vector
 from models import LinkDocument, RelatedLink
-from ai_service import GeminiService, GEMINI_ANALYSIS_MODEL
+from ai_service import GeminiService, GEMINI_ANALYSIS_MODEL, embedding_needs_repair
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,10 @@ class GraphService:
         """
         Find semantically related links using Vector Search + LLM Verification
         """
+        if not embedding:
+            # No query vector (embed failed) → no neighbours; don't crash on
+            # Vector(None) inside the query below.
+            return []
         try:
             # 1. Vector Search (Candidate Retrieval)
             # Find top 10 similar vectors
@@ -112,7 +116,7 @@ class GraphService:
         embedded = 0
         for doc in docs:
             d = doc.to_dict() or {}
-            if d.get('embedding_vector') is not None:
+            if not (d.get('needsEmbedding') or embedding_needs_repair(d.get('embedding_vector'))):
                 continue
             text = f"{d.get('title', '')}\n{d.get('summary', '')}".strip()
             if not text:
@@ -125,7 +129,8 @@ class GraphService:
             if not emb:
                 continue
             try:
-                doc.reference.update({'embedding_vector': Vector(emb)})
+                doc.reference.update({'embedding_vector': Vector(emb),
+                                      'needsEmbedding': firestore.DELETE_FIELD})
                 embeddings[doc.id] = emb
                 embedded += 1
             except Exception as e:
@@ -203,15 +208,21 @@ class GraphService:
             text = f"{d.get('title', '')}\n{d.get('summary', '')}".strip()
 
             if phase == 'embed':
-                if d.get('embedding_vector') is not None or not text:
+                # Repair anything unsearchable: missing, list-typed (schema
+                # drift), degenerate/poisoned, or explicitly flagged — not just
+                # "field absent" (which missed drift/poison and left cards dead).
+                needs = d.get('needsEmbedding') or embedding_needs_repair(d.get('embedding_vector'))
+                if not needs or not text:
                     skipped += 1
                     continue
                 try:
                     emb = self.ai.embed_text(text)
                     if emb:
-                        doc.reference.update({'embedding_vector': Vector(emb)})
+                        doc.reference.update({'embedding_vector': Vector(emb),
+                                              'needsEmbedding': firestore.DELETE_FIELD})
                         embedded += 1
                     else:
+                        doc.reference.update({'needsEmbedding': True})
                         failed += 1
                 except Exception as e:
                     logger.error(f"Backfill embed failed for {doc.id}: {e}")

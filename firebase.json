@@ -58,6 +58,14 @@
         "function": "delete_account_http"
       },
       {
+        "source": "/api/publish-share",
+        "function": "publish_share_http"
+      },
+      {
+        "source": "/api/unpublish-share",
+        "function": "unpublish_share_http"
+      },
+      {
         "source": "/api/register-device-token",
         "function": "register_device_token_http"
       },

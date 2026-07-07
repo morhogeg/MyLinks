@@ -56,6 +56,14 @@
     {
       "source": "/api/delete-account",
       "destination": "https://secondbrain-app-94da2.web.app/api/delete-account"
+    },
+    {
+      "source": "/api/publish-share",
+      "destination": "https://secondbrain-app-94da2.web.app/api/publish-share"
+    },
+    {
+      "source": "/api/unpublish-share",
+      "destination": "https://secondbrain-app-94da2.web.app/api/unpublish-share"
     }
   ]
 }
