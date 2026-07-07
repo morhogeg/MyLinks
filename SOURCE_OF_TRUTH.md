@@ -582,6 +582,31 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-07 — Facebook links now summarize with full detail (scraper fix).**
+  Follow-up to the summary-accuracy ship below: a saved **Facebook link** still
+  produced a generic summary (named the categories "attractions/hotels/tips" but
+  none of the specifics, and the preview duplicated the key points). Root cause was
+  NOT the prompt — it was content starvation in `functions/scraper.py`
+  `_scrape_facebook_url` (commit `b389b7d`). FB serves only Open Graph tags to a
+  logged-out server, and the code fed the AI `og:description` — which FB truncates
+  to ~1–2 lines (**199 chars** for the test reel). Probed the live URL
+  (`facebook.com/reel/1357476399649801`) and found the **full 1369-char caption
+  sitting in `og:title`**, wrapped as `"<caption> | <Author> | Facebook"`. Fix:
+  new `_clean_fb_title()` strips the `"NNK views · NNN reactions | "` prefix and
+  `" | <Author> | Facebook"` suffix; `_scrape_facebook_url` now prefers the cleaned
+  `og:title` (falls back to `og:description` when og:title is missing/generic) and
+  returns the recovered author as `source_name` (already consumed by `analyze_link`
+  + `process_link_background`). **Verified live end-to-end:** extracted text 199 →
+  1383 chars; summary now names Hallein salt mine / Werfen / Hallstatt / Geisterberg
+  Alpendorf / both hotels / the SalzburgLand Card, and preview no longer duplicates
+  key points. `mbasic.facebook.com` confirmed dead (redirects to login). **Deployed:**
+  `analyze_link`, `process_link_background` (both `Successful update`). **Note:** this
+  cherry-picked `b389b7d` onto the parallel push/digest main after a merge-conflict
+  abort (conflicts were only in `firebase.json` + `rules.test.mjs`, neither mine).
+  **Known limits:** only tested on this one reel — other FB post shapes (plain
+  `/posts/`, `/share/`, videos) may wrap `og:title` differently; watch for a caption
+  that still comes back thin. Instagram uses a different (og:description-based) path
+  and was NOT changed here.
 - **2026-07-07 — iOS push notifications (FCM/APNs) + in-app Digest section**
   (branch `claude/ios-push-digest-5y8fj8`, rebased onto the audit-remediation
   main). Machina goes native-first on
