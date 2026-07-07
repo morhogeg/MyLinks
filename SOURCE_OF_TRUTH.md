@@ -119,8 +119,9 @@ surface in the category and a knowledge graph computed on every save. The path t
   hand. The workflow now has an **"Install signing certificate"** step that
   imports one **persistent** `.p12` (secrets `BUILD_CERTIFICATE_P12_BASE64` +
   `BUILD_CERTIFICATE_PASSWORD`) into a temp keychain so automatic signing REUSES
-  it and never mints — **once the owner adds those secrets** (one-time export +
-  base64; steps in `docs/IOS_CICD.md` → "Stable signing certificate"). Until the
+  it and never mints. **Secrets added + VERIFIED 2026-07-07** — build 1045
+  imported both identities and archived with no minting; setup in
+  `docs/IOS_CICD.md` → "Stable signing certificate". Until the
   secret exists the step warns and falls back to the old minting behavior (so it's
   safe to land before setup). A global `CODE_SIGN_IDENTITY` override is still not
   an option — it leaks onto every SPM target (run #17) — which is why the fix is
@@ -578,11 +579,13 @@ exact-match, capped.
   persistent `.p12` (secrets `BUILD_CERTIFICATE_P12_BASE64` +
   `BUILD_CERTIFICATE_PASSWORD`) into a temp keychain so signing reuses it — no more
   minting, no more manual revoking. Import-if-present (warns + falls back to the
-  old behavior when unset), so it's safe already-landed. **Owner one-time step to
-  activate:** export the Distribution+Development certs as one `.p12`, base64, add
-  the two secrets — exact steps in `docs/IOS_CICD.md` → "Stable signing
-  certificate". Also re-ran the build after the manual cert prune: run #44 →
-  build 1044 (in flight). §2 gotcha updated.
+  old behavior when unset). **VERIFIED ACTIVE 2026-07-07:** owner added the secrets
+  (`BUILD_CERTIFICATE_P12_BASE64` from a combined Distribution+Development `.p12` +
+  `BUILD_CERTIFICATE_PASSWORD`); run #45 → build 1045 imported BOTH identities
+  ("2 valid identities found … no new cert is minted") and archived + uploaded
+  clean. Also shipped the audit-fix build after the manual prune: run #44 →
+  **build 1044** (success — camera-string/downsample/favicon/arm64). Exact owner
+  setup lives in `docs/IOS_CICD.md` → "Stable signing certificate". §2 gotcha updated.
 - **2026-07-07 — Production-readiness audit + remediation sweep (5-agent audit,
   4-agent fix; ~19 issues fixed, rest tracked in `AUDIT_FINDINGS.md`).** A deep
   five-agent audit (backend, React components, frontend data layer, security,
