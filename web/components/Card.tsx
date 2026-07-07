@@ -304,9 +304,13 @@ export default function Card({
                         })()}
                     </div>
 
-                    {/* Action Buttons (Absolute Center) - Fades in on hover */}
+                    {/* Action Buttons (Absolute Center) - Fades in on hover.
+                        Pinned to dir="ltr" so the button order is IDENTICAL on
+                        every card — otherwise the card's dir (rtl for Hebrew)
+                        mirrors the row and the icons land in a different order
+                        per language. */}
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none group-hover:pointer-events-auto">
-                        <div className="flex items-center gap-1 bg-card/90 backdrop-blur-md border border-white/10 p-1 rounded-full shadow-xl">
+                        <div dir="ltr" className="flex items-center gap-1 bg-card/90 backdrop-blur-md border border-white/10 p-1 rounded-full shadow-xl">
                             {/* Only render as a link for real http(s) URLs — never make a
                                 stored javascript:/data: value clickable. */}
                             {!!link.url && /^https?:\/\//i.test(link.url) && (
