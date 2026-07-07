@@ -20,7 +20,7 @@
 | # | Finding | File | Status |
 |---|---------|------|--------|
 | 1 | Public-share takeover: `shared_cards`/`shared_collections` UPDATE authorized against incoming doc's `ownerUid`, not existing → any signed-in user overwrites any public share (phishing repoint) | `firestore.rules.locked:83-99` | ✅ |
-| 2 | World-readable share docs store `ownerUid` = owner phone number (PII leak) | `firestore.rules.locked` + `web/lib/collections.ts:135,167` | 📝 needs data-model change |
+| 2 | World-readable share docs store `ownerUid` = owner phone number (PII leak) | `firestore.rules.locked` + `web/lib/collections.ts` | ✅ LIVE (option a; rules lock ships at cutover) |
 | 3 | Missing `NSCameraUsageDescription` → camera tap from in-app picker hard-crashes; App Review reject | `web/ios/App/App/Info.plist` | ✅ |
 | 4 | "Delete Account" leaves `syntheses` subcollection + `task_logs` behind (5.1.1(v)) | `functions/link_service.py:129-148` | ✅ |
 
@@ -41,19 +41,24 @@ keying so `ownerUid` is an opaque Auth uid. `SECURITY TODO` comment left in the 
 | 6 | Zero error boundaries + no crash reporting; unguarded `link.tags.some()` on non-guaranteed fields → one bad doc blanks the app | `web/app/` (no error.tsx), `Feed.tsx:371,404,441,466` | ✅ (Sentry ⬜) |
 | 7 | WhatsApp send failures swallowed → reminders marked COMPLETED that never fired; digests stamped sent | `functions/whatsapp_handler.py:51-70` + reminder/digest callers | ✅ |
 | 8 | Spoofable rate-limit IP: takes first `X-Forwarded-For` hop (client-controlled) instead of GFE-appended last | `functions/rate_limit.py:67-72` | ✅ |
-| 9 | Embedding schema drift (retry writes raw array, not Vector) + zero-vector poisoning on transient failure → cards permanently invisible to search, no repair path | `main.py:604/2140`, `storage.ts:115`, `ai_service.py:571` | ⬜ deferred |
-| 10 | Cards stuck at `processing` forever: 300s timeout bypasses except; `retryFailedLink` fetch has no timeout; `main.py:2018` update outside try; no janitor | `main.py:1989-2233`, `storage.ts:73-122` | 🔧 (retry timeout + 2018 fixed; janitor ⬜) |
+| 9 | Embedding schema drift (retry writes raw array, not Vector) + zero-vector poisoning on transient failure → cards permanently invisible to search, no repair path | `main.py`, `storage.ts`, `ai_service.py`, `search.py`, `graph_service.py` | ✅ LIVE 2026-07-07 |
+| 10 | Cards stuck at `processing` forever: 300s timeout bypasses except; `retryFailedLink` fetch has no timeout; `main.py:2018` update outside try; no janitor | `main.py`, `storage.ts` | ✅ LIVE (janitor `sweep_stuck_processing`, every 5 min) |
 | 11 | Whole library incl. 768-float vectors re-downloaded every launch; no `persistentLocalCache`, no `limit()` | `firebase.ts:30-32`, `Feed.tsx:241` | 🔧 (cache fixed; vector/pagination ⬜) |
 | 12 | `key={refreshKey}` remounts entire Feed on every add (wipes view/filters/listeners) | `web/app/page.tsx:30,50-52,159` | ✅ |
 | 13 | Share Extension jetsam on large photos (full-res `UIImage(data:)` + base64 in ~120MB process) | `ShareViewController.swift:803-846` | ✅ |
 | 14 | Background-upload failures after "you can close this" reach nobody (random-UUID session, no `handleEventsForBackgroundURLSession`) | `ShareViewController.swift:898-917`, `AppDelegate.swift` | ⬜ deferred |
 
-**#9 defer reason:** needs coordinated client+trigger change (stop round-tripping embeddings
-through the client; make `sync_link_embedding` repair array-typed/updated docs; on embed
-failure omit field + set `needsEmbedding` so backfills can find it). Higher-risk; own pass.
+**#9 — DONE + LIVE 2026-07-07:** `embed_text` returns `None` on failure (no more
+`[1e-9]*768` poison); `embedding_needs_repair()` (missing / plain-list drift / degenerate)
+shared by the trigger + both backfills; `sync_link_embedding` moved to `on_document_written`
+and repairs missing/drift/degenerate/`needsEmbedding` docs (loop-guarded, skips
+processing/failed); client no longer round-trips `embedding_vector`; background pipeline
+stores a real Vector or sets `needsEmbedding`.
 
-**#10/#14 defer reason:** the scheduled-janitor function and the ShareExt pending-record
-reconciliation are new subsystems, not surgical edits — own pass.
+**#10 — DONE + LIVE 2026-07-07:** scheduled `sweep_stuck_processing` (every 5 min) flips
+`processing` cards older than 15 min to retryable `FAILED` (via `processingStartedAt`, else
+`createdAt`); admin `force_sweep_stuck_processing` twin. **#14 still deferred:** the ShareExt
+background-upload pending-record reconciliation is a separate new subsystem.
 
 ---
 

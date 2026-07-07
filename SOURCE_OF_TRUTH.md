@@ -241,17 +241,20 @@ The multi-user auth work is **fully written but not live**:
    `APPCHECK_ENFORCE=true`, `OWNER_EMAIL` in functions env. **Rotate the Gemini
    key** (was pasted in chat 2026-06-23) and the **App Store Connect API `.p8`**
    (pasted in plaintext during CI setup).
-5a. **[ ] Share-doc `ownerUid` PII leak (owner decision — do before publishing any
-    share post-cutover).** `shared_cards`/`shared_collections` are world-readable
-    (`allow read: if true`) and store `ownerUid`, which for the owner's phone-keyed
-    workspace **is the phone number** — any client can `getDoc` a share ID and read
-    it. Rules can't hide a field. Two fixes: (a) publish snapshots via an Admin-SDK
-    function that omits `ownerUid` (store the owner mapping in a functions-only
-    collection), or (b) migrate the owner data doc off phone-number keying so
-    `ownerUid` is an opaque Auth uid. New-user workspaces already use Auth uids, so
-    (b) mainly affects the legacy owner doc. Details: `AUDIT_FINDINGS.md` #2. (The
-    UPDATE-takeover half of this finding is already **fixed** in
-    `firestore.rules.locked` — ships with task 2.)
+5a. **[x] Share-doc `ownerUid` PII leak — FIXED via option (a), owner chose it
+    2026-07-07.** `shared_cards`/`shared_collections` used to store `ownerUid`
+    (= owner phone number) in a world-readable doc. Fix: new Admin-SDK
+    `publish_share_http`/`unpublish_share_http` write the public snapshot **without**
+    `ownerUid`; the owner mapping lives in a functions-only `shared_owners/{shareId}`
+    collection. Client (`web/lib/collections.ts`) routes publish/unpublish/
+    delete-published through `/api/publish-share` + `/api/unpublish-share` (server
+    strips `ownerUid`, stamps shareId/publishedAt, enforces anti-takeover). **LIVE**
+    (functions deployed, hosting + vercel rewrites deployed, OPTIONS→204 / no-auth
+    POST→401 verified). `firestore.rules.locked` now: `shared_*` read-public /
+    write-denied, `shared_owners` denied to clients — **ships at cutover** (task 2;
+    rules tests updated). Pre-cutover the live permissive rules still allow direct
+    writes, but the client no longer does them, so no new share doc carries
+    `ownerUid`. (The UPDATE-takeover half was already fixed in the ruleset.)
 
 ### 🟠 P1 — App Store submission requirements (see §6 for the full readiness review)
 
@@ -339,13 +342,17 @@ The multi-user auth work is **fully written but not live**:
     the email channel).
 19a. **[ ] Deferred audit remediations (from the 2026-07-07 sweep — full detail +
     file:line in `AUDIT_FINDINGS.md`).** The high-value fixes shipped that session;
-    these remain, roughly high→low: **(data integrity)** embedding schema-drift +
-    zero-vector poisoning — cards permanently invisible to search with no repair
-    path (stop round-tripping embeddings through the client; make
-    `sync_link_embedding` repair array/updated docs; on embed failure omit the field
-    + set `needsEmbedding`); **(reliability)** a scheduled janitor to flip
-    `processing` cards older than ~15 min to `FAILED` (timeout/OOM kills bypass the
-    except); **(perf)** Feed re-render storm — throttle `useProcessingBanner`'s 200ms
+    these remain, roughly high→low: **(data integrity) — ✅ DONE + LIVE
+    2026-07-07:** embedding schema-drift + zero-vector poisoning fixed
+    (`embed_text` returns None on failure; new `embedding_needs_repair` helper;
+    `sync_link_embedding` now `on_document_written` + repairs missing/list/degenerate/
+    flagged embeddings, loop-guarded; client no longer round-trips embeddings;
+    background pipeline stores a real Vector or sets `needsEmbedding`; both backfills
+    detect drift/poison). **(reliability) — ✅ DONE + LIVE 2026-07-07:** scheduled
+    janitor `sweep_stuck_processing` (every 5 min) flips `processing` cards older than
+    15 min to retryable `FAILED` (`processingStartedAt` stamped on placeholder +
+    retry; admin `force_sweep_stuck_processing` twin). **Still open:**
+    **(perf)** Feed re-render storm — throttle `useProcessingBanner`'s 200ms
     tick, memoize the `filteredLinks`/facet-count chain, `React.memo` Card/ListCard,
     move drag-scroll to refs, one shared "now" tick (currently 5 Hz full-tree
     re-renders during any capture + per-card `setInterval`s); **(security
@@ -582,6 +589,47 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-07 — iOS ship finished (build 1043) + data-integrity cluster + share
+  PII fix (task 5a option a). Merge `4fb3d20`.** Three things landed. **(1) iOS
+  ship:** re-ran "iOS → TestFlight" on `main` after the owner pruned the Apple
+  Development certs — **run #43 → build 1043 uploaded**, carrying the P0
+  camera-usage-string fix, image downsampling, favicon-privacy fix, arm64, and the
+  new CI tripwires (empty-secret check, URL-scheme-in-archive for `machina` +
+  `REVERSED_CLIENT_ID`, App-Group + Apple-Sign-In entitlement checks) **all
+  verified passing**. (Parallel session later shipped build 1045/1046 with push
+  notifs.) **(2) Data-integrity (task 19a top two — LIVE):** `embed_text` returns
+  `None` on failure (was a `[1e-9]*768` poison vector that looked embedded but
+  polluted search and no backfill could detect); new `embedding_needs_repair()`
+  (missing / plain-list schema-drift / degenerate); `sync_link_embedding` now fires
+  `on_document_written` (was create-only, so retries — an update — never
+  re-embedded) and repairs, loop-guarded, skipping processing/failed cards; stopped
+  round-tripping embeddings through the client (`analyze_link` no longer returns
+  `embedding_vector`, `storage.ts` retry no longer writes it); background pipeline
+  stores a real Vector or sets `needsEmbedding`; both backfills detect drift/poison.
+  New scheduled `sweep_stuck_processing` (every 5 min) ages `processing` cards >15
+  min to retryable FAILED (`processingStartedAt` stamped; admin
+  `force_sweep_stuck_processing`). **(3) Share PII (task 5a, owner chose option a):**
+  Admin-SDK `publish_share_http`/`unpublish_share_http` write world-readable share
+  snapshots **without** `ownerUid` (= owner phone number); owner mapping in
+  functions-only `shared_owners`; client routes through `/api/publish-share` +
+  `/api/unpublish-share`. `firestore.rules.locked`: `shared_*` read-public/
+  write-denied + `shared_owners` denied (ships at cutover; tests updated).
+  **SHIPPED:** all 9 affected/new functions deployed (`analyze_link`,
+  `process_link_background`, `sync_link_embedding` [trigger type migrated],
+  `rebuild_connections`, `backfill_related_links`, `sweep_stuck_processing`,
+  `force_sweep_stuck_processing`, `publish_share_http`, `unpublish_share_http`);
+  hosting redeployed for the new `/api` rewrites (OPTIONS→204 / no-auth POST→401
+  verified live); web via Vercel. `tsc`/`py_compile`/rules-validate clean.
+  ⚠️ **Parallel-session collision (see the new memory + §2):** the other session
+  (`claude/ios-push-digest-*`) moved `main` mid-deploy, so my first hosting deploy
+  went out with THEIR `firebase.json` (fixed by a 3-way merge + hosting redeploy).
+  ⚠️ **Owner follow-up:** the parallel session's `functions/` (push-notif
+  `register_device_token_http`/`unregister_device_token_http`, plus the committed FB
+  scraper `b389b7d` + AI-prompt `2446e34` fixes) are **committed to `main` but not
+  deployed** ("owner-local"); `analyze_link`/`process_link_background` are live with
+  my changes but on the pre-fix scraper/ai_service — an owner `./deploy-functions.sh`
+  from `main` picks up everything consistently. The parallel session also had an
+  **uncommitted** `functions/scraper.py` WIP in `~/MyLinks` (left untouched).
 - **2026-07-07 — Facebook links now summarize with full detail (scraper fix).**
   Follow-up to the summary-accuracy ship below: a saved **Facebook link** still
   produced a generic summary (named the categories "attractions/hotels/tips" but
