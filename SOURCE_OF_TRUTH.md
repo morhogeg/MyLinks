@@ -639,19 +639,14 @@ exact-match, capped.
   query on due users, or widen cadence to 15 min for ≤15-min latency at 4× cost).
   No "send one now" button was added (non-goal); `send_digest_now` callable
   untouched. `tsc` clean (only pre-existing `push.ts` native-plugin errors),
-  `py_compile` clean. **SHIPPED:** merged to `main` (`d1061d7`) → desktop web
-  live via Vercel; **iOS → TestFlight run #49 → build 1049 triggered** (carries
-  the new Settings UI + native time picker for on-device QA). **⚠️ OWNER STEP
-  STILL PENDING — backend NOT deployed:** the auto-mode classifier gates prod
-  Firebase deploys to the owner's own hands, so `send_digests` (new `is_due`
-  minute-window + every-5-min cadence) is **not live yet** — run
-  `cd ~/MyLinks && ./deploy-functions.sh functions:send_digests`. Until then the
-  scheduler still ticks hourly and ignores `digest_minute` (digests fire at the
-  top of the chosen hour — no data corruption, just minute not honored). The
-  `link_service.py` default only affects brand-new workspaces; existing users get
-  `digest_minute` via the `?? 0` / `.get(...,0)` fallback, so no backfill needed.
-  Device QA (native wheel renders + a 16:24 round-trips + saves) pending on build
-  1049 in TestFlight.
+  `py_compile` clean. **SHIPPED + LIVE:** merged to `main` (`d1061d7`) → desktop
+  web live via Vercel; **`send_digests` deployed** by owner (`Successful update
+  operation`, us-central1) so the new `is_due` minute-window + every-5-min cadence
+  are **live**; **iOS → TestFlight run #49 → build 1049** carries the new Settings
+  UI + native time picker. The `link_service.py` default only affects brand-new
+  workspaces; existing users get `digest_minute` via the `?? 0` / `.get(...,0)`
+  fallback, so no backfill was needed. **Only remaining:** device QA on build 1049
+  (native wheel renders + a 16:24 round-trips + saves).
 - **2026-07-07 — FB login-wall handling + hover-toolbar order + TestFlight 1048.**
   Closing out the Facebook/summary work. **(1) Login wall (`fd6c9fe`, deployed
   `analyze_link` + `process_link_background`):** FB intermittently serves logged-out
