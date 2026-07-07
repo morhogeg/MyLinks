@@ -2,6 +2,7 @@ import UIKit
 import Social
 import MobileCoreServices
 import ImageIO
+import UserNotifications
 
 /// Share Extension entry point. Pulls the shared item (link, text, or image)
 /// out of the share sheet, reads the user's ingest endpoint + token from the
@@ -208,6 +209,17 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         openMainApp()
     }
 
+    /// Throttled: keep the App-Group hand-off flag in step with the HUD so that
+    /// whenever the user next opens Machina — whether they tap "Open Machina" or
+    /// just launch it themselves — the in-app banner resumes at this exact %.
+    private var lastHintPct = -1
+    private func syncProgressHint() {
+        let pct = Int(progress.rounded())
+        guard pct != lastHintPct else { return }
+        lastHintPct = pct
+        writePendingShareHint()
+    }
+
     /// Stamp a short-lived "a capture was just shared" flag in the shared App
     /// Group. `ShareConfigPlugin.consumePendingShare` reads + clears it on the app
     /// side to seed the optimistic banner.
@@ -221,40 +233,33 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         defaults.set(Double(progress), forKey: "pendingShareProgress")
     }
 
-    /// Open the main app from the extension.
+    /// Bring the user into Machina from the share sheet.
     ///
-    /// Primary path is `NSExtensionContext.open(_:)` — the sanctioned,
-    /// forward-compatible API that still launches the host from the share sheet
-    /// on modern iOS, where the classic "walk the responder chain to
-    /// `UIApplication.openURL:`" hack has become an unreliable no-op. We fall back
-    /// to that hack only if the system declines, and complete the extension
-    /// request AFTER the switch attempt so we never tear the context down mid-open.
+    /// iOS deliberately forbids app extensions from launching their host app: the
+    /// `UIApplication.openURL:` responder-chain hack hard-fails on iOS 17+ ("BUG IN
+    /// CLIENT OF UIKIT … Force returning false"), and `NSExtensionContext.open` is
+    /// Today-widget-only. Apple's sanctioned route is a **local notification** the
+    /// user taps to foreground the app — where the in-app banner resumes this exact
+    /// progress (via the App-Group hand-off flag). If notifications aren't
+    /// authorized we simply dismiss; the flag is already written, so opening
+    /// Machina from the Home Screen still resumes the save.
     private func openMainApp() {
-        let kind = isImageFlow ? "image" : "link"
-        guard let url = URL(string: "machina://shared?kind=\(kind)") else { finish(); return }
-        if let ctx = extensionContext {
-            ctx.open(url) { [weak self] opened in
-                if !opened { self?.openViaResponderChain(url) }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.finish() }
-            }
-        } else {
-            openViaResponderChain(url)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.finish() }
-        }
-    }
-
-    /// Legacy fallback: invoke `openURL:` on the first responder-chain object that
-    /// implements it (that's `UIApplication`). Deprecated, but the only route left
-    /// when `extensionContext.open` declines on a given iOS version.
-    private func openViaResponderChain(_ url: URL) {
-        let selector = NSSelectorFromString("openURL:")
-        var responder: UIResponder? = self
-        while let r = responder {
-            if r.responds(to: selector) {
-                r.perform(selector, with: url)
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { [weak self] settings in
+            let authorized = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
+            guard authorized else {
+                DispatchQueue.main.async { self?.finish() }
                 return
             }
-            responder = r.next
+            let content = UNMutableNotificationContent()
+            content.title = "Machina"
+            content.body = "Your save is on its way — tap to open and track it."
+            let req = UNNotificationRequest(
+                identifier: "machina-share-open-\(UUID().uuidString)",
+                content: content,
+                trigger: nil, // deliver immediately
+            )
+            center.add(req) { _ in DispatchQueue.main.async { self?.finish() } }
         }
     }
 
@@ -571,6 +576,9 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     private func beginScanAnimation() {
         card.isHidden = true
         scanContainer.isHidden = false
+        // Seed the hand-off flag immediately so opening Machina even a beat later
+        // resumes from the start rather than a blank banner.
+        writePendingShareHint()
         displayLink = CADisplayLink(target: self, selector: #selector(tick))
         displayLink?.add(to: .main, forMode: .common)
     }
@@ -581,6 +589,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         let step = max((ceiling - progress) * 0.018, 0.05)
         progress = min(progress + step, ceiling)
         renderProgress(progress, done: false)
+        syncProgressHint()
     }
 
     private func renderProgress(_ p: CGFloat, done: Bool) {
