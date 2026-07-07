@@ -22,8 +22,6 @@ import SwipeDeck from './SwipeDeck';
 import AskBrain from './AskBrain';
 import LinkDetailModal from './LinkDetailModal';
 import SynthesisCard from './SynthesisCard';
-import ConnectionsView from './ConnectionsView';
-import { crossCategoryClusters } from '@/lib/connections';
 import ConfirmDialog from './ConfirmDialog';
 import AddToCollectionSheet from './AddToCollectionSheet';
 import CollectionsGallery from './CollectionsGallery';
@@ -31,7 +29,7 @@ import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
 import { Button } from './ui/Button';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Shapes, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus, RefreshCw, Link2, Newspaper } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Shapes, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus, RefreshCw, Newspaper } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
@@ -100,7 +98,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
         setActiveLinkId(null);
     };
     const [isLoading, setIsLoading] = useState(true);
-    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'ask' | 'collections' | 'connections' | 'digest'>('grid');
+    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'ask' | 'collections' | 'digest'>('grid');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
@@ -848,11 +846,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
         { key: 'list', label: 'List', icon: <List className="w-4 h-4" />, hint: 'List view' },
         { key: 'review', label: 'Review', icon: <GalleryHorizontalEnd className="w-4 h-4" />, hint: 'Swipe to review' },
     ];
-    // The Connections view + its toolbar pill surface only *cross-category*
-    // clusters — cards from different categories sharing a thread, which a
-    // category filter can't reproduce. The pill count matches the view exactly.
-    const connectionClusters = useMemo(() => crossCategoryClusters(links, 2), [links]);
-
     // The layout the Ask/Collections buttons return you to when you leave them.
     const lastLayout = useRef<'grid' | 'list' | 'review'>('grid');
     if (viewMode === 'grid' || viewMode === 'list' || viewMode === 'review') lastLayout.current = viewMode;
@@ -907,7 +900,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
 
     // Hide the add-link FAB in Ask *and* Collections — neither view captures links.
     useEffect(() => {
-        onHideAddButton?.(viewMode === 'ask' || viewMode === 'collections' || viewMode === 'connections' || viewMode === 'digest');
+        onHideAddButton?.(viewMode === 'ask' || viewMode === 'collections' || viewMode === 'digest');
     }, [viewMode, onHideAddButton]);
 
     if (isLoading) {
@@ -1000,17 +993,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                 New
                             </button>
                         </MobileSubheader>
-                    </div>
-                ) : viewMode === 'connections' ? (
-                    // Desktop only: the Connections list flows inline beneath this
-                    // subheader. Mobile renders its own full-screen overlay below.
-                    <div className="hidden sm:block">
-                        <MobileSubheader
-                            onBack={() => setViewMode(lastLayout.current)}
-                            backLabel="Back to your library"
-                            icon={<Link2 className="w-5 h-5" />}
-                            title="Connections"
-                        />
                     </div>
                 ) : viewMode === 'digest' ? (
                     // Desktop only: the digest history flows inline beneath this
@@ -1334,20 +1316,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                                 <Layers className="w-4 h-4" />
                                 <span className="hidden sm:inline">Collections</span>
                             </button>
-                            {connectionClusters.length > 0 && (
-                                <button
-                                    onClick={() => setViewMode('connections')}
-                                    title="Connections across what you've saved"
-                                    aria-label="Connections"
-                                    className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
-                                >
-                                    <Link2 className="w-4 h-4" />
-                                    <span className="hidden sm:inline">Connections</span>
-                                    <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-accent/15 text-accent">
-                                        {connectionClusters.length}
-                                    </span>
-                                </button>
-                            )}
                             <button
                                 onClick={() => setViewMode('digest')}
                                 title="Your curated digests"
@@ -1914,16 +1882,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
 
                 {/* Links Grid / Ask */}
                 <div className="flex-grow min-w-0">
-                    {viewMode === 'connections' ? (
-                        // Desktop only: the Connections list flows inline beneath the
-                        // subheader. Mobile renders the full-screen overlay below.
-                        <div className="hidden sm:block">
-                            <ConnectionsView
-                                links={links}
-                                onOpenCard={(id) => setActiveLinkId(id)}
-                            />
-                        </div>
-                    ) : viewMode === 'digest' ? (
+                    {viewMode === 'digest' ? (
                         // Desktop only: the digest history flows inline beneath the
                         // subheader. Mobile renders the full-screen overlay below.
                         <div className="hidden sm:block">
@@ -2103,25 +2062,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                 </div>
             )}
 
-            {/* Connections — mobile full-screen overlay (mirrors Collections). */}
-            {viewMode === 'connections' && (
-                <div className="sm:hidden fixed inset-x-0 top-0 bottom-0 z-50 bg-background flex flex-col animate-fade-in">
-                    <MobileSubheader
-                        onBack={() => setViewMode(lastLayout.current)}
-                        backLabel="Back to your library"
-                        icon={<Link2 className="w-5 h-5" />}
-                        title="Connections"
-                    />
-                    <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
-                        <ConnectionsView
-                            links={links}
-                            onOpenCard={(id) => setActiveLinkId(id)}
-                        />
-                    </div>
-                </div>
-            )}
-
-            {/* Digest — mobile full-screen overlay (mirrors Connections). */}
+            {/* Digest — mobile full-screen overlay (mirrors Collections). */}
             {viewMode === 'digest' && (
                 <div className="sm:hidden fixed inset-x-0 top-0 bottom-0 z-50 bg-background flex flex-col animate-fade-in">
                     <MobileSubheader
