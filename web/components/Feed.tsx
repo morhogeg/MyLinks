@@ -1340,44 +1340,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             )}
                         </button>
 
-                        {/* Source filter — toggle icons for platforms + screenshots present in the library */}
-                        {(availablePlatforms.length > 0 || screenshotCount > 0) && (
-                            <div className="flex items-center gap-1 ps-2 border-s border-border-subtle">
-                                {availablePlatforms.map(p => {
-                                    const active = selectedPlatforms.has(p);
-                                    return (
-                                        <button
-                                            key={p}
-                                            onClick={() => handleTogglePlatform(p)}
-                                            title={`${PLATFORM_LABELS[p]} (${platformCounts[p]})`}
-                                            aria-label={`Filter by ${PLATFORM_LABELS[p]}`}
-                                            aria-pressed={active}
-                                            style={active ? platformActiveStyle(p) : undefined}
-                                            className={`${ctrlBase} w-9 px-0 border ${active ? 'shadow-sm' : ctrlIdle}`}
-                                        >
-                                            {platformIcon(p, 'w-4 h-4')}
-                                        </button>
-                                    );
-                                })}
-                                {screenshotCount > 0 && (
-                                    <button
-                                        onClick={() => setScreenshotOnly(v => !v)}
-                                        title={`Screenshots (${screenshotCount})`}
-                                        aria-label="Filter by screenshots"
-                                        aria-pressed={screenshotOnly}
-                                        className={`${ctrlBase} w-9 px-0 border ${screenshotOnly ? 'bg-accent text-white border-accent shadow-sm' : ctrlIdle}`}
-                                    >
-                                        <ImageIcon className="w-4 h-4" />
-                                    </button>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Sources submenu — the full publisher/site list (Ynet, CNN,
-                            a YouTube channel, @handle…), one popover from the toolbar.
-                            Complements the coarse platform icons above. */}
+                        {/* Sources — the single grouped source filter (platform → account),
+                            opened as one popover. Replaces the old row of redundant
+                            round platform icons. */}
                         {sourceFacets.length > 0 && (
-                            <div className="relative">
+                            <div className="relative ps-2 border-s border-border-subtle">
                                 <button
                                     onClick={() => setIsSourcesOpen(o => !o)}
                                     aria-haspopup="menu"
@@ -1400,7 +1367,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     <>
                                         {/* Click-away layer */}
                                         <div className="fixed inset-0 z-40" onClick={() => setIsSourcesOpen(false)} />
-                                        <div className="absolute z-50 mt-2 end-0 w-72 max-h-[60vh] overflow-y-auto surface-card rounded-2xl border border-border-subtle shadow-[var(--shadow-card)] p-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                                        <div className="absolute z-50 mt-2 end-0 w-72 max-h-[60vh] overflow-y-auto bg-card surface-card rounded-2xl border border-border-subtle shadow-[var(--shadow-card)] p-2 animate-in fade-in slide-in-from-top-1 duration-150">
                                             <div className="flex items-center justify-between px-2 py-1.5">
                                                 <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">
                                                     {sourceFacets.length} source{sourceFacets.length === 1 ? '' : 's'}
@@ -1793,43 +1760,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     <span>Reminders{reminderCount > 0 ? ` (${reminderCount})` : ''}</span>
                                 </button>
 
-                                {/* Source */}
-                                {(availablePlatforms.length > 0 || screenshotCount > 0) && (
-                                    <div>
-                                        <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">Source</label>
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            {availablePlatforms.map(p => {
-                                                const active = selectedPlatforms.has(p);
-                                                return (
-                                                    <button
-                                                        key={p}
-                                                        onClick={() => handleTogglePlatform(p)}
-                                                        aria-pressed={active}
-                                                        title={`${PLATFORM_LABELS[p]} (${platformCounts[p]})`}
-                                                        style={active ? platformActiveStyle(p) : undefined}
-                                                        className={`${ctrlBase} w-10 px-0 border ${active ? 'shadow-sm' : ctrlIdle}`}
-                                                    >
-                                                        {platformIcon(p, 'w-4 h-4')}
-                                                    </button>
-                                                );
-                                            })}
-                                            {screenshotCount > 0 && (
-                                                <button
-                                                    onClick={() => setScreenshotOnly(v => !v)}
-                                                    aria-pressed={screenshotOnly}
-                                                    title={`Screenshots (${screenshotCount})`}
-                                                    className={`${ctrlBase} w-10 px-0 border ${screenshotOnly ? 'bg-accent text-white border-accent shadow-sm' : ctrlIdle}`}
-                                                >
-                                                    <ImageIcon className="w-4 h-4" />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Sources — the full publisher/site list as a tappable
-                                    checklist (Ynet, CNN, a channel…). Each row toggles
-                                    that source into the feed filter. */}
+                                {/* Sources — the grouped source list (platform → account).
+                                    Replaces the old redundant row of platform icons; the
+                                    Screenshots bucket is included in the list. */}
                                 {sourceFacets.length > 0 && (
                                     <div>
                                         <div className="flex items-center justify-between mb-2">
