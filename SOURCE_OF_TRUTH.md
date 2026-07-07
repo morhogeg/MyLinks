@@ -589,6 +589,36 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-08 — Share "Open Machina" switched to Apple's supported path
+  (`2502123`, merge `45b93ab`; TestFlight run #55 → build 1055).** The button
+  never worked because iOS **forbids app extensions from launching the host app**
+  — the `UIApplication.openURL:` responder hack hard-fails on iOS 17+ ("BUG IN
+  CLIENT OF UIKIT … Force returning false") and `NSExtensionContext.open` is
+  Today-widget-only (confirmed via Apple DTS, forums thread 764570; two earlier
+  builds 1051/1053 that tried the hack/`extensionContext.open` could not have
+  worked). `ShareViewController.openMainApp()` now posts an **immediate local
+  notification** the user taps to foreground Machina (needs notification auth;
+  dismisses silently otherwise). Plus the App-Group hand-off flag is now seeded at
+  scan start and updated (throttled) as the % rises, so opening Machina any time —
+  notification or Home Screen — resumes the exact progress. **⚠️ On-device
+  verify (build 1055):** share → tap Open Machina → confirm the notification
+  appears and tapping it opens Machina to the resuming banner; if the two-tap feel
+  is unwanted, the alternative is dropping the button and relying on the
+  Home-Screen-open hand-off. **⚠️ PARALLEL-SESSION COLLISION (unresolved):** this
+  session also built a Sources filter reorg — **platform-grouped rows with
+  expandable per-account sub-sections** + a desktop Sources popover
+  (`SourceFilter.tsx`, `platformAccount()` in `platform.tsx`) — but a parallel
+  session shipped a *different* Sources feature first (build 1054, `source.ts`
+  `getSourceInfo`/`buildSourceFacets`, a **flat ranked source list** + search).
+  To avoid clobbering their live work, my duplicate was **dropped, not merged**.
+  Open question for next session: the user asked for **platform + account
+  subsections** (grouped/expandable), which the shipped 1054 flat list does NOT
+  do — decide whether to layer the platform-grouping UI on top of their
+  `source.ts` foundation. Two other user asks are pending visual confirmation: a
+  reported **toggle side-gap** (the Settings `Toggle` is already at the iOS 51×31 /
+  27px-knob spec — need a screenshot of the remaining gap, possibly a stale build)
+  and **top-toolbar chip alignment** (chips are a uniform 36px and Ask is centered
+  in its zone — likely fine; awaiting a screenshot).
 - **2026-07-07 — Filter + search by source / publisher (`21bfa2d`, merge
   `5baf2a1`; TestFlight run #54 → build 1054, UI-only).** New feed capability:
   filter and find cards by their **source** (publisher/site/channel), e.g.
