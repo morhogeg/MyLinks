@@ -616,7 +616,13 @@ exact-match, capped.
   ask_brain, get_article, share_ingest, claim/delete (+_http), whatsapp_webhook,
   check_reminders, send_digests (+force twins), send_digest_now, rebuild_connections,
   get_share_config, share_page, backfills, ping, debug_status, process_link_background);
-  TestFlight **run #42 → build 1042** triggered on `main`. **NOT live:** the
+  TestFlight **run #42 (build 1042) FAILED on the Apple Development cert cap**
+  ("maximum number of certificates" — the §2/§3 outage, NOT this session's code;
+  the archive died at signing before the new CI tripwires ran). **Owner action:
+  prune Development certs at developer.apple.com → Certificates, then re-run the
+  "iOS → TestFlight" workflow on `main`** to get the iOS build (camera-string /
+  downsample / favicon / arm64 fixes). Web + functions are unaffected and live.
+  **NOT live:** the
   `firestore.rules.locked` takeover fix — it only deploys with the task-2 cutover
   (`cp firestore.rules.locked firestore.rules && firebase deploy --only firestore:rules`).
   Deferred (higher-risk, own passes) are logged in `AUDIT_FINDINGS.md` and the new §4
