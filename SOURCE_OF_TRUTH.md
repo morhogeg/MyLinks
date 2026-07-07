@@ -589,6 +589,21 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-07 — Facebook author byline + honest save-dialog copy (commits
+  `2258fd4`, `453299e`).** Two small UX fixes. **(1) FB author byline:** the scraper
+  now captures the post author for text posts too (bare `og:title` name, not just the
+  reel `"| Author |"` wrapper — verified `/share/p/` → "משה הלינגר", reel → "Doron
+  Baram Ron"), and `Card.tsx` + `LinkDetailModal.tsx` render it next to the FB logo
+  with the same byline treatment X gets (icon + name, `dir="auto"` for Hebrew RTL,
+  minus the @). Falls back to logo-only when no real name. Deployed `analyze_link`,
+  `process_link_background`. **(2) Save-dialog copy:** the scan-progress copy said
+  "Keep Machina open — this only takes a few seconds" based on a STALE comment
+  claiming the save dies on close. Verified it doesn't: `AddLinkForm` stays mounted
+  and publishes to the persistent `AnalyzingBanner` (built to "survive this form
+  collapsing/closing"); the fetch only aborts on a 60s timeout, and only quitting/
+  backgrounding the whole app suspends the WebView. Copy now reads "You can close
+  this window — Machina keeps working in the background" (link/image/video) and the
+  misleading comments were corrected. Frontend via Vercel.
 - **2026-07-07 — Honest "preview only" note for truncated Facebook links (commit
   `d64183f`).** Follow-up to the FB extraction work below: for text posts FB serves
   only a truncated ~200-char `og:description` (ends in "..."), so those cards were
