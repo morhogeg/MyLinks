@@ -589,6 +589,33 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-07 — Filter + search by source / publisher (`21bfa2d`, merge
+  `5baf2a1`; TestFlight run #54 → build 1054, UI-only).** New feed capability:
+  filter and find cards by their **source** (publisher/site/channel), e.g.
+  "Ynet", an MKBHD video, `@naval` on X. **New `web/lib/source.ts`** —
+  `getSourceInfo(link)` canonicalizes a card to a stable source identity in a
+  fixed order (X `@handle` → LinkedIn author → real `sourceName` (skips the
+  generic `None`/`Screenshot` placeholders) → known platform label → `Screenshot`
+  → pretty hostname), deliberately mirroring what `ListCard` already renders so
+  the filter list matches the labels users see on cards; `buildSourceFacets()`
+  ranks the distinct sources by count. **`Feed.tsx`** gained a `selectedSources`
+  Set facet **unioned** (OR) with the existing coarse platform/screenshot source
+  block (picking Ynet + YouTube shows both), wired into `activeMobileFilters`,
+  `isDefaultLibraryView`, and every Clear-all. UI: a desktop **"Sources" popover
+  submenu** (Globe button in the toolbar cluster, click-away layer, brand
+  icon + count + check per row) and a **mobile Filters-sheet "Sources"
+  checklist**. **Search upgrade:** keyword matching now also matches
+  `sourceName` + hostname (so typing "ynet" surfaces its cards even without a
+  semantic hit), and the live results **split into a tappable "Sources"
+  suggestion row above the "Cards" grid** — tapping a source clears the query and
+  jumps to that source's filtered library view. Frontend-only (Vercel + the iOS
+  Capacitor shell carries the same web UI). `tsc --noEmit` clean (only the
+  pre-existing `auth.ts`/`push.ts` native-plugin module errors). **⚠️ Deferred
+  owner check:** the feed is behind the web auth gate, so this was verified by
+  typecheck + concrete-case re-derivation, not a live UI pass — on desktop web
+  (live in ~1–2 min) or TestFlight build 1054, confirm the Sources popover lists
+  your publishers with correct counts, toggling one narrows the grid, and
+  searching a source name shows the Sources row + jumps on tap.
 - **2026-07-07 — Share Extension: reliable "Open Machina" + continuous progress
   into the app (`bd824d3`, merge `88466f6`; TestFlight run #53 → build 1053).**
   Two native+web fixes to the iOS share hand-off. (A) **Open Machina button:**
