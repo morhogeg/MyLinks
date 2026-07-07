@@ -216,7 +216,12 @@ def run_reminder_check() -> dict:
                 message = f"🧠 *Machina AI — Revisit Loop*\n\nTime to revisit:\n📄 *{title}*\n{cat_emoji} {category}\n\n{url}\n\n🔗 *Open in Machina AI:*\n{APP_URL}?linkId={link_id}\n\n💡 *Why now?* Spaced repetition strengthens long-term retention."
 
             try:
-                send_whatsapp_message(f"whatsapp:{phone_number}", message)
+                sent = send_whatsapp_message(f"whatsapp:{phone_number}", message)
+                if not sent:
+                    err_msg = f"WhatsApp send failed for link {link_id} (no message SID)"
+                    logger.error(err_msg)
+                    report["errors"].append(err_msg)
+                    continue
                 report["reminders_sent"] += 1
 
                 new_reminder_count = reminder_count + 1

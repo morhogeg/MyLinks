@@ -1,8 +1,10 @@
-firebase-functions>=0.4.0
-firebase-admin>=6.4.0
-google-genai>=1.0.0
-beautifulsoup4>=4.12.0
-requests>=2.31.0
-pydantic>=2.0.0
-flask>=3.0.0
-twilio>=8.0.0
+# TODO: replace these ranges with exact pins from a known-good deploy (==X.Y.Z).
+# Upper bounds below just cap at the next major so a deploy can't pull a breaking release.
+firebase-functions>=0.4.0,<1.0
+firebase-admin>=6.4.0,<7.0
+google-genai>=1.0.0,<2.0
+beautifulsoup4>=4.12.0,<5.0
+requests>=2.31.0,<3.0
+pydantic>=2.0.0,<3.0
+flask>=3.0.0,<4.0
+twilio>=8.0.0,<9.0

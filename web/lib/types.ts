@@ -35,7 +35,8 @@ export interface AIAnalysis {
   actionableTakeaway: string;
   sourceType?: string;
   sourceName?: string;
-  confidence?: string;
+  // Backend writes a float score here; some legacy docs stored a string label.
+  confidence?: string | number;
   keyEntities?: string[];
   recipe?: {
     ingredients: string[];
@@ -64,7 +65,8 @@ export interface Link {
   // AI Analysis metadata
   sourceType?: string;
   sourceName?: string;
-  confidence?: string;
+  // Backend writes a float score here; some legacy docs stored a string label.
+  confidence?: string | number;
   keyEntities?: string[];
 
   // Recipe data if applicable

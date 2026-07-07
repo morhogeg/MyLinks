@@ -71,6 +71,30 @@ jobs:
         id: bn
         run: echo "value=$(( 1000 + ${{ github.run_number }} ))" >> "$GITHUB_OUTPUT"
 
+      # Fail fast on a misconfigured runner: a build with empty Firebase config
+      # bakes a dead bundle (no auth, broken client init) that still archives
+      # green and ships to TestFlight. Guard the load-bearing keys BEFORE the
+      # build — same empty-check pattern as the GS_PLIST_BASE64 step below.
+      - name: Verify required Firebase secrets are set
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+        run: |
+          if [ -z "$NEXT_PUBLIC_FIREBASE_API_KEY" ]; then
+            echo "::error::NEXT_PUBLIC_FIREBASE_API_KEY secret is not set — add it (see docs/IOS_CICD.md)."
+            exit 1
+          fi
+          if [ -z "$NEXT_PUBLIC_FIREBASE_PROJECT_ID" ]; then
+            echo "::error::NEXT_PUBLIC_FIREBASE_PROJECT_ID secret is not set — add it (see docs/IOS_CICD.md)."
+            exit 1
+          fi
+          if [ -z "$NEXT_PUBLIC_FIREBASE_APP_ID" ]; then
+            echo "::error::NEXT_PUBLIC_FIREBASE_APP_ID secret is not set — add it (see docs/IOS_CICD.md)."
+            exit 1
+          fi
+          echo "Required Firebase secrets present."
+
       - name: Build web bundle + Capacitor sync
         working-directory: web
         env:
@@ -230,6 +254,32 @@ jobs:
           echo "$(codesign -d --entitlements :- Payload/App.app 2>/dev/null)" | grep -q "com.apple.developer.applesignin" \
             || echo "::warning::App is missing the Sign in with Apple entitlement — required before the auth cutover build."
           echo "Entitlements OK: App Group present in app + extension."
+
+          # URL-scheme tripwire: the archived Info.plist must still carry BOTH the
+          # custom "machina" scheme (Share Extension → "Open Machina") AND the
+          # injected Google REVERSED_CLIENT_ID scheme, or the Google sign-in flow
+          # can't return to the app. A build that drops either archives green but
+          # ships a broken app. Read the compiled plist inside the .app bundle.
+          PB=/usr/libexec/PlistBuddy
+          APP_INFO="Payload/App.app/Info.plist"
+          URL_TYPES="$($PB -c 'Print :CFBundleURLTypes' "$APP_INFO" 2>/dev/null || true)"
+          echo "$URL_TYPES" | grep -q "machina" || {
+            echo "::error::Archived Info.plist is missing the 'machina' URL scheme — the Share Extension 'Open Machina' deep link would be broken. Refusing to upload."
+            echo "$URL_TYPES"
+            exit 1
+          }
+          GS="$GITHUB_WORKSPACE/web/ios/App/App/GoogleService-Info.plist"
+          RCID="$($PB -c 'Print :REVERSED_CLIENT_ID' "$GS" 2>/dev/null || true)"
+          if [ -z "$RCID" ]; then
+            echo "::error::REVERSED_CLIENT_ID missing from GoogleService-Info.plist at verify time — cannot confirm the archived app registered the Google URL scheme. Refusing to upload."
+            exit 1
+          fi
+          echo "$URL_TYPES" | grep -q "$RCID" || {
+            echo "::error::Archived Info.plist is missing the injected REVERSED_CLIENT_ID URL scheme (${RCID:0:24}…) — the Google sign-in callback would fail. Refusing to upload."
+            echo "$URL_TYPES"
+            exit 1
+          }
+          echo "URL schemes OK: 'machina' + REVERSED_CLIENT_ID present in archived Info.plist."
 
       - name: Upload to TestFlight
         env:

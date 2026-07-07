@@ -7,14 +7,16 @@
  * Firebase Hosting / Vercel domain), falling back to the known hosting origin.
  */
 
+import { isNativeApp } from './api';
+
 const SHARE_BASE =
     process.env.NEXT_PUBLIC_SHARE_BASE?.replace(/\/$/, '') ||
     'https://secondbrain-app-94da2.web.app';
 
-const isCapacitor =
-    typeof window !== 'undefined' &&
-    (window.location.protocol === 'capacitor:' ||
-        Boolean((window as unknown as { Capacitor?: unknown }).Capacitor));
+// Canonical native detection (see api.ts isNativeApp): the capacitor:// origin
+// or the runtime's own isNativePlatform() — NOT the mere presence of the
+// window.Capacitor global, which @capacitor/core defines in plain browsers too.
+const isCapacitor = isNativeApp();
 
 /** Absolute public URL for a share path like `/c?id=abc` or `/s?id=abc`. */
 export function shareUrlFor(path: string): string {

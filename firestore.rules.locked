@@ -82,12 +82,19 @@ service cloud.firestore {
     // the owner of the referenced workspace (docs carry `ownerUid`).
     match /shared_collections/{shareId} {
       allow read: if true;
-      allow create, update: if owns(request.resource.data.ownerUid);
+      allow create: if owns(request.resource.data.ownerUid);
+      allow update: if owns(resource.data.ownerUid) && request.resource.data.ownerUid == resource.data.ownerUid;
       allow delete: if owns(resource.data.ownerUid);
     }
+    // SECURITY TODO: these share docs are world-readable (`allow read: if true`) yet
+    // store `ownerUid`, which for the owner is a phone number (PII). Rules alone
+    // can't hide a field (reads are all-or-nothing per doc) — keep `ownerUid` OUT of
+    // the world-readable snapshot: publish via the Admin SDK to a doc without it, or
+    // migrate the owner doc off phone-number keying. Tracked separately.
     match /shared_cards/{shareId} {
       allow read: if true;
-      allow create, update: if owns(request.resource.data.ownerUid);
+      allow create: if owns(request.resource.data.ownerUid);
+      allow update: if owns(resource.data.ownerUid) && request.resource.data.ownerUid == resource.data.ownerUid;
       allow delete: if owns(resource.data.ownerUid);
     }
 

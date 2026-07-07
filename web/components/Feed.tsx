@@ -8,7 +8,7 @@ import { Link, LinkStatus, Collection, WeeklySynthesis } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, type PlatformKey } from '@/lib/platform';
 import Dropdown from './Dropdown';
-import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
+import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus, retryFailedLink, toLink } from '@/lib/storage';
 import { collection, query, orderBy, onSnapshot, getDocsFromServer, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
@@ -242,10 +242,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
         const q = query(linksRef, orderBy('createdAt', 'desc'));
 
         const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
-            const fetchedLinks = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => ({
-                id: doc.id,
-                ...doc.data()
-            } as Link));
+            const fetchedLinks = snapshot.docs.map(toLink);
             setLinks(fetchedLinks);
             setIsLoading(false);
         }, (error: Error) => {
@@ -324,7 +321,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange }: {
                 getDocsFromServer(q),
                 new Promise((r) => setTimeout(r, 600)),
             ]);
-            setLinks(snap.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({ id: d.id, ...d.data() } as Link)));
+            setLinks(snap.docs.map(toLink));
         } catch {
             toast.error("Couldn't refresh. Please try again.");
         }
