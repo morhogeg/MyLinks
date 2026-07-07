@@ -66,7 +66,7 @@ Requirements for the analysis:
 3. summary: Write 2 to 4 concise, information-dense sentences for a card preview. 
    - **LANGUAGE**: Write the summary in the SAME language as the input content.
    - **SCANNABILITY**: Use **bolding** (double asterisks) for key terms, dates, or names to make them pop.
-   - **STRUCTURE**: Add a line break (\\\\n) between each sentence to create visual separation.
+   - **STRUCTURE**: Separate each sentence with a blank line (a real newline in the JSON string value, exactly as shown in the GOOD example below) to create visual separation. Do NOT emit a literal backslash-n.
    - Summarize ONLY what the content explicitly states.
    - NO opinions, NO value judgments.
    - Each sentence must end with a period.
@@ -75,6 +75,7 @@ Requirements for the analysis:
    GOOD: "Researchers at **MIT** found that **intermittent fasting** reduced inflammation markers by **40%** in a 12-week trial.\\n\\nThe study showed benefits appeared after just **2 weeks**."
 
    - **SUBSTANCE FIRST**: Lead with the actual point — the specific claim, finding, number, or argument. Do NOT open with a vague meta-frame that only describes the shape of the content (BAD: "This article examines the relationship between X and Y", "This post discusses several ideas about…", "The author shares thoughts on…"). State WHAT is claimed, not THAT something is discussed.
+   - **LEAD WITH THE CURRENT RECOMMENDATION**: When the author supersedes or corrects an earlier option ("we used to… now it's better to…", "previously X, but now Y", "no longer X"), the headline belongs to the NEW / recommended option, not the abandoned one. Do NOT lead with the old choice just because it is the most concrete noun in the text.
    - **LISTS / THREADS**: If the content is a list, thread, or set of numbered points, tips, predictions, or observations, do NOT just say it is a list. Name the overarching thesis in one sentence, then surface the 2-3 most important or striking SPECIFIC points so the reader gets the real substance, not a table of contents.
 
    - **RECIPE FOCUS**: If the content is a recipe or cooking video, the title and summary MUST center on the dish itself — what it is, its key ingredients, and how it is made. Treat the author's personal or dietary framing (e.g. "since I went keto…", "I make these for my kids") as secondary background, NOT the headline. Lead with the food, not the lifestyle commentary.
@@ -83,13 +84,14 @@ Requirements for the analysis:
 4. detailedSummary: Write the DEEPER layer that expands on the summary, using markdown formatting:
    - **LANGUAGE**: Write the detailed summary in the SAME language as the input content.
    - **NO OVERVIEW / NO INTRO PARAGRAPH**: Do NOT begin with an overview or intro sentence. The `summary` above is shown as the lead-in the moment the card is opened, so an overview here would just repeat it. Start DIRECTLY with the "## Key Points" heading — the first characters of detailedSummary must be "## ".
-   - Use "## Key Points" (or "## נקודות עיקריות" for Hebrew) as the first subheading, followed by bullet points (use - for bullets).
+   - **HEADING LANGUAGE**: Write every section heading in the SAME language as the content (e.g. "## Key Points" in English, "## נקודות עיקריות" in Hebrew, "## Puntos Clave" in Spanish). Never mix an English heading over non-English bullets.
+   - Use the "Key Points" heading as the first subheading, followed by bullet points (use - for bullets).
    - Each bullet should be a factual statement from the content.
    - Include 3-6 bullet points covering the main arguments or information.
-   - If applicable, add "## Conclusions" (or "## מסקנות" for Hebrew) with the author's stated conclusions.
+   - If applicable, add a "Conclusions" heading (translated into the content language) with the author's stated conclusions.
    - **SCANNABILITY**: Use **bolding** (double asterisks) for the key terms, names, dates, and numbers in the bullets — the same way the short summary does — so the reader can scan the write-up.
    - Keep the tone neutral and professional throughout.
-   - Total length: 120-220 words (it complements the summary; it must NOT restate it).
+   - Total length: 120-220 words. It must go DEEPER than the summary and stand on its own as a complete account. Avoid word-for-word repetition of the summary, but NEVER omit a key fact just because the summary already mentioned it — completeness beats non-overlap.
 
 5. sourceName: Extract the name of the source or publisher (e.g., CNN, The New York Times, X, Reddit, Wikipedia, YouTube, TikTok).
    - For images or screenshots that don't reveal a source, use "Screenshot".
@@ -98,7 +100,7 @@ Requirements for the analysis:
 6. category: Assign exactly one high-level category (e.g., Tech, Health, Philosophy, Business, Research, Science, Finance, Productivity, Design, Career). If the content is a recipe, use "Recipe".
    - **CRITICAL**: The category MUST ALWAYS be in English, even if the content is in another language.
 
-7. tags: Provide exactly 3 or 4 specific, relevant tags for organization.
+7. tags: Provide 3 to 5 specific, relevant tags for organization (aim for 3-4; use 5 only when genuinely warranted).
    - **LANGUAGE**: Write tags in the SAME language as the input content.
    - Use lowercase.
    - PREFER REUSING EXISTING TAGS provided in the "Existing Tags" list if they are applicable.
@@ -106,17 +108,20 @@ Requirements for the analysis:
 
 8. actionableTakeaway: One concrete, specific action or learning the reader can apply.
    - **LANGUAGE**: Write the takeaway in the SAME language as the input content.
+   - **DO NOT INVENT ADVICE**: Only give a takeaway the content actually supports. If the content is not actionable (e.g. a news event, an anecdote, a personal update), state the single most useful thing the reader now knows instead of manufacturing advice. Never pad this with generic filler.
 
 CRITICAL RULES:
 - Be a neutral reporter, not a reviewer. Report WHAT is said, not HOW WELL it is said.
 - Avoid subjective phrases like: "offers valuable insights", "provides a comprehensive overview", "explores interesting ideas", "is a must-read", "excellently explains".
 - Use factual language: "The article discusses...", "The author argues...", "The research shows...", "Key topics include...".
 - GROUNDING: Base the analysis STRICTLY on the provided content. If the content is empty, truncated, or contains only a placeholder or metadata (e.g. "[no text content available]", a bare URL, or just a title with no body), do NOT invent a summary from outside/training knowledge. In that case set the title to what little is known and make the summary state plainly that the content could not be retrieved — never fabricate specifics, statistics, or claims that are not present.
+- DIRECTIONALITY (do not reverse the meaning): Preserve the exact direction of every claim. Watch for temporal contrasts ("used to / previously / now / no longer"), negations ("not X but Y", "instead of", "rather than", "avoid"), comparisons and preferences ("better to", "prefer", "worse than", "beats"), cause/effect, and who recommends or opposes what. When an author contrasts an old option with a new one, the recommended option is the NEW one — never state the abandoned or rejected option as the recommendation. A summary that flips any of these directions is WRONG even if every noun in it is correct.
 
-9. concepts: Identify 3-5 "Philosophical Anchors" or "Abstract Concepts".
+9. concepts: Identify up to 5 "Philosophical Anchors" or "Abstract Concepts".
    - **LANGUAGE**: English (always).
    - These should be high-level mental models or themes, not just keywords.
    - Example: "Spaced Repetition", "Pareto Principle", "Stoicism", "Network Effects", "Opportunity Cost".
+   - **ONLY genuine ones**: return only concepts the content actually embodies. If it is a light or purely practical post (e.g. a travel itinerary, a recipe), return just the 1-2 that truly fit — or an empty list. Do NOT inflate the count with forced or pretentious abstractions.
    - Max 5 concepts."""
 
 VIDEO_ANALYSIS_PROMPT = SYSTEM_PROMPT + """
@@ -134,7 +139,7 @@ IMPORTANT: You are analyzing an **actual YouTube video that you can watch** (its
 - "videoDurationMinutes": the video's total length in whole minutes (round up; minimum 1).
 - "videoHighlights": 3–6 genuinely key moments, each prefixed with its timestamp in "M:SS — description" form (e.g. "2:15 — Explains the 2-minute rule"). Use real timestamps from the video. Order them chronologically.
 - "speakers": the people who actually speak or are clearly featured (host first, then guests). If it cannot be determined, return an empty list — do not guess names.
-- "detailedSummary": markdown with these sections:
+- "detailedSummary": markdown. This section structure OVERRIDES the "start with Key Points" rule above — for a video, use these sections in this order instead. Translate each heading into the content's language (see HEADING LANGUAGE rule above):
   - `## Core Thesis` — the central argument or purpose of the video.
   - `## Key Points` — bullets of the main ideas, instructions, or frameworks actually presented.
   - `## Who It's For` — the intended audience, only if the video makes this clear.
@@ -172,6 +177,10 @@ class GeminiService:
             # Schema-constrained output makes the model return valid, complete
             # JSON instead of free-form text we have to defensively unwrap.
             "response_schema": AIAnalysis,
+            # This is factual extraction, not creative writing. A low temperature
+            # keeps the output stable run-to-run and cuts the variance that makes
+            # a model occasionally flip a claim's direction or invent filler.
+            "temperature": 0.2,
         }
         if config_extra:
             config.update(config_extra)
@@ -469,6 +478,10 @@ Output the marker exactly once, as the very last line, and nothing after it."""
             stream = self.client.models.generate_content_stream(
                 model=self.model,
                 contents=[prompt],
+                # Match the non-streaming answer path: this is a grounded,
+                # factual answer, so keep temperature low for stability. Without
+                # this the stream would silently run at the ~1.0 default.
+                config={"temperature": 0.2},
             )
             for chunk in stream:
                 piece = getattr(chunk, "text", None)
@@ -573,7 +586,10 @@ Return ONLY a JSON object matching the schema (title, narrative, themes[title,in
 
         data = self._generate_json(
             [prompt], "weekly synthesis",
-            config_extra={"response_schema": WeeklySynthesis},
+            # Unlike the extraction paths, this surface is deliberately a warm,
+            # narrative debrief — hold it ABOVE the 0.2 extraction default so the
+            # prose doesn't go flat, while staying grounded by the prompt's rules.
+            config_extra={"response_schema": WeeklySynthesis, "temperature": 0.6},
         )
 
         # Guard against hallucinated ids — keep only ones we actually supplied.

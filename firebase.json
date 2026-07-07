@@ -66,6 +66,14 @@
         "function": "unpublish_share_http"
       },
       {
+        "source": "/api/register-device-token",
+        "function": "register_device_token_http"
+      },
+      {
+        "source": "/api/unregister-device-token",
+        "function": "unregister_device_token_http"
+      },
+      {
         "source": "/s",
         "function": "share_page"
       },

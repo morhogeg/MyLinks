@@ -22,9 +22,12 @@ DEFAULT_USER_SETTINGS = {
     "daily_digest": False,
     "reminders_enabled": True,
     "reminder_frequency": "smart",
+    # Push flips true client-side once the user grants the OS permission.
+    "push_enabled": False,
+    "reminders_channel": ["push"],
     "digest_enabled": False,
     "digest_frequency": "weekly",
-    "digest_channels": ["whatsapp"],
+    "digest_channels": ["push"],
     "digest_mode": "smart",
     "digest_topics": [],
     "digest_topic": None,

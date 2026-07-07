@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 # Firebase Functions framework
 from firebase_functions import https_fn, scheduler_fn, firestore_fn, options
 from firebase_admin import storage, auth as admin_auth
+from google.cloud import firestore as gc_firestore
 from google.cloud.firestore_v1.vector import Vector
 
 # Internal modules
@@ -227,6 +228,7 @@ _RATE_LIMITS = {
     "article": (120, 3600),
     "share": (120, 3600),
     "whatsapp": (60, 60),
+    "device_token": (30, 3600),
 }
 
 
@@ -1380,6 +1382,113 @@ def delete_account_http(req: https_fn.Request) -> https_fn.Response:
         return _error_response(str(e), 500, headers)
     except Exception as e:
         return _server_error(headers, e, "Account deletion failed")
+
+
+# ─────────────────────────────────────────────
+# Device tokens (iOS push notifications)
+# ─────────────────────────────────────────────
+#
+# Plain HTTP endpoints (not callables) for the same reason as
+# claim_workspace_http: the callable transport's CORS preflight is rejected
+# from `capacitor://localhost`, so the native shell must use /api/* twins.
+# These are the ONLY write path for `users/{uid}.fcmTokens` — the client never
+# writes the field directly (see firestore.rules note).
+
+# Bound how many device tokens a single workspace can accumulate. iOS rotates
+# tokens occasionally and dead ones are pruned on send (push_service), so a
+# small cap comfortably covers real devices while blocking unbounded growth.
+MAX_DEVICE_TOKENS = 10
+
+# FCM registration tokens are ~150-320 chars today; reject anything wildly off.
+MAX_DEVICE_TOKEN_LENGTH = 512
+
+
+def _device_token_request(req):
+    """Shared validation for the register/unregister endpoints.
+
+    Returns (uid, token, None) on success or (None, None, error_response).
+    """
+    headers = _cors_headers(req)
+
+    rl = _rate_limited("device_token", client_ip(req), headers)
+    if rl:
+        return None, None, rl
+
+    decoded = _verify_bearer(req)
+    if not decoded:
+        return None, None, _error_response("User must be signed in", 401, headers)
+    uid = find_data_uid_by_auth_uid(decoded.get("uid"))
+    if not uid:
+        return None, None, _error_response("No workspace linked to this account", 403, headers)
+
+    data = req.get_json(silent=True) or {}
+    token = (data.get("token") or "").strip()
+    if not token or len(token) > MAX_DEVICE_TOKEN_LENGTH:
+        return None, None, _error_response("Missing or invalid token", 400, headers)
+
+    return uid, token, None
+
+
+@https_fn.on_request()
+def register_device_token_http(req: https_fn.Request) -> https_fn.Response:
+    """Register an FCM device token for the verified caller's workspace.
+
+    Body: { "token": "<fcm registration token>" }. ArrayUnion dedupes, so
+    re-registering the same token on every app launch is a cheap no-op.
+    """
+    if req.method == 'OPTIONS':
+        return _cors_preflight(req)
+    headers = _cors_headers(req)
+    if req.method != 'POST':
+        return _error_response("Method not allowed", 405, headers)
+
+    uid, token, err = _device_token_request(req)
+    if err:
+        return err
+
+    try:
+        user_ref = get_db().collection("users").document(uid)
+        user_ref.set({"fcmTokens": gc_firestore.ArrayUnion([token])}, merge=True)
+        # Trim the oldest entries if a workspace somehow accumulates too many.
+        tokens = (user_ref.get().to_dict() or {}).get("fcmTokens") or []
+        if len(tokens) > MAX_DEVICE_TOKENS:
+            user_ref.update({"fcmTokens": tokens[-MAX_DEVICE_TOKENS:]})
+        return https_fn.Response(
+            json.dumps({"success": True}),
+            status=200, headers=headers, mimetype='application/json',
+        )
+    except Exception as e:
+        return _server_error(headers, e, "Token registration failed")
+
+
+@https_fn.on_request()
+def unregister_device_token_http(req: https_fn.Request) -> https_fn.Response:
+    """Remove an FCM device token (sign-out / permission revoked).
+
+    Body: { "token": "<fcm registration token>" }. Removing a token that is
+    not registered is a success (idempotent).
+    """
+    if req.method == 'OPTIONS':
+        return _cors_preflight(req)
+    headers = _cors_headers(req)
+    if req.method != 'POST':
+        return _error_response("Method not allowed", 405, headers)
+
+    uid, token, err = _device_token_request(req)
+    if err:
+        return err
+
+    try:
+        get_db().collection("users").document(uid).update(
+            {"fcmTokens": gc_firestore.ArrayRemove([token])}
+        )
+    except Exception as e:
+        # A missing user doc means there is nothing to remove — idempotent.
+        logger.info("Device token unregister skipped: %s", e)
+    return https_fn.Response(
+        json.dumps({"success": True}),
+        status=200, headers=headers, mimetype='application/json',
+    )
 
 
 # ─────────────────────────────────────────────

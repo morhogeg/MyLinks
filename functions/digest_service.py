@@ -2,12 +2,14 @@
 Digest Service
 ==============
 Delivers a *curated set of saved cards* to the user on a schedule (daily or
-weekly) via email and/or WhatsApp.
+weekly). Every digest is ALWAYS persisted to users/{uid}/digests — the in-app
+Digest section is the always-on surface — and additionally sent over the
+opt-in delivery channels (iOS push, email, WhatsApp).
 
 The user controls, from Settings:
   • whether digests are on at all              (digest_enabled)
   • how often                                  (digest_frequency: daily | weekly)
-  • where to                                   (digest_channels: email / whatsapp)
+  • where to                                   (digest_channels: push / email / whatsapp)
   • what to curate                             (digest_mode)
   • a topic to focus on                        (digest_topic, when mode=topic)
   • how many cards                             (digest_count)
@@ -38,6 +40,8 @@ from datetime import datetime, timezone
 from typing import Optional, List
 
 import requests
+
+from google.cloud import firestore
 
 from db import get_db
 from link_service import is_hebrew
@@ -766,6 +770,21 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
     _write_inapp_synthesis(uid, synth, cards, week_id)
     result["channels"].append("in_app")
 
+    # Push (native iOS)
+    if "push" in channels and user_data.get("fcmTokens"):
+        from push_service import send_push  # lazy: keeps cold starts light
+        try:
+            push_result = send_push(
+                uid,
+                synth.get("title") or "What you learned this week",
+                f"Your weekly synthesis of {len(cards)} cards is ready",
+                {"view": "digest"},
+            )
+            if push_result.get("sent"):
+                result["channels"].append("push")
+        except Exception as e:
+            logger.error(f"Synthesis push send failed for {uid}: {e}")
+
     # WhatsApp
     if "whatsapp" in channels:
         phone = user_data.get("phone_number") or user_data.get("phoneNumber")
@@ -794,6 +813,81 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
         merge=True,
     )
     return result
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# In-app curated digest (the always-on surface)
+# ─────────────────────────────────────────────────────────────────────────
+
+# Keep the newest N digest docs per user; older ones are pruned on write so
+# the subcollection stays bounded.
+DIGEST_RETENTION = 30
+
+
+def _digest_id(frequency: str, now: Optional[datetime] = None) -> str:
+    """Deterministic doc id per period so a re-run within the same period
+    overwrites instead of duplicating: daily → '2026-07-06', weekly → '2026-W28'."""
+    now = now or datetime.now(timezone.utc)
+    if frequency == "daily":
+        return now.strftime("%Y-%m-%d")
+    return _week_id(now)
+
+
+def _write_inapp_digest(uid: str, cards: List[dict], mode: str, frequency: str, topics) -> Optional[str]:
+    """Persist the curated digest to users/{uid}/digests/{digestId} (mirrors
+    _write_inapp_synthesis). Cards are denormalized so the digest renders even
+    if a source link is later deleted; the app still deep-links by id when the
+    card exists. Returns the doc id, or None if the write failed."""
+    period = "Daily" if frequency == "daily" else "Weekly"
+    digest_id = _digest_id(frequency)
+
+    card_refs = [
+        {
+            "id": c.get("id"),
+            "title": (c.get("title") or "Untitled").strip(),
+            "category": c.get("category") or "General",
+            "summary": (c.get("summary") or "").strip(),
+            "thumbnailUrl": c.get("thumbnailUrl") or None,
+            "sourceName": c.get("sourceName") or None,
+            "url": c.get("url") or None,
+        }
+        for c in cards
+    ]
+
+    doc = {
+        "id": digest_id,
+        "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+        "mode": mode,
+        "frequency": frequency,
+        "title": f"Your {period} Brew",
+        "topics": _normalize_topics(topics),
+        "cards": card_refs,
+        "cardCount": len(card_refs),
+    }
+    try:
+        col = get_db().collection("users").document(uid).collection("digests")
+        col.document(digest_id).set(doc)
+    except Exception as e:
+        logger.error(f"Failed to write in-app digest for {uid}: {e}")
+        return None
+
+    _prune_old_digests(uid)
+    return digest_id
+
+
+def _prune_old_digests(uid: str, keep: int = DIGEST_RETENTION) -> None:
+    """Best-effort retention: delete digest docs beyond the newest `keep`."""
+    try:
+        col = get_db().collection("users").document(uid).collection("digests")
+        stale = (
+            col.order_by("createdAt", direction=firestore.Query.DESCENDING)
+            .offset(keep)
+            .stream()
+        )
+        for doc in stale:
+            doc.reference.delete()
+    except Exception as e:
+        logger.warning(f"Digest retention cleanup failed for {uid}: {e}")
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -842,6 +936,33 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
     result["card_count"] = len(cards)
     db = get_db()
     delivered_any = False
+
+    # In-app (always-on surface): persist the digest BEFORE any channel sends,
+    # so the Digest section shows it even when every outbound channel fails.
+    digest_id = _write_inapp_digest(uid, cards, mode, frequency, topics)
+    if digest_id:
+        result["channels"].append("in_app")
+        result["digest_id"] = digest_id
+        delivered_any = True
+
+    # Push (native iOS)
+    if "push" in channels:
+        if user_data.get("fcmTokens"):
+            from push_service import send_push  # lazy: keeps cold starts light
+            period = "Daily" if frequency == "daily" else "Weekly"
+            try:
+                push_result = send_push(
+                    uid,
+                    f"🧠 Your {period} Brew",
+                    f"{len(cards)} new card{'s' if len(cards) != 1 else ''} to revisit",
+                    {"view": "digest"},
+                )
+                if push_result.get("sent"):
+                    result["channels"].append("push")
+            except Exception as e:
+                logger.error(f"Digest push send failed for {uid}: {e}")
+        else:
+            logger.info(f"Digest: user {uid} has push channel but no device tokens")
 
     # WhatsApp
     if "whatsapp" in channels:
@@ -909,8 +1030,9 @@ def is_due(settings: dict, tz_name: Optional[str], last_sent_ms: Optional[int]) 
     """
     if not settings.get("digest_enabled"):
         return False
-    if not (settings.get("digest_channels") or []):
-        return False
+    # NOTE: no digest_channels requirement — the in-app Digest section is the
+    # always-on surface, so a digest with zero outbound channels still runs
+    # (it just persists to users/{uid}/digests and sends nothing).
 
     local = _local_now(tz_name)
     target_hour = int(settings.get("digest_hour", 9))

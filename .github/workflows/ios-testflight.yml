@@ -161,12 +161,49 @@ jobs:
           fi
           echo "URL scheme registered: ${RCID:0:24}…"
 
-      # Signing uses Apple "cloud-managed" distribution: xcodebuild, given the
-      # App Store Connect API key + -allowProvisioningUpdates, creates/reuses a
-      # cloud signing certificate and provisioning profile automatically. No
-      # manually-exported .p12 certificate is needed (that's the step people get
-      # stuck on). Requires the project's automatic signing (CODE_SIGN_STYLE =
-      # Automatic), which this app already uses.
+      # ── Signing ────────────────────────────────────────────────────────────
+      # The app uses automatic signing (CODE_SIGN_STYLE = Automatic). xcodebuild,
+      # given the App Store Connect API key + -allowProvisioningUpdates, manages
+      # the provisioning PROFILES automatically — profiles are uncapped, so that
+      # part is fine.
+      #
+      # The CERTIFICATE is the problem. A GitHub runner is ephemeral: empty
+      # keychain, no private key. With no identity to reuse, automatic signing
+      # asks Apple to MINT A NEW certificate every run — and that cert dies with
+      # the runner. Apple caps certificates (2 Apple Development per account), so
+      # every few runs the archive fails with "maximum number of certificates"
+      # until someone revokes old ones by hand (runs #15/#16/#31/#42). The step
+      # below ends that treadmill: it imports ONE persistent signing identity
+      # (a .p12 exported once by the owner) into a temporary keychain, so
+      # automatic signing REUSES it and never mints a new cert.
+      # One-time setup: docs/IOS_CICD.md → "Stable signing certificate".
+      - name: Install signing certificate
+        env:
+          CERT_P12_BASE64: ${{ secrets.BUILD_CERTIFICATE_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.BUILD_CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -z "$CERT_P12_BASE64" ]; then
+            echo "::warning::BUILD_CERTIFICATE_P12_BASE64 is not set — falling back to cloud-managed signing, which MINTS A NEW Apple certificate every run and periodically hits Apple's certificate cap (you then have to revoke certs by hand). Add the secret to stop this permanently: docs/IOS_CICD.md → 'Stable signing certificate'."
+            exit 0
+          fi
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PW="$(openssl rand -base64 24)"
+          security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/build_cert.p12"
+          security import "$RUNNER_TEMP/build_cert.p12" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          # Let codesign use the private key non-interactively (no UI prompt on CI).
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PW" "$KEYCHAIN" >/dev/null
+          # Make our keychain visible to xcodebuild (prepend to the user search list).
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed 's/"//g')
+          echo "Signing identities in the CI keychain:"
+          security find-identity -v -p codesigning "$KEYCHAIN"
+          if security find-identity -v -p codesigning "$KEYCHAIN" | grep -q '0 valid identities found'; then
+            echo "::error::The imported .p12 has no code-signing identity — it was exported without its private key, or the password is wrong. Re-export the certificate WITH its private key (see docs/IOS_CICD.md)."
+            exit 1
+          fi
+          echo "Certificate installed — automatic signing will reuse it; no new cert is minted."
 
       - name: Install App Store Connect API key
         env:
@@ -189,10 +226,12 @@ jobs:
           # and sign in first"). Entitlements are baked at archive-time
           # codesign; export re-signing from an unsigned archive does not
           # restore them. The entitlement check step below is the tripwire.
-          # Cost of this approach: each ephemeral runner mints an Apple
-          # Development certificate, and Apple caps those — prune them at
-          # developer.apple.com → Certificates when archive fails with
-          # "maximum number of certificates" (runs #15/#16).
+          # Certificate reuse: the "Install signing certificate" step above
+          # imports one persistent identity so automatic signing does NOT mint a
+          # new cert per run. If that secret is ever unset, this reverts to
+          # cloud-managed minting and will eventually hit Apple's cert cap
+          # ("maximum number of certificates") — then prune at developer.apple.com
+          # → Certificates and, better, set BUILD_CERTIFICATE_P12_BASE64.
           xcodebuild clean archive \
             -project App.xcodeproj \
             -scheme App \
@@ -253,7 +292,11 @@ jobs:
           done
           echo "$(codesign -d --entitlements :- Payload/App.app 2>/dev/null)" | grep -q "com.apple.developer.applesignin" \
             || echo "::warning::App is missing the Sign in with Apple entitlement — required before the auth cutover build."
-          echo "Entitlements OK: App Group present in app + extension."
+          echo "$(codesign -d --entitlements :- Payload/App.app 2>/dev/null)" | grep -q "aps-environment" || {
+            echo "::error::App is missing the aps-environment entitlement — push notifications would silently never register. Refusing to upload."
+            exit 1
+          }
+          echo "Entitlements OK: App Group present in app + extension; aps-environment present in app."
 
           # URL-scheme tripwire: the archived Info.plist must still carry BOTH the
           # custom "machina" scheme (Share Extension → "Open Machina") AND the

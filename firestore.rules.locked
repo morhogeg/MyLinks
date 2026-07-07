@@ -75,6 +75,14 @@ service cloud.firestore {
         allow read: if owns(uid);
         allow write: if false;
       }
+
+      // Curated digests (in-app Digest section). Written by Cloud Functions
+      // (Admin SDK, bypasses rules); the client only reads to render the
+      // digest history (lib/digest.ts).
+      match /digests/{digestId} {
+        allow read: if owns(uid);
+        allow write: if false;
+      }
     }
 
     // Shared collections & cards: public, read-only snapshots for share links so

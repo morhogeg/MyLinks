@@ -3,7 +3,7 @@
 // Mirrors the REAL client access patterns (web/lib/*.ts, AuthProvider):
 //   - workspace resolve: LIST query on /users where('authUids','array-contains', me)
 //   - owner doc updates (timezone/settings), links/chats/collections CRUD
-//   - syntheses: client READ-ONLY (written by Cloud Functions via Admin SDK)
+//   - syntheses / digests: client READ-ONLY (written by Cloud Functions via Admin SDK)
 //   - shared_cards / shared_collections: public read, owner-only write
 //   - rate_limits / pending_processing / task_logs: never client-accessible
 //
@@ -70,6 +70,9 @@ beforeEach(async () => {
     });
     await setDoc(doc(db, 'users', OWNER_DOC, 'syntheses', '2026-W27'), {
       weekId: '2026-W27', narrative: 'What you learned', createdAt: 1,
+    });
+    await setDoc(doc(db, 'users', OWNER_DOC, 'digests', '2026-W27'), {
+      id: '2026-W27', title: 'Your Weekly Brew', cards: [], createdAt: 1,
     });
     await setDoc(doc(db, 'shared_cards', 'card-share-1'), {
       shareId: 'card-share-1', ownerUid: OWNER_DOC, card: { title: 'Shared' },
@@ -183,6 +186,27 @@ test('nobody can write syntheses from the client (Cloud Functions only)', async 
 test('stranger and anon cannot read syntheses', async () => {
   await assertFails(getDoc(doc(strangerDb(), 'users', OWNER_DOC, 'syntheses', '2026-W27')));
   await assertFails(getDoc(doc(anonDb(), 'users', OWNER_DOC, 'syntheses', '2026-W27')));
+});
+
+// ── digests: client read-only (in-app Digest section) ────────────────────────
+
+test('owner can read digests (Digest section subscription)', async () => {
+  await assertSucceeds(getDoc(doc(ownerDb(), 'users', OWNER_DOC, 'digests', '2026-W27')));
+  await assertSucceeds(getDocs(collection(ownerDb(), 'users', OWNER_DOC, 'digests')));
+});
+
+test('nobody can write digests from the client (Cloud Functions only)', async () => {
+  await assertFails(
+    setDoc(doc(ownerDb(), 'users', OWNER_DOC, 'digests', '2026-07-06'), { id: '2026-07-06' }),
+  );
+  await assertFails(
+    updateDoc(doc(ownerDb(), 'users', OWNER_DOC, 'digests', '2026-W27'), { title: 'x' }),
+  );
+});
+
+test('stranger and anon cannot read digests', async () => {
+  await assertFails(getDoc(doc(strangerDb(), 'users', OWNER_DOC, 'digests', '2026-W27')));
+  await assertFails(getDoc(doc(anonDb(), 'users', OWNER_DOC, 'digests', '2026-W27')));
 });
 
 // ── shared_cards / shared_collections: public read, Admin-SDK-only write ──────
