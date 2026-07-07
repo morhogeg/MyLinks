@@ -178,8 +178,9 @@ class UserSettings(BaseModel):
     digest_topic: Optional[str] = None
     # How many cards per digest.
     digest_count: int = 5
-    # Preferred local delivery hour (0–23) in the user's timezone.
+    # Preferred local delivery time (0–23 hour, 0–59 minute) in the user's timezone.
     digest_hour: int = 9
+    digest_minute: int = 0
     # Preferred weekday for weekly digests (0=Mon … 6=Sun).
     digest_day: int = 0
     # Don't send a digest if there's nothing fresh to show.

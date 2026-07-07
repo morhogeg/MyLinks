@@ -2693,9 +2693,13 @@ def force_check_reminders(req: https_fn.Request) -> https_fn.Response:
 # Curated Digest (email + WhatsApp)
 # ─────────────────────────────────────────────
 
-@scheduler_fn.on_schedule(schedule="every 60 minutes")
+# Cadence MUST match DIGEST_CADENCE_MINUTES in digest_service.py — is_due() uses
+# it as the match window, so a mismatch means missed or double-checked sends.
+# Every 5 min honors minute-precise delivery times (digest_hour:digest_minute)
+# to within one tick; the daily 20h / weekly 6d dup-guard prevents double-sends.
+@scheduler_fn.on_schedule(schedule="every 5 minutes")
 def send_digests(event: scheduler_fn.ScheduledEvent) -> None:
-    """Hourly: deliver curated digests to users whose schedule is due now."""
+    """Every 5 min: deliver curated digests to users whose schedule is due now."""
     from digest_service import run_digest_check
     run_digest_check()
 
