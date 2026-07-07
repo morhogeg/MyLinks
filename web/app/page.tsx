@@ -28,6 +28,9 @@ function pickBanner(...states: (AnalyzingState | null)[]): AnalyzingState | null
 export default function Home() {
   const { uid, loading } = useAuth();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  // When set, the Settings sheet opens straight to that sub-screen (e.g. the
+  // digest settings, deep-linked from the empty Digest page).
+  const [settingsSection, setSettingsSection] = useState<'digest' | null>(null);
   const [isAskMode, setIsAskMode] = useState(false);
   const [hideAddButton, setHideAddButton] = useState(false);
   // In-flight capture analysis for the one "Analyzing… N%" banner. Two sources:
@@ -136,7 +139,7 @@ export default function Home() {
             </div>
             <IconButton
               data-tour="settings"
-              onClick={() => setIsSettingsOpen(true)}
+              onClick={() => { setSettingsSection(null); setIsSettingsOpen(true); }}
               variant="secondary"
               radius="full"
               aria-label="Settings"
@@ -154,7 +157,7 @@ export default function Home() {
         {/* The feed is already live via onSnapshot, so a new save streams in on
             its own — no remount needed. (Previously keyed on refreshKey, which
             tore down listeners and wiped view/filter/search on every add.) */}
-        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} />
+        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} />
       </main>
 
       {/* Add Link FAB — hidden in Ask & Collections (neither view captures links). */}
@@ -170,6 +173,7 @@ export default function Home() {
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
           onReplayTour={replayTour}
+          initialSection={settingsSection ?? undefined}
         />
       )}
 
