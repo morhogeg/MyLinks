@@ -87,12 +87,13 @@ export default function VideoScanProgress({ thumbnailSrc, progress }: VideoScanP
                 />
             </div>
 
-            {/* Video analysis is slow (~a minute) and runs in the foreground (see
-                AddLinkForm.handleSubmit), so the app must stay open — be honest
-                rather than implying they can leave. */}
+            {/* Video analysis is slow (~a minute) but the request keeps running
+                after this dialog closes — AddLinkForm stays mounted and publishes
+                progress to the persistent AnalyzingBanner. Only quitting the whole
+                app suspends the WebView and loses the save. */}
             {!done && (
                 <p className="text-xs text-text-muted text-center">
-                    Watching the full video takes a minute — keep Machina open while it runs.
+                    This takes about a minute — you can close this window, Machina keeps working in the background.
                 </p>
             )}
         </div>
