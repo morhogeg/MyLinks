@@ -4,6 +4,8 @@ import {
     orderBy,
     limit,
     onSnapshot,
+    deleteDoc,
+    doc,
     QueryDocumentSnapshot,
     DocumentData,
 } from 'firebase/firestore';
@@ -20,6 +22,13 @@ import { CuratedDigest } from './types';
  */
 
 const digestsCol = (uid: string) => collection(db, 'users', uid, 'digests');
+
+/** Remove a single digest from the in-app history. The doc id is the digest's
+    deterministic period id (e.g. "2026-07-06" / "2026-W28"). The live onSnapshot
+    subscription drops it from the view automatically. */
+export async function deleteDigest(uid: string, id: string): Promise<void> {
+    await deleteDoc(doc(db, 'users', uid, 'digests', id));
+}
 
 function toDigest(d: QueryDocumentSnapshot<DocumentData>): CuratedDigest {
     const data = d.data();

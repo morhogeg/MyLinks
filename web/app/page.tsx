@@ -7,6 +7,7 @@ import AddLinkForm from "@/components/AddLinkForm";
 import AnalyzingBanner, { AnalyzingState } from "@/components/AnalyzingBanner";
 import InstallPWA from "@/components/InstallPWA";
 import SettingsModal from "@/components/SettingsModal";
+import ScrollToTop from "@/components/ScrollToTop";
 import OnboardingTour, { ONBOARDING_STORAGE_KEY } from "@/components/OnboardingTour";
 import { Settings } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -165,6 +166,7 @@ export default function Home() {
           onSnapshot, so nothing extra is needed here on a successful save. */}
       <AddLinkForm onLinkAdded={() => {}} hidden={hideAddButton} onAnalyzingChange={setAnalyzing} />
       <AnalyzingBanner state={bannerState} />
+      <ScrollToTop />
 
       {/* Settings Modal */}
       {uid && (

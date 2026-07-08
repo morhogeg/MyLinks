@@ -35,6 +35,7 @@ interface Props {
     onOpenSynthesisCard: (id: string) => void;
     onDismissSynthesis: () => void;
     onOpenDigestSettings?: () => void;
+    onDeleteDigest?: (id: string) => void;
 }
 
 /**
@@ -45,7 +46,7 @@ interface Props {
  * scroll of collapsed headers.
  */
 export default function DigestView({
-    digests, synthesis, onOpenCard, onOpenSynthesisCard, onDismissSynthesis, onOpenDigestSettings,
+    digests, synthesis, onOpenCard, onOpenSynthesisCard, onDismissSynthesis, onOpenDigestSettings, onDeleteDigest,
 }: Props) {
     // Sidebar selection. 'synthesis' or a digest id; falls back to the newest.
     const [selId, setSelId] = useState<string | null>(null);
@@ -96,7 +97,7 @@ export default function DigestView({
                     <SynthesisCard synthesis={synthesis} onOpenCard={onOpenSynthesisCard} onDismiss={onDismissSynthesis} />
                 )}
                 {digests.map((digest, i) => (
-                    <DigestCard key={digest.id} digest={digest} defaultExpanded={i === 0} onOpenCard={onOpenCard} />
+                    <DigestCard key={digest.id} digest={digest} defaultExpanded={i === 0} onOpenCard={onOpenCard} onOpenSettings={onOpenDigestSettings} onDelete={onDeleteDigest} />
                 ))}
             </div>
 
@@ -133,7 +134,7 @@ export default function DigestView({
                     {activeId === 'synthesis' && synthesis ? (
                         <SynthesisCard synthesis={synthesis} onOpenCard={onOpenSynthesisCard} onDismiss={onDismissSynthesis} />
                     ) : activeDigest ? (
-                        <DigestCard key={activeDigest.id} digest={activeDigest} alwaysOpen onOpenCard={onOpenCard} />
+                        <DigestCard key={activeDigest.id} digest={activeDigest} alwaysOpen onOpenCard={onOpenCard} onOpenSettings={onOpenDigestSettings} onDelete={onDeleteDigest} />
                     ) : null}
                 </div>
             </div>
