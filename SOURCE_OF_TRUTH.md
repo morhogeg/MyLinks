@@ -589,6 +589,21 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-08 — Digest markdown fix + scalable desktop reader (`830588a`;
+  TestFlight run #59 → build 1059; Vercel live).** (1) Digest card summaries
+  rendered raw `**bold**` as literal asterisks — now routed through
+  `SimpleMarkdown` via a new lightweight **`inline`** mode (flattens newlines/
+  bullets to one bold-rendered run so `line-clamp` still works). (2) New
+  **`DigestView`** so the section scales past one digest: phones/tablets keep the
+  elegant single column of collapsible `DigestCard`s (unchanged); **desktop (lg+)
+  becomes a two-pane reader** — a date-grouped sidebar (Today / Yesterday /
+  Earlier this week / month buckets) of every digest on the left, the selected one
+  pinned open on the right (`DigestCard` gained an `alwaysOpen` pane variant, no
+  collapse chrome). Empty-state + weekly-synthesis handling moved into DigestView;
+  `Feed.tsx`'s inline `digestContent` now just renders `<DigestView/>`. **Note:**
+  the two-pane desktop layout is only exercised at scale (the user has ~1 digest
+  now) — worth a visual pass once several digests exist. Frontend-only; tsc +
+  build clean.
 - **2026-07-08 — Settings auto-save, Reminders→Show, overlay scroll-lock, source
   search fix (`9c4b16e`; TestFlight run #58 → build 1058; Vercel live).** Four
   user-driven changes. **(1) Settings auto-save** (`SettingsModal.tsx`): removed
