@@ -434,10 +434,18 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // card never spawns a phantom "Processing" category/tag), then surfaced
     // separately, pinned at the top of the library, so a capture is always visible.
     const isPending = (l: Link) => l.status === 'processing' || l.status === 'failed';
-    const contentLinks = links.filter((l) => !isPending(l));
+    // Memoized so the per-second processing tick (and any unrelated re-render)
+    // doesn't re-derive the whole content set from the links prop each time.
+    const contentLinks = useMemo(
+        () => links.filter((l) => l.status !== 'processing' && l.status !== 'failed'),
+        [links]
+    );
 
-    // 4. Hybrid Search Logic
-    const filteredLinks = contentLinks
+    // 4. Hybrid Search Logic — the six-pass filter + sort over the whole library.
+    // Memoized on exactly the inputs it reads so it only recomputes when a filter,
+    // the search, the sort, or the links actually change — not on every render
+    // (the processing banner alone used to re-run this chain 5×/s during a capture).
+    const filteredLinks = useMemo(() => contentLinks
         .filter((link) => {
             // Apply status filters
             if (filter === 'reminders') return link.reminderStatus === 'pending';
@@ -527,7 +535,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 default:
                     return 0;
             }
-        });
+        }),
+        [contentLinks, filter, selectedCategory, selectedTags, selectedCollections,
+         selectedPlatforms, screenshotOnly, selectedSources, debouncedQuery, searchResults, sortBy]);
 
     // Does a link carry any of the currently selected tags? (parent tags match
     // their children, e.g. "ai" matches "ai/agents"). Shared by the faceted counts.
@@ -538,26 +548,38 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // computed against the OTHER facet's current selection (but never its own), so
     // picking the "Tech" category instantly drops a non-overlapping tag like
     // "politics" to 0, while the category chips keep reflecting the tag selection.
-    // Pure client-side derivation — no extra reads, no backend cost.
-    const linksForCategoryCounts = selectedTags.size === 0 ? contentLinks : contentLinks.filter(matchesSelectedTags);
-    const categoryCounts = linksForCategoryCounts.reduce((acc, link) => {
-        acc[link.category] = (acc[link.category] || 0) + 1;
-        return acc;
-    }, {} as Record<string, number>);
+    // Pure client-side derivation — no extra reads, no backend cost. Memoized so
+    // these O(n) passes don't re-run on every render (e.g. the processing tick).
+    const categoryCounts = useMemo(() => {
+        const linksForCategoryCounts = selectedTags.size === 0 ? contentLinks : contentLinks.filter(matchesSelectedTags);
+        return linksForCategoryCounts.reduce((acc, link) => {
+            acc[link.category] = (acc[link.category] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [contentLinks, selectedTags]);
 
     // Category chips stay derived from the whole library so they never vanish —
     // they just read 0 when nothing matches the current tag selection.
-    const categories = Array.from(new Set(contentLinks.map(l => l.category).filter(Boolean))).sort();
+    const categories = useMemo(
+        () => Array.from(new Set(contentLinks.map(l => l.category).filter(Boolean))).sort(),
+        [contentLinks]
+    );
 
-    const linksForTagCounts = selectedCategory.size === 0 ? contentLinks : contentLinks.filter(link => selectedCategory.has(link.category));
-    const tagCounts = linksForTagCounts.reduce((acc, link) => {
-        link.tags.forEach(tag => {
-            acc[tag] = (acc[tag] || 0) + 1;
-        });
-        return acc;
-    }, {} as Record<string, number>);
+    const tagCounts = useMemo(() => {
+        const linksForTagCounts = selectedCategory.size === 0 ? contentLinks : contentLinks.filter(link => selectedCategory.has(link.category));
+        return linksForTagCounts.reduce((acc, link) => {
+            link.tags.forEach(tag => {
+                acc[tag] = (acc[tag] || 0) + 1;
+            });
+            return acc;
+        }, {} as Record<string, number>);
+    }, [contentLinks, selectedCategory]);
 
-    const allTags = Array.from(new Set(contentLinks.flatMap(l => l.tags))).sort();
+    const allTags = useMemo(
+        () => Array.from(new Set(contentLinks.flatMap(l => l.tags))).sort(),
+        [contentLinks]
+    );
 
     const handleToggleTag = (tag: string) => {
         const next = new Set(selectedTags);
@@ -567,13 +589,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     };
 
     // Source/platform filter: only surface platforms actually present in the library.
-    const platformCounts = contentLinks.reduce((acc, link) => {
+    const platformCounts = useMemo(() => contentLinks.reduce((acc, link) => {
         const p = getPlatform(link.url);
         if (p) acc[p] = (acc[p] || 0) + 1;
         return acc;
-    }, {} as Record<PlatformKey, number>);
-    const availablePlatforms = (Object.keys(PLATFORM_LABELS) as PlatformKey[]).filter(p => platformCounts[p]);
-    const screenshotCount = contentLinks.filter(l => l.sourceType === 'image').length;
+    }, {} as Record<PlatformKey, number>), [contentLinks]);
+    const availablePlatforms = useMemo(
+        () => (Object.keys(PLATFORM_LABELS) as PlatformKey[]).filter(p => platformCounts[p]),
+        [platformCounts]
+    );
+    const screenshotCount = useMemo(() => contentLinks.filter(l => l.sourceType === 'image').length, [contentLinks]);
 
     const handleTogglePlatform = (p: PlatformKey) => {
         const next = new Set(selectedPlatforms);
@@ -621,7 +646,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         ? sourceFacets.filter(s => sourceMatchesQuery(s, debouncedQuery)).slice(0, 8)
         : [];
 
-    const reminderCount = contentLinks.filter(l => l.reminderStatus === 'pending').length;
+    const reminderCount = useMemo(() => contentLinks.filter(l => l.reminderStatus === 'pending').length, [contentLinks]);
 
     // Pending capture cards to surface, pinned above the feed. Only shown on the
     // default library views (All/Unread, no active facet/search) so they're always

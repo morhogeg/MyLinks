@@ -42,9 +42,14 @@ export function useProcessingBanner(links: Link[]): AnalyzingState | null {
     }
 
     // While anything is processing, re-render on an interval so the ramp moves.
+    // 1 Hz (not 5 Hz): this hook lives in <Feed>, so every tick re-renders the
+    // whole feed tree — at 200ms that was a 5×/s render storm for the entire
+    // capture. The progress bar is an eased, time-based curve with a CSS width
+    // transition, so a 1s cadence looks identically smooth while cutting the
+    // re-render rate 5×.
     useEffect(() => {
         if (!active) return;
-        const iv = setInterval(() => tick((n) => n + 1), 200);
+        const iv = setInterval(() => tick((n) => n + 1), 1000);
         return () => clearInterval(iv);
     }, [active]);
 
