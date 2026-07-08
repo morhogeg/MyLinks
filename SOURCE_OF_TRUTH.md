@@ -17,8 +17,9 @@
 > steps), `SHARE_EXTENSION.md`, `SHORTCUT_SETUP.md`, `docs/IOS_CICD.md` (TestFlight
 > CI secrets/setup), `web/VERCEL.md`, `extension/README.md`, `README.md` (public-facing).
 >
-> **Last full review:** 2026-07-03 — every task below was verified against the
-> actual code on `main`, not just against what old docs claimed.
+> **Last full review:** 2026-07-08 — four-pass codebase review (backend /
+> frontend / iOS+CI / doc fact-check) against `main`. Findings + the ranked,
+> owner-last action queue live in **§11**. (Previous full review: 2026-07-03.)
 
 ---
 
@@ -370,6 +371,25 @@ The multi-user auth work is **fully written but not live**:
     CI, `altool`→`-exportArchive`, filter the Xcode beta glob, lockstep the
     App/ShareExt build numbers, ShareExt background-upload pending-record
     reconciliation.
+19b. **[ ] Net-new findings from the 2026-07-08 review (full ranked queue: §11).**
+    Items NOT previously tracked anywhere above: **(correctness)** semantic search
+    decides "user has no embeddings" by sampling ONE arbitrary link doc
+    (`functions/search.py:146-155`) → silent empty results when that doc happens to
+    lack a vector; **(debt)** `EmbeddingService.generate_embedding`
+    (`search.py:23-52`) duplicates `GeminiService.embed_text`
+    (`ai_service.py:618-643`) with divergent failure semantics, and `search.py:198`
+    lazy-imports `REQUIRE_AUTH` from `main` to dodge a circular import (flag belongs
+    in a config module); **(scale)** schedulers scan every user every 2–5 min and
+    re-read whole link collections (`reminder_service.py:144-155,188-195`,
+    `digest_service.py:1080+`, `link_service.py:171-183`, keyword fallback streams
+    300 docs/Ask `main.py:689`); **(CI)** re-running a workflow run reuses
+    `run_number` → duplicate `CFBundleVersion` upload rejection
+    (`.github/workflows/ios-testflight.yml:70-72`), and App vs ShareExt
+    `CURRENT_PROJECT_VERSION` drifted 21 vs 19 (`project.pbxproj:418/442/464/490` —
+    CI overrides both, local archives would fail validation); **(privacy)** email
+    recipients logged in the clear (`digest_service.py:448,473,481`); **(docs)**
+    `docs/APP_STORE.md:177-186` still lists the already-done device-family flip as
+    pending. Everything else found by the review maps onto tasks 12–19a.
 
 ### 🟢 P3 — product roadmap (post-launch)
 
@@ -589,6 +609,19 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-08 — Full codebase review → §11 ranked action plan (docs-only).**
+  Four independent review passes (backend functions, web frontend, iOS shell + CI,
+  and a fact-check of this doc's claims) ran against `main` (~26k LOC). Headline:
+  engineering quality is well above solo-project grade and this doc checked out as
+  accurate, but everything is gated on the auth cutover (owner steps, unchanged
+  since 07-05), there are zero automated tests, the SSRF substring-routing gap and
+  phone-numbers-in-logs are still live, and the three monoliths all grew
+  (`main.py` 2769 L, `Feed.tsx` 2279 L, `SettingsModal.tsx` 1293 L). All findings
+  consolidated into new **§11**: a ranked, subject-grouped queue with file:line
+  refs where Claude-only work (Queues A/B/C) deliberately comes BEFORE the
+  owner-action block (Queue O), plus a copy-paste kickoff prompt for the next
+  session. §4 gained task 19b (net-new findings only); header review date bumped.
+  No code changed.
 - **2026-07-08 — Digest markdown fix + scalable desktop reader (`830588a`;
   TestFlight run #59 → build 1059; Vercel live).** (1) Digest card summaries
   rendered raw `**bold**` as literal asterisks — now routed through
@@ -1558,3 +1591,162 @@ exact-match, capped.
 - Repos: `morhogeg/MyLinks` (this app), `morhogeg/versus` (empty — LICENSE only).
 - Live user doc uid = owner phone number; data keyed by it forever (by design —
   `AUTH_SPEC.md` §2).
+
+## 11. Codebase review 2026-07-08 — findings & ranked action queue
+
+> Produced by a four-pass review (backend / frontend / iOS+CI / fact-check of
+> this doc) against `main`, ~26k LOC (web 17.1k TS/TSX, functions 7.4k py, iOS
+> 1.2k Swift, extension 0.4k js). **How to use:** work Queue A top-down, then B,
+> then C. **Queue O (owner) is intentionally LAST** — Claude sessions must not
+> block on it or attempt it. Tick boxes here AND keep the §4 twin in sync
+> (§4 refs are noted per item). Full narrative report lives in the 2026-07-08
+> session chat; this section is the actionable distillation.
+
+### Verdict (short)
+
+Product ~7.5–8/10 and trending up; engineering well above solo-project grade
+(share-ext memory/durability design, CI entitlement tripwires, SSRF `safe_get`,
+schema-constrained Gemini output, coherent privacy story). This doc fact-checked
+as **accurate**. The blocking pattern is operational, not technical: the auth
+cutover has been code-complete since 07-05 while polish sessions jump the queue.
+Biggest debts: no automated tests anywhere; live `firestore.rules` still
+`if true` + `REQUIRE_AUTH` off (cross-tenant IDOR incl. `get_share_config`
+returning any workspace's ingest token, `functions/main.py:1159`); SSRF gap in
+scraper branch routing; phone-number uids leaking into logs; Feed re-render
+storm; three growing monoliths. App Store: ~1–2 focused weeks out — guideline
+fundamentals (4.8 SIWA, 5.1.1(v) delete, AI consent, privacy manifests, SDK
+floor, iPhone-only, public policy pages) are all ✅; what remains is Queue O.
+
+### Queue A — ship-blocking code, safe pre-cutover (Claude-only)
+
+- [ ] **A1 · security — SSRF: hostname-routed scrapers + `safe_get` everywhere.**
+  Routing is by substring (`'facebook.com' in url`, `functions/scraper.py:93-110`)
+  so a crafted URL reaches platform branches that use plain
+  `requests.get(..., allow_redirects=True)` (`scraper.py:261,369,578,619,760`) —
+  a 302 there lands on `169.254.169.254`. Parse the hostname once, route on it,
+  use `safe_get` in every branch; pin the Twilio media fetch (`main.py:2412`) to
+  `api.twilio.com`. *(§4 19a security)*
+- [ ] **A2 · privacy — phone numbers out of logs + code.** uid IS the phone, so
+  every `... user {uid}` log line leaks it. Apply `_mask_phone` (`main.py:145`)
+  at: `link_service.py:50,65`; `main.py:1110,1140,2525,2768`;
+  `search.py:124,153`; `digest_service.py` (~12 sites incl. recipient emails at
+  `:448,473,481`); `reminder_service.py:208`; `graph_service.py:177`. Delete the
+  owner's real phone from `models.py:195`. *(§4 13 + 19a hygiene)*
+- [ ] **A3 · correctness — semantic search "no embeddings" heuristic.**
+  `search.py:146-155` samples ONE arbitrary doc; if it lacks a vector, search
+  silently returns `[]` for a user with hundreds of embedded cards. Check
+  properly (e.g. limit-1 query filtered on the field, or attempt + fallback).
+  *(§4 19b)*
+- [ ] **A4 · launch honesty — README rewrite.** Claims Graph Visualization
+  (`README.md:49,83,154`), Insights Dashboard (`:50,155`), "Works Offline"
+  (`:54`), PWA badges/positioning (`:7,52,97`), Table view (`:59`) — none exist.
+  Rewrite around the real product (recall engine, capture surface, synthesis)
+  BEFORE any Show HN/Product Hunt eyes hit the repo. *(§4 14 + 16)*
+- [ ] **A5 · correctness — stale-search guard + chat timeout.** Add a
+  request-id/latest-wins guard to semantic search results (`Feed.tsx:157-203`)
+  and `maxDuration` to `web/app/api/chat/route.ts`. *(§4 19a correctness)*
+
+### Queue B — quality before public launch (Claude-only)
+
+- [ ] **B1 · perf — Feed re-render storm.** Verified live: 200ms tick re-renders
+  the whole tree 5×/s during any capture (`web/lib/useProcessingBanner.ts:47` →
+  `Feed.tsx:172`); six-pass filter+sort chain and all facet counts recomputed
+  every render (`Feed.tsx:429-519,532-565`; only `sourceFacets` is memoized);
+  per-card 60s `setInterval`s (`Card.tsx:101-108`); `Card`/`ListCard` not
+  memoized, handlers not `useCallback`ed. Fix as one pass: throttle tick,
+  `useMemo` the chain, `React.memo` cards, one shared "now" context. *(§4 19a perf)*
+- [ ] **B2 · a11y — modal focus + Escape.** No focus trap anywhere; focus never
+  moved on open/restored on close; `LinkDetailModal.tsx` + `SettingsModal.tsx`
+  don't close on Escape; unlabeled close buttons (`ConfirmDialog.tsx:95-100`,
+  Feed tag-sheet `Feed.tsx:~1905`). FAB `aria-label`. *(§4 19a a11y)*
+- [ ] **B3 · debt — AI-layer dedup.** RAG prompt + helpers copy-pasted between
+  `answer_from_context`/`_stream` (`ai_service.py:309-360` vs `:403-453`); the
+  stream path cites ALL cards when `[[CITED:]]` is missing (`:485-487`);
+  `EmbeddingService.generate_embedding` (`search.py:23-52`) duplicates
+  `embed_text` (`ai_service.py:618-643`); move `REQUIRE_AUTH` into a config
+  module to kill the `search.py:198` circular lazy-import. *(§4 19a/19b debt)*
+- [ ] **B4 · theming — hardcoded color sweep.** ~200 hardcoded utilities
+  (`text-white` ×74, `bg-white/*` ×80+) vs the token rule; worst light-mode
+  offenders: `ConfirmDialog.tsx:88,115`, `AddLinkForm.tsx:441`, Feed skeleton
+  `Feed.tsx:971-987`. Sweep, keep only justified scrims/on-accent. *(§4 17/19a)*
+- [ ] **B5 · branding — extension rename.** `extension/manifest.json:3-12` still
+  "MyLinks — Save to Second Brain" etc. → Machina AI. *(§4 19a hygiene)*
+- [ ] **B6 · CI — regression net.** Add a PR workflow: `cd web && npx tsc
+  --noEmit` + `cd functions && python -m py_compile *.py` + run
+  `firestore-rules-test/` (emulator downloads fine on GH runners; it's only the
+  cloud sandbox that can't). Today `ios-testflight.yml` is the ONLY workflow.
+  *(§4 18 + 19a)*
+- [ ] **B7 · tests — first pytest/vitest seeds.** Zero tests exist (web has no
+  runner at all; `functions/test_yt_scrape.py` is a debug script). Highest-value
+  pure targets: `embedding_needs_repair` (`ai_service.py:13-40`), `_md_to_html`
+  (`main.py:1566-1655`), reminder parsing, digest `is_due`, SSE `[[CITED:]]`
+  buffering (`ai_service.py:455-531`); web: `lib/source.ts`, `lib/tags.ts`,
+  `lib/related.ts`, the Feed filter chain (extract → test). *(§4 18)*
+- [ ] **B8 · iOS CI robustness.** Build number: include `run_attempt` (or fail
+  fast on re-runs) — re-runs currently mint duplicate `CFBundleVersion`
+  (`ios-testflight.yml:70-72`); migrate `altool` (`:334`, deprecated) to
+  `-exportArchive`-upload; lockstep `CURRENT_PROJECT_VERSION` 21 vs 19
+  (`web/ios/App/App.xcodeproj/project.pbxproj:418/442/464/490`); fix stale
+  `docs/APP_STORE.md:177-186` (device-family flip already done). *(§4 19a/19b)*
+- [ ] **B9 · security — ingest token → Keychain.** App Group UserDefaults today
+  (`ShareConfigPlugin.swift:37-38`, read `ShareViewController.swift:913-914`);
+  move to a Keychain access group + server-side rotation. *(§4 12)*
+
+### Queue C — structural / post-launch (Claude-only)
+
+- [ ] **C1 · debt — decompose the monoliths** (they GREW since last measured):
+  `functions/main.py` **2,769 L** (share pages `:1529-1997` → `share_service.py`;
+  WhatsApp router `:2071-2278`; pipeline `:2314-2572`; schedulers `:2579-2769`),
+  `web/components/Feed.tsx` **2,279 L** (~40 `useState` in one component —
+  extract filter pipeline, facets, collections handlers, modal zoo
+  `:2166-2264`), `SettingsModal.tsx` **1,293 L**. Do BEFORE more parallel
+  sessions collide in them. *(§4 19a debt)*
+- [ ] **C2 · scale — O(users×links) schedulers** (fine single-user, wrong shape
+  for launch): see §4 19b list. Move to due-time queries/collection-group
+  indexes when user count > ~50.
+- [ ] **C3 · product decisions to close deliberately:** offline claims (§4 16),
+  light theme (§4 17 — B4 is the code half), `InstallPWA.tsx` retirement (§4 15).
+- [ ] **C4 · iOS niceties:** `handleEventsForBackgroundURLSession` no-op means
+  post-death upload confirmations are dropped (UI copy already honest); temp
+  JSON bodies never deleted (`ShareViewController.swift:946-949`); ShareExt
+  pending-record reconciliation (§4 19a).
+
+### Queue O — needs the owner (DO LAST; Claude sessions skip these)
+
+- [ ] **O1 · THE CUTOVER (§4 task 2 — everything gates on this).** Console/env
+  steps in order: Apple Services ID + `.p8` in Firebase Apple provider →
+  `OWNER_EMAIL` + `ADMIN_TOKEN` + `APPCHECK_ENFORCE=true` in `functions/.env` →
+  flip `REQUIRE_AUTH` + `NEXT_PUBLIC_REQUIRE_AUTH`, redeploy functions + web →
+  `cd firestore-rules-test && npm test` → `cp firestore.rules.locked
+  firestore.rules && firebase deploy --only firestore:rules` → device-verify the
+  brand-new-user claim path. Checklist: `NATIVE_AUTH_SETUP.md` §6.
+- [ ] **O2 · key rotation (§4 task 5):** Gemini key (pasted in chat 06-23) and
+  the ASC API `.p8` (pasted during CI setup). 30 min, do with O1.
+- [ ] **O3 · pending owner-machine deploys (§4 task 4):** `./deploy-functions.sh`
+  (weekly synthesis dark), `firebase deploy --only firestore:rules` (syntheses
+  read rule), Settings→Connections→Rebuild tap, `/api/analyze` 60s-cap decision.
+- [ ] **O4 · App Store Connect pass (§4 tasks 8/9):** create + seed the demo
+  account post-cutover and replace `REVIEWER_EMAIL_TBD`/`PASSWORD_TBD`
+  (`docs/APP_STORE.md:117-122`); click in nutrition label + metadata
+  (`docs/APP_STORE.md` §1–§2); take the 6 screenshots (§4 shot list); pick a
+  governing-law jurisdiction for `/terms` §10 (Claude can write it once told).
+- [ ] **O5 · on-device sweep (§4 task 11)** — physical iPhone: share-ext offline
+  neutral state, sign-in both providers, account deletion end-to-end, keyboard/
+  haptics/PTR pass. Plus pending verifies: build 1055 "Open Machina"
+  notification flow; digest two-pane desktop layout at scale.
+- [ ] **O6 · GCP budget alerts (§4 task 19)** — 10 minutes, free insurance; plus
+  the SendGrid-or-cut-email decision.
+
+### Next-session kickoff prompt (copy-paste)
+
+```
+Read SOURCE_OF_TRUTH.md §11 (codebase review 2026-07-08). Work the queues in
+order — A1→A5, then B1→B9, then C — skipping every Queue-O item (owner-only).
+For each item: implement it, verify (cd web && npx tsc --noEmit; cd functions
+&& python -m py_compile *.py; run any tests you've added), commit per item,
+tick its box in §11 and any §4 twin. Constraints: do NOT flip
+REQUIRE_AUTH/NEXT_PUBLIC_REQUIRE_AUTH, do NOT deploy firestore.rules, do NOT
+attempt Queue O. Backend changes can't be deployed from the cloud sandbox —
+commit them and list them in the §9 entry as "pending owner deploy". When a
+coherent batch is done, ship via /ship, and finish with a §9 session-log entry.
+```
