@@ -7,7 +7,7 @@ import { useState, useEffect, useRef, useMemo, cloneElement, type ReactElement }
 import { Link, LinkStatus, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, platformColor, prettyHost, type PlatformKey } from '@/lib/platform';
-import { getSourceInfo, buildSourceFacets } from '@/lib/source';
+import { getSourceInfo, buildSourceFacets, sourceMatchesQuery } from '@/lib/source';
 import SourceFacetList from './SourceFacetList';
 import Dropdown from './Dropdown';
 import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus, retryFailedLink, toLink } from '@/lib/storage';
@@ -408,6 +408,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         enabled: (viewMode === 'grid' || viewMode === 'list') && !anyOverlayOpen,
     });
 
+    // Lock the page behind any open overlay/sheet so scrolling inside a menu (the
+    // Filters sheet, a confirm dialog, etc.) never scrolls the feed behind it.
+    useEffect(() => {
+        if (!anyOverlayOpen) return;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = prev; };
+    }, [anyOverlayOpen]);
+
     // Pending captures (M3) — processing/failed cards. They're excluded from the
     // normal filtered feed and from every facet derivation below (so a still-empty
     // card never spawns a phantom "Processing" category/tag), then surfaced
@@ -472,7 +481,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 link.summary.toLowerCase().includes(query) ||
                 link.tags.some((tag) => tag.toLowerCase().includes(query)) ||
                 link.category.toLowerCase().includes(query) ||
-                getSourceInfo(link).label.toLowerCase().includes(query) ||
+                // Source label + platform aliases, so "twitter"/"x" finds every X
+                // card (labelled by @handle), not just hosts containing the letter.
+                sourceMatchesQuery(getSourceInfo(link), query) ||
                 prettyHost(link.url).toLowerCase().includes(query)
             );
         })
@@ -595,7 +606,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // Search "Sources" suggestions — the sources whose label matches the live
     // query, so a search splits into a Sources row (tap to filter) + the Cards grid.
     const matchingSources = debouncedQuery.trim()
-        ? sourceFacets.filter(s => s.label.toLowerCase().includes(debouncedQuery.trim().toLowerCase())).slice(0, 8)
+        ? sourceFacets.filter(s => sourceMatchesQuery(s, debouncedQuery)).slice(0, 8)
         : [];
 
     const reminderCount = contentLinks.filter(l => l.reminderStatus === 'pending').length;
@@ -882,6 +893,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         { value: 'unread', label: 'Unread', icon: <Inbox className="w-4 h-4 text-accent" /> },
         { value: 'read', label: 'Read', icon: <CheckCircle2 className="w-4 h-4 text-green-500" /> },
         { value: 'favorite', label: 'Favorites', icon: <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" /> },
+        // Reminders lives here as a Show option (was a separate toolbar button).
+        { value: 'reminders', label: reminderCount > 0 ? `Reminders (${reminderCount})` : 'Reminders', icon: <Bell className="w-4 h-4 text-blue-500" /> },
         { value: 'archived', label: 'Archived', icon: <Archive className="w-4 h-4 text-text-secondary" /> },
     ];
     const statusTriggerIcon = (statusOptions.find(o => o.value === filter) ?? statusOptions[0]).icon;
@@ -1302,10 +1315,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         Filters sheet. Hidden entirely in Ask mode (no grid to filter). */}
                     <div className="hidden sm:flex items-center gap-2">
                         {isLibraryView && (<>
-                        {/* Status Filter — accent-themed dropdown (no native OS blue) */}
+                        {/* Status Filter — accent-themed dropdown (Reminders is a Show
+                            option now, not a separate button). */}
                         <Dropdown
                             ariaLabel="Filter by status"
-                            value={filter === 'reminders' ? 'all' : filter}
+                            value={filter}
                             onChange={(v) => setFilter(v as FilterType)}
                             leadingIcon={statusTriggerIcon}
                             options={statusOptions}
@@ -1319,26 +1333,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             leadingIcon={<ArrowUpDown className="w-4 h-4 text-text-secondary" />}
                             options={sortOptions}
                         />
-
-                        {/* Reminders Toggle */}
-                        <button
-                            onClick={() => setFilter(filter === 'reminders' ? 'all' : 'reminders')}
-                            aria-pressed={filter === 'reminders'}
-                            title="Show items with reminders"
-                            className={`${ctrlBase} px-3.5 ${filter === 'reminders'
-                                ? 'bg-blue-500 text-white border border-blue-500 shadow-sm'
-                                : ctrlIdle + ' hover:text-blue-500 hover:border-blue-500/40'
-                                }`}
-                        >
-                            <Bell className={`w-4 h-4 ${filter === 'reminders' ? 'fill-current' : ''}`} />
-                            <span className="hidden sm:inline">Reminders</span>
-                            {reminderCount > 0 && (
-                                <span className={`flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${filter === 'reminders' ? 'bg-white/25 text-white' : 'bg-blue-500/15 text-blue-500'
-                                    }`}>
-                                    {reminderCount}
-                                </span>
-                            )}
-                        </button>
 
                         {/* Sources — the single grouped source filter (platform → account),
                             opened as one popover. Replaces the old row of redundant
@@ -1729,7 +1723,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                         <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">Show</label>
                                         <Dropdown
                                             ariaLabel="Filter by status"
-                                            value={filter === 'reminders' ? 'all' : filter}
+                                            value={filter}
                                             onChange={(v) => setFilter(v as FilterType)}
                                             leadingIcon={statusTriggerIcon}
                                             options={statusOptions}
@@ -1746,19 +1740,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                         />
                                     </div>
                                 </div>
-
-                                {/* Reminders */}
-                                <button
-                                    onClick={() => setFilter(filter === 'reminders' ? 'all' : 'reminders')}
-                                    aria-pressed={filter === 'reminders'}
-                                    className={`${ctrlBase} w-full justify-start px-3.5 ${filter === 'reminders'
-                                        ? 'bg-blue-500 text-white border border-blue-500 shadow-sm'
-                                        : ctrlIdle
-                                        }`}
-                                >
-                                    <Bell className={`w-4 h-4 ${filter === 'reminders' ? 'fill-current' : ''}`} />
-                                    <span>Reminders{reminderCount > 0 ? ` (${reminderCount})` : ''}</span>
-                                </button>
 
                                 {/* Sources — the grouped source list (platform → account).
                                     Replaces the old redundant row of platform icons; the

@@ -132,7 +132,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
 
     const [settings, setSettings] = useState<User['settings']>(DEFAULT_SETTINGS);
     const [isLoading, setIsLoading] = useState(true);
-    const [isSaving, setIsSaving] = useState(false);
     // True when the last settings load failed. We then show DEFAULT_SETTINGS but
     // must NOT let the user Save them over their real config — so Save is disabled
     // and an inline notice offers a retry until a load succeeds.
@@ -156,18 +155,44 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     // Theme is excluded — it applies live via ThemeProvider, not this form's Save.
     const [settingsBaseline, setSettingsBaseline] = useState('');
     const [emailBaseline, setEmailBaseline] = useState('');
-    const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
-    const isDirty = () => {
-        if (isLoading || !settingsBaseline) return false;
-        return JSON.stringify(settings) !== settingsBaseline || email.trim() !== emailBaseline;
+    // Auto-save: there's no explicit Save button. Preferences persist when the
+    // user leaves a sub-screen (Back / Done) or closes the sheet — but only when
+    // something actually changed vs the loaded baseline, and never over a failed
+    // load (which would clobber the real config with defaults).
+    const savePreferences = async () => {
+        if (loadError || isLoading || !settingsBaseline) return;
+        const unchanged = JSON.stringify(settings) === settingsBaseline && email.trim() === emailBaseline;
+        if (unchanged) return;
+        try {
+            await updateUserSettings(uid, {
+                reminders_enabled: settings.reminders_enabled,
+                reminder_frequency: settings.reminder_frequency,
+                push_enabled: settings.push_enabled,
+                reminders_channel: settings.reminders_channel,
+                digest_enabled: settings.digest_enabled,
+                digest_frequency: settings.digest_frequency,
+                digest_channels: settings.digest_channels,
+                digest_mode: settings.digest_mode,
+                digest_topics: settings.digest_topics,
+                digest_count: settings.digest_count,
+                digest_hour: settings.digest_hour,
+                digest_minute: settings.digest_minute,
+                digest_day: settings.digest_day,
+                digest_skip_empty: settings.digest_skip_empty,
+            });
+            if (email.trim()) await updateUserEmail(uid, email.trim());
+            // Advance the baseline so a subsequent leave doesn't re-write unchanged settings.
+            setSettingsBaseline(JSON.stringify(settings));
+            setEmailBaseline(email.trim());
+        } catch (error) {
+            console.error('Failed to save settings:', error);
+            toast.error("Couldn't save your settings. Please try again.");
+        }
     };
-
-    // Guarded close: prompt before throwing away unsaved edits; close freely if clean.
-    const handleClose = () => {
-        if (isDirty()) setShowDiscardConfirm(true);
-        else onClose();
-    };
+    // Optimistic: pop/close immediately, persist in the background.
+    const closeSettings = () => { void savePreferences(); onClose(); };
+    const leaveSubscreen = () => { void savePreferences(); back(); };
 
     // Account deletion (App Store guideline 5.1.1(v)): confirm, then hard-delete
     // the user's workspace + Auth account via the delete_account function.
@@ -241,8 +266,8 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
 
     // Swipe in from the left edge to leave: pop one screen, or close from the root.
     useEdgeSwipeBack(() => {
-        if (stack.length > 1) back();
-        else handleClose();
+        if (stack.length > 1) leaveSubscreen();
+        else closeSettings();
     }, isMobile && isOpen);
 
     useEffect(() => {
@@ -338,43 +363,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
             setLoadError(true);
         } finally {
             setIsLoading(false);
-        }
-    };
-
-    const handleSave = async () => {
-        // Never overwrite real config with defaults after a failed load.
-        if (loadError) {
-            toast.error("Can't save — settings didn't load. Reload and try again.");
-            return;
-        }
-        setIsSaving(true);
-        try {
-            await updateUserSettings(uid, {
-                reminders_enabled: settings.reminders_enabled,
-                reminder_frequency: settings.reminder_frequency,
-                push_enabled: settings.push_enabled,
-                reminders_channel: settings.reminders_channel,
-                digest_enabled: settings.digest_enabled,
-                digest_frequency: settings.digest_frequency,
-                digest_channels: settings.digest_channels,
-                digest_mode: settings.digest_mode,
-                digest_topics: settings.digest_topics,
-                digest_count: settings.digest_count,
-                digest_hour: settings.digest_hour,
-                digest_minute: settings.digest_minute,
-                digest_day: settings.digest_day,
-                digest_skip_empty: settings.digest_skip_empty,
-            });
-            if (email.trim()) {
-                await updateUserEmail(uid, email.trim());
-            }
-            onClose();
-        } catch (error) {
-            // Keep the modal open so the user's edits aren't lost, and tell them.
-            console.error('Failed to save settings:', error);
-            toast.error("Couldn't save your settings. Please try again.");
-        } finally {
-            setIsSaving(false);
         }
     };
 
@@ -482,7 +470,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                 >
                     {showBack ? (
                         <button
-                            onClick={back}
+                            onClick={leaveSubscreen}
                             className="inline-flex items-center gap-0.5 -ml-1.5 pr-2 py-1 rounded-2xl text-[16px] font-medium text-accent hover:opacity-80 transition-opacity cursor-pointer"
                             aria-label="Back"
                         >
@@ -496,7 +484,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                     {/* Close lives only on the root screen; sub-screens use Back / Done. */}
                     {!showBack && (
                         <button
-                            onClick={handleClose}
+                            onClick={closeSettings}
                             className="h-8 w-8 flex items-center justify-center text-text-muted hover:text-text transition-colors cursor-pointer"
                             aria-label="Close settings"
                         >
@@ -603,50 +591,35 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                     </div>
                 </div>
 
-                {/* Footer */}
-                <div
-                    className="px-6 py-4 border-t border-border-subtle bg-background"
-                    style={isMobile ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' } : undefined}
-                >
-                    <div className="w-full max-w-2xl mx-auto flex items-center justify-end gap-2">
-                        {showBack ? (
-                            // On a sub-screen the change is already applied to the form
-                            // in memory; Done just returns to the parent screen (as does
-                            // the Back button). It's persisted by Save on the root screen.
-                            <button
-                                onClick={back}
-                                className="h-10 px-6 rounded-full text-sm font-semibold bg-accent text-white hover:bg-accent/90 transition-colors shadow-lg shadow-accent/20 cursor-pointer"
-                            >
-                                Done
-                            </button>
-                        ) : (
-                            <>
-                                {loadError && (
-                                    <button
-                                        onClick={() => loadSettings()}
-                                        className="mr-auto inline-flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 transition-colors cursor-pointer"
-                                    >
-                                        <RefreshCw className="w-4 h-4" />
-                                        Couldn&apos;t load settings — retry
-                                    </button>
-                                )}
+                {/* Footer — auto-save model: no Save/Cancel. Sub-screens show Done
+                    (persist + return); the root screen has no footer unless a load
+                    failed, in which case it offers a retry. */}
+                {(showBack || loadError) && (
+                    <div
+                        className="px-6 py-4 border-t border-border-subtle bg-background"
+                        style={isMobile ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' } : undefined}
+                    >
+                        <div className="w-full max-w-2xl mx-auto flex items-center justify-end gap-2">
+                            {loadError && (
                                 <button
-                                    onClick={handleClose}
-                                    className="h-10 px-4 rounded-full text-sm font-semibold text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
+                                    onClick={() => loadSettings()}
+                                    className="mr-auto inline-flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 transition-colors cursor-pointer"
                                 >
-                                    Cancel
+                                    <RefreshCw className="w-4 h-4" />
+                                    Couldn&apos;t load settings — retry
                                 </button>
+                            )}
+                            {showBack && (
                                 <button
-                                    onClick={handleSave}
-                                    disabled={isSaving || isLoading || loadError}
-                                    className="h-10 px-5 rounded-full text-sm font-semibold bg-accent text-white hover:bg-accent/90 transition-colors disabled:opacity-50 shadow-lg shadow-accent/20 cursor-pointer disabled:cursor-not-allowed"
+                                    onClick={leaveSubscreen}
+                                    className="h-10 px-6 rounded-full text-sm font-semibold bg-accent text-white hover:bg-accent/90 transition-colors shadow-lg shadow-accent/20 cursor-pointer"
                                 >
-                                    {isSaving ? 'Saving…' : 'Save changes'}
+                                    Done
                                 </button>
-                            </>
-                        )}
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             <ConfirmDialog
@@ -657,19 +630,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                 message="This permanently deletes your account and all saved links, collections, and chats. This action cannot be undone."
                 confirmLabel={deleting ? 'Deleting…' : 'Delete account'}
                 cancelLabel="Cancel"
-                variant="danger"
-            />
-
-            {/* Guard unsaved edits — closing while dirty prompts instead of
-                silently discarding the user's work (M7). */}
-            <ConfirmDialog
-                isOpen={showDiscardConfirm}
-                onClose={() => setShowDiscardConfirm(false)}
-                onConfirm={() => { setShowDiscardConfirm(false); onClose(); }}
-                title="Discard changes?"
-                message="You've made changes that haven't been saved. Close settings and discard them?"
-                confirmLabel="Discard"
-                cancelLabel="Keep editing"
                 variant="danger"
             />
         </div>
