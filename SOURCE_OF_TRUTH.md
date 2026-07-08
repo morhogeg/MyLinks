@@ -589,6 +589,25 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-08 — 7-fix batch: settings footer, YouTube cards, date bug, source
+  chips/layout (`c27f9f8`; TestFlight run #60 → build 1060; Vercel live).**
+  Investigated via 3 parallel Explore agents, then fixed. (1) `SettingsModal`
+  Done footer: tighter (`px-[18px] py-2.5`, smaller safe-area pad), aligned to the
+  content column. (2) `LinkDetailModal`: **removed the Speakers section** on video
+  cards. (3) The inline YouTube embed trips **YouTube error 153** in the WebView —
+  replaced it with the **thumbnail** (`metadata.thumbnailUrl`, `i.ytimg` fallback)
+  that opens the video externally; **Key moments kept**, now deep-link to the
+  timestamp on YouTube (`watch?v=…&t=Ns`) via `openExternal` (dropped the iframe
+  seek). (4) Strip the AI's **"Who It's For"** section from video summaries
+  (`stripMarkdownSection`, frontend-only — note `functions/ai_service.py:145` still
+  generates that heading; optional backend cleanup later). (5) **"19,000 days ago"
+  bug**: some ingest paths (Facebook, screenshots) store Unix **seconds** not ms —
+  `getTimeAgo` (Card.tsx + LinkDetailModal.tsx) now scales sub-`1e12` values ×1000
+  and guards `<=0`. (6) Selected **sources now show removable chips** above the
+  grid (Feed.tsx, matches tag/collection chips). (7) `SourceFacetList` group row
+  de-cluttered — accent-tinted `n/total` count for partial + a single accent check
+  when fully on (dropped the bordered circle/dot); expand chevron is now a distinct
+  square button. Frontend-only; tsc + build clean.
 - **2026-07-08 — Digest markdown fix + scalable desktop reader (`830588a`;
   TestFlight run #59 → build 1059; Vercel live).** (1) Digest card summaries
   rendered raw `**bold**` as literal asterisks — now routed through
