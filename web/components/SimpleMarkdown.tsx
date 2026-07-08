@@ -7,13 +7,16 @@ interface SimpleMarkdownProps {
     className?: string;
     isCompact?: boolean;
     isRtl?: boolean;
+    /** Render as a single inline run (bold only, newlines/bullets flattened) — for
+        one/two-line previews where block <p>/<ul> would break line-clamp. */
+    inline?: boolean;
 }
 
 /**
  * Simple markdown renderer for AI summaries
  * Handles: ## headings, - bullet points, **bold**
  */
-export default function SimpleMarkdown({ content, className = '', isCompact = false, isRtl = false }: SimpleMarkdownProps) {
+export default function SimpleMarkdown({ content, className = '', isCompact = false, isRtl = false, inline = false }: SimpleMarkdownProps) {
     if (!content) return null;
 
     const lines = content.split('\n');
@@ -59,6 +62,17 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
         if (parts.length === 1 && typeof parts[0] === 'string') return parts[0];
         return <>{parts}</>;
     };
+
+    // Inline preview: flatten to one run (drop heading/bullet markers, collapse
+    // newlines) and render **bold** so line-clamp still works on the wrapper.
+    if (inline) {
+        const flat = content
+            .replace(/\s*\n+\s*/g, ' ')
+            .replace(/#{1,6}\s+/g, '')
+            .replace(/(^|\s)[-*]\s+/g, '$1')
+            .trim();
+        return <span className={className} dir="auto">{formatInlineStyles(flat)}</span>;
+    }
 
     for (const line of lines) {
         const trimmed = line.trim();

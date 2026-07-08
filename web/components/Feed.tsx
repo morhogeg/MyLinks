@@ -9,6 +9,7 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, platformColor, prettyHost, type PlatformKey } from '@/lib/platform';
 import { getSourceInfo, buildSourceFacets, sourceMatchesQuery } from '@/lib/source';
 import SourceFacetList from './SourceFacetList';
+import DigestView from './DigestView';
 import Dropdown from './Dropdown';
 import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus, retryFailedLink, toLink } from '@/lib/storage';
 import { collection, query, orderBy, onSnapshot, getDocsFromServer, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
@@ -944,45 +945,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // top, then every curated digest, newest first. Built once and rendered in
     // both layouts (desktop inline / mobile full-screen overlay).
     const digestContent = (
-        <div className="max-w-3xl mx-auto flex flex-col gap-3">
-            {latestSynthesis && latestSynthesis.weekId !== dismissedSynthesisWeek && (
-                <SynthesisCard
-                    synthesis={latestSynthesis}
-                    onOpenCard={(id) => setActiveLinkId(id)}
-                    onDismiss={dismissSynthesis}
-                />
-            )}
-            {digests.map((digest, i) => (
-                <DigestCard
-                    key={digest.id}
-                    digest={digest}
-                    defaultExpanded={i === 0}
-                    onOpenCard={openDigestCard}
-                />
-            ))}
-            {digests.length === 0 && (!latestSynthesis || latestSynthesis.weekId === dismissedSynthesisWeek) && (
-                <div className="text-center py-16 animate-fade-in">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-accent/20">
-                        <Newspaper className="w-8 h-8 text-white" />
-                    </div>
-                    <h3 className="text-lg font-medium text-text mb-2">No digests yet</h3>
-                    <p className="text-text-secondary text-sm">
-                        Your hand-picked batches will collect here once the curated
-                        digest is on.{onOpenDigestSettings && (
-                            <>
-                                {' '}
-                                <button
-                                    onClick={onOpenDigestSettings}
-                                    className="text-accent font-medium hover:underline cursor-pointer"
-                                >
-                                    Set up your digest
-                                </button>
-                            </>
-                        )}
-                    </p>
-                </div>
-            )}
-        </div>
+        <DigestView
+            digests={digests}
+            synthesis={latestSynthesis && latestSynthesis.weekId !== dismissedSynthesisWeek ? latestSynthesis : null}
+            onOpenCard={openDigestCard}
+            onOpenSynthesisCard={(id) => setActiveLinkId(id)}
+            onDismissSynthesis={dismissSynthesis}
+            onOpenDigestSettings={onOpenDigestSettings}
+        />
     );
 
     // Tell the page when we're in Ask mode (drives the full-height chat layout).
