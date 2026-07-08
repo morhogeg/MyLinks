@@ -85,10 +85,15 @@ export function useSharedCaptureBanner(processingActive: boolean): AnalyzingStat
         if (processingActive && signal) setSignal(null);
     }, [processingActive, signal]);
 
-    // Advance the ramp while active.
+    // Advance the ramp while active. 1Hz (not 200ms): the ramp % is derived from
+    // real timestamps, so sampling once a second changes nothing about the curve,
+    // but it keeps the whole tree (this hook is mounted above Feed) from
+    // re-rendering 5×/s during the up-to-28s hand-off window — the other half of
+    // the B1 render-storm fix. The banner bar interpolates the 1s steps smoothly
+    // via its duration-1000 linear width transition.
     useEffect(() => {
         if (!signal) return;
-        const iv = setInterval(() => tick((n) => n + 1), 200);
+        const iv = setInterval(() => tick((n) => n + 1), 1000);
         return () => clearInterval(iv);
     }, [signal]);
 
