@@ -36,7 +36,7 @@ import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, Ar
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
-import { subscribeDigests } from '@/lib/digest';
+import { subscribeDigests, deleteDigest } from '@/lib/digest';
 import DigestCard from './DigestCard';
 import { PUSH_INTENT_EVENT, PUSH_FOREGROUND_EVENT, consumePendingPushIntent, readLocalPushPrompt, type PushIntent } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
@@ -580,6 +580,34 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         return m;
     }, [sourceFacets]);
 
+    // Chips for the active source filter. A fully-selected platform collapses to a
+    // single platform chip (e.g. one "Facebook" chip, not one per page/account);
+    // everything else stays an individual source chip.
+    const sourceChips = useMemo(() => {
+        if (selectedSources.size === 0) return [] as { id: string; label: string; keys: string[] }[];
+        const keysByPlatform = new Map<PlatformKey, string[]>();
+        sourceFacets.forEach(s => {
+            if (s.platform) {
+                const arr = keysByPlatform.get(s.platform) ?? [];
+                arr.push(s.key);
+                keysByPlatform.set(s.platform, arr);
+            }
+        });
+        const chips: { id: string; label: string; keys: string[] }[] = [];
+        const covered = new Set<string>();
+        keysByPlatform.forEach((keys, platform) => {
+            if (keys.length > 1 && keys.every(k => selectedSources.has(k))) {
+                chips.push({ id: `platform:${platform}`, label: PLATFORM_LABELS[platform], keys });
+                keys.forEach(k => covered.add(k));
+            }
+        });
+        selectedSources.forEach(k => {
+            if (covered.has(k)) return;
+            chips.push({ id: k, label: sourceLabelByKey.get(k) ?? k, keys: [k] });
+        });
+        return chips;
+    }, [selectedSources, sourceFacets, sourceLabelByKey]);
+
     const handleToggleSource = (key: string) => {
         const next = new Set(selectedSources);
         if (next.has(key)) next.delete(key);
@@ -952,6 +980,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             onOpenSynthesisCard={(id) => setActiveLinkId(id)}
             onDismissSynthesis={dismissSynthesis}
             onOpenDigestSettings={onOpenDigestSettings}
+            onDeleteDigest={uid ? (id) => { void deleteDigest(uid, id); } : undefined}
         />
     );
 
@@ -1583,27 +1612,24 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         <Globe className="w-3 h-3 text-accent" />
                         <span className="text-[10px] font-bold text-accent uppercase tracking-wider">Sources:</span>
                     </div>
-                    {Array.from(selectedSources).map(key => {
-                        const label = sourceLabelByKey.get(key) ?? key;
-                        return (
-                            <div
-                                key={key}
-                                className="group flex items-center gap-1 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm"
+                    {sourceChips.map(chip => (
+                        <div
+                            key={chip.id}
+                            className="group flex items-center gap-1 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm"
+                        >
+                            <span>{chip.label}</span>
+                            <button
+                                type="button"
+                                onClick={() => handleToggleSourceKeys(chip.keys)}
+                                aria-label={`Remove ${chip.label} filter`}
+                                title="Remove filter"
+                                className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
                             >
-                                <span>{label}</span>
-                                <button
-                                    type="button"
-                                    onClick={() => handleToggleSource(key)}
-                                    aria-label={`Remove ${label} filter`}
-                                    title="Remove filter"
-                                    className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
-                                >
-                                    <X className="w-3.5 h-3.5" />
-                                </button>
-                            </div>
-                        );
-                    })}
-                    {selectedSources.size > 1 && (
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    ))}
+                    {sourceChips.length > 1 && (
                         <button
                             onClick={() => setSelectedSources(new Set())}
                             className="text-[10px] font-bold text-text-muted/60 hover:text-accent hover:underline px-2 transition-colors uppercase tracking-tight"

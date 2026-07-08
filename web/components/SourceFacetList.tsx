@@ -77,12 +77,28 @@ export default function SourceFacetList({ facets, selected, onToggleKey, onToggl
     return (
         <div className="flex flex-col">
             {groups.map((g) => {
-                // A one-facet group is just that source — render it as a leaf.
+                // A one-facet group is just that source — render it as a leaf, but
+                // keep the same structure + a chevron-width spacer so it lines up with
+                // the expandable rows instead of floating wider.
                 if (g.facets.length === 1) {
                     const f = g.facets[0];
                     const active = selected.has(f.key);
                     return (
-                        <SourceRow key={g.id} icon={facetIcon(f)} label={f.label} count={f.count} active={active} onClick={() => onToggleKey(f.key)} />
+                        <div key={g.id} className="flex items-center gap-1">
+                            <button
+                                onClick={() => onToggleKey(f.key)}
+                                aria-pressed={active}
+                                className={`flex-1 min-w-0 flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-[13px] text-start transition-colors cursor-pointer ${active ? 'bg-accent/10 text-text' : 'text-text-secondary hover:bg-card-hover hover:text-text'}`}
+                            >
+                                <span className="shrink-0">{facetIcon(f)}</span>
+                                <span className="flex-1 min-w-0 truncate font-medium">{f.label}</span>
+                                <span className={`shrink-0 text-[12px] tabular-nums ${active ? 'text-accent font-semibold' : 'text-text-muted'}`}>{f.count}</span>
+                                {active
+                                    ? <Check className="w-[18px] h-[18px] shrink-0 text-accent" strokeWidth={2.6} />
+                                    : <span className="w-[18px] h-[18px] shrink-0" />}
+                            </button>
+                            <span className="shrink-0 w-8" aria-hidden />
+                        </div>
                     );
                 }
                 const keys = g.facets.map((f) => f.key);

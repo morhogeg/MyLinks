@@ -392,14 +392,10 @@ export default function LinkDetailModal({
                             <button
                                 onClick={() => openExternal(youtubeWatchUrl(videoId))}
                                 aria-label="Watch on YouTube"
-                                className="group relative block w-full aspect-video rounded-2xl overflow-hidden border border-white/10 bg-black cursor-pointer"
+                                className="group relative block w-full h-36 sm:h-44 rounded-2xl overflow-hidden border border-white/10 bg-black cursor-pointer"
                             >
                                 <img src={thumb} alt="" className="w-full h-full object-cover" />
-                                <span className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/15 transition-colors">
-                                    <span className="w-14 h-14 rounded-2xl bg-red-600 flex items-center justify-center shadow-lg">
-                                        <Play className="w-7 h-7 text-white fill-white ms-0.5" />
-                                    </span>
-                                </span>
+                                <span className="absolute inset-0 bg-black/[0.04] group-hover:bg-transparent transition-colors" />
                                 <span className="absolute bottom-2 end-2 inline-flex items-center gap-1 text-[11px] font-semibold text-white bg-black/60 px-2 py-0.5 rounded-full">
                                     <Youtube className="w-3.5 h-3.5" /> Watch on YouTube
                                 </span>
@@ -580,7 +576,7 @@ export default function LinkDetailModal({
                                             <SimpleMarkdown
                                                 content={link.summary}
                                                 isRtl={isRtl}
-                                                className={`text-lg ${detailBody ? 'mb-6' : ''}`}
+                                                className={`text-base ${detailBody ? 'mb-6' : ''}`}
                                             />
                                         )}
                                         {detailBody && (
