@@ -187,6 +187,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             return;
         }
 
+        // Latest-wins guard: searches are async and a slower earlier request can
+        // resolve *after* a newer one, overwriting fresh results with stale ones
+        // (type "ai" → the "a" request lands last and shows the wrong results).
+        // Each effect run owns this flag; the cleanup below trips it when
+        // debouncedQuery changes or the component unmounts, so any in-flight
+        // response from a superseded query is dropped instead of applied.
+        let cancelled = false;
+
         const performSearch = async () => {
             setIsSearching(true);
             setSearchError(null);
@@ -197,9 +205,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     limit: 20
                     // We can pass uid here if needed for dev, but auth context should handle it
                 });
+                if (cancelled) return;
                 const data = result.data as { links: Link[] };
                 setSearchResults(data.links || []);
             } catch (err: any) {
+                if (cancelled) return;
                 console.error("Search failed:", err);
                 // Extract error message from the Firebase callable error
                 let errorMessage = 'Search failed. Please try again.';
@@ -220,11 +230,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 // Fall back to local filtering only - semantic search errors shouldn't break the app
                 setSearchResults([]);
             } finally {
-                setIsSearching(false);
+                if (!cancelled) setIsSearching(false);
             }
         };
 
         performSearch();
+        return () => { cancelled = true; };
     }, [debouncedQuery]);
 
     // Load collapsed state from localStorage

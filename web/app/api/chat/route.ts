@@ -10,6 +10,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+// This route proxies a streaming RAG response, which can run well past the
+// platform's short default function timeout (10–15s) — a long answer would be
+// cut off mid-stream. Give it headroom. Vercel reads `maxDuration` (seconds)
+// from the route module; `force-dynamic` keeps it off any static optimization.
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
+
 const CHAT_BACKEND_URL =
     process.env.CHAT_BACKEND_URL ||
     'https://us-central1-secondbrain-app-94da2.cloudfunctions.net/ask_brain';
