@@ -589,6 +589,23 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-08 — 6-fix batch: source filter polish, digest facelift+delete,
+  YouTube thumb, scroll-to-top, card fonts (`e66c0f4`; TestFlight run #61 → build
+  1061; Vercel live).** (1) `SourceFacetList`: single-source leaf rows now share
+  the expandable rows' structure + a chevron-width spacer so they align instead of
+  floating wider. (2) **Digest facelift + per-digest actions**: `DigestCard` shows
+  topics as chips (eyebrow is now `date · mode`, not a long comma string); when
+  open, a footer offers **"Digest settings"** (→ Settings digest screen) and a
+  two-tap **Delete** — new `deleteDigest(uid,id)` in `lib/digest.ts` (`deleteDoc`
+  on `users/{uid}/digests/{id}`; onSnapshot drops it live; backend still auto-
+  prunes to 30). Threaded Feed→DigestView→DigestCard. (3) Source filter chips: a
+  fully-selected platform collapses to ONE chip (e.g. "Facebook") via a
+  `sourceChips` memo in Feed, instead of one chip per account. (4) YouTube cards:
+  removed the play-button overlay, shortened the thumbnail (`h-36 sm:h-44`).
+  (5) New `ScrollToTop.tsx` — subtle bottom-left "back to top" that fades in past
+  700px of window scroll; mounted in `page.tsx`. (6) Open-card body font unified:
+  lead summary `text-lg → text-base` to match the section bodies; subheadings
+  unchanged. Frontend-only; tsc + build clean.
 - **2026-07-08 — 7-fix batch: settings footer, YouTube cards, date bug, source
   chips/layout (`c27f9f8`; TestFlight run #60 → build 1060; Vercel live).**
   Investigated via 3 parallel Explore agents, then fixed. (1) `SettingsModal`
