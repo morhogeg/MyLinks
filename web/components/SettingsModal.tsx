@@ -596,8 +596,8 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                     failed, in which case it offers a retry. */}
                 {(showBack || loadError) && (
                     <div
-                        className="px-6 py-4 border-t border-border-subtle bg-background"
-                        style={isMobile ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' } : undefined}
+                        className="px-[18px] py-2.5 border-t border-border-subtle bg-background"
+                        style={isMobile ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)' } : undefined}
                     >
                         <div className="w-full max-w-2xl mx-auto flex items-center justify-end gap-2">
                             {loadError && (

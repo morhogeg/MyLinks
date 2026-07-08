@@ -1576,6 +1576,44 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 </div>
             )}
 
+            {/* Active Source filters — removable chips, like tags. */}
+            {isLibraryView && selectedSources.size > 0 && (
+                <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent/5 border border-accent/10">
+                        <Globe className="w-3 h-3 text-accent" />
+                        <span className="text-[10px] font-bold text-accent uppercase tracking-wider">Sources:</span>
+                    </div>
+                    {Array.from(selectedSources).map(key => {
+                        const label = sourceLabelByKey.get(key) ?? key;
+                        return (
+                            <div
+                                key={key}
+                                className="group flex items-center gap-1 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm"
+                            >
+                                <span>{label}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => handleToggleSource(key)}
+                                    aria-label={`Remove ${label} filter`}
+                                    title="Remove filter"
+                                    className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        );
+                    })}
+                    {selectedSources.size > 1 && (
+                        <button
+                            onClick={() => setSelectedSources(new Set())}
+                            className="text-[10px] font-bold text-text-muted/60 hover:text-accent hover:underline px-2 transition-colors uppercase tracking-tight"
+                        >
+                            Clear All
+                        </button>
+                    )}
+                </div>
+            )}
+
             {/* Active Collection — banner shown when the feed is scoped to a collection. */}
             {isLibraryView && selectedCollections.size > 0 && (
                 <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">

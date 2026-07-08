@@ -112,8 +112,11 @@ export default function Card({
         if (!timestamp || !now) return '...';
 
         // Handle ISO string or number
-        const time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
-        if (isNaN(time)) return isRtl ? 'לאחרונה' : 'recently';
+        let time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
+        if (isNaN(time) || time <= 0) return isRtl ? 'לאחרונה' : 'recently';
+        // Some ingest paths (Facebook, screenshots) store Unix *seconds*, not ms —
+        // anything below year-2001-in-ms is really a seconds value, so scale it up.
+        if (time < 1e12) time *= 1000;
 
         const seconds = Math.floor((now - time) / 1000);
         if (seconds < 60) return isRtl ? 'זה עתה' : 'just now';
