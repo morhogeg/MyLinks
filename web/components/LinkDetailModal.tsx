@@ -11,6 +11,7 @@ import CategoryInput from './CategoryInput';
 import TagInput from './TagInput';
 import { hasHebrew } from '@/lib/rtl';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
+import { useDialogA11y } from '@/lib/useDialogA11y';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { getRelatedCards } from '@/lib/related';
 
@@ -117,6 +118,13 @@ export default function LinkDetailModal({
     const goBack = onBack ?? onClose;
     useEdgeSwipeBack(goBack, isOpen && !isReading);
 
+    // Baseline dialog a11y: trap focus, move focus in on open, restore on close,
+    // and close on Escape. Suspended while the reader is on top (it's its own
+    // layer with its own dismissal). Escape steps back one card if there's a
+    // back-stack, else dismisses — matching the edge-swipe-back gesture.
+    const dialogRef = useRef<HTMLDivElement>(null);
+    useDialogA11y(dialogRef, { isOpen: isOpen && !isReading, onClose: goBack });
+
     // Clamp the modal to the *visible* viewport so an inline edit (category /
     // tags) can't be hidden behind the on-screen keyboard: the body scrolls the
     // focused field into the shrunken visible area instead of extending under
@@ -186,6 +194,7 @@ export default function LinkDetailModal({
             />
 
             <div
+                ref={dialogRef}
                 role="dialog"
                 aria-modal="true"
                 aria-label="Link details"

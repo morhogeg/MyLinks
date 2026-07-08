@@ -3,6 +3,7 @@
 import { X, AlertTriangle } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { hapticWarning, hapticMedium } from '@/lib/haptics';
+import { useDialogA11y } from '@/lib/useDialogA11y';
 
 interface ConfirmDialogProps {
     isOpen: boolean;
@@ -47,20 +48,18 @@ export default function ConfirmDialog({
         onClose();
     };
 
-    // Handle Escape key to close
+    // Focus trap + move focus in on open + restore on close + Escape-to-close.
+    // Focus lands on the first focusable (the Close/X — a non-destructive
+    // control), which is the safe default for a destructive confirm.
+    const dialogRef = useRef<HTMLDivElement>(null);
+    useDialogA11y(dialogRef, { isOpen, onClose });
+
+    // Lock body scroll behind the dialog.
     useEffect(() => {
-        const handleEscape = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
-        };
-        if (isOpen) {
-            window.addEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'hidden';
-        }
-        return () => {
-            window.removeEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'unset';
-        };
-    }, [isOpen, onClose]);
+        if (!isOpen) return;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = 'unset'; };
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
@@ -74,8 +73,11 @@ export default function ConfirmDialog({
 
             {/* Dialog */}
             <div
+                ref={dialogRef}
                 role="alertdialog"
                 aria-modal="true"
+                aria-labelledby="confirm-dialog-title"
+                aria-describedby="confirm-dialog-message"
                 className="relative bg-card w-full max-w-md rounded-2xl border border-white/5 shadow-2xl p-6 overflow-hidden animate-scale-up"
             >
                 {/* Header */}
@@ -85,15 +87,17 @@ export default function ConfirmDialog({
                         <AlertTriangle className="w-6 h-6" />
                     </div>
                     <div className="flex-1">
-                        <h3 className="text-xl font-bold text-white leading-tight">
+                        <h3 id="confirm-dialog-title" className="text-xl font-bold text-white leading-tight">
                             {title}
                         </h3>
-                        <p className="mt-2 text-text-secondary text-sm leading-relaxed">
+                        <p id="confirm-dialog-message" className="mt-2 text-text-secondary text-sm leading-relaxed">
                             {message}
                         </p>
                     </div>
                     <button
                         onClick={onClose}
+                        aria-label="Close"
+                        title="Close"
                         className="p-1 hover:bg-white/5 rounded-full text-text-muted transition-colors"
                     >
                         <X className="w-5 h-5" />

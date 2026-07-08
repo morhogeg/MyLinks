@@ -10,6 +10,7 @@ import { isNativeApp } from '@/lib/api';
 import { policyUrl, openExternal } from '@/lib/share';
 import { readLocalAiConsent } from '@/lib/aiConsent';
 import { hapticSelection } from '@/lib/haptics';
+import { useDialogA11y } from '@/lib/useDialogA11y';
 import { rebuildConnections } from '@/lib/rebuildConnections';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from './AuthProvider';
@@ -197,6 +198,12 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     // Account deletion (App Store guideline 5.1.1(v)): confirm, then hard-delete
     // the user's workspace + Auth account via the delete_account function.
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    // Baseline dialog a11y: focus trap + move/restore focus + Escape-to-close
+    // (Escape saves prefs first, mirroring the close button). Suspended while the
+    // nested delete-confirm dialog is up so Escape closes only that, not both.
+    const dialogRef = useRef<HTMLDivElement>(null);
+    useDialogA11y(dialogRef, { isOpen: isOpen && !showDeleteConfirm, onClose: closeSettings });
     const [deleting, setDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -457,6 +464,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     return (
         <div className="fixed inset-0 z-50">
             <div
+                ref={dialogRef}
                 role="dialog"
                 aria-modal="true"
                 aria-label="Settings"

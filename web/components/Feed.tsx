@@ -1940,6 +1940,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 </h2>
                                 <button
                                     onClick={() => setIsTagExplorerOpen(false)}
+                                    aria-label="Close tag filters"
                                     className="p-2 hover:bg-white/5 rounded-full touch-manipulation"
                                 >
                                     <X className="w-5 h-5" />
