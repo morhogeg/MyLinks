@@ -589,6 +589,24 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-08 — Settings auto-save, Reminders→Show, overlay scroll-lock, source
+  search fix (`9c4b16e`; TestFlight run #58 → build 1058; Vercel live).** Four
+  user-driven changes. **(1) Settings auto-save** (`SettingsModal.tsx`): removed
+  the Save changes / Cancel footer and the dirty-discard dialog. `savePreferences`
+  now persists on leaving a sub-screen (Back/Done) or closing (X) — guarded by a
+  baseline diff (skips no-op writes) and `loadError` (never writes defaults over a
+  failed load), advancing the baseline after each save. Sub-screens keep a **Done**
+  button (persist + pop); the root screen has no footer (X closes). **(2)
+  Reminders** moved from a standalone toolbar/sheet button into the **Show** status
+  dropdown as an option (with count); toolbar rearranged. **(3) Scroll-lock**
+  (`Feed.tsx`): body scroll is now locked whenever `anyOverlayOpen` (the existing
+  combined overlay flag) — fixes the Filters sheet scrolling the feed behind it,
+  app-wide. **(4) Source search** (`source.ts` `sourceMatchesQuery`): X/Twitter
+  sources are labelled by @handle, so searching "x"/"twitter" found none. New
+  matcher resolves **platform aliases** (x↔twitter, yt↔youtube, ig↔insta,
+  fb↔facebook) AND does **word-prefix** (not substring) label matching — so "x"
+  finds the X platform only, never a publisher with a mid-word x ("Perplexity").
+  Wired into both the card keyword filter and the Sources search suggestions.
 - **2026-07-08 — Sources popover fixed + redundant platform icons removed
   (`ebef8ae`; TestFlight run #57 → build 1057; Vercel live).** The desktop Sources
   popover was transparent (it used `surface-card`, which only paints a sheen and
