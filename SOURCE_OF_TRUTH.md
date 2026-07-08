@@ -609,6 +609,43 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-08 — §11 Queue A + B worked (branch `claude/codebase-review-queue-6hihui`,
+  NOT yet merged/shipped).** All of Queue A done: **A1** SSRF — scrapers now route
+  on parsed hostname (`_host_matches`) + `safe_get` in every platform branch, and
+  the Twilio media fetch is pinned to `*.twilio.com` before creds are attached
+  (`scraper.py`, `main.py`). **A2** PII — new dependency-free `pii.py`
+  (`mask_phone`/`mask_email`) applied across link_service/main/search/digest/
+  reminder/graph log sites; owner's real number removed from `models.py`. **A3**
+  search — dropped the broken single-doc "no embeddings" heuristic
+  (`search.py`). **A4** README rewritten around the real product (removed Graph
+  Viz / Insights / offline / PWA / table-view claims; corrected YouTube). **A5**
+  latest-wins guard on Feed semantic search + `maxDuration=60` on
+  `/api/chat`. Queue B: **B1** feed re-render storm — processing tick throttled
+  5×→1× Hz + filter/sort chain & all facet counts memoized (card-level
+  `React.memo`/shared-now deferred, see §11). **B2** modal a11y — new
+  `useDialogA11y` (focus trap + move/restore + Escape) on LinkDetail/Settings/
+  ConfirmDialog + close-button/FAB labels. **B3** AI dedup — shared
+  `_rag_prompt_body` + `embed_content`, stream no longer over-cites when the
+  marker is missing, `REQUIRE_AUTH` moved to `config.py` (kills the circular
+  import). **B4** worst light-mode color offenders → theme tokens (rest deferred
+  to visual QA). **B5** extension rebranded MyLinks→Machina AI. **B6** new
+  `ci.yml` (tsc + py_compile + rules tests + the new unit tests on every PR).
+  **B7** first tests — backend `unittest` (pii, scraper SSRF, extracted
+  `rag_stream` marker logic; 22 green) + web `vitest` (tags, source; 13 green),
+  both wired into CI. **B8** iOS CI — build number now unique per re-run,
+  ShareExt `CURRENT_PROJECT_VERSION` 19→21, APP_STORE doc corrected (`altool`
+  migration deferred). **B9** Keychain migration deliberately NOT attempted
+  (entitlement + device-verify + backend rotation — plan in §11). tsc + both test
+  suites green. **Pending owner deploy (backend, can't deploy from sandbox):**
+  A1, A2, A3, B3 (`./deploy-functions.sh functions:process_link_background,
+  functions:ask_brain,functions:search_links,functions:whatsapp_webhook,…` — the
+  scraper/pii/config/ai_service/search changes touch the whole function set;
+  deploy the ones you exercise). **Not shipped:** frontend changes are on the
+  branch only — merge to `main` for the Vercel deploy after a visual smoke test
+  of the feed/modals (B1 memoization + B2 focus-trap want an eyes-on check). Did
+  NOT flip `REQUIRE_AUTH`/`NEXT_PUBLIC_REQUIRE_AUTH`, did NOT deploy
+  `firestore.rules`, did NOT touch Queue O. Queue C untouched (post-launch
+  structural — next session).
 - **2026-07-08 — Full codebase review → §11 ranked action plan (docs-only).**
   Four independent review passes (backend functions, web frontend, iOS shell + CI,
   and a fact-check of this doc's claims) ran against `main` (~26k LOC). Headline:
