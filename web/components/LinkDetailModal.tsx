@@ -392,7 +392,7 @@ export default function LinkDetailModal({
                             <button
                                 onClick={() => openExternal(youtubeWatchUrl(videoId))}
                                 aria-label="Watch on YouTube"
-                                className="group relative block w-full h-36 sm:h-44 rounded-2xl overflow-hidden border border-white/10 bg-black cursor-pointer"
+                                className="group relative block w-full h-28 sm:h-32 rounded-2xl overflow-hidden border border-white/10 bg-black cursor-pointer"
                             >
                                 <img src={thumb} alt="" className="w-full h-full object-cover" />
                                 <span className="absolute inset-0 bg-black/[0.04] group-hover:bg-transparent transition-colors" />
