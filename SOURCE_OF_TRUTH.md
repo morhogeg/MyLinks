@@ -1619,14 +1619,14 @@ floor, iPhone-only, public policy pages) are all ✅; what remains is Queue O.
 
 ### Queue A — ship-blocking code, safe pre-cutover (Claude-only)
 
-- [ ] **A1 · security — SSRF: hostname-routed scrapers + `safe_get` everywhere.**
+- [x] **A1 · security — SSRF: hostname-routed scrapers + `safe_get` everywhere.**
   Routing is by substring (`'facebook.com' in url`, `functions/scraper.py:93-110`)
   so a crafted URL reaches platform branches that use plain
   `requests.get(..., allow_redirects=True)` (`scraper.py:261,369,578,619,760`) —
   a 302 there lands on `169.254.169.254`. Parse the hostname once, route on it,
   use `safe_get` in every branch; pin the Twilio media fetch (`main.py:2412`) to
   `api.twilio.com`. *(§4 19a security)*
-- [ ] **A2 · privacy — phone numbers out of logs + code.** uid IS the phone, so
+- [x] **A2 · privacy — phone numbers out of logs + code.** uid IS the phone, so
   every `... user {uid}` log line leaks it. Apply `_mask_phone` (`main.py:145`)
   at: `link_service.py:50,65`; `main.py:1110,1140,2525,2768`;
   `search.py:124,153`; `digest_service.py` (~12 sites incl. recipient emails at
