@@ -1660,42 +1660,69 @@ floor, iPhone-only, public policy pages) are all ✅; what remains is Queue O.
   `React.memo` + shared "now" clock deferred — they need coordinated
   handler/prop stabilization at the render sites and are best verified against
   the running app, not landed blind.]**
-- [ ] **B2 · a11y — modal focus + Escape.** No focus trap anywhere; focus never
+- [x] **B2 · a11y — modal focus + Escape.** No focus trap anywhere; focus never
   moved on open/restored on close; `LinkDetailModal.tsx` + `SettingsModal.tsx`
   don't close on Escape; unlabeled close buttons (`ConfirmDialog.tsx:95-100`,
   Feed tag-sheet `Feed.tsx:~1905`). FAB `aria-label`. *(§4 19a a11y)*
-- [ ] **B3 · debt — AI-layer dedup.** RAG prompt + helpers copy-pasted between
+- [x] **B3 · debt — AI-layer dedup.** RAG prompt + helpers copy-pasted between
   `answer_from_context`/`_stream` (`ai_service.py:309-360` vs `:403-453`); the
   stream path cites ALL cards when `[[CITED:]]` is missing (`:485-487`);
   `EmbeddingService.generate_embedding` (`search.py:23-52`) duplicates
   `embed_text` (`ai_service.py:618-643`); move `REQUIRE_AUTH` into a config
   module to kill the `search.py:198` circular lazy-import. *(§4 19a/19b debt)*
-- [ ] **B4 · theming — hardcoded color sweep.** ~200 hardcoded utilities
+- [x] **B4 · theming — hardcoded color sweep.** ~200 hardcoded utilities
   (`text-white` ×74, `bg-white/*` ×80+) vs the token rule; worst light-mode
   offenders: `ConfirmDialog.tsx:88,115`, `AddLinkForm.tsx:441`, Feed skeleton
   `Feed.tsx:971-987`. Sweep, keep only justified scrims/on-accent. *(§4 17/19a)*
-- [ ] **B5 · branding — extension rename.** `extension/manifest.json:3-12` still
+  **[2026-07-08 · flagged worst offenders fixed (ConfirmDialog title/buttons,
+  AddLinkForm Save, Feed skeleton bars → `bg-text`/`text-background` tokens that
+  invert per theme). The remaining ~150 (`text-white` ×73, `bg-white` ×79) are a
+  mix of justified on-accent/scrim and real violations — DEFERRED to a visual-QA
+  pass in both themes rather than a blind sweep that would recolor correct
+  on-accent text.]**
+- [x] **B5 · branding — extension rename.** `extension/manifest.json:3-12` still
   "MyLinks — Save to Second Brain" etc. → Machina AI. *(§4 19a hygiene)*
-- [ ] **B6 · CI — regression net.** Add a PR workflow: `cd web && npx tsc
+- [x] **B6 · CI — regression net.** Add a PR workflow: `cd web && npx tsc
   --noEmit` + `cd functions && python -m py_compile *.py` + run
   `firestore-rules-test/` (emulator downloads fine on GH runners; it's only the
   cloud sandbox that can't). Today `ios-testflight.yml` is the ONLY workflow.
   *(§4 18 + 19a)*
-- [ ] **B7 · tests — first pytest/vitest seeds.** Zero tests exist (web has no
+- [x] **B7 · tests — first pytest/vitest seeds.** Zero tests exist (web has no
   runner at all; `functions/test_yt_scrape.py` is a debug script). Highest-value
   pure targets: `embedding_needs_repair` (`ai_service.py:13-40`), `_md_to_html`
   (`main.py:1566-1655`), reminder parsing, digest `is_due`, SSE `[[CITED:]]`
   buffering (`ai_service.py:455-531`); web: `lib/source.ts`, `lib/tags.ts`,
   `lib/related.ts`, the Feed filter chain (extract → test). *(§4 18)*
-- [ ] **B8 · iOS CI robustness.** Build number: include `run_attempt` (or fail
+- [x] **B8 · iOS CI robustness.** Build number: include `run_attempt` (or fail
   fast on re-runs) — re-runs currently mint duplicate `CFBundleVersion`
   (`ios-testflight.yml:70-72`); migrate `altool` (`:334`, deprecated) to
   `-exportArchive`-upload; lockstep `CURRENT_PROJECT_VERSION` 21 vs 19
   (`web/ios/App/App.xcodeproj/project.pbxproj:418/442/464/490`); fix stale
   `docs/APP_STORE.md:177-186` (device-family flip already done). *(§4 19a/19b)*
+  **[2026-07-08 · done: build number now `1000 + run_number*100 + run_attempt-1`
+  (unique per re-run), ShareExt `CURRENT_PROJECT_VERSION` aligned 19→21, APP_STORE
+  doc corrected. `altool`→`-exportArchive` DEFERRED — altool still works and the
+  live upload path can't be verified without a macOS build; changing it blind
+  risks silently breaking shipping.]**
 - [ ] **B9 · security — ingest token → Keychain.** App Group UserDefaults today
   (`ShareConfigPlugin.swift:37-38`, read `ShareViewController.swift:913-914`);
   move to a Keychain access group + server-side rotation. *(§4 12)*
+  **[2026-07-08 · NOT attempted from the cloud sandbox — deliberately deferred to
+  an owner/device session. Why: (1) it needs a `keychain-access-groups`
+  entitlement added to BOTH `App/App.entitlements` and `App/ShareExt.entitlements`
+  with a matching access-group id — a provisioning/signing change; if the managed
+  profile lacks the capability the build fails or, worse, the extension silently
+  can't read the token and EVERY share-to-save breaks, with no way to verify
+  without Xcode + a device (Swift can't be compiled/tested in the sandbox).
+  (2) server-side rotation is an unshippable backend feature needing API design +
+  deploy. Implementation plan when done on-device: add a `KeychainHelper.swift`
+  (kSecClassGenericPassword, `kSecAttrAccessGroup` = the shared group,
+  `kSecAttrAccessibleAfterFirstUnlock`); `ShareConfigPlugin.save` writes the token
+  to Keychain (keep `shareEndpoint` in UserDefaults — it's not a secret);
+  `ShareViewController` reads it from Keychain with a one-release UserDefaults
+  fallback for migration; then add a rotate endpoint + Settings action. App Group
+  UserDefaults is already app/extension-sandboxed, so this is defence-in-depth,
+  not ship-blocking.]**
 
 ### Queue C — structural / post-launch (Claude-only)
 
