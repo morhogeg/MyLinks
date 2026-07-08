@@ -1655,6 +1655,11 @@ floor, iPhone-only, public policy pages) are all ✅; what remains is Queue O.
   per-card 60s `setInterval`s (`Card.tsx:101-108`); `Card`/`ListCard` not
   memoized, handlers not `useCallback`ed. Fix as one pass: throttle tick,
   `useMemo` the chain, `React.memo` cards, one shared "now" context. *(§4 19a perf)*
+  **[2026-07-08 · core landed (`d…`): tick throttled 5×→1× Hz + the filter/sort
+  chain and every facet count memoized, so the storm is gone. Card-level
+  `React.memo` + shared "now" clock deferred — they need coordinated
+  handler/prop stabilization at the render sites and are best verified against
+  the running app, not landed blind.]**
 - [ ] **B2 · a11y — modal focus + Escape.** No focus trap anywhere; focus never
   moved on open/restored on close; `LinkDetailModal.tsx` + `SettingsModal.tsx`
   don't close on Escape; unlabeled close buttons (`ConfirmDialog.tsx:95-100`,
