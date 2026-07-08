@@ -609,6 +609,44 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-08 — Acted on the Queue A+B review (same branch
+  `claude/codebase-review-queue-6hihui`, still NOT merged/shipped).** Reproduced
+  the green baseline, then triaged the review's ranked findings against the code
+  (each failure scenario confirmed before touching it). **Fixed all six
+  blocking/should-fix items + three cheap follow-ups**, one commit each:
+  **#1/#2/#4 (B2, 🔴/🟠)** — `useDialogA11y` split into two gates: `isOpen` drives
+  the focus lifecycle, a new `active` gate drives the Tab-trap+Escape, so a
+  stacked layer disarms only the keyboard without restoring focus behind it.
+  LinkDetailModal now disarms under the reader / a stacked overlay (new
+  `overlayOpen` prop from Feed) / an inline category-tag edit; SettingsModal
+  disarms under its delete confirm. This kills the Escape-double-close, the
+  Tab-trap fight on the delete confirm, the Escape-strands-the-sheet bug
+  (add-to-collection / reminder), the inline-edit-Escape-closes-modal bug, and
+  the focus-restore-behind-open-layers bug. **#3 (A2, 🔴)** — `test_pii` swapped
+  the owner's real number for a fictional 555 fixture. **#5 (A2, 🟠)** — masked
+  the three PII log sites A2 missed (`link_service.py:212`,
+  `whatsapp_handler.py:64` — number + body, `backfill_embeddings.py:41`).
+  **#6 (A1, 🟠)** — Twilio media pin now requires https (not just the host) via a
+  new pure, testable `scraper.is_pinned_host_url`; `main.py` wired to it + 4
+  regression tests (http-cleartext, lookalike host, metadata IP). **#7 (B1, 🟡)**
+  — `useSharedCaptureBanner` tick 200ms→1000ms, finishing the render-storm kill
+  (both ticks now 1Hz). **#9 (B1, 🟡)** — banner bar transition→`duration-1000
+  ease-linear` so it interpolates the 1Hz tick instead of stepping. **#10 (B3,
+  🟡)** — empty-citation log info→warning to watch post-deploy. Backend unittest
+  now **26 green** (+4 pin tests); web vitest **13**; tsc + py_compile clean.
+  **Fine-to-ride / deferred (per the review, not fixed):** #8 (Settings
+  sub-screen Escape exits all of Settings vs edge-swipe pops one — prefs
+  auto-save, no data loss), #11 (B8 operational rule: don't re-run pre-branch CI
+  runs — they mint stale build numbers), #12 (remaining test gaps: SSRF
+  redirect-to-metadata runtime + RAG-stream generator end-to-end), #13 (B4
+  leftover invisible light-mode borders/hover near the fixed sites — visual-QA
+  scope). Cosmetic leftover from #3: the owner's number still sits in
+  `AUDIT_FINDINGS.md`/`AUTH_SPEC.md` (historical audit docs, pre-existing on
+  `main`). **Pending owner deploy (backend, unchanged targets + now #5/#6/#10):**
+  `main.py`, `scraper.py`, `link_service.py`, `whatsapp_handler.py`,
+  `ai_service.py`, `backfill_embeddings.py` — `./deploy-functions.sh`. Frontend
+  still branch-only and still wants an eyes-on smoke test of the modal keyboard
+  paths before merge.
 - **2026-07-08 — §11 Queue A + B worked (branch `claude/codebase-review-queue-6hihui`,
   NOT yet merged/shipped).** All of Queue A done: **A1** SSRF — scrapers now route
   on parsed hostname (`_host_matches`) + `safe_get` in every platform branch, and
@@ -1663,12 +1701,21 @@ floor, iPhone-only, public policy pages) are all ✅; what remains is Queue O.
   a 302 there lands on `169.254.169.254`. Parse the hostname once, route on it,
   use `safe_get` in every branch; pin the Twilio media fetch (`main.py:2412`) to
   `api.twilio.com`. *(§4 19a security)*
+  **[2026-07-08 review-response · the media pin now also requires https (a
+  hostname-only pin still leaked the Basic-auth creds in cleartext over
+  http://api.twilio.com), via a new pure/testable `scraper.is_pinned_host_url`
+  with SSRF regression tests.]**
 - [x] **A2 · privacy — phone numbers out of logs + code.** uid IS the phone, so
   every `... user {uid}` log line leaks it. Apply `_mask_phone` (`main.py:145`)
   at: `link_service.py:50,65`; `main.py:1110,1140,2525,2768`;
   `search.py:124,153`; `digest_service.py` (~12 sites incl. recipient emails at
   `:448,473,481`); `reminder_service.py:208`; `graph_service.py:177`. Delete the
   owner's real phone from `models.py:195`. *(§4 13 + 19a hygiene)*
+  **[2026-07-08 review-response · three sites the first pass missed now masked
+  (`link_service.py:212`, `whatsapp_handler.py:64` number+body,
+  `backfill_embeddings.py:41`); `test_pii` no longer re-commits the owner's real
+  number (555 fixture). Cosmetic leftover: the number still sits in
+  `AUDIT_FINDINGS.md`/`AUTH_SPEC.md` (historical, pre-existing on `main`).]**
 - [x] **A3 · correctness — semantic search "no embeddings" heuristic.**
   `search.py:146-155` samples ONE arbitrary doc; if it lacks a vector, search
   silently returns `[]` for a user with hundreds of embedded cards. Check
@@ -1692,15 +1739,29 @@ floor, iPhone-only, public policy pages) are all ✅; what remains is Queue O.
   per-card 60s `setInterval`s (`Card.tsx:101-108`); `Card`/`ListCard` not
   memoized, handlers not `useCallback`ed. Fix as one pass: throttle tick,
   `useMemo` the chain, `React.memo` cards, one shared "now" context. *(§4 19a perf)*
-  **[2026-07-08 · core landed (`d…`): tick throttled 5×→1× Hz + the filter/sort
+  **[2026-07-08 · core landed: tick throttled 5×→1× Hz + the filter/sort
   chain and every facet count memoized, so the storm is gone. Card-level
   `React.memo` + shared "now" clock deferred — they need coordinated
   handler/prop stabilization at the render sites and are best verified against
   the running app, not landed blind.]**
+  **[2026-07-08 review-response · the OTHER 200ms tick
+  (`useSharedCaptureBanner`, mounted above Feed) is now also 1Hz, so the
+  share-extension hand-off window no longer re-renders the tree 5×/s — the
+  render storm is fully dead. Banner bar transition bumped to `duration-1000
+  ease-linear` so the 1Hz updates interpolate smoothly instead of stepping.
+  Card-level `React.memo`/shared-now still deferred.]**
 - [x] **B2 · a11y — modal focus + Escape.** No focus trap anywhere; focus never
   moved on open/restored on close; `LinkDetailModal.tsx` + `SettingsModal.tsx`
   don't close on Escape; unlabeled close buttons (`ConfirmDialog.tsx:95-100`,
   Feed tag-sheet `Feed.tsx:~1905`). FAB `aria-label`. *(§4 19a a11y)*
+  **[2026-07-08 review-response · the first `useDialogA11y` cut armed a
+  document-capture Escape/Tab listener that stayed live under stacked layers,
+  breaking four live paths (delete-from-card double-close, add-to-collection /
+  reminder Escape stranding, inline tag/category edit Escape, focus restore
+  behind an open layer). Reworked into two gates — `isOpen` (focus lifecycle)
+  vs `active` (keyboard trap) — so only the topmost layer owns the keyboard;
+  wired into LinkDetail (reader/overlay/inline-edit) + Settings (delete
+  confirm). Fixed, still wants an eyes-on keyboard smoke test before merge.]**
 - [x] **B3 · debt — AI-layer dedup.** RAG prompt + helpers copy-pasted between
   `answer_from_context`/`_stream` (`ai_service.py:309-360` vs `:403-453`); the
   stream path cites ALL cards when `[[CITED:]]` is missing (`:485-487`);
