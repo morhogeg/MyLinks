@@ -67,9 +67,14 @@ jobs:
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
 
       # Build number: strictly increasing, well above the manual builds (18).
+      # Must also differ across RE-RUNS of the same run: run_number is identical
+      # on a re-run, so the old `1000 + run_number` minted a duplicate
+      # CFBundleVersion and App Store Connect rejects the upload. Fold run_attempt
+      # in (×100 headroom → up to 99 re-runs before any overlap with the next run)
+      # so every attempt gets a unique, strictly-increasing number.
       - name: Compute build number
         id: bn
-        run: echo "value=$(( 1000 + ${{ github.run_number }} ))" >> "$GITHUB_OUTPUT"
+        run: echo "value=$(( 1000 + ${{ github.run_number }} * 100 + ${{ github.run_attempt }} - 1 ))" >> "$GITHUB_OUTPUT"
 
       # Fail fast on a misconfigured runner: a build with empty Firebase config
       # bakes a dead bundle (no auth, broken client init) that still archives

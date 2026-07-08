@@ -174,8 +174,9 @@ clean (9:41, full battery). Order matters — the first two sell the app.
    cover images; optionally one shown as a public share page. Caption:
    "Curate it. Share it (or don't)."
 
-iPad: not planned — flip `TARGETED_DEVICE_FAMILY` to `1` (iPhone-only) before
-submission (§4 task 9) instead of producing iPad screenshots.
+iPad: not planned. `TARGETED_DEVICE_FAMILY` is already `1` (iPhone-only) in
+`web/ios/App/App.xcodeproj/project.pbxproj` (all four build configs), so no iPad
+screenshots are needed — nothing left to flip here.
 
 ## 5. Remaining manual steps (owner)
 
@@ -183,6 +184,6 @@ submission (§4 task 9) instead of producing iPad screenshots.
 - [ ] Enter metadata per §2 (after the auth cutover, when the store build exists).
 - [ ] Create + seed the reviewer demo account; fill credentials into §3.
 - [ ] Take the 6 screenshots per §4.
-- [ ] Set `TARGETED_DEVICE_FAMILY = 1` (or produce iPad screenshots).
+- [x] Set `TARGETED_DEVICE_FAMILY = 1` (done — iPhone-only in project.pbxproj).
 - [ ] Verify the AI-consent screen (§4 task 6) is in the submitted build before
       using the review-notes wording above.
