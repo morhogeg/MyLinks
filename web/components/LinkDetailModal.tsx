@@ -5,6 +5,7 @@ import { Link, LinkStatus } from '@/lib/types';
 import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2, ChevronLeft } from 'lucide-react';
 import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
+import { openExternal } from '@/lib/share';
 import ReadingView from './ReadingView';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
@@ -28,6 +29,25 @@ function parseHighlight(entry: string): { seconds: number | null; label: string 
         : parseInt(a) * 60 + parseInt(b);
     const stamp = c ? `${a}:${b}:${c}` : `${a}:${b}`;
     return { seconds, label: rest?.trim() || stamp };
+}
+
+/** YouTube watch URL, optionally deep-linked to a timestamp (seconds). */
+function youtubeWatchUrl(id: string, seconds?: number | null): string {
+    return `https://www.youtube.com/watch?v=${id}${seconds != null ? `&t=${Math.floor(seconds)}s` : ''}`;
+}
+
+/** Drop a markdown section (a `## Heading` and its body up to the next `##`)
+    whose heading matches `re`. Used to strip the AI's "Who It's For" block from
+    video summaries. */
+function stripMarkdownSection(md: string, re: RegExp): string {
+    if (!md) return md;
+    const out: string[] = [];
+    let skipping = false;
+    for (const line of md.split('\n')) {
+        if (/^\s*##\s+/.test(line)) skipping = re.test(line);
+        if (!skipping) out.push(line);
+    }
+    return out.join('\n').trim();
 }
 
 interface LinkDetailModalProps {
@@ -150,8 +170,11 @@ export default function LinkDetailModal({
 
     const getTimeAgo = (timestamp: any, now: number): string => {
         if (!timestamp || !now) return '...';
-        const time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
-        if (isNaN(time)) return isRtl ? 'לאחרונה' : 'recently';
+        let time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
+        if (isNaN(time) || time <= 0) return isRtl ? 'לאחרונה' : 'recently';
+        // Some ingest paths (Facebook, screenshots) store Unix *seconds*, not ms —
+        // anything below year-2001-in-ms is really a seconds value, so scale it up.
+        if (time < 1e12) time *= 1000;
 
         const seconds = Math.floor((now - time) / 1000);
         if (seconds < 60) return isRtl ? 'זה עתה' : 'just now';
@@ -358,19 +381,29 @@ export default function LinkDetailModal({
                         )
                     )}
 
-                    {/* YouTube: embedded player + clickable key moments + speakers */}
-                    {link.sourceType === 'youtube' && link.metadata?.videoId && (
+                    {/* YouTube: thumbnail (the inline player trips a YouTube "error
+                        153" in the WebView) + clickable key moments that deep-link
+                        into the video on YouTube. */}
+                    {link.sourceType === 'youtube' && link.metadata?.videoId && (() => {
+                        const videoId = link.metadata.videoId;
+                        const thumb = link.metadata.thumbnailUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+                        return (
                         <div className="mb-6 space-y-4">
-                            <div className="rounded-2xl overflow-hidden border border-white/10 bg-black aspect-video">
-                                <iframe
-                                    key={videoStart ?? 'start'}
-                                    src={`https://www.youtube-nocookie.com/embed/${link.metadata.videoId}?rel=0${videoStart != null ? `&start=${videoStart}&autoplay=1` : ''}`}
-                                    title={link.title}
-                                    className="w-full h-full"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                    allowFullScreen
-                                />
-                            </div>
+                            <button
+                                onClick={() => openExternal(youtubeWatchUrl(videoId))}
+                                aria-label="Watch on YouTube"
+                                className="group relative block w-full aspect-video rounded-2xl overflow-hidden border border-white/10 bg-black cursor-pointer"
+                            >
+                                <img src={thumb} alt="" className="w-full h-full object-cover" />
+                                <span className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/15 transition-colors">
+                                    <span className="w-14 h-14 rounded-2xl bg-red-600 flex items-center justify-center shadow-lg">
+                                        <Play className="w-7 h-7 text-white fill-white ms-0.5" />
+                                    </span>
+                                </span>
+                                <span className="absolute bottom-2 end-2 inline-flex items-center gap-1 text-[11px] font-semibold text-white bg-black/60 px-2 py-0.5 rounded-full">
+                                    <Youtube className="w-3.5 h-3.5" /> Watch on YouTube
+                                </span>
+                            </button>
 
                             {!!link.metadata.videoHighlights?.length && (
                                 <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
@@ -383,7 +416,7 @@ export default function LinkDetailModal({
                                             return (
                                                 <li key={i}>
                                                     <button
-                                                        onClick={() => seconds != null && setVideoStart(seconds)}
+                                                        onClick={() => seconds != null && openExternal(youtubeWatchUrl(videoId, seconds))}
                                                         disabled={seconds == null}
                                                         className={`w-full text-start flex items-start gap-3 rounded-lg px-2 py-1.5 transition-colors ${seconds != null ? 'hover:bg-white/5 cursor-pointer' : 'cursor-default'}`}
                                                     >
@@ -400,21 +433,9 @@ export default function LinkDetailModal({
                                     </ul>
                                 </div>
                             )}
-
-                            {!!link.metadata.speakers?.length && (
-                                <div className="flex items-center flex-wrap gap-2">
-                                    <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-text-muted">
-                                        <Users className="w-3.5 h-3.5" /> Speakers
-                                    </span>
-                                    {link.metadata.speakers.map((s, i) => (
-                                        <span key={i} className="text-xs font-medium text-text-secondary bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
-                                            {s}
-                                        </span>
-                                    ))}
-                                </div>
-                            )}
                         </div>
-                    )}
+                        );
+                    })()}
 
                     <div className="mb-4">
                         {(() => {
@@ -542,7 +563,11 @@ export default function LinkDetailModal({
                             to strip, so we show it alone to avoid duplicating it. */}
                         <div className="mb-6">
                             {(() => {
-                                const detailed = link.detailedSummary || '';
+                                // Videos: drop the AI's "Who It's For" section (the user
+                                // finds it noise on YouTube cards).
+                                const detailed = isYouTube
+                                    ? stripMarkdownSection(link.detailedSummary || '', /who\s*it'?s?\s*for/i)
+                                    : (link.detailedSummary || '');
                                 const headingIdx = detailed.indexOf('## ');
                                 const hasSections = headingIdx >= 0;
                                 const detailBody = hasSections ? detailed.slice(headingIdx) : detailed;
