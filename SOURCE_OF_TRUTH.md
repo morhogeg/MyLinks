@@ -1632,17 +1632,17 @@ floor, iPhone-only, public policy pages) are all ✅; what remains is Queue O.
   `search.py:124,153`; `digest_service.py` (~12 sites incl. recipient emails at
   `:448,473,481`); `reminder_service.py:208`; `graph_service.py:177`. Delete the
   owner's real phone from `models.py:195`. *(§4 13 + 19a hygiene)*
-- [ ] **A3 · correctness — semantic search "no embeddings" heuristic.**
+- [x] **A3 · correctness — semantic search "no embeddings" heuristic.**
   `search.py:146-155` samples ONE arbitrary doc; if it lacks a vector, search
   silently returns `[]` for a user with hundreds of embedded cards. Check
   properly (e.g. limit-1 query filtered on the field, or attempt + fallback).
   *(§4 19b)*
-- [ ] **A4 · launch honesty — README rewrite.** Claims Graph Visualization
+- [x] **A4 · launch honesty — README rewrite.** Claims Graph Visualization
   (`README.md:49,83,154`), Insights Dashboard (`:50,155`), "Works Offline"
   (`:54`), PWA badges/positioning (`:7,52,97`), Table view (`:59`) — none exist.
   Rewrite around the real product (recall engine, capture surface, synthesis)
   BEFORE any Show HN/Product Hunt eyes hit the repo. *(§4 14 + 16)*
-- [ ] **A5 · correctness — stale-search guard + chat timeout.** Add a
+- [x] **A5 · correctness — stale-search guard + chat timeout.** Add a
   request-id/latest-wins guard to semantic search results (`Feed.tsx:157-203`)
   and `maxDuration` to `web/app/api/chat/route.ts`. *(§4 19a correctness)*
 
