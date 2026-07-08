@@ -145,10 +145,11 @@ def _server_error(headers: dict = None, exc: Exception = None,
 def _mask_phone(value) -> str:
     """Redact a phone number for logging — keep only the last 4 digits.
 
-    Inbound WhatsApp numbers are PII; never log them in the clear.
+    Inbound WhatsApp numbers are PII; never log them in the clear. Delegates to
+    the shared `pii.mask_phone` so every service module masks identically.
     """
-    s = str(value or "")
-    return f"***{s[-4:]}" if len(s) >= 4 else "***"
+    from pii import mask_phone
+    return mask_phone(value)
 
 
 def _verify_bearer(req):
@@ -1107,7 +1108,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 "status": "queued",
                 "attempts": 0,
             })
-            logger.info(f"Share ingest queued image for user {uid}")
+            logger.info(f"Share ingest queued image for user {_mask_phone(uid)}")
             return https_fn.Response(
                 json.dumps({"success": True, "queued": True, "id": process_ref.id, "image": True}),
                 status=200, headers=headers, mimetype='application/json'
@@ -1137,7 +1138,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             "attempts": 0
         })
 
-        logger.info(f"Share ingest queued: {url} for user {uid}")
+        logger.info(f"Share ingest queued: {url} for user {_mask_phone(uid)}")
         return https_fn.Response(
             json.dumps({"success": True, "queued": True, "id": process_ref.id, "url": url}),
             status=200, headers=headers, mimetype='application/json'
@@ -2531,7 +2532,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             except Exception:
                 pass
             msg = format_success_message(link_data, reminder_time, language=analysis.get("language", "en"), link_id=link_id, tz=user_tz)
-            logger.info(f"Processing complete, sending message to {from_number}")
+            logger.info(f"Processing complete, sending message to {_mask_phone(from_number)}")
             send_whatsapp_message(from_number, msg)
         else:
             logger.info(f"Processing complete for {data.get('source', 'unknown')} item (no WhatsApp notification)")
@@ -2774,5 +2775,5 @@ def send_digest_now(req: https_fn.CallableRequest) -> dict:
         result = build_and_send_digest(uid, user_data, force=True)
         return result
     except Exception as e:
-        logger.error(f"send_digest_now failed for {uid}: {e}")
+        logger.error(f"send_digest_now failed for {_mask_phone(uid)}: {e}")
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=str(e))

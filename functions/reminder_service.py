@@ -12,6 +12,7 @@ from typing import Optional
 from db import get_db
 from link_service import is_hebrew
 from models import ReminderStatus
+from pii import mask_phone
 
 logger = logging.getLogger(__name__)
 
@@ -199,13 +200,13 @@ def run_reminder_check() -> dict:
         try:
             due_links = query.get()
         except Exception as e:
-            err_msg = f"Failed to query reminders for user {uid}: {e}"
+            err_msg = f"Failed to query reminders for user {mask_phone(uid)}: {e}"
             logger.error(err_msg)
             report["errors"].append(err_msg)
             continue
 
         if due_links:
-            logger.info(f"Found {len(due_links)} reminders for user {uid}")
+            logger.info(f"Found {len(due_links)} reminders for user {mask_phone(uid)}")
             report["reminders_found"] += len(due_links)
 
         for link_doc in due_links:

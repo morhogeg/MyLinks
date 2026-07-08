@@ -192,7 +192,7 @@ class UserDocument(BaseModel):
     Firestore document schema for a user
     Collection path: users/{uid}
     """
-    phone_number: str = Field(description="Phone number in E.164 format, e.g., +16462440305")
+    phone_number: str = Field(description="Phone number in E.164 format, e.g., +15551234567")
     createdAt: datetime = Field(default_factory=datetime.now)
     settings: UserSettings = Field(default_factory=UserSettings)
     last_saved_link_id: Optional[str] = Field(None, description="ID of the last saved link for context")

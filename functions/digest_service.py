@@ -45,6 +45,7 @@ from google.cloud import firestore
 
 from db import get_db
 from link_service import is_hebrew
+from pii import mask_phone, mask_email
 
 logger = logging.getLogger(__name__)
 
@@ -445,7 +446,7 @@ def send_email(to_email: str, subject: str, html_body: str, text_body: str) -> b
                 timeout=20,
             )
             if resp.status_code in (200, 201, 202):
-                logger.info(f"Digest email sent to {to_email} via SendGrid")
+                logger.info(f"Digest email sent to {mask_email(to_email)} via SendGrid")
                 return True
             logger.error(f"SendGrid error {resp.status_code}: {resp.text[:300]}")
             return False
@@ -470,7 +471,7 @@ def send_email(to_email: str, subject: str, html_body: str, text_body: str) -> b
                 if user and password:
                     server.login(user, password)
                 server.send_message(msg)
-            logger.info(f"Digest email sent to {to_email} via SMTP")
+            logger.info(f"Digest email sent to {mask_email(to_email)} via SMTP")
             return True
         except Exception as e:
             logger.error(f"SMTP send failed: {e}")
@@ -478,7 +479,7 @@ def send_email(to_email: str, subject: str, html_body: str, text_body: str) -> b
 
     logger.warning(
         f"No email provider configured (set SENDGRID_API_KEY or SMTP_HOST). "
-        f"Would have emailed {to_email}: {subject!r}"
+        f"Would have emailed {mask_email(to_email)}: {subject!r}"
     )
     return False
 
@@ -738,7 +739,7 @@ def _write_inapp_synthesis(uid: str, synth: dict, cards: List[dict], week_id: st
     try:
         get_db().collection("users").document(uid).collection("syntheses").document(week_id).set(doc)
     except Exception as e:
-        logger.error(f"Failed to write in-app synthesis for {uid}: {e}")
+        logger.error(f"Failed to write in-app synthesis for {mask_phone(uid)}: {e}")
 
 
 def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force: bool = False) -> dict:
@@ -766,7 +767,7 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
     try:
         synth = GeminiService().synthesize_week(cards)
     except AnalysisError as e:
-        logger.error(f"Synthesis generation failed for {uid}: {e}")
+        logger.error(f"Synthesis generation failed for {mask_phone(uid)}: {e}")
         result["skipped"] = "synthesis_failed"
         return result
 
@@ -790,7 +791,7 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
             if push_result.get("sent"):
                 result["channels"].append("push")
         except Exception as e:
-            logger.error(f"Synthesis push send failed for {uid}: {e}")
+            logger.error(f"Synthesis push send failed for {mask_phone(uid)}: {e}")
 
     # WhatsApp
     if "whatsapp" in channels:
@@ -801,7 +802,7 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
                     send_whatsapp_message(f"whatsapp:{phone}", body)
                 result["channels"].append("whatsapp")
             except Exception as e:
-                logger.error(f"Synthesis WhatsApp send failed for {uid}: {e}")
+                logger.error(f"Synthesis WhatsApp send failed for {mask_phone(uid)}: {e}")
 
     # Email
     if "email" in channels:
@@ -812,7 +813,7 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
                 if send_email(email_addr, subject, html_body, text_body):
                     result["channels"].append("email")
             except Exception as e:
-                logger.error(f"Synthesis email send failed for {uid}: {e}")
+                logger.error(f"Synthesis email send failed for {mask_phone(uid)}: {e}")
 
     result["sent"] = True
     get_db().collection("users").document(uid).set(
@@ -875,7 +876,7 @@ def _write_inapp_digest(uid: str, cards: List[dict], mode: str, frequency: str, 
         col = get_db().collection("users").document(uid).collection("digests")
         col.document(digest_id).set(doc)
     except Exception as e:
-        logger.error(f"Failed to write in-app digest for {uid}: {e}")
+        logger.error(f"Failed to write in-app digest for {mask_phone(uid)}: {e}")
         return None
 
     _prune_old_digests(uid)
@@ -894,7 +895,7 @@ def _prune_old_digests(uid: str, keep: int = DIGEST_RETENTION) -> None:
         for doc in stale:
             doc.reference.delete()
     except Exception as e:
-        logger.warning(f"Digest retention cleanup failed for {uid}: {e}")
+        logger.warning(f"Digest retention cleanup failed for {mask_phone(uid)}: {e}")
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -967,9 +968,9 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
                 if push_result.get("sent"):
                     result["channels"].append("push")
             except Exception as e:
-                logger.error(f"Digest push send failed for {uid}: {e}")
+                logger.error(f"Digest push send failed for {mask_phone(uid)}: {e}")
         else:
-            logger.info(f"Digest: user {uid} has push channel but no device tokens")
+            logger.info(f"Digest: user {mask_phone(uid)} has push channel but no device tokens")
 
     # WhatsApp
     if "whatsapp" in channels:
@@ -988,11 +989,11 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
                     result["whatsapp_parts"] = len(messages)
                     delivered_any = True
                 else:
-                    logger.error(f"Digest WhatsApp send failed for {uid} (no message SID)")
+                    logger.error(f"Digest WhatsApp send failed for {mask_phone(uid)} (no message SID)")
             except Exception as e:
-                logger.error(f"Digest WhatsApp send failed for {uid}: {e}")
+                logger.error(f"Digest WhatsApp send failed for {mask_phone(uid)}: {e}")
         else:
-            logger.warning(f"Digest: user {uid} has whatsapp channel but no phone")
+            logger.warning(f"Digest: user {mask_phone(uid)} has whatsapp channel but no phone")
 
     # Email
     if "email" in channels:
@@ -1004,9 +1005,9 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
                     result["channels"].append("email")
                     delivered_any = True
             except Exception as e:
-                logger.error(f"Digest email send failed for {uid}: {e}")
+                logger.error(f"Digest email send failed for {mask_phone(uid)}: {e}")
         else:
-            logger.warning(f"Digest: user {uid} has email channel but no address")
+            logger.warning(f"Digest: user {mask_phone(uid)} has email channel but no address")
 
     if delivered_any:
         result["sent"] = True
@@ -1111,7 +1112,7 @@ def run_digest_check() -> dict:
                 report["digests_sent"] += 1
                 report["cards_delivered"] += res.get("card_count", 0)
         except Exception as e:
-            err = f"Digest failed for {uid}: {e}"
+            err = f"Digest failed for {mask_phone(uid)}: {e}"
             logger.error(err)
             report["errors"].append(err)
 

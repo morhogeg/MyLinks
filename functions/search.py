@@ -16,6 +16,7 @@ from google import genai
 
 from db import get_db
 from ai_service import embedding_needs_repair
+from pii import mask_phone
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,7 @@ def sync_link_embedding(event: firestore_fn.Event[firestore_fn.Change[firestore_
 
 def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dict]:
     """Core search logic separated from Firebase transport."""
-    logger.info(f"Searching for '{query_text}' for user {uid}")
+    logger.info(f"Searching for '{query_text}' for user {mask_phone(uid)}")
 
     service = EmbeddingService()
     
@@ -150,7 +151,7 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
         has_any_embeddings = "embedding_vector" in sample_doc
     
     if not has_any_embeddings:
-        logger.warning(f"No embeddings found for user {uid}. Run backfill_embeddings.py to generate embeddings for existing links.")
+        logger.warning(f"No embeddings found for user {mask_phone(uid)}. Run backfill_embeddings.py to generate embeddings for existing links.")
         # Don't fail the search, just return empty results with a helpful message
         return []
 

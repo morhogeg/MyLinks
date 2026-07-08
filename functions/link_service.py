@@ -12,6 +12,7 @@ from typing import Optional
 from google.cloud import firestore
 
 from db import get_db
+from pii import mask_phone
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ def find_user_by_phone(phone_number: str) -> Optional[str]:
     db = get_db()
     clean_number = re.sub(r'\D', '', phone_number)
 
-    logger.info(f"Searching for user with normalized phone: {clean_number}")
+    logger.info(f"Searching for user with normalized phone: {mask_phone(clean_number)}")
 
     users_ref = db.collection('users')
 
@@ -59,10 +60,10 @@ def find_user_by_phone(phone_number: str) -> Optional[str]:
             query = users_ref.where(field, '==', val).limit(1)
             docs = query.get()
             if docs:
-                logger.info(f"Found user {docs[0].id} via {field}={val}")
+                logger.info(f"Found user {mask_phone(docs[0].id)} via {field}={mask_phone(val)}")
                 return docs[0].id
 
-    logger.warning(f"User not found for phone: {phone_number} (normalized: {clean_number})")
+    logger.warning(f"User not found for phone: {mask_phone(phone_number)} (normalized: {mask_phone(clean_number)})")
     return None
 
 
