@@ -142,19 +142,13 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
     db = get_db()
     links_ref = db.collection("users").document(uid).collection("links")
 
-    # First, check if any links have embeddings
-    # This helps diagnose if the issue is missing embeddings vs. other problems
-    all_links = list(links_ref.limit(1).stream())
-    has_any_embeddings = False
-    if all_links:
-        sample_doc = all_links[0].to_dict()
-        has_any_embeddings = "embedding_vector" in sample_doc
-    
-    if not has_any_embeddings:
-        logger.warning(f"No embeddings found for user {mask_phone(uid)}. Run backfill_embeddings.py to generate embeddings for existing links.")
-        # Don't fail the search, just return empty results with a helpful message
-        return []
-
+    # Run the vector search directly. `find_nearest` only ever considers docs
+    # that actually carry an `embedding_vector`, so there is no need to gate on a
+    # pre-check — and the old gate was actively wrong: it sampled ONE arbitrary
+    # link (`links_ref.limit(1)`) and, if that single doc happened to lack a
+    # vector, returned [] even for a user with hundreds of embedded cards. We now
+    # let the query surface whatever is embedded and treat an *empty* result as
+    # the (ambiguous) "maybe no embeddings yet" signal instead.
     try:
         vector_query = links_ref.find_nearest(
             vector_field="embedding_vector",
@@ -181,6 +175,15 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
 
         data["id"] = doc.id
         links.append(data)
+
+    if not links:
+        # Zero matches is ambiguous: either nothing was similar enough, or this
+        # user simply has no embedded cards yet. Log the backfill hint to aid
+        # diagnosis; the caller still just sees an empty result set.
+        logger.warning(
+            f"No semantic-search matches for user {mask_phone(uid)} — if this "
+            f"persists the user's links may lack embeddings (run backfill_embeddings.py)."
+        )
 
     logger.info(f"Found {len(links)} results.")
     return links
