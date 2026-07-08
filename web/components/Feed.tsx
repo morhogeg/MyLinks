@@ -2221,6 +2221,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     excludeRelatedIds={linkStack}
                     onAddToCollection={(link) => setAddToCollectionLink(link)}
                     onShare={handleShareCard}
+                    overlayOpen={confirmDeleteId !== null || addToCollectionLink !== null || reminderModalLink !== null}
                 />
             )}
 

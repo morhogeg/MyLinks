@@ -203,7 +203,14 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     // (Escape saves prefs first, mirroring the close button). Suspended while the
     // nested delete-confirm dialog is up so Escape closes only that, not both.
     const dialogRef = useRef<HTMLDivElement>(null);
-    useDialogA11y(dialogRef, { isOpen: isOpen && !showDeleteConfirm, onClose: closeSettings });
+    useDialogA11y(dialogRef, {
+        isOpen,
+        // Disarm the trap/Escape while the delete confirm is stacked on top, but
+        // keep the focus lifecycle keyed on isOpen so suspending doesn't restore
+        // focus to the gear button behind the still-open Settings page.
+        active: isOpen && !showDeleteConfirm,
+        onClose: closeSettings,
+    });
     const [deleting, setDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
 

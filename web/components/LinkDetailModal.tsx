@@ -50,6 +50,11 @@ interface LinkDetailModalProps {
     excludeRelatedIds?: string[];  // cards already behind you in the back-stack
     onAddToCollection?: (link: Link) => void;
     onShare?: (link: Link) => void;
+    // True while a layer this modal spawns (delete confirm, add-to-collection
+    // sheet, reminder modal) is stacked on top. Disarms this modal's focus
+    // trap + Escape so the layer above owns the keyboard — otherwise one Escape
+    // closes both, and the two traps fight over Tab focus.
+    overlayOpen?: boolean;
 }
 
 export default function LinkDetailModal({
@@ -71,6 +76,7 @@ export default function LinkDetailModal({
     excludeRelatedIds,
     onAddToCollection,
     onShare,
+    overlayOpen = false,
 }: LinkDetailModalProps) {
     const [isReading, setIsReading] = useState(false);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
@@ -123,7 +129,14 @@ export default function LinkDetailModal({
     // layer with its own dismissal). Escape steps back one card if there's a
     // back-stack, else dismisses — matching the edge-swipe-back gesture.
     const dialogRef = useRef<HTMLDivElement>(null);
-    useDialogA11y(dialogRef, { isOpen: isOpen && !isReading, onClose: goBack });
+    useDialogA11y(dialogRef, {
+        isOpen,
+        // Keep the trap armed only while this modal is the topmost keyboard
+        // owner: disarm it under the reader, under a stacked overlay, and while
+        // an inline category/tag editor is open (each has its own Escape).
+        active: isOpen && !isReading && !overlayOpen && !isEditingCategory && !isAddingTag,
+        onClose: goBack,
+    });
 
     // Clamp the modal to the *visible* viewport so an inline edit (category /
     // tags) can't be hidden behind the on-screen keyboard: the body scrolls the
