@@ -589,6 +589,11 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-08 — Closed-state (feed) YouTube card thumbnail shortened + play icon
+  removed (`eb332e4`; build 1063; Vercel live).** Follow-up: `Card.tsx` still used
+  full `aspect-video` + a play overlay on the feed card while the open card was
+  already `h-28 sm:h-32` and play-free — matched them (short banner, dropped the
+  play circle, kept the duration badge; trimmed the unused `Play` import).
 - **2026-07-08 — Removed the share "Open Machina" button; YouTube thumb + scroll-
   top tweaks (`1c034fb`; TestFlight run #62 → build 1062; Vercel live).** (1) The
   YouTube open-card thumbnail shortened again to `h-28 sm:h-32`. (2) `ScrollToTop`
