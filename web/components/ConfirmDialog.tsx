@@ -87,7 +87,7 @@ export default function ConfirmDialog({
                         <AlertTriangle className="w-6 h-6" />
                     </div>
                     <div className="flex-1">
-                        <h3 id="confirm-dialog-title" className="text-xl font-bold text-white leading-tight">
+                        <h3 id="confirm-dialog-title" className="text-xl font-bold text-text leading-tight">
                             {title}
                         </h3>
                         <p id="confirm-dialog-message" className="mt-2 text-text-secondary text-sm leading-relaxed">
@@ -98,7 +98,7 @@ export default function ConfirmDialog({
                         onClick={onClose}
                         aria-label="Close"
                         title="Close"
-                        className="p-1 hover:bg-white/5 rounded-full text-text-muted transition-colors"
+                        className="p-1 hover:bg-text/5 rounded-full text-text-muted transition-colors"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -108,7 +108,7 @@ export default function ConfirmDialog({
                 <div className="flex gap-3 mt-6">
                     <button
                         onClick={onClose}
-                        className="flex-1 px-4 py-2.5 rounded-xl bg-white/5 text-text font-medium hover:bg-white/10 transition-colors"
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-text/5 text-text font-medium hover:bg-text/10 transition-colors"
                     >
                         {cancelLabel}
                     </button>
@@ -116,7 +116,7 @@ export default function ConfirmDialog({
                         onClick={handleConfirm}
                         className={`flex-1 px-4 py-2.5 rounded-xl font-medium transition-colors ${variant === 'danger'
                                 ? 'bg-red-500 text-white hover:bg-red-600'
-                                : 'bg-white text-black hover:bg-gray-200'
+                                : 'bg-text text-background hover:opacity-90'
                             }`}
                     >
                         {confirmLabel}

@@ -1011,16 +1011,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             key={i}
                             className="bg-card border border-white/5 rounded-2xl p-5 relative overflow-hidden skeleton-shimmer surface-card shadow-[var(--shadow-card)]"
                         >
-                            <div className="h-3 w-20 bg-white/10 rounded-full mb-4" />
-                            <div className="h-5 w-3/4 bg-white/10 rounded mb-3" />
+                            <div className="h-3 w-20 bg-text/10 rounded-full mb-4" />
+                            <div className="h-5 w-3/4 bg-text/10 rounded mb-3" />
                             <div className="space-y-2 mb-5">
-                                <div className="h-3 w-full bg-white/5 rounded" />
-                                <div className="h-3 w-5/6 bg-white/5 rounded" />
-                                <div className="h-3 w-2/3 bg-white/5 rounded" />
+                                <div className="h-3 w-full bg-text/5 rounded" />
+                                <div className="h-3 w-5/6 bg-text/5 rounded" />
+                                <div className="h-3 w-2/3 bg-text/5 rounded" />
                             </div>
                             <div className="flex gap-2">
-                                <div className="h-5 w-14 bg-white/5 rounded-full" />
-                                <div className="h-5 w-16 bg-white/5 rounded-full" />
+                                <div className="h-5 w-14 bg-text/5 rounded-full" />
+                                <div className="h-5 w-16 bg-text/5 rounded-full" />
                             </div>
                         </div>
                     ))}

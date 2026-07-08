@@ -438,7 +438,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                 <button
                                     type="submit"
                                     disabled={activeTab === 'link' ? !url.trim() : !imageFile}
-                                    className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-100 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
+                                    className="w-full py-4 bg-text text-background font-bold rounded-xl hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
                                 >
                                     Save
                                 </button>
