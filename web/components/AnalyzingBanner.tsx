@@ -106,7 +106,7 @@ export default function AnalyzingBanner({ state }: { state: AnalyzingState | nul
                 </div>
                 <div className="mt-2 h-1 w-full rounded-full bg-white/10 overflow-hidden">
                     <div
-                        className={`h-full rounded-full transition-[width] duration-300 ease-out ${done ? 'bg-green-500' : 'bg-accent'}`}
+                        className={`h-full rounded-full transition-[width] duration-1000 ease-linear ${done ? 'bg-green-500' : 'bg-accent'}`}
                         style={{ width: `${pct}%` }}
                     />
                 </div>
