@@ -253,7 +253,9 @@ APPCHECK_ENFORCE = os.environ.get("APPCHECK_ENFORCE", "").lower() in ("1", "true
 # endpoint/callable REQUIRES a valid ID token and derives the workspace uid from
 # it (client-supplied uids are rejected). Flip to true only after sign-in is
 # confirmed working end-to-end. See NATIVE_AUTH_SETUP.md ("Cutover order").
-REQUIRE_AUTH = os.environ.get("REQUIRE_AUTH", "").lower() in ("1", "true", "yes")
+# Canonical definition lives in config.py so other modules (e.g. search.py) can
+# read it without a circular `from main import …`; re-exported here unchanged.
+from config import REQUIRE_AUTH
 
 
 def _require_app_check(req, headers: dict = None) -> bool:

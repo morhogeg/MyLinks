@@ -46,6 +46,22 @@ EMBEDDING_MODEL = "models/gemini-embedding-001"
 EMBEDDING_DIMENSIONS = 768
 
 
+def embed_content(client, text: str) -> List[float]:
+    """Raw Gemini embedding call — the single source of truth for the embedding
+    model + dimensionality. Both `GeminiService.embed_text` (returns None on
+    error) and `search.EmbeddingService.generate_embedding` (raises on error)
+    wrap this, so the model/dims can never drift between the write path and the
+    query path (which would silently break vector search). Raises on failure;
+    callers apply their own error contract.
+    """
+    result = client.models.embed_content(
+        model=EMBEDDING_MODEL,
+        contents=text[:9000],
+        config={"output_dimensionality": EMBEDDING_DIMENSIONS},
+    )
+    return result.embeddings[0].values
+
+
 class AnalysisError(Exception):
     """Raised when AI analysis genuinely fails so callers can surface a real
     error instead of silently saving a junk 'Analysis Failed' card."""
@@ -145,6 +161,67 @@ IMPORTANT: You are analyzing an **actual YouTube video that you can watch** (its
   - `## Who It's For` — the intended audience, only if the video makes this clear.
 - "summary": focus on the takeaway — what a viewer will know or be able to do after watching, stated factually.
 """
+
+
+def _rag_source_label(c: dict) -> str:
+    """Publisher name for the card — explicit sourceName, else the URL's host.
+    Lets the model answer questions that name the source (e.g. 'the CNN
+    fact-check'), which the title/summary alone don't contain."""
+    name = (c.get("sourceName") or "").strip()
+    if name and name.lower() not in ("none", "screenshot", "unknown"):
+        return name
+    url = c.get("url") or ""
+    try:
+        from urllib.parse import urlparse
+        host = urlparse(url).hostname or ""
+        return host[4:] if host.startswith("www.") else host
+    except Exception:
+        return ""
+
+
+def _rag_card_block(c: dict) -> str:
+    src = _rag_source_label(c)
+    meta = [f"source: {src}"] if src else []
+    meta.append(f"category: {c.get('category', 'General')}")
+    meta.append(f"tags: {', '.join(c.get('tags', []) or [])}")
+    return (
+        f"[{c.get('id')}] {c.get('title', 'Untitled')} "
+        f"({'; '.join(meta)})\n{c.get('summary', '')}"
+    )
+
+
+def _rag_history_text(history: list) -> str:
+    if not history:
+        return ""
+    turns = []
+    for h in history[-6:]:  # keep the prompt bounded
+        role = "User" if h.get("role") == "user" else "Assistant"
+        turns.append(f"{role}: {h.get('content', '')}")
+    return "\n\nEarlier in this conversation:\n" + "\n".join(turns)
+
+
+def _rag_prompt_body(question: str, cards: list, history: list) -> str:
+    """The shared RAG prompt — intro, grounding rules, sources, history, and the
+    question — WITHOUT the final output-format instruction. The JSON path and the
+    streaming path append their own format tail, so the grounding/Hebrew rules
+    (and thus answer quality) stay identical between them."""
+    sources_text = "\n\n".join(_rag_card_block(c) for c in cards)
+    history_text = _rag_history_text(history)
+    return f"""You are Machina AI, the user's personal knowledge assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved.
+
+Rules:
+- Ground every claim in the provided sources. Do NOT use outside knowledge or invent facts.
+- If the sources don't contain the answer, say so plainly and suggest what they could save.
+- Be concise and direct (2-5 sentences, or a short list when that's clearer).
+- Don't announce a count of items (e.g. "three sources") — just give the list. If you do state a number, it MUST exactly match the number of items you list.
+- CRITICAL — match the user's language: write your ENTIRE answer in the same language as the User question, NOT the language of the sources. If the question is in English, answer in English even when every source is in Hebrew; if the question is in Hebrew, answer in Hebrew. The sources' language must not influence your answer's language.
+- Only cite sources you actually used.
+
+Saved sources:
+{sources_text}
+{history_text}
+
+User question: {question}"""
 
 
 class GeminiService:
@@ -306,58 +383,9 @@ If the image is an article, extract the headline and body."""
                 "citedIds": [],
             }
 
-        def _source_label(c: dict) -> str:
-            """Publisher name for the card — explicit sourceName, else the URL's
-            host. Lets the model answer questions that name the source (e.g.
-            'the CNN fact-check'), which the title/summary alone don't contain."""
-            name = (c.get("sourceName") or "").strip()
-            if name and name.lower() not in ("none", "screenshot", "unknown"):
-                return name
-            url = c.get("url") or ""
-            try:
-                from urllib.parse import urlparse
-                host = urlparse(url).hostname or ""
-                return host[4:] if host.startswith("www.") else host
-            except Exception:
-                return ""
+        prompt = _rag_prompt_body(question, cards, history) + """
 
-        def _card_block(c: dict) -> str:
-            src = _source_label(c)
-            meta = [f"source: {src}"] if src else []
-            meta.append(f"category: {c.get('category', 'General')}")
-            meta.append(f"tags: {', '.join(c.get('tags', []) or [])}")
-            return (
-                f"[{c.get('id')}] {c.get('title', 'Untitled')} "
-                f"({'; '.join(meta)})\n{c.get('summary', '')}"
-            )
-
-        sources_text = "\n\n".join(_card_block(c) for c in cards)
-
-        history_text = ""
-        if history:
-            turns = []
-            for h in history[-6:]:  # keep the prompt bounded
-                role = "User" if h.get("role") == "user" else "Assistant"
-                turns.append(f"{role}: {h.get('content', '')}")
-            history_text = "\n\nEarlier in this conversation:\n" + "\n".join(turns)
-
-        prompt = f"""You are Machina AI, the user's personal knowledge assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved.
-
-Rules:
-- Ground every claim in the provided sources. Do NOT use outside knowledge or invent facts.
-- If the sources don't contain the answer, say so plainly and suggest what they could save.
-- Be concise and direct (2-5 sentences, or a short list when that's clearer).
-- Don't announce a count of items (e.g. "three sources") — just give the list. If you do state a number, it MUST exactly match the number of items you list.
-- CRITICAL — match the user's language: write your ENTIRE answer in the same language as the User question, NOT the language of the sources. If the question is in English, answer in English even when every source is in Hebrew; if the question is in Hebrew, answer in Hebrew. The sources' language must not influence your answer's language.
-- Only cite sources you actually used.
-
-Saved sources:
-{sources_text}
-{history_text}
-
-User question: {question}
-
-Return ONLY a JSON object: {{"answer": string, "citedIds": string[]}} where citedIds are the ids (without brackets) of the sources you relied on."""
+Return ONLY a JSON object: {"answer": string, "citedIds": string[]} where citedIds are the ids (without brackets) of the sources you relied on."""
 
         data = self._generate_json([prompt], "answer", config_extra={"response_schema": BrainAnswer})
 
@@ -380,8 +408,9 @@ Return ONLY a JSON object: {{"answer": string, "citedIds": string[]}} where cite
         model instead writes a plain-text answer and ends with a machine-readable
         marker line `[[CITED: id1, id2]]`. We buffer the tail of the stream so the
         marker is never surfaced to the user, and parse it at the end to derive
-        citations. If the marker is missing/unparseable we fall back to citing all
-        supplied card ids (so sources are never empty when cards exist).
+        citations. If the marker is missing/unparseable we return NO citations
+        (rather than dumping every retrieved card as a source), matching the
+        non-streaming path which returns only the ids the model actually named.
 
         On mid-stream failure this raises AnalysisError; callers should wrap the
         consumption in a try/except and emit a sanitized error to the client.
@@ -398,55 +427,10 @@ Return ONLY a JSON object: {{"answer": string, "citedIds": string[]}} where cite
             yield ("citedIds", [])
             return
 
-        # Reuse the exact source/history framing from answer_from_context so the
-        # grounded answer is identical in quality to the non-streaming path.
-        def _source_label(c: dict) -> str:
-            name = (c.get("sourceName") or "").strip()
-            if name and name.lower() not in ("none", "screenshot", "unknown"):
-                return name
-            url = c.get("url") or ""
-            try:
-                from urllib.parse import urlparse
-                host = urlparse(url).hostname or ""
-                return host[4:] if host.startswith("www.") else host
-            except Exception:
-                return ""
-
-        def _card_block(c: dict) -> str:
-            src = _source_label(c)
-            meta = [f"source: {src}"] if src else []
-            meta.append(f"category: {c.get('category', 'General')}")
-            meta.append(f"tags: {', '.join(c.get('tags', []) or [])}")
-            return (
-                f"[{c.get('id')}] {c.get('title', 'Untitled')} "
-                f"({'; '.join(meta)})\n{c.get('summary', '')}"
-            )
-
-        sources_text = "\n\n".join(_card_block(c) for c in cards)
-
-        history_text = ""
-        if history:
-            turns = []
-            for h in history[-6:]:  # keep the prompt bounded
-                role = "User" if h.get("role") == "user" else "Assistant"
-                turns.append(f"{role}: {h.get('content', '')}")
-            history_text = "\n\nEarlier in this conversation:\n" + "\n".join(turns)
-
-        prompt = f"""You are Machina AI, the user's personal knowledge assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved.
-
-Rules:
-- Ground every claim in the provided sources. Do NOT use outside knowledge or invent facts.
-- If the sources don't contain the answer, say so plainly and suggest what they could save.
-- Be concise and direct (2-5 sentences, or a short list when that's clearer).
-- Don't announce a count of items (e.g. "three sources") — just give the list. If you do state a number, it MUST exactly match the number of items you list.
-- CRITICAL — match the user's language: write your ENTIRE answer in the same language as the User question, NOT the language of the sources. If the question is in English, answer in English even when every source is in Hebrew; if the question is in Hebrew, answer in Hebrew. The sources' language must not influence your answer's language.
-- Only cite sources you actually used.
-
-Saved sources:
-{sources_text}
-{history_text}
-
-User question: {question}
+        # Reuse the exact source/history framing from answer_from_context (via
+        # _rag_prompt_body) so the grounded answer is identical in quality to the
+        # non-streaming path; only the output-format tail differs.
+        prompt = _rag_prompt_body(question, cards, history) + """
 
 Write the answer as plain text (no JSON). Then, on a NEW LINE after the answer, output a citation marker listing the ids (without brackets) of the sources you relied on, in exactly this format:
 [[CITED: id1, id2]]
@@ -525,9 +509,13 @@ Output the marker exactly once, as the very last line, and nothing after it."""
 
         valid_set = set(valid_ids)
         cited = [cid for cid in cited if cid in valid_set]
-        # Never leave sources empty when we did have cards to ground on.
+        # If the model didn't emit a parseable marker, cite NOTHING rather than
+        # dumping every retrieved card as a "source" — claiming the answer used
+        # all N cards when we don't actually know which it used is misleading
+        # (and inconsistent with the non-streaming path, which returns only the
+        # ids the model named). The answer still streams; sources just stay empty.
         if not cited:
-            cited = list(valid_ids)
+            logger.info("Ask stream: no parseable [[CITED:]] marker — returning empty citations")
         yield ("citedIds", cited)
 
     def synthesize_week(self, cards: list) -> dict:
@@ -632,12 +620,7 @@ Return ONLY a JSON object matching the schema (title, narrative, themes[title,in
             return None
 
         try:
-            result = self.client.models.embed_content(
-                model=EMBEDDING_MODEL,
-                contents=text[:9000],
-                config={"output_dimensionality": EMBEDDING_DIMENSIONS}
-            )
-            return result.embeddings[0].values
+            return embed_content(self.client, text)
         except Exception as e:
             logger.error(f"Embedding generation failed: {str(e)}")
             return None

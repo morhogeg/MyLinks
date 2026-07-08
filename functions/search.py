@@ -15,8 +15,12 @@ from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
 from google import genai
 
 from db import get_db
-from ai_service import embedding_needs_repair
+from ai_service import embedding_needs_repair, embed_content, EMBEDDING_MODEL
 from pii import mask_phone
+# Now a normal top-level import: REQUIRE_AUTH lives in the dependency-free config
+# module, so search no longer needs the lazy `from main import REQUIRE_AUTH`
+# (main imports search → that was a circular import dodged at call time).
+from config import REQUIRE_AUTH
 
 logger = logging.getLogger(__name__)
 
@@ -32,22 +36,20 @@ class EmbeddingService:
                 logger.error(f"Failed to initialize Gemini client: {e}")
         else:
             logger.warning("GEMINI_API_KEY environment variable not set!")
-        self.model = "models/gemini-embedding-001"
+        self.model = EMBEDDING_MODEL
         logger.info(f"EmbeddingService initialized with model: {self.model}, client initialized: {self.client is not None}")
 
     def generate_embedding(self, text: str) -> List[float]:
-        """Generate 768-dim embedding for text."""
+        """Generate an embedding for text. Raises if unconfigured or on API error
+        (search must distinguish "not configured" from "no results")."""
         if not self.client:
             logger.error("Gemini client not initialized - cannot generate embeddings! Set GEMINI_API_KEY environment variable.")
             raise Exception("GEMINI_API_KEY not configured. Please set the GEMINI_API_KEY environment variable in Firebase Cloud Functions.")
 
         try:
-            result = self.client.models.embed_content(
-                model=self.model,
-                contents=text,
-                config={"output_dimensionality": 768}
-            )
-            return result.embeddings[0].values
+            # Shared with the write-path embedding (ai_service.embed_content) so
+            # the model + dimensionality can't drift between them.
+            return embed_content(self.client, text)
         except Exception as e:
             logger.error(f"Embedding generation failed: {e}")
             raise Exception(f"Gemini Embedding failed: {str(e)}")
@@ -199,7 +201,6 @@ def search_links(req: https_fn.CallableRequest) -> Any:
         # Prefer the verified caller; fall back to the client uid only while
         # REQUIRE_AUTH is off (staged rollout).
         from link_service import find_data_uid_by_auth_uid
-        from main import REQUIRE_AUTH
         uid = find_data_uid_by_auth_uid(req.auth.uid) if req.auth else None
         if not uid and not REQUIRE_AUTH and req.data:
             uid = req.data.get("uid") or req.data.get("test_uid")
