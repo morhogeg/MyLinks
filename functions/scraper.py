@@ -91,6 +91,22 @@ def _host_matches(host: Optional[str], *domains: str) -> bool:
     return any(host == d or host.endswith("." + d) for d in domains)
 
 
+def is_pinned_host_url(url: str, *domains: str, require_https: bool = True) -> bool:
+    """True if ``url``'s parsed hostname is (a subdomain of) one of ``domains``
+    and — by default — it's served over https.
+
+    Used to pin an outbound fetch that carries credentials (e.g. the Twilio media
+    download, which sends the account SID + auth token as Basic auth) to a known
+    host. Checking the host alone isn't enough: ``http://api.twilio.com/...`` would
+    still leak those credentials in cleartext on the first hop, so the scheme is
+    pinned too.
+    """
+    parsed = urlparse(url or "")
+    if require_https and parsed.scheme != "https":
+        return False
+    return _host_matches(parsed.hostname, *domains)
+
+
 def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
     """
     Fetch and extract content from a URL.

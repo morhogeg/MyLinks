@@ -2416,10 +2416,9 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             # inbound webhook payload; without this a spoofed MediaUrl would make
             # us POST the Twilio account credentials (sent as Basic auth below) to
             # an attacker-controlled or internal host — an SSRF + credential leak.
-            from urllib.parse import urlparse as _urlparse
-            _media_host = (_urlparse(url).hostname or "").lower()
-            if not (_media_host == "api.twilio.com" or _media_host.endswith(".twilio.com")):
-                raise ValueError(f"Refusing to fetch image media from non-Twilio host: {_media_host}")
+            from scraper import is_pinned_host_url
+            if not is_pinned_host_url(url, "twilio.com"):
+                raise ValueError("Refusing to fetch image media: not an https api.twilio.com URL")
 
             img_response = requests.get(url, timeout=30, auth=(account_sid, auth_token))
             img_response.raise_for_status()

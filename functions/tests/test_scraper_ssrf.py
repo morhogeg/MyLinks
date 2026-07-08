@@ -11,7 +11,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import scraper
-from scraper import _host_matches, validate_public_url, UnsafeURLError
+from scraper import _host_matches, validate_public_url, UnsafeURLError, is_pinned_host_url
 from urllib.parse import urlparse
 
 
@@ -36,6 +36,27 @@ class TestHostMatches(unittest.TestCase):
     def test_multiple_domains(self):
         self.assertTrue(_host_matches(_host("https://x.com/a/status/1"), "twitter.com", "x.com"))
         self.assertFalse(_host_matches(_host("https://notx.com/"), "twitter.com", "x.com"))
+
+
+class TestIsPinnedHostUrl(unittest.TestCase):
+    """The credential-carrying Twilio media fetch (main.py) pins to an https
+    api.twilio.com URL via this helper."""
+
+    def test_accepts_https_twilio(self):
+        self.assertTrue(is_pinned_host_url("https://api.twilio.com/media/x.jpg", "twilio.com"))
+        self.assertTrue(is_pinned_host_url("https://media.us1.twilio.com/x", "twilio.com"))
+
+    def test_rejects_http_first_hop_cleartext(self):
+        # Hostname is fine but http would leak the Basic-auth creds in cleartext.
+        self.assertFalse(is_pinned_host_url("http://api.twilio.com/media/x.jpg", "twilio.com"))
+
+    def test_rejects_lookalike_and_foreign_hosts(self):
+        self.assertFalse(is_pinned_host_url("https://api.twilio.com.attacker.example/x", "twilio.com"))
+        self.assertFalse(is_pinned_host_url("https://169.254.169.254/?x=twilio.com", "twilio.com"))
+        self.assertFalse(is_pinned_host_url("https://evil.example/x", "twilio.com"))
+
+    def test_require_https_can_be_relaxed(self):
+        self.assertTrue(is_pinned_host_url("http://api.twilio.com/x", "twilio.com", require_https=False))
 
 
 class TestValidatePublicUrl(unittest.TestCase):
