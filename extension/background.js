@@ -1,4 +1,4 @@
-// MyLinks — Save to Second Brain
+// Machina AI — Save to your knowledge brain
 // Service worker: all capture logic lives here. The popup only manages settings.
 
 const DEFAULT_BASE_URL = "https://secondbrain-app-94da2.web.app";
@@ -114,25 +114,25 @@ async function saveAndReport({ url, note, label }) {
 
   if (result.error === "no-token") {
     await badgeError();
-    notify("Set your token first", "Click to open MyLinks settings and paste your ingest token.");
+    notify("Set your token first", "Click to open Machina AI settings and paste your ingest token.");
     chrome.runtime.openOptionsPage().catch(() => {});
     return result;
   }
   if (result.ok && result.body) {
     if (result.body.duplicate) {
       await badgeDuplicate();
-      notify("Already in MyLinks", name);
+      notify("Already in Machina AI", name);
     } else {
       await badgeSaved();
       const extra = note ? " (with your selection)" : "";
-      notify("Saved to MyLinks ✓", `${name}${extra} — analyzing now, it'll appear in your app shortly.`);
+      notify("Saved to Machina AI ✓", `${name}${extra} — analyzing now, it'll appear in your app shortly.`);
     }
   } else {
     await badgeError();
     const reason =
       result.status === 403 ? "Invalid token — check it in settings." :
       result.status === 401 ? "No token sent — check it in settings." :
-      "Couldn't reach MyLinks. Check your connection.";
+      "Couldn't reach Machina AI. Check your connection.";
     notify("Couldn't save", reason);
   }
   return result;
@@ -172,12 +172,12 @@ function createMenus() {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: CONTEXT_MENU_ID,
-      title: "Save to MyLinks",
+      title: "Save to Machina AI",
       contexts: ["page", "link", "selection"],
     });
     chrome.contextMenus.create({
       id: CONTEXT_SETTINGS_ID,
-      title: "MyLinks settings…",
+      title: "Machina AI settings…",
       contexts: ["action"],
     });
   });
