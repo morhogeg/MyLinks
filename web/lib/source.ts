@@ -86,6 +86,39 @@ export interface SourceFacet extends SourceInfo {
     count: number;
 }
 
+/** Search aliases per platform so typing the platform's name finds its sources
+    and cards even though the facet is labelled by handle/channel (e.g. "@naval",
+    not "X"). "twitter" → X, "yt" → YouTube, etc. */
+const PLATFORM_ALIASES: Record<PlatformKey, string[]> = {
+    youtube: ['youtube', 'yt'],
+    x: ['x', 'twitter', 'tweet'],
+    instagram: ['instagram', 'insta', 'ig'],
+    linkedin: ['linkedin'],
+    facebook: ['facebook', 'fb'],
+    github: ['github'],
+};
+
+/**
+ * Does a source match a search query? Matching is deliberately **precise**, not a
+ * loose substring, so a query resolves to a source only when it names it:
+ *   1. A platform alias — "x"/"twitter" → the X platform (and ONLY X), never a
+ *      publisher that merely contains the letter x ("Perplexity").
+ *   2. Otherwise a word-prefix of the label (ignoring a leading @ and splitting on
+ *      separators) — so "ynet" → Ynet and "naval" → @naval, but a mid-word letter
+ *      ("x" inside "Perplexity") never matches.
+ */
+export function sourceMatchesQuery(info: SourceInfo, query: string): boolean {
+    const q = query.trim().toLowerCase();
+    if (!q) return false;
+    const aliases = info.platform ? PLATFORM_ALIASES[info.platform] : [];
+    if (aliases.some((a) => a.startsWith(q) || q.startsWith(a))) return true;
+    return info.label
+        .toLowerCase()
+        .split(/[\s@/_.-]+/)
+        .filter(Boolean)
+        .some((word) => word.startsWith(q));
+}
+
 /**
  * Build the deduped, ranked list of sources present in a set of cards — the data
  * behind the Sources filter list. Sorted by count (desc) then label (A–Z), with
