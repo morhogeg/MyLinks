@@ -32,6 +32,9 @@ jobs:
       - name: Typecheck
         working-directory: web
         run: npx tsc --noEmit
+      - name: Unit tests (vitest)
+        working-directory: web
+        run: npm run test
 
   functions-compile:
     name: functions · py_compile
@@ -44,6 +47,14 @@ jobs:
       - name: Byte-compile all functions
         working-directory: functions
         run: python -m py_compile *.py
+      # The stdlib-only unit tests import scraper, whose sole heavy top-level
+      # import is `requests` — install just that so the suite runs without the
+      # full (google-genai / firebase) function dependency set.
+      - name: Install test-only deps
+        run: pip install requests
+      - name: Unit tests (unittest)
+        working-directory: functions
+        run: python -m unittest discover -s tests -t . -v
 
   rules-test:
     name: firestore rules · emulator

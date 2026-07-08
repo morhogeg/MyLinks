@@ -6,6 +6,7 @@ from typing import List, Optional
 from google import genai
 from google.cloud.firestore_v1.vector import Vector
 from models import AIAnalysis, BrainAnswer, WeeklySynthesis
+from rag_stream import CITATION_MARKER, safe_emit_point, parse_citation_marker
 
 logger = logging.getLogger(__name__)
 
@@ -438,25 +439,13 @@ Output the marker exactly once, as the very last line, and nothing after it."""
 
         # Tail buffer: hold back the trailing characters that could be the start
         # of the "[[CITED: ...]]" marker so it is never streamed as visible text.
-        # We keep at least the marker's full prefix length buffered at all times.
-        MARKER = "[[CITED:"
+        # The buffering/parsing logic lives in rag_stream.py (stdlib-only, unit
+        # tested) — see safe_emit_point / parse_citation_marker.
+        MARKER = CITATION_MARKER
         # Once we see the marker open we stop emitting and accumulate the rest.
         buffer = ""
         full_text = ""
         marker_seen = False
-
-        def _safe_emit_point(buf: str) -> int:
-            """Return how many leading chars of `buf` are safe to emit now —
-            i.e. cannot be part of an as-yet-incomplete marker at the tail."""
-            # If the marker is fully present, caller handles it separately.
-            idx = buf.find(MARKER)
-            if idx != -1:
-                return idx
-            # Otherwise withhold any suffix that could be the start of the marker.
-            for keep in range(min(len(MARKER) - 1, len(buf)), 0, -1):
-                if buf.endswith(MARKER[:keep]):
-                    return len(buf) - keep
-            return len(buf)
 
         try:
             stream = self.client.models.generate_content_stream(
@@ -485,7 +474,7 @@ Output the marker exactly once, as the very last line, and nothing after it."""
                     marker_seen = True
                     buffer = ""
                     continue
-                emit_to = _safe_emit_point(buffer)
+                emit_to = safe_emit_point(buffer)
                 if emit_to > 0:
                     yield ("token", buffer[:emit_to])
                     buffer = buffer[emit_to:]
@@ -497,15 +486,7 @@ Output the marker exactly once, as the very last line, and nothing after it."""
             raise AnalysisError(f"AI answer failed: {e}")
 
         # Parse the citation marker out of the accumulated full text.
-        cited = []
-        try:
-            import re as _re
-            m = _re.search(r"\[\[CITED:(.*?)\]\]", full_text, _re.DOTALL)
-            if m:
-                raw = m.group(1)
-                cited = [t.strip() for t in raw.split(",") if t.strip()]
-        except Exception:
-            cited = []
+        cited = parse_citation_marker(full_text)
 
         valid_set = set(valid_ids)
         cited = [cid for cid in cited if cid in valid_set]
