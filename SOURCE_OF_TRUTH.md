@@ -589,6 +589,21 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-08 — Removed the share "Open Machina" button; YouTube thumb + scroll-
+  top tweaks (`1c034fb`; TestFlight run #62 → build 1062; Vercel live).** (1) The
+  YouTube open-card thumbnail shortened again to `h-28 sm:h-32`. (2) `ScrollToTop`
+  moved to the **right, just above the + FAB** (`bottom-24 right-…`), smaller
+  (`w-9`) and more muted. (3) **Removed the "Open Machina" button from the Share
+  Extension** (`ShareViewController.swift`) — iOS forbids extensions from
+  launching the host app, so both the URL-scheme (build 1051/1053) and the
+  local-notification (build 1055) routes were dead ends and the button did
+  nothing. Deleted the button + its `configureOpenAppButton`/`openAppTapped`/
+  `openMainApp` methods, re-pinned the scan card's bottom to the hint label, and
+  reworded the sign-in message. The App-Group progress hand-off is still written
+  continuously during the scan (`beginScanAnimation` + `syncProgressHint`), so
+  opening Machina from the Home Screen still resumes the in-app banner at the same
+  %. **`import UserNotifications` is now unused** in that file (harmless). Web tsc
+  clean; Swift builds on CI.
 - **2026-07-08 — 6-fix batch: source filter polish, digest facelift+delete,
   YouTube thumb, scroll-to-top, card fonts (`e66c0f4`; TestFlight run #61 → build
   1061; Vercel live).** (1) `SourceFacetList`: single-source leaf rows now share
