@@ -496,7 +496,11 @@ Output the marker exactly once, as the very last line, and nothing after it."""
         # (and inconsistent with the non-streaming path, which returns only the
         # ids the model named). The answer still streams; sources just stay empty.
         if not cited:
-            logger.info("Ask stream: no parseable [[CITED:]] marker — returning empty citations")
+            # warning (not info): this is now a reachable state whenever the model
+            # flubs the [[CITED:]] marker (or names only invalid ids). The answer
+            # still streams fine with no source chips, but we want its frequency
+            # visible post-deploy to catch a systematic prompt/model regression.
+            logger.warning("Ask stream: no valid [[CITED:]] citations — returning empty citations")
         yield ("citedIds", cited)
 
     def synthesize_week(self, cards: list) -> dict:
