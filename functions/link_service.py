@@ -209,7 +209,7 @@ def ensure_ingest_token(uid: str) -> str:
 
     token = secrets.token_urlsafe(24)
     user_ref.set({'ingestToken': token}, merge=True)
-    logger.info(f"Generated new ingest token for user {uid}")
+    logger.info(f"Generated new ingest token for user {mask_phone(uid)}")
     return token
 
 

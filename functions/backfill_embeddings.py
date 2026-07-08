@@ -12,6 +12,7 @@ from google import genai
 # Add functions directory to path for imports
 sys.path.append(os.path.join(os.getcwd(), 'functions'))
 from search import EmbeddingService
+from pii import mask_phone
 
 def backfill_embeddings(force=False):
     # Initialize Firebase Admin
@@ -38,7 +39,7 @@ def backfill_embeddings(force=False):
     
     for user_doc in users:
         uid = user_doc.id
-        print(f"\nProcessing user: {uid}")
+        print(f"\nProcessing user: {mask_phone(uid)}")
         
         links_ref = db.collection("users").document(uid).collection("links")
         # Find links that DON'T have an embedding vector

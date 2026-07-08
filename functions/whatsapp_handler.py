@@ -13,6 +13,7 @@ from twilio.rest import Client
 
 from link_service import is_hebrew
 from reminder_service import format_local_time
+from pii import mask_phone
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ def send_whatsapp_message(to_number: str, body: str) -> bool:
     from_number = os.environ.get("TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238886")
 
     if not account_sid or not auth_token:
-        logger.warning(f"Twilio credentials missing. Would have sent to {to_number}: {body[:100]}...")
+        logger.warning(f"Twilio credentials missing. Would have sent to {mask_phone(to_number)} ({len(body)} chars).")
         return False
 
     try:
