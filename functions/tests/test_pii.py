@@ -12,7 +12,7 @@ from pii import mask_phone, mask_email
 
 class TestMaskPhone(unittest.TestCase):
     def test_keeps_only_last_four(self):
-        self.assertEqual(mask_phone("+16462440305"), "***0305")
+        self.assertEqual(mask_phone("+12025550142"), "***0142")
         self.assertEqual(mask_phone("15551234567"), "***4567")
 
     def test_short_or_empty_is_fully_masked(self):
