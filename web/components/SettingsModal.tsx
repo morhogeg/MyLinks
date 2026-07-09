@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef, Children } from 'react';
 import type { ReactNode } from 'react';
 import { User, DigestMode, DigestChannel, ReminderChannel } from '@/lib/types';
-import { X, Bell, Sparkles, Check, Sun, Moon, Monitor, RefreshCw, BrainCircuit, Mail, Shuffle, Tag, Inbox, Star, History, ChevronLeft, ChevronRight, Compass, LogOut, Search, ShieldCheck, ExternalLink, Network, Clock, Info } from 'lucide-react';
+import { X, Bell, Sparkles, Check, Sun, Moon, Monitor, RefreshCw, BrainCircuit, Mail, Shuffle, Tag, Inbox, Star, History, ChevronLeft, ChevronRight, Compass, LogOut, Search, ShieldCheck, ExternalLink, Network, Clock, Info, Puzzle, Copy, Eye, EyeOff } from 'lucide-react';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
 import { registerPush, unregisterPush } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
@@ -18,6 +18,7 @@ import { auth } from '@/lib/firebase';
 import ProfileAvatar from './ProfileAvatar';
 import ConfirmDialog from './ConfirmDialog';
 import { useToast } from './Toast';
+import { fetchShareConfig } from '@/lib/shareConfig';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { Trash2 } from 'lucide-react';
 
@@ -37,7 +38,7 @@ type Frequency = User['settings']['reminder_frequency'];
 // One home for "how Machina brings your saves back": the main list plus the
 // drill-in sub-screens. Navigation is a simple stack (push/pop) so Back always
 // returns to wherever you came from and the edge-swipe pops one level.
-type View = 'main' | 'account' | 'resurfacing' | 'cadence' | 'style' | 'schedule' | 'cards' | 'delivery';
+type View = 'main' | 'account' | 'resurfacing' | 'cadence' | 'style' | 'schedule' | 'cards' | 'delivery' | 'extension';
 
 const VIEW_TITLE: Record<View, string> = {
     main: 'Settings',
@@ -48,6 +49,7 @@ const VIEW_TITLE: Record<View, string> = {
     schedule: 'Schedule',
     cards: 'Cards per digest',
     delivery: 'Delivery',
+    extension: 'Browser extension',
 };
 
 const FREQUENCY_NOTE: Record<string, string> = {
@@ -619,6 +621,10 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                                 setEmail={setEmail}
                             />
                         )}
+
+                        {view === 'extension' && (
+                            <ExtensionView uid={uid} toast={toast} />
+                        )}
                     </div>
                 </div>
 
@@ -720,6 +726,12 @@ function MainView({
                 <NavRow tile={<Clock className="w-[17px] h-[17px]" />} tileClass="bg-pink-500" title="Reminders & Digest" value={remindersOrDigest ? 'On' : 'Off'} onClick={() => go('resurfacing')} />
             </List>
             {pushNote && <p className="text-[12px] text-amber-500 leading-snug px-2 pt-1.5">{pushNote}</p>}
+
+            <SectionHeader>Integrations</SectionHeader>
+            <List>
+                <NavRow tile={<Puzzle className="w-[16px] h-[16px]" />} tileClass="bg-violet-500" title="Browser extension" onClick={() => go('extension')} />
+            </List>
+            <Footnote>Save any page into your library from Chrome, Edge, or Brave with one click.</Footnote>
 
             <SectionHeader>Appearance</SectionHeader>
             <List>
@@ -1080,6 +1092,134 @@ function DeliveryView({
                 </div>
             )}
             <Footnote>Every digest lands in the in-app Digest section, and as a push notification when notifications are on. These are extra channels on top of that.</Footnote>
+        </>
+    );
+}
+
+/** Browser-extension / iOS-Shortcut setup: reveals and copies the workspace's
+    personal ingest token (and the endpoint the Shortcut posts to). The token is
+    fetched from the get_share_config callable — the same server-side source of
+    truth the native Share bridge uses, which mints one on first use. */
+function ExtensionView({ uid, toast }: { uid: string; toast: ReturnType<typeof useToast> }) {
+    const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+    const [token, setToken] = useState('');
+    const [endpoint, setEndpoint] = useState('');
+    const [revealed, setRevealed] = useState(false);
+
+    // Reload counter — bumped by Retry to re-run the fetch effect below.
+    const [reloadNonce, setReloadNonce] = useState(0);
+    // Fetch on entry (this screen only mounts when navigated to) and on retry.
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            setStatus('loading');
+            try {
+                const cfg = await fetchShareConfig(uid);
+                if (cancelled) return;
+                setToken(cfg.token);
+                setEndpoint(cfg.endpoint);
+                setStatus('ready');
+            } catch {
+                if (!cancelled) setStatus('error');
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [uid, reloadNonce]);
+
+    const copy = async (value: string, label: string) => {
+        try {
+            await navigator.clipboard.writeText(value);
+            toast.success(`${label} copied`);
+        } catch {
+            toast.error("Couldn't copy — select the text and copy it manually.");
+        }
+    };
+
+    const hasToken = status === 'ready' && !!token;
+    const masked = token ? `••••${token.slice(-4)}` : '';
+
+    return (
+        <>
+            <LargeTitle>Browser extension</LargeTitle>
+
+            <SectionHeader first>Ingest token</SectionHeader>
+            {status === 'loading' && (
+                <List>
+                    <RowShell>
+                        <RowText title="Loading your token…" />
+                        <RefreshCw className="ml-auto w-4 h-4 text-text-muted animate-spin shrink-0" />
+                    </RowShell>
+                </List>
+            )}
+            {status === 'error' && (
+                <List>
+                    <RowShell>
+                        <RowText title="Couldn't load your token" sub="Check your connection and try again." />
+                        <button
+                            onClick={() => setReloadNonce((n) => n + 1)}
+                            className="ml-auto h-8 px-3 rounded-full bg-card-hover border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                        >
+                            <RefreshCw className="w-4 h-4" />
+                            Retry
+                        </button>
+                    </RowShell>
+                </List>
+            )}
+            {hasToken && (
+                <List>
+                    <RowShell>
+                        <div className="flex-1 min-w-0 py-[11px]">
+                            <div className="text-[15px] text-text tracking-[-0.01em] leading-tight font-mono truncate">
+                                {revealed ? token : masked}
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setRevealed((v) => !v)}
+                            aria-label={revealed ? 'Hide token' : 'Reveal token'}
+                            aria-pressed={revealed}
+                            className="text-text-muted hover:text-accent transition-colors cursor-pointer shrink-0 p-1"
+                        >
+                            {revealed ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
+                        </button>
+                        <button
+                            onClick={() => copy(token, 'Token')}
+                            className="ml-1 h-8 px-3 rounded-full bg-card-hover border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                        >
+                            <Copy className="w-4 h-4" />
+                            Copy
+                        </button>
+                    </RowShell>
+                </List>
+            )}
+            {status === 'ready' && !token && (
+                <List>
+                    <RowShell>
+                        <RowText title="No token yet" sub="Your ingest token is created together with your workspace — reopen this screen in a moment." />
+                    </RowShell>
+                </List>
+            )}
+            <Footnote>Used by the browser extension and iOS Shortcut to save into your library. Paste it into the extension&apos;s settings popup, then keep it private.</Footnote>
+
+            {hasToken && (
+                <>
+                    <SectionHeader>Endpoint</SectionHeader>
+                    <List>
+                        <RowShell>
+                            <div className="flex-1 min-w-0 py-[11px]">
+                                <div className="text-[15px] text-text tracking-[-0.01em] leading-tight font-mono truncate">{endpoint}</div>
+                            </div>
+                            <button
+                                onClick={() => copy(endpoint, 'Endpoint')}
+                                className="ml-1 h-8 px-3 rounded-full bg-card-hover border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                            >
+                                <Copy className="w-4 h-4" />
+                                Copy
+                            </button>
+                        </RowShell>
+                    </List>
+                    <Footnote>The browser extension already points here by default — only the token is required. This is the URL the iOS Shortcut posts to.</Footnote>
+                </>
+            )}
         </>
     );
 }

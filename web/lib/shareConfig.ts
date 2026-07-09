@@ -99,9 +99,31 @@ export function onShareBridgeStatus(fn: (s: ShareBridgeStatus) => void): () => v
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Fetch this workspace's share-ingest endpoint + personal ingest token from the
+ * `get_share_config` callable — the single server-side source of truth, which
+ * mints a token on first use. Used both by the native bridge's token-less
+ * fallback below and by the web Settings "Browser extension" screen (so the
+ * extension / iOS Shortcut can be configured). No new backend endpoint.
+ * Throws if the callable fails or returns nothing usable.
+ */
+export async function fetchShareConfig(uid: string): Promise<{ endpoint: string; token: string }> {
+    const { httpsCallable } = await import('firebase/functions');
+    const { functions } = await import('./firebase');
+    const getShareConfig = httpsCallable<
+        { uid: string },
+        { endpoint: string; token: string }
+    >(functions, 'get_share_config');
+    const res = await getShareConfig({ uid });
+    const endpoint = res.data?.endpoint;
+    const token = res.data?.token;
+    if (!endpoint || !token) throw new Error('No ingest token available');
+    return { endpoint, token };
+}
+
 async function attemptOnce(uid: string, docToken?: string): Promise<void> {
-    let endpoint: string | undefined;
-    let token: string | undefined;
+    let endpoint: string;
+    let token: string;
 
     // Preferred source: the ingest token straight off the already-loaded user
     // doc, with the endpoint built from the app's own API base. No callable,
@@ -113,18 +135,9 @@ async function attemptOnce(uid: string, docToken?: string): Promise<void> {
     } else {
         // Fallback (first-ever launch before a token exists on the doc): the
         // get_share_config callable mints one server-side.
-        const { httpsCallable } = await import('firebase/functions');
-        const { functions } = await import('./firebase');
-        const getShareConfig = httpsCallable<
-            { uid: string },
-            { endpoint: string; token: string }
-        >(functions, 'get_share_config');
-        const res = await getShareConfig({ uid });
-        endpoint = res.data?.endpoint;
-        token = res.data?.token;
+        ({ endpoint, token } = await fetchShareConfig(uid));
     }
 
-    if (!endpoint || !token) throw new Error('No ingest token available');
     await ShareConfigNative.save({ endpoint, token });
 }
 
