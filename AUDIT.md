@@ -17,8 +17,11 @@
 
 ## 1. Executive Summary
 
-**Baseline health:** `tsc --noEmit` ✅ clean · `py_compile` ✅ clean · eslint ❌ 15 errors / 37 warnings ·
-`npm audit` ❌ 1 critical (protobufjs, transitive), 5 high, 5 moderate, 1 low.
+**Baseline health at audit time:** tsc ✅ · py_compile ✅ · eslint ❌ 15 errors / 37 warnings ·
+npm audit ❌ 1 critical, 5 high, 5 moderate, 1 low.
+**Final health after remediation (2026-07-09):** tsc ✅ · py_compile ✅ · eslint ✅ 0 errors
+(2 deliberate AuthProvider exhaustive-deps warnings) · npm audit ✅ 0 critical/high (1 accepted
+moderate: postcss vendored inside Next) · `next build` ✅ · pytest ✅ 73/73 · Next 16.2.10.
 
 ### Top 5 risks
 
@@ -336,16 +339,16 @@ Verified against actual files (not docs claims).
 | I-1 | CI hardening: assert aps-environment=production in exported IPA (both targets' check where applicable); filter Xcode beta from glob; altool → xcodebuild -exportArchive destination=upload; SIWA entitlement hard-fail | .github/workflows/ios-testflight.yml | — | yaml valid; assertions target the IPA; needs one CI run to confirm (M15) | ✅ |
 | I-2 | iOS cleanup: ShareExt unused imports (Social/MobileCoreServices/UserNotifications), temp-file cleanup on upload completion + stale-file sweep, ShareExt CURRENT_PROJECT_VERSION 19→21 (both configs), stale comments (Info.plist:54-57, ShareConfigPlugin.swift:44-47) | web/ios/App/ShareExt/ShareViewController.swift, App/Info.plist, App/ShareConfigPlugin.swift, App.xcodeproj/project.pbxproj | — | Swift compiles by inspection (no CI here); pbxproj numbers match; machina:// scheme KEPT (Shortcut/deep-link uses) | ✅ |
 | I-3 | Extension rebrand MyLinks→Machina AI (manifest, background, popup, READMEs, safari build script) | extension/*, safari/* | — | no "MyLinks"/"Second Brain"/com.mylinks.* left; manifest valid JSON | ✅ |
-| D-16 | eslint zero-errors sweep (remaining errors: no-explicit-any ×7, set-state-in-effect ×3, purity ×1) + unused-import warnings | storage.ts, ThemeProvider.tsx, CollectionFormModal.tsx, ManageCollectionCardsSheet.tsx, + misc | W-2, W-3, F-1, P-1 | `npx eslint .` → 0 errors; warnings ≤ 5 | 🔄 |
+| D-16 | eslint zero-errors sweep (remaining errors: no-explicit-any ×7, set-state-in-effect ×3, purity ×1) + unused-import warnings | storage.ts, ThemeProvider.tsx, CollectionFormModal.tsx, ManageCollectionCardsSheet.tsx, + misc | W-2, W-3, F-1, P-1 | `npx eslint .` → 0 errors; warnings ≤ 5 | ✅ |
 | D-17 | README full rewrite (real product: recall engine/capture/synthesis; drop WhatsApp, PWA badge, Graph Viz/Insights/Offline/Table-view claims, Shadcn claim, stale structure) | README.md | W-1 | no false feature claims; matches actual architecture | ✅ |
 | D-18 | Docs sweep: SOURCE_OF_TRUTH (WhatsApp refs, stale TARGETED_DEVICE_FAMILY claim :470, PII scrub :1375-1376, §9 session-log entry for this remediation, §4 checkbox updates), docs/APP_STORE.md (WhatsApp bullets/notes, stale device-family :177/:186), AUTH_SPEC.md (:15 PII, :23/:57/:151), NATIVE_AUTH_SETUP.md:144, ship SKILL.md:110, deploy-hosting.sh header, models.py:195 PII placeholder | SOURCE_OF_TRUTH.md, docs/APP_STORE.md, AUTH_SPEC.md, NATIVE_AUTH_SETUP.md, .claude/skills/ship/SKILL.md, deploy-hosting.sh, functions/models.py | W-1, D-2 done first for models.py | placeholders replace real PII; docs match code state | ✅ |
 | D-19 | Backend dead code: ClaudeService, models.py LinkDocument/RelatedLink + graph_service import, main.py:42 dead import + :44 stale comment, delete backfill_embeddings.py + test_yt_scrape.py, log-the-silent-excepts (scraper empty-dict returns get a logger.warning) | functions/ai_service.py, models.py, graph_service.py, main.py, backfill_embeddings.py(del), test_yt_scrape.py(del), scraper.py | W-1, C-1, S-1, S-3 | py_compile clean; grep confirms no references to deleted symbols | ✅ |
 | A-11 | a11y: Escape handlers (LinkDetailModal, ReminderModal, SettingsModal), initial focus into dialogs, desktop search aria-label, icon-button aria-labels (ConfirmDialog close etc.) | web/components/LinkDetailModal.tsx, ReminderModal.tsx, SettingsModal.tsx, Feed.tsx | W-2, P-1 | Escape closes each; focus moves in; labels present | ✅ |
-| F-2 | Settings ingest-token copy UI (N-1) | web/components/SettingsModal.tsx (+ lib/shareConfig.ts) | W-2, A-11 | token visible + copy button under a Capture/Extensions row | 🔄 |
-| R-1 | Extract share_service.py (main.py:1529-1997) + dedup link_data builders | functions/main.py, functions/share_service.py(new) | W-1, S-2, S-3, D-19 | endpoints unchanged (names/decorators stay in main.py or re-exported); py_compile clean; behavior-identical | 🔄 |
-| N-2a | Offline pytest suite + GH Actions python-tests job; rules-test CI job | functions/tests/(new), .github/workflows/python-tests.yml(new), .github/workflows/rules-tests.yml(new) | W-1, R-1 | tests pass locally offline; workflows lint-valid; needs CI run (M15) | 🔄 |
-| R-3 | Feed.tsx decomposition (hooks + render extractions per §8 seams) | web/components/Feed.tsx + new files | P-1, A-11, D-16 | pure mechanical extraction; tsc + next build clean; **highest-risk refactor — only if all prior batches verified green** | ⬜ |
-| R-4 | SettingsModal decomposition (useUserSettings, DigestSettings, AccountSection) | web/components/SettingsModal.tsx + new files | W-2, A-11, F-2 | same bar as R-3 | ⬜ |
+| F-2 | Settings ingest-token copy UI (N-1) | web/components/SettingsModal.tsx (+ lib/shareConfig.ts) | W-2, A-11 | token visible + copy button under a Capture/Extensions row | ✅ |
+| R-1 | Extract share_service.py (main.py:1529-1997) + dedup link_data builders | functions/main.py, functions/share_service.py(new) | W-1, S-2, S-3, D-19 | endpoints unchanged (names/decorators stay in main.py or re-exported); py_compile clean; behavior-identical | ✅ |
+| N-2a | Offline pytest suite + GH Actions python-tests job; rules-test CI job | functions/tests/(new), .github/workflows/python-tests.yml(new), .github/workflows/rules-tests.yml(new) | W-1, R-1 | tests pass locally offline; workflows lint-valid; needs CI run (M15) | ✅ |
+| R-3 | Feed.tsx decomposition (hooks + render extractions per §8 seams) | web/components/Feed.tsx + new files | P-1, A-11, D-16 | pure mechanical extraction; tsc + next build clean; **highest-risk refactor — only if all prior batches verified green** | ✅ |
+| R-4 | SettingsModal decomposition (useUserSettings, DigestSettings, AccountSection) | web/components/SettingsModal.tsx + new files | W-2, A-11, F-2 | same bar as R-3 | ✅ |
 
 **Explicitly NOT tasked (needs human judgment):** markdown-stack consolidation (A-7, visual QA),
 requirements pinning (A-8/M9, needs deploy truth), get_article gating (S-4/M10), ShareExt
@@ -374,3 +377,15 @@ background reconciliation (P-7, device work), light-theme *design* investment be
   Batch 3 running: R-1 (share_service extraction), F-2 (Settings ingest-token
   UI), D-16 (eslint zero errors), N-2a (pytest harness + python/rules CI).
   Then B4 decision on R-3/R-4 decompositions.
+- **2026-07-09 (FINAL — all agent tasks complete).** Batches 3+4 landed: R-1
+  (share_service.py extraction + link_data dedup, main.py 2545→2204), F-2
+  (Settings ingest-token surface reusing get_share_config), D-16 (eslint 0
+  errors), N-2a (73 offline pytest tests + python-tests/rules-tests CI
+  workflows), R-4 (SettingsModal 1454→419 via useUserSettings +
+  settings/ components), R-3 (Feed 2398→1732 via useLinks/useSemanticSearch/
+  useFeedFilters/useLinkActions + feed/ components). 25 tasks total, each an
+  individually reviewed commit. **Every remaining item in this document is
+  in §9 Manual Action Required (owner-only)** — the highest-leverage ones:
+  M1 auth cutover, M2 key rotation + env flags, M7 APNs console steps, M15
+  one TestFlight CI run to validate the pipeline changes (aps assertion,
+  exportArchive upload, new workflows), M6 Twilio decommission.
