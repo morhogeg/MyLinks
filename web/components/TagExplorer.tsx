@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { TagNode, buildTagTree } from '@/lib/tags';
-import { ChevronRight, ChevronDown, Tag, Hash, Folder, X, Search, Filter, ChevronLeft } from 'lucide-react';
+import { ChevronRight, ChevronDown, Tag, Hash, X, Search, ChevronLeft } from 'lucide-react';
 
 interface TagExplorerProps {
     tags: string[];

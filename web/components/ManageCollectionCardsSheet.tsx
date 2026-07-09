@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Collection, Link } from '@/lib/types';
-import { Check, X, Search, LayoutGrid } from 'lucide-react';
+import { Check, Search, LayoutGrid } from 'lucide-react';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { addLinkToCollection, removeLinkFromCollection } from '@/lib/collections';
 import { useToast } from '@/components/Toast';
@@ -35,12 +35,22 @@ export default function ManageCollectionCardsSheet({
     // doesn't push the card list under the keys. No-op on desktop.
     const vp = useVisualViewport();
 
+    // Clear the search field when the sheet opens. Done as a render-time state
+    // adjustment (React re-renders synchronously, discarding the stale pass)
+    // rather than in the effect below, which avoids a set-state-in-effect
+    // cascade — and, unlike the old effect, doesn't get re-triggered by the
+    // inline `onClose` prop changing on every parent render.
+    const [prevOpen, setPrevOpen] = useState(isOpen);
+    if (prevOpen !== isOpen) {
+        setPrevOpen(isOpen);
+        if (isOpen) setQ('');
+    }
+
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
         if (isOpen) {
             window.addEventListener('keydown', handleEscape);
             document.body.style.overflow = 'hidden';
-            setQ('');
         }
         return () => {
             window.removeEventListener('keydown', handleEscape);

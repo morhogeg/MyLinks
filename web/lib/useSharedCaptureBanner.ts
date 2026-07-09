@@ -77,7 +77,6 @@ export function useSharedCaptureBanner(processingActive: boolean): AnalyzingStat
             document.removeEventListener('visibilitychange', onVis);
             window.removeEventListener('focus', check);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Real processing card appeared → hand off (it owns the finish frame).
@@ -102,7 +101,11 @@ export function useSharedCaptureBanner(processingActive: boolean): AnalyzingStat
     const elapsedReal = Math.max(0, now() - signal.openedAt);
     if (elapsedReal > MAX_MS) {
         // No real card ever arrived. Emit exactly one inactive frame so the banner
-        // flashes "Saved" and slides away, then clear.
+        // flashes "Saved" and slides away, then clear. finishedOnce is a deliberate
+        // once-latch (not render-affecting state): it gates the single terminal
+        // frame emitted during the render→setSignal(null) hand-off, so reading it
+        // here is intentional rather than a stale-ref hazard.
+        // eslint-disable-next-line react-hooks/refs
         if (!finishedOnce.current) {
             finishedOnce.current = true;
             Promise.resolve().then(() => setSignal(null));

@@ -103,7 +103,7 @@ function Card({
         ? link.sourceName : null;
 
     // Format relative time (e.g., "2h ago")
-    const getTimeAgo = (timestamp: any, now: number): string => {
+    const getTimeAgo = (timestamp: number | string, now: number): string => {
         if (!timestamp || !now) return '...';
 
         // Handle ISO string or number

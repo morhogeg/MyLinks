@@ -28,7 +28,6 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                 {/* Brand mark — same lockup as LoginScreen so the handoff from
                     sign-in feels like one continuous flow. */}
                 <div className="w-16 h-16 rounded-3xl overflow-hidden shadow-lg shadow-purple-500/20 ring-1 ring-white/15">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
                 </div>
 

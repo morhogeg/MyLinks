@@ -3,7 +3,7 @@ import { db, appCheckHeaders } from './firebase';
 import { authHeaders } from './auth';
 import { apiUrl, fetchWithTimeout } from './api';
 
-import { Link, LinkMetadata, LinkStatus, User } from './types';
+import { AnalyzeResponse, Link, LinkMetadata, LinkStatus, User } from './types';
 
 /**
  * Normalize a Firestore link doc into a safe `Link`.
@@ -76,7 +76,7 @@ export async function saveLink(uid: string, linkData: Partial<Link>): Promise<vo
             acc[key] = value;
         }
         return acc;
-    }, {} as any);
+    }, {} as Record<string, unknown>);
 
     await addDoc(linksRef, {
         ...cleanData,
@@ -120,13 +120,13 @@ export async function retryFailedLink(uid: string, link: Link): Promise<void> {
             body: JSON.stringify({ url: link.url, existingTags, uid }),
         }, 60_000);
         const text = await response.text();
-        let data: any;
+        let data: AnalyzeResponse;
         try {
-            data = JSON.parse(text);
+            data = JSON.parse(text) as AnalyzeResponse;
         } catch {
             throw new Error('The analysis service returned an unexpected response.');
         }
-        if (!response.ok || !data.success) {
+        if (!response.ok || !data.success || !data.link) {
             throw new Error(data?.error || 'Analysis failed. Please try again.');
         }
 
@@ -271,7 +271,7 @@ export async function getUserSettings(uid: string): Promise<User['settings'] | n
 export async function updateUserSettings(uid: string, settings: Partial<User['settings']>): Promise<void> {
     const userRef = doc(db, 'users', uid);
     // Construct dot notation for partial updates to avoid overwriting other settings
-    const updates: Record<string, any> = {};
+    const updates: Record<string, unknown> = {};
     Object.entries(settings).forEach(([key, value]) => {
         updates[`settings.${key}`] = value;
     });

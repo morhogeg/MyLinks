@@ -34,7 +34,6 @@ export default function ImageScanProgress({ imageSrc, progress }: ImageScanProgr
     return (
         <div className="space-y-3">
             <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-white/10">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={imageSrc} alt="Analyzing" className="w-full h-full object-cover" />
 
                 {/* Dim + subtle blur so the scan line reads clearly */}

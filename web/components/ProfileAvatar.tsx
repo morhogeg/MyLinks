@@ -22,7 +22,6 @@ export default function ProfileAvatar({
 
     if (photoURL) {
         return (
-            // eslint-disable-next-line @next/next/no-img-element
             <img
                 src={photoURL}
                 alt={name || email || 'Profile'}

@@ -35,7 +35,6 @@ export default function VideoScanProgress({ thumbnailSrc, progress }: VideoScanP
         <div className="space-y-3">
             <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-white/10 bg-black">
                 {thumbnailSrc ? (
-                    // eslint-disable-next-line @next/next/no-img-element
                     <img src={thumbnailSrc} alt="Analyzing video" className="w-full h-full object-cover" />
                 ) : (
                     <div className="w-full h-full bg-[image:var(--accent-gradient)] opacity-30" />

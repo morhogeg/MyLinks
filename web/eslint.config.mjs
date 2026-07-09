@@ -13,6 +13,14 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    rules: {
+      // We intentionally use plain <img>: this app is a static export (no Next
+      // image optimization server) and renders remote thumbnails from arbitrary
+      // hosts, which next/image can't handle without a custom loader.
+      "@next/next/no-img-element": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

@@ -58,12 +58,15 @@ const isPending = (l: Link) => l.status === 'processing' || l.status === 'failed
 
 // Consistent millisecond timestamp from a number, ISO string, or Firestore
 // Timestamp. Module-scope + pure so it's a stable dependency for memoization.
-const getTimestampNumber = (val: any): number => {
+const getTimestampNumber = (val: unknown): number => {
     if (!val) return 0;
     if (typeof val === 'number') return val;
     if (typeof val === 'string') return new Date(val).getTime();
-    if (val.toMillis && typeof val.toMillis === 'function') return val.toMillis();
-    if (val.seconds) return val.seconds * 1000;
+    if (typeof val === 'object') {
+        const obj = val as { toMillis?: () => number; seconds?: number };
+        if (typeof obj.toMillis === 'function') return obj.toMillis();
+        if (obj.seconds) return obj.seconds * 1000;
+    }
     return 0;
 };
 
@@ -168,7 +171,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // Semantic Search State
     const [isSearching, setIsSearching] = useState(false);
     const [searchResults, setSearchResults] = useState<Link[]>([]);
-    const [searchError, setSearchError] = useState<string | null>(null);
+    const [, setSearchError] = useState<string | null>(null);
     const [debouncedQuery, setDebouncedQuery] = useState('');
 
     // Debounce search query
@@ -231,22 +234,23 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 setSearchResults((data.links || []).map((r) =>
                     toLink({ id: r.id, data: () => r } as unknown as QueryDocumentSnapshot<DocumentData>)
                 ));
-            } catch (err: any) {
+            } catch (err: unknown) {
                 if (isStale()) return;
                 console.error("Search failed:", err);
                 // Extract error message from the Firebase callable error
                 let errorMessage = 'Search failed. Please try again.';
-                if (err?.message) {
-                    if (err.message.includes('SEMANTIC_SEARCH_NOT_CONFIGURED')) {
+                const message = err instanceof Error ? err.message : '';
+                if (message) {
+                    if (message.includes('SEMANTIC_SEARCH_NOT_CONFIGURED')) {
                         errorMessage = 'Semantic search is not configured. Please set GEMINI_API_KEY in Firebase Functions.';
-                    } else if (err.message.includes('SEMANTIC_SEARCH_ERROR')) {
+                    } else if (message.includes('SEMANTIC_SEARCH_ERROR')) {
                         errorMessage = 'Failed to generate search embeddings. Check your API key.';
-                    } else if (err.message.includes('VECTOR_SEARCH_ERROR')) {
+                    } else if (message.includes('VECTOR_SEARCH_ERROR')) {
                         errorMessage = 'Vector search failed. Please ensure Firestore vector index is deployed.';
-                    } else if (err.message.includes('GEMINI_API_KEY')) {
+                    } else if (message.includes('GEMINI_API_KEY')) {
                         errorMessage = 'API key not configured for semantic search.';
                     } else {
-                        errorMessage = err.message;
+                        errorMessage = message;
                     }
                 }
                 setSearchError(errorMessage);
