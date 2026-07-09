@@ -4,12 +4,12 @@ Digest Service
 Delivers a *curated set of saved cards* to the user on a schedule (daily or
 weekly). Every digest is ALWAYS persisted to users/{uid}/digests — the in-app
 Digest section is the always-on surface — and additionally sent over the
-opt-in delivery channels (iOS push, email, WhatsApp).
+opt-in delivery channels (iOS push, email).
 
 The user controls, from Settings:
   • whether digests are on at all              (digest_enabled)
   • how often                                  (digest_frequency: daily | weekly)
-  • where to                                   (digest_channels: push / email / whatsapp)
+  • where to                                   (digest_channels: push / email)
   • what to curate                             (digest_mode)
   • a topic to focus on                        (digest_topic, when mode=topic)
   • how many cards                             (digest_count)
@@ -26,8 +26,8 @@ backend curates all six identically — the split is presentation only:
   favorites  – revisit your starred cards                               [advanced]
 
 Email is sent via SendGrid (if SENDGRID_API_KEY is set) or SMTP (if SMTP_HOST
-is set); otherwise it degrades gracefully to a logged no-op, exactly like the
-Twilio path in whatsapp_handler.py. No new Python dependency is required.
+is set); otherwise it degrades gracefully to a logged no-op. No new Python
+dependency is required.
 """
 
 import os
@@ -110,6 +110,20 @@ def _to_ms(value) -> int:
         except Exception:
             return 0
     return 0
+
+
+def _normalize_channels(stored) -> List[str]:
+    """Resolve a user's stored digest_channels into the live channel set.
+
+    Digest delivery is push + email. A missing setting defaults to ['push'];
+    any legacy 'whatsapp' entry is migrated to 'push' at read time (deduped),
+    so a user who only ever had WhatsApp still receives push digests.
+    """
+    if stored is None:
+        return ["push"]
+    return list(dict.fromkeys(
+        "push" if c == "whatsapp" else c for c in (stored or [])
+    ))
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -248,36 +262,11 @@ def curate(links: List[dict], mode: str, count: int, topics=None) -> List[dict]:
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# Formatting — WhatsApp
+# Formatting helpers
 # ─────────────────────────────────────────────────────────────────────────
 
 def _link_url(link_id: str) -> str:
     return f"{APP_URL}?linkId={link_id}"
-
-
-# Twilio caps a WhatsApp message body at 1600 chars; stay safely under it and
-# split a long digest across multiple messages rather than have Twilio reject it.
-WHATSAPP_LIMIT = 1500
-
-
-def _whatsapp_card_block(index: int, c: dict) -> str:
-    """Render a single card as an atomic WhatsApp block (never split)."""
-    title = (c.get("title") or "Untitled").strip()
-    category = c.get("category") or "General"
-    emoji = _cat_emoji(category)
-    read = (c.get("metadata") or {}).get("estimatedReadTime")
-    meta = f"{emoji} {category}"
-    if read:
-        meta += f" · ⏱️ {read} min"
-    summary = (c.get("summary") or "").strip()
-    if len(summary) > 140:
-        summary = summary[:137].rstrip() + "…"
-
-    parts = [f"*{index}. {title}*", meta]
-    if summary:
-        parts.append(summary)
-    parts.append(_link_url(c["id"]))
-    return "\n".join(parts)
 
 
 def _topics_label(topics) -> str:
@@ -288,49 +277,6 @@ def _topics_label(topics) -> str:
         topics = [topics]
     items = [t.strip() for t in topics if t and t.strip()]
     return ", ".join(items) if items else "your library"
-
-
-def format_digest_whatsapp_messages(cards: List[dict], mode: str, topics, frequency: str) -> List[str]:
-    """
-    Render the curated cards as one or more WhatsApp messages, each kept under
-    Twilio's length limit. Card blocks are packed greedily; the header rides on
-    the first message and the footer on the last.
-    """
-    period = "Daily" if frequency == "daily" else "Weekly"
-    blurb = MODE_BLURB.get(mode, MODE_BLURB["smart"]).format(topic=_topics_label(topics))
-    header = f"🧠 *Your {period} Brew* — {len(cards)} cards\n_{blurb}_"
-    footer = (f"📲 Open Machina AI:\n{APP_URL}\n\n"
-              "_Reply DIGEST for a fresh one • STOP DIGEST to pause_")
-
-    blocks = [_whatsapp_card_block(i, c) for i, c in enumerate(cards, 1)]
-
-    messages: List[str] = []
-    current = header
-    for block in blocks:
-        candidate = f"{current}\n\n{block}"
-        if len(candidate) > WHATSAPP_LIMIT:
-            messages.append(current)
-            current = block
-        else:
-            current = candidate
-
-    candidate = f"{current}\n\n{footer}"
-    if len(candidate) > WHATSAPP_LIMIT:
-        messages.append(current)
-        messages.append(footer)
-    else:
-        messages.append(candidate)
-
-    # Tag parts when there's more than one message.
-    if len(messages) > 1:
-        total = len(messages)
-        messages = [f"{m}\n\n_({i}/{total})_" for i, m in enumerate(messages, 1)]
-    return messages
-
-
-def format_digest_whatsapp(cards: List[dict], mode: str, topics, frequency: str) -> str:
-    """Convenience: the full digest as a single string (joins all parts)."""
-    return "\n\n".join(format_digest_whatsapp_messages(cards, mode, topics, frequency))
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -517,73 +463,6 @@ def _card_index(cards: List[dict]) -> dict:
     return {c["id"]: c for c in cards if c.get("id")}
 
 
-def format_synthesis_whatsapp_messages(synth: dict, cards: List[dict]) -> List[str]:
-    """Render the synthesis as one or more WhatsApp messages under Twilio's limit."""
-    by_id = _card_index(cards)
-    title = (synth.get("title") or "What you learned this week").strip()
-    parts = [f"🧠 *{title}*"]
-
-    narrative = (synth.get("narrative") or "").strip()
-    if narrative:
-        parts.append(narrative)
-
-    for theme in (synth.get("themes") or []):
-        t_title = (theme.get("title") or "").strip()
-        insight = (theme.get("insight") or "").strip()
-        if not t_title and not insight:
-            continue
-        block = f"*{t_title}*" if t_title else ""
-        if insight:
-            block = f"{block}\n{insight}" if block else insight
-        # Link the theme's source cards.
-        links_lines = []
-        for cid in (theme.get("cardIds") or []):
-            c = by_id.get(cid)
-            if c:
-                links_lines.append(f"• {(c.get('title') or 'Untitled').strip()}\n  {_link_url(cid)}")
-        if links_lines:
-            block += "\n" + "\n".join(links_lines)
-        parts.append(block)
-
-    standout_id = synth.get("standoutCardId")
-    standout = by_id.get(standout_id) if standout_id else None
-    if standout:
-        reason = (synth.get("standoutReason") or "").strip()
-        s = f"⭐ *Standout:* {(standout.get('title') or 'Untitled').strip()}"
-        if reason:
-            s += f"\n{reason}"
-        s += f"\n{_link_url(standout_id)}"
-        parts.append(s)
-
-    question = (synth.get("openQuestion") or "").strip()
-    if question:
-        parts.append(f"💭 *Worth sitting with:*\n{question}")
-
-    footer = f"📲 Open Machina AI:\n{APP_URL}"
-
-    # Pack greedily into messages under the WhatsApp limit.
-    messages: List[str] = []
-    current = ""
-    for block in parts:
-        candidate = f"{current}\n\n{block}" if current else block
-        if len(candidate) > WHATSAPP_LIMIT and current:
-            messages.append(current)
-            current = block
-        else:
-            current = candidate
-    candidate = f"{current}\n\n{footer}"
-    if len(candidate) > WHATSAPP_LIMIT:
-        messages.append(current)
-        messages.append(footer)
-    else:
-        messages.append(candidate)
-
-    if len(messages) > 1:
-        total = len(messages)
-        messages = [f"{m}\n\n_({i}/{total})_" for i, m in enumerate(messages, 1)]
-    return messages
-
-
 def format_synthesis_email(synth: dict, cards: List[dict]) -> tuple:
     """Return (subject, html_body, text_body) for the weekly synthesis email."""
     by_id = _card_index(cards)
@@ -745,14 +624,13 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
     """Generate the weekly "What you learned" synthesis and deliver it.
 
     Always writes the in-app special card (that's the primary surface), and
-    additionally sends over whichever email/WhatsApp channels the user has on.
+    additionally sends over whichever push/email channels the user has on.
     Returns a result dict shaped like build_and_send_digest's.
     """
-    from whatsapp_handler import send_whatsapp_message  # lazy: pulls Twilio SDK
     from ai_service import GeminiService, AnalysisError
 
     settings = user_data.get("settings", {}) or {}
-    channels = settings.get("digest_channels", ["whatsapp"]) or []
+    channels = _normalize_channels(settings.get("digest_channels"))
     result = {"uid": uid, "sent": False, "channels": [], "card_count": 0, "skipped": None, "mode": "synthesis"}
 
     cards = synthesis_window_cards(links)
@@ -791,17 +669,6 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
                 result["channels"].append("push")
         except Exception as e:
             logger.error(f"Synthesis push send failed for {uid}: {e}")
-
-    # WhatsApp
-    if "whatsapp" in channels:
-        phone = user_data.get("phone_number") or user_data.get("phoneNumber")
-        if phone:
-            try:
-                for body in format_synthesis_whatsapp_messages(synth, cards):
-                    send_whatsapp_message(f"whatsapp:{phone}", body)
-                result["channels"].append("whatsapp")
-            except Exception as e:
-                logger.error(f"Synthesis WhatsApp send failed for {uid}: {e}")
 
     # Email
     if "email" in channels:
@@ -909,8 +776,6 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
 
     Returns a per-user result dict.
     """
-    from whatsapp_handler import send_whatsapp_message  # lazy: pulls Twilio SDK
-
     settings = user_data.get("settings", {}) or {}
     result = {"uid": uid, "sent": False, "channels": [], "card_count": 0, "skipped": None}
 
@@ -921,7 +786,7 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
         topics = [settings["digest_topic"]]
     count = settings.get("digest_count", 5)
     frequency = settings.get("digest_frequency", "weekly")
-    channels = settings.get("digest_channels", ["whatsapp"]) or []
+    channels = _normalize_channels(settings.get("digest_channels"))
     skip_empty = settings.get("digest_skip_empty", True)
 
     links = fetch_candidate_links(uid)
@@ -970,29 +835,6 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
                 logger.error(f"Digest push send failed for {uid}: {e}")
         else:
             logger.info(f"Digest: user {uid} has push channel but no device tokens")
-
-    # WhatsApp
-    if "whatsapp" in channels:
-        phone = user_data.get("phone_number") or user_data.get("phoneNumber")
-        if phone:
-            try:
-                messages = format_digest_whatsapp_messages(cards, mode, topics, frequency)
-                # Only count the channel as delivered if every part actually sent.
-                all_sent = True
-                for body in messages:
-                    if not send_whatsapp_message(f"whatsapp:{phone}", body):
-                        all_sent = False
-                        break
-                if all_sent and messages:
-                    result["channels"].append("whatsapp")
-                    result["whatsapp_parts"] = len(messages)
-                    delivered_any = True
-                else:
-                    logger.error(f"Digest WhatsApp send failed for {uid} (no message SID)")
-            except Exception as e:
-                logger.error(f"Digest WhatsApp send failed for {uid}: {e}")
-        else:
-            logger.warning(f"Digest: user {uid} has whatsapp channel but no phone")
 
     # Email
     if "email" in channels:

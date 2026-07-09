@@ -131,11 +131,10 @@ def calculate_next_reminder(reminder_count: int, profile: str = "smart") -> date
 def run_reminder_check() -> dict:
     """
     Main logic for checking pending reminders and delivering them over the
-    user's reminder channels (iOS push and/or legacy WhatsApp).
+    user's reminder channels (iOS push).
     Returns a summary dict.
     """
     # Import here to avoid circular dependency
-    from whatsapp_handler import send_whatsapp_message
     from push_service import send_push
 
     db = get_db()
@@ -165,20 +164,23 @@ def run_reminder_check() -> dict:
 
         report["users_with_reminders_enabled"] += 1
 
-        phone_number = user_data.get('phone_number') or user_data.get('phoneNumber')
         fcm_tokens = user_data.get('fcmTokens') or []
 
-        # Delivery channels. Users predating the push rollout have no
-        # reminders_channel setting — they only ever had WhatsApp, so that is
-        # the legacy default. New workspaces default to ["push"]
-        # (DEFAULT_USER_SETTINGS in link_service.py).
-        channels = settings.get('reminders_channel')
-        if channels is None:
-            channels = ['whatsapp']
+        # Delivery channels. Reminders are push-only. Users predating the push
+        # rollout (or with a legacy 'whatsapp' entry stored) are migrated to
+        # push at read time: a missing setting defaults to ['push'], and any
+        # stored 'whatsapp' entry is normalized to 'push' (deduped). New
+        # workspaces default to ["push"] (DEFAULT_USER_SETTINGS in link_service.py).
+        stored = settings.get('reminders_channel')
+        if stored is None:
+            channels = ['push']
+        else:
+            channels = list(dict.fromkeys(
+                'push' if c == 'whatsapp' else c for c in stored
+            ))
         wants_push = 'push' in channels and bool(fcm_tokens)
-        wants_whatsapp = 'whatsapp' in channels and bool(phone_number)
 
-        if not wants_push and not wants_whatsapp:
+        if not wants_push:
             continue
 
         links_ref = db.collection('users').document(uid).collection('links')
@@ -213,21 +215,10 @@ def run_reminder_check() -> dict:
             link_data = link_doc.to_dict()
 
             title = link_data.get('title', 'Untitled')
-            url = link_data.get('url', '')
             category = link_data.get('category', 'General')
             reminder_count = link_data.get('reminderCount', 0)
 
             is_he = is_hebrew(title)
-
-            if is_he:
-                cat_name = "מתכון" if category == "Recipe" else category
-                message = f"🧠 *Machina AI — לולאת חזרה*\n\nזמן לחזור אל:\n📄 *{title}*\n📂 {cat_name}\n\n{url}\n\n🔗 *פתח ב-Machina AI:*\n{APP_URL}?linkId={link_id}\n\n💡 *למה עכשיו?* חזרה ברווחים מחזקת את הזיכרון לטווח ארוך."
-            else:
-                cat_emoji = "📂"
-                if "Recipe" in category: cat_emoji = "🍲"
-                elif "Tech" in category: cat_emoji = "💻"
-
-                message = f"🧠 *Machina AI — Revisit Loop*\n\nTime to revisit:\n📄 *{title}*\n{cat_emoji} {category}\n\n{url}\n\n🔗 *Open in Machina AI:*\n{APP_URL}?linkId={link_id}\n\n💡 *Why now?* Spaced repetition strengthens long-term retention."
 
             try:
                 delivered = False
@@ -239,21 +230,9 @@ def run_reminder_check() -> dict:
                     if push_result.get("sent"):
                         delivered = True
 
-                if wants_whatsapp:
-                    # send_whatsapp_message returns the message SID; a falsy
-                    # return means Twilio rejected the send (reliability fix).
-                    sent = send_whatsapp_message(f"whatsapp:{phone_number}", message)
-                    if sent:
-                        delivered = True
-                    else:
-                        err_msg = f"WhatsApp send failed for link {link_id} (no message SID)"
-                        logger.error(err_msg)
-                        report["errors"].append(err_msg)
-
                 if not delivered:
-                    # e.g. push-only user whose tokens all just went dead, or the
-                    # sole WhatsApp send failed — leave the reminder pending so
-                    # the next sweep retries it.
+                    # e.g. a push-only user whose tokens all just went dead —
+                    # leave the reminder pending so the next sweep retries it.
                     logger.warning(f"Reminder for link {link_id} not delivered on any channel")
                     continue
 

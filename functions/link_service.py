@@ -3,7 +3,6 @@ Link Service
 Handles Firestore operations for links and users.
 """
 
-import re
 import secrets
 import logging
 from datetime import datetime, timezone
@@ -37,33 +36,6 @@ DEFAULT_USER_SETTINGS = {
     "digest_day": 0,
     "digest_skip_empty": True,
 }
-
-
-def find_user_by_phone(phone_number: str) -> Optional[str]:
-    """
-    Look up user UID by phone number in Firestore.
-    Robust matching: searches both 'phone_number' and 'phoneNumber'.
-    """
-    db = get_db()
-    clean_number = re.sub(r'\D', '', phone_number)
-
-    logger.info(f"Searching for user with normalized phone: {clean_number}")
-
-    users_ref = db.collection('users')
-
-    formats = [f"+{clean_number}", clean_number]
-    fields = ['phone_number', 'phoneNumber']
-
-    for field in fields:
-        for val in formats:
-            query = users_ref.where(field, '==', val).limit(1)
-            docs = query.get()
-            if docs:
-                logger.info(f"Found user {docs[0].id} via {field}={val}")
-                return docs[0].id
-
-    logger.warning(f"User not found for phone: {phone_number} (normalized: {clean_number})")
-    return None
 
 
 def find_data_uid_by_auth_uid(auth_uid: str) -> Optional[str]:

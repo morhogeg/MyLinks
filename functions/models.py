@@ -3,7 +3,7 @@ Pydantic models for SecondBrain
 These mirror the Firestore schema from the PRD
 """
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -130,24 +130,6 @@ class RelatedLink(BaseModel):
     embedding_vector: Optional[List[float]] = Field(None, description="768-dimensional vector for semantic search")
 
 
-class WebhookPayload(BaseModel):
-    """
-    Incoming WhatsApp message payload
-    This structure depends on your WhatsApp provider (Twilio, etc.)
-    """
-    from_number: str = Field(alias="From", description="Sender phone number in E.164 format")
-    body: str = Field(alias="Body", description="Message content containing the URL")
-    message_sid: Optional[str] = Field(None, alias="MessageSid")
-    num_media: int = Field(0, alias="NumMedia", description="Number of media items attached")
-    media_url0: Optional[str] = Field(None, alias="MediaUrl0", description="URL for the first media item")
-    media_content_type0: Optional[str] = Field(None, alias="MediaContentType0", description="Mime type for the first media item")
-
-    model_config = ConfigDict(
-        extra="allow",
-        populate_by_name=True
-    )
-
-
 class UserSettings(BaseModel):
     """User preferences"""
     theme: str = "dark"
@@ -156,13 +138,13 @@ class UserSettings(BaseModel):
     reminder_frequency: str = "smart"  # "smart", "daily", "weekly", "off"
 
     # ── Curated Digest delivery ──────────────────────────────────────────
-    # A scheduled, curated set of saved cards delivered to email and/or
-    # WhatsApp. See digest_service.py for the curation + delivery logic.
+    # A scheduled, curated set of saved cards delivered to push and/or email.
+    # See digest_service.py for the curation + delivery logic.
     digest_enabled: bool = False
     # How often to deliver: "daily" | "weekly"
     digest_frequency: str = "weekly"
-    # Delivery channels — any subset of ["email", "whatsapp"]
-    digest_channels: List[str] = Field(default_factory=lambda: ["whatsapp"])
+    # Delivery channels — any subset of ["push", "email"]
+    digest_channels: List[str] = Field(default_factory=lambda: ["push"])
     # Curation strategy:
     #   "smart"      – a balanced mix of backlog + rediscovery (default)
     #   "random"     – surprise me: a random sample across the library

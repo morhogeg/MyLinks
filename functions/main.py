@@ -1,13 +1,12 @@
 """
 SecondBrain Cloud Functions — Entry Point
-Handles WhatsApp webhook ingestion and AI processing.
+Handles link ingestion (share sheet / web) and AI processing.
 
 All business logic is extracted into dedicated modules:
 - scraper.py: URL content extraction
 - ai_service.py: Gemini AI analysis & embeddings
 - link_service.py: Firestore user/link operations
 - reminder_service.py: Spaced repetition reminders
-- whatsapp_handler.py: WhatsApp messaging via Twilio
 - search.py: Semantic vector search
 - graph_service.py: Knowledge graph / related links
 - db.py: Shared Firestore client singleton
@@ -31,20 +30,19 @@ from google.cloud.firestore_v1.vector import Vector
 
 # Internal modules
 from db import get_db
-from models import WebhookPayload, LinkStatus, ReminderStatus
+from models import LinkStatus, ReminderStatus
 from ai_service import GeminiService, AnalysisError
 from link_service import (
-    find_user_by_phone, save_link_to_firestore, get_user_tags, is_hebrew,
+    save_link_to_firestore, get_user_tags, is_hebrew,
     ensure_ingest_token, find_user_by_ingest_token, link_exists_for_url,
     pending_exists_for_url, find_data_uid_by_auth_uid, delete_user_data,
     create_workspace,
 )
 from reminder_service import handle_reminder_intent, set_reminder, calculate_next_reminder, run_reminder_check, format_local_time
 from graph_service import GraphService
-# NOTE: `scraper` (pulls youtube_transcript_api) and `whatsapp_handler` (pulls
-# the Twilio SDK) are imported lazily inside the functions that use them. Both
-# are heavy and irrelevant to the hot image-analysis path, so deferring them
-# keeps cold starts lighter for functions like analyze_image.
+# NOTE: `scraper` (pulls youtube_transcript_api) is imported lazily inside the
+# functions that use it. It's heavy and irrelevant to the hot image-analysis
+# path, so deferring it keeps cold starts lighter for functions like analyze_image.
 from search import sync_link_embedding, search_links, perform_search_logic
 from rate_limit import check_rate_limit, client_ip
 
@@ -142,15 +140,6 @@ def _server_error(headers: dict = None, exc: Exception = None,
     return _error_response(message, status, headers)
 
 
-def _mask_phone(value) -> str:
-    """Redact a phone number for logging — keep only the last 4 digits.
-
-    Inbound WhatsApp numbers are PII; never log them in the clear.
-    """
-    s = str(value or "")
-    return f"***{s[-4:]}" if len(s) >= 4 else "***"
-
-
 def _verify_bearer(req):
     """Verify the Firebase ID token from the Authorization: Bearer header.
 
@@ -227,7 +216,6 @@ _RATE_LIMITS = {
     "chat": (60, 3600),
     "article": (120, 3600),
     "share": (120, 3600),
-    "whatsapp": (60, 60),
     "device_token": (30, 3600),
 }
 
@@ -509,7 +497,6 @@ def debug_status(req: https_fn.Request) -> https_fn.Response:
             "environment": {
                 "project": os.environ.get("GCLOUD_PROJECT"),
                 "has_gemini_key": bool(os.environ.get("GEMINI_API_KEY")),
-                "has_twilio_sid": bool(os.environ.get("TWILIO_ACCOUNT_SID")),
             },
             "system_check": {
                 "pending_tasks_count": len(pending_data),
@@ -1067,7 +1054,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
         # Image share path: the native Share Extension can send a raw image
         # (base64) when the user shares a photo/screenshot rather than a link.
         # Store it, then queue an image job — the background pipeline already
-        # knows how to analyse images (isImage=True), same as the WhatsApp flow.
+        # knows how to analyse images (isImage=True).
         image_b64 = data.get('image') or data.get('imageBytes')
         if image_b64:
             try:
@@ -1520,7 +1507,7 @@ def unregister_device_token_http(req: https_fn.Request) -> https_fn.Response:
 # ─────────────────────────────────────────────
 #
 # The web app is a static export, so a client-rendered /s?id=… page can't give
-# link-preview crawlers (WhatsApp, iMessage, Slack, X…) per-card OpenGraph tags —
+# link-preview crawlers (iMessage, Slack, X…) per-card OpenGraph tags —
 # they don't run JS, so every shared link previewed as the generic app. These
 # functions OWN the /s (single card) and /c (collection) routes via Hosting
 # rewrites and return real HTML: correct og:title/description/image for crawlers,
@@ -1998,287 +1985,6 @@ def share_page(req: https_fn.Request) -> https_fn.Response:
 
 
 # ─────────────────────────────────────────────
-# WhatsApp Webhook
-# ─────────────────────────────────────────────
-
-def _verify_twilio_signature(request) -> bool:
-    """Validate an inbound Twilio webhook via the X-Twilio-Signature header.
-
-    Returns True if the signature is valid, OR if verification is not configured
-    (no TWILIO_AUTH_TOKEN) so local/dev testing still works. Returns False only
-    when a token IS configured and the signature is missing/invalid — which is
-    how we reject spoofed webhooks (anyone could otherwise POST a victim's phone
-    number and act as them).
-    """
-    auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
-    if not auth_token:
-        # Fail CLOSED in production: an unsigned webhook lets anyone POST a
-        # victim's phone number and act as them. Only allow the unverified path
-        # under the local Functions emulator, never on deployed Cloud Run.
-        if os.environ.get("FUNCTIONS_EMULATOR", "").lower() in ("1", "true", "yes"):
-            logger.warning("TWILIO_AUTH_TOKEN not set — skipping signature check (emulator only)")
-            return True
-        logger.error("TWILIO_AUTH_TOKEN not set in production — rejecting webhook")
-        return False
-
-    from twilio.request_validator import RequestValidator
-    validator = RequestValidator(auth_token)
-
-    signature = request.headers.get("X-Twilio-Signature", "")
-    # Twilio signs against the public HTTPS URL it posted to. Behind Cloud Run /
-    # Hosting the internally-seen scheme can be http, so normalize to https.
-    url = request.url
-    if request.headers.get("X-Forwarded-Proto") == "https" and url.startswith("http://"):
-        url = "https://" + url[len("http://"):]
-
-    params = request.form.to_dict() if request.form else {}
-    return validator.validate(url, params, signature)
-
-
-def _seen_message_sid(sid: str) -> bool:
-    """Idempotency guard for Twilio webhook retries.
-
-    Twilio re-POSTs the same message (same MessageSid) ~15s later if it doesn't
-    get a fast 200, so without a guard every retry re-runs the whole handler —
-    duplicate sends and, for the `digest` command, a duplicate multi-second
-    Gemini synthesis + spend. We record each MessageSid in `processed_messages`
-    the first time we see it and treat any later sighting as a no-op.
-
-    Returns True if this sid was already processed (caller should no-op), False
-    if it's new (and now recorded). Fails OPEN (returns False) on any backend
-    error so a transient Firestore issue degrades to "process it" rather than
-    dropping the message.
-    """
-    if not sid:
-        return False
-    try:
-        from google.api_core import exceptions as gcloud_exceptions
-        db = get_db()
-        doc_ref = db.collection('processed_messages').document(sid)
-        # create() fails if the doc already exists → atomic first-writer-wins.
-        try:
-            doc_ref.create({"seenAt": datetime.now(timezone.utc).isoformat()})
-            return False
-        except gcloud_exceptions.AlreadyExists:
-            # Doc already present → this is a Twilio retry of a message we've
-            # already processed.
-            return True
-    except Exception as e:
-        logger.error(f"MessageSid dedup check failed (failing open): {e}")
-        return False
-
-
-@https_fn.on_request()
-def whatsapp_webhook(request):
-    """
-    WhatsApp webhook endpoint.
-    Respond-First Pattern: Saves to pending_processing and returns 200 immediately.
-    """
-    # whatsapp_handler pulls the Twilio SDK — imported lazily (see top-of-file note).
-    from whatsapp_handler import send_whatsapp_message
-
-    # Reject spoofed webhooks before doing any work (phone-number impersonation).
-    if not _verify_twilio_signature(request):
-        logger.warning("Rejected WhatsApp webhook: invalid/missing Twilio signature")
-        return https_fn.Response(
-            json.dumps({"error": "Forbidden"}), status=403, mimetype="application/json"
-        )
-
-    if check_rate_limit(f"whatsapp:{client_ip(request)}", *_RATE_LIMITS["whatsapp"]) is False:
-        logger.warning("Rate limit exceeded: whatsapp:%s", client_ip(request))
-        return https_fn.Response(
-            json.dumps({"error": "Too many requests"}), status=429, mimetype="application/json"
-        )
-
-    try:
-        if request.content_type == 'application/x-www-form-urlencoded':
-            data = request.form.to_dict()
-        else:
-            data = request.get_json()
-
-        # Do NOT log the raw payload — it carries the sender's phone number
-        # (From) and full message body (PII). Log only routing metadata.
-        logger.info(
-            "Received webhook payload (sid=%s, num_media=%s, fields=%d)",
-            (data or {}).get("MessageSid") or (data or {}).get("SmsMessageSid") or "?",
-            (data or {}).get("NumMedia", "0"),
-            len(data) if isinstance(data, dict) else 0,
-        )
-        payload = WebhookPayload(**data)
-    except Exception as e:
-        logger.error(f"Payload parse error: {e}")
-        return https_fn.Response(json.dumps({"error": "Invalid payload"}), status=400, mimetype="application/json")
-
-    # Idempotency: Twilio retries the same MessageSid (~15s) until it gets a
-    # fast 200. Without this guard each retry re-runs everything — duplicate
-    # sends and a duplicate synchronous Gemini digest synthesis. No-op on a sid
-    # we've already handled and just ack 200 so Twilio stops retrying.
-    if _seen_message_sid(payload.message_sid):
-        logger.info("Duplicate WhatsApp webhook (MessageSid already processed) — no-op")
-        return https_fn.Response(json.dumps({"success": True, "duplicate": True}), status=200, mimetype="application/json")
-
-    db = get_db()
-
-    # Find user by phone number
-    uid = find_user_by_phone(payload.from_number)
-
-    # Normalize UID
-    if uid and uid.startswith("whatsapp:"):
-        uid = uid.replace("whatsapp:", "")
-
-    # Detect language from incoming message
-    user_msg_is_hebrew = is_hebrew(payload.body)
-
-    if not uid:
-        logger.warning(f"Unauthorized number: {_mask_phone(payload.from_number)}")
-        msg = "❌ מצטערים, מספר הטלפון שלך לא מזוהה. אנא וודא שהוא תואם להגדרות." if user_msg_is_hebrew else "❌ Sorry, your phone number is not recognized. Please make sure it matches the number in your Machina AI settings."
-        send_whatsapp_message(payload.from_number, msg)
-        return https_fn.Response(json.dumps({"error": "User not found"}), status=403, mimetype="application/json")
-
-    # Extract URL from message body
-    url_match = re.search(r'https?://[^\s]+', payload.body)
-
-    # 1. Image Support: Check if media is attached
-    if payload.num_media > 0 and payload.media_url0:
-        logger.info(f"Media detected: {payload.media_url0} (Type: {payload.media_content_type0})")
-
-        process_ref = db.collection('pending_processing').document()
-        process_ref.set({
-            "uid": uid,
-            "url": payload.media_url0,
-            "mimeType": payload.media_content_type0,
-            "fromNumber": payload.from_number,
-            "body": payload.body,
-            "createdAt": datetime.now(timezone.utc).isoformat(),
-            "status": "queued",
-            "isImage": True,
-            "attempts": 0
-        })
-        return https_fn.Response(json.dumps({"success": True, "queued": True, "id": process_ref.id}), status=200, mimetype="application/json")
-
-    if not url_match:
-        # Handling conversational commands (Reminders)
-        logger.info("No URL found, checking for commands")
-
-        msg_lower = payload.body.lower().strip()
-
-        # Digest controls over WhatsApp: pause / resume the curated digest.
-        if msg_lower in ("stop digest", "pause digest", "digest off"):
-            db.collection('users').document(uid).set(
-                {"settings": {"digest_enabled": False}}, merge=True
-            )
-            msg = ("✅ Digest paused. Reply *START DIGEST* to turn it back on, "
-                   "or manage it anytime in Settings.")
-            if user_msg_is_hebrew:
-                msg = "✅ הדייג'סט הושהה. השב/י *START DIGEST* כדי להפעיל מחדש."
-            send_whatsapp_message(payload.from_number, msg)
-            return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
-
-        if msg_lower in ("start digest", "resume digest", "digest on"):
-            db.collection('users').document(uid).set(
-                {"settings": {"digest_enabled": True}}, merge=True
-            )
-            msg = "✅ Digest resumed. You'll get your curated cards on schedule."
-            if user_msg_is_hebrew:
-                msg = "✅ הדייג'סט חזר לפעול. תקבל/י כרטיסים נבחרים לפי לוח הזמנים."
-            send_whatsapp_message(payload.from_number, msg)
-            return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
-
-        if msg_lower in ("digest", "digest now", "דייג'סט"):
-            # On-demand digest. Since the request came over WhatsApp, always
-            # reply over WhatsApp regardless of the user's configured channels.
-            from digest_service import build_and_send_digest
-            user_doc = db.collection('users').document(uid).get()
-            user_data = user_doc.to_dict() or {}
-            user_data["settings"] = {**user_data.get("settings", {}), "digest_channels": ["whatsapp"]}
-            res = build_and_send_digest(uid, user_data, force=True)
-            if not res.get("sent"):
-                msg = ("📭 אין עדיין מה לאסוף — שמור/י כמה לינקים קודם!" if user_msg_is_hebrew
-                       else "📭 Nothing to curate yet — save a few links first!")
-                send_whatsapp_message(payload.from_number, msg)
-            return https_fn.Response(json.dumps({"success": True, **res}), status=200, mimetype="application/json")
-
-        if msg_lower == "reminder" or msg_lower == "תזכורת":
-            is_he = (msg_lower == "תזכורת") or user_msg_is_hebrew
-            if is_he:
-                menu = "מתי להזכיר לך?\nהשב/י עם מספר הימים — *1*, *2*, *3* או *7*\nאו *S* לחזרה מרווחת (spaced repetition)"
-            else:
-                menu = "When should I remind you?\nReply with the number of days — *1*, *2*, *3* or *7*\nOr *S* for spaced repetition"
-            send_whatsapp_message(payload.from_number, menu)
-            return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
-
-        reminder_time = handle_reminder_intent(payload.body)
-
-        if reminder_time:
-            user_doc = db.collection('users').document(uid).get()
-            last_link_id = user_doc.to_dict().get('lastSavedLinkId')
-            if last_link_id:
-                link_doc = db.collection('users').document(uid).collection('links').document(last_link_id).get()
-                if link_doc.exists:
-                    reply = payload.body.strip().lower()
-                    is_spaced = reply in ("s", "spaced")
-                    profile = "spaced" if is_spaced else "once"
-                    set_reminder(uid, last_link_id, reminder_time, profile=profile)
-
-                    link_data = link_doc.to_dict()
-                    title = link_data.get('title', 'Unknown Link')
-                    category = link_data.get('category', 'General')
-
-                    user_tz = user_doc.to_dict().get('timezone')
-                    date_str = format_local_time(reminder_time, user_tz, user_msg_is_hebrew)
-
-                    if user_msg_is_hebrew:
-                        extra = "\n🔁 חזרה מרווחת — אזכיר שוב בהמשך" if is_spaced else ""
-                        change = "\n\n_טעית במספר? השב/י מספר אחר (1/2/3/7) או S לעדכון._"
-                        msg = f"⏰ *התזכורת נקבעה*\n\n📄 *{title}*\n📂 {category}\n📅 {date_str}{extra}{change}"
-                    else:
-                        extra = "\n🔁 Spaced repetition — I'll keep nudging you" if is_spaced else ""
-                        change = "\n\n_Wrong number? Reply a different one (1/2/3/7) or S to change it._"
-                        msg = f"⏰ *Reminder Set*\n\n📄 *{title}*\n📂 {category}\n📅 {date_str}{extra}{change}"
-
-                    send_whatsapp_message(payload.from_number, msg)
-                    return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
-
-            msg = "❌ לא נמצא לינק קודם. שלח לינק קודם!" if user_msg_is_hebrew else "❌ No previous link found. Send a link first!"
-            send_whatsapp_message(payload.from_number, msg)
-            return https_fn.Response(json.dumps({"error": "No context"}), status=200, mimetype="application/json")
-
-        msg = "אני יכול לשמור לינקים או לקבוע תזכורות. נסה לשלוח לינק!" if user_msg_is_hebrew else "I can save links or set reminders. Try sending a URL!"
-        send_whatsapp_message(payload.from_number, msg)
-        return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
-
-    # URL FOUND -> Save to pending_processing for Background Processing
-    url = url_match.group(0)
-
-    # Dedup: skip if already saved or already queued for this user (mirrors the
-    # share_ingest path). Prevents Twilio dupes / re-sent links from stacking.
-    if link_exists_for_url(uid, url) or pending_exists_for_url(uid, url):
-        logger.info(f"WhatsApp ingest skipped (duplicate): {url}")
-        msg = ("✅ הלינק הזה כבר שמור אצלך." if user_msg_is_hebrew
-               else "✅ You've already saved that link.")
-        send_whatsapp_message(payload.from_number, msg)
-        return https_fn.Response(
-            json.dumps({"success": True, "duplicate": True, "url": url}),
-            status=200, mimetype="application/json"
-        )
-
-    logger.info(f"Queueing URL for processing: {url}")
-
-    process_ref = db.collection('pending_processing').document()
-    process_ref.set({
-        "uid": uid,
-        "url": url,
-        "fromNumber": payload.from_number,
-        "body": payload.body,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-        "status": "queued",
-        "attempts": 0
-    })
-
-    return https_fn.Response(json.dumps({"success": True, "queued": True, "id": process_ref.id}), status=200, mimetype="application/json")
-
-
-# ─────────────────────────────────────────────
 # Background Processing
 # ─────────────────────────────────────────────
 
@@ -2322,7 +2028,6 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     """
     # Heavy/external deps imported lazily (see top-of-file note).
     from scraper import scrape_url
-    from whatsapp_handler import send_whatsapp_message, format_success_message
     snapshot = event.data
     if not snapshot:
         logger.error("No snapshot in background trigger")
@@ -2336,7 +2041,6 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     url = data.get("url")
     is_image = data.get("isImage", False)
     mime_type = data.get("mimeType", "image/jpeg")
-    from_number = data.get("fromNumber")
     original_body = data.get("body")
 
     log_to_firestore(task_id, "Background processing started", data={"url": url, "uid": uid, "isImage": is_image})
@@ -2406,10 +2110,9 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             log_to_firestore(task_id, f"Downloading image bytes from: {url}")
             ref.update({"status": "downloading_image"})
 
-            account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
-            auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
-
-            img_response = requests.get(url, timeout=30, auth=(account_sid, auth_token))
+            # Share-ingest images are public Firebase Storage URLs — a plain
+            # fetch (no auth) is all that's needed.
+            img_response = requests.get(url, timeout=30)
             img_response.raise_for_status()
             image_bytes = img_response.content
 
@@ -2512,20 +2215,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             profile = "spaced" if ("spaced" in reply or reply == "s") else "once"
             set_reminder(uid, link_id, reminder_time, profile=profile)
 
-        # Notify via WhatsApp only when the item came from WhatsApp.
-        # Share-sheet / connector items have no phone number and must not trigger a reply.
-        if from_number:
-            user_tz = None
-            try:
-                _udoc = db.collection('users').document(uid).get()
-                user_tz = _udoc.to_dict().get('timezone') if _udoc.exists else None
-            except Exception:
-                pass
-            msg = format_success_message(link_data, reminder_time, language=analysis.get("language", "en"), link_id=link_id, tz=user_tz)
-            logger.info(f"Processing complete, sending message to {from_number}")
-            send_whatsapp_message(from_number, msg)
-        else:
-            logger.info(f"Processing complete for {data.get('source', 'unknown')} item (no WhatsApp notification)")
+        logger.info(f"Processing complete for {data.get('source', 'unknown')} item")
 
         # Successful cleanup
         ref.delete()
@@ -2567,9 +2257,6 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             ref.delete()
         except Exception:
             pass
-
-        if from_number:
-            send_whatsapp_message(from_number, f"⚠️ Saved: {url}\n\nNote: Detailed AI analysis encountered an issue ({str(e)[:50]}...).")
 
 
 # ─────────────────────────────────────────────
@@ -2690,7 +2377,7 @@ def force_check_reminders(req: https_fn.Request) -> https_fn.Response:
 
 
 # ─────────────────────────────────────────────
-# Curated Digest (email + WhatsApp)
+# Curated Digest (push + email)
 # ─────────────────────────────────────────────
 
 # Cadence MUST match DIGEST_CADENCE_MINUTES in digest_service.py — is_due() uses
