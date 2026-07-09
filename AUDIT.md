@@ -95,21 +95,21 @@ backfill/debug/force endpoints; Twilio-signature — `whatsapp_webhook` :2071 (r
 
 | # | Item | Evidence | Status |
 |---|------|----------|--------|
-| D-1 | `ClaudeService = GeminiService` (`functions/ai_service.py:647`) | Only the definition line exists repo-wide | ⬜ |
-| D-2 | `format_digest_whatsapp` (`functions/digest_service.py:331-333`) | Zero callers (only the `_messages` variant is live) — subsumed by W-1 | ⬜ |
-| D-3 | `models.py` `LinkDocument` (:92-117) + `RelatedLink` (:120-130) + import at `graph_service.py:6` | Imported once, never instantiated (graph_service builds plain dicts; comment at graph_service.py:83 is misleading). TS `RelatedLink` in types.ts is unrelated | ⬜ |
-| D-4 | `functions/test_yt_scrape.py` (whole file) | Standalone debug script; imports `youtube_transcript_api` which is **not in requirements.txt** — cannot run in deploy env | ⬜ |
-| D-5 | `functions/backfill_embeddings.py` (whole file) | Only called from its own `__main__`; superseded by `sync_link_embedding` trigger + `GraphService.backfill_batch` | ⬜ |
-| D-6 | Dead import `calculate_next_reminder` (`functions/main.py:42`) | Never used in main.py | ⬜ |
-| D-7 | Template SVGs: `web/public/{file,globe,next,vercel,window}.svg` | Zero references in web/ | ⬜ |
-| D-8 | `getCategoryColor()` (`web/lib/colors.ts:93-116`) | No callers (only `getCategoryColorStyle`/`getColorStyleByKey` used) | ⬜ |
-| D-9 | Vestigial Feed state: `selectedPlatforms` (:110), `screenshotOnly` (:116), `handleTogglePlatform` (:567-572), `availablePlatforms`/`platformCounts`/`screenshotCount` (:559-565), dead filter branch (:460-465) | Never set to non-empty/true; the old platform icon row was replaced by grouped Sources | ⬜ |
-| D-10 | `web/components/InstallPWA.tsx` + refs `app/page.tsx:8,186` | iPhone PWA retired (SOURCE_OF_TRUTH task 15); still shows Add-to-Home-Screen on mobile Safari; contains light-theme-breaking `text-white` (:50,53,55) | ⬜ |
-| D-11 | Unused import `platformActiveStyle` (`web/components/Feed.tsx:9`) + ~15 other unused imports/vars flagged by eslint (full list: scratch eslint run; e.g. Card.tsx:6 `Tag`/`CheckCircle2`, LinkDetailModal.tsx:5, Feed.tsx:34-35) | eslint `no-unused-vars` | ⬜ |
-| D-12 | `test_locally.sh` | Posts to `/webhook/whatsapp` which has no rewrite; targets an emulator flow that no longer exists — subsumed by W-1 | ⬜ |
-| D-13 | Dead branch `INCLUDE_CONNECTIONS = False` (`functions/whatsapp_handler.py:24,163-171`) | File deleted entirely by W-1 | ⬜ |
-| D-14 | `AddLinkForm.tsx:255` writes `embedding_vector` from the analyze response into `saveLink` | Contradicts the shipped embedding-drift fix (AUDIT_FINDINGS #9; `storage.ts:149-152` deliberately omits it on retry) — re-introduces plain-array drift the trigger must repair | ⬜ |
-| D-15 | Stale comment `functions/main.py:44` (claims scraper pulls `youtube_transcript_api` — it no longer does) | Comment only | ⬜ |
+| D-1 | `ClaudeService = GeminiService` (`functions/ai_service.py:647`) | Only the definition line exists repo-wide | ✅ |
+| D-2 | `format_digest_whatsapp` (`functions/digest_service.py:331-333`) | Zero callers (only the `_messages` variant is live) — subsumed by W-1 | ✅ |
+| D-3 | `models.py` `LinkDocument` (:92-117) + `RelatedLink` (:120-130) + import at `graph_service.py:6` | Imported once, never instantiated (graph_service builds plain dicts; comment at graph_service.py:83 is misleading). TS `RelatedLink` in types.ts is unrelated | ✅ |
+| D-4 | `functions/test_yt_scrape.py` (whole file) | Standalone debug script; imports `youtube_transcript_api` which is **not in requirements.txt** — cannot run in deploy env | ✅ |
+| D-5 | `functions/backfill_embeddings.py` (whole file) | Only called from its own `__main__`; superseded by `sync_link_embedding` trigger + `GraphService.backfill_batch` | ✅ |
+| D-6 | Dead import `calculate_next_reminder` (`functions/main.py:42`) | Never used in main.py | ✅ |
+| D-7 | Template SVGs: `web/public/{file,globe,next,vercel,window}.svg` | Zero references in web/ | ✅ |
+| D-8 | `getCategoryColor()` (`web/lib/colors.ts:93-116`) | No callers (only `getCategoryColorStyle`/`getColorStyleByKey` used) | ✅ |
+| D-9 | Vestigial Feed state: `selectedPlatforms` (:110), `screenshotOnly` (:116), `handleTogglePlatform` (:567-572), `availablePlatforms`/`platformCounts`/`screenshotCount` (:559-565), dead filter branch (:460-465) | Never set to non-empty/true; the old platform icon row was replaced by grouped Sources | ✅ |
+| D-10 | `web/components/InstallPWA.tsx` + refs `app/page.tsx:8,186` | iPhone PWA retired (SOURCE_OF_TRUTH task 15); still shows Add-to-Home-Screen on mobile Safari; contains light-theme-breaking `text-white` (:50,53,55) | ✅ |
+| D-11 | Unused import `platformActiveStyle` (`web/components/Feed.tsx:9`) + ~15 other unused imports/vars flagged by eslint (full list: scratch eslint run; e.g. Card.tsx:6 `Tag`/`CheckCircle2`, LinkDetailModal.tsx:5, Feed.tsx:34-35) | eslint `no-unused-vars` | ✅ |
+| D-12 | `test_locally.sh` | Posts to `/webhook/whatsapp` which has no rewrite; targets an emulator flow that no longer exists — subsumed by W-1 | ✅ |
+| D-13 | Dead branch `INCLUDE_CONNECTIONS = False` (`functions/whatsapp_handler.py:24,163-171`) | File deleted entirely by W-1 | ✅ |
+| D-14 | `AddLinkForm.tsx:255` writes `embedding_vector` from the analyze response into `saveLink` | Contradicts the shipped embedding-drift fix (AUDIT_FINDINGS #9; `storage.ts:149-152` deliberately omits it on retry) — re-introduces plain-array drift the trigger must repair | ✅ |
+| D-15 | Stale comment `functions/main.py:44` (claims scraper pulls `youtube_transcript_api` — it no longer does) | Comment only | ✅ |
 
 ### Anti-patterns & bad code (auto-fixable unless noted)
 
@@ -233,11 +233,11 @@ Verified against actual files (not docs claims).
 
 | # | Finding | Location | Fix | Status |
 |---|---------|----------|-----|--------|
-| S-1 | SSRF platform-fetcher bypass (risk #3): substring dispatch + bare `requests.get` with redirects in all platform branches | `scraper.py:93-110` dispatch; fetchers :261/:304/:329/:369/:578/:619/:760/:891 | Route every fetch through `safe_get`; hostname-anchored dispatch | ⬜ |
-| S-2 | Rate limits are per-IP only on paid Gemini endpoints (rotate IPs to bypass; NAT users collide) | `main.py:224-232` buckets; call sites :551/:726/:873/:913 | Composite per-uid+IP keys on analyze/image/chat | ⬜ |
-| S-3 | `ask_brain` history items have no per-item length cap (6 huge turns → unbounded prompt cost + injection surface); `existingTags` from the client reach the Gemini prompt unvalidated | `main.py:744`, `ai_service.py:341/:432`; `main.py:564/:927` → `ai_service.py:230/:249/:269` | Cap history item length; validate tags (count/length/type) | ⬜ |
+| S-1 | SSRF platform-fetcher bypass (risk #3): substring dispatch + bare `requests.get` with redirects in all platform branches | `scraper.py:93-110` dispatch; fetchers :261/:304/:329/:369/:578/:619/:760/:891 | Route every fetch through `safe_get`; hostname-anchored dispatch | ✅ |
+| S-2 | Rate limits are per-IP only on paid Gemini endpoints (rotate IPs to bypass; NAT users collide) | `main.py:224-232` buckets; call sites :551/:726/:873/:913 | Composite per-uid+IP keys on analyze/image/chat | ✅ |
+| S-3 | `ask_brain` history items have no per-item length cap (6 huge turns → unbounded prompt cost + injection surface); `existingTags` from the client reach the Gemini prompt unvalidated | `main.py:744`, `ai_service.py:341/:432`; `main.py:564/:927` → `ai_service.py:230/:249/:269` | Cap history item length; validate tags (count/length/type) | ✅ |
 | S-4 | `get_article` is an anonymous server-side fetch proxy (App Check soft + 120/hr IP limit; SSRF-bounded via safe_get) | `main.py:860-902` | **Owner decision** — SOURCE_OF_TRUTH task 2 explicitly flags "keep anonymous or gate deliberately" (📝 M10) | 📝 |
-| S-5 | protobufjs critical CVE chain (transitive); postcss moderate | `web/package-lock.json` | `npm audit fix` (protobufjs); Next upgrade later for postcss | ⬜ |
+| S-5 | protobufjs critical CVE chain (transitive); postcss moderate | `web/package-lock.json` | `npm audit fix` (protobufjs); Next upgrade later for postcss | ✅ |
 | S-6 | Rate limiter + MessageSid dedup both fail open on Firestore outage | `rate_limit.py:62-64`, `main.py:2066-2068` | Accepted availability trade-off; MessageSid half vanishes with W-1. Document only | noted |
 
 ### Protecting users (data & privacy)
@@ -322,28 +322,28 @@ Verified against actual files (not docs claims).
 
 | ID | Task | Files | Deps | AC | Status |
 |----|------|-------|------|----|--------|
-| W-1 | Backend WhatsApp removal + channel migration (chapter 4 spec) | functions/whatsapp_handler.py(del), main.py, digest_service.py, reminder_service.py, link_service.py, models.py, requirements.txt, .env.example, firestore.rules(comment), test_locally.sh(del) | — | grep -ri whatsapp/twilio in functions/ → 0 executable hits; channels normalize whatsapp→push; shared paths intact | ⬜ |
-| W-2 | Frontend WhatsApp removal | web/lib/types.ts, components/SettingsModal.tsx, Onboarding.tsx, PushNudge.tsx (+ comment sweep) | — | no 'whatsapp' in web/ source; legacy fallbacks → ['push']; tsc clean | ⬜ |
-| W-3 | Legal pages update | web/app/privacy/page.tsx, terms/page.tsx | — | no WhatsApp/Twilio/phone-collection claims; also fix the 4 `<a>`→`<Link>` eslint errors here | ⬜ |
-| S-1 | SSRF: platform fetchers through safe_get + hostname dispatch; reword caption label | functions/scraper.py | — | every outbound fetch goes through safe_get; redirects re-validated; scrapers still return same shapes | ⬜ |
-| S-2 | Per-uid+IP rate limits on paid endpoints | functions/main.py | W-1 | analyze/image/chat keyed on uid+ip composite; anonymous callers still limited by IP | ⬜ |
-| S-3 | ask_brain history caps + existingTags validation | functions/main.py | W-1, S-2 | per-item history length cap; tags validated (list of short strings, capped count) | ⬜ |
-| S-5 | npm audit fix (protobufjs critical) | web/package-lock.json | — | npm audit: 0 critical; build green | ⬜ |
-| C-1 | [[CITED:]] fallback fix + RAG prompt dedup | functions/ai_service.py | — | missing marker → filter (mirror :366-368), never cite-all; one shared prompt builder | ⬜ |
-| C-2 | has_any_embeddings: query for an embedded doc instead of sampling one | functions/search.py | — | a leading non-embedded doc no longer blanks search | ⬜ |
-| F-1 | AddLinkForm bundle: drop embedding_vector write (:255), tokenize Save button (:441), FAB aria-label, dialog role+Escape; /api/chat maxDuration; ConfirmDialog theme (:88/:115); delete InstallPWA + page.tsx refs; delete 5 template SVGs; delete getCategoryColor | web/components/AddLinkForm.tsx, ConfirmDialog.tsx, InstallPWA.tsx(del), app/page.tsx, app/api/chat/route.ts, public/*.svg(del), lib/colors.ts | — | light theme legible; aria-label present; maxDuration exported; tsc clean | ⬜ |
-| P-1 | Feed perf umbrella: memoize filteredLinks+facets, remove vestigial platform state (D-9), useCallback handlers, per-card collection map, React.memo Card/ListCard, shared clock (kill per-card intervals), throttle both banner hooks (CSS-driven progress), stale-search generation guard, normalize searchResults via toLink, drop unused imports | web/components/Feed.tsx, Card.tsx, ListCard.tsx, lib/useProcessingBanner.ts, lib/useSharedCaptureBanner.ts (+ new lib/useNow.ts) | — | capture-time re-renders limited to banner; no behavior change; tsc + next build clean | ⬜ |
-| I-1 | CI hardening: assert aps-environment=production in exported IPA (both targets' check where applicable); filter Xcode beta from glob; altool → xcodebuild -exportArchive destination=upload; SIWA entitlement hard-fail | .github/workflows/ios-testflight.yml | — | yaml valid; assertions target the IPA; needs one CI run to confirm (M15) | ⬜ |
-| I-2 | iOS cleanup: ShareExt unused imports (Social/MobileCoreServices/UserNotifications), temp-file cleanup on upload completion + stale-file sweep, ShareExt CURRENT_PROJECT_VERSION 19→21 (both configs), stale comments (Info.plist:54-57, ShareConfigPlugin.swift:44-47) | web/ios/App/ShareExt/ShareViewController.swift, App/Info.plist, App/ShareConfigPlugin.swift, App.xcodeproj/project.pbxproj | — | Swift compiles by inspection (no CI here); pbxproj numbers match; machina:// scheme KEPT (Shortcut/deep-link uses) | ⬜ |
-| I-3 | Extension rebrand MyLinks→Machina AI (manifest, background, popup, READMEs, safari build script) | extension/*, safari/* | — | no "MyLinks"/"Second Brain"/com.mylinks.* left; manifest valid JSON | ⬜ |
-| D-16 | eslint zero-errors sweep (remaining errors: no-explicit-any ×7, set-state-in-effect ×3, purity ×1) + unused-import warnings | storage.ts, ThemeProvider.tsx, CollectionFormModal.tsx, ManageCollectionCardsSheet.tsx, + misc | W-2, W-3, F-1, P-1 | `npx eslint .` → 0 errors; warnings ≤ 5 | ⬜ |
-| D-17 | README full rewrite (real product: recall engine/capture/synthesis; drop WhatsApp, PWA badge, Graph Viz/Insights/Offline/Table-view claims, Shadcn claim, stale structure) | README.md | W-1 | no false feature claims; matches actual architecture | ⬜ |
-| D-18 | Docs sweep: SOURCE_OF_TRUTH (WhatsApp refs, stale TARGETED_DEVICE_FAMILY claim :470, PII scrub :1375-1376, §9 session-log entry for this remediation, §4 checkbox updates), docs/APP_STORE.md (WhatsApp bullets/notes, stale device-family :177/:186), AUTH_SPEC.md (:15 PII, :23/:57/:151), NATIVE_AUTH_SETUP.md:144, ship SKILL.md:110, deploy-hosting.sh header, models.py:195 PII placeholder | SOURCE_OF_TRUTH.md, docs/APP_STORE.md, AUTH_SPEC.md, NATIVE_AUTH_SETUP.md, .claude/skills/ship/SKILL.md, deploy-hosting.sh, functions/models.py | W-1, D-2 done first for models.py | placeholders replace real PII; docs match code state | ⬜ |
-| D-19 | Backend dead code: ClaudeService, models.py LinkDocument/RelatedLink + graph_service import, main.py:42 dead import + :44 stale comment, delete backfill_embeddings.py + test_yt_scrape.py, log-the-silent-excepts (scraper empty-dict returns get a logger.warning) | functions/ai_service.py, models.py, graph_service.py, main.py, backfill_embeddings.py(del), test_yt_scrape.py(del), scraper.py | W-1, C-1, S-1, S-3 | py_compile clean; grep confirms no references to deleted symbols | ⬜ |
-| A-11 | a11y: Escape handlers (LinkDetailModal, ReminderModal, SettingsModal), initial focus into dialogs, desktop search aria-label, icon-button aria-labels (ConfirmDialog close etc.) | web/components/LinkDetailModal.tsx, ReminderModal.tsx, SettingsModal.tsx, Feed.tsx | W-2, P-1 | Escape closes each; focus moves in; labels present | ⬜ |
-| F-2 | Settings ingest-token copy UI (N-1) | web/components/SettingsModal.tsx (+ lib/shareConfig.ts) | W-2, A-11 | token visible + copy button under a Capture/Extensions row | ⬜ |
-| R-1 | Extract share_service.py (main.py:1529-1997) + dedup link_data builders | functions/main.py, functions/share_service.py(new) | W-1, S-2, S-3, D-19 | endpoints unchanged (names/decorators stay in main.py or re-exported); py_compile clean; behavior-identical | ⬜ |
-| N-2a | Offline pytest suite + GH Actions python-tests job; rules-test CI job | functions/tests/(new), .github/workflows/python-tests.yml(new), .github/workflows/rules-tests.yml(new) | W-1, R-1 | tests pass locally offline; workflows lint-valid; needs CI run (M15) | ⬜ |
+| W-1 | Backend WhatsApp removal + channel migration (chapter 4 spec) | functions/whatsapp_handler.py(del), main.py, digest_service.py, reminder_service.py, link_service.py, models.py, requirements.txt, .env.example, firestore.rules(comment), test_locally.sh(del) | — | grep -ri whatsapp/twilio in functions/ → 0 executable hits; channels normalize whatsapp→push; shared paths intact | ✅ |
+| W-2 | Frontend WhatsApp removal | web/lib/types.ts, components/SettingsModal.tsx, Onboarding.tsx, PushNudge.tsx (+ comment sweep) | — | no 'whatsapp' in web/ source; legacy fallbacks → ['push']; tsc clean | ✅ |
+| W-3 | Legal pages update | web/app/privacy/page.tsx, terms/page.tsx | — | no WhatsApp/Twilio/phone-collection claims; also fix the 4 `<a>`→`<Link>` eslint errors here | ✅ |
+| S-1 | SSRF: platform fetchers through safe_get + hostname dispatch; reword caption label | functions/scraper.py | — | every outbound fetch goes through safe_get; redirects re-validated; scrapers still return same shapes | ✅ |
+| S-2 | Per-uid+IP rate limits on paid endpoints | functions/main.py | W-1 | analyze/image/chat keyed on uid+ip composite; anonymous callers still limited by IP | ✅ |
+| S-3 | ask_brain history caps + existingTags validation | functions/main.py | W-1, S-2 | per-item history length cap; tags validated (list of short strings, capped count) | ✅ |
+| S-5 | npm audit fix (protobufjs critical) | web/package-lock.json | — | npm audit: 0 critical; build green | ✅ |
+| C-1 | [[CITED:]] fallback fix + RAG prompt dedup | functions/ai_service.py | — | missing marker → filter (mirror :366-368), never cite-all; one shared prompt builder | ✅ |
+| C-2 | has_any_embeddings: query for an embedded doc instead of sampling one | functions/search.py | — | a leading non-embedded doc no longer blanks search | ✅ |
+| F-1 | AddLinkForm bundle: drop embedding_vector write (:255), tokenize Save button (:441), FAB aria-label, dialog role+Escape; /api/chat maxDuration; ConfirmDialog theme (:88/:115); delete InstallPWA + page.tsx refs; delete 5 template SVGs; delete getCategoryColor | web/components/AddLinkForm.tsx, ConfirmDialog.tsx, InstallPWA.tsx(del), app/page.tsx, app/api/chat/route.ts, public/*.svg(del), lib/colors.ts | — | light theme legible; aria-label present; maxDuration exported; tsc clean | ✅ |
+| P-1 | Feed perf umbrella: memoize filteredLinks+facets, remove vestigial platform state (D-9), useCallback handlers, per-card collection map, React.memo Card/ListCard, shared clock (kill per-card intervals), throttle both banner hooks (CSS-driven progress), stale-search generation guard, normalize searchResults via toLink, drop unused imports | web/components/Feed.tsx, Card.tsx, ListCard.tsx, lib/useProcessingBanner.ts, lib/useSharedCaptureBanner.ts (+ new lib/useNow.ts) | — | capture-time re-renders limited to banner; no behavior change; tsc + next build clean | ✅ |
+| I-1 | CI hardening: assert aps-environment=production in exported IPA (both targets' check where applicable); filter Xcode beta from glob; altool → xcodebuild -exportArchive destination=upload; SIWA entitlement hard-fail | .github/workflows/ios-testflight.yml | — | yaml valid; assertions target the IPA; needs one CI run to confirm (M15) | ✅ |
+| I-2 | iOS cleanup: ShareExt unused imports (Social/MobileCoreServices/UserNotifications), temp-file cleanup on upload completion + stale-file sweep, ShareExt CURRENT_PROJECT_VERSION 19→21 (both configs), stale comments (Info.plist:54-57, ShareConfigPlugin.swift:44-47) | web/ios/App/ShareExt/ShareViewController.swift, App/Info.plist, App/ShareConfigPlugin.swift, App.xcodeproj/project.pbxproj | — | Swift compiles by inspection (no CI here); pbxproj numbers match; machina:// scheme KEPT (Shortcut/deep-link uses) | ✅ |
+| I-3 | Extension rebrand MyLinks→Machina AI (manifest, background, popup, READMEs, safari build script) | extension/*, safari/* | — | no "MyLinks"/"Second Brain"/com.mylinks.* left; manifest valid JSON | ✅ |
+| D-16 | eslint zero-errors sweep (remaining errors: no-explicit-any ×7, set-state-in-effect ×3, purity ×1) + unused-import warnings | storage.ts, ThemeProvider.tsx, CollectionFormModal.tsx, ManageCollectionCardsSheet.tsx, + misc | W-2, W-3, F-1, P-1 | `npx eslint .` → 0 errors; warnings ≤ 5 | 🔄 |
+| D-17 | README full rewrite (real product: recall engine/capture/synthesis; drop WhatsApp, PWA badge, Graph Viz/Insights/Offline/Table-view claims, Shadcn claim, stale structure) | README.md | W-1 | no false feature claims; matches actual architecture | ✅ |
+| D-18 | Docs sweep: SOURCE_OF_TRUTH (WhatsApp refs, stale TARGETED_DEVICE_FAMILY claim :470, PII scrub :1375-1376, §9 session-log entry for this remediation, §4 checkbox updates), docs/APP_STORE.md (WhatsApp bullets/notes, stale device-family :177/:186), AUTH_SPEC.md (:15 PII, :23/:57/:151), NATIVE_AUTH_SETUP.md:144, ship SKILL.md:110, deploy-hosting.sh header, models.py:195 PII placeholder | SOURCE_OF_TRUTH.md, docs/APP_STORE.md, AUTH_SPEC.md, NATIVE_AUTH_SETUP.md, .claude/skills/ship/SKILL.md, deploy-hosting.sh, functions/models.py | W-1, D-2 done first for models.py | placeholders replace real PII; docs match code state | ✅ |
+| D-19 | Backend dead code: ClaudeService, models.py LinkDocument/RelatedLink + graph_service import, main.py:42 dead import + :44 stale comment, delete backfill_embeddings.py + test_yt_scrape.py, log-the-silent-excepts (scraper empty-dict returns get a logger.warning) | functions/ai_service.py, models.py, graph_service.py, main.py, backfill_embeddings.py(del), test_yt_scrape.py(del), scraper.py | W-1, C-1, S-1, S-3 | py_compile clean; grep confirms no references to deleted symbols | ✅ |
+| A-11 | a11y: Escape handlers (LinkDetailModal, ReminderModal, SettingsModal), initial focus into dialogs, desktop search aria-label, icon-button aria-labels (ConfirmDialog close etc.) | web/components/LinkDetailModal.tsx, ReminderModal.tsx, SettingsModal.tsx, Feed.tsx | W-2, P-1 | Escape closes each; focus moves in; labels present | ✅ |
+| F-2 | Settings ingest-token copy UI (N-1) | web/components/SettingsModal.tsx (+ lib/shareConfig.ts) | W-2, A-11 | token visible + copy button under a Capture/Extensions row | 🔄 |
+| R-1 | Extract share_service.py (main.py:1529-1997) + dedup link_data builders | functions/main.py, functions/share_service.py(new) | W-1, S-2, S-3, D-19 | endpoints unchanged (names/decorators stay in main.py or re-exported); py_compile clean; behavior-identical | 🔄 |
+| N-2a | Offline pytest suite + GH Actions python-tests job; rules-test CI job | functions/tests/(new), .github/workflows/python-tests.yml(new), .github/workflows/rules-tests.yml(new) | W-1, R-1 | tests pass locally offline; workflows lint-valid; needs CI run (M15) | 🔄 |
 | R-3 | Feed.tsx decomposition (hooks + render extractions per §8 seams) | web/components/Feed.tsx + new files | P-1, A-11, D-16 | pure mechanical extraction; tsc + next build clean; **highest-risk refactor — only if all prior batches verified green** | ⬜ |
 | R-4 | SettingsModal decomposition (useUserSettings, DigestSettings, AccountSection) | web/components/SettingsModal.tsx + new files | W-2, A-11, F-2 | same bar as R-3 | ⬜ |
 
@@ -357,4 +357,20 @@ background reconciliation (P-7, device work), light-theme *design* investment be
 
 ## Progress log
 
-- **2026-07-09** — Audit produced. Remediation batches dispatching (batch plan: B1 = W-1, W-2, W-3+F-1 adjacents, S-1, C-1+C-2, P-1, I-1, I-2, I-3, S-5 → B2 = S-2, S-3, D-17, D-18, D-19, A-11 → B3 = R-1, F-2, D-16, N-2a → B4 = R-3, R-4).
+- **2026-07-09 (batch 3 dispatched)** — Batches 1+2 COMPLETE, 18 tasks landed as
+  individually verified commits: W-1/W-2/W-3 (WhatsApp removal end-to-end with
+  whatsapp→push migration), S-1 (SSRF), S-2/S-3 (per-uid limits + input caps +
+  queue-doc fetch via safe_get), S-5 (npm audit fix + Next 16.2.10 — all
+  high/critical advisories cleared), C-1/C-2 (citation trust + search
+  availability), F-1 (theme/a11y/maxDuration/dead-asset bundle; note:
+  force-dynamic is incompatible with output:export so only maxDuration
+  shipped), P-1 (Feed perf overhaul + stale-search guard + shared clock),
+  I-1 (CI: aps-environment=production assertion, no-beta Xcode, altool→
+  exportArchive upload, SIWA hard-fail), I-2 (ShareExt imports/temp-file/
+  build-lockstep 19→21), I-3 (extension rebrand), D-17 (README rewrite),
+  D-18 (docs truth sweep + PII scrub), D-19 (backend dead code), A-11
+  (modal Escape/focus/labels). Verification green at each step: tsc,
+  py_compile, next build (placeholder Firebase env), npm audit.
+  Batch 3 running: R-1 (share_service extraction), F-2 (Settings ingest-token
+  UI), D-16 (eslint zero errors), N-2a (pytest harness + python/rules CI).
+  Then B4 decision on R-3/R-4 decompositions.
