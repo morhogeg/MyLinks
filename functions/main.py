@@ -38,11 +38,13 @@ from link_service import (
     pending_exists_for_url, find_data_uid_by_auth_uid, delete_user_data,
     create_workspace,
 )
-from reminder_service import handle_reminder_intent, set_reminder, calculate_next_reminder, run_reminder_check, format_local_time
+from reminder_service import handle_reminder_intent, set_reminder, run_reminder_check, format_local_time
 from graph_service import GraphService
-# NOTE: `scraper` (pulls youtube_transcript_api) is imported lazily inside the
-# functions that use it. It's heavy and irrelevant to the hot image-analysis
-# path, so deferring it keeps cold starts lighter for functions like analyze_image.
+# NOTE: `scraper` is imported lazily inside the functions that actually scrape
+# URLs, not at module top-level. That keeps it (and the scraping helpers it
+# pulls in, e.g. BeautifulSoup) off the import path of functions that never
+# scrape — like the hot image-analysis path in analyze_image — so their cold
+# starts stay lighter.
 from search import sync_link_embedding, search_links, perform_search_logic
 from rate_limit import check_rate_limit, client_ip
 
@@ -210,14 +212,72 @@ MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
 
 # Per-bucket rate limits: (max_requests, window_seconds). The analyze / image /
 # chat buckets are deliberately tight because each call spends money on Gemini.
+# The `*-uid` twins mirror their IP buckets so paid endpoints are limited BOTH
+# per source IP (catches anonymous/rotating-IP abuse and shared NAT) AND per
+# resolved workspace uid (a single account can't just rotate IPs to bypass the
+# limit). See _rate_limited call sites in analyze_link / analyze_image / ask_brain.
 _RATE_LIMITS = {
     "analyze": (30, 3600),
+    "analyze-uid": (30, 3600),
     "image": (30, 3600),
+    "image-uid": (30, 3600),
     "chat": (60, 3600),
+    "chat-uid": (60, 3600),
     "article": (120, 3600),
     "share": (120, 3600),
     "device_token": (30, 3600),
 }
+
+# Input caps for client-supplied fields that flow into the Gemini prompt, so a
+# hostile/oversized payload can't inflate prompt cost or widen the injection
+# surface. Enforced by _sanitize_history / _sanitize_tags below.
+MAX_HISTORY_ITEMS = 6            # ai_service._build_rag_prompt uses the last 6 turns
+MAX_HISTORY_CONTENT_LENGTH = 4000
+MAX_TAGS = 50
+MAX_TAG_LENGTH = 60
+
+
+def _sanitize_history(history) -> list:
+    """Clamp client-supplied chat history before it reaches the Gemini prompt.
+
+    ai_service._build_rag_prompt concatenates the last few turns verbatim, so
+    unbounded history items are both a cost and a prompt-injection surface. Keep
+    only the last MAX_HISTORY_ITEMS turns, drop anything that isn't a dict,
+    whitelist the role to user/assistant (default user), and truncate each
+    turn's content to MAX_HISTORY_CONTENT_LENGTH chars. Non-list → [].
+    """
+    if not isinstance(history, list):
+        return []
+    cleaned = []
+    for item in history[-MAX_HISTORY_ITEMS:]:
+        if not isinstance(item, dict):
+            continue
+        role = item.get("role")
+        if role not in ("user", "assistant"):
+            role = "user"
+        content = item.get("content")
+        if not isinstance(content, str):
+            content = "" if content is None else str(content)
+        cleaned.append({"role": role, "content": content[:MAX_HISTORY_CONTENT_LENGTH]})
+    return cleaned
+
+
+def _sanitize_tags(tags) -> list:
+    """Validate client-supplied existingTags before they reach the Gemini prompt.
+
+    The tags are concatenated into the analysis prompt, so cap the count and per-
+    tag length and drop anything that isn't a non-empty string. Keep at most
+    MAX_TAGS items, coerce each to a str, truncate to MAX_TAG_LENGTH chars, drop
+    empties. Anything that isn't a list → [].
+    """
+    if not isinstance(tags, list):
+        return []
+    cleaned = []
+    for tag in tags[:MAX_TAGS]:
+        s = (tag if isinstance(tag, str) else str(tag)).strip()[:MAX_TAG_LENGTH]
+        if s:
+            cleaned.append(s)
+    return cleaned
 
 
 def _rate_limited(bucket: str, identity: str, headers: dict = None):
@@ -548,7 +608,7 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             return _error_response("Invalid JSON body", 400, headers)
 
         url = data.get('url')
-        existing_tags = data.get('existingTags', [])
+        existing_tags = _sanitize_tags(data.get('existingTags'))
 
         if not url:
             return _error_response("URL is required", 400, headers)
@@ -560,6 +620,13 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         uid, auth_err = _authed_uid(req, headers, data.get('uid'))
         if auth_err:
             return auth_err
+
+        # Second rate-limit bucket, keyed per workspace uid (the IP bucket above
+        # can't stop a single account rotating IPs). Only when a uid resolves.
+        if uid:
+            rl = _rate_limited("analyze-uid", uid, headers)
+            if rl:
+                return rl
 
         logger.info(f"Analyzing URL synchronously: {url}")
 
@@ -727,8 +794,18 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         uid, auth_err = _authed_uid(req, headers, data.get('uid'))
         if auth_err:
             return auth_err
+
+        # Second rate-limit bucket, keyed per workspace uid (the IP bucket above
+        # can't stop a single account rotating IPs). Only when a uid resolves.
+        if uid:
+            rl = _rate_limited("chat-uid", uid, headers)
+            if rl:
+                return rl
+
         question = (data.get('question') or '').strip()
-        history = data.get('history') or []
+        # Clamp client-supplied history before it reaches the Gemini prompt
+        # (last few turns, per-item length cap, roles whitelisted).
+        history = _sanitize_history(data.get('history'))
         # Opt-in token streaming (SSE). Only honored for POST so the JSON path is
         # 100% unchanged when not explicitly requested.
         want_stream = bool(data.get('stream')) and req.method == 'POST'
@@ -911,12 +988,19 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
 
         image_url = data.get('imageUrl')
         image_b64 = data.get('imageBytes')
-        existing_tags = data.get('existingTags', [])
+        existing_tags = _sanitize_tags(data.get('existingTags'))
         # Identity: prefer the verified ID token; falls back to the body uid only
         # while REQUIRE_AUTH is off (see _authed_uid).
         uid, auth_err = _authed_uid(req, headers, data.get('uid'))
         if auth_err:
             return auth_err
+
+        # Second rate-limit bucket, keyed per workspace uid (the IP bucket above
+        # can't stop a single account rotating IPs). Only when a uid resolves.
+        if uid:
+            rl = _rate_limited("image-uid", uid, headers)
+            if rl:
+                return rl
 
         if not image_url and not image_b64:
             return _error_response("imageBytes or imageUrl is required", 400, headers)
@@ -2110,9 +2194,13 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             log_to_firestore(task_id, f"Downloading image bytes from: {url}")
             ref.update({"status": "downloading_image"})
 
-            # Share-ingest images are public Firebase Storage URLs — a plain
-            # fetch (no auth) is all that's needed.
-            img_response = requests.get(url, timeout=30)
+            # Route through scraper.safe_get (SSRF guard + per-redirect
+            # re-validation): the pending_processing queue doc is attacker-
+            # influenceable, so a hostile imageUrl must not be able to make us
+            # fetch an internal/metadata endpoint. Normal share-ingest images are
+            # public Firebase Storage URLs, which pass the guard fine.
+            from scraper import safe_get
+            img_response = safe_get(url, timeout=30)
             img_response.raise_for_status()
             image_bytes = img_response.content
 
