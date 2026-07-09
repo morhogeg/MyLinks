@@ -28,7 +28,7 @@ async function load() {
   tokenInput.value = token;
   baseUrlInput.value = baseUrl;
   if (!token) {
-    showBanner("Paste your MyLinks token to start saving.");
+    showBanner("Paste your Machina AI token to start saving.");
   } else {
     showBanner("");
   }
@@ -39,7 +39,7 @@ async function saveSettings() {
   const baseUrl = baseUrlInput.value.trim().replace(/\/+$/, "");
   await chrome.storage.sync.set({ token, baseUrl });
   if (!token) {
-    showBanner("Paste your MyLinks token to start saving.");
+    showBanner("Paste your Machina AI token to start saving.");
     setStatus("Token cleared.", "");
   } else {
     showBanner("");

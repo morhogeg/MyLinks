@@ -1,4 +1,4 @@
-# MyLinks — Safari extension
+# Machina AI — Safari extension
 
 Safari runs the **same** Web Extension code as Chrome (everything under
 [`/extension`](../extension)). The only difference is packaging: Safari extensions
@@ -19,12 +19,12 @@ regenerates the Safari wrapper from it.
 
 2. **Open & build in Xcode:**
    ```sh
-   open safari/build/MyLinks/MyLinks.xcodeproj
+   open "safari/build/Machina Capture/Machina Capture.xcodeproj"
    ```
-   - Select the **MyLinks** scheme → **Product ▸ Run** (▶). For a local build with
+   - Select the **Machina Capture** scheme → **Product ▸ Run** (▶). For a local build with
      no paid developer account, set the app target's **Signing & Capabilities ▸
      Team** to your personal Apple ID (or "Sign to Run Locally"). Do the same for
-     the **MyLinks Extension** target.
+     the **Machina Capture Extension** target.
    - The wrapper app launches with a "turn it on in Safari" message — you can quit it.
 
 ## Enable it in Safari
@@ -32,8 +32,8 @@ regenerates the Safari wrapper from it.
 1. Safari ▸ **Settings… ▸ Advanced** → check **"Show features for web developers"**.
 2. The new **Develop** menu → enable **"Allow Unsigned Extensions"** (needed for a
    locally-built, unsigned extension; you may need to re-enable it after each restart).
-3. Safari ▸ **Settings… ▸ Extensions** → turn on **MyLinks**.
-4. Click the MyLinks toolbar button → Safari will ask for permission to access
+3. Safari ▸ **Settings… ▸ Extensions** → turn on **Machina Capture**.
+4. Click the Machina Capture toolbar button → Safari will ask for permission to access
    websites. Grant access (at least to `secondbrain-app-94da2.web.app`, or
    **Always Allow on Every Website** for one-click saving anywhere).
 
@@ -48,12 +48,12 @@ See [`../extension/README.md`](../extension/README.md) for where to find the tok
 | Feature | Safari |
 |---|---|
 | Toolbar click → save current tab | ✅ |
-| Context menu "Save to MyLinks" (link / selection / page) | ✅ |
+| Context menu "Save to Machina" (link / selection / page) | ✅ |
 | Keyboard shortcut (`⌘⇧S`) | ✅ (Safari 16.4+) |
 | Settings popup | ✅ — opens as a **tab** (Safari ignores `open_in_tab:false`) |
 | ✓ / ✗ toolbar **badge** | ✅ |
 | **System notification** confirmation | ❌ not supported by Safari Web Extensions — the save still happens and the badge confirms it; the card appears in the app as usual |
-| Real-time appearance in the MyLinks app | ✅ (Firestore sync — unchanged) |
+| Real-time appearance in the Machina AI app | ✅ (Firestore sync — unchanged) |
 
 The converter prints a warning about the `notifications` and `open_in_tab` manifest
 keys for this reason — both degrade gracefully, so no code changes are needed.
