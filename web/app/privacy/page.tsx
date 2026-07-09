@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Privacy Policy — Machina AI",
@@ -13,9 +14,9 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <main className="mx-auto max-w-2xl px-6 py-16">
-      <a href="/" className="text-sm text-text-secondary hover:text-text transition-colors">
+      <Link href="/" className="text-sm text-text-secondary hover:text-text transition-colors">
         &larr; Machina AI
-      </a>
+      </Link>
 
       <h1 className="mt-6 text-3xl font-semibold tracking-tight text-text">
         Privacy Policy
@@ -45,12 +46,6 @@ export default function PrivacyPage() {
         <li>
           <span className="text-text">Questions you ask.</span> Your &ldquo;Ask Machina&rdquo;
           questions and the resulting chat history, so you can revisit past conversations.
-        </li>
-        <li>
-          <span className="text-text">Phone number — only if you use WhatsApp capture.</span> Saving
-          via WhatsApp is optional. If you use it, we see the phone number the message came from (to
-          route the save to your workspace) and the content of messages you send to Machina&rsquo;s
-          number. If you never use WhatsApp capture, we never receive your phone number.
         </li>
         <li>
           <span className="text-text">Preferences.</span> Your in-app settings, including your
@@ -90,11 +85,6 @@ export default function PrivacyPage() {
         <li>
           <span className="text-text">Google Firebase / Google Cloud.</span> Storage, authentication,
           and backend hosting, as described above.
-        </li>
-        <li>
-          <span className="text-text">Twilio (WhatsApp capture, optional).</span> If you save via
-          WhatsApp, your messages and phone number pass through Twilio&rsquo;s WhatsApp messaging
-          service to reach Machina.
         </li>
         <li>
           <span className="text-text">Vercel.</span> Serves the web application and receives
@@ -157,7 +147,7 @@ export default function PrivacyPage() {
       <footer className="mt-14 border-t border-border-subtle pt-6 text-sm text-text-muted">
         <a href="/terms" className="hover:text-text transition-colors">Terms of Service</a>
         <span className="mx-2">&middot;</span>
-        <a href="/" className="hover:text-text transition-colors">Machina AI</a>
+        <Link href="/" className="hover:text-text transition-colors">Machina AI</Link>
       </footer>
     </main>
   );

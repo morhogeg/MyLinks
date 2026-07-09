@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Terms of Service — Machina AI",
@@ -12,9 +13,9 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   return (
     <main className="mx-auto max-w-2xl px-6 py-16">
-      <a href="/" className="text-sm text-text-secondary hover:text-text transition-colors">
+      <Link href="/" className="text-sm text-text-secondary hover:text-text transition-colors">
         &larr; Machina AI
-      </a>
+      </Link>
 
       <h1 className="mt-6 text-3xl font-semibold tracking-tight text-text">
         Terms of Service
@@ -31,7 +32,7 @@ export default function TermsPage() {
       <h2 className="mt-10 text-xl font-semibold text-text">1. What Machina is</h2>
       <p className="mt-4 leading-relaxed text-text-secondary">
         Machina is a personal knowledge base. You save links, text, and images from the iOS share
-        sheet, the web app, a browser extension, or (optionally) WhatsApp; Machina analyzes each
+        sheet, in-app add, a browser extension, or the web app; Machina analyzes each
         save with AI to produce summaries, categories, tags, and connections; and you can search
         your saves or ask questions answered from them, with citations. Features include reminders,
         digests, weekly syntheses, and collections.
@@ -132,7 +133,7 @@ export default function TermsPage() {
       <footer className="mt-14 border-t border-border-subtle pt-6 text-sm text-text-muted">
         <a href="/privacy" className="hover:text-text transition-colors">Privacy Policy</a>
         <span className="mx-2">&middot;</span>
-        <a href="/" className="hover:text-text transition-colors">Machina AI</a>
+        <Link href="/" className="hover:text-text transition-colors">Machina AI</Link>
       </footer>
     </main>
   );
