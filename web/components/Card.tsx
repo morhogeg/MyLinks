@@ -3,9 +3,10 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Youtube, ExternalLink, Layers, Share2, X, Loader2, RotateCcw, AlertTriangle } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Youtube, ExternalLink, Layers, Share2, X, Loader2, RotateCcw, AlertTriangle } from 'lucide-react';
+import { useState, memo } from 'react';
 import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
+import { useNow } from '@/lib/useNow';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
@@ -45,7 +46,7 @@ interface CardProps {
 /**
  * Card component for displaying a saved link
  */
-export default function Card({
+function Card({
     link,
     onOpenDetails,
     onStatusChange,
@@ -69,7 +70,10 @@ export default function Card({
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
-    const [now, setNow] = useState<number>(0);
+    // One shared app-wide minute clock (see lib/useNow) instead of a per-card
+    // 60s interval — relative times still update once a minute, without dozens
+    // of independent timers each triggering their own re-render.
+    const now = useNow();
 
     // Cap the stagger so long feeds still finish assembling quickly (M-P4: tighter
     // per-card delay for a snappier entrance).
@@ -98,15 +102,6 @@ export default function Card({
         && !['facebook', 'screenshot', 'none'].includes(link.sourceName.trim().toLowerCase())
         ? link.sourceName : null;
 
-    useEffect(() => {
-        const initialTimer = setTimeout(() => setNow(Date.now()), 0);
-        const timer = setInterval(() => setNow(Date.now()), 60000);
-        return () => {
-            clearTimeout(initialTimer);
-            clearInterval(timer);
-        };
-    }, []);
-
     // Format relative time (e.g., "2h ago")
     const getTimeAgo = (timestamp: any, now: number): string => {
         if (!timestamp || !now) return '...';
@@ -128,8 +123,8 @@ export default function Card({
         return isRtl ? `לפני ${days} ימים` : `${days}d ago`;
     };
 
-    // M3 — async-capture lifecycle. A card queued via the share sheet / WhatsApp
-    // is written as `processing` and flips to `failed` if analysis errors. Render
+    // M3 — async-capture lifecycle. A card queued via the share sheet is written
+    // as `processing` and flips to `failed` if analysis errors. Render
     // a skeleton (processing) or a retryable "couldn't analyze" card (failed) so a
     // capture is never invisible and never silently dropped. These are terminal
     // presentational states — the normal card body/actions don't apply.
@@ -617,3 +612,7 @@ export default function Card({
         </>
     );
 }
+
+// Memoized: with stable handler/array props from Feed, an unchanged card skips
+// re-rendering during unrelated feed updates (banner ticks, search typing, etc.).
+export default memo(Card);

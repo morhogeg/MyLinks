@@ -85,10 +85,13 @@ export function useSharedCaptureBanner(processingActive: boolean): AnalyzingStat
         if (processingActive && signal) setSignal(null);
     }, [processingActive, signal]);
 
-    // Advance the ramp while active.
+    // Advance the ramp while active. Ticks once a second (down from 200 ms) so
+    // the optimistic banner re-renders ≤1×/s; the banner's CSS width transition
+    // smooths each step, and progress is a pure function of elapsed time so the
+    // ramp still lands at the same value at any given moment.
     useEffect(() => {
         if (!signal) return;
-        const iv = setInterval(() => tick((n) => n + 1), 200);
+        const iv = setInterval(() => tick((n) => n + 1), 1000);
         return () => clearInterval(iv);
     }, [signal]);
 

@@ -3,15 +3,15 @@
 
 
 
-import { useState, useEffect, useRef, useMemo, cloneElement, type ReactElement } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, cloneElement, type ReactElement } from 'react';
 import { Link, LinkStatus, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, platformColor, prettyHost, type PlatformKey } from '@/lib/platform';
+import { PLATFORM_LABELS, platformIcon, platformColor, prettyHost, type PlatformKey } from '@/lib/platform';
 import { getSourceInfo, buildSourceFacets, sourceMatchesQuery } from '@/lib/source';
 import SourceFacetList from './SourceFacetList';
 import DigestView from './DigestView';
 import Dropdown from './Dropdown';
-import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus, retryFailedLink, toLink } from '@/lib/storage';
+import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkCategory, updateLinkReadStatus, retryFailedLink, toLink } from '@/lib/storage';
 import { collection, query, orderBy, onSnapshot, getDocsFromServer, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
@@ -31,13 +31,11 @@ import CollectionsGallery from './CollectionsGallery';
 import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
-import { Button } from './ui/Button';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Shapes, Check, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus, RefreshCw, Newspaper } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Shapes, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, Share2, Globe, Plus, RefreshCw, Newspaper } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
 import { subscribeDigests, deleteDigest } from '@/lib/digest';
-import DigestCard from './DigestCard';
 import { PUSH_INTENT_EVENT, PUSH_FOREGROUND_EVENT, consumePendingPushIntent, readLocalPushPrompt, type PushIntent } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
 import PushNudge from './PushNudge';
@@ -50,6 +48,24 @@ import { Suspense } from 'react';
 
 type FilterType = 'all' | 'unread' | 'read' | 'archived' | 'favorite' | 'reminders';
 type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
+
+// Stable no-op for card slots that don't wire up an action (pending cards).
+const noop = () => { };
+
+// Pending captures (M3): processing/failed cards are surfaced separately, pinned
+// above the feed, and excluded from the normal filtered feed + every facet.
+const isPending = (l: Link) => l.status === 'processing' || l.status === 'failed';
+
+// Consistent millisecond timestamp from a number, ISO string, or Firestore
+// Timestamp. Module-scope + pure so it's a stable dependency for memoization.
+const getTimestampNumber = (val: any): number => {
+    if (!val) return 0;
+    if (typeof val === 'number') return val;
+    if (typeof val === 'string') return new Date(val).getTime();
+    if (val.toMillis && typeof val.toMillis === 'function') return val.toMillis();
+    if (val.seconds) return val.seconds * 1000;
+    return 0;
+};
 
 /**
  * Main feed component displaying saved links
@@ -107,13 +123,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
     const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
-    const [selectedPlatforms, setSelectedPlatforms] = useState<Set<PlatformKey>>(new Set());
     // Source (publisher/site) facet — keyed by getSourceInfo().key, e.g. a card
     // from Ynet, an MKBHD video, or @naval on X. Sits alongside the coarse
     // platform quick-filters and is unioned with them (see the filter chain).
     const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
     const [isSourcesOpen, setIsSourcesOpen] = useState(false);
-    const [screenshotOnly, setScreenshotOnly] = useState(false);
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
     const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
@@ -140,7 +154,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
     // Curated digest history — the dedicated Digest section (written
     // server-side to users/{uid}/digests; the in-app view is the always-on
-    // surface, push/WhatsApp/email are extra delivery channels).
+    // surface, push/email are extra delivery channels).
     const [digests, setDigests] = useState<CuratedDigest[]>([]);
 
     // First-run notifications nudge (native only, once per account). By the
@@ -165,7 +179,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
-    // Server-side captures (Share Extension / WhatsApp) show up as `processing`
+    // Server-side captures (the iOS Share Extension) show up as `processing`
     // cards; surface the same app-level "Analyzing… N%" banner for them. Report
     // the state up to the page, throttled to meaningful changes so it doesn't
     // fire every ramp frame.
@@ -178,14 +192,26 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [procSig]);
 
+    // Generation guard: each search run bumps this counter and captures its own
+    // generation. Out-of-order callable responses (a slow "cat" landing after a
+    // fast "dog") would otherwise clobber the newer results — so every state
+    // write below is gated on still being the latest generation. The callable
+    // API can't be aborted mid-flight, so the guard alone protects state.
+    // Modeled on AskBrain's stream-generation guard.
+    const searchGenRef = useRef(0);
+
     // Semantic Search Effect
     useEffect(() => {
         if (!debouncedQuery.trim()) {
+            searchGenRef.current += 1; // supersede any in-flight search
             setIsSearching(false);
             setSearchResults([]);
             setSearchError(null);
             return;
         }
+
+        const gen = ++searchGenRef.current;
+        const isStale = () => searchGenRef.current !== gen;
 
         const performSearch = async () => {
             setIsSearching(true);
@@ -197,9 +223,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     limit: 20
                     // We can pass uid here if needed for dev, but auth context should handle it
                 });
+                if (isStale()) return; // a newer query superseded this one
                 const data = result.data as { links: Link[] };
-                setSearchResults(data.links || []);
+                // Normalize each result to the full Link shape (fills defaults),
+                // matching how live cards are read via toLink — safe for future
+                // rendering, not just id-membership use.
+                setSearchResults((data.links || []).map((r) =>
+                    toLink({ id: r.id, data: () => r } as unknown as QueryDocumentSnapshot<DocumentData>)
+                ));
             } catch (err: any) {
+                if (isStale()) return;
                 console.error("Search failed:", err);
                 // Extract error message from the Firebase callable error
                 let errorMessage = 'Search failed. Please try again.';
@@ -220,11 +253,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 // Fall back to local filtering only - semantic search errors shouldn't break the app
                 setSearchResults([]);
             } finally {
-                setIsSearching(false);
+                if (!isStale()) setIsSearching(false);
             }
         };
 
         performSearch();
+
+        // Superseding a still-running search on cleanup means its late response
+        // is ignored (the callable itself can't be cancelled).
+        return () => { searchGenRef.current += 1; };
     }, [debouncedQuery]);
 
     // Load collapsed state from localStorage
@@ -338,16 +375,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         return () => unsubscribe();
     }, [uid]);
 
-    // Helper to get consistent number for timestamps (handles number, string, or Firestore Timestamp)
-    const getTimestampNumber = (val: any): number => {
-        if (!val) return 0;
-        if (typeof val === 'number') return val;
-        if (typeof val === 'string') return new Date(val).getTime();
-        if (val.toMillis && typeof val.toMillis === 'function') return val.toMillis();
-        if (val.seconds) return val.seconds * 1000;
-        return 0;
-    };
-
     // 3. Handle deep linking
     //
     // The effect depends on `links`, which Firestore's onSnapshot mutates on every
@@ -422,11 +449,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // normal filtered feed and from every facet derivation below (so a still-empty
     // card never spawns a phantom "Processing" category/tag), then surfaced
     // separately, pinned at the top of the library, so a capture is always visible.
-    const isPending = (l: Link) => l.status === 'processing' || l.status === 'failed';
-    const contentLinks = links.filter((l) => !isPending(l));
+    const contentLinks = useMemo(() => links.filter((l) => !isPending(l)), [links]);
 
-    // 4. Hybrid Search Logic
-    const filteredLinks = contentLinks
+    // 4. Hybrid Search Logic — memoized so a banner tick or any unrelated state
+    // change (search typing, overlay toggles) doesn't re-run the 6-stage filter +
+    // sort. Recomputes only when an input it actually reads changes.
+    const filteredLinks = useMemo(() => contentLinks
         .filter((link) => {
             // Apply status filters
             if (filter === 'reminders') return link.reminderStatus === 'pending';
@@ -455,14 +483,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             return (link.collectionIds ?? []).some(id => selectedCollections.has(id));
         })
         .filter((link) => {
-            // Apply source filters — platforms + screenshots + publisher sources,
-            // OR across every selection (picking Ynet AND YouTube shows both).
-            if (selectedPlatforms.size === 0 && !screenshotOnly && selectedSources.size === 0) return true;
-            const platform = getPlatform(link.url);
-            const matchesPlatform = platform != null && selectedPlatforms.has(platform);
-            const matchesScreenshot = screenshotOnly && link.sourceType === 'image';
-            const matchesSource = selectedSources.size > 0 && selectedSources.has(getSourceInfo(link).key);
-            return matchesPlatform || matchesScreenshot || matchesSource;
+            // Apply source filters — publisher/site sources (incl. the Screenshots
+            // bucket), OR across every selection (picking Ynet AND YouTube shows both).
+            if (selectedSources.size === 0) return true;
+            return selectedSources.has(getSourceInfo(link).key);
         })
         .filter((link) => {
             // Apply search (Hybrid: keyword OR semantic result)
@@ -516,60 +540,57 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 default:
                     return 0;
             }
-        });
-
-    // Does a link carry any of the currently selected tags? (parent tags match
-    // their children, e.g. "ai" matches "ai/agents"). Shared by the faceted counts.
-    const matchesSelectedTags = (link: Link) =>
-        link.tags.some(tag => Array.from(selectedTags).some(s => tag === s || tag.startsWith(`${s}/`)));
+        }),
+        [contentLinks, filter, selectedCategory, selectedTags, selectedCollections, selectedSources, debouncedQuery, searchResults, sortBy]);
 
     // Faceted counts — the numbers update live as you tap. Each facet's counts are
     // computed against the OTHER facet's current selection (but never its own), so
     // picking the "Tech" category instantly drops a non-overlapping tag like
     // "politics" to 0, while the category chips keep reflecting the tag selection.
-    // Pure client-side derivation — no extra reads, no backend cost.
-    const linksForCategoryCounts = selectedTags.size === 0 ? contentLinks : contentLinks.filter(matchesSelectedTags);
-    const categoryCounts = linksForCategoryCounts.reduce((acc, link) => {
-        acc[link.category] = (acc[link.category] || 0) + 1;
-        return acc;
-    }, {} as Record<string, number>);
+    // Pure client-side derivation — no extra reads, no backend cost. Memoized so it
+    // recomputes only when the library or the relevant selection changes.
+    const categoryCounts = useMemo(() => {
+        const forCounts = selectedTags.size === 0
+            ? contentLinks
+            : contentLinks.filter(link => link.tags.some(tag => Array.from(selectedTags).some(s => tag === s || tag.startsWith(`${s}/`))));
+        return forCounts.reduce((acc, link) => {
+            acc[link.category] = (acc[link.category] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+    }, [contentLinks, selectedTags]);
 
     // Category chips stay derived from the whole library so they never vanish —
     // they just read 0 when nothing matches the current tag selection.
-    const categories = Array.from(new Set(contentLinks.map(l => l.category).filter(Boolean))).sort();
+    const categories = useMemo(
+        () => Array.from(new Set(contentLinks.map(l => l.category).filter(Boolean))).sort(),
+        [contentLinks]
+    );
 
-    const linksForTagCounts = selectedCategory.size === 0 ? contentLinks : contentLinks.filter(link => selectedCategory.has(link.category));
-    const tagCounts = linksForTagCounts.reduce((acc, link) => {
-        link.tags.forEach(tag => {
-            acc[tag] = (acc[tag] || 0) + 1;
+    const tagCounts = useMemo(() => {
+        const forCounts = selectedCategory.size === 0
+            ? contentLinks
+            : contentLinks.filter(link => selectedCategory.has(link.category));
+        return forCounts.reduce((acc, link) => {
+            link.tags.forEach(tag => {
+                acc[tag] = (acc[tag] || 0) + 1;
+            });
+            return acc;
+        }, {} as Record<string, number>);
+    }, [contentLinks, selectedCategory]);
+
+    const allTags = useMemo(
+        () => Array.from(new Set(contentLinks.flatMap(l => l.tags))).sort(),
+        [contentLinks]
+    );
+
+    const handleToggleTag = useCallback((tag: string) => {
+        setSelectedTags(prev => {
+            const next = new Set(prev);
+            if (next.has(tag)) next.delete(tag);
+            else next.add(tag);
+            return next;
         });
-        return acc;
-    }, {} as Record<string, number>);
-
-    const allTags = Array.from(new Set(contentLinks.flatMap(l => l.tags))).sort();
-
-    const handleToggleTag = (tag: string) => {
-        const next = new Set(selectedTags);
-        if (next.has(tag)) next.delete(tag);
-        else next.add(tag);
-        setSelectedTags(next);
-    };
-
-    // Source/platform filter: only surface platforms actually present in the library.
-    const platformCounts = contentLinks.reduce((acc, link) => {
-        const p = getPlatform(link.url);
-        if (p) acc[p] = (acc[p] || 0) + 1;
-        return acc;
-    }, {} as Record<PlatformKey, number>);
-    const availablePlatforms = (Object.keys(PLATFORM_LABELS) as PlatformKey[]).filter(p => platformCounts[p]);
-    const screenshotCount = contentLinks.filter(l => l.sourceType === 'image').length;
-
-    const handleTogglePlatform = (p: PlatformKey) => {
-        const next = new Set(selectedPlatforms);
-        if (next.has(p)) next.delete(p);
-        else next.add(p);
-        setSelectedPlatforms(next);
-    };
+    }, []);
 
     // Source (publisher/site) facet — every distinct source in the library, ranked
     // by count. Drives the Sources submenu and the search "Sources" suggestions.
@@ -634,11 +655,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
     // Search "Sources" suggestions — the sources whose label matches the live
     // query, so a search splits into a Sources row (tap to filter) + the Cards grid.
-    const matchingSources = debouncedQuery.trim()
-        ? sourceFacets.filter(s => sourceMatchesQuery(s, debouncedQuery)).slice(0, 8)
-        : [];
+    const matchingSources = useMemo(
+        () => debouncedQuery.trim()
+            ? sourceFacets.filter(s => sourceMatchesQuery(s, debouncedQuery)).slice(0, 8)
+            : [],
+        [debouncedQuery, sourceFacets]
+    );
 
-    const reminderCount = contentLinks.filter(l => l.reminderStatus === 'pending').length;
+    const reminderCount = useMemo(
+        () => contentLinks.filter(l => l.reminderStatus === 'pending').length,
+        [contentLinks]
+    );
 
     // Pending capture cards to surface, pinned above the feed. Only shown on the
     // default library views (All/Unread, no active facet/search) so they're always
@@ -653,14 +680,30 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         && selectedCollections.size === 0
         && selectedCategory.size === 0
         && selectedTags.size === 0
-        && selectedPlatforms.size === 0
         && selectedSources.size === 0
-        && !screenshotOnly
         && !debouncedQuery.trim();
 
-    const pendingCards = isDefaultLibraryView
-        ? links.filter(isPending).sort((a, b) => getTimestampNumber(b.createdAt) - getTimestampNumber(a.createdAt))
-        : [];
+    const pendingCards = useMemo(
+        () => isDefaultLibraryView
+            ? links.filter(isPending).sort((a, b) => getTimestampNumber(b.createdAt) - getTimestampNumber(a.createdAt))
+            : [],
+        [isDefaultLibraryView, links]
+    );
+
+    // Precomputed collection chips per card — built once per links/collections
+    // change instead of filtering `collections` for every card on every render.
+    const cardCollectionsByLink = useMemo(() => {
+        const map = new Map<string, { id: string; name: string }[]>();
+        for (const link of links) {
+            const ids = link.collectionIds;
+            if (!ids || ids.length === 0) continue;
+            const chips = collections
+                .filter(c => ids.includes(c.id))
+                .map(c => ({ id: c.id, name: c.name }));
+            if (chips.length > 0) map.set(link.id, chips);
+        }
+        return map;
+    }, [links, collections]);
 
     // The proactive feed modules, rendered once and reused in both the grid and
     // list layouts (above pending + real cards). Just the weekly synthesis recap
@@ -686,7 +729,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // Firestore's onSnapshot applies writes optimistically (latency
     // compensation) and reverts them if the write fails, so the UI updates
     // instantly. We just surface failures and confirm meaningful actions.
-    const handleStatusChange = async (id: string, status: LinkStatus) => {
+    const handleStatusChange = useCallback(async (id: string, status: LinkStatus) => {
         if (!uid) return;
         try {
             await updateLinkStatus(uid, id, status);
@@ -699,40 +742,45 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         } catch {
             toast.error("Couldn't update the link. Please try again.");
         }
-    };
+    }, [uid, toast]);
 
-    const handleReadStatusChange = async (id: string, isRead: boolean) => {
+    const handleReadStatusChange = useCallback(async (id: string, isRead: boolean) => {
         if (!uid) return;
         try {
             await updateLinkReadStatus(uid, id, isRead);
         } catch {
             toast.error("Couldn't update read status. Please try again.");
         }
-    };
+    }, [uid, toast]);
 
-    const handleUpdateTags = async (id: string, tags: string[]) => {
+    const handleUpdateTags = useCallback(async (id: string, tags: string[]) => {
         if (!uid) return;
         try {
             await updateLinkTags(uid, id, tags);
         } catch {
             toast.error("Couldn't save tags. Please try again.");
         }
-    };
+    }, [uid, toast]);
 
-    const handleUpdateCategory = async (id: string, category: string) => {
+    const handleUpdateCategory = useCallback(async (id: string, category: string) => {
         if (!uid) return;
         try {
             await updateLinkCategory(uid, id, category);
         } catch {
             toast.error("Couldn't change category. Please try again.");
         }
-    };
+    }, [uid, toast]);
 
     // Open the branded confirm dialog instead of a native window.confirm. The
     // card/sheet/table all call this; actual deletion happens on confirm.
-    const handleDelete = (id: string) => {
+    const handleDelete = useCallback((id: string) => {
         setConfirmDeleteId(id);
-    };
+    }, []);
+
+    // Stable card-open + reminder + add-to-collection handlers so memoized cards
+    // keep identical props across unrelated re-renders.
+    const openLinkDetails = useCallback((link: Link) => setActiveLinkId(link.id), []);
+    const handleAddToCollection = useCallback((link: Link) => setAddToCollectionLink(link), []);
 
     const performDelete = async (id: string) => {
         if (!uid) return;
@@ -771,14 +819,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         setIsSelectionMode(false);
     };
 
-    const handleOpenReminderModal = (link: Link) => {
+    const handleOpenReminderModal = useCallback((link: Link) => {
         setReminderModalLink(link);
-    };
+    }, []);
 
     // Retry analysis for a failed capture card (M3). Optimistically flips the card
     // back to `processing` and re-runs analysis in place; on failure it returns to
     // a `failed` card so nothing is ever lost.
-    const handleRetryProcessing = async (link: Link) => {
+    const handleRetryProcessing = useCallback(async (link: Link) => {
         if (!uid) return;
         try {
             await retryFailedLink(uid, link);
@@ -786,7 +834,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         } catch {
             toast.error("Couldn't analyze that link. Please try again.");
         }
-    };
+    }, [uid, toast]);
 
     // A pending capture (processing / failed) rendered with Card's dedicated
     // skeleton / retry treatment. Reused above both the grid and list layouts.
@@ -795,13 +843,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             key={link.id}
             index={0}
             link={link}
-            onOpenDetails={() => { }}
+            onOpenDetails={noop}
             onStatusChange={handleStatusChange}
             onReadStatusChange={handleReadStatusChange}
             onUpdateCategory={handleUpdateCategory}
             allCategories={categories}
             onDelete={handleDelete}
-            onUpdateReminder={() => { }}
+            onUpdateReminder={noop}
             onRetry={handleRetryProcessing}
         />
     );
@@ -813,7 +861,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         setViewMode('grid');
     };
 
-    const handleRemoveFromCollection = async (link: Link, collectionId: string) => {
+    const handleRemoveFromCollection = useCallback(async (link: Link, collectionId: string) => {
         if (!uid) return;
         try {
             await removeLinkFromCollection(uid, link.id, collectionId);
@@ -821,10 +869,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         } catch {
             toast.error("Couldn't remove from the collection. Please try again.");
         }
-    };
+    }, [uid, toast]);
 
     // Share a single card as a public Machina page.
-    const handleShareCard = async (link: Link) => {
+    const handleShareCard = useCallback(async (link: Link) => {
         if (!uid) return;
         try {
             const shareId = await publishCard(uid, link);
@@ -838,7 +886,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         } catch {
             toast.error("Couldn't share this card. Please try again.");
         }
-    };
+    }, [uid, toast]);
 
     // Publish (or re-publish) a collection snapshot, then open the share sheet.
     const handleShareCollection = async (col: Collection) => {
@@ -893,12 +941,19 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         setCollectionFormOpen(true);
     };
 
-    const toggleSelection = (id: string) => {
-        const next = new Set(selectedIds);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        setSelectedIds(next);
-    };
+    const toggleSelection = useCallback((id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
+
+    // Stable SwipeDeck (Review mode) action handlers.
+    const swipeFavorite = useCallback((link: Link) => handleStatusChange(link.id, 'favorite'), [handleStatusChange]);
+    const swipeArchive = useCallback((link: Link) => handleStatusChange(link.id, 'archived'), [handleStatusChange]);
+    const swipeResetStatus = useCallback((link: Link) => handleStatusChange(link.id, 'unread'), [handleStatusChange]);
 
     const filterButtons: { key: FilterType; label: string; icon: React.ReactNode }[] = [
         { key: 'all', label: 'All', icon: <Inbox className="w-4 h-4" /> },
@@ -967,7 +1022,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const activeCollectionId = selectedCollections.size === 1 ? Array.from(selectedCollections)[0] : undefined;
     // Count of active grid filters — badges the mobile "Filters" button.
     const activeMobileFilters =
-        (filter !== 'all' ? 1 : 0) + selectedPlatforms.size + selectedSources.size + (screenshotOnly ? 1 : 0) + selectedTags.size + selectedCollections.size;
+        (filter !== 'all' ? 1 : 0) + selectedSources.size + selectedTags.size + selectedCollections.size;
 
     // The Digest section's scrollable history — the weekly synthesis rides on
     // top, then every curated digest, newest first. Built once and rendered in
@@ -1806,7 +1861,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 <div className="flex items-center gap-3 pt-1">
                                     {activeMobileFilters > 0 && (
                                         <button
-                                            onClick={() => { setFilter('all'); setSelectedPlatforms(new Set()); setSelectedSources(new Set()); setScreenshotOnly(false); setSelectedTags(new Set()); }}
+                                            onClick={() => { setFilter('all'); setSelectedSources(new Set()); setSelectedTags(new Set()); }}
                                             className="text-sm font-semibold text-text-muted hover:text-accent transition-colors"
                                         >
                                             Clear all
@@ -2098,13 +2153,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                                         selectedTags.size > 0 ? 'Try clearing some tag filters' :
                                                             'Add your first link using the + button below'}
                             </p>
-                            {(selectedTags.size > 0 || selectedPlatforms.size > 0 || selectedSources.size > 0 || screenshotOnly || searchQuery) && (
+                            {(selectedTags.size > 0 || selectedSources.size > 0 || searchQuery) && (
                                 <button
                                     onClick={() => {
                                         setSelectedTags(new Set());
-                                        setSelectedPlatforms(new Set());
                                         setSelectedSources(new Set());
-                                        setScreenshotOnly(false);
                                         setSearchQuery('');
                                     }}
                                     className="mt-4 px-4 py-2 bg-accent text-white rounded-xl text-sm font-bold hover:bg-accent-hover transition-all"
@@ -2116,11 +2169,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     ) : viewMode === 'review' ? (
                         <SwipeDeck
                             links={filteredLinks}
-                            onFavorite={(link) => handleStatusChange(link.id, 'favorite')}
-                            onArchive={(link) => handleStatusChange(link.id, 'archived')}
-                            onRemind={(link) => handleOpenReminderModal(link)}
-                            onOpen={(link) => setActiveLinkId(link.id)}
-                            onResetStatus={(link) => handleStatusChange(link.id, 'unread')}
+                            onFavorite={swipeFavorite}
+                            onArchive={swipeArchive}
+                            onRemind={handleOpenReminderModal}
+                            onOpen={openLinkDetails}
+                            onResetStatus={swipeResetStatus}
                         />
                     ) : viewMode === 'list' ? (
                         <div className="flex flex-col gap-2 max-w-3xl mx-auto">
@@ -2131,7 +2184,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     key={link.id}
                                     index={idx}
                                     link={link}
-                                    onOpenDetails={(link) => setActiveLinkId(link.id)}
+                                    onOpenDetails={openLinkDetails}
                                     onStatusChange={handleStatusChange}
                                     onDelete={handleDelete}
                                     isSelectionMode={isSelectionMode}
@@ -2150,22 +2203,20 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     key={link.id}
                                     index={idx}
                                     link={link}
-                                    onOpenDetails={(link) => setActiveLinkId(link.id)}
+                                    onOpenDetails={openLinkDetails}
                                     onStatusChange={handleStatusChange}
                                     onReadStatusChange={handleReadStatusChange}
                                     onUpdateCategory={handleUpdateCategory}
                                     allCategories={categories}
                                     onDelete={handleDelete}
-                                    onUpdateReminder={(link) => handleOpenReminderModal(link)}
+                                    onUpdateReminder={handleOpenReminderModal}
                                     isSelectionMode={isSelectionMode}
                                     isSelected={selectedIds.has(link.id)}
                                     onToggleSelection={toggleSelection}
                                     onTagClick={handleToggleTag}
-                                    onAddToCollection={(link) => setAddToCollectionLink(link)}
+                                    onAddToCollection={handleAddToCollection}
                                     onShare={handleShareCard}
-                                    cardCollections={collections
-                                        .filter(c => (link.collectionIds ?? []).includes(c.id))
-                                        .map(c => ({ id: c.id, name: c.name }))}
+                                    cardCollections={cardCollectionsByLink.get(link.id)}
                                     activeCollectionId={activeCollectionId}
                                     onRemoveFromCollection={handleRemoveFromCollection}
                                 />
@@ -2242,7 +2293,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     onReadStatusChange={handleReadStatusChange}
                     onUpdateTags={handleUpdateTags}
                     onUpdateCategory={handleUpdateCategory}
-                    onUpdateReminder={(link) => handleOpenReminderModal(link)}
+                    onUpdateReminder={handleOpenReminderModal}
                     onDelete={handleDelete}
                     onOpenOtherLink={openRelatedLink}
                     excludeRelatedIds={linkStack}
