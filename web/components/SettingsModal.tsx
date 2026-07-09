@@ -280,6 +280,36 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
         else closeSettings();
     }, isMobile && isOpen);
 
+    // A11y: Escape mirrors the edge-swipe-back — pop a sub-screen (persisting via
+    // Done's auto-save path), else close through closeSettings (which also
+    // auto-saves). While the delete confirmation is up, its own ConfirmDialog
+    // owns Escape, so we defer. No dependency array on purpose: the handler must
+    // always see fresh settings/stack for the auto-save closures.
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== 'Escape' || showDeleteConfirm) return;
+            e.preventDefault();
+            if (stack.length > 1) leaveSubscreen();
+            else closeSettings();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    });
+
+    // A11y: move focus into the sheet on open, restore it to the trigger on close.
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const restoreFocusRef = useRef<HTMLElement | null>(null);
+    useEffect(() => {
+        if (!isOpen) return;
+        restoreFocusRef.current = (document.activeElement as HTMLElement) ?? null;
+        const t = setTimeout(() => dialogRef.current?.focus({ preventScroll: true }), 0);
+        return () => {
+            clearTimeout(t);
+            restoreFocusRef.current?.focus?.({ preventScroll: true });
+        };
+    }, [isOpen]);
+
     useEffect(() => {
         if (isOpen && uid) {
             // Deep-link: open straight to the digest screen (main → Reminders &
@@ -457,10 +487,12 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     return (
         <div className="fixed inset-0 z-50">
             <div
+                ref={dialogRef}
+                tabIndex={-1}
                 role="dialog"
                 aria-modal="true"
                 aria-label="Settings"
-                className={`relative w-full h-full bg-background overflow-hidden flex flex-col ${isMobile ? 'animate-ios-push' : 'animate-fade-in'}`}
+                className={`relative w-full h-full bg-background overflow-hidden flex flex-col focus:outline-none ${isMobile ? 'animate-ios-push' : 'animate-fade-in'}`}
             >
                 {/* Header — main: big title inline with the close button; sub-screens:
                     back + close, with the large title in the scrolling body. */}

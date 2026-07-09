@@ -143,6 +143,39 @@ export default function LinkDetailModal({
     // the keys. No-op on desktop (visualViewport spans the full window).
     const vp = useVisualViewport();
 
+    // A11y: move focus into the dialog on open and restore it to the trigger on
+    // close. Keyed on isOpen only, so navigating between related cards (which
+    // keeps the modal open and only changes link.id) never steals focus.
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const restoreFocusRef = useRef<HTMLElement | null>(null);
+    useEffect(() => {
+        if (!isOpen) return;
+        restoreFocusRef.current = (document.activeElement as HTMLElement) ?? null;
+        const t = setTimeout(() => dialogRef.current?.focus({ preventScroll: true }), 0);
+        return () => {
+            clearTimeout(t);
+            restoreFocusRef.current?.focus?.({ preventScroll: true });
+        };
+    }, [isOpen]);
+
+    // A11y: Escape closes the topmost open layer first — the distraction-free
+    // reader, an inline category edit, or the add-tag input — otherwise it
+    // dismisses the whole modal (same as the X / backdrop). Desktop-web win;
+    // harmless in the native WKWebView where hardware keyboards are rare.
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== 'Escape') return;
+            e.preventDefault();
+            if (isReading) setIsReading(false);
+            else if (isEditingCategory) setIsEditingCategory(false);
+            else if (isAddingTag) setIsAddingTag(false);
+            else onClose();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [isOpen, isReading, isEditingCategory, isAddingTag, onClose]);
+
     if (!isOpen) return null;
 
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary) || (link.detailedSummary ? hasHebrew(link.detailedSummary) : false);
@@ -209,10 +242,12 @@ export default function LinkDetailModal({
             />
 
             <div
+                ref={dialogRef}
+                tabIndex={-1}
                 role="dialog"
                 aria-modal="true"
                 aria-label="Link details"
-                className="relative bg-card border-0 sm:border border-white/10 w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-up"
+                className="relative bg-card border-0 sm:border border-white/10 w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-up focus:outline-none"
             >
                 {/* Header Actions — a single compact row: the item actions scroll
                     horizontally if they don't all fit (so nothing is ever clipped),
@@ -472,6 +507,7 @@ export default function LinkDetailModal({
                                                         e.stopPropagation();
                                                         setIsEditingCategory(true);
                                                     }}
+                                                    aria-label="Edit category"
                                                     className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1.5 -ms-1.5 hover:bg-white/5 rounded-md"
                                                 >
                                                     <Pencil className="w-3.5 h-3.5 text-text-muted/40 hover:text-text-muted" />
