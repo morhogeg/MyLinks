@@ -3,7 +3,7 @@
 
 export type LinkStatus = 'unread' | 'archived' | 'favorite';
 
-// Async-capture lifecycle (M3). Items saved via the share sheet / WhatsApp are
+// Async-capture lifecycle (M3). Items saved via the share sheet are
 // written as `processing` the instant they're queued, then flip to a normal
 // LinkStatus (ready) or `failed` (retryable) — so a capture is never invisible
 // and never silently dropped. A card's `status` field holds one of these while
@@ -154,14 +154,14 @@ export interface RelatedLink {
 }
 
 export type DigestFrequency = 'daily' | 'weekly';
-export type DigestChannel = 'push' | 'email' | 'whatsapp';
-export type ReminderChannel = 'push' | 'whatsapp';
+export type DigestChannel = 'push' | 'email';
+export type ReminderChannel = 'push';
 export type DigestMode = 'smart' | 'random' | 'topic' | 'unread' | 'favorites' | 'rediscover' | 'synthesis';
 
 // ── Weekly "What you learned" synthesis (M12) ────────────────────────────────
 // A narrative recap of the week's saves, generated server-side (digest_service)
 // and stored at users/{uid}/syntheses/{weekId}. Surfaced in-app as a special
-// feed card and also delivered over email/WhatsApp.
+// feed card and also delivered over email.
 export interface SynthesisTheme {
   title: string;
   insight: string;
@@ -191,7 +191,7 @@ export interface WeeklySynthesis {
 
 // ── Curated digest (in-app Digest section) ───────────────────────────────────
 // Every curated digest is persisted server-side (digest_service) to
-// users/{uid}/digests/{digestId} — the always-on surface; push/WhatsApp/email
+// users/{uid}/digests/{digestId} — the always-on surface; push/email
 // are additional opt-in delivery channels.
 
 /** A card denormalized into the digest doc, so it renders even if the source

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef, Children } from 'react';
 import type { ReactNode } from 'react';
 import { User, DigestMode, DigestChannel, ReminderChannel } from '@/lib/types';
-import { X, Bell, Sparkles, Check, Sun, Moon, Monitor, MessageCircle, RefreshCw, BrainCircuit, Mail, Shuffle, Tag, Inbox, Star, History, ChevronLeft, ChevronRight, Compass, LogOut, Search, ShieldCheck, ExternalLink, Network, Clock, Info } from 'lucide-react';
+import { X, Bell, Sparkles, Check, Sun, Moon, Monitor, RefreshCw, BrainCircuit, Mail, Shuffle, Tag, Inbox, Star, History, ChevronLeft, ChevronRight, Compass, LogOut, Search, ShieldCheck, ExternalLink, Network, Clock, Info } from 'lucide-react';
 import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
 import { registerPush, unregisterPush } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
@@ -107,6 +107,16 @@ function withPush<T extends ReminderChannel | DigestChannel>(channels: T[], on: 
     if (on && !has) return [...channels, 'push' as T];
     if (!on && has) return channels.filter((c) => c !== 'push');
     return channels;
+}
+
+// Drop retired/unknown legacy channels out of a stored array: keep only the
+// values still valid for the narrowed channel type, dedupe, and fall back to
+// the given default so a delivery array is never left blank or carrying a ghost
+// value that would crash the narrowed types or render a dead chip. ('push' is
+// then reconciled against push_enabled by withPush at the call site.)
+function normalizeChannels<T extends string>(channels: readonly string[] | undefined, valid: readonly T[], fallback: T): T[] {
+    const kept = Array.from(new Set(channels ?? [])).filter((c): c is T => (valid as readonly string[]).includes(c));
+    return kept.length ? kept : [fallback];
 }
 
 // "4:24 PM" / "9:00 AM" — 12-hour local formatting for the digest summary.
@@ -326,14 +336,13 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                     reminders_enabled: userSettings.reminders_enabled ?? true,
                     reminder_frequency: userSettings.reminder_frequency || 'smart',
                     push_enabled: userSettings.push_enabled ?? false,
-                    // Accounts predating push only ever had WhatsApp reminders —
-                    // that's the legacy default (matches the backend's fallback).
-                    reminders_channel: userSettings.reminders_channel?.length
-                        ? userSettings.reminders_channel
-                        : ['whatsapp'],
+                    // Keep only valid channels; a retired legacy value is
+                    // dropped and an empty array defaults to push so delivery
+                    // is never left blank.
+                    reminders_channel: normalizeChannels<ReminderChannel>(userSettings.reminders_channel, ['push'], 'push'),
                     digest_enabled: userSettings.digest_enabled ?? false,
                     digest_frequency: userSettings.digest_frequency || 'weekly',
-                    digest_channels: userSettings.digest_channels?.length ? userSettings.digest_channels : ['whatsapp'],
+                    digest_channels: normalizeChannels<DigestChannel>(userSettings.digest_channels, ['push', 'email'], 'push'),
                     digest_mode: userSettings.digest_mode || 'smart',
                     digest_topics: userSettings.digest_topics?.length
                         ? userSettings.digest_topics
@@ -403,15 +412,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
         }
     };
 
-    const toggleReminderChannel = (channel: ReminderChannel) => {
-        setSettings((p) => ({
-            ...p,
-            reminders_channel: p.reminders_channel.includes(channel)
-                ? p.reminders_channel.filter((c) => c !== channel)
-                : [...p.reminders_channel, channel],
-        }));
-    };
-
     const toggleChannel = (channel: DigestChannel) => {
         setSettings((p) => {
             const has = p.digest_channels.includes(channel);
@@ -438,7 +438,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     const scheduleValue = settings.digest_frequency === 'weekly'
         ? `${DAYS[settings.digest_day]} · ${formatTime(settings.digest_hour, settings.digest_minute)}`
         : `Daily · ${formatTime(settings.digest_hour, settings.digest_minute)}`;
-    const deliveryValue = ['In-app', settings.push_enabled && 'Push', settings.digest_channels.includes('whatsapp') && 'WhatsApp', settings.digest_channels.includes('email') && 'Email']
+    const deliveryValue = ['In-app', settings.push_enabled && 'Push', settings.digest_channels.includes('email') && 'Email']
         .filter(Boolean).join(' · ');
 
     // Derived topic-picker state (only meaningful in topic mode).
@@ -534,7 +534,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                             <ResurfacingView
                                 settings={settings}
                                 setSettings={setSettings}
-                                toggleReminderChannel={toggleReminderChannel}
                                 cadenceLabel={CADENCE_LABEL[settings.reminder_frequency] ?? 'Smart'}
                                 modeLabel={modeLabel}
                                 scheduleValue={scheduleValue}
@@ -789,11 +788,10 @@ function AccountView({
 }
 
 function ResurfacingView({
-    settings, setSettings, toggleReminderChannel, cadenceLabel, modeLabel, scheduleValue, deliveryValue, go,
+    settings, setSettings, cadenceLabel, modeLabel, scheduleValue, deliveryValue, go,
 }: {
     settings: Settings;
     setSettings: SetSettings;
-    toggleReminderChannel: (c: ReminderChannel) => void;
     cadenceLabel: string;
     modeLabel: string;
     scheduleValue: string;
@@ -812,12 +810,6 @@ function ResurfacingView({
                 </RowShell>
                 {settings.reminders_enabled && (
                     <NavRow title="Cadence" value={cadenceLabel} onClick={() => go('cadence')} />
-                )}
-                {settings.reminders_enabled && (
-                    <RowShell>
-                        <RowText title="Also send to WhatsApp" sub="Legacy channel — needs a linked phone number" />
-                        <Toggle on={settings.reminders_channel.includes('whatsapp')} onChange={() => toggleReminderChannel('whatsapp')} />
-                    </RowShell>
                 )}
             </List>
             <Footnote>Smart spacing surfaces each card when you&apos;re most likely to want it — not on a fixed clock.</Footnote>
@@ -1038,10 +1030,6 @@ function DeliveryView({
         <>
             <LargeTitle>Delivery</LargeTitle>
             <List tight>
-                <RowShell tile={<MessageCircle className="w-[17px] h-[17px]" />} tileClass="bg-green-500">
-                    <RowText title="WhatsApp" sub="Needs a linked phone number" />
-                    <Toggle on={settings.digest_channels.includes('whatsapp')} onChange={() => toggleChannel('whatsapp')} />
-                </RowShell>
                 <RowShell tile={<Mail className="w-[16px] h-[16px]" />} tileClass="bg-indigo-500">
                     <RowText title="Email" />
                     <Toggle on={settings.digest_channels.includes('email')} onChange={() => toggleChannel('email')} />
