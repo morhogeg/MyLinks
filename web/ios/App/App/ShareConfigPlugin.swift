@@ -40,8 +40,9 @@ public class ShareConfigPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     /// Read (and clear) the "a capture was just shared" hint the Share Extension
-    /// writes when the user taps "Open Machina" on the share progress HUD. Lets
-    /// the app flash the in-app "Analyzing…" banner immediately on open, before
+    /// writes continuously as it scans (syncProgressHint/writePendingShareHint),
+    /// stamping the latest progress % into the App Group. Lets the app flash the
+    /// in-app "Analyzing…" banner immediately on open, resuming from that %, before
     /// the server's `processing` card streams into the feed. Cleared on read so
     /// it fires exactly once.
     ///
