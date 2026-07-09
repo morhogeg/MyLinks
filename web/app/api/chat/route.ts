@@ -10,6 +10,20 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+// Give the SSE proxy a longer ceiling than the default on Vercel — a cold RAG
+// backend call can be slow.
+//
+// NOTE: we deliberately do NOT add `export const dynamic = 'force-dynamic'`.
+// next.config.ts builds this app with `output: export` for Capacitor/iOS
+// whenever VERCEL is unset, and Next.js still evaluates every app/api route file
+// during that build (the vercel.json /api/* rewrites don't exclude it). Next
+// hard-fails `next build` with `dynamic = 'force-dynamic'` under `output: export`
+// ("cannot be used with output: export"), and the value must be a static literal
+// so it can't be gated on VERCEL. This route reads the incoming request
+// (request.json() + headers), so it is already dynamic-by-default and streams
+// SSE fine without the directive.
+export const maxDuration = 60;
+
 const CHAT_BACKEND_URL =
     process.env.CHAT_BACKEND_URL ||
     'https://us-central1-secondbrain-app-94da2.cloudfunctions.net/ask_brain';

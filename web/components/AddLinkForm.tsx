@@ -65,7 +65,6 @@ const fetchWithTimeout = async (input: string, init: RequestInit) => {
 
 /**
  * Form for manually adding URLs
- * This replaces WhatsApp ingestion for local testing
  */
 export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingChange }: AddLinkFormProps) {
     const { uid } = useAuth();
@@ -97,6 +96,16 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
 
     // Swipe in from the left edge to dismiss the open sheet (iOS back gesture).
     useEdgeSwipeBack(() => setIsExpanded(false), isMobile && isExpanded);
+
+    // Escape collapses the open sheet, mirroring the close button / backdrop tap.
+    useEffect(() => {
+        if (!isExpanded) return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setIsExpanded(false);
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [isExpanded]);
 
     // A YouTube link gets the "watching the video" progress treatment, since
     // native video analysis takes ~1 minute vs. a few seconds for a page.
@@ -252,7 +261,6 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                     },
                     sourceType: activeTab === 'image' ? 'image' : (data.link.sourceType || 'web'),
                     sourceName: data.link.sourceName,
-                    embedding_vector: data.link.embedding_vector,
                     concepts: data.link.concepts,
                     relatedLinks: data.link.relatedLinks,
                 });
@@ -308,6 +316,9 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 >
                     <form
                         onSubmit={handleSubmit}
+                        role="dialog"
+                        aria-label="Add link"
+                        aria-modal="true"
                         className="bg-card border border-white/10 rounded-3xl p-6 shadow-2xl relative overflow-hidden animate-fade-in"
                         noValidate
                     >
@@ -438,7 +449,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                 <button
                                     type="submit"
                                     disabled={activeTab === 'link' ? !url.trim() : !imageFile}
-                                    className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-100 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
+                                    className="w-full py-4 bg-accent text-white font-bold rounded-xl hover:bg-accent-hover active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-accent/20"
                                 >
                                     Save
                                 </button>
@@ -462,6 +473,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 {/* FAB Button */}
                 <button
                     data-tour="add"
+                    aria-label="Add to Machina"
                     onClick={() => setIsExpanded(!isExpanded)}
                     className={`w-14 h-14 min-h-[44px] min-w-[44px] rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${isExpanded
                         ? 'bg-card border border-white/10 rotate-45 scale-90 opacity-0 pointer-events-none'

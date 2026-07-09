@@ -5,7 +5,6 @@ import { useAuth } from '@/components/AuthProvider';
 import Feed from "@/components/Feed";
 import AddLinkForm from "@/components/AddLinkForm";
 import AnalyzingBanner, { AnalyzingState } from "@/components/AnalyzingBanner";
-import InstallPWA from "@/components/InstallPWA";
 import SettingsModal from "@/components/SettingsModal";
 import ScrollToTop from "@/components/ScrollToTop";
 import OnboardingTour, { ONBOARDING_STORAGE_KEY } from "@/components/OnboardingTour";
@@ -36,7 +35,7 @@ export default function Home() {
   const [hideAddButton, setHideAddButton] = useState(false);
   // In-flight capture analysis for the one "Analyzing… N%" banner. Two sources:
   // `analyzing` = the in-app add flow (real progress); `processing` = captures
-  // shared from other apps / WhatsApp (server-side, ramped). Prefer the in-app
+  // shared from other apps (server-side, ramped). Prefer the in-app
   // one when it's active (it has true milestones); otherwise show the share one.
   const [analyzing, setAnalyzing] = useState<AnalyzingState | null>(null);
   const [processing, setProcessing] = useState<AnalyzingState | null>(null);
@@ -181,9 +180,6 @@ export default function Home() {
 
       {/* First-run guided tour */}
       <OnboardingTour open={isTourOpen} onClose={() => setIsTourOpen(false)} />
-
-      {/* iOS Install Banner */}
-      <InstallPWA />
     </div>
   );
 }
