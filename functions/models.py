@@ -89,47 +89,6 @@ class WeeklySynthesis(BaseModel):
     openQuestion: str = Field(default="", description="One genuine open question the week's reading raises, to carry into next week")
 
 
-class LinkDocument(BaseModel):
-    """
-    Firestore document schema for a saved link
-    Collection path: users/{uid}/links/{linkId}
-    """
-    url: str
-    title: str
-    summary: str
-    detailedSummary: Optional[str] = None
-    tags: List[str] = Field(max_length=5)
-    category: str
-    sourceName: Optional[str] = None
-    status: LinkStatus = LinkStatus.UNREAD
-    createdAt: datetime = Field(default_factory=datetime.now)
-    metadata: LinkMetadata
-    # Reminder fields
-    reminderStatus: ReminderStatus = ReminderStatus.NONE
-    nextReminderAt: Optional[int] = None # Using int for Unix ms timestamp
-    reminderCount: int = 0
-    reminderProfile: Optional[str] = "smart" # "smart" or "spaced"
-    lastViewedAt: Optional[int] = None
-
-    # Contextual Linking & graph fields
-    embedding: Optional[List[float]] = Field(None, description="Vector embedding of title + summary")
-    concepts: List[str] = Field(default_factory=list, description="List of abstract concepts/philosophical anchors")
-    relatedLinks: List["RelatedLink"] = Field(default_factory=list, description="AI-suggested related notes")
-
-
-class RelatedLink(BaseModel):
-    """
-    Snapshot of a related link
-    """
-    id: str
-    title: str
-    reason: str = Field(description="AI-generated explanation of the connection")
-    similarity: float = Field(description="Cosine similarity score (0-1)")
-    commonConcepts: List[str] = Field(default_factory=list)
-    # Semantic Search
-    embedding_vector: Optional[List[float]] = Field(None, description="768-dimensional vector for semantic search")
-
-
 class UserSettings(BaseModel):
     """User preferences"""
     theme: str = "dark"
@@ -174,7 +133,7 @@ class UserDocument(BaseModel):
     Firestore document schema for a user
     Collection path: users/{uid}
     """
-    phone_number: str = Field(description="Phone number in E.164 format, e.g., +16462440305")
+    phone_number: str = Field(description="Phone number in E.164 format, e.g., +15551234567")
     createdAt: datetime = Field(default_factory=datetime.now)
     settings: UserSettings = Field(default_factory=UserSettings)
     last_saved_link_id: Optional[str] = Field(None, description="ID of the last saved link for context")

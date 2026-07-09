@@ -363,6 +363,7 @@ def _scrape_twitter_url(url: str) -> dict:
             logger.info("Scrape failed, reverting to thin vxtwitter result")
             return vx_result
 
+        logger.warning(f"All Twitter extraction methods (fxtwitter/vxtwitter/metadata) failed for {url}")
         return {"html": "", "title": "", "text": ""}
 
     except Exception as e:
@@ -378,6 +379,7 @@ def _scrape_twitter_metadata(url: str) -> dict:
         }
         response = safe_get(url, headers=headers, timeout=10)
         if not response.ok:
+            logger.warning(f"Twitter metadata scrape got HTTP {response.status_code} for {url}")
             return {"html": "", "title": "", "text": ""}
 
         html = response.text
@@ -389,6 +391,7 @@ def _scrape_twitter_metadata(url: str) -> dict:
         desc = desc_match.group(1) if desc_match else ""
 
         if not title and not desc:
+            logger.warning(f"Twitter metadata scrape found no og:title/og:description for {url}")
             return {"html": "", "title": "", "text": ""}
 
         formatted_text = f"""

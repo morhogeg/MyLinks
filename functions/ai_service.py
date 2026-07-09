@@ -617,7 +617,3 @@ Return ONLY a JSON object matching the schema (title, narrative, themes[title,in
         except Exception as e:
             logger.error(f"Embedding generation failed: {str(e)}")
             return None
-
-
-# Backward compatibility alias
-ClaudeService = GeminiService

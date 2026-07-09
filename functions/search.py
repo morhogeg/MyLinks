@@ -155,7 +155,7 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
     has_any_embeddings = any("embedding_vector" in d.to_dict() for d in sample_docs)
 
     if not has_any_embeddings:
-        logger.warning(f"No embeddings found for user {uid}. Run backfill_embeddings.py to generate embeddings for existing links.")
+        logger.warning(f"No embeddings found for user {uid}. Use Settings → Connections → Rebuild (or the backfill_related_links admin endpoint) to generate embeddings for existing links.")
         # Don't fail the search, just return empty results with a helpful message
         return []
 
