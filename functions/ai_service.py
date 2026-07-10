@@ -142,7 +142,6 @@ IMPORTANT: You are analyzing an **actual YouTube video that you can watch** (its
 - "detailedSummary": markdown. This section structure OVERRIDES the "start with Key Points" rule above — for a video, use these sections in this order instead. Translate each heading into the content's language (see HEADING LANGUAGE rule above):
   - `## Core Thesis` — the central argument or purpose of the video.
   - `## Key Points` — bullets of the main ideas, instructions, or frameworks actually presented.
-  - `## Who It's For` — the intended audience, only if the video makes this clear.
 - "summary": focus on the takeaway — what a viewer will know or be able to do after watching, stated factually.
 """
 

@@ -36,20 +36,6 @@ function youtubeWatchUrl(id: string, seconds?: number | null): string {
     return `https://www.youtube.com/watch?v=${id}${seconds != null ? `&t=${Math.floor(seconds)}s` : ''}`;
 }
 
-/** Drop a markdown section (a `## Heading` and its body up to the next `##`)
-    whose heading matches `re`. Used to strip the AI's "Who It's For" block from
-    video summaries. */
-function stripMarkdownSection(md: string, re: RegExp): string {
-    if (!md) return md;
-    const out: string[] = [];
-    let skipping = false;
-    for (const line of md.split('\n')) {
-        if (/^\s*##\s+/.test(line)) skipping = re.test(line);
-        if (!skipping) out.push(line);
-    }
-    return out.join('\n').trim();
-}
-
 interface LinkDetailModalProps {
     link: Link;
     allLinks: Link[];
@@ -590,11 +576,7 @@ export default function LinkDetailModal({
                             to strip, so we show it alone to avoid duplicating it. */}
                         <div className="mb-6">
                             {(() => {
-                                // Videos: drop the AI's "Who It's For" section (the user
-                                // finds it noise on YouTube cards).
-                                const detailed = isYouTube
-                                    ? stripMarkdownSection(link.detailedSummary || '', /who\s*it'?s?\s*for/i)
-                                    : (link.detailedSummary || '');
+                                const detailed = link.detailedSummary || '';
                                 const headingIdx = detailed.indexOf('## ');
                                 const hasSections = headingIdx >= 0;
                                 const detailBody = hasSections ? detailed.slice(headingIdx) : detailed;
