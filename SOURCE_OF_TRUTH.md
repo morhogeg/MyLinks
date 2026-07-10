@@ -596,7 +596,19 @@ exact-match, capped.
   source `development` value — audit risk closed), SIWA hard-check passed,
   no-beta Xcode filter worked, and the upload ran via
   `-exportArchive destination=upload` (altool fully retired). AUDIT.md M15 is
-  done. **Remaining owner step:** **Deploy functions** (owner machine):
+  done. **Backend: DEPLOYED 2026-07-10** — owner ran `./deploy-functions.sh`
+  with all 30 targets on `main@7d3f61e` (second attempt; the first deployed a
+  stale pre-ship checkout — **gotcha: always `git pull` before deploying**, and
+  don't paste a `#`-comment on the command line: interactive zsh passes it as
+  an argument and the script deploys a function literally named `#`). The
+  removed **`whatsapp_webhook` was deleted from prod** (`firebase
+  functions:delete whatsapp_webhook --force` — successful); `TWILIO_*` removed
+  from `functions/.env`. **New CI: `python-tests` run #1 failed CI-only** (4
+  rate-limit tests — the real `@firestore.transactional` rejects the FakeTxn
+  and the limiter fails open); fixed in `5f6efeb` (identity-decorator patch in
+  the test setup, verified 73/73 against BOTH the conftest fakes and the real
+  firestore driver). `rules-tests` only fires on rules/rules-test changes —
+  not yet exercised. Historical ship reference below (original owner steps):
   `./deploy-functions.sh` with ALL targets (every module changed — WhatsApp
   removal + per-uid rate limits + share_service extraction touch main.py and
   all shared modules), e.g. functions:analyze_link,functions:analyze_image,

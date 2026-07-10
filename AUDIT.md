@@ -389,3 +389,14 @@ background reconciliation (P-7, device work), light-theme *design* investment be
   M1 auth cutover, M2 key rotation + env flags, M7 APNs console steps, M15
   one TestFlight CI run to validate the pipeline changes (aps assertion,
   exportArchive upload, new workflows), M6 Twilio decommission.
+- **2026-07-10 — SHIPPED + DEPLOYED.** Merged to main (`9e1f042`): Vercel live;
+  **TestFlight run #64 → build 1064 GREEN** (fired via the temp-push-trigger
+  pattern; the run validated the entire CI hardening — aps-environment is
+  rewritten to `production` by the distribution profile, closing audit risk
+  #2; SIWA hard-check passed; upload via exportArchive). **Backend deployed by
+  owner** (all 30 functions, `main@7d3f61e`) and **`whatsapp_webhook` deleted
+  from production**; `TWILIO_*` scrubbed from the deployed env. M15 ✅ and the
+  webhook half of M6 ✅ (releasing the Twilio number/account remains).
+  Post-ship fix: `python-tests` CI failed on 4 rate-limit tests under the real
+  firestore driver — fixed in `5f6efeb`, 73/73 verified against both fake and
+  real drivers. Remaining manual items: M1-M5, M6 (number release), M7-M14.
