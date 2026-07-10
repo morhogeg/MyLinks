@@ -588,14 +588,15 @@ exact-match, capped.
 
 - **2026-07-09 — SHIPPED: audit remediation merged to main (merge `9e1f042`,
   25 tasks, 26 commits — see `AUDIT.md`).** Vercel auto-deploy is live (desktop
-  web). **Owner steps to finish the ship:** (1) **Trigger "iOS → TestFlight"
-  manually** (Actions → iOS → TestFlight → Run workflow on main) — the remote
-  session's GitHub integration got 403 on dispatch. This run also VALIDATES the
-  new CI hardening (aps-environment=production assertion on the exported IPA,
-  no-beta Xcode filter, altool→`-exportArchive destination=upload`, SIWA
-  hard-fail): if it fails on the aps assertion, the distribution profile is not
-  rewriting the entitlement — flip `App.entitlements` aps-environment to
-  `production` and re-run. (2) **Deploy functions** (owner machine):
+  web). **iOS: SHIPPED — TestFlight run #64 → build 1064, GREEN** (fired via the
+  temp-push-trigger pattern on the audit branch, commit `4c845eb`, trigger
+  reverted in `69a68e1`; API dispatch remains 403 from cloud sessions). The run
+  also VALIDATED the new CI hardening end-to-end: aps-environment=production
+  asserted in the exported IPA (the distribution profile DOES rewrite the
+  source `development` value — audit risk closed), SIWA hard-check passed,
+  no-beta Xcode filter worked, and the upload ran via
+  `-exportArchive destination=upload` (altool fully retired). AUDIT.md M15 is
+  done. **Remaining owner step:** **Deploy functions** (owner machine):
   `./deploy-functions.sh` with ALL targets (every module changed — WhatsApp
   removal + per-uid rate limits + share_service extraction touch main.py and
   all shared modules), e.g. functions:analyze_link,functions:analyze_image,
@@ -610,7 +611,7 @@ exact-match, capped.
   functions:check_reminders,functions:sweep_stuck_processing,
   functions:send_digests — then **delete the removed webhook**:
   `firebase functions:delete whatsapp_webhook --project secondbrain-app-94da2 --force`,
-  and remove `TWILIO_*` from `functions/.env`. (3) The new `python-tests` /
+  and remove `TWILIO_*` from `functions/.env`. The new `python-tests` /
   `rules-tests` workflows will run on the next functions/rules PR — confirm
   green once. Remaining owner work is consolidated in `AUDIT.md` §9 (auth
   cutover M1, key rotation M2, APNs console M7, Twilio decommission M6,
