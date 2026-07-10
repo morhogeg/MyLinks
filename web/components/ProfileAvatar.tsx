@@ -29,7 +29,7 @@ export default function ProfileAvatar({
                 height={size}
                 // Google avatar URLs 403 when a referrer is sent.
                 referrerPolicy="no-referrer"
-                className={`rounded-full object-cover ring-1 ring-black/5 dark:ring-white/10 ${className}`}
+                className={`rounded-full object-cover ring-1 ring-border-strong ${className}`}
                 style={dimension}
             />
         );

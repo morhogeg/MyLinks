@@ -557,9 +557,9 @@ function CardFace({ link, why }: { link: Link; why: string }) {
 
             {/* Tags */}
             {link.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-white/5">
+                <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-border-subtle">
                     {link.tags.slice(0, 4).map((tag) => (
-                        <span key={tag} className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-white/5 text-text-muted/60">
+                        <span key={tag} className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-fill-subtle text-text-muted/60">
                             {tag.split('/').pop()}
                         </span>
                     ))}

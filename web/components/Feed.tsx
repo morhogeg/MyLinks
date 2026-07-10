@@ -730,7 +730,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         {searchQuery && (
                             <button
                                 onClick={() => setSearchQuery('')}
-                                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-white/10 rounded-full transition-all"
+                                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-fill-strong rounded-full transition-all"
                             >
                                 <X className="w-4 h-4 text-text-muted" />
                             </button>
@@ -853,7 +853,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     <button
                                         onClick={() => setSearchQuery('')}
                                         aria-label="Clear search"
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-white/10 transition-colors"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-fill-strong transition-colors"
                                     >
                                         <X className="w-4 h-4" />
                                     </button>
@@ -1742,7 +1742,7 @@ export default function Feed({ onAskModeChange, onHideAddButton, onProcessingCha
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
-                <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                <div className="w-8 h-8 border-2 border-text/20 border-t-text rounded-full animate-spin" />
             </div>
         }>
             <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onOpenDigestSettings={onOpenDigestSettings} />

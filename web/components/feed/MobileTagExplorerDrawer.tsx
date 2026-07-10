@@ -29,15 +29,15 @@ export default function MobileTagExplorerDrawer({
                 className="absolute inset-0 bg-background/80 backdrop-blur-sm"
                 onClick={onClose}
             />
-            <div className="relative w-full sm:w-80 h-[100dvh] bg-card border-l border-white/10 flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
-                <div className="flex-none p-4 border-b border-white/10 flex justify-between items-center bg-card/50 backdrop-blur-xl z-10 safe-pt">
+            <div className="relative w-full sm:w-80 h-[100dvh] bg-card border-l border-border-strong flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+                <div className="flex-none p-4 border-b border-border-strong flex justify-between items-center bg-card/50 backdrop-blur-xl z-10 safe-pt">
                     <h2 className="text-base font-bold flex items-center gap-2">
                         <TagIcon className="w-4 h-4 text-accent" />
                         Filter Tags
                     </h2>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-white/5 rounded-full touch-manipulation"
+                        className="p-2 hover:bg-fill-subtle rounded-full touch-manipulation"
                     >
                         <X className="w-5 h-5" />
                     </button>

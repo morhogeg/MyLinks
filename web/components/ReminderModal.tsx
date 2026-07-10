@@ -221,7 +221,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                         ? 'bg-accent/20 border-accent ring-2 ring-accent'
                         : highlighted
                             ? 'bg-accent/5 border-accent/10 hover:bg-accent/10'
-                            : 'bg-white/5 border-white/5 hover:bg-white/10'
+                            : 'bg-fill-subtle border-border-subtle hover:bg-fill-strong'
                     }
                     ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}
                 `}
@@ -231,7 +231,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                         ? 'bg-accent text-white'
                         : highlighted
                             ? 'bg-accent/10 text-accent group-hover:bg-accent group-hover:text-white'
-                            : 'bg-white/5 text-text-muted'
+                            : 'bg-fill-subtle text-text-muted'
                     }
                 `}>
                     {isSelected ? (
@@ -263,9 +263,9 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                 role="dialog"
                 aria-modal="true"
                 aria-label="Set reminder"
-                className="relative bg-card border border-white/10 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 safe-pt focus:outline-none"
+                className="relative bg-card border border-border-strong w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 safe-pt focus:outline-none"
             >
-                <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle">
                     <h2 className="text-lg font-bold text-text flex items-center gap-2">
                         <Bell className="w-5 h-5 text-accent" />
                         Set Reminder
@@ -274,7 +274,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                         onClick={onClose}
                         disabled={isSaving}
                         aria-label="Close"
-                        className="p-2 rounded-full hover:bg-white/5 transition-all disabled:opacity-50"
+                        className="p-2 rounded-full hover:bg-fill-subtle transition-all disabled:opacity-50"
                     >
                         <X className="w-5 h-5 text-text-muted" />
                     </button>
@@ -335,7 +335,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                 subtitle="Initial interval for review"
                             />
                             {selectedOption === 'spaced' && (
-                                <div className="flex gap-2 mx-2 p-1 bg-white/5 rounded-xl border border-white/5 animate-in slide-in-from-top-2 duration-300">
+                                <div className="flex gap-2 mx-2 p-1 bg-fill-subtle rounded-xl border border-border-subtle animate-in slide-in-from-top-2 duration-300">
                                     {[3, 5, 7].map((interval) => (
                                         <button
                                             key={interval}
@@ -343,7 +343,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                             className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all
                                                 ${spacedInterval === interval
                                                     ? 'bg-accent text-white shadow-sm'
-                                                    : 'text-text-muted hover:bg-white/5 hover:text-text'
+                                                    : 'text-text-muted hover:bg-fill-subtle hover:text-text'
                                                 }
                                             `}
                                         >
@@ -356,9 +356,9 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
 
                         {/* Separator */}
                         <div className="flex items-center gap-3 py-2">
-                            <div className="flex-1 h-px bg-white/10"></div>
+                            <div className="flex-1 h-px bg-fill-strong"></div>
                             <span className="text-xs text-text-muted uppercase tracking-wider">Or</span>
-                            <div className="flex-1 h-px bg-white/10"></div>
+                            <div className="flex-1 h-px bg-fill-strong"></div>
                         </div>
 
                         {/* Custom Date & Time */}
@@ -368,14 +368,14 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                             className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left w-full
                                 ${selectedOption === 'custom'
                                     ? 'bg-accent/20 border-accent ring-2 ring-accent'
-                                    : 'bg-white/5 border-white/5 hover:bg-white/10'
+                                    : 'bg-fill-subtle border-border-subtle hover:bg-fill-strong'
                                 }
                             `}
                         >
                             <div className={`p-2 rounded-lg transition-colors
                                 ${selectedOption === 'custom'
                                     ? 'bg-accent text-white'
-                                    : 'bg-white/5 text-text-muted'
+                                    : 'bg-fill-subtle text-text-muted'
                                 }
                             `}>
                                 {selectedOption === 'custom' ? (
@@ -394,7 +394,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                             <div className="pl-3 pr-3 pb-3 space-y-2">
                                 <div className="grid grid-cols-3 gap-2">
                                     <select
-                                        className="bg-black/20 border border-white/10 rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
+                                        className="bg-surface-inset border border-border-strong rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
                                         onChange={(e) => {
                                             const currentDate = customDate ? parseLocalDate(customDate) : new Date();
                                             currentDate.setMonth(parseInt(e.target.value));
@@ -408,7 +408,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                         ))}
                                     </select>
                                     <select
-                                        className="bg-black/20 border border-white/10 rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
+                                        className="bg-surface-inset border border-border-strong rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
                                         onChange={(e) => {
                                             const currentDate = customDate ? parseLocalDate(customDate) : new Date();
                                             currentDate.setDate(parseInt(e.target.value));
@@ -422,7 +422,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                         ))}
                                     </select>
                                     <select
-                                        className="bg-black/20 border border-white/10 rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
+                                        className="bg-surface-inset border border-border-strong rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
                                         onChange={(e) => {
                                             const currentDate = customDate ? parseLocalDate(customDate) : new Date();
                                             currentDate.setFullYear(parseInt(e.target.value));
@@ -437,7 +437,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                     </select>
                                 </div>
                                 <select
-                                    className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
+                                    className="w-full bg-surface-inset border border-border-strong rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
                                     onChange={(e) => setCustomTime(e.target.value)}
                                     value={customTime}
                                     disabled={isSaving}
@@ -459,7 +459,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     </div>
 
                     {isReminderActive && (
-                        <div className="pt-2 border-t border-white/5 mt-2">
+                        <div className="pt-2 border-t border-border-subtle mt-2">
                             <button
                                 onClick={() => handleSelectOption('off')}
                                 disabled={isSaving}
@@ -482,7 +482,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                         <button
                             onClick={onClose}
                             disabled={isSaving}
-                            className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-text-muted transition-all disabled:opacity-50"
+                            className="flex-1 py-3 rounded-xl bg-fill-subtle hover:bg-fill-strong text-text-muted transition-all disabled:opacity-50"
                         >
                             Cancel
                         </button>

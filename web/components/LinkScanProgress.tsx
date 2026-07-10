@@ -44,7 +44,7 @@ export default function LinkScanProgress({ url, progress }: LinkScanProgressProp
 
     return (
         <div className="space-y-3">
-            <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-white/10 bg-card">
+            <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-border-strong bg-card">
                 {/* Faux page being read */}
                 <div className="absolute inset-0 p-4 flex flex-col gap-2.5">
                     <div className="flex items-center gap-2">
@@ -61,11 +61,11 @@ export default function LinkScanProgress({ url, progress }: LinkScanProgressProp
                         <span className="text-xs font-medium text-text-secondary truncate max-w-[70%]">{host}</span>
                     </div>
                     {/* Skeleton title + body lines */}
-                    <div className="h-3 w-3/4 rounded bg-white/10" />
-                    <div className="h-2 w-full rounded bg-white/5" />
-                    <div className="h-2 w-11/12 rounded bg-white/5" />
-                    <div className="h-2 w-5/6 rounded bg-white/5" />
-                    <div className="h-2 w-2/3 rounded bg-white/5" />
+                    <div className="h-3 w-3/4 rounded bg-fill-strong" />
+                    <div className="h-2 w-full rounded bg-fill-subtle" />
+                    <div className="h-2 w-11/12 rounded bg-fill-subtle" />
+                    <div className="h-2 w-5/6 rounded bg-fill-subtle" />
+                    <div className="h-2 w-2/3 rounded bg-fill-subtle" />
                 </div>
 
                 {/* Dim + subtle blur so the scan line and status read clearly */}
@@ -101,7 +101,7 @@ export default function LinkScanProgress({ url, progress }: LinkScanProgressProp
 
             {/* Determinate progress bar, driven by the same value as the %. */}
             <div
-                className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden"
+                className="h-1.5 w-full rounded-full bg-fill-strong overflow-hidden"
                 role="progressbar"
                 aria-label="Link analysis progress"
                 aria-valuenow={Math.round(clamped)}

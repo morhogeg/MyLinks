@@ -96,14 +96,14 @@ export default function ManageCollectionCardsSheet({
                 role="dialog"
                 aria-modal="true"
                 aria-label={`Manage cards in ${collection.name}`}
-                className="relative w-full sm:max-w-lg bg-card border-t sm:border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up overflow-hidden safe-pb flex flex-col h-[85vh] sm:h-[70vh] max-h-full"
+                className="relative w-full sm:max-w-lg bg-card border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up overflow-hidden safe-pb flex flex-col h-[85vh] sm:h-[70vh] max-h-full"
             >
                 <div className="sm:hidden flex justify-center pt-3 pb-1">
-                    <div className="h-1.5 w-10 rounded-full bg-white/15" />
+                    <div className="h-1.5 w-10 rounded-full bg-fill-strong" />
                 </div>
 
                 {/* Header */}
-                <div className="flex items-center gap-3 px-5 pt-3 pb-3 border-b border-white/5">
+                <div className="flex items-center gap-3 px-5 pt-3 pb-3 border-b border-border-subtle">
                     <LayoutGrid className="w-5 h-5 text-accent shrink-0" />
                     <div className="flex-1 min-w-0">
                         <h3 className="text-base font-bold text-text truncate">Manage cards</h3>
@@ -119,7 +119,7 @@ export default function ManageCollectionCardsSheet({
                 </div>
 
                 {/* Search */}
-                <div className="px-4 py-3 border-b border-white/5">
+                <div className="px-4 py-3 border-b border-border-subtle">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                         <input
@@ -145,7 +145,7 @@ export default function ManageCollectionCardsSheet({
                                 role="menuitemcheckbox"
                                 aria-checked={isMember}
                                 onClick={() => toggle(l)}
-                                className="w-full flex items-center gap-3 px-4 py-2.5 text-start transition-colors hover:bg-white/5 active:bg-white/10"
+                                className="w-full flex items-center gap-3 px-4 py-2.5 text-start transition-colors hover:bg-fill-subtle active:bg-fill-strong"
                             >
                                 <span className="w-10 h-10 rounded-lg overflow-hidden shrink-0 flex items-center justify-center" style={{ backgroundColor: colorStyle.backgroundColor }}>
                                     {thumb
@@ -158,7 +158,7 @@ export default function ManageCollectionCardsSheet({
                                 </span>
                                 <span
                                     className={`flex items-center justify-center w-6 h-6 rounded-full border shrink-0 transition-colors ${
-                                        isMember ? 'bg-accent border-accent text-white' : 'border-white/15 text-transparent'
+                                        isMember ? 'bg-accent border-accent text-white' : 'border-border-strong text-transparent'
                                     }`}
                                 >
                                     <Check className="w-3.5 h-3.5" />
