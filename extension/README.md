@@ -3,7 +3,7 @@
 A tiny Manifest V3 extension that saves the current page, a right-clicked link, or
 selected text straight into your Machina AI library. It's a **thin client** — it
 just POSTs to the existing `share_ingest` Cloud Function (`/api/share`), the same
-endpoint the iOS Share Shortcut uses. The backend scrapes, analyzes with Gemini,
+endpoint the iOS Share Extension uses. The backend scrapes, analyzes with Gemini,
 embeds, and saves; the card then appears in the app via real-time sync.
 
 No build step, no dependencies — plain HTML/CSS/JS.
@@ -19,8 +19,8 @@ No build step, no dependencies — plain HTML/CSS/JS.
 
 1. Right-click the toolbar icon → **Machina settings…** (or click the icon before a
    token is set — it opens settings automatically).
-2. Paste your **ingest token**. Get it from the Machina AI web app → Settings (it's the
-   same token the iOS Shortcut uses; the in-Settings token UI is being added).
+2. Paste your **ingest token**, found in the Machina AI web app →
+   **Settings → Browser extension**.
 3. *(Optional)* change the **Backend URL** — defaults to
    `https://secondbrain-app-94da2.web.app`.
 4. Click **Save settings**, then **Test connection** to confirm the token works.

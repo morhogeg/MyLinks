@@ -6,10 +6,10 @@ import { fetchShareConfig } from '@/lib/shareConfig';
 import { useToast } from '@/components/Toast';
 import { LargeTitle, SectionHeader, Footnote, List, RowShell, RowText } from './primitives';
 
-/** Browser-extension / iOS-Shortcut setup: reveals and copies the workspace's
-    personal ingest token (and the endpoint the Shortcut posts to). The token is
-    fetched from the get_share_config callable — the same server-side source of
-    truth the native Share bridge uses, which mints one on first use. */
+/** Browser-extension setup: reveals and copies the workspace's personal ingest
+    token (and the endpoint the extension posts to). The token is fetched from the
+    get_share_config callable — the same server-side source of truth the native
+    Share bridge uses, which mints one on first use. */
 export function ExtensionView({ uid, toast }: { uid: string; toast: ReturnType<typeof useToast> }) {
     const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
     const [token, setToken] = useState('');
@@ -108,7 +108,7 @@ export function ExtensionView({ uid, toast }: { uid: string; toast: ReturnType<t
                     </RowShell>
                 </List>
             )}
-            <Footnote>Used by the browser extension and iOS Shortcut to save into your library. Paste it into the extension&apos;s settings popup, then keep it private.</Footnote>
+            <Footnote>Used by the browser extension to save into your library. Paste it into the extension&apos;s settings popup, then keep it private.</Footnote>
 
             {hasToken && (
                 <>
@@ -127,7 +127,7 @@ export function ExtensionView({ uid, toast }: { uid: string; toast: ReturnType<t
                             </button>
                         </RowShell>
                     </List>
-                    <Footnote>The browser extension already points here by default — only the token is required. This is the URL the iOS Shortcut posts to.</Footnote>
+                    <Footnote>The browser extension already points here by default — only the token is required.</Footnote>
                 </>
             )}
         </>

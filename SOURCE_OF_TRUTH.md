@@ -14,7 +14,7 @@
 >
 > Remaining *reference* docs (how-to guides, not task trackers — they stay):
 > `AUTH_SPEC.md` (auth design), `NATIVE_AUTH_SETUP.md` (auth cutover console/Xcode
-> steps), `SHARE_EXTENSION.md`, `SHORTCUT_SETUP.md`, `docs/IOS_CICD.md` (TestFlight
+> steps), `SHARE_EXTENSION.md`, `docs/IOS_CICD.md` (TestFlight
 > CI secrets/setup), `web/VERCEL.md`, `extension/README.md`, `README.md` (public-facing).
 > `AUDIT.md` (repo root) is the **2026-07-09 audit + remediation tracker** —
 > full-tree findings with file:line and the remaining manual/owner items (its §9).
@@ -412,7 +412,7 @@ The multi-user auth work is **fully written but not live**:
   URL-scheme guards, sanitized errors, privacy manifest files created.
 - **Capture surface:** Share Extension (links/text/images + scan HUD), web
   add/image, browser extension (`/extension`, Chrome/Edge/Brave + Safari
-  converter), iOS Shortcut (legacy, still works).
+  converter).
 - **Recall:** Ask Machina (hybrid RAG, streaming on web, chat history), semantic
   search, reminders, curated digest (6 modes), weekly synthesis, collections +
   public share pages (server-rendered OG), reading view + TTS.

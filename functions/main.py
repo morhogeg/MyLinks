@@ -1134,7 +1134,7 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
 
 
 # ─────────────────────────────────────────────
-# Share Ingestion (iOS Shortcut / share sheet)
+# Share Ingestion (iOS Share Extension / browser extension)
 # ─────────────────────────────────────────────
 
 def _extract_url(*candidates: str) -> str:
@@ -1151,7 +1151,7 @@ def _extract_url(*candidates: str) -> str:
 @https_fn.on_request()
 def share_ingest(req: https_fn.Request) -> https_fn.Response:
     """
-    HTTP endpoint for the iOS share Shortcut (and any share-sheet client).
+    HTTP endpoint for the iOS Share Extension (and any share-sheet client).
     Authenticates with a per-user ingest token, then queues the shared URL
     into the existing background processing pipeline.
 
@@ -1266,7 +1266,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
 def get_share_config(req: https_fn.CallableRequest) -> dict:
     """
     Returns the share-ingest endpoint and the caller's personal ingest token
-    (generating one on first use). Used by Settings to configure the Shortcut.
+    (generating one on first use). Used by Settings to configure the browser extension.
     """
     # Prefer the verified caller; fall back to the client uid only while
     # REQUIRE_AUTH is off (staged rollout).
