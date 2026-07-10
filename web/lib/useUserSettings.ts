@@ -54,6 +54,8 @@ export function normalizeChannels<T extends string>(channels: readonly string[] 
 // load time so an existing setting keeps working (curating via the survivor),
 // and the stale value is never written back on save — the Style picker only
 // offers survivors, so settings.digest_mode can never become a removed value.
+// MIRRORED in functions/digest_service.py REMOVED_MODE_ALIASES — retire or add
+// modes in BOTH places or client and server will disagree on stored settings.
 const REMOVED_DIGEST_MODES: Record<string, DigestMode> = { random: 'smart', unread: 'smart', favorites: 'smart' };
 const VALID_DIGEST_MODES: readonly DigestMode[] = ['smart', 'topic', 'rediscover', 'synthesis'];
 export function normalizeDigestMode(mode: string | undefined): DigestMode {

@@ -90,44 +90,6 @@ def test_curate_unknown_mode_falls_back_to_smart():
     assert len(ds.curate(_links(), "totally-unknown", 2)) == 2
 
 
-# ── _topics_label ─────────────────────────────────────────────────────────
-
-def test_topics_label_empty_defaults_to_library():
-    assert ds._topics_label(None) == "your library"
-    assert ds._topics_label([]) == "your library"
-    assert ds._topics_label(["", "  "]) == "your library"
-
-
-def test_topics_label_accepts_single_string():
-    assert ds._topics_label("AI") == "AI"
-
-
-def test_topics_label_joins_and_trims_list():
-    assert ds._topics_label([" AI ", "Health"]) == "AI, Health"
-
-
-# ── _cat_emoji ────────────────────────────────────────────────────────────
-
-def test_cat_emoji_unknown_category_uses_default_folder():
-    assert ds._cat_emoji("something-not-in-map") == "📂"
-    assert ds._cat_emoji("") == "📂"
-    assert ds._cat_emoji(None) == "📂"
-
-
-def test_cat_emoji_matches_known_category_case_insensitively():
-    # Every configured mapping should resolve to its own (non-default) emoji.
-    for key, emoji in ds.CATEGORY_EMOJI.items():
-        assert ds._cat_emoji(key.upper()) == emoji
-
-
-# ── _link_url ─────────────────────────────────────────────────────────────
-
-def test_link_url_embeds_link_id():
-    url = ds._link_url("card42")
-    assert url.endswith("?linkId=card42")
-    assert url.startswith(ds.APP_URL)
-
-
 # ── _to_ms coercion ───────────────────────────────────────────────────────
 
 def test_to_ms_handles_none_and_numbers():

@@ -25,7 +25,6 @@ of any of them is mapped to 'smart' at read time (see REMOVED_MODE_ALIASES) so
 existing settings keep working; the removed value is never written back.
 """
 
-import os
 import random
 import logging
 from datetime import datetime, timezone, timedelta
@@ -37,9 +36,10 @@ from db import get_db
 
 logger = logging.getLogger(__name__)
 
-APP_URL = os.environ.get("APP_URL", "https://secondbrain-app-94da2.web.app")
-
 # How old (days) a save must be before "rediscover" will resurface it.
+# Client mirror: web/lib/reviewQueue.ts forgottenQueue() twins the rediscover
+# branch for in-app Review mode — keep the SHAPE in sync (constants
+# intentionally differ: the deck uses 30d and no random backfill).
 REDISCOVER_MIN_AGE_DAYS = 14
 # Cap how many links we pull per user when curating (keeps reads bounded).
 CANDIDATE_LIMIT = 500
@@ -57,6 +57,8 @@ VALID_MODES = {"smart", "topic", "rediscover", "synthesis"}
 # settings still carry one of these keeps getting a digest (curated via the
 # mapped survivor) with no error; the stale value is normalized at read time and
 # never written back. Kept here (not in curate) so every read path shares it.
+# MIRRORED in web/lib/useUserSettings.ts REMOVED_DIGEST_MODES — retire or add
+# modes in BOTH places or client and server will disagree on stored settings.
 REMOVED_MODE_ALIASES = {"random": "smart", "unread": "smart", "favorites": "smart"}
 
 
@@ -72,19 +74,6 @@ def normalize_mode(mode: Optional[str]) -> str:
 # this a recap would be thin — skip rather than send something hollow).
 SYNTHESIS_WINDOW_DAYS = 7
 SYNTHESIS_MIN_CARDS = 3
-
-CATEGORY_EMOJI = {
-    "Recipe": "🍲", "Tech": "💻", "Health": "❤️", "Business": "💼",
-    "Science": "🔬", "Philosophy": "🧭", "Finance": "💰", "News": "📰",
-    "Education": "🎓", "Travel": "✈️", "Productivity": "⚡",
-}
-
-
-def _cat_emoji(category: str) -> str:
-    for key, emoji in CATEGORY_EMOJI.items():
-        if key.lower() in (category or "").lower():
-            return emoji
-    return "📂"
 
 
 def _to_ms(value) -> int:
@@ -242,24 +231,6 @@ def curate(links: List[dict], mode: str, count: int, topics=None) -> List[dict]:
             seen.add(l["id"])
 
     return picks[:count]
-
-
-# ─────────────────────────────────────────────────────────────────────────
-# Formatting helpers
-# ─────────────────────────────────────────────────────────────────────────
-
-def _link_url(link_id: str) -> str:
-    return f"{APP_URL}?linkId={link_id}"
-
-
-def _topics_label(topics) -> str:
-    """Human-readable, original-case join of topics for headers/blurbs."""
-    if not topics:
-        return "your library"
-    if isinstance(topics, str):
-        topics = [topics]
-    items = [t.strip() for t in topics if t and t.strip()]
-    return ", ".join(items) if items else "your library"
 
 
 # ─────────────────────────────────────────────────────────────────────────

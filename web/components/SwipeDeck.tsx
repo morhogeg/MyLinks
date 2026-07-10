@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
@@ -13,6 +13,7 @@ import {
     REVIEW_SESSION_SIZE,
     buildReviewQueue,
     forgottenQueue,
+    isOpen,
     recentQueue,
     tidyingQueue,
     whyThisCard,
@@ -86,6 +87,10 @@ export default function SwipeDeck({
     const moved = useRef(false);
     const exitDir = useRef<SwipeDir | null>(null);
     const pendingRemind = useRef<Link | null>(null);
+    // Cards the user has undone this session. Undo optimistically reverses the
+    // action, but the live `links` snapshot may lag a beat — without this
+    // exception the just-undone card would be skipped as "acted on" for a frame.
+    const undoneIds = useRef(new Set<string>());
 
     // Live map so card faces render fresh data and deleted cards resolve to null.
     const byId = useMemo(() => {
@@ -97,27 +102,33 @@ export default function SwipeDeck({
     // Session slots aligned to sessionIds (null = deleted since deal).
     const slots = useMemo(() => sessionIds.map((id) => byId.get(id) ?? null), [sessionIds, byId]);
 
-    // First live card at/after the pointer, skipping deleted slots.
+    // A slot ahead of the pointer is dealable while its card is still open —
+    // cards acted on OUTSIDE the deck's gestures mid-session (deleted, archived
+    // elsewhere, reminder set from the detail modal) are skipped, not re-dealt.
+    const isDealable = (l: Link | null): l is Link => !!l && (isOpen(l) || undoneIds.current.has(l.id));
+
+    // First dealable card at/after the pointer.
     let currentIndex = pos;
-    while (currentIndex < slots.length && !slots[currentIndex]) currentIndex++;
+    while (currentIndex < slots.length && !isDealable(slots[currentIndex])) currentIndex++;
     const current = slots[currentIndex] ?? null;
 
-    // The visible stack: up to three live cards from the current position on.
-    const visible: { link: Link; depth: number }[] = [];
-    for (let i = currentIndex, depth = 0; i < slots.length && depth < 3; i++) {
+    // The visible stack: up to three dealable cards from the current position on.
+    const visible: Link[] = [];
+    for (let i = currentIndex; i < slots.length && visible.length < 3; i++) {
         const l = slots[i];
-        if (l) visible.push({ link: l, depth: depth++ });
+        if (isDealable(l)) visible.push(l);
     }
 
-    const liveFromCurrent = slots.slice(currentIndex).filter(Boolean).length;
-    const totalLive = slots.filter(Boolean).length;
-    const done = totalLive - liveFromCurrent;
+    const passed = slots.slice(0, currentIndex).filter(Boolean).length;
+    const remaining = slots.slice(currentIndex).filter(isDealable).length;
 
     // Full candidate pools drive the queue counts and the "review more" offer.
-    const forgottenCount = useMemo(() => forgottenQueue(links).length, [links]);
-    const recentCount = useMemo(() => recentQueue(links).length, [links]);
-    const tidyingCount = useMemo(() => tidyingQueue(links).length, [links]);
-    const queueCount = queue === 'recent' ? recentCount : queue === 'tidying' ? tidyingCount : forgottenCount;
+    const counts = useMemo<Record<ReviewQueue, number>>(() => ({
+        forgotten: forgottenQueue(links).length,
+        recent: recentQueue(links).length,
+        tidying: tidyingQueue(links).length,
+    }), [links]);
+    const queueCount = counts[queue];
 
     // Deal a fresh session window from the current live pool for `q`.
     const deal = (q: ReviewQueue) => {
@@ -131,6 +142,7 @@ export default function SwipeDeck({
         setDrag({ x: 0, y: 0 });
         exitDir.current = null;
         pendingRemind.current = null;
+        undoneIds.current = new Set();
     };
 
     const selectQueue = (q: ReviewQueue) => {
@@ -138,6 +150,22 @@ export default function SwipeDeck({
         setQueue(q);
         deal(q);
     };
+
+    // Self-heal an empty, untouched session: the deck mounted before links
+    // streamed in, or the feed filter changed under it and every dealt id
+    // dropped out. Re-deal — falling back to the first queue with candidates so
+    // the default tab is never a dead end for users with no 30-day-old saves.
+    // Guarded to zero-activity states so a finished session's summary (tallies
+    // or an undoable action present) is never skipped past.
+    const acted = kept + archived + reminders;
+    useEffect(() => {
+        if (current || acted > 0 || lastAction || phase === 'waiting') return;
+        const next = counts[queue] > 0 ? queue : QUEUES.map((q) => q.key).find((k) => counts[k] > 0);
+        if (!next) return;
+        if (next !== queue) setQueue(next);
+        deal(next);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [current, acted, lastAction, phase, counts, queue]);
 
     // Size the deck to the space between its top and the viewport bottom so the
     // whole thing (card + action buttons) fits without scrolling.
@@ -249,6 +277,9 @@ export default function SwipeDeck({
     const undo = () => {
         if (!lastAction) return;
         const { link, kind, index } = lastAction;
+        // Keep the card dealable while the optimistic reversal propagates into
+        // the live `links` snapshot (see undoneIds).
+        undoneIds.current.add(link.id);
         if (kind === 'remind') {
             onCancelRemind(link);
             setReminders((r) => Math.max(0, r - 1));
@@ -296,7 +327,7 @@ export default function SwipeDeck({
         <div className="flex items-center justify-center gap-2 flex-wrap shrink-0">
             {QUEUES.map((q) => {
                 const active = q.key === queue;
-                const count = q.key === 'recent' ? recentCount : q.key === 'tidying' ? tidyingCount : forgottenCount;
+                const count = counts[q.key];
                 return (
                     <button
                         key={q.key}
@@ -371,15 +402,14 @@ export default function SwipeDeck({
         <div ref={rootRef} className="flex flex-col items-center gap-3 select-none" style={{ height: maxH ? maxH : undefined }}>
             {queueTabs}
             <div className="text-xs font-semibold text-text-muted tabular-nums shrink-0">
-                {done + 1} of {totalLive} · {liveFromCurrent} left
+                {passed + 1} of {passed + remaining} · {remaining} left
             </div>
 
             {/* Card stack — flexes to fill the space above the buttons */}
             <div className="relative w-full max-w-[440px] flex-1 min-h-0">
                 {[2, 1, 0].map((depth) => {
-                    const entry = visible.find((v) => v.depth === depth);
-                    if (!entry) return null;
-                    const link = entry.link;
+                    const link = visible[depth];
+                    if (!link) return null;
                     const isTop = depth === 0;
 
                     const transform = isTop
@@ -405,7 +435,7 @@ export default function SwipeDeck({
                                 pointerEvents: isTop ? 'auto' : 'none',
                             }}
                         >
-                            <CardFace link={link} why={whyThisCard(link, queue)} />
+                            <CardFace link={link} queue={queue} />
                             {isTop && (
                                 <>
                                     <HintBadge label="KEEP" color="34,197,94" icon={<Star className="w-4 h-4" />} opacity={rightHint} pos="left" />
@@ -490,8 +520,13 @@ function HintBadge({ label, color, icon, opacity, pos }: { label: string; color:
     );
 }
 
-/** The visible card content (category, source, why-this-card, title, gist, tags). */
-function CardFace({ link, why }: { link: Link; why: string }) {
+/** The visible card content (category, source, why-this-card, title, gist, tags).
+ *  Memoized: the deck re-renders on every drag pointermove frame, and without
+ *  the memo all three stacked faces would re-run SimpleMarkdown parsing (and the
+ *  why-line derivation) at pointer-event rate — only the wrapper's transform
+ *  actually changes per frame. */
+const CardFace = memo(function CardFace({ link, queue }: { link: Link; queue: ReviewQueue }) {
+    const why = whyThisCard(link, queue);
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
     const colorStyle = getCategoryColorStyle(link.category);
     const platform = getPlatform(link.url);
@@ -567,4 +602,4 @@ function CardFace({ link, why }: { link: Link; why: string }) {
             )}
         </div>
     );
-}
+});

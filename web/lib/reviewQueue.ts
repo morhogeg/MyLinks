@@ -1,5 +1,5 @@
 import { Link } from '@/lib/types';
-import { getTimestampNumber } from '@/lib/feedUtils';
+import { getTimestampNumber, isPending } from '@/lib/feedUtils';
 
 /**
  * Curated review queues for the SwipeDeck (Review mode). Review mode is the
@@ -27,21 +27,29 @@ const viewed = (l: Link): number => getTimestampNumber(l.lastViewedAt);
  * A card is a live review candidate only while it's still "open" — not already
  * kept (favorite), archived, awaiting a reminder, or mid-capture. Acting on a
  * card in the deck flips one of these, which is exactly how it leaves the queue
- * (and how Undo, by reversing the flip, brings it back).
+ * (and how Undo, by reversing the flip, brings it back). Exported so the deck
+ * can also skip cards acted on OUTSIDE its gestures mid-session (e.g. a
+ * reminder set from the detail modal).
  */
-function isOpen(link: Link): boolean {
-    return link.status !== 'archived'
+export function isOpen(link: Link): boolean {
+    return !isPending(link)
+        && link.status !== 'archived'
         && link.status !== 'favorite'
-        && link.status !== 'processing'
-        && link.status !== 'failed'
         && link.reminderStatus !== 'pending';
+}
+
+/** The two triage gaps, shared by the queue predicate and its "why" line. */
+function tidyingGaps(link: Link): { noTags: boolean; noCategory: boolean } {
+    const cat = (link.category || '').trim().toLowerCase();
+    return {
+        noTags: !link.tags || link.tags.length === 0,
+        noCategory: cat === '' || cat === 'general' || cat === 'uncategorized',
+    };
 }
 
 /** No tags, or an empty / default ("General"/"Uncategorized") category. */
 export function needsTidying(link: Link): boolean {
-    const noTags = !link.tags || link.tags.length === 0;
-    const cat = (link.category || '').trim().toLowerCase();
-    const noCategory = cat === '' || cat === 'general' || cat === 'uncategorized';
+    const { noTags, noCategory } = tidyingGaps(link);
     return noTags || noCategory;
 }
 
@@ -67,7 +75,7 @@ export function recentQueue(links: Link[]): Link[] {
 }
 
 /** "Needs tidying": untagged / uncategorized cards — a triage queue, newest first. */
-export function tidyingQueue(links: Link[], _now: number = Date.now()): Link[] {
+export function tidyingQueue(links: Link[]): Link[] {
     return links
         .filter(isOpen)
         .filter(needsTidying)
@@ -80,7 +88,7 @@ export function buildReviewQueue(links: Link[], queue: ReviewQueue, now: number 
         case 'recent':
             return recentQueue(links);
         case 'tidying':
-            return tidyingQueue(links, now);
+            return tidyingQueue(links);
         case 'forgotten':
         default:
             return forgottenQueue(links, now);
@@ -108,9 +116,7 @@ export function relativeAge(ms: number, now: number = Date.now()): string {
  */
 export function whyThisCard(link: Link, queue: ReviewQueue, now: number = Date.now()): string {
     if (queue === 'tidying') {
-        const noTags = !link.tags || link.tags.length === 0;
-        const cat = (link.category || '').trim().toLowerCase();
-        const noCategory = cat === '' || cat === 'general' || cat === 'uncategorized';
+        const { noTags, noCategory } = tidyingGaps(link);
         if (noTags && noCategory) return 'No tags or category yet';
         if (noTags) return 'No tags yet';
         return 'Needs a category';

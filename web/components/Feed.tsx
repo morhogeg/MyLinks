@@ -155,6 +155,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // so an up-swipe is only "acted on" if a reminder was actually saved (F-29).
     const [remindSignal, setRemindSignal] = useState<{ id: string; saved: boolean; seq: number } | null>(null);
     const remindSeq = useRef(0);
+    // ReminderModal fires onUpdate (saved) and then onClose (dismissed) on a
+    // successful save; this flag keeps that trailing onClose from also emitting
+    // a "cancelled" signal for the same open.
+    const remindSavedRef = useRef(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
@@ -454,6 +458,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     };
 
     const handleOpenReminderModal = useCallback((link: Link) => {
+        remindSavedRef.current = false;
         setReminderModalLink(link);
     }, []);
 
@@ -549,6 +554,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const swipeArchive = useCallback((link: Link) => handleStatusChange(link.id, 'archived'), [handleStatusChange]);
     const swipeResetStatus = useCallback((link: Link) => handleStatusChange(link.id, 'unread'), [handleStatusChange]);
     // Undo of an up-swipe: clear the reminder the deck just set for this card (F-29).
+    // Clearing (not restoring a prior state) is safe because reviewQueue.isOpen
+    // excludes reminder-pending cards from every deck queue — a dealt card can't
+    // have carried a pre-existing reminder. Keep that invariant if queues change.
     const swipeCancelRemind = useCallback(async (link: Link) => {
         if (!uid) return;
         try {
@@ -1706,8 +1714,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     uid={uid}
                     link={reminderModalLink}
                     isOpen={!!reminderModalLink}
-                    onClose={() => { resolveRemind(reminderModalLink, false); setReminderModalLink(null); }}
-                    onUpdate={() => { resolveRemind(reminderModalLink, true); setReminderModalLink(null); }}
+                    onClose={() => { if (!remindSavedRef.current) resolveRemind(reminderModalLink, false); setReminderModalLink(null); }}
+                    onUpdate={() => { remindSavedRef.current = true; resolveRemind(reminderModalLink, true); setReminderModalLink(null); }}
                 />
             )}
 

@@ -32,6 +32,18 @@ function parseLocalDate(str: string): Date {
     return new Date(y, m - 1, d);
 }
 
+function daysInMonth(year: number, month: number): number {
+    return new Date(year, month + 1, 0).getDate();
+}
+
+// Move a date to another month/year keeping the day-of-month, clamped to the
+// target month's length — bare setMonth/setFullYear overflows (Jul 31 → setMonth
+// Feb → Mar 3), silently landing the reminder a month off the selection.
+function withMonthClamped(d: Date, year: number, month: number): Date {
+    const day = Math.min(d.getDate(), daysInMonth(year, month));
+    return new Date(year, month, day);
+}
+
 export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: ReminderModalProps) {
     const toast = useToast();
     const [selectedOption, setSelectedOption] = useState<ReminderOption | null>(null);
@@ -142,8 +154,10 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                 case 'off':
                     await updateLinkReminder(uid, link.id, false);
                     toast.success('Reminder turned off');
-                    onClose();
+                    // onUpdate (saved) before onClose (dismissed) so callers that
+                    // treat a bare onClose as "cancelled" see the save first.
                     if (onUpdate) onUpdate();
+                    onClose();
                     return;
             }
 
@@ -165,8 +179,10 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     selectedOption === 'spaced' ? `spaced-${spacedInterval}` : selectedOption
                 );
                 toast.success(`Reminder set for ${new Date(nextReminderTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}`);
-                onClose();
+                // onUpdate (saved) before onClose (dismissed) so callers that
+                // treat a bare onClose as "cancelled" see the save first.
                 if (onUpdate) onUpdate();
+                onClose();
             }
 
         } catch (error) {
@@ -181,6 +197,18 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
     };
 
     const isReminderActive = link.reminderStatus === 'pending';
+
+    // Materialize the custom default date the moment "Custom" is chosen (the
+    // selects otherwise render a today fallback that was never committed to
+    // state, so Save silently no-ops on an untouched picker). Late at night —
+    // past the last 15-min slot — default to tomorrow so the picker doesn't
+    // open onto a day with every time slot disabled.
+    useEffect(() => {
+        if (!isOpen || selectedOption !== 'custom' || customDate) return;
+        const base = new Date();
+        if (base.getHours() * 60 + base.getMinutes() >= 23 * 60 + 45) base.setDate(base.getDate() + 1);
+        setCustomDate(formatLocalDate(base));
+    }, [isOpen, selectedOption, customDate]);
 
     // Selection-time guards for the custom picker so past dates/times can't be
     // chosen in the first place. Recomputed every render (cheap), so the "today"
@@ -397,8 +425,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                         className="bg-surface-inset border border-border-strong rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
                                         onChange={(e) => {
                                             const currentDate = customDate ? parseLocalDate(customDate) : new Date();
-                                            currentDate.setMonth(parseInt(e.target.value));
-                                            setCustomDate(formatLocalDate(currentDate));
+                                            setCustomDate(formatLocalDate(withMonthClamped(currentDate, currentDate.getFullYear(), parseInt(e.target.value))));
                                         }}
                                         value={selMonth}
                                         disabled={isSaving}
@@ -417,7 +444,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                         value={selDay}
                                         disabled={isSaving}
                                     >
-                                        {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                                        {Array.from({ length: daysInMonth(selYear, selMonth) }, (_, i) => i + 1).map(day => (
                                             <option key={day} value={day} disabled={selYear === nowYear && selMonth === nowMonth && day < nowDay}>{day}</option>
                                         ))}
                                     </select>
@@ -425,8 +452,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                         className="bg-surface-inset border border-border-strong rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
                                         onChange={(e) => {
                                             const currentDate = customDate ? parseLocalDate(customDate) : new Date();
-                                            currentDate.setFullYear(parseInt(e.target.value));
-                                            setCustomDate(formatLocalDate(currentDate));
+                                            setCustomDate(formatLocalDate(withMonthClamped(currentDate, parseInt(e.target.value), currentDate.getMonth())));
                                         }}
                                         value={selYear}
                                         disabled={isSaving}
