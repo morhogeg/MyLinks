@@ -57,6 +57,14 @@ class FakeDB:
 
 def _install_fake_db(monkeypatch, store):
     monkeypatch.setattr(rate_limit, "get_db", lambda: FakeDB(store))
+    # Bypass @firestore.transactional: the REAL google-cloud-firestore decorator
+    # (installed in CI via requirements.txt) demands a genuine Transaction object
+    # (reads txn._read_only etc.), so FakeTxn makes check_rate_limit fail open
+    # and nothing persists. The decorator is applied at call time inside
+    # check_rate_limit, so patching the module attribute to an identity
+    # decorator runs the txn body directly against FakeTxn in BOTH the
+    # fake-module (sandbox) and real-package (CI) environments.
+    monkeypatch.setattr(rate_limit.firestore, "transactional", lambda fn: fn)
     return store
 
 
