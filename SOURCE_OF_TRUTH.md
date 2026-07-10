@@ -585,6 +585,37 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-07-09 — SHIPPED: audit remediation merged to main (merge `9e1f042`,
+  25 tasks, 26 commits — see `AUDIT.md`).** Vercel auto-deploy is live (desktop
+  web). **Owner steps to finish the ship:** (1) **Trigger "iOS → TestFlight"
+  manually** (Actions → iOS → TestFlight → Run workflow on main) — the remote
+  session's GitHub integration got 403 on dispatch. This run also VALIDATES the
+  new CI hardening (aps-environment=production assertion on the exported IPA,
+  no-beta Xcode filter, altool→`-exportArchive destination=upload`, SIWA
+  hard-fail): if it fails on the aps assertion, the distribution profile is not
+  rewriting the entitlement — flip `App.entitlements` aps-environment to
+  `production` and re-run. (2) **Deploy functions** (owner machine):
+  `./deploy-functions.sh` with ALL targets (every module changed — WhatsApp
+  removal + per-uid rate limits + share_service extraction touch main.py and
+  all shared modules), e.g. functions:analyze_link,functions:analyze_image,
+  functions:ask_brain,functions:share_ingest,functions:get_article,
+  functions:claim_workspace,functions:claim_workspace_http,
+  functions:delete_account,functions:delete_account_http,
+  functions:register_device_token_http,functions:unregister_device_token_http,
+  functions:publish_share_http,functions:unpublish_share_http,
+  functions:share_page,functions:get_share_config,functions:rebuild_connections,
+  functions:send_digest_now,functions:search_links,
+  functions:process_link_background,functions:sync_link_embedding,
+  functions:check_reminders,functions:sweep_stuck_processing,
+  functions:send_digests — then **delete the removed webhook**:
+  `firebase functions:delete whatsapp_webhook --project secondbrain-app-94da2 --force`,
+  and remove `TWILIO_*` from `functions/.env`. (3) The new `python-tests` /
+  `rules-tests` workflows will run on the next functions/rules PR — confirm
+  green once. Remaining owner work is consolidated in `AUDIT.md` §9 (auth
+  cutover M1, key rotation M2, APNs console M7, Twilio decommission M6,
+  App Store Connect M3-M4).
+
 > PR descriptions — this is the orientation trail, not a changelog.
 
 - **2026-07-09 — Orchestrated full-tree audit + remediation (`AUDIT.md` created at
