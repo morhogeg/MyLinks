@@ -16,6 +16,22 @@ interface ReminderModalProps {
 
 type ReminderOption = 'smart' | 'tomorrow' | 'next-week' | 'spaced' | 'custom' | 'off';
 
+// Format a Date to a `YYYY-MM-DD` string in LOCAL time. Using toISOString() here
+// would emit the UTC date, which shifts by a day for users west of UTC.
+function formatLocalDate(d: Date): string {
+    const y = d.getFullYear();
+    const m = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+// Parse a `YYYY-MM-DD` string as LOCAL midnight. `new Date('YYYY-MM-DD')` parses
+// as UTC midnight, so combining it with local setHours() rolls the day over.
+function parseLocalDate(str: string): Date {
+    const [y, m, d] = str.split('-').map(Number);
+    return new Date(y, m - 1, d);
+}
+
 export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: ReminderModalProps) {
     const toast = useToast();
     const [selectedOption, setSelectedOption] = useState<ReminderOption | null>(null);
@@ -43,7 +59,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                 setSelectedOption('custom');
                 if (link.nextReminderAt) {
                     const date = new Date(link.nextReminderAt);
-                    setCustomDate(date.toISOString().split('T')[0]);
+                    setCustomDate(formatLocalDate(date));
                     setCustomTime(`${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`);
                 }
             } else {
@@ -116,7 +132,9 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                         setIsSaving(false);
                         return;
                     }
-                    const picked = new Date(customDate);
+                    // Build the timestamp in LOCAL time: parseLocalDate avoids the
+                    // UTC-midnight parse that would otherwise roll the day over.
+                    const picked = parseLocalDate(customDate);
                     const [hours, minutes] = customTime.split(':').map(Number);
                     picked.setHours(hours, minutes, 0, 0);
                     nextReminderTime = picked.getTime();
@@ -127,6 +145,15 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     onClose();
                     if (onUpdate) onUpdate();
                     return;
+            }
+
+            // Hard invariant: a reminder can NEVER be created in the past. `now` is
+            // re-derived at save (above), so this holds even if the modal sat open
+            // across midnight or the picked time has since elapsed.
+            if (nextReminderTime && nextReminderTime <= now.getTime()) {
+                toast.error('Please pick a time in the future — that moment has already passed.');
+                setIsSaving(false);
+                return;
             }
 
             if (nextReminderTime) {
@@ -154,6 +181,21 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
     };
 
     const isReminderActive = link.reminderStatus === 'pending';
+
+    // Selection-time guards for the custom picker so past dates/times can't be
+    // chosen in the first place. Recomputed every render (cheap), so the "today"
+    // reference never goes stale while the modal sits open. The save-time check
+    // above remains the hard backstop.
+    const nowForGuards = new Date();
+    const nowYear = nowForGuards.getFullYear();
+    const nowMonth = nowForGuards.getMonth();
+    const nowDay = nowForGuards.getDate();
+    const nowMinutes = nowForGuards.getHours() * 60 + nowForGuards.getMinutes();
+    const selDate = customDate ? parseLocalDate(customDate) : nowForGuards;
+    const selYear = selDate.getFullYear();
+    const selMonth = selDate.getMonth();
+    const selDay = selDate.getDate();
+    const selIsToday = selYear === nowYear && selMonth === nowMonth && selDay === nowDay;
 
     const OptionButton = ({
         option,
@@ -354,39 +396,39 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                     <select
                                         className="bg-black/20 border border-white/10 rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
                                         onChange={(e) => {
-                                            const currentDate = customDate ? new Date(customDate) : new Date();
+                                            const currentDate = customDate ? parseLocalDate(customDate) : new Date();
                                             currentDate.setMonth(parseInt(e.target.value));
-                                            setCustomDate(currentDate.toISOString().split('T')[0]);
+                                            setCustomDate(formatLocalDate(currentDate));
                                         }}
-                                        value={customDate ? new Date(customDate).getMonth() : new Date().getMonth()}
+                                        value={selMonth}
                                         disabled={isSaving}
                                     >
                                         {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, i) => (
-                                            <option key={i} value={i}>{month}</option>
+                                            <option key={i} value={i} disabled={selYear === nowYear && i < nowMonth}>{month}</option>
                                         ))}
                                     </select>
                                     <select
                                         className="bg-black/20 border border-white/10 rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
                                         onChange={(e) => {
-                                            const currentDate = customDate ? new Date(customDate) : new Date();
+                                            const currentDate = customDate ? parseLocalDate(customDate) : new Date();
                                             currentDate.setDate(parseInt(e.target.value));
-                                            setCustomDate(currentDate.toISOString().split('T')[0]);
+                                            setCustomDate(formatLocalDate(currentDate));
                                         }}
-                                        value={customDate ? new Date(customDate).getDate() : new Date().getDate()}
+                                        value={selDay}
                                         disabled={isSaving}
                                     >
                                         {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
-                                            <option key={day} value={day}>{day}</option>
+                                            <option key={day} value={day} disabled={selYear === nowYear && selMonth === nowMonth && day < nowDay}>{day}</option>
                                         ))}
                                     </select>
                                     <select
                                         className="bg-black/20 border border-white/10 rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
                                         onChange={(e) => {
-                                            const currentDate = customDate ? new Date(customDate) : new Date();
+                                            const currentDate = customDate ? parseLocalDate(customDate) : new Date();
                                             currentDate.setFullYear(parseInt(e.target.value));
-                                            setCustomDate(currentDate.toISOString().split('T')[0]);
+                                            setCustomDate(formatLocalDate(currentDate));
                                         }}
-                                        value={customDate ? new Date(customDate).getFullYear() : new Date().getFullYear()}
+                                        value={selYear}
                                         disabled={isSaving}
                                     >
                                         {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + i).map(year => (
@@ -402,12 +444,14 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                 >
                                     {Array.from({ length: 24 }, (_, i) => {
                                         const hour = i.toString().padStart(2, '0');
-                                        return [
-                                            <option key={`${hour}:00`} value={`${hour}:00`}>{`${hour}:00`}</option>,
-                                            <option key={`${hour}:15`} value={`${hour}:15`}>{`${hour}:15`}</option>,
-                                            <option key={`${hour}:30`} value={`${hour}:30`}>{`${hour}:30`}</option>,
-                                            <option key={`${hour}:45`} value={`${hour}:45`}>{`${hour}:45`}</option>
-                                        ];
+                                        return ['00', '15', '30', '45'].map((min) => {
+                                            const value = `${hour}:${min}`;
+                                            // For today, disable slots at or before the current minute.
+                                            const isPast = selIsToday && (i * 60 + parseInt(min)) <= nowMinutes;
+                                            return (
+                                                <option key={value} value={value} disabled={isPast}>{value}</option>
+                                            );
+                                        });
                                     }).flat()}
                                 </select>
                             </div>
