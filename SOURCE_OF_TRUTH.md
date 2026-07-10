@@ -334,13 +334,21 @@ The multi-user auth work is **fully written but not live**:
 16. **[ ] Offline decision (M15).** No service worker exists. Either build
     read-cache offline for opened articles or (cheaper) drop every offline claim
     (fold into 14).
-17. **[ ] Light theme decision (M-P1).** Give light mode the dark theme's material
-    care, or ship dark-only intentionally. Decide, don't leave half-done.
+17. **[x] Light theme decision (M-P1) — RESOLVED 2026-07-10: keep BOTH, light
+    brought to parity.** Four theme-aware material tokens added in `globals.css`
+    (`--fill-subtle`, `--fill-strong`, `--surface-inset`, `--border-strong`;
+    identical dark values, dark-alpha light values) and ~26 components swapped
+    off raw `white/black` alphas. Deliberately kept: modal scrims, media
+    overlays, `text-white` on solid accent surfaces. On-device light-mode visual
+    QA list in the §9 entry.
 18. **[ ] Test harness (T3).** Add scraper fixtures, `ai_service` schema-contract
     tests, `search.py` tests; wire into CI/SessionStart (AUDIT.md N-2a tracks this).
 19. **[ ] Cost guardrails.** Budget alerts on the Firebase/GCP project; per-user
-    monthly quotas (see §7); email digest provider decision (SendGrid key or cut
-    the email channel).
+    monthly quotas (see §7). ~~Email digest provider decision~~ **DECIDED
+    2026-07-10: the email channel was CUT** (SendGrid was never configured; push
+    + the always-on in-app digest supersede it). Stored `email` channel values
+    are dropped at read time (`_normalize_channels` / `normalizeChannels`) and
+    never written back.
 19a. **[ ] Deferred audit remediations (from the 2026-07-07 sweep — full detail +
     file:line in `AUDIT_FINDINGS.md`).** The high-value fixes shipped that session;
     these remain, roughly high→low: **(data integrity) — ✅ DONE + LIVE
@@ -372,20 +380,27 @@ The multi-user auth work is **fully written but not live**:
 
 ### 🟢 P3 — product roadmap (post-launch)
 
-20. **[ ] M17 Voice capture + voice ask** (mic in AskBrain; WKWebView speech quirks).
-21. **[ ] M18 Proactive brain** (contradiction/reinforcement observations). Push
+20. **[ ] M19 Shareable cited answers — FIRST POST-LAUNCH ITEM (re-ranked to the
+    top of P3, 2026-07-10 product review).** Ask Machina is the hero; a shareable
+    cited answer is its growth surface and every share is a public OG page
+    linking back to the app (`share_page` backend exists). Do this before any
+    other P3 work.
+21. **[ ] M17 Voice capture + voice ask** (mic in AskBrain; WKWebView speech quirks).
+22. **[ ] M18 Proactive brain** (contradiction/reinforcement observations). Push
     notifications now EXIST (shipped 2026-07-06: reminder + digest push over
     FCM/APNs, see §9) — M18 only needs the observation engine on top.
-22. **[ ] M19 Shareable cited answers** (growth surface; `share_page` backend exists).
 23. **[ ] M20 Auto-collections** (cluster `concepts`/embeddings into suggested collections).
 24. **[ ] T10 export** (MD/PDF/HTML from ReadingView), **T11 highlights**, T5/T6
     connector framework + YouTube liked-videos sync (pull connectors; IG/FB saved
     have no legitimate API — won't do), Chrome Web Store listing for the extension.
 25. **[ ] QA backlog leftovers** (from the F-series, still open): F-16 ref-counted
-    scroll locks, F-20 ReminderModal past-times/date-rollover, F-21 offline signal
-    for optimistic writes, F-24/25/26 SimpleMarkdown + RTL unification, F-29
-    SwipeDeck undo doesn't cancel reminders, F-31 Reader "Listen" reliability,
-    F-32 SwipeDeck stale snapshot, L-5 unbounded `deleteCollection` batch.
+    scroll locks, F-21 offline signal for optimistic writes, F-24/25/26
+    SimpleMarkdown + RTL unification, F-31 Reader "Listen" reliability, L-5
+    unbounded `deleteCollection` batch. **✅ Fixed 2026-07-10:** F-20 (ReminderModal
+    past-times/date-rollover — local-time parsing, picker guards, save-time
+    invariant), F-29 (up-swipe remind is now outcome-aware: cancel returns the
+    card, Undo clears the created reminder), F-32 (deck order snapshotted as ids,
+    live card data, deleted/externally-acted cards skip).
 
 ### ✅ Done — verified against code (do not redo)
 
@@ -414,8 +429,10 @@ The multi-user auth work is **fully written but not live**:
   add/image, browser extension (`/extension`, Chrome/Edge/Brave + Safari
   converter).
 - **Recall:** Ask Machina (hybrid RAG, streaming on web, chat history), semantic
-  search, reminders, curated digest (6 modes), weekly synthesis, collections +
-  public share pages (server-rendered OG), reading view + TTS.
+  search, reminders, curated digest (3 modes: smart / rediscover / by-topic,
+  collapsed from 6 on 2026-07-10), weekly synthesis, Review mode (curated
+  bounded swipe sessions), collections + public share pages (server-rendered
+  OG), reading view + TTS.
 - **CI:** iOS → TestFlight workflow green (UI-only build 1006, 2026-07-02);
   secrets configured; cloud-managed signing works.
 - **T15 polish pass, T2 pipeline consolidation** (Python canonical; TS routes are
@@ -586,7 +603,47 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-09 — SHIPPED: audit remediation merged to main (merge `9e1f042`,
+- **2026-07-10 — Product-review execution: subtraction + Review-mode upgrade
+  (branch `claude/machina-review-execution-bvwize`, 8 commits — NOT yet merged;
+  owner reviews and ships).** Orchestrated 7 work packages (one Opus agent
+  each) + an 8-angle code review. Shipped on the branch: **(A) Review mode
+  upgraded** into the digest's interactive twin — three curated queues
+  (Forgotten default / Recent / Needs tidying, pure logic in
+  `web/lib/reviewQueue.ts`), sessions bounded at 12 cards with a kept/archived/
+  reminders summary + "Review 12 more", a "why this card" line per face,
+  arrow-key bindings, and fixes for **F-29** (up-swipe holds the card until the
+  reminder modal resolves; cancel returns it; Undo clears the reminder) and
+  **F-32** (order-stable id snapshot over live card data; deleted/externally-
+  acted cards skip). **(B) Email digest channel CUT** (never configured):
+  formatters/senders/SendGrid-SMTP config and the Delivery settings screen
+  deleted; stored `email` channels dropped at read time mirroring the
+  whatsapp→push migration (email-only legacy users fall back to the always-on
+  in-app digest — deliberate, no silent push opt-in); closes task 19's provider
+  decision. **(C) Digest modes 6→3** (smart/rediscover/topic; synthesis pathway
+  untouched): retired random/unread/favorites map to smart at read time via
+  mirrored normalizers (`normalize_mode` / `normalizeDigestMode`), never
+  written back. **(D) F-20 fixed** (ReminderModal local-time date handling,
+  past-slot guards, never-in-the-past save invariant, month-overflow clamp).
+  **(E)** "Who It's For" removed from the video prompt at the source
+  (`ai_service.py`) + the frontend strip band-aid deleted — legacy video cards
+  show the stored section until re-saved (accepted). **(F) Task 17 resolved:
+  BOTH themes kept, light brought to material parity** via four new tokens in
+  `globals.css` (dark values identical — dark mode pixel-unchanged). **(G) iOS
+  Shortcut path retired** (`SHORTCUT_SETUP.md` deleted, refs scrubbed; no
+  Shortcut-only endpoint existed — `share_ingest`/`get_share_config` are shared
+  with the Share Extension + browser extension, nothing removed). **M19
+  re-ranked to top of P3** (first post-launch item). Code review (8 finder
+  angles, verified) fixed: unix-seconds timestamps in `getTimestampNumber`
+  (day-old FB/screenshot cards were landing in "Forgotten"), reminder-modal
+  save/cancel signal ordering, empty-session self-heal + default-queue
+  fallback, mid-session skip of externally-acted cards, `CardFace` memoization
+  (markdown no longer re-parses per drag frame), dead email-era helpers
+  deleted. Verified: `tsc --noEmit` clean, `py_compile` clean, 70/70 pytest.
+  **⚠️ On-device QA before ship:** Review-mode gesture feel + the up-swipe
+  cancel/return animation; light-mode visual pass (ReminderModal inset pickers,
+  scan-progress skeletons, card elevation/hairlines, drag handles, HintBadge +
+  category-chip contrast, Toast); `layout.tsx` `themeColor` is still static
+  dark — decide if it should follow the theme.
   25 tasks, 26 commits — see `AUDIT.md`).** Vercel auto-deploy is live (desktop
   web). **iOS: SHIPPED — TestFlight run #64 → build 1064, GREEN** (fired via the
   temp-push-trigger pattern on the audit branch, commit `4c845eb`, trigger
