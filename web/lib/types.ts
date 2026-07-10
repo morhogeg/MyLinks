@@ -156,7 +156,10 @@ export interface RelatedLink {
 export type DigestFrequency = 'daily' | 'weekly';
 export type DigestChannel = 'push';
 export type ReminderChannel = 'push';
-export type DigestMode = 'smart' | 'random' | 'topic' | 'unread' | 'favorites' | 'rediscover' | 'synthesis';
+// Three curation modes survive; 'synthesis' is the separate weekly-recap path.
+// Retired modes (random/unread/favorites) map to 'smart' at load time — see
+// normalizeDigestMode in useUserSettings.ts.
+export type DigestMode = 'smart' | 'topic' | 'rediscover' | 'synthesis';
 
 // ── Weekly "What you learned" synthesis (M12) ────────────────────────────────
 // A narrative recap of the week's saves, generated server-side (digest_service)

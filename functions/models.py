@@ -97,19 +97,18 @@ class UserSettings(BaseModel):
     reminder_frequency: str = "smart"  # "smart", "daily", "weekly", "off"
 
     # ── Curated Digest delivery ──────────────────────────────────────────
-    # A scheduled, curated set of saved cards delivered to push and/or email.
-    # See digest_service.py for the curation + delivery logic.
+    # A scheduled, curated set of saved cards delivered over push (plus the
+    # always-on in-app Digest section). See digest_service.py for the logic.
     digest_enabled: bool = False
     # How often to deliver: "daily" | "weekly"
     digest_frequency: str = "weekly"
-    # Delivery channels — any subset of ["push", "email"]
+    # Delivery channels — push only (retired whatsapp/email entries are
+    # migrated/dropped at read time in digest_service._normalize_channels)
     digest_channels: List[str] = Field(default_factory=lambda: ["push"])
-    # Curation strategy:
+    # Curation strategy (retired modes random/unread/favorites map to "smart" at
+    # read time in digest_service.normalize_mode):
     #   "smart"      – a balanced mix of backlog + rediscovery (default)
-    #   "random"     – surprise me: a random sample across the library
     #   "topic"      – only cards from a chosen category/tag (see digest_topic)
-    #   "unread"     – chip away at the backlog (oldest unread first)
-    #   "favorites"  – revisit starred cards
     #   "rediscover" – "on this day": older saves you haven't opened recently
     digest_mode: str = "smart"
     # Categories/tags to focus on when digest_mode == "topic". `digest_topics`

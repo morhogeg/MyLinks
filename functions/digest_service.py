@@ -15,15 +15,14 @@ The user controls, from Settings:
   • how many cards                             (digest_count)
   • when, in their local time                  (digest_hour, digest_minute, digest_day)
 
-Curation modes (digest_mode). The Settings UI surfaces the first three as the
-primary choices and tucks the rest behind an "advanced" disclosure (M14); the
-backend curates all six identically — the split is presentation only:
-  smart      – a balanced mix of backlog + rediscovery (the default)   [primary]
-  unread     – chip away at the backlog (oldest unread first)          [primary]
-  rediscover – "on this day": older saves you haven't opened in a while [primary]
-  random     – "surprise me": a random sample across the whole library [advanced]
-  topic      – only cards from a chosen category/tag                    [advanced]
-  favorites  – revisit your starred cards                               [advanced]
+Curation modes (digest_mode) — three survivors:
+  smart      – a balanced mix of backlog + rediscovery (the default)
+  rediscover – "on this day": older saves you haven't opened in a while
+  topic      – only cards from a chosen category/tag
+
+Three earlier modes (random / unread / favorites) were retired. A stored value
+of any of them is mapped to 'smart' at read time (see REMOVED_MODE_ALIASES) so
+existing settings keep working; the removed value is never written back.
 """
 
 import os
@@ -52,7 +51,21 @@ CANDIDATE_LIMIT = 500
 # chosen minute but proportionally more scheduler invocations (cost).
 DIGEST_CADENCE_MINUTES = 5
 
-VALID_MODES = {"smart", "random", "topic", "unread", "favorites", "rediscover", "synthesis"}
+VALID_MODES = {"smart", "topic", "rediscover", "synthesis"}
+
+# Retired curation modes → the surviving mode they now resolve to. A user whose
+# settings still carry one of these keeps getting a digest (curated via the
+# mapped survivor) with no error; the stale value is normalized at read time and
+# never written back. Kept here (not in curate) so every read path shares it.
+REMOVED_MODE_ALIASES = {"random": "smart", "unread": "smart", "favorites": "smart"}
+
+
+def normalize_mode(mode: Optional[str]) -> str:
+    """Resolve a stored digest_mode to a live one: retired modes map to their
+    survivor (REMOVED_MODE_ALIASES), anything unrecognized falls back to 'smart'."""
+    mode = mode or "smart"
+    mode = REMOVED_MODE_ALIASES.get(mode, mode)
+    return mode if mode in VALID_MODES else "smart"
 
 # How many days of saves the weekly "What you learned" synthesis (M12) looks back
 # over, and the minimum number of cards in that window worth synthesizing (below
@@ -153,7 +166,10 @@ def curate(links: List[dict], mode: str, count: int, topics=None) -> List[dict]:
     `topics` may be a single string or a list of categories/tags (used when
     mode == "topic"). Pure function (no I/O) so it can be unit-tested.
     """
-    mode = mode if mode in VALID_MODES else "smart"
+    # Read-time mapping: retired modes resolve to their survivor here too, so a
+    # stale stored value curates via 'smart' rather than crashing or curating
+    # nothing (defense in depth — build_and_send_digest also normalizes on read).
+    mode = normalize_mode(mode)
     count = max(1, min(int(count or 5), 20))
     topic_set = set(_normalize_topics(topics))
     # Defense in depth: never surface archived cards even if they slip in.
@@ -170,11 +186,6 @@ def curate(links: List[dict], mode: str, count: int, topics=None) -> List[dict]:
     def viewed(l):
         return _to_ms(l.get("lastViewedAt"))
 
-    if mode == "random":
-        pool = list(links)
-        random.shuffle(pool)
-        return pool[:count]
-
     if mode == "topic":
         pool = [
             l for l in links
@@ -184,17 +195,6 @@ def curate(links: List[dict], mode: str, count: int, topics=None) -> List[dict]:
             )
         ]
         random.shuffle(pool)
-        return pool[:count]
-
-    if mode == "favorites":
-        pool = [l for l in links if l.get("status") == "favorite"]
-        random.shuffle(pool)
-        return pool[:count]
-
-    if mode == "unread":
-        pool = [l for l in links if l.get("status") not in ("archived", "favorite")
-                and not l.get("isRead")]
-        pool.sort(key=created)  # oldest first — clear the backlog
         return pool[:count]
 
     if mode == "rediscover":
@@ -477,7 +477,9 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
     settings = user_data.get("settings", {}) or {}
     result = {"uid": uid, "sent": False, "channels": [], "card_count": 0, "skipped": None}
 
-    mode = settings.get("digest_mode", "smart")
+    # Read-time mapping: a stored retired mode (random/unread/favorites) resolves
+    # to its survivor here so it's never carried past load or written back.
+    mode = normalize_mode(settings.get("digest_mode"))
     # Support multi-topic (digest_topics) with single-topic (digest_topic) fallback.
     topics = settings.get("digest_topics") or []
     if not topics and settings.get("digest_topic"):

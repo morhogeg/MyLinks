@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import type { User, DigestChannel, ReminderChannel } from '@/lib/types';
+import type { User, DigestChannel, DigestMode, ReminderChannel } from '@/lib/types';
 import { updateUserSettings, getUserSettings, getLinksFromFirestore } from '@/lib/storage';
 import { registerPush, unregisterPush } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
@@ -47,6 +47,19 @@ export function withPush<T extends ReminderChannel | DigestChannel>(channels: T[
 export function normalizeChannels<T extends string>(channels: readonly string[] | undefined, valid: readonly T[], fallback: T): T[] {
     const kept = Array.from(new Set(channels ?? [])).filter((c): c is T => (valid as readonly string[]).includes(c));
     return kept.length ? kept : [fallback];
+}
+
+// Retired digest modes → the surviving mode they now resolve to. Mirrors
+// normalizeChannels: a stored value of a removed mode is mapped to 'smart' at
+// load time so an existing setting keeps working (curating via the survivor),
+// and the stale value is never written back on save — the Style picker only
+// offers survivors, so settings.digest_mode can never become a removed value.
+const REMOVED_DIGEST_MODES: Record<string, DigestMode> = { random: 'smart', unread: 'smart', favorites: 'smart' };
+const VALID_DIGEST_MODES: readonly DigestMode[] = ['smart', 'topic', 'rediscover', 'synthesis'];
+export function normalizeDigestMode(mode: string | undefined): DigestMode {
+    if (!mode) return 'smart';
+    if (mode in REMOVED_DIGEST_MODES) return REMOVED_DIGEST_MODES[mode];
+    return (VALID_DIGEST_MODES as readonly string[]).includes(mode) ? (mode as DigestMode) : 'smart';
 }
 
 /**
@@ -156,7 +169,7 @@ export function useUserSettings(uid: string) {
                     digest_enabled: userSettings.digest_enabled ?? false,
                     digest_frequency: userSettings.digest_frequency || 'weekly',
                     digest_channels: normalizeChannels<DigestChannel>(userSettings.digest_channels, ['push'], 'push'),
-                    digest_mode: userSettings.digest_mode || 'smart',
+                    digest_mode: normalizeDigestMode(userSettings.digest_mode),
                     digest_topics: userSettings.digest_topics?.length
                         ? userSettings.digest_topics
                         : (userSettings.digest_topic ? [userSettings.digest_topic] : []),
