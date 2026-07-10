@@ -147,6 +147,72 @@ IMPORTANT: You are analyzing an **actual YouTube video that you can watch** (its
 """
 
 
+def _rag_source_label(c: dict) -> str:
+    """Publisher name for the card — explicit sourceName, else the URL's
+    host. Lets the model answer questions that name the source (e.g.
+    'the CNN fact-check'), which the title/summary alone don't contain."""
+    name = (c.get("sourceName") or "").strip()
+    if name and name.lower() not in ("none", "screenshot", "unknown"):
+        return name
+    url = c.get("url") or ""
+    try:
+        from urllib.parse import urlparse
+        host = urlparse(url).hostname or ""
+        return host[4:] if host.startswith("www.") else host
+    except Exception:
+        return ""
+
+
+def _rag_card_block(c: dict) -> str:
+    src = _rag_source_label(c)
+    meta = [f"source: {src}"] if src else []
+    meta.append(f"category: {c.get('category', 'General')}")
+    meta.append(f"tags: {', '.join(c.get('tags', []) or [])}")
+    return (
+        f"[{c.get('id')}] {c.get('title', 'Untitled')} "
+        f"({'; '.join(meta)})\n{c.get('summary', '')}"
+    )
+
+
+def _build_rag_prompt(question: str, cards: list, history: list = None) -> str:
+    """Shared grounding prompt for both RAG answer paths (streaming and
+    non-streaming).
+
+    Returns the prompt through the `User question:` line; each caller appends
+    its own output-format instruction (a JSON object vs. the streamable
+    `[[CITED: ...]]` marker), which is the ONLY part that legitimately differs
+    between the two paths. Centralising this means a wording change to the
+    grounding rules happens once and both paths stay byte-identical.
+    """
+    sources_text = "\n\n".join(_rag_card_block(c) for c in cards)
+
+    history_text = ""
+    if history:
+        turns = []
+        for h in history[-6:]:  # keep the prompt bounded
+            role = "User" if h.get("role") == "user" else "Assistant"
+            turns.append(f"{role}: {h.get('content', '')}")
+        history_text = "\n\nEarlier in this conversation:\n" + "\n".join(turns)
+
+    return f"""You are Machina AI, the user's personal knowledge assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved.
+
+Rules:
+- Ground every claim in the provided sources. Do NOT use outside knowledge or invent facts.
+- If the sources don't contain the answer, say so plainly and suggest what they could save.
+- Be concise and direct (2-5 sentences, or a short list when that's clearer).
+- Don't announce a count of items (e.g. "three sources") — just give the list. If you do state a number, it MUST exactly match the number of items you list.
+- CRITICAL — match the user's language: write your ENTIRE answer in the same language as the User question, NOT the language of the sources. If the question is in English, answer in English even when every source is in Hebrew; if the question is in Hebrew, answer in Hebrew. The sources' language must not influence your answer's language.
+- Only cite sources you actually used.
+
+Saved sources:
+{sources_text}
+{history_text}
+
+User question: {question}
+
+"""
+
+
 class GeminiService:
     """
     Wrapper for Google Gemini AI.
@@ -306,58 +372,10 @@ If the image is an article, extract the headline and body."""
                 "citedIds": [],
             }
 
-        def _source_label(c: dict) -> str:
-            """Publisher name for the card — explicit sourceName, else the URL's
-            host. Lets the model answer questions that name the source (e.g.
-            'the CNN fact-check'), which the title/summary alone don't contain."""
-            name = (c.get("sourceName") or "").strip()
-            if name and name.lower() not in ("none", "screenshot", "unknown"):
-                return name
-            url = c.get("url") or ""
-            try:
-                from urllib.parse import urlparse
-                host = urlparse(url).hostname or ""
-                return host[4:] if host.startswith("www.") else host
-            except Exception:
-                return ""
-
-        def _card_block(c: dict) -> str:
-            src = _source_label(c)
-            meta = [f"source: {src}"] if src else []
-            meta.append(f"category: {c.get('category', 'General')}")
-            meta.append(f"tags: {', '.join(c.get('tags', []) or [])}")
-            return (
-                f"[{c.get('id')}] {c.get('title', 'Untitled')} "
-                f"({'; '.join(meta)})\n{c.get('summary', '')}"
-            )
-
-        sources_text = "\n\n".join(_card_block(c) for c in cards)
-
-        history_text = ""
-        if history:
-            turns = []
-            for h in history[-6:]:  # keep the prompt bounded
-                role = "User" if h.get("role") == "user" else "Assistant"
-                turns.append(f"{role}: {h.get('content', '')}")
-            history_text = "\n\nEarlier in this conversation:\n" + "\n".join(turns)
-
-        prompt = f"""You are Machina AI, the user's personal knowledge assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved.
-
-Rules:
-- Ground every claim in the provided sources. Do NOT use outside knowledge or invent facts.
-- If the sources don't contain the answer, say so plainly and suggest what they could save.
-- Be concise and direct (2-5 sentences, or a short list when that's clearer).
-- Don't announce a count of items (e.g. "three sources") — just give the list. If you do state a number, it MUST exactly match the number of items you list.
-- CRITICAL — match the user's language: write your ENTIRE answer in the same language as the User question, NOT the language of the sources. If the question is in English, answer in English even when every source is in Hebrew; if the question is in Hebrew, answer in Hebrew. The sources' language must not influence your answer's language.
-- Only cite sources you actually used.
-
-Saved sources:
-{sources_text}
-{history_text}
-
-User question: {question}
-
-Return ONLY a JSON object: {{"answer": string, "citedIds": string[]}} where citedIds are the ids (without brackets) of the sources you relied on."""
+        prompt = _build_rag_prompt(question, cards, history) + (
+            'Return ONLY a JSON object: {"answer": string, "citedIds": string[]} '
+            "where citedIds are the ids (without brackets) of the sources you relied on."
+        )
 
         data = self._generate_json([prompt], "answer", config_extra={"response_schema": BrainAnswer})
 
@@ -380,8 +398,9 @@ Return ONLY a JSON object: {{"answer": string, "citedIds": string[]}} where cite
         model instead writes a plain-text answer and ends with a machine-readable
         marker line `[[CITED: id1, id2]]`. We buffer the tail of the stream so the
         marker is never surfaced to the user, and parse it at the end to derive
-        citations. If the marker is missing/unparseable we fall back to citing all
-        supplied card ids (so sources are never empty when cards exist).
+        citations. If the marker is missing/unparseable we cite NOTHING (empty
+        list) — mirroring the non-streaming path — rather than over-crediting the
+        answer to every retrieved card.
 
         On mid-stream failure this raises AnalysisError; callers should wrap the
         consumption in a try/except and emit a sanitized error to the client.
@@ -398,59 +417,13 @@ Return ONLY a JSON object: {{"answer": string, "citedIds": string[]}} where cite
             yield ("citedIds", [])
             return
 
-        # Reuse the exact source/history framing from answer_from_context so the
-        # grounded answer is identical in quality to the non-streaming path.
-        def _source_label(c: dict) -> str:
-            name = (c.get("sourceName") or "").strip()
-            if name and name.lower() not in ("none", "screenshot", "unknown"):
-                return name
-            url = c.get("url") or ""
-            try:
-                from urllib.parse import urlparse
-                host = urlparse(url).hostname or ""
-                return host[4:] if host.startswith("www.") else host
-            except Exception:
-                return ""
-
-        def _card_block(c: dict) -> str:
-            src = _source_label(c)
-            meta = [f"source: {src}"] if src else []
-            meta.append(f"category: {c.get('category', 'General')}")
-            meta.append(f"tags: {', '.join(c.get('tags', []) or [])}")
-            return (
-                f"[{c.get('id')}] {c.get('title', 'Untitled')} "
-                f"({'; '.join(meta)})\n{c.get('summary', '')}"
-            )
-
-        sources_text = "\n\n".join(_card_block(c) for c in cards)
-
-        history_text = ""
-        if history:
-            turns = []
-            for h in history[-6:]:  # keep the prompt bounded
-                role = "User" if h.get("role") == "user" else "Assistant"
-                turns.append(f"{role}: {h.get('content', '')}")
-            history_text = "\n\nEarlier in this conversation:\n" + "\n".join(turns)
-
-        prompt = f"""You are Machina AI, the user's personal knowledge assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved.
-
-Rules:
-- Ground every claim in the provided sources. Do NOT use outside knowledge or invent facts.
-- If the sources don't contain the answer, say so plainly and suggest what they could save.
-- Be concise and direct (2-5 sentences, or a short list when that's clearer).
-- Don't announce a count of items (e.g. "three sources") — just give the list. If you do state a number, it MUST exactly match the number of items you list.
-- CRITICAL — match the user's language: write your ENTIRE answer in the same language as the User question, NOT the language of the sources. If the question is in English, answer in English even when every source is in Hebrew; if the question is in Hebrew, answer in Hebrew. The sources' language must not influence your answer's language.
-- Only cite sources you actually used.
-
-Saved sources:
-{sources_text}
-{history_text}
-
-User question: {question}
-
-Write the answer as plain text (no JSON). Then, on a NEW LINE after the answer, output a citation marker listing the ids (without brackets) of the sources you relied on, in exactly this format:
-[[CITED: id1, id2]]
-Output the marker exactly once, as the very last line, and nothing after it."""
+        prompt = _build_rag_prompt(question, cards, history) + (
+            "Write the answer as plain text (no JSON). Then, on a NEW LINE after "
+            "the answer, output a citation marker listing the ids (without "
+            "brackets) of the sources you relied on, in exactly this format:\n"
+            "[[CITED: id1, id2]]\n"
+            "Output the marker exactly once, as the very last line, and nothing after it."
+        )
 
         # Tail buffer: hold back the trailing characters that could be the start
         # of the "[[CITED: ...]]" marker so it is never streamed as visible text.
@@ -523,11 +496,14 @@ Output the marker exactly once, as the very last line, and nothing after it."""
         except Exception:
             cited = []
 
+        # Guard against hallucinated ids AND mirror the non-streaming path's
+        # semantics exactly: keep only ids the model actually named that we in
+        # fact supplied. If the [[CITED:]] marker is missing, unparseable, or
+        # names nothing valid, cite NOTHING (empty list). The old fallback
+        # re-cited EVERY supplied id, attributing the answer to up to ~13 cards
+        # the model may never have used — a trust bug, not a safety net.
         valid_set = set(valid_ids)
         cited = [cid for cid in cited if cid in valid_set]
-        # Never leave sources empty when we did have cards to ground on.
-        if not cited:
-            cited = list(valid_ids)
         yield ("citedIds", cited)
 
     def synthesize_week(self, cards: list) -> dict:
@@ -641,7 +617,3 @@ Return ONLY a JSON object matching the schema (title, narrative, themes[title,in
         except Exception as e:
             logger.error(f"Embedding generation failed: {str(e)}")
             return None
-
-
-# Backward compatibility alias
-ClaudeService = GeminiService

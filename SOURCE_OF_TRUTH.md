@@ -16,6 +16,8 @@
 > `AUTH_SPEC.md` (auth design), `NATIVE_AUTH_SETUP.md` (auth cutover console/Xcode
 > steps), `SHARE_EXTENSION.md`, `SHORTCUT_SETUP.md`, `docs/IOS_CICD.md` (TestFlight
 > CI secrets/setup), `web/VERCEL.md`, `extension/README.md`, `README.md` (public-facing).
+> `AUDIT.md` (repo root) is the **2026-07-09 audit + remediation tracker** —
+> full-tree findings with file:line and the remaining manual/owner items (its §9).
 >
 > **Last full review:** 2026-07-03 — every task below was verified against the
 > actual code on `main`, not just against what old docs claimed.
@@ -25,7 +27,7 @@
 ## 1. What Machina is
 
 **Machina AI** (`com.morhogeg.machina`) — an AI-powered personal knowledge base.
-Capture a link/image from anywhere (iOS share sheet, WhatsApp, web UI, browser
+Capture a link/image from anywhere (iOS share sheet, web UI, browser
 extension) → Python Cloud Function scrapes + Gemini analyzes → a structured card
 (summary, category, tags, concepts, embedding, related links) lands in a real-time
 feed with semantic search, RAG chat ("Ask Machina"), spaced-repetition reminders,
@@ -55,9 +57,9 @@ surface in the category and a knowledge graph computed on every save. The path t
 - **Backend:** Python 3.13 Firebase Cloud Functions in `functions/` (project
   **`secondbrain-app-94da2`**, us-central1). Gemini `gemini-3.1-flash-lite`
   (analysis/vision, centralized in `GEMINI_ANALYSIS_MODEL`), `gemini-embedding-001`
-  (search). Twilio (WhatsApp). SendGrid/SMTP (email digests — not yet configured).
+  (search). SendGrid/SMTP (email digests — not yet configured).
 - **Data:** Firestore `users/{uid}/…` where **uid = phone number** (e.g.
-  `+1646…`); Google/Apple accounts link via `authUids[]` on the user doc (no data
+  `+1555…`); Google/Apple accounts link via `authUids[]` on the user doc (no data
   migration — see `AUTH_SPEC.md`). Subcollections: `links`, `chats`, `collections`,
   `syntheses`. Public snapshots: `shared_cards`, `shared_collections`.
 - **Deploy surfaces:**
@@ -77,8 +79,8 @@ surface in the category and a knowledge graph computed on every save. The path t
 
 ### Operational gotchas (hard-won — don't re-learn these)
 
-- `GEMINI_API_KEY` and `TWILIO_*` are **plain env vars in `functions/.env`**
-  (gitignored) — NOT Secret Manager secrets; binding them as secrets breaks deploy.
+- `GEMINI_API_KEY` is a **plain env var in `functions/.env`**
+  (gitignored) — NOT a Secret Manager secret; binding it as a secret breaks deploy.
   Functions deploy needs a local venv (`cd functions && python3.13 -m venv venv &&
   venv/bin/pip install -r requirements.txt`) so firebase-tools can import the source.
 - `deploy-functions.sh` pins `--project secondbrain-app-94da2` (a `firebase use`
@@ -282,7 +284,7 @@ The multi-user auth work is **fully written but not live**:
 8. **[x] Privacy policy + Terms URLs, App Privacy "nutrition label", App Store
    metadata** *(doc/code side done 2026-07-03).* Hosted pages live:
    `web/app/privacy/page.tsx` + `web/app/terms/page.tsx` (static, prose,
-   theme-tokened; content verified against the code — Gemini/Twilio/Firebase
+   theme-tokened; content verified against the code — Gemini/Firebase
    processors, share-page caveat, `delete_account` scope). They are **public**:
    `web/lib/publicRoutes.tsx` (used by `app/layout.tsx`) skips the
    AuthProvider gate on `/privacy` + `/terms` so App Review can read them
@@ -293,15 +295,13 @@ The multi-user auth work is **fully written but not live**:
    Connect, take the screenshots (`docs/APP_STORE.md` §4), name a concrete
    governing-law jurisdiction in `/terms` §10 before public launch.
 9. **[ ] Reviewer readiness.** Demo account credentials for App Review (auth will
-   be ON), review notes explaining WhatsApp capture (reviewer can't test Twilio),
-   and either iPad screenshots or set `TARGETED_DEVICE_FAMILY = 1`. *Device
-   family half done 2026-07-03: `TARGETED_DEVICE_FAMILY = 1` set in all four
-   build configs (App + ShareExt, Debug + Release) — iPhone-only, no iPad
-   screenshots needed. Doc side done 2026-07-03: review-notes template (demo-
-   account placeholder + fresh-sign-in-auto-creates-workspace explanation,
-   WhatsApp-is-optional/test-share-sheet-instead, AI-consent-on-first-run,
-   Sign in with Apple) and the 6-screenshot shot-list are in
-   `docs/APP_STORE.md` §3–§4. **Remaining:** create + seed the demo account
+   be ON) and review notes. `TARGETED_DEVICE_FAMILY = 1` (iPhone-only) is already
+   set in all four build configs (App + ShareExt, Debug + Release), so no iPad
+   screenshots are needed. Doc side done 2026-07-03 (WhatsApp line dropped
+   2026-07-09): review-notes template (demo-account placeholder + fresh-sign-in-
+   auto-creates-workspace explanation, test-capture-via-share-sheet,
+   AI-consent-on-first-run, Sign in with Apple) and the 6-screenshot shot-list are
+   in `docs/APP_STORE.md` §3–§4. **Remaining:** create + seed the demo account
    post-cutover, fill its credentials into the notes, take the screenshots.*
 10. **[x] CI SDK check** *(done 2026-07-03, folded into task 1: the workflow now
     runs on `macos-26` with `Xcode_26*`, satisfying Apple's current-SDK
@@ -317,26 +317,27 @@ The multi-user auth work is **fully written but not live**:
 
 12. **[ ] Ingest token hardening (audit H-1).** Move from App Group UserDefaults
     to Keychain; server copy to a functions-only collection; add rotation.
-13. **[ ] Remaining audit mediums:** per-uid rate limits post-auth + fail-closed
-    on paid buckets (M-3), cap `ask_brain` history (M-5), mask remaining phone
-    logs in `link_service.py`/`whatsapp_handler.py` (H-4 residue).
-14. **[ ] README ↔ reality (M-P5/T12) — still false.** Verified 2026-07-03: README
-    claims Graph *Visualization*, Insights Dashboard, "Works Offline", Table view —
-    none exist. Rewrite to describe the real product (recall engine, capture
-    surface, synthesis). Also remove the PWA badge/positioning.
-15. **[ ] Retire the iPhone-PWA surface deliberately.** The native app replaced
-    it: remove `InstallPWA.tsx` (or gate to Android only), stop advertising
-    install-to-home-screen, and stop routine `./deploy-hosting.sh` runs (already
-    removed from the ship skill). Keep Hosting alive solely for `/api/*` rewrites +
-    share pages.
+13. **[x] Remaining audit mediums — landed 2026-07-09 (AUDIT.md S-2/S-3).**
+    Per-uid+IP rate limits on the paid endpoints and `ask_brain` history/input
+    caps shipped. Phone-log masking (H-4 residue) is **moot**: `link_service.py`'s
+    phone lookup and `whatsapp_handler.py` were deleted with the WhatsApp removal
+    (AUDIT.md ch. 4). Residual: fail-closed-on-Firestore-outage stays an accepted
+    availability trade-off (AUDIT.md S-6).
+14. **[x] README ↔ reality (M-P5/T12) — rewritten 2026-07-09 (AUDIT.md D-17).**
+    Dropped the false Graph *Visualization* / Insights Dashboard / "Works Offline" /
+    Table-view / PWA claims; README now describes the real product (recall engine,
+    capture surface, synthesis).
+15. **[x] Retire the iPhone-PWA surface — done 2026-07-09 (AUDIT.md F-1).**
+    `InstallPWA.tsx` deleted (+ its `app/page.tsx` refs); routine
+    `./deploy-hosting.sh` runs already removed from the ship skill. Hosting stays
+    alive solely for the `/api/*` rewrites + `/s`,`/c` share pages.
 16. **[ ] Offline decision (M15).** No service worker exists. Either build
     read-cache offline for opened articles or (cheaper) drop every offline claim
     (fold into 14).
 17. **[ ] Light theme decision (M-P1).** Give light mode the dark theme's material
     care, or ship dark-only intentionally. Decide, don't leave half-done.
-18. **[ ] Test harness (T3).** Only `functions/test_yt_scrape.py` exists. Add
-    scraper fixtures, `ai_service` schema-contract tests, `search.py` tests,
-    WhatsApp payload smoke test; wire into CI/SessionStart.
+18. **[ ] Test harness (T3).** Add scraper fixtures, `ai_service` schema-contract
+    tests, `search.py` tests; wire into CI/SessionStart (AUDIT.md N-2a tracks this).
 19. **[ ] Cost guardrails.** Budget alerts on the Firebase/GCP project; per-user
     monthly quotas (see §7); email digest provider decision (SendGrid key or cut
     the email channel).
@@ -351,25 +352,23 @@ The multi-user auth work is **fully written but not live**:
     detect drift/poison). **(reliability) — ✅ DONE + LIVE 2026-07-07:** scheduled
     janitor `sweep_stuck_processing` (every 5 min) flips `processing` cards older than
     15 min to retryable `FAILED` (`processingStartedAt` stamped on placeholder +
-    retry; admin `force_sweep_stuck_processing` twin). **Still open:**
-    **(perf)** Feed re-render storm — throttle `useProcessingBanner`'s 200ms
-    tick, memoize the `filteredLinks`/facet-count chain, `React.memo` Card/ListCard,
-    move drag-scroll to refs, one shared "now" tick (currently 5 Hz full-tree
-    re-renders during any capture + per-card `setInterval`s); **(security
-    hardening)** SSRF scraper-branch dispatch (platform fetchers bypass `safe_get`;
-    substring routing); **(correctness)** semantic-search stale-response guard,
-    `/api/chat` `maxDuration`; **(a11y)** modal focus-trap/Escape + FAB `aria-label`;
-    **(polish)** light-theme solid `text-white`/`bg-white` in ConfirmDialog +
-    AddLinkForm Save; **(debt)** decompose `Feed.tsx` (2109 L) + `SettingsModal.tsx`
-    (1117 L) + extract `share_service.py` from `main.py` (2333 L), dedup the verbatim
-    RAG prompt across `answer_from_context`/`_stream` (+ fix the stream path citing
-    *all* cards when the `[[CITED:]]` marker is missing), fix/delete the dead-stale
-    `models.py` `LinkDocument`/`RelatedLink`, consolidate the two markdown stacks;
-    **(hygiene)** scrub owner PII from `models.py`/docs, add extension token-copy UI
-    + rename the stale "MyLinks" manifest, run the `firestore-rules-test` suite in
-    CI, `altool`→`-exportArchive`, filter the Xcode beta glob, lockstep the
-    App/ShareExt build numbers, ShareExt background-upload pending-record
-    reconciliation.
+    retry; admin `force_sweep_stuck_processing` twin). **✅ Fixed in the 2026-07-09
+    remediation (AUDIT.md):** Feed re-render storm — throttled banner ticks, memoized
+    `filteredLinks`/facet chain, `React.memo` Card/ListCard, one shared "now" tick —
+    plus the semantic-search stale-response guard and `/api/chat` `maxDuration`
+    (P-1/P-2/P-6); SSRF scraper-branch dispatch routed through `safe_get` with
+    hostname-anchored dispatch (S-1); the `[[CITED:]]` stream path citing *all* cards +
+    RAG-prompt dedup (C-1); modal Escape + FAB/desktop-search `aria-label` (A-11);
+    light-theme `text-white`/`bg-white` in ConfirmDialog + AddLinkForm Save (F-1);
+    dead-stale `models.py` `LinkDocument`/`RelatedLink` deleted (D-19); owner PII
+    scrubbed from `models.py`/docs (D-18); the stale "MyLinks" extension manifest
+    rebranded to Machina AI (I-3); `altool`→`-exportArchive`, Xcode beta-glob filter,
+    and App/ShareExt build-number lockstep in CI (I-1/I-2). **Still open:** decompose
+    `Feed.tsx` + `SettingsModal.tsx` (R-3/R-4) and extract `share_service.py` from
+    `main.py` (R-1); consolidate the two markdown stacks (A-7, needs on-device visual
+    QA); run the `firestore-rules-test` suite in CI (N-2a); add the extension
+    token-copy UI in Settings (F-2); ShareExt background-upload pending-record
+    reconciliation (P-7, device work).
 
 ### 🟢 P3 — product roadmap (post-launch)
 
@@ -411,9 +410,9 @@ The multi-user auth work is **fully written but not live**:
 - **Audit Batch 1:** SSRF redirect guard, PII log scrubbing (main.py), Twilio
   fail-closed, fetch timeouts, admin-token-gated debug endpoints, noopener,
   URL-scheme guards, sanitized errors, privacy manifest files created.
-- **Capture surface:** Share Extension (links/text/images + scan HUD), WhatsApp
-  (EN/HE + digest commands), web add/image, browser extension (`/extension`,
-  Chrome/Edge/Brave + Safari converter), iOS Shortcut (legacy, still works).
+- **Capture surface:** Share Extension (links/text/images + scan HUD), web
+  add/image, browser extension (`/extension`, Chrome/Edge/Brave + Safari
+  converter), iOS Shortcut (legacy, still works).
 - **Recall:** Ask Machina (hybrid RAG, streaming on web, chat history), semantic
   search, reminders, curated digest (6 modes), weekly synthesis, collections +
   public share pages (server-rendered OG), reading view + TTS.
@@ -463,12 +462,11 @@ naming Gemini is now table stakes. Second, the **SDK floor**: since April 2026
 submissions must be built against the current-generation SDK, and the CI pins
 `Xcode_16*` on `macos-14` — bump the runner before the store submission even
 though TestFlight accepted the July 2 build. Third, review logistics: a **demo
-account** in App Review notes, an explanation that WhatsApp capture requires an
-external Twilio number (so the reviewer doesn't fail it as broken), a hosted
-**privacy policy + support URL**, the App Privacy nutrition label matching
-Firebase + Google Sign-In data collection, and either iPad screenshots or flipping
-`TARGETED_DEVICE_FAMILY` from `"1,2"` to iPhone-only (recommended — the UI is
-phone-first). None of these are engineering-heavy; they are a focused week once
+account** in App Review notes, a hosted **privacy policy + support URL**, the App
+Privacy nutrition label matching Firebase + Google Sign-In data collection, and —
+already handled — `TARGETED_DEVICE_FAMILY = 1` (iPhone-only, set in every build
+config), so no iPad screenshots are needed. None of these are engineering-heavy;
+they are a focused week once
 the auth build is green. Realistic sequence: CI plugin fix → cutover → consent
 screen + policy URLs → device pass (§4 task 11) → submit.
 
@@ -559,7 +557,7 @@ paid spend.
 > This is the screenshot I keep sending friends: [screenshot: weekly synthesis]
 
 *Post 4 (CTA):*
-> Free on the App Store. Save from the share sheet, WhatsApp, or your browser.
+> Free on the App Store. Save from the share sheet or your browser.
 > Ask it anything you've saved.
 >
 > [App Store link] — reply with what you'd ask your bookmarks 👇
@@ -589,6 +587,24 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-09 — Orchestrated full-tree audit + remediation (`AUDIT.md` created at
+  repo root — the grounded findings + manual-item tracker).** WhatsApp/Twilio
+  removed end-to-end (backend, frontend, legal pages, docs) with a
+  `whatsapp → push` channel migration at read/send time so no reminder/digest
+  silently drops; SSRF platform-fetcher fix (all scraper branches through
+  `safe_get` + hostname-anchored dispatch); streaming-citation trust fix (missing
+  `[[CITED:]]` marker no longer attributes the answer to all retrieved cards);
+  semantic-search availability fix (`has_any_embeddings`); per-uid+IP rate limits +
+  input caps on paid endpoints; CI hardening (assert `aps-environment=production`
+  in the exported IPA, filter the Xcode beta glob, `altool`→`-exportArchive`
+  upload, Sign-in-with-Apple entitlement hard-fail); ShareExt cleanup + App/ShareExt
+  build-number lockstep (build 21); browser/Safari extension rebranded to
+  Machina AI; README rewritten to the real product; dead-code purge
+  (`InstallPWA.tsx`, template SVGs, dead `models.py`/`ai_service.py` symbols);
+  a11y + light-theme token fixes; Feed capture-time perf overhaul; owner PII
+  scrubbed from docs. Remaining manual/owner items (auth cutover, key rotation,
+  Twilio decommission, APNs steps, App Store Connect data entry, etc.) live in
+  `AUDIT.md` §9.
 - **2026-07-08 — Closed-state (feed) YouTube card thumbnail shortened + play icon
   removed (`eb332e4`; build 1063; Vercel live).** Follow-up: `Card.tsx` still used
   full `aspect-video` + a play overlay on the feed card while the open card was
@@ -1362,7 +1378,7 @@ exact-match, capped.
   1033** uploaded). On device: the Apple/Google login screen shows, **both**
   Continue-with-Apple and Continue-with-Google sign in successfully and load the
   feed, and Settings shows the account + Delete account. Firebase Auth has ONE
-  user for morhogeg@gmail.com (`jX2yUZpZtybHuKrAfkCQR0NEzj72`) with BOTH apple.com
+  user for the owner (`<owner-auth-uid>`) with BOTH apple.com
   and google.com providers linked (auto-linked by verified email) — so one uid
   covers both methods. **Deployed** `claim_workspace` + `delete_account` (they
   were never on prod — the live backend predated the auth work; deployed from the
@@ -1372,8 +1388,8 @@ exact-match, capped.
   reaches it (no execution logs; same class of WebView-callable failure that
   already forced share-config off its callable) — so the owner-claim never wrote,
   and the sign-in dead-ended on the restricted screen. **Workaround applied:**
-  manually wrote `authUids:[jX2yUZpZtybHuKrAfkCQR0NEzj72]` + `email` onto
-  `users/+16462440305` via the Admin SDK (exactly what the owner-claim does),
+  manually wrote `authUids:[<owner-auth-uid>]` + `email` onto
+  `users/<owner-phone-uid>` via the Admin SDK (exactly what the owner-claim does),
   which unblocked device sign-in. A proper fix (route claim through an HTTP
   endpoint with the `capacitor://localhost` CORS allowlist + bearer verify, like
   `/api/chat`) shipped the same session — **see the entry above.**

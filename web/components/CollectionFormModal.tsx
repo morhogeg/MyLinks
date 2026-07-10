@@ -46,7 +46,14 @@ export default function CollectionFormModal({
     // (visualViewport == full window there).
     const vp = useVisualViewport();
 
-    useEffect(() => {
+    // Reset the form fields when the sheet opens (or the target collection
+    // changes while open). Done as a render-time state adjustment rather than in
+    // an effect — React re-renders synchronously without committing the stale
+    // pass, matching the previous [isOpen, collection] effect exactly while
+    // avoiding a set-state-in-effect cascade.
+    const [resetKey, setResetKey] = useState<{ isOpen: boolean; collection: Collection | null | undefined }>({ isOpen, collection });
+    if (resetKey.isOpen !== isOpen || resetKey.collection !== collection) {
+        setResetKey({ isOpen, collection });
         if (isOpen) {
             setName(collection?.name ?? '');
             setDescription(collection?.description ?? '');
@@ -54,7 +61,7 @@ export default function CollectionFormModal({
             setColor(collection?.color ?? randomColorKey());
             setBusy(false);
         }
-    }, [isOpen, collection]);
+    }
 
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {

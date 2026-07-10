@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { memo, useRef, useState } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getDirection } from '@/lib/rtl';
@@ -34,7 +34,7 @@ const TRIGGER = 64;
  * category cue, M-P3). On touch, swipe right to delete or left to favourite;
  * tapping opens the link.
  */
-export default function ListCard({
+function ListCard({
     link,
     onOpenDetails,
     onStatusChange,
@@ -224,3 +224,7 @@ export default function ListCard({
         </div>
     );
 }
+
+// Memoized: with stable handler props from Feed, an unchanged row skips
+// re-rendering during unrelated feed updates.
+export default memo(ListCard);

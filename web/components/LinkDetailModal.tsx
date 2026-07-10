@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2, ChevronLeft } from 'lucide-react';
+import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2, ChevronLeft } from 'lucide-react';
 import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import { openExternal } from '@/lib/share';
@@ -93,24 +93,19 @@ export default function LinkDetailModal({
 }: LinkDetailModalProps) {
     const [isReading, setIsReading] = useState(false);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
-    const [editedCategory, setEditedCategory] = useState(link.category);
     const [now, setNow] = useState<number>(0);
     const [isAddingTag, setIsAddingTag] = useState(false);
-    // Timestamp (seconds) to seek the embedded video player to; null = start.
-    const [videoStart, setVideoStart] = useState<number | null>(null);
     const [imgFailed, setImgFailed] = useState(false);
-    useEffect(() => { setImgFailed(false); }, [link.id]);
+    // Reset the broken-image fallback when navigating to a different card. Done
+    // as a render-time state adjustment (React discards this pass and re-renders
+    // synchronously) rather than in an effect, avoiding a set-state-in-effect
+    // cascade while preserving the previous [link.id] reset behavior.
+    const [imgLinkId, setImgLinkId] = useState(link.id);
+    if (imgLinkId !== link.id) {
+        setImgLinkId(link.id);
+        setImgFailed(false);
+    }
     const hasValidImage = !!link.url && /^https?:\/\//.test(link.url);
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(() => {
-        setEditedCategory(link.category);
-    }, [link.category]);
-
-    // Reset the player seek when switching to a different link (related-link nav).
-    useEffect(() => {
-        setVideoStart(null);
-    }, [link.id]);
 
     // Scroll back to the top when the card changes. Opening a related card reuses
     // this same scroll container, so without this it would open scrolled down to
@@ -143,6 +138,39 @@ export default function LinkDetailModal({
     // the keys. No-op on desktop (visualViewport spans the full window).
     const vp = useVisualViewport();
 
+    // A11y: move focus into the dialog on open and restore it to the trigger on
+    // close. Keyed on isOpen only, so navigating between related cards (which
+    // keeps the modal open and only changes link.id) never steals focus.
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const restoreFocusRef = useRef<HTMLElement | null>(null);
+    useEffect(() => {
+        if (!isOpen) return;
+        restoreFocusRef.current = (document.activeElement as HTMLElement) ?? null;
+        const t = setTimeout(() => dialogRef.current?.focus({ preventScroll: true }), 0);
+        return () => {
+            clearTimeout(t);
+            restoreFocusRef.current?.focus?.({ preventScroll: true });
+        };
+    }, [isOpen]);
+
+    // A11y: Escape closes the topmost open layer first — the distraction-free
+    // reader, an inline category edit, or the add-tag input — otherwise it
+    // dismisses the whole modal (same as the X / backdrop). Desktop-web win;
+    // harmless in the native WKWebView where hardware keyboards are rare.
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== 'Escape') return;
+            e.preventDefault();
+            if (isReading) setIsReading(false);
+            else if (isEditingCategory) setIsEditingCategory(false);
+            else if (isAddingTag) setIsAddingTag(false);
+            else onClose();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [isOpen, isReading, isEditingCategory, isAddingTag, onClose]);
+
     if (!isOpen) return null;
 
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary) || (link.detailedSummary ? hasHebrew(link.detailedSummary) : false);
@@ -168,7 +196,7 @@ export default function LinkDetailModal({
         && !['facebook', 'screenshot', 'none'].includes(link.sourceName.trim().toLowerCase())
         ? link.sourceName : null;
 
-    const getTimeAgo = (timestamp: any, now: number): string => {
+    const getTimeAgo = (timestamp: number | string, now: number): string => {
         if (!timestamp || !now) return '...';
         let time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
         if (isNaN(time) || time <= 0) return isRtl ? 'לאחרונה' : 'recently';
@@ -209,10 +237,12 @@ export default function LinkDetailModal({
             />
 
             <div
+                ref={dialogRef}
+                tabIndex={-1}
                 role="dialog"
                 aria-modal="true"
                 aria-label="Link details"
-                className="relative bg-card border-0 sm:border border-white/10 w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-up"
+                className="relative bg-card border-0 sm:border border-white/10 w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-up focus:outline-none"
             >
                 {/* Header Actions — a single compact row: the item actions scroll
                     horizontally if they don't all fit (so nothing is ever clipped),
@@ -472,6 +502,7 @@ export default function LinkDetailModal({
                                                         e.stopPropagation();
                                                         setIsEditingCategory(true);
                                                     }}
+                                                    aria-label="Edit category"
                                                     className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1.5 -ms-1.5 hover:bg-white/5 rounded-md"
                                                 >
                                                     <Pencil className="w-3.5 h-3.5 text-text-muted/40 hover:text-text-muted" />

@@ -141,16 +141,21 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
     db = get_db()
     links_ref = db.collection("users").document(uid).collection("links")
 
-    # First, check if any links have embeddings
-    # This helps diagnose if the issue is missing embeddings vs. other problems
-    all_links = list(links_ref.limit(1).stream())
-    has_any_embeddings = False
-    if all_links:
-        sample_doc = all_links[0].to_dict()
-        has_any_embeddings = "embedding_vector" in sample_doc
-    
+    # Does this library have ANY embedded docs to search? Sampling a SINGLE
+    # arbitrary doc (the old `limit(1)`) was a correctness bug: if that one doc
+    # happened to lack `embedding_vector` (still processing, failed, or flagged
+    # needsEmbedding), semantic search AND ask_brain retrieval returned [] for
+    # the WHOLE user even when every other doc was fully embedded. Sample a
+    # handful instead and treat the library as searchable if ANY of them carries
+    # an embedding. This needs no new Firestore index — an
+    # `order_by('embedding_vector')` or a `where('embedding_vector', '!=', None)`
+    # would each require a scalar index the field doesn't have (it only has the
+    # vectorConfig index used by find_nearest), whereas a small scan does not.
+    sample_docs = list(links_ref.limit(10).stream())
+    has_any_embeddings = any("embedding_vector" in d.to_dict() for d in sample_docs)
+
     if not has_any_embeddings:
-        logger.warning(f"No embeddings found for user {uid}. Run backfill_embeddings.py to generate embeddings for existing links.")
+        logger.warning(f"No embeddings found for user {uid}. Use Settings → Connections → Rebuild (or the backfill_related_links admin endpoint) to generate embeddings for existing links.")
         # Don't fail the search, just return empty results with a helpful message
         return []
 

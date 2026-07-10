@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Collection, Link } from '@/lib/types';
-import { Check, Plus, X, Layers, FolderPlus } from 'lucide-react';
+import { Check, X, Layers, FolderPlus } from 'lucide-react';
 import { getColorStyleByKey } from '@/lib/colors';
 import {
     addLinkToCollection,

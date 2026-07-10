@@ -24,8 +24,8 @@ echo
 
 xcrun safari-web-extension-converter "$SRC" \
   --project-location "$OUT" \
-  --app-name "MyLinks" \
-  --bundle-identifier "com.mylinks.capture" \
+  --app-name "Machina Capture" \
+  --bundle-identifier "com.morhogeg.machina.capture" \
   --macos-only \
   --copy-resources \
   --no-open \

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from '@/lib/types';
 import { X, Sparkles, Calendar, Clock, Bell, BellOff, Loader2, Check } from 'lucide-react';
 import { updateLinkReminder } from '@/lib/storage';
@@ -51,6 +51,32 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
             }
         }
     }, [isOpen, link]);
+
+    // A11y: move focus into the dialog on open, restore it to the trigger on close.
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const restoreFocusRef = useRef<HTMLElement | null>(null);
+    useEffect(() => {
+        if (!isOpen) return;
+        restoreFocusRef.current = (document.activeElement as HTMLElement) ?? null;
+        const t = setTimeout(() => dialogRef.current?.focus({ preventScroll: true }), 0);
+        return () => {
+            clearTimeout(t);
+            restoreFocusRef.current?.focus?.({ preventScroll: true });
+        };
+    }, [isOpen]);
+
+    // A11y: Escape dismisses the modal via the same onClose the X / backdrop use,
+    // but respects the in-flight save guard (the backdrop is inert while saving).
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== 'Escape' || isSaving) return;
+            e.preventDefault();
+            onClose();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [isOpen, isSaving, onClose]);
 
     if (!isOpen) return null;
 
@@ -190,10 +216,12 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
             />
 
             <div
+                ref={dialogRef}
+                tabIndex={-1}
                 role="dialog"
                 aria-modal="true"
                 aria-label="Set reminder"
-                className="relative bg-card border border-white/10 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 safe-pt"
+                className="relative bg-card border border-white/10 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 safe-pt focus:outline-none"
             >
                 <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
                     <h2 className="text-lg font-bold text-text flex items-center gap-2">
@@ -203,6 +231,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     <button
                         onClick={onClose}
                         disabled={isSaving}
+                        aria-label="Close"
                         className="p-2 rounded-full hover:bg-white/5 transition-all disabled:opacity-50"
                     >
                         <X className="w-5 h-5 text-text-muted" />

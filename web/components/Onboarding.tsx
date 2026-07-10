@@ -1,13 +1,13 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Share, MessageCircle, Puzzle, ArrowRight } from 'lucide-react';
+import { Share, Puzzle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 /**
  * First-run welcome — shown exactly once, right after a fresh workspace is
  * created for a brand-new account (see AuthProvider). One screen, one job:
- * teach the three ways to capture, then get out of the way. Dismissal is
+ * teach the two ways to capture, then get out of the way. Dismissal is
  * persisted on the user doc (`onboarded: true`) with a localStorage fallback.
  *
  * Visual language mirrors LoginScreen (brand mark + gradient wordmark on
@@ -28,7 +28,6 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                 {/* Brand mark — same lockup as LoginScreen so the handoff from
                     sign-in feels like one continuous flow. */}
                 <div className="w-16 h-16 rounded-3xl overflow-hidden shadow-lg shadow-purple-500/20 ring-1 ring-white/15">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
                 </div>
 
@@ -40,17 +39,12 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
                     and answers from it when you ask.
                 </p>
 
-                {/* The three capture surfaces */}
+                {/* The capture surfaces */}
                 <div className="mt-8 w-full flex flex-col gap-3">
                     <CaptureRow
                         icon={<Share className="w-[18px] h-[18px]" />}
                         title="Share from any app"
                         body="Tap the share button in Safari, YouTube, X — anywhere — and pick Machina."
-                    />
-                    <CaptureRow
-                        icon={<MessageCircle className="w-[18px] h-[18px]" />}
-                        title="Send it on WhatsApp"
-                        body="Message a link to Machina on WhatsApp and it lands in your feed, analyzed."
                     />
                     <CaptureRow
                         icon={<Puzzle className="w-[18px] h-[18px]" />}

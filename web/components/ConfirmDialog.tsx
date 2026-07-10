@@ -85,7 +85,7 @@ export default function ConfirmDialog({
                         <AlertTriangle className="w-6 h-6" />
                     </div>
                     <div className="flex-1">
-                        <h3 className="text-xl font-bold text-white leading-tight">
+                        <h3 className="text-xl font-bold text-text leading-tight">
                             {title}
                         </h3>
                         <p className="mt-2 text-text-secondary text-sm leading-relaxed">
@@ -94,6 +94,7 @@ export default function ConfirmDialog({
                     </div>
                     <button
                         onClick={onClose}
+                        aria-label="Close"
                         className="p-1 hover:bg-white/5 rounded-full text-text-muted transition-colors"
                     >
                         <X className="w-5 h-5" />
@@ -112,7 +113,7 @@ export default function ConfirmDialog({
                         onClick={handleConfirm}
                         className={`flex-1 px-4 py-2.5 rounded-xl font-medium transition-colors ${variant === 'danger'
                                 ? 'bg-red-500 text-white hover:bg-red-600'
-                                : 'bg-white text-black hover:bg-gray-200'
+                                : 'bg-accent text-white hover:bg-accent-hover'
                             }`}
                     >
                         {confirmLabel}

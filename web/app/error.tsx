@@ -12,7 +12,6 @@ import { RefreshCw } from 'lucide-react';
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
     useEffect(() => {
         // Surface for debugging; the branded UI is what the user sees.
-        // eslint-disable-next-line no-console
         console.error('Render error boundary caught:', error);
     }, [error]);
 

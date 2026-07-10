@@ -64,7 +64,17 @@ jobs:
           cache-dependency-path: web/package-lock.json
 
       - name: Select latest Xcode
-        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
+        # Pick the newest Xcode 26 GA, never a beta: a beta toolchain can bake
+        # an unstable / rejected-at-review binary. Filter out any path matching
+        # "beta" (grep -vi beta) BEFORE sort -V, and hard-fail if nothing is left.
+        run: |
+          XCODE="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -vi beta | sort -V | tail -1)"
+          if [ -z "$XCODE" ]; then
+            echo "::error::No non-beta Xcode 26 found on the runner (only betas or none matched /Applications/Xcode_26*.app). Refusing to build with a beta toolchain."
+            exit 1
+          fi
+          echo "Selecting $XCODE"
+          sudo xcode-select -s "$XCODE"
 
       # Build number: strictly increasing, well above the manual builds (18).
       - name: Compute build number
@@ -290,13 +300,40 @@ jobs:
               exit 1
             }
           done
-          echo "$(codesign -d --entitlements :- Payload/App.app 2>/dev/null)" | grep -q "com.apple.developer.applesignin" \
-            || echo "::warning::App is missing the Sign in with Apple entitlement — required before the auth cutover build."
-          echo "$(codesign -d --entitlements :- Payload/App.app 2>/dev/null)" | grep -q "aps-environment" || {
-            echo "::error::App is missing the aps-environment entitlement — push notifications would silently never register. Refusing to upload."
+          # Sign in with Apple entitlement — HARD requirement. The app ships
+          # Google sign-in, so App Store Review Guideline 4.8 mandates Sign in
+          # with Apple as an equivalent login option; a build missing the
+          # entitlement is a guaranteed App Review rejection. Fail here, not at
+          # review.
+          APP_ENT="$(codesign -d --entitlements :- Payload/App.app 2>/dev/null)"
+          echo "$APP_ENT" | grep -q "com.apple.developer.applesignin" || {
+            echo "::error::App is missing the Sign in with Apple entitlement (com.apple.developer.applesignin) — App Review Guideline 4.8 requires it because the app offers Google sign-in, so this build would be rejected at review. Refusing to upload."
+            echo "$APP_ENT"
             exit 1
           }
-          echo "Entitlements OK: App Group present in app + extension; aps-environment present in app."
+
+          # aps-environment must be present AND equal to "production". The source
+          # App.entitlements deliberately says "development"; the App Store
+          # distribution profile is supposed to rewrite it to "production" during
+          # export — so this is the ground-truth check on the EXPORTED IPA. If the
+          # value is "development" (or missing), the app registers with the APNs
+          # SANDBOX and receives sandbox push tokens, which the PRODUCTION APNs
+          # servers cannot deliver to — push would silently never reach real
+          # TestFlight / App Store users. Extract the value via PlistBuddy and
+          # hard-fail on anything other than "production".
+          echo "$APP_ENT" | grep -q "aps-environment" || {
+            echo "::error::App is missing the aps-environment entitlement — push notifications would silently never register. Refusing to upload."
+            echo "$APP_ENT"
+            exit 1
+          }
+          echo "$APP_ENT" > "$RUNNER_TEMP/app-entitlements.plist"
+          APS_ENV="$(/usr/libexec/PlistBuddy -c 'Print :aps-environment' "$RUNNER_TEMP/app-entitlements.plist" 2>/dev/null || true)"
+          if [ "$APS_ENV" != "production" ]; then
+            echo "::error::aps-environment in the exported IPA is '${APS_ENV:-<empty/missing>}', expected 'production'. A 'development' value means the app gets APNs SANDBOX push tokens, which the production APNs servers cannot deliver to — push would silently never reach real TestFlight / App Store users. The App Store distribution profile is supposed to rewrite the source 'development' value to 'production' at export; it did not. Refusing to upload."
+            echo "$APP_ENT"
+            exit 1
+          fi
+          echo "Entitlements OK: App Group present in app + extension; Sign in with Apple present; aps-environment=production."
 
           # URL-scheme tripwire: the archived Info.plist must still carry BOTH the
           # custom "machina" scheme (Share Extension → "Open Machina") AND the
@@ -324,12 +361,42 @@ jobs:
           }
           echo "URL schemes OK: 'machina' + REVERSED_CLIENT_ID present in archived Info.plist."
 
+      # Upload via a SECOND xcodebuild -exportArchive pass with
+      # destination=upload — Apple's supported path, replacing the deprecated
+      # `xcrun altool --upload-app`. We deliberately do NOT fold the upload into
+      # the earlier "Export IPA" step: that step uses destination=export so the
+      # entitlement/URL-scheme tripwires above can crack the exported IPA and
+      # refuse to ship a bad build. This step re-runs -exportArchive against the
+      # SAME archive with destination=upload, which builds and uploads the IPA
+      # to App Store Connect in one operation — and only runs once the tripwires
+      # have passed. Same App Store Connect API key auth as the export step
+      # (cloud signing via -allowProvisioningUpdates + the -authenticationKey*
+      # flags); no altool, no Transporter.
       - name: Upload to TestFlight
+        working-directory: web/ios/App
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
-          IPA="$(ls "$RUNNER_TEMP"/export/*.ipa | head -1)"
-          echo "Uploading $IPA (build ${{ steps.bn.outputs.value }})"
-          xcrun altool --upload-app -f "$IPA" -t ios \
-            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+          echo "Uploading build ${{ steps.bn.outputs.value }} via xcodebuild -exportArchive (destination=upload)"
+          cat > "$RUNNER_TEMP/UploadOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>destination</key><string>upload</string>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportPath "$RUNNER_TEMP/upload" \
+            -exportOptionsPlist "$RUNNER_TEMP/UploadOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            -authenticationKeyPath ~/private_keys/AuthKey_${ASC_KEY_ID}.p8

@@ -49,7 +49,6 @@ export default function LinkScanProgress({ url, progress }: LinkScanProgressProp
                 <div className="absolute inset-0 p-4 flex flex-col gap-2.5">
                     <div className="flex items-center gap-2">
                         {faviconOk ? (
-                            // eslint-disable-next-line @next/next/no-img-element
                             <img
                                 src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`}
                                 alt=""

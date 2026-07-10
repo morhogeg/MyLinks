@@ -12,7 +12,7 @@ already-deployed iOS app**.
 ## 1. Where we're starting from
 
 - **Single-user prototype.** All data lives under `users/{uid}/…` where `uid` is
-  the owner's **phone number** (e.g. `+16462440305`) — that's the Firestore
+  the owner's **phone number** (e.g. `+15551234567`) — that's the Firestore
   document ID.
 - **No login.** `AuthProvider` queries `users` and uses the *first* doc it finds.
   `request.auth` is always `null`.
@@ -20,8 +20,9 @@ already-deployed iOS app**.
   requiring auth today would break every read/write.
 - **Backend trusts the client.** The `/api/*` Cloud Functions read `uid` straight
   out of the request body. Share ingestion authenticates with a per-user
-  **ingest token**; WhatsApp resolves the user by **phone number**. Both look the
-  user up by *field query*, not by document ID — this matters below.
+  **ingest token**, which looks the user up by *field query*, not by document ID
+  — this matters below. (A now-removed WhatsApp capture path used the same
+  field-query pattern, resolving the user by phone number.)
 - **`firebase.ts` already initializes `auth`** but deliberately **omits the
   popup/redirect resolver**: `getAuth()` eagerly loads Google's `gapi` iframe,
   which throws under Capacitor's `capacitor://` WKWebView origin and aborts app
@@ -54,8 +55,8 @@ The owner's data is keyed by **phone number**. A Google sign-in produces a
 - **(B) Keep the phone-number doc ID; link the Google account to it.** ← chosen.
   Store an `authUids: string[]` array (and `email`) on the user doc. On sign-in
   we resolve the data doc by `authUids array-contains <auth uid>`. **No data
-  migration**; WhatsApp (phone-field query) and ingest tokens (token-field query)
-  keep working unchanged, because they never depended on the document ID.
+  migration**; ingest tokens (token-field query) keep working unchanged, because
+  they never depended on the document ID.
 
 The price of (B) is that Firestore rules can't be a bare `request.auth.uid == uid`
 — they need a `get()` to check membership in `authUids` (see Phase 3). For a
@@ -147,9 +148,9 @@ match /users/{uid} {
 
 Also tighten `shared_collections` / `shared_cards` writes to
 `request.auth.uid`-owned (reads stay public for share links). Only ship this once
-**all** write paths (web, native, share ingest via Admin SDK which bypasses rules,
-WhatsApp via Admin SDK) are confirmed working under auth — otherwise reads/writes
-brick until the user redeploys.
+**all** write paths (web, native, share ingest via Admin SDK which bypasses rules)
+are confirmed working under auth — otherwise reads/writes brick until the user
+redeploys.
 
 ---
 

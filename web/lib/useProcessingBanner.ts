@@ -6,8 +6,8 @@ import type { AnalyzingState } from '@/components/AnalyzingBanner';
 
 /**
  * Drives the app-level "Analyzing…" banner for captures shared from OTHER apps
- * (iOS Share Extension, WhatsApp). Those are analyzed server-side, so there's
- * no real progress to read — but `process_link_background` writes a
+ * (the iOS Share Extension). Those are analyzed server-side, so there's no real
+ * progress to read — but `process_link_background` writes a
  * `status: 'processing'` card to the feed the instant a capture is queued and
  * flips it to a normal status when analysis lands. We watch those cards and
  * synthesize a forward-moving percentage so the user gets the same reassurance
@@ -23,28 +23,42 @@ const CEILING = 95;
 
 export function useProcessingBanner(links: Link[]): AnalyzingState | null {
     const firstSeen = useRef<Map<string, number>>(new Map());
-    const [, tick] = useState(0);
+    // `now` advances once a second while a capture is in flight (down from a
+    // 200 ms tick), so the banner ramp re-renders the feed ≤1×/s instead of
+    // 5×/s. The clock is read inside effects, never during render, keeping the
+    // render pure (no react-hooks/purity violation).
+    const [now, setNow] = useState(0);
     const wasActive = useRef(false);
 
     const processing = links.filter((l) => l.status === 'processing');
     const active = processing.length > 0;
 
-    // Prune first-seen entries for cards that are no longer processing, and
-    // stamp newly-seen ones. Uses performance.now for a monotonic clock that
-    // doesn't depend on the disallowed Date.now in some contexts.
-    const now = typeof performance !== 'undefined' ? performance.now() : 0;
-    const liveIds = new Set(processing.map((l) => l.id));
-    for (const id of firstSeen.current.keys()) {
-        if (!liveIds.has(id)) firstSeen.current.delete(id);
-    }
-    for (const l of processing) {
-        if (!firstSeen.current.has(l.id)) firstSeen.current.set(l.id, now);
-    }
+    // A stable key for "the set of processing cards" so the bookkeeping effect
+    // only re-runs when that set actually changes.
+    const liveKey = processing.map((l) => l.id).sort().join(',');
 
-    // While anything is processing, re-render on an interval so the ramp moves.
+    // Prune first-seen entries for cards that are no longer processing, and
+    // stamp newly-seen ones. Done in an effect (not during render) so render
+    // stays pure. Uses performance.now for a monotonic clock, falling back to
+    // Date.now where performance is unavailable.
+    useEffect(() => {
+        const t = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        const liveIds = new Set(processing.map((l) => l.id));
+        for (const id of firstSeen.current.keys()) {
+            if (!liveIds.has(id)) firstSeen.current.delete(id);
+        }
+        for (const l of processing) {
+            if (!firstSeen.current.has(l.id)) firstSeen.current.set(l.id, t);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [liveKey]);
+
+    // While anything is processing, snap `now` to the clock once a second so the
+    // ramp moves forward. The banner's own CSS width transition smooths the step.
     useEffect(() => {
         if (!active) return;
-        const iv = setInterval(() => tick((n) => n + 1), 200);
+        const read = () => setNow(typeof performance !== 'undefined' ? performance.now() : Date.now());
+        const iv = setInterval(read, 1000);
         return () => clearInterval(iv);
     }, [active]);
 

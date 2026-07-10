@@ -1,8 +1,5 @@
 import UIKit
-import Social
-import MobileCoreServices
 import ImageIO
-import UserNotifications
 
 /// Share Extension entry point. Pulls the shared item (link, text, or image)
 /// out of the share sheet, reads the user's ingest endpoint + token from the
@@ -49,6 +46,10 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     // hand the upload to a *background* session that the system finishes for us.
     private var backgroundSession: URLSession?
     private var responseData = Data()
+    // The temp JSON body handed to the background upload task. Kept so we can
+    // delete it once the transfer completes (didCompleteWithError); the file must
+    // survive until then because the background daemon reads it after we dismiss.
+    private var uploadTempURL: URL?
 
     // MARK: Image scan HUD
     private let scanContainer = UIView()          // rounded card holding the preview + bar
@@ -85,9 +86,34 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = UIColor.black.withAlphaComponent(0.25)
+        sweepStaleShareTempFiles()
         setupGenericUI()
         setupScanUI()
         handleShare()
+    }
+
+    /// Best-effort sweep of orphaned upload bodies. Each share writes a
+    /// `machina-share-<UUID>.json` temp file that's normally deleted once the
+    /// background upload completes (didCompleteWithError); if the extension was
+    /// killed before that, the file lingers. Delete any older than ~1 day so they
+    /// don't accumulate. Non-fatal — any failure is ignored.
+    private func sweepStaleShareTempFiles() {
+        let fm = FileManager.default
+        let tmpDir = fm.temporaryDirectory
+        let cutoff = Date().addingTimeInterval(-24 * 60 * 60)
+        guard let entries = try? fm.contentsOfDirectory(
+            at: tmpDir,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        ) else { return }
+        for url in entries where url.lastPathComponent.hasPrefix("machina-share-")
+            && url.pathExtension == "json" {
+            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate
+            if let modified = modified, modified < cutoff {
+                try? fm.removeItem(at: url)
+            }
+        }
     }
 
     override func viewDidLayoutSubviews() {
@@ -868,6 +894,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             showResult("Couldn't prepare upload", success: false)
             return
         }
+        uploadTempURL = tmpURL
 
         // Background session — append a UUID to the identifier so re-invocations of
         // the extension never collide on an already-in-use identifier. The shared
@@ -921,6 +948,13 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             } else {
                 showResult("Couldn't save (\(code))", success: false)
             }
+        }
+        // The background daemon has read the body file by the time didComplete
+        // fires, so it's safe to delete now (best-effort — a leftover is swept at
+        // the next launch anyway).
+        if let tmp = uploadTempURL {
+            try? FileManager.default.removeItem(at: tmp)
+            uploadTempURL = nil
         }
         // Let the system tear the session down once it's done with it.
         session.finishTasksAndInvalidate()

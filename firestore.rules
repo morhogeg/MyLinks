@@ -7,7 +7,7 @@ service cloud.firestore {
     // SECURITY — ACCEPTED RESIDUAL RISK (auth rollout in progress):
     // Phase 1 (web Google Sign-In) is LIVE, but these rules stay open on purpose.
     // The data doc is keyed by phone number, NOT the Auth uid, and the native iOS
-    // shell + share ingest + WhatsApp paths still write without a user token.
+    // shell + share ingest paths still write without a user token.
     // Locking now would brick them. Cloud Functions are hardened (App Check +
     // pinned CORS + rate limiting), so the realistic abuse surface is reduced.
     //

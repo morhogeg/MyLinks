@@ -1,13 +1,12 @@
 """
 SecondBrain Cloud Functions — Entry Point
-Handles WhatsApp webhook ingestion and AI processing.
+Handles link ingestion (share sheet / web) and AI processing.
 
 All business logic is extracted into dedicated modules:
 - scraper.py: URL content extraction
 - ai_service.py: Gemini AI analysis & embeddings
 - link_service.py: Firestore user/link operations
 - reminder_service.py: Spaced repetition reminders
-- whatsapp_handler.py: WhatsApp messaging via Twilio
 - search.py: Semantic vector search
 - graph_service.py: Knowledge graph / related links
 - db.py: Shared Firestore client singleton
@@ -31,22 +30,31 @@ from google.cloud.firestore_v1.vector import Vector
 
 # Internal modules
 from db import get_db
-from models import WebhookPayload, LinkStatus, ReminderStatus
+from models import LinkStatus, ReminderStatus
 from ai_service import GeminiService, AnalysisError
 from link_service import (
-    find_user_by_phone, save_link_to_firestore, get_user_tags, is_hebrew,
+    save_link_to_firestore, get_user_tags, is_hebrew,
     ensure_ingest_token, find_user_by_ingest_token, link_exists_for_url,
     pending_exists_for_url, find_data_uid_by_auth_uid, delete_user_data,
     create_workspace,
 )
-from reminder_service import handle_reminder_intent, set_reminder, calculate_next_reminder, run_reminder_check, format_local_time
+from reminder_service import handle_reminder_intent, set_reminder, run_reminder_check, format_local_time
 from graph_service import GraphService
-# NOTE: `scraper` (pulls youtube_transcript_api) and `whatsapp_handler` (pulls
-# the Twilio SDK) are imported lazily inside the functions that use them. Both
-# are heavy and irrelevant to the hot image-analysis path, so deferring them
-# keeps cold starts lighter for functions like analyze_image.
+# NOTE: `scraper` is imported lazily inside the functions that actually scrape
+# URLs, not at module top-level. That keeps it (and the scraping helpers it
+# pulls in, e.g. BeautifulSoup) off the import path of functions that never
+# scrape — like the hot image-analysis path in analyze_image — so their cold
+# starts stay lighter.
 from search import sync_link_embedding, search_links, perform_search_logic
 from rate_limit import check_rate_limit, client_ip
+# Public share-page subsystem (renderers + publish/unpublish logic). The three
+# HTTP endpoints (publish_share_http, unpublish_share_http, share_page) stay in
+# this file — Firebase discovers deployables by scanning main.py — and call into
+# these helpers. share_service imports only db + stdlib (never main → no cycle).
+from share_service import (
+    _publish_share_logic, _unpublish_share_logic,
+    _render_shared_card, _render_shared_collection, _share_not_found_html,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -142,15 +150,6 @@ def _server_error(headers: dict = None, exc: Exception = None,
     return _error_response(message, status, headers)
 
 
-def _mask_phone(value) -> str:
-    """Redact a phone number for logging — keep only the last 4 digits.
-
-    Inbound WhatsApp numbers are PII; never log them in the clear.
-    """
-    s = str(value or "")
-    return f"***{s[-4:]}" if len(s) >= 4 else "***"
-
-
 def _verify_bearer(req):
     """Verify the Firebase ID token from the Authorization: Bearer header.
 
@@ -221,15 +220,72 @@ MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
 
 # Per-bucket rate limits: (max_requests, window_seconds). The analyze / image /
 # chat buckets are deliberately tight because each call spends money on Gemini.
+# The `*-uid` twins mirror their IP buckets so paid endpoints are limited BOTH
+# per source IP (catches anonymous/rotating-IP abuse and shared NAT) AND per
+# resolved workspace uid (a single account can't just rotate IPs to bypass the
+# limit). See _rate_limited call sites in analyze_link / analyze_image / ask_brain.
 _RATE_LIMITS = {
     "analyze": (30, 3600),
+    "analyze-uid": (30, 3600),
     "image": (30, 3600),
+    "image-uid": (30, 3600),
     "chat": (60, 3600),
+    "chat-uid": (60, 3600),
     "article": (120, 3600),
     "share": (120, 3600),
-    "whatsapp": (60, 60),
     "device_token": (30, 3600),
 }
+
+# Input caps for client-supplied fields that flow into the Gemini prompt, so a
+# hostile/oversized payload can't inflate prompt cost or widen the injection
+# surface. Enforced by _sanitize_history / _sanitize_tags below.
+MAX_HISTORY_ITEMS = 6            # ai_service._build_rag_prompt uses the last 6 turns
+MAX_HISTORY_CONTENT_LENGTH = 4000
+MAX_TAGS = 50
+MAX_TAG_LENGTH = 60
+
+
+def _sanitize_history(history) -> list:
+    """Clamp client-supplied chat history before it reaches the Gemini prompt.
+
+    ai_service._build_rag_prompt concatenates the last few turns verbatim, so
+    unbounded history items are both a cost and a prompt-injection surface. Keep
+    only the last MAX_HISTORY_ITEMS turns, drop anything that isn't a dict,
+    whitelist the role to user/assistant (default user), and truncate each
+    turn's content to MAX_HISTORY_CONTENT_LENGTH chars. Non-list → [].
+    """
+    if not isinstance(history, list):
+        return []
+    cleaned = []
+    for item in history[-MAX_HISTORY_ITEMS:]:
+        if not isinstance(item, dict):
+            continue
+        role = item.get("role")
+        if role not in ("user", "assistant"):
+            role = "user"
+        content = item.get("content")
+        if not isinstance(content, str):
+            content = "" if content is None else str(content)
+        cleaned.append({"role": role, "content": content[:MAX_HISTORY_CONTENT_LENGTH]})
+    return cleaned
+
+
+def _sanitize_tags(tags) -> list:
+    """Validate client-supplied existingTags before they reach the Gemini prompt.
+
+    The tags are concatenated into the analysis prompt, so cap the count and per-
+    tag length and drop anything that isn't a non-empty string. Keep at most
+    MAX_TAGS items, coerce each to a str, truncate to MAX_TAG_LENGTH chars, drop
+    empties. Anything that isn't a list → [].
+    """
+    if not isinstance(tags, list):
+        return []
+    cleaned = []
+    for tag in tags[:MAX_TAGS]:
+        s = (tag if isinstance(tag, str) else str(tag)).strip()[:MAX_TAG_LENGTH]
+        if s:
+            cleaned.append(s)
+    return cleaned
 
 
 def _rate_limited(bucket: str, identity: str, headers: dict = None):
@@ -384,6 +440,57 @@ def _apply_youtube_metadata(link_data: dict, yt_meta: dict, analysis: dict, minu
     meta["speakers"] = analysis.get("speakers", [])
 
 
+# Sentinel marking a link_data field the caller wants OMITTED entirely (distinct
+# from passing None, which would still write the key). Used to preserve the
+# per-call-site drift in `relatedLinks` / `confidence` / `keyEntities` presence.
+_OMIT = object()
+
+
+def _build_link_data(*, url, title, summary, detailed_summary, source_type,
+                     source_name, original_title, estimated_read_time, analysis,
+                     related_links=_OMIT, confidence=_OMIT, key_entities=_OMIT):
+    """Build the link document shared by analyze_link / analyze_image /
+    process_link_background.
+
+    The three call sites had drifted near-identical copies of this dict; this is
+    the single builder. Fields that legitimately differ per site (url, title,
+    summary/detailedSummary defaults, sourceType/sourceName, the metadata
+    originalTitle/estimatedReadTime) are passed in already-computed. The KNOWN
+    drift is preserved verbatim rather than reconciled — `confidence` is passed
+    per site (0.8 for analyze_link, 0.9 for analyze_image) and OMITTED for the
+    background pipeline; `relatedLinks` and `keyEntities` are likewise present or
+    omitted via the `_OMIT` sentinel to keep each site's exact output. Embedding
+    handling (embedding_vector / needsEmbedding) stays at the background call
+    site since only it writes those.
+    """
+    data = {
+        "url": url,
+        "title": title,
+        "summary": summary,
+        "detailedSummary": detailed_summary,
+        "tags": analysis.get("tags", []),
+        "category": analysis.get("category", "General"),
+        "status": LinkStatus.UNREAD.value,
+        "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+        "language": analysis.get("language", "en"),
+        "metadata": {
+            "originalTitle": original_title,
+            "estimatedReadTime": estimated_read_time,
+            "actionableTakeaway": analysis.get("actionableTakeaway"),
+        },
+        "concepts": analysis.get("concepts", []),
+        "sourceType": source_type,
+        "sourceName": source_name,
+    }
+    if related_links is not _OMIT:
+        data["relatedLinks"] = related_links
+    if confidence is not _OMIT:
+        data["confidence"] = confidence
+    if key_entities is not _OMIT:
+        data["keyEntities"] = key_entities
+    return data
+
+
 def _card_source_name(c: dict):
     """Best byline for a card: the YouTube channel when present, else the stored
     publisher/source name. Mirrors the web card so Ask citations show the same
@@ -509,7 +616,6 @@ def debug_status(req: https_fn.Request) -> https_fn.Response:
             "environment": {
                 "project": os.environ.get("GCLOUD_PROJECT"),
                 "has_gemini_key": bool(os.environ.get("GEMINI_API_KEY")),
-                "has_twilio_sid": bool(os.environ.get("TWILIO_ACCOUNT_SID")),
             },
             "system_check": {
                 "pending_tasks_count": len(pending_data),
@@ -561,7 +667,7 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             return _error_response("Invalid JSON body", 400, headers)
 
         url = data.get('url')
-        existing_tags = data.get('existingTags', [])
+        existing_tags = _sanitize_tags(data.get('existingTags'))
 
         if not url:
             return _error_response("URL is required", 400, headers)
@@ -573,6 +679,13 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         uid, auth_err = _authed_uid(req, headers, data.get('uid'))
         if auth_err:
             return auth_err
+
+        # Second rate-limit bucket, keyed per workspace uid (the IP bucket above
+        # can't stop a single account rotating IPs). Only when a uid resolves.
+        if uid:
+            rl = _rate_limited("analyze-uid", uid, headers)
+            if rl:
+                return rl
 
         logger.info(f"Analyzing URL synchronously: {url}")
 
@@ -612,34 +725,26 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         else:
             estimated_time = _estimate_read_time(scraped.get("text", ""))
 
-        link_data = {
-            "url": url,
-            "title": analysis.get("title", scraped.get("title", "Untitled")),
-            "summary": analysis.get("summary", ""),
-            "detailedSummary": analysis.get("detailedSummary", ""),
-            "tags": analysis.get("tags", []),
-            "category": analysis.get("category", "General"),
-            "status": LinkStatus.UNREAD.value,
-            "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
-            "language": analysis.get("language", "en"),
-            "metadata": {
-                "originalTitle": scraped.get("title", ""),
-                "estimatedReadTime": estimated_time,
-                "actionableTakeaway": analysis.get("actionableTakeaway")
-            },
-            "concepts": analysis.get("concepts", []),
-            # NB: no `embedding_vector` here on purpose. It used to be returned
-            # and round-tripped through the client, which stored it as a plain
-            # list — invisible to `find_nearest`. The `sync_link_embedding`
-            # Firestore trigger now owns the embedding server-side (writes a real
-            # Vector on create AND on the retry update). The `embedding` computed
-            # above is still used locally for `find_related_links`.
-            "relatedLinks": related_links,
-            "sourceType": "youtube" if is_youtube else "web",
-            "sourceName": scraped.get("source_name") or analysis.get("sourceName"),
-            "confidence": 0.8,
-            "keyEntities": []
-        }
+        # NB: no `embedding_vector` here on purpose. It used to be returned and
+        # round-tripped through the client, which stored it as a plain list —
+        # invisible to `find_nearest`. The `sync_link_embedding` Firestore trigger
+        # now owns the embedding server-side (writes a real Vector on create AND on
+        # the retry update). The `embedding` computed above is still used locally
+        # for `find_related_links`.
+        link_data = _build_link_data(
+            url=url,
+            title=analysis.get("title", scraped.get("title", "Untitled")),
+            summary=analysis.get("summary", ""),
+            detailed_summary=analysis.get("detailedSummary", ""),
+            source_type="youtube" if is_youtube else "web",
+            source_name=scraped.get("source_name") or analysis.get("sourceName"),
+            original_title=scraped.get("title", ""),
+            estimated_read_time=estimated_time,
+            analysis=analysis,
+            related_links=related_links,
+            confidence=0.8,
+            key_entities=[],
+        )
 
         # Mirror the background pipeline's YouTube enrichment so web-added
         # videos get the same rich metadata (channel, thumbnail, highlights).
@@ -740,8 +845,18 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         uid, auth_err = _authed_uid(req, headers, data.get('uid'))
         if auth_err:
             return auth_err
+
+        # Second rate-limit bucket, keyed per workspace uid (the IP bucket above
+        # can't stop a single account rotating IPs). Only when a uid resolves.
+        if uid:
+            rl = _rate_limited("chat-uid", uid, headers)
+            if rl:
+                return rl
+
         question = (data.get('question') or '').strip()
-        history = data.get('history') or []
+        # Clamp client-supplied history before it reaches the Gemini prompt
+        # (last few turns, per-item length cap, roles whitelisted).
+        history = _sanitize_history(data.get('history'))
         # Opt-in token streaming (SSE). Only honored for POST so the JSON path is
         # 100% unchanged when not explicitly requested.
         want_stream = bool(data.get('stream')) and req.method == 'POST'
@@ -924,12 +1039,19 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
 
         image_url = data.get('imageUrl')
         image_b64 = data.get('imageBytes')
-        existing_tags = data.get('existingTags', [])
+        existing_tags = _sanitize_tags(data.get('existingTags'))
         # Identity: prefer the verified ID token; falls back to the body uid only
         # while REQUIRE_AUTH is off (see _authed_uid).
         uid, auth_err = _authed_uid(req, headers, data.get('uid'))
         if auth_err:
             return auth_err
+
+        # Second rate-limit bucket, keyed per workspace uid (the IP bucket above
+        # can't stop a single account rotating IPs). Only when a uid resolves.
+        if uid:
+            rl = _rate_limited("image-uid", uid, headers)
+            if rl:
+                return rl
 
         if not image_url and not image_b64:
             return _error_response("imageBytes or imageUrl is required", 400, headers)
@@ -988,27 +1110,19 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
                 logger.error(f"Failed to store screenshot: {e}")
 
         # 3. Construct Link Object
-        link_data = {
-            "url": stored_url,
-            "title": analysis.get("title", "Image Analysis"),
-            "summary": analysis.get("summary", ""),
-            "detailedSummary": analysis.get("detailedSummary", ""),
-            "tags": analysis.get("tags", []),
-            "category": analysis.get("category", "General"),
-            "status": LinkStatus.UNREAD.value,
-            "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
-            "language": analysis.get("language", "en"),
-            "metadata": {
-                "originalTitle": "Image Upload",
-                "estimatedReadTime": 1,
-                "actionableTakeaway": analysis.get("actionableTakeaway")
-            },
-            "concepts": analysis.get("concepts", []),
-            "sourceType": "image",
-            "sourceName": analysis.get("sourceName") or "Screenshot",
-            "confidence": 0.9,
-            "keyEntities": []
-        }
+        link_data = _build_link_data(
+            url=stored_url,
+            title=analysis.get("title", "Image Analysis"),
+            summary=analysis.get("summary", ""),
+            detailed_summary=analysis.get("detailedSummary", ""),
+            source_type="image",
+            source_name=analysis.get("sourceName") or "Screenshot",
+            original_title="Image Upload",
+            estimated_read_time=1,
+            analysis=analysis,
+            confidence=0.9,
+            key_entities=[],
+        )
 
         return https_fn.Response(
             json.dumps({"success": True, "link": link_data}),
@@ -1067,7 +1181,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
         # Image share path: the native Share Extension can send a raw image
         # (base64) when the user shares a photo/screenshot rather than a link.
         # Store it, then queue an image job — the background pipeline already
-        # knows how to analyse images (isImage=True), same as the WhatsApp flow.
+        # knows how to analyse images (isImage=True).
         image_b64 = data.get('image') or data.get('imageBytes')
         if image_b64:
             try:
@@ -1520,386 +1634,11 @@ def unregister_device_token_http(req: https_fn.Request) -> https_fn.Response:
 # ─────────────────────────────────────────────
 #
 # The web app is a static export, so a client-rendered /s?id=… page can't give
-# link-preview crawlers (WhatsApp, iMessage, Slack, X…) per-card OpenGraph tags —
+# link-preview crawlers (iMessage, Slack, X…) per-card OpenGraph tags —
 # they don't run JS, so every shared link previewed as the generic app. These
 # functions OWN the /s (single card) and /c (collection) routes via Hosting
 # rewrites and return real HTML: correct og:title/description/image for crawlers,
 # and a readable card for humans with no JS required.
-
-def _esc(value) -> str:
-    """HTML-escape a value for safe interpolation (handles None)."""
-    return _html.escape(str(value), quote=True) if value is not None else ""
-
-
-# Inline markdown patterns, applied AFTER the whole string is HTML-escaped.
-# Order matters: bold (**/__) before italic (*/_) so we don't eat the inner stars.
-_MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^\s)]+)\)")
-_MD_BOLD_RE = re.compile(r"(?<!\*)\*\*(?!\s)(.+?)(?<!\s)\*\*(?!\*)|(?<!_)__(?!\s)(.+?)(?<!\s)__(?!_)")
-# Note: no \w lookbehind on the * form, so emphasis works flush against
-# letters in RTL scripts (e.g. Hebrew "ו*נטוי*"). Bold (**) runs first, and
-# the (?<!\*)/(?!\*) guards keep us from eating bold's leftover stars. The _
-# form keeps word-boundary guards to avoid mangling snake_case identifiers.
-_MD_ITALIC_RE = re.compile(r"(?<!\*)\*(?!\s)([^*]+?)(?<!\s)\*(?!\*)|(?<![_\w])_(?!\s)(.+?)(?<!\s)_(?![_\w])")
-_MD_CODE_RE = re.compile(r"`([^`]+)`")
-
-
-def _md_inline(text: str) -> str:
-    """Render inline markdown for a SINGLE already-HTML-escaped line.
-
-    Input MUST be pre-escaped (see _md_to_html). We only translate a fixed set
-    of markdown markers into a fixed set of safe tags, so no untrusted text ever
-    becomes markup. Links are restricted to http(s) and rel-hardened.
-    """
-    # Inline code first so markers inside backticks aren't reinterpreted.
-    text = _MD_CODE_RE.sub(lambda m: f"<code>{m.group(1)}</code>", text)
-
-    def _link(m):
-        label, href = m.group(1), m.group(2)
-        return f'<a href="{href}" rel="noopener nofollow" target="_blank">{label}</a>'
-
-    text = _MD_LINK_RE.sub(_link, text)
-    text = _MD_BOLD_RE.sub(lambda m: f"<strong>{m.group(1) or m.group(2)}</strong>", text)
-    text = _MD_ITALIC_RE.sub(lambda m: f"<em>{m.group(1) or m.group(2)}</em>", text)
-    return text
-
-
-def _md_to_html(value) -> str:
-    """Convert stored markdown to safe HTML for the public share pages.
-
-    XSS-safe by construction: every character of the user/AI-authored text is
-    HTML-escaped FIRST (via _esc, line-by-line), and only then do we apply a
-    small, fixed grammar (headings, bullet/numbered lists, blockquotes, bold,
-    italic, inline code, http(s) links, paragraphs, line breaks). The escaped
-    text can never reopen a tag, so no markup injection is possible.
-    """
-    if not value:
-        return ""
-    text = str(value).replace("\r\n", "\n").replace("\r", "\n")
-    lines = text.split("\n")
-
-    html_parts: list[str] = []
-    list_stack: list[str] = []  # "ul" or "ol" currently open
-    para: list[str] = []
-
-    def _flush_para():
-        if para:
-            html_parts.append(f'<p dir="auto">{"<br>".join(para)}</p>')
-            para.clear()
-
-    def _close_lists():
-        while list_stack:
-            html_parts.append(f"</{list_stack.pop()}>")
-
-    for raw in lines:
-        line = raw.rstrip()
-        stripped = line.strip()
-
-        if not stripped:
-            _flush_para()
-            _close_lists()
-            continue
-
-        # Headings: ## .. ###### (h1 reserved for the card title).
-        m = re.match(r"^(#{1,6})\s+(.*)$", stripped)
-        if m:
-            _flush_para()
-            _close_lists()
-            level = min(max(len(m.group(1)), 2), 4)  # clamp to h2–h4
-            html_parts.append(
-                f'<h{level} dir="auto">{_md_inline(_esc(m.group(2).strip()))}</h{level}>'
-            )
-            continue
-
-        # Blockquote.
-        m = re.match(r"^>\s?(.*)$", stripped)
-        if m:
-            _flush_para()
-            _close_lists()
-            html_parts.append(
-                f'<blockquote dir="auto">{_md_inline(_esc(m.group(1).strip()))}</blockquote>'
-            )
-            continue
-
-        # Unordered list item: - / * / • bullet.
-        m = re.match(r"^[-*•]\s+(.*)$", stripped)
-        if m:
-            _flush_para()
-            if list_stack[-1:] != ["ul"]:
-                _close_lists()
-                list_stack.append("ul")
-                html_parts.append("<ul>")
-            html_parts.append(
-                f'<li dir="auto">{_md_inline(_esc(m.group(1).strip()))}</li>'
-            )
-            continue
-
-        # Ordered list item: 1. / 1)
-        m = re.match(r"^\d+[.)]\s+(.*)$", stripped)
-        if m:
-            _flush_para()
-            if list_stack[-1:] != ["ol"]:
-                _close_lists()
-                list_stack.append("ol")
-                html_parts.append("<ol>")
-            html_parts.append(
-                f'<li dir="auto">{_md_inline(_esc(m.group(1).strip()))}</li>'
-            )
-            continue
-
-        # Plain text → accumulate into the current paragraph.
-        _close_lists()
-        para.append(_md_inline(_esc(stripped)))
-
-    _flush_para()
-    _close_lists()
-    return "".join(html_parts)
-
-
-def _share_card_image(card: dict) -> str:
-    """Best preview image for a card; falls back to the Machina icon."""
-    thumb = card.get("thumbnailUrl")
-    if thumb and str(thumb).startswith("http"):
-        return thumb
-    url = card.get("url") or ""
-    # Image/screenshot cards store the (public) image itself as the url.
-    if card.get("sourceType") == "image" and url.startswith("http"):
-        return url
-    return f"{APP_URL}/icon-512.png"
-
-
-def _share_html_shell(*, title: str, description: str, image: str, url: str, body: str) -> str:
-    """Wrap rendered body in a full HTML doc with OpenGraph + Twitter cards."""
-    t, d = _esc(title), _esc(description)
-    img, u = _esc(image), _esc(url)
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>{t} · Machina</title>
-<meta name="description" content="{d}">
-<meta property="og:type" content="article">
-<meta property="og:site_name" content="Machina">
-<meta property="og:title" content="{t}">
-<meta property="og:description" content="{d}">
-<meta property="og:image" content="{img}">
-<meta property="og:url" content="{u}">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="{t}">
-<meta name="twitter:description" content="{d}">
-<meta name="twitter:image" content="{img}">
-<link rel="icon" href="{_esc(APP_URL)}/icon-192.png">
-<style>
-  :root {{ color-scheme: dark; }}
-  * {{ box-sizing: border-box; }}
-  body {{ margin:0; background:#070708; color:#ededed;
-         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-         line-height:1.6; }}
-  .wrap {{ max-width:640px; margin:0 auto; padding:32px 20px 64px; }}
-  .brand {{ display:flex; align-items:center; gap:10px; margin-bottom:28px; }}
-  .brand img {{ width:32px; height:32px; border-radius:8px; }}
-  .brand span {{ font-weight:600; letter-spacing:.2px; }}
-  .badge {{ display:inline-block; font-size:12px; font-weight:700; letter-spacing:.6px;
-           text-transform:uppercase; color:#c4b5fd; background:rgba(139,92,246,.14);
-           padding:5px 10px; border-radius:999px; margin-bottom:16px; }}
-  h1 {{ font-size:26px; line-height:1.25; margin:0 0 16px; }}
-  .hero {{ width:100%; border-radius:14px; margin:8px 0 22px; display:block; }}
-  .summary {{ font-size:17px; color:#d4d4d8; }}
-  .detail {{ margin-top:16px; color:#a1a1aa; }}
-  /* Rendered markdown blocks (summary / detailed / collection items). */
-  .md > :first-child {{ margin-top:0; }}
-  .md > :last-child {{ margin-bottom:0; }}
-  .md p {{ margin:0 0 12px; }}
-  .md h2 {{ font-size:20px; line-height:1.3; margin:22px 0 10px; }}
-  .md h3 {{ font-size:17px; line-height:1.3; margin:18px 0 8px; }}
-  .md h4 {{ font-size:15px; line-height:1.3; margin:16px 0 6px; color:#e4e4e7; }}
-  .md ul, .md ol {{ margin:8px 0 14px; padding-inline-start:22px; }}
-  .md li {{ margin:4px 0; }}
-  .md strong {{ color:#fafafa; font-weight:700; }}
-  .md em {{ font-style:italic; }}
-  .md code {{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.9em;
-             background:#161618; border:1px solid #262629; border-radius:6px; padding:1px 5px; }}
-  .md blockquote {{ margin:12px 0; padding:4px 0 4px 14px; border-inline-start:3px solid #3a3a3f;
-                   color:#a1a1aa; }}
-  .md a {{ color:#c4b5fd; }}
-  .tags {{ margin:22px 0 0; display:flex; flex-wrap:wrap; gap:8px; }}
-  .tag {{ font-size:13px; color:#a1a1aa; background:#161618; border:1px solid #262629;
-         padding:4px 10px; border-radius:999px; }}
-  .actions {{ margin-top:32px; display:flex; flex-wrap:wrap; gap:12px; }}
-  .btn {{ display:inline-block; padding:12px 20px; border-radius:12px; font-weight:600;
-         text-decoration:none; font-size:15px; }}
-  .btn-primary {{ background:linear-gradient(135deg,#8b5cf6,#d946ef); color:#fff; }}
-  .btn-ghost {{ background:#161618; color:#ededed; border:1px solid #262629; }}
-  .card {{ background:#0e0e10; border:1px solid #1c1c1f; border-radius:18px; padding:24px; }}
-  .col-item {{ padding:18px 0; border-top:1px solid #1c1c1f; }}
-  .col-item h3 {{ margin:0 0 6px; font-size:18px; }}
-  .col-item p {{ margin:0; color:#a1a1aa; font-size:15px; }}
-  .foot {{ margin-top:40px; font-size:13px; color:#71717a; text-align:center; }}
-  a {{ color:#c4b5fd; }}
-</style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="brand"><img src="{_esc(APP_URL)}/icon-192.png" alt="Machina"><span>Machina</span></div>
-    {body}
-    <div class="foot">Saved on <a href="{_esc(APP_URL)}">Machina</a> — your AI knowledge base.</div>
-  </div>
-</body>
-</html>"""
-
-
-def _render_shared_card(card: dict, share_url: str) -> str:
-    title = card.get("title") or "Shared card"
-    summary = card.get("summary") or ""
-    detailed = card.get("detailedSummary") or ""
-    source = card.get("sourceName") or card.get("category") or ""
-    image = _share_card_image(card)
-    original = card.get("url") or ""
-    tags = card.get("tags") or []
-
-    has_real_image = image and not image.endswith("/icon-512.png")
-    hero = f'<img class="hero" src="{_esc(image)}" alt="">' if has_real_image else ""
-    badge = f'<div class="badge">{_esc(source)}</div>' if source else ""
-    detail_html = f'<div class="detail md" dir="auto">{_md_to_html(detailed)}</div>' if detailed else ""
-    tags_html = ""
-    if tags:
-        chips = "".join(f'<span class="tag">{_esc(t)}</span>' for t in tags[:8])
-        tags_html = f'<div class="tags">{chips}</div>'
-
-    # "View original" only for real external links (not stored screenshot images).
-    original_btn = ""
-    if original.startswith("http") and card.get("sourceType") != "image":
-        original_btn = f'<a class="btn btn-ghost" href="{_esc(original)}" rel="noopener nofollow" target="_blank">View original</a>'
-
-    body = f"""<div class="card">
-      {badge}
-      <h1 dir="auto">{_esc(title)}</h1>
-      {hero}
-      <div class="summary md" dir="auto">{_md_to_html(summary)}</div>
-      {detail_html}
-      {tags_html}
-      <div class="actions">
-        <a class="btn btn-primary" href="{_esc(APP_URL)}">Open in Machina</a>
-        {original_btn}
-      </div>
-    </div>"""
-    return _share_html_shell(
-        title=title, description=summary or detailed or "Shared from Machina",
-        image=image, url=share_url, body=body,
-    )
-
-
-def _render_shared_collection(data: dict, share_url: str) -> str:
-    name = data.get("name") or "Shared collection"
-    description = data.get("description") or ""
-    cards = data.get("cards") or []
-    image = _share_card_image(cards[0]) if cards else f"{APP_URL}/icon-512.png"
-
-    items = "".join(
-        f'<div class="col-item"><h3 dir="auto">{_esc(c.get("title"))}</h3>'
-        f'<div class="md" dir="auto">{_md_to_html(c.get("summary"))}</div></div>'
-        for c in cards[:50]
-    )
-    desc_html = f'<div class="summary md" dir="auto">{_md_to_html(description)}</div>' if description else ""
-    count = len(cards)
-    body = f"""<div class="card">
-      <div class="badge">Collection · {count} card{'s' if count != 1 else ''}</div>
-      <h1 dir="auto">{_esc(name)}</h1>
-      {desc_html}
-      {items}
-      <div class="actions"><a class="btn btn-primary" href="{_esc(APP_URL)}">Open in Machina</a></div>
-    </div>"""
-    return _share_html_shell(
-        title=name, description=description or f"A collection of {count} cards on Machina",
-        image=image, url=share_url, body=body,
-    )
-
-
-def _share_not_found_html() -> str:
-    body = """<div class="card">
-      <h1>This page isn’t available</h1>
-      <div class="summary">The shared card or collection may have been removed.</div>
-      <div class="actions"><a class="btn btn-primary" href="%s">Open Machina</a></div>
-    </div>""" % _esc(APP_URL)
-    return _share_html_shell(
-        title="Not available", description="This shared page may have been removed.",
-        image=f"{APP_URL}/icon-512.png", url=APP_URL, body=body,
-    )
-
-
-# ─────────────────────────────────────────────
-# Publishing public shares (Admin-SDK; keeps ownerUid out of world-readable docs)
-# ─────────────────────────────────────────────
-#
-# The world-readable `shared_cards`/`shared_collections` docs must NOT carry
-# `ownerUid` — for the phone-keyed owner workspace that value is a phone number
-# (PII), and any client could `getDoc` a share id and read it. Rules can't hide a
-# field, so the fix is structural: publish via these Admin-SDK endpoints, which
-# write the public snapshot WITHOUT `ownerUid` and keep the owner mapping in the
-# functions-only `shared_owners/{shareId}` collection (rules deny all client
-# access). The locked ruleset denies direct client writes to `shared_*`, so these
-# endpoints (Admin SDK bypasses rules) are the only writers.
-
-_SHARE_COLLECTIONS = {"card": "shared_cards", "collection": "shared_collections"}
-
-
-def _share_owner_uid(db, share_id: str, public_coll: str) -> Optional[str]:
-    """Resolve who owns a share id. Prefers the functions-only `shared_owners`
-    mapping; falls back to a legacy public doc's `ownerUid` (pre-migration shares
-    still carry it) so ownership checks keep working during the transition."""
-    owner_snap = db.collection("shared_owners").document(share_id).get()
-    if owner_snap.exists:
-        return (owner_snap.to_dict() or {}).get("ownerUid")
-    legacy = db.collection(public_coll).document(share_id).get()
-    if legacy.exists:
-        return (legacy.to_dict() or {}).get("ownerUid")
-    return None
-
-
-def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict) -> dict:
-    """Write a public share snapshot for `uid` WITHOUT `ownerUid`, plus the
-    functions-only owner mapping. Rejects overwriting a share id owned by someone
-    else (the server-side equivalent of the rules' anti-takeover guard)."""
-    public_coll = _SHARE_COLLECTIONS.get(share_type)
-    if not public_coll:
-        raise ValueError("invalid share type")
-    if not share_id or not isinstance(payload, dict):
-        raise ValueError("shareId and payload are required")
-
-    db = get_db()
-    existing_owner = _share_owner_uid(db, share_id, public_coll)
-    if existing_owner is not None and existing_owner != uid:
-        raise PermissionError("This share id belongs to another account")
-
-    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-    doc = {k: v for k, v in payload.items() if v is not None}
-    doc.pop("ownerUid", None)  # never persist PII in the world-readable doc
-    doc["shareId"] = share_id
-    doc["publishedAt"] = now_ms
-
-    db.collection(public_coll).document(share_id).set(doc)
-    db.collection("shared_owners").document(share_id).set({
-        "ownerUid": uid, "type": share_type, "publishedAt": now_ms,
-    })
-    return {"shareId": share_id}
-
-
-def _unpublish_share_logic(uid: str, share_type: str, share_id: str) -> dict:
-    """Delete a public share + its owner mapping, if `uid` owns it."""
-    public_coll = _SHARE_COLLECTIONS.get(share_type)
-    if not public_coll:
-        raise ValueError("invalid share type")
-    if not share_id:
-        raise ValueError("shareId is required")
-
-    db = get_db()
-    owner = _share_owner_uid(db, share_id, public_coll)
-    if owner is not None and owner != uid:
-        raise PermissionError("This share id belongs to another account")
-
-    db.collection(public_coll).document(share_id).delete()
-    db.collection("shared_owners").document(share_id).delete()
-    return {"success": True}
 
 
 @https_fn.on_request()
@@ -1998,287 +1737,6 @@ def share_page(req: https_fn.Request) -> https_fn.Response:
 
 
 # ─────────────────────────────────────────────
-# WhatsApp Webhook
-# ─────────────────────────────────────────────
-
-def _verify_twilio_signature(request) -> bool:
-    """Validate an inbound Twilio webhook via the X-Twilio-Signature header.
-
-    Returns True if the signature is valid, OR if verification is not configured
-    (no TWILIO_AUTH_TOKEN) so local/dev testing still works. Returns False only
-    when a token IS configured and the signature is missing/invalid — which is
-    how we reject spoofed webhooks (anyone could otherwise POST a victim's phone
-    number and act as them).
-    """
-    auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
-    if not auth_token:
-        # Fail CLOSED in production: an unsigned webhook lets anyone POST a
-        # victim's phone number and act as them. Only allow the unverified path
-        # under the local Functions emulator, never on deployed Cloud Run.
-        if os.environ.get("FUNCTIONS_EMULATOR", "").lower() in ("1", "true", "yes"):
-            logger.warning("TWILIO_AUTH_TOKEN not set — skipping signature check (emulator only)")
-            return True
-        logger.error("TWILIO_AUTH_TOKEN not set in production — rejecting webhook")
-        return False
-
-    from twilio.request_validator import RequestValidator
-    validator = RequestValidator(auth_token)
-
-    signature = request.headers.get("X-Twilio-Signature", "")
-    # Twilio signs against the public HTTPS URL it posted to. Behind Cloud Run /
-    # Hosting the internally-seen scheme can be http, so normalize to https.
-    url = request.url
-    if request.headers.get("X-Forwarded-Proto") == "https" and url.startswith("http://"):
-        url = "https://" + url[len("http://"):]
-
-    params = request.form.to_dict() if request.form else {}
-    return validator.validate(url, params, signature)
-
-
-def _seen_message_sid(sid: str) -> bool:
-    """Idempotency guard for Twilio webhook retries.
-
-    Twilio re-POSTs the same message (same MessageSid) ~15s later if it doesn't
-    get a fast 200, so without a guard every retry re-runs the whole handler —
-    duplicate sends and, for the `digest` command, a duplicate multi-second
-    Gemini synthesis + spend. We record each MessageSid in `processed_messages`
-    the first time we see it and treat any later sighting as a no-op.
-
-    Returns True if this sid was already processed (caller should no-op), False
-    if it's new (and now recorded). Fails OPEN (returns False) on any backend
-    error so a transient Firestore issue degrades to "process it" rather than
-    dropping the message.
-    """
-    if not sid:
-        return False
-    try:
-        from google.api_core import exceptions as gcloud_exceptions
-        db = get_db()
-        doc_ref = db.collection('processed_messages').document(sid)
-        # create() fails if the doc already exists → atomic first-writer-wins.
-        try:
-            doc_ref.create({"seenAt": datetime.now(timezone.utc).isoformat()})
-            return False
-        except gcloud_exceptions.AlreadyExists:
-            # Doc already present → this is a Twilio retry of a message we've
-            # already processed.
-            return True
-    except Exception as e:
-        logger.error(f"MessageSid dedup check failed (failing open): {e}")
-        return False
-
-
-@https_fn.on_request()
-def whatsapp_webhook(request):
-    """
-    WhatsApp webhook endpoint.
-    Respond-First Pattern: Saves to pending_processing and returns 200 immediately.
-    """
-    # whatsapp_handler pulls the Twilio SDK — imported lazily (see top-of-file note).
-    from whatsapp_handler import send_whatsapp_message
-
-    # Reject spoofed webhooks before doing any work (phone-number impersonation).
-    if not _verify_twilio_signature(request):
-        logger.warning("Rejected WhatsApp webhook: invalid/missing Twilio signature")
-        return https_fn.Response(
-            json.dumps({"error": "Forbidden"}), status=403, mimetype="application/json"
-        )
-
-    if check_rate_limit(f"whatsapp:{client_ip(request)}", *_RATE_LIMITS["whatsapp"]) is False:
-        logger.warning("Rate limit exceeded: whatsapp:%s", client_ip(request))
-        return https_fn.Response(
-            json.dumps({"error": "Too many requests"}), status=429, mimetype="application/json"
-        )
-
-    try:
-        if request.content_type == 'application/x-www-form-urlencoded':
-            data = request.form.to_dict()
-        else:
-            data = request.get_json()
-
-        # Do NOT log the raw payload — it carries the sender's phone number
-        # (From) and full message body (PII). Log only routing metadata.
-        logger.info(
-            "Received webhook payload (sid=%s, num_media=%s, fields=%d)",
-            (data or {}).get("MessageSid") or (data or {}).get("SmsMessageSid") or "?",
-            (data or {}).get("NumMedia", "0"),
-            len(data) if isinstance(data, dict) else 0,
-        )
-        payload = WebhookPayload(**data)
-    except Exception as e:
-        logger.error(f"Payload parse error: {e}")
-        return https_fn.Response(json.dumps({"error": "Invalid payload"}), status=400, mimetype="application/json")
-
-    # Idempotency: Twilio retries the same MessageSid (~15s) until it gets a
-    # fast 200. Without this guard each retry re-runs everything — duplicate
-    # sends and a duplicate synchronous Gemini digest synthesis. No-op on a sid
-    # we've already handled and just ack 200 so Twilio stops retrying.
-    if _seen_message_sid(payload.message_sid):
-        logger.info("Duplicate WhatsApp webhook (MessageSid already processed) — no-op")
-        return https_fn.Response(json.dumps({"success": True, "duplicate": True}), status=200, mimetype="application/json")
-
-    db = get_db()
-
-    # Find user by phone number
-    uid = find_user_by_phone(payload.from_number)
-
-    # Normalize UID
-    if uid and uid.startswith("whatsapp:"):
-        uid = uid.replace("whatsapp:", "")
-
-    # Detect language from incoming message
-    user_msg_is_hebrew = is_hebrew(payload.body)
-
-    if not uid:
-        logger.warning(f"Unauthorized number: {_mask_phone(payload.from_number)}")
-        msg = "❌ מצטערים, מספר הטלפון שלך לא מזוהה. אנא וודא שהוא תואם להגדרות." if user_msg_is_hebrew else "❌ Sorry, your phone number is not recognized. Please make sure it matches the number in your Machina AI settings."
-        send_whatsapp_message(payload.from_number, msg)
-        return https_fn.Response(json.dumps({"error": "User not found"}), status=403, mimetype="application/json")
-
-    # Extract URL from message body
-    url_match = re.search(r'https?://[^\s]+', payload.body)
-
-    # 1. Image Support: Check if media is attached
-    if payload.num_media > 0 and payload.media_url0:
-        logger.info(f"Media detected: {payload.media_url0} (Type: {payload.media_content_type0})")
-
-        process_ref = db.collection('pending_processing').document()
-        process_ref.set({
-            "uid": uid,
-            "url": payload.media_url0,
-            "mimeType": payload.media_content_type0,
-            "fromNumber": payload.from_number,
-            "body": payload.body,
-            "createdAt": datetime.now(timezone.utc).isoformat(),
-            "status": "queued",
-            "isImage": True,
-            "attempts": 0
-        })
-        return https_fn.Response(json.dumps({"success": True, "queued": True, "id": process_ref.id}), status=200, mimetype="application/json")
-
-    if not url_match:
-        # Handling conversational commands (Reminders)
-        logger.info("No URL found, checking for commands")
-
-        msg_lower = payload.body.lower().strip()
-
-        # Digest controls over WhatsApp: pause / resume the curated digest.
-        if msg_lower in ("stop digest", "pause digest", "digest off"):
-            db.collection('users').document(uid).set(
-                {"settings": {"digest_enabled": False}}, merge=True
-            )
-            msg = ("✅ Digest paused. Reply *START DIGEST* to turn it back on, "
-                   "or manage it anytime in Settings.")
-            if user_msg_is_hebrew:
-                msg = "✅ הדייג'סט הושהה. השב/י *START DIGEST* כדי להפעיל מחדש."
-            send_whatsapp_message(payload.from_number, msg)
-            return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
-
-        if msg_lower in ("start digest", "resume digest", "digest on"):
-            db.collection('users').document(uid).set(
-                {"settings": {"digest_enabled": True}}, merge=True
-            )
-            msg = "✅ Digest resumed. You'll get your curated cards on schedule."
-            if user_msg_is_hebrew:
-                msg = "✅ הדייג'סט חזר לפעול. תקבל/י כרטיסים נבחרים לפי לוח הזמנים."
-            send_whatsapp_message(payload.from_number, msg)
-            return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
-
-        if msg_lower in ("digest", "digest now", "דייג'סט"):
-            # On-demand digest. Since the request came over WhatsApp, always
-            # reply over WhatsApp regardless of the user's configured channels.
-            from digest_service import build_and_send_digest
-            user_doc = db.collection('users').document(uid).get()
-            user_data = user_doc.to_dict() or {}
-            user_data["settings"] = {**user_data.get("settings", {}), "digest_channels": ["whatsapp"]}
-            res = build_and_send_digest(uid, user_data, force=True)
-            if not res.get("sent"):
-                msg = ("📭 אין עדיין מה לאסוף — שמור/י כמה לינקים קודם!" if user_msg_is_hebrew
-                       else "📭 Nothing to curate yet — save a few links first!")
-                send_whatsapp_message(payload.from_number, msg)
-            return https_fn.Response(json.dumps({"success": True, **res}), status=200, mimetype="application/json")
-
-        if msg_lower == "reminder" or msg_lower == "תזכורת":
-            is_he = (msg_lower == "תזכורת") or user_msg_is_hebrew
-            if is_he:
-                menu = "מתי להזכיר לך?\nהשב/י עם מספר הימים — *1*, *2*, *3* או *7*\nאו *S* לחזרה מרווחת (spaced repetition)"
-            else:
-                menu = "When should I remind you?\nReply with the number of days — *1*, *2*, *3* or *7*\nOr *S* for spaced repetition"
-            send_whatsapp_message(payload.from_number, menu)
-            return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
-
-        reminder_time = handle_reminder_intent(payload.body)
-
-        if reminder_time:
-            user_doc = db.collection('users').document(uid).get()
-            last_link_id = user_doc.to_dict().get('lastSavedLinkId')
-            if last_link_id:
-                link_doc = db.collection('users').document(uid).collection('links').document(last_link_id).get()
-                if link_doc.exists:
-                    reply = payload.body.strip().lower()
-                    is_spaced = reply in ("s", "spaced")
-                    profile = "spaced" if is_spaced else "once"
-                    set_reminder(uid, last_link_id, reminder_time, profile=profile)
-
-                    link_data = link_doc.to_dict()
-                    title = link_data.get('title', 'Unknown Link')
-                    category = link_data.get('category', 'General')
-
-                    user_tz = user_doc.to_dict().get('timezone')
-                    date_str = format_local_time(reminder_time, user_tz, user_msg_is_hebrew)
-
-                    if user_msg_is_hebrew:
-                        extra = "\n🔁 חזרה מרווחת — אזכיר שוב בהמשך" if is_spaced else ""
-                        change = "\n\n_טעית במספר? השב/י מספר אחר (1/2/3/7) או S לעדכון._"
-                        msg = f"⏰ *התזכורת נקבעה*\n\n📄 *{title}*\n📂 {category}\n📅 {date_str}{extra}{change}"
-                    else:
-                        extra = "\n🔁 Spaced repetition — I'll keep nudging you" if is_spaced else ""
-                        change = "\n\n_Wrong number? Reply a different one (1/2/3/7) or S to change it._"
-                        msg = f"⏰ *Reminder Set*\n\n📄 *{title}*\n📂 {category}\n📅 {date_str}{extra}{change}"
-
-                    send_whatsapp_message(payload.from_number, msg)
-                    return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
-
-            msg = "❌ לא נמצא לינק קודם. שלח לינק קודם!" if user_msg_is_hebrew else "❌ No previous link found. Send a link first!"
-            send_whatsapp_message(payload.from_number, msg)
-            return https_fn.Response(json.dumps({"error": "No context"}), status=200, mimetype="application/json")
-
-        msg = "אני יכול לשמור לינקים או לקבוע תזכורות. נסה לשלוח לינק!" if user_msg_is_hebrew else "I can save links or set reminders. Try sending a URL!"
-        send_whatsapp_message(payload.from_number, msg)
-        return https_fn.Response(json.dumps({"success": True}), status=200, mimetype="application/json")
-
-    # URL FOUND -> Save to pending_processing for Background Processing
-    url = url_match.group(0)
-
-    # Dedup: skip if already saved or already queued for this user (mirrors the
-    # share_ingest path). Prevents Twilio dupes / re-sent links from stacking.
-    if link_exists_for_url(uid, url) or pending_exists_for_url(uid, url):
-        logger.info(f"WhatsApp ingest skipped (duplicate): {url}")
-        msg = ("✅ הלינק הזה כבר שמור אצלך." if user_msg_is_hebrew
-               else "✅ You've already saved that link.")
-        send_whatsapp_message(payload.from_number, msg)
-        return https_fn.Response(
-            json.dumps({"success": True, "duplicate": True, "url": url}),
-            status=200, mimetype="application/json"
-        )
-
-    logger.info(f"Queueing URL for processing: {url}")
-
-    process_ref = db.collection('pending_processing').document()
-    process_ref.set({
-        "uid": uid,
-        "url": url,
-        "fromNumber": payload.from_number,
-        "body": payload.body,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-        "status": "queued",
-        "attempts": 0
-    })
-
-    return https_fn.Response(json.dumps({"success": True, "queued": True, "id": process_ref.id}), status=200, mimetype="application/json")
-
-
-# ─────────────────────────────────────────────
 # Background Processing
 # ─────────────────────────────────────────────
 
@@ -2322,7 +1780,6 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     """
     # Heavy/external deps imported lazily (see top-of-file note).
     from scraper import scrape_url
-    from whatsapp_handler import send_whatsapp_message, format_success_message
     snapshot = event.data
     if not snapshot:
         logger.error("No snapshot in background trigger")
@@ -2336,7 +1793,6 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     url = data.get("url")
     is_image = data.get("isImage", False)
     mime_type = data.get("mimeType", "image/jpeg")
-    from_number = data.get("fromNumber")
     original_body = data.get("body")
 
     log_to_firestore(task_id, "Background processing started", data={"url": url, "uid": uid, "isImage": is_image})
@@ -2406,10 +1862,13 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             log_to_firestore(task_id, f"Downloading image bytes from: {url}")
             ref.update({"status": "downloading_image"})
 
-            account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
-            auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
-
-            img_response = requests.get(url, timeout=30, auth=(account_sid, auth_token))
+            # Route through scraper.safe_get (SSRF guard + per-redirect
+            # re-validation): the pending_processing queue doc is attacker-
+            # influenceable, so a hostile imageUrl must not be able to make us
+            # fetch an internal/metadata endpoint. Normal share-ingest images are
+            # public Firebase Storage URLs, which pass the guard fine.
+            from scraper import safe_get
+            img_response = safe_get(url, timeout=30)
             img_response.raise_for_status()
             image_bytes = img_response.content
 
@@ -2462,26 +1921,18 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         else:
             estimated_time = _estimate_read_time(scraped.get("text", ""))
 
-        link_data = {
-            "url": url,
-            "title": final_title,
-            "summary": analysis.get("summary", "No summary available"),
-            "detailedSummary": analysis.get("detailedSummary"),
-            "tags": analysis.get("tags", []),
-            "concepts": analysis.get("concepts", []),
-            "relatedLinks": related_links,
-            "category": analysis.get("category", "General"),
-            "sourceName": scraped.get("source_name") or analysis.get("sourceName") or ("Screenshot" if is_image else None),
-            "sourceType": "youtube" if is_youtube else ("image" if is_image else "web"),
-            "language": analysis.get("language", "en"),
-            "status": LinkStatus.UNREAD.value,
-            "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
-            "metadata": {
-                "originalTitle": scraped.get("title", "Image Upload" if is_image else ""),
-                "estimatedReadTime": estimated_time,
-                "actionableTakeaway": analysis.get("actionableTakeaway")
-            }
-        }
+        link_data = _build_link_data(
+            url=url,
+            title=final_title,
+            summary=analysis.get("summary", "No summary available"),
+            detailed_summary=analysis.get("detailedSummary"),
+            source_type="youtube" if is_youtube else ("image" if is_image else "web"),
+            source_name=scraped.get("source_name") or analysis.get("sourceName") or ("Screenshot" if is_image else None),
+            original_title=scraped.get("title", "Image Upload" if is_image else ""),
+            estimated_read_time=estimated_time,
+            analysis=analysis,
+            related_links=related_links,
+        )
 
         # Embedding: only store a real Vector. If the embed failed (None), omit
         # the field and flag the card so a backfill repairs it later — never
@@ -2512,20 +1963,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             profile = "spaced" if ("spaced" in reply or reply == "s") else "once"
             set_reminder(uid, link_id, reminder_time, profile=profile)
 
-        # Notify via WhatsApp only when the item came from WhatsApp.
-        # Share-sheet / connector items have no phone number and must not trigger a reply.
-        if from_number:
-            user_tz = None
-            try:
-                _udoc = db.collection('users').document(uid).get()
-                user_tz = _udoc.to_dict().get('timezone') if _udoc.exists else None
-            except Exception:
-                pass
-            msg = format_success_message(link_data, reminder_time, language=analysis.get("language", "en"), link_id=link_id, tz=user_tz)
-            logger.info(f"Processing complete, sending message to {from_number}")
-            send_whatsapp_message(from_number, msg)
-        else:
-            logger.info(f"Processing complete for {data.get('source', 'unknown')} item (no WhatsApp notification)")
+        logger.info(f"Processing complete for {data.get('source', 'unknown')} item")
 
         # Successful cleanup
         ref.delete()
@@ -2567,9 +2005,6 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             ref.delete()
         except Exception:
             pass
-
-        if from_number:
-            send_whatsapp_message(from_number, f"⚠️ Saved: {url}\n\nNote: Detailed AI analysis encountered an issue ({str(e)[:50]}...).")
 
 
 # ─────────────────────────────────────────────
@@ -2690,7 +2125,7 @@ def force_check_reminders(req: https_fn.Request) -> https_fn.Response:
 
 
 # ─────────────────────────────────────────────
-# Curated Digest (email + WhatsApp)
+# Curated Digest (push + email)
 # ─────────────────────────────────────────────
 
 # Cadence MUST match DIGEST_CADENCE_MINUTES in digest_service.py — is_due() uses

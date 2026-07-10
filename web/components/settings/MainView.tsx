@@ -1,0 +1,114 @@
+'use client';
+
+import { Bell, Sun, Moon, Monitor, RefreshCw, Clock, Compass, Network, Puzzle } from 'lucide-react';
+import { policyUrl, openExternal } from '@/lib/share';
+import ProfileAvatar from '../ProfileAvatar';
+import type { Settings, View } from './types';
+import {
+    SectionHeader, Footnote, List, RowShell, RowText, Chevron,
+    NavRow, ExternalRow, Toggle, Segmented,
+} from './primitives';
+
+export function MainView({
+    authUid, accountEmail, displayName, photoURL, providerLabel, settings, theme, setTheme,
+    togglePush, pushNote, aiConsentAt,
+    rebuilding, rebuildLabel, handleRebuild, onReplayTour, go,
+}: {
+    authUid: string | null;
+    accountEmail: string | null;
+    displayName: string | null;
+    photoURL: string | null;
+    providerLabel: string;
+    settings: Settings;
+    theme: 'light' | 'dark' | 'system';
+    setTheme: (t: 'light' | 'dark' | 'system') => void;
+    togglePush: () => void;
+    pushNote: string | null;
+    aiConsentAt: number | null;
+    rebuilding: boolean;
+    rebuildLabel: string | null;
+    handleRebuild: () => void;
+    onReplayTour?: () => void;
+    go: (v: View) => void;
+}) {
+    const remindersOrDigest = settings.reminders_enabled || settings.digest_enabled;
+    return (
+        <>
+            {/* Account (web only — native has no signed-in user) */}
+            {authUid && (
+                <List>
+                    <RowShell onClick={() => go('account')} className="py-3">
+                        <ProfileAvatar email={accountEmail} name={displayName} photoURL={photoURL} size={44} />
+                        <div className="flex-1 min-w-0 py-0.5">
+                            <div className="text-[19px] font-semibold text-text truncate leading-tight">{displayName || accountEmail || 'Signed in'}</div>
+                            <div className="text-[13px] text-text-muted truncate mt-0.5">{providerLabel}{accountEmail ? ` · ${accountEmail}` : ''}</div>
+                        </div>
+                        <Chevron />
+                    </RowShell>
+                </List>
+            )}
+
+            <SectionHeader first={!authUid}>Notifications</SectionHeader>
+            <List>
+                <RowShell tile={<Bell className="w-[17px] h-[17px]" />} tileClass="bg-accent">
+                    <RowText title="Push notifications" />
+                    <Toggle on={settings.push_enabled} onChange={togglePush} />
+                </RowShell>
+                <NavRow tile={<Clock className="w-[17px] h-[17px]" />} tileClass="bg-pink-500" title="Reminders & Digest" value={remindersOrDigest ? 'On' : 'Off'} onClick={() => go('resurfacing')} />
+            </List>
+            {pushNote && <p className="text-[12px] text-amber-500 leading-snug px-2 pt-1.5">{pushNote}</p>}
+
+            <SectionHeader>Integrations</SectionHeader>
+            <List>
+                <NavRow tile={<Puzzle className="w-[16px] h-[16px]" />} tileClass="bg-violet-500" title="Browser extension" onClick={() => go('extension')} />
+            </List>
+            <Footnote>Save any page into your library from Chrome, Edge, or Brave with one click.</Footnote>
+
+            <SectionHeader>Appearance</SectionHeader>
+            <List>
+                <RowShell>
+                    <RowText title="Theme" />
+                    <Segmented
+                        value={theme}
+                        onChange={(v) => setTheme(v as typeof theme)}
+                        iconOnly
+                        options={[
+                            { value: 'light', label: 'Light', icon: <Sun className="w-[18px] h-[18px]" /> },
+                            { value: 'system', label: 'Auto', icon: <Monitor className="w-[18px] h-[18px]" /> },
+                            { value: 'dark', label: 'Dark', icon: <Moon className="w-[18px] h-[18px]" /> },
+                        ]}
+                    />
+                </RowShell>
+            </List>
+
+            <SectionHeader>Privacy &amp; AI</SectionHeader>
+            <List>
+                <ExternalRow title="Privacy Policy" onClick={() => openExternal(policyUrl('/privacy'))} />
+                <ExternalRow title="Terms of Service" onClick={() => openExternal(policyUrl('/terms'))} />
+            </List>
+            <Footnote>
+                <b className="text-text-secondary font-semibold">Powered by Google Gemini.</b> Saved content and your questions are sent to Gemini for summaries and answers.
+                {aiConsentAt !== null && ` You agreed on ${new Date(aiConsentAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}.`}
+            </Footnote>
+
+            <SectionHeader>Advanced</SectionHeader>
+            <List>
+                <RowShell tile={<Network className="w-[16px] h-[16px]" />} tileClass="bg-indigo-500">
+                    <RowText title="Rebuild connections" />
+                    <button
+                        onClick={handleRebuild}
+                        disabled={rebuilding}
+                        className="ml-auto h-8 px-3 rounded-full bg-card-hover border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${rebuilding ? 'animate-spin' : ''}`} />
+                        {rebuilding ? 'Rebuilding…' : 'Rebuild'}
+                    </button>
+                </RowShell>
+                {onReplayTour && (
+                    <NavRow tile={<Compass className="w-[16px] h-[16px]" />} tileClass="bg-slate-500" title="Take the tour again" onClick={onReplayTour} />
+                )}
+            </List>
+            <Footnote>{rebuildLabel ?? 'Recompute “See also” links across your whole library — useful for cards saved before connections existed.'}</Footnote>
+        </>
+    );
+}
