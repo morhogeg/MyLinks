@@ -31,12 +31,6 @@ on:
   #   paths:
   #     - 'web/**'
   #     - '.github/workflows/ios-testflight.yml'
-  #
-  # TEMPORARY push trigger (remote-session dispatch workaround — API dispatch
-  # is 403 from cloud sessions; see SOURCE_OF_TRUTH.md). REMOVE after the run
-  # fires; scoped to the audit branch so it can never fire on main.
-  push:
-    branches: [claude/codebase-audit-ios-ready-9595aj]
 
 concurrency:
   group: ios-testflight
