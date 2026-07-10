@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import type { User, DigestChannel, ReminderChannel } from '@/lib/types';
-import { updateUserSettings, getUserSettings, updateUserEmail, getUserEmail, getLinksFromFirestore } from '@/lib/storage';
+import { updateUserSettings, getUserSettings, getLinksFromFirestore } from '@/lib/storage';
 import { registerPush, unregisterPush } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
 import { useToast } from '@/components/Toast';
@@ -51,7 +51,7 @@ export function normalizeChannels<T extends string>(channels: readonly string[] 
 
 /**
  * The settings-persistence brain: owns the loaded settings, the topic options,
- * the email + dirty-tracking baselines, and every mutation/persistence helper.
+ * the dirty-tracking baseline, and every mutation/persistence helper.
  * Navigation, focus, and the load-on-open effect stay in SettingsModal — this
  * hook only exposes the loaders so that effect can drive them.
  */
@@ -65,18 +65,16 @@ export function useUserSettings(uid: string) {
     // and an inline notice offers a retry until a load succeeds.
     const [loadError, setLoadError] = useState(false);
 
-    const [email, setEmail] = useState('');
     // Topic options, split by origin and de-duped case-insensitively (the
     // digest matcher lowercases everything, so "Tech" and "tech" are the same).
     const [categoryTopics, setCategoryTopics] = useState<string[]>([]);
     const [tagTopics, setTagTopics] = useState<string[]>([]);
     const [topicQuery, setTopicQuery] = useState('');
 
-    // Dirty-tracking (M7): baselines captured when the form loads, so closing
+    // Dirty-tracking (M7): a baseline captured when the form loads, so closing
     // with unsaved edits warns instead of silently discarding the user's work.
     // Theme is excluded — it applies live via ThemeProvider, not this form's Save.
     const [settingsBaseline, setSettingsBaseline] = useState('');
-    const [emailBaseline, setEmailBaseline] = useState('');
 
     // Auto-save: there's no explicit Save button. Preferences persist when the
     // user leaves a sub-screen (Back / Done) or closes the sheet — but only when
@@ -84,7 +82,7 @@ export function useUserSettings(uid: string) {
     // load (which would clobber the real config with defaults).
     const savePreferences = async () => {
         if (loadError || isLoading || !settingsBaseline) return;
-        const unchanged = JSON.stringify(settings) === settingsBaseline && email.trim() === emailBaseline;
+        const unchanged = JSON.stringify(settings) === settingsBaseline;
         if (unchanged) return;
         try {
             await updateUserSettings(uid, {
@@ -103,10 +101,8 @@ export function useUserSettings(uid: string) {
                 digest_day: settings.digest_day,
                 digest_skip_empty: settings.digest_skip_empty,
             });
-            if (email.trim()) await updateUserEmail(uid, email.trim());
             // Advance the baseline so a subsequent leave doesn't re-write unchanged settings.
             setSettingsBaseline(JSON.stringify(settings));
-            setEmailBaseline(email.trim());
         } catch (error) {
             console.error('Failed to save settings:', error);
             toast.error("Couldn't save your settings. Please try again.");
@@ -115,12 +111,7 @@ export function useUserSettings(uid: string) {
 
     const loadDigestExtras = useCallback(async () => {
         try {
-            const [storedEmail, links] = await Promise.all([
-                getUserEmail(uid),
-                getLinksFromFirestore(uid),
-            ]);
-            if (storedEmail) setEmail(storedEmail);
-            setEmailBaseline((storedEmail || '').trim());
+            const links = await getLinksFromFirestore(uid);
             // Categories and tags → topic options, keyed by lowercase so case
             // variants collapse to one chip. Keep the nicer-cased label.
             const startsUpper = (s: string) => s.length > 0 && s[0] === s[0].toUpperCase() && s[0] !== s[0].toLowerCase();
@@ -164,7 +155,7 @@ export function useUserSettings(uid: string) {
                     reminders_channel: normalizeChannels<ReminderChannel>(userSettings.reminders_channel, ['push'], 'push'),
                     digest_enabled: userSettings.digest_enabled ?? false,
                     digest_frequency: userSettings.digest_frequency || 'weekly',
-                    digest_channels: normalizeChannels<DigestChannel>(userSettings.digest_channels, ['push', 'email'], 'push'),
+                    digest_channels: normalizeChannels<DigestChannel>(userSettings.digest_channels, ['push'], 'push'),
                     digest_mode: userSettings.digest_mode || 'smart',
                     digest_topics: userSettings.digest_topics?.length
                         ? userSettings.digest_topics
@@ -234,16 +225,6 @@ export function useUserSettings(uid: string) {
         }
     };
 
-    const toggleChannel = (channel: DigestChannel) => {
-        setSettings((p) => {
-            const has = p.digest_channels.includes(channel);
-            const next = has
-                ? p.digest_channels.filter((c) => c !== channel)
-                : [...p.digest_channels, channel];
-            return { ...p, digest_channels: next };
-        });
-    };
-
     const toggleTopic = (topic: string) => {
         setSettings((p) => {
             const key = topic.toLowerCase();
@@ -259,8 +240,6 @@ export function useUserSettings(uid: string) {
         settings,
         setSettings,
         loadError,
-        email,
-        setEmail,
         categoryTopics,
         tagTopics,
         topicQuery,
@@ -270,7 +249,6 @@ export function useUserSettings(uid: string) {
         loadDigestExtras,
         togglePush,
         pushNote,
-        toggleChannel,
         toggleTopic,
     };
 }

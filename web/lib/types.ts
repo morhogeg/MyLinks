@@ -154,14 +154,14 @@ export interface RelatedLink {
 }
 
 export type DigestFrequency = 'daily' | 'weekly';
-export type DigestChannel = 'push' | 'email';
+export type DigestChannel = 'push';
 export type ReminderChannel = 'push';
 export type DigestMode = 'smart' | 'random' | 'topic' | 'unread' | 'favorites' | 'rediscover' | 'synthesis';
 
 // ── Weekly "What you learned" synthesis (M12) ────────────────────────────────
 // A narrative recap of the week's saves, generated server-side (digest_service)
 // and stored at users/{uid}/syntheses/{weekId}. Surfaced in-app as a special
-// feed card and also delivered over email.
+// feed card, and pushed as a notification when the push channel is on.
 export interface SynthesisTheme {
   title: string;
   insight: string;
@@ -191,8 +191,8 @@ export interface WeeklySynthesis {
 
 // ── Curated digest (in-app Digest section) ───────────────────────────────────
 // Every curated digest is persisted server-side (digest_service) to
-// users/{uid}/digests/{digestId} — the always-on surface; push/email
-// are additional opt-in delivery channels.
+// users/{uid}/digests/{digestId} — the always-on surface; push is an
+// additional opt-in delivery channel.
 
 /** A card denormalized into the digest doc, so it renders even if the source
  *  link is later deleted (the app still deep-links by id when it exists). */

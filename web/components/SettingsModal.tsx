@@ -19,7 +19,7 @@ import { AccountView } from './settings/AccountSection';
 import { ExtensionView } from './settings/ExtensionView';
 import {
     DIGEST_MODES, DAYS, COUNT_OPTIONS, formatTime,
-    ResurfacingView, StyleView, ScheduleView, DeliveryView, PickerView,
+    ResurfacingView, StyleView, ScheduleView, PickerView,
 } from './settings/DigestSettings';
 
 interface SettingsModalProps {
@@ -43,7 +43,6 @@ const VIEW_TITLE: Record<View, string> = {
     style: 'Digest style',
     schedule: 'Schedule',
     cards: 'Cards per digest',
-    delivery: 'Delivery',
     extension: 'Browser extension',
 };
 
@@ -72,13 +71,13 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
         return 'Signed in';
     })();
 
-    // The settings-persistence brain: loaded settings, topic options, email +
-    // dirty-tracking baselines, and every mutation/persistence helper.
+    // The settings-persistence brain: loaded settings, topic options, the
+    // dirty-tracking baseline, and every mutation/persistence helper.
     const {
-        settings, setSettings, loadError, email, setEmail,
+        settings, setSettings, loadError,
         categoryTopics, tagTopics, topicQuery, setTopicQuery,
         savePreferences, loadSettings, loadDigestExtras,
-        togglePush, pushNote, toggleChannel, toggleTopic,
+        togglePush, pushNote, toggleTopic,
     } = useUserSettings(uid);
 
     // Navigation stack; the last entry is the visible screen.
@@ -215,8 +214,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     const scheduleValue = settings.digest_frequency === 'weekly'
         ? `${DAYS[settings.digest_day]} · ${formatTime(settings.digest_hour, settings.digest_minute)}`
         : `Daily · ${formatTime(settings.digest_hour, settings.digest_minute)}`;
-    const deliveryValue = ['In-app', settings.push_enabled && 'Push', settings.digest_channels.includes('email') && 'Email']
-        .filter(Boolean).join(' · ');
 
     // Derived topic-picker state (only meaningful in topic mode).
     const totalTopics = categoryTopics.length + tagTopics.length;
@@ -316,7 +313,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                                 cadenceLabel={CADENCE_LABEL[settings.reminder_frequency] ?? 'Smart'}
                                 modeLabel={modeLabel}
                                 scheduleValue={scheduleValue}
-                                deliveryValue={deliveryValue}
                                 go={go}
                             />
                         )}
@@ -355,15 +351,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                                 options={COUNT_OPTIONS.map((c) => ({ value: String(c), label: `${c} cards` }))}
                                 value={String(settings.digest_count)}
                                 onSelect={(v) => setSettings((p) => ({ ...p, digest_count: Number(v) }))}
-                            />
-                        )}
-
-                        {view === 'delivery' && (
-                            <DeliveryView
-                                settings={settings}
-                                toggleChannel={toggleChannel}
-                                email={email}
-                                setEmail={setEmail}
                             />
                         )}
 

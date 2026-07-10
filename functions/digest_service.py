@@ -4,12 +4,12 @@ Digest Service
 Delivers a *curated set of saved cards* to the user on a schedule (daily or
 weekly). Every digest is ALWAYS persisted to users/{uid}/digests — the in-app
 Digest section is the always-on surface — and additionally sent over the
-opt-in delivery channels (iOS push, email).
+opt-in delivery channel (iOS push).
 
 The user controls, from Settings:
   • whether digests are on at all              (digest_enabled)
   • how often                                  (digest_frequency: daily | weekly)
-  • where to                                   (digest_channels: push / email)
+  • where to                                   (digest_channels: push)
   • what to curate                             (digest_mode)
   • a topic to focus on                        (digest_topic, when mode=topic)
   • how many cards                             (digest_count)
@@ -24,27 +24,17 @@ backend curates all six identically — the split is presentation only:
   random     – "surprise me": a random sample across the whole library [advanced]
   topic      – only cards from a chosen category/tag                    [advanced]
   favorites  – revisit your starred cards                               [advanced]
-
-Email is sent via SendGrid (if SENDGRID_API_KEY is set) or SMTP (if SMTP_HOST
-is set); otherwise it degrades gracefully to a logged no-op. No new Python
-dependency is required.
 """
 
 import os
-import html
 import random
 import logging
-import smtplib
-from email.message import EmailMessage
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
-
-import requests
 
 from google.cloud import firestore
 
 from db import get_db
-from link_service import is_hebrew
 
 logger = logging.getLogger(__name__)
 
@@ -69,17 +59,6 @@ VALID_MODES = {"smart", "random", "topic", "unread", "favorites", "rediscover", 
 # this a recap would be thin — skip rather than send something hollow).
 SYNTHESIS_WINDOW_DAYS = 7
 SYNTHESIS_MIN_CARDS = 3
-
-# Short, human description of each mode — shown as the digest's "why these".
-MODE_BLURB = {
-    "smart": "A balanced mix of your backlog and older gems worth a second look.",
-    "random": "A random handful from across your library — surprise yourself.",
-    "topic": "Hand-picked from {topic}.",
-    "unread": "Still on your list — let's chip away at the backlog.",
-    "favorites": "Your starred cards, back for an encore.",
-    "rediscover": "From the archives — saves you haven't opened in a while.",
-    "synthesis": "A short recap of what your week of reading added up to.",
-}
 
 CATEGORY_EMOJI = {
     "Recipe": "🍲", "Tech": "💻", "Health": "❤️", "Business": "💼",
@@ -115,14 +94,18 @@ def _to_ms(value) -> int:
 def _normalize_channels(stored) -> List[str]:
     """Resolve a user's stored digest_channels into the live channel set.
 
-    Digest delivery is push + email. A missing setting defaults to ['push'];
-    any legacy 'whatsapp' entry is migrated to 'push' at read time (deduped),
-    so a user who only ever had WhatsApp still receives push digests.
+    Digest delivery is push-only (plus the always-on in-app surface). A missing
+    setting defaults to ['push']; any legacy 'whatsapp' entry is migrated to
+    'push' at read time (deduped), so a user who only ever had WhatsApp still
+    receives push digests. The retired 'email' channel is dropped at read time —
+    email delivery was cut — and is never written back.
     """
     if stored is None:
         return ["push"]
     return list(dict.fromkeys(
-        "push" if c == "whatsapp" else c for c in (stored or [])
+        "push" if c == "whatsapp" else c
+        for c in (stored or [])
+        if c != "email"
     ))
 
 
@@ -280,165 +263,6 @@ def _topics_label(topics) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# Formatting — Email (HTML + plain-text fallback)
-# ─────────────────────────────────────────────────────────────────────────
-
-def format_digest_email(cards: List[dict], mode: str, topics, frequency: str) -> tuple:
-    """Return (subject, html_body, text_body)."""
-    period = "Daily" if frequency == "daily" else "Weekly"
-    blurb = MODE_BLURB.get(mode, MODE_BLURB["smart"]).format(topic=_topics_label(topics))
-    subject = f"🧠 Your {period} Brew — {len(cards)} cards to revisit"
-
-    # ── HTML ──
-    rows = []
-    for i, c in enumerate(cards, 1):
-        title = html.escape((c.get("title") or "Untitled").strip())
-        category = html.escape(c.get("category") or "General")
-        emoji = _cat_emoji(c.get("category") or "")
-        read = (c.get("metadata") or {}).get("estimatedReadTime")
-        summary = html.escape((c.get("summary") or "").strip())
-        url = html.escape(_link_url(c["id"]))
-        src = html.escape((c.get("sourceName") or "").strip())
-        rtl = ' dir="rtl"' if is_hebrew(c.get("title") or "") else ""
-
-        meta_bits = [f"{emoji} {category}"]
-        if read:
-            meta_bits.append(f"⏱️ {read} min")
-        if src and src not in ("None", "Screenshot"):
-            meta_bits.append(src)
-        meta = html.escape(" · ").join(html.escape(b) for b in meta_bits)
-
-        rows.append(f"""
-        <tr><td style="padding:0 0 16px 0;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
-                 style="background:#1b1b29;border:1px solid #2c2c40;border-radius:16px;">
-            <tr><td style="padding:18px 20px;"{rtl}>
-              <div style="font:600 11px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#8a8aa3;letter-spacing:.08em;text-transform:uppercase;">{meta}</div>
-              <a href="{url}" style="display:block;margin:6px 0 8px;font:700 17px/1.35 -apple-system,Segoe UI,Roboto,sans-serif;color:#ffffff;text-decoration:none;">{i}. {title}</a>
-              <div style="font:400 14px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#b6b6cc;">{summary}</div>
-              <a href="{url}" style="display:inline-block;margin-top:12px;font:600 13px/1 -apple-system,Segoe UI,Roboto,sans-serif;color:#a78bfa;text-decoration:none;">Open card →</a>
-            </td></tr>
-          </table>
-        </td></tr>""")
-
-    html_body = f"""<!doctype html>
-<html><body style="margin:0;padding:0;background:#0e0e16;">
-  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#0e0e16;">
-    <tr><td align="center" style="padding:32px 16px;">
-      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;">
-        <tr><td style="padding:0 4px 20px;">
-          <div style="font:800 24px/1.2 -apple-system,Segoe UI,Roboto,sans-serif;background:linear-gradient(90deg,#a78bfa,#ec4899);-webkit-background-clip:text;background-clip:text;color:#a78bfa;">🧠 Your {period} Brew</div>
-          <div style="margin-top:6px;font:400 14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#8a8aa3;">{html.escape(blurb)}</div>
-        </td></tr>
-        {''.join(rows)}
-        <tr><td align="center" style="padding:8px 0 4px;">
-          <a href="{html.escape(APP_URL)}" style="display:inline-block;background:linear-gradient(90deg,#7c3aed,#db2777);color:#fff;font:700 14px/1 -apple-system,Segoe UI,Roboto,sans-serif;text-decoration:none;padding:14px 26px;border-radius:999px;">Open Machina AI</a>
-        </td></tr>
-        <tr><td align="center" style="padding:22px 0 0;">
-          <div style="font:400 12px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#5c5c75;">You're getting this because digests are on in Machina AI.<br/>Change the schedule, topic, or turn it off anytime in Settings.</div>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>"""
-
-    # ── Plain text ──
-    text_lines = [f"Your {period} Brew — {len(cards)} cards", blurb, ""]
-    for i, c in enumerate(cards, 1):
-        text_lines.append(f"{i}. {c.get('title','Untitled')}")
-        if c.get("summary"):
-            text_lines.append(f"   {c['summary']}")
-        text_lines.append(f"   {_link_url(c['id'])}")
-        text_lines.append("")
-    text_lines.append(f"Open Machina AI: {APP_URL}")
-    text_body = "\n".join(text_lines)
-
-    return subject, html_body, text_body
-
-
-# ─────────────────────────────────────────────────────────────────────────
-# Email delivery (SendGrid → SMTP → graceful no-op)
-# ─────────────────────────────────────────────────────────────────────────
-
-def _from_email() -> str:
-    return os.environ.get("DIGEST_FROM_EMAIL", "Machina AI <digest@secondbrain.app>")
-
-
-def send_email(to_email: str, subject: str, html_body: str, text_body: str) -> bool:
-    """Send an email. Returns True on success, False on no-op/failure."""
-    if not to_email:
-        logger.warning("send_email called with no recipient")
-        return False
-
-    sendgrid_key = os.environ.get("SENDGRID_API_KEY")
-    smtp_host = os.environ.get("SMTP_HOST")
-
-    if sendgrid_key:
-        try:
-            resp = requests.post(
-                "https://api.sendgrid.com/v3/mail/send",
-                headers={"Authorization": f"Bearer {sendgrid_key}",
-                         "Content-Type": "application/json"},
-                json={
-                    "personalizations": [{"to": [{"email": to_email}]}],
-                    "from": _parse_from(_from_email()),
-                    "subject": subject,
-                    "content": [
-                        {"type": "text/plain", "value": text_body},
-                        {"type": "text/html", "value": html_body},
-                    ],
-                },
-                timeout=20,
-            )
-            if resp.status_code in (200, 201, 202):
-                logger.info(f"Digest email sent to {to_email} via SendGrid")
-                return True
-            logger.error(f"SendGrid error {resp.status_code}: {resp.text[:300]}")
-            return False
-        except Exception as e:
-            logger.error(f"SendGrid request failed: {e}")
-            return False
-
-    if smtp_host:
-        try:
-            msg = EmailMessage()
-            msg["Subject"] = subject
-            msg["From"] = _from_email()
-            msg["To"] = to_email
-            msg.set_content(text_body)
-            msg.add_alternative(html_body, subtype="html")
-
-            port = int(os.environ.get("SMTP_PORT", "587"))
-            user = os.environ.get("SMTP_USER")
-            password = os.environ.get("SMTP_PASSWORD")
-            with smtplib.SMTP(smtp_host, port, timeout=20) as server:
-                server.starttls()
-                if user and password:
-                    server.login(user, password)
-                server.send_message(msg)
-            logger.info(f"Digest email sent to {to_email} via SMTP")
-            return True
-        except Exception as e:
-            logger.error(f"SMTP send failed: {e}")
-            return False
-
-    logger.warning(
-        f"No email provider configured (set SENDGRID_API_KEY or SMTP_HOST). "
-        f"Would have emailed {to_email}: {subject!r}"
-    )
-    return False
-
-
-def _parse_from(value: str) -> dict:
-    """Turn 'Name <addr@x>' or 'addr@x' into SendGrid's {email,name} dict."""
-    if "<" in value and ">" in value:
-        name = value.split("<")[0].strip()
-        email_addr = value.split("<")[1].split(">")[0].strip()
-        return {"email": email_addr, "name": name or "Machina AI"}
-    return {"email": value.strip(), "name": "Machina AI"}
-
-
-# ─────────────────────────────────────────────────────────────────────────
 # Weekly "What you learned" synthesis (M12)
 # ─────────────────────────────────────────────────────────────────────────
 
@@ -461,121 +285,6 @@ def synthesis_window_cards(links: List[dict]) -> List[dict]:
 
 def _card_index(cards: List[dict]) -> dict:
     return {c["id"]: c for c in cards if c.get("id")}
-
-
-def format_synthesis_email(synth: dict, cards: List[dict]) -> tuple:
-    """Return (subject, html_body, text_body) for the weekly synthesis email."""
-    by_id = _card_index(cards)
-    title = (synth.get("title") or "What you learned this week").strip()
-    subject = f"🧠 {title}"
-
-    def _rtl(s: str) -> str:
-        return ' dir="rtl"' if is_hebrew(s or "") else ""
-
-    # Narrative — render paragraph breaks.
-    narrative = html.escape((synth.get("narrative") or "").strip())
-    narrative_html = "".join(
-        f'<p style="margin:0 0 14px;font:400 15px/1.7 -apple-system,Segoe UI,Roboto,sans-serif;color:#c8c8dc;"{_rtl(p)}>{p}</p>'
-        for p in narrative.split("\n") if p.strip()
-    )
-
-    theme_rows = []
-    for theme in (synth.get("themes") or []):
-        t_title = html.escape((theme.get("title") or "").strip())
-        insight = html.escape((theme.get("insight") or "").strip())
-        card_links = []
-        for cid in (theme.get("cardIds") or []):
-            c = by_id.get(cid)
-            if not c:
-                continue
-            ct = html.escape((c.get("title") or "Untitled").strip())
-            url = html.escape(_link_url(cid))
-            card_links.append(
-                f'<a href="{url}" style="display:block;margin:4px 0;font:500 14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#a78bfa;text-decoration:none;">↳ {ct}</a>'
-            )
-        theme_rows.append(f"""
-        <tr><td style="padding:0 0 18px;">
-          <div style="font:700 16px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#ffffff;">{t_title}</div>
-          <div style="margin:4px 0 8px;font:400 14px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#b6b6cc;">{insight}</div>
-          {''.join(card_links)}
-        </td></tr>""")
-
-    standout_html = ""
-    standout_id = synth.get("standoutCardId")
-    standout = by_id.get(standout_id) if standout_id else None
-    if standout:
-        reason = html.escape((synth.get("standoutReason") or "").strip())
-        ct = html.escape((standout.get("title") or "Untitled").strip())
-        url = html.escape(_link_url(standout_id))
-        standout_html = f"""
-        <tr><td style="padding:4px 0 18px;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#1b1b29;border:1px solid #2c2c40;border-radius:16px;">
-            <tr><td style="padding:16px 18px;">
-              <div style="font:600 11px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#f0b45a;letter-spacing:.08em;text-transform:uppercase;">⭐ Standout</div>
-              <a href="{url}" style="display:block;margin:6px 0 4px;font:700 16px/1.35 -apple-system,Segoe UI,Roboto,sans-serif;color:#ffffff;text-decoration:none;">{ct}</a>
-              <div style="font:400 14px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#b6b6cc;">{reason}</div>
-            </td></tr>
-          </table>
-        </td></tr>"""
-
-    question_html = ""
-    question = html.escape((synth.get("openQuestion") or "").strip())
-    if question:
-        question_html = f"""
-        <tr><td style="padding:4px 0 18px;">
-          <div style="font:600 11px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;color:#8a8aa3;letter-spacing:.08em;text-transform:uppercase;">💭 Worth sitting with</div>
-          <div style="margin-top:6px;font:400 15px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#c8c8dc;font-style:italic;">{question}</div>
-        </td></tr>"""
-
-    html_body = f"""<!doctype html>
-<html><body style="margin:0;padding:0;background:#0e0e16;">
-  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#0e0e16;">
-    <tr><td align="center" style="padding:32px 16px;">
-      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;">
-        <tr><td style="padding:0 4px 20px;">
-          <div style="font:800 24px/1.25 -apple-system,Segoe UI,Roboto,sans-serif;background:linear-gradient(90deg,#a78bfa,#ec4899);-webkit-background-clip:text;background-clip:text;color:#a78bfa;"{_rtl(title)}>{html.escape(title)}</div>
-          <div style="margin-top:6px;font:400 13px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;color:#8a8aa3;">Your week in Machina AI</div>
-        </td></tr>
-        <tr><td style="padding:0 4px 8px;">{narrative_html}</td></tr>
-        {''.join(theme_rows)}
-        {standout_html}
-        {question_html}
-        <tr><td align="center" style="padding:8px 0 4px;">
-          <a href="{html.escape(APP_URL)}" style="display:inline-block;background:linear-gradient(90deg,#7c3aed,#db2777);color:#fff;font:700 14px/1 -apple-system,Segoe UI,Roboto,sans-serif;text-decoration:none;padding:14px 26px;border-radius:999px;">Open Machina AI</a>
-        </td></tr>
-        <tr><td align="center" style="padding:22px 0 0;">
-          <div style="font:400 12px/1.6 -apple-system,Segoe UI,Roboto,sans-serif;color:#5c5c75;">You're getting this weekly recap because digests are on in Machina AI.<br/>Change it anytime in Settings.</div>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>"""
-
-    # ── Plain text ──
-    text_lines = [title, ""]
-    if synth.get("narrative"):
-        text_lines += [synth["narrative"].strip(), ""]
-    for theme in (synth.get("themes") or []):
-        if theme.get("title"):
-            text_lines.append(theme["title"])
-        if theme.get("insight"):
-            text_lines.append(f"  {theme['insight']}")
-        for cid in (theme.get("cardIds") or []):
-            c = by_id.get(cid)
-            if c:
-                text_lines.append(f"  - {(c.get('title') or 'Untitled').strip()}: {_link_url(cid)}")
-        text_lines.append("")
-    if standout:
-        text_lines.append(f"Standout: {(standout.get('title') or 'Untitled').strip()} — {_link_url(standout_id)}")
-        if synth.get("standoutReason"):
-            text_lines.append(f"  {synth['standoutReason']}")
-        text_lines.append("")
-    if synth.get("openQuestion"):
-        text_lines += [f"Worth sitting with: {synth['openQuestion']}", ""]
-    text_lines.append(f"Open Machina AI: {APP_URL}")
-    text_body = "\n".join(text_lines)
-
-    return subject, html_body, text_body
 
 
 def _write_inapp_synthesis(uid: str, synth: dict, cards: List[dict], week_id: str) -> None:
@@ -624,7 +333,7 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
     """Generate the weekly "What you learned" synthesis and deliver it.
 
     Always writes the in-app special card (that's the primary surface), and
-    additionally sends over whichever push/email channels the user has on.
+    additionally sends a push notification when the user has the push channel on.
     Returns a result dict shaped like build_and_send_digest's.
     """
     from ai_service import GeminiService, AnalysisError
@@ -669,17 +378,6 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
                 result["channels"].append("push")
         except Exception as e:
             logger.error(f"Synthesis push send failed for {uid}: {e}")
-
-    # Email
-    if "email" in channels:
-        email_addr = user_data.get("email") or settings.get("email")
-        if email_addr:
-            try:
-                subject, html_body, text_body = format_synthesis_email(synth, cards)
-                if send_email(email_addr, subject, html_body, text_body):
-                    result["channels"].append("email")
-            except Exception as e:
-                logger.error(f"Synthesis email send failed for {uid}: {e}")
 
     result["sent"] = True
     get_db().collection("users").document(uid).set(
@@ -835,20 +533,6 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
                 logger.error(f"Digest push send failed for {uid}: {e}")
         else:
             logger.info(f"Digest: user {uid} has push channel but no device tokens")
-
-    # Email
-    if "email" in channels:
-        email_addr = user_data.get("email") or settings.get("email")
-        if email_addr:
-            try:
-                subject, html_body, text_body = format_digest_email(cards, mode, topics, frequency)
-                if send_email(email_addr, subject, html_body, text_body):
-                    result["channels"].append("email")
-                    delivered_any = True
-            except Exception as e:
-                logger.error(f"Digest email send failed for {uid}: {e}")
-        else:
-            logger.warning(f"Digest: user {uid} has email channel but no address")
 
     if delivered_any:
         result["sent"] = True

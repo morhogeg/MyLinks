@@ -1,8 +1,8 @@
-"""digest_service pure formatters and channel normalization.
+"""digest_service pure helpers and channel normalization.
 
-digest_service imports google.cloud.firestore / requests / db at module top;
-conftest fakes those offline. The functions tested here are pure (no db/network
-calls), so they run directly.
+digest_service imports google.cloud.firestore / db at module top; conftest
+fakes those offline. The functions tested here are pure (no db/network calls),
+so they run directly.
 """
 
 import digest_service as ds
@@ -21,12 +21,19 @@ def test_normalize_channels_maps_whatsapp_to_push():
 def test_normalize_channels_dedupes_after_migration():
     # push + legacy whatsapp collapse to a single push, order preserved.
     assert ds._normalize_channels(["push", "whatsapp"]) == ["push"]
-    assert ds._normalize_channels(["whatsapp", "email"]) == ["push", "email"]
+    # whatsapp migrates to push; the retired email channel is dropped.
+    assert ds._normalize_channels(["whatsapp", "email"]) == ["push"]
 
 
-def test_normalize_channels_preserves_valid_channels():
-    assert ds._normalize_channels(["push", "email"]) == ["push", "email"]
-    assert ds._normalize_channels(["email"]) == ["email"]
+def test_normalize_channels_drops_retired_email():
+    # Email delivery was cut: it's silently dropped at read time, never kept.
+    assert ds._normalize_channels(["push", "email"]) == ["push"]
+    # An email-only legacy user falls back to the always-on in-app surface.
+    assert ds._normalize_channels(["email"]) == []
+
+
+def test_normalize_channels_preserves_push():
+    assert ds._normalize_channels(["push"]) == ["push"]
 
 
 def test_normalize_channels_empty_list_stays_empty():
@@ -85,53 +92,3 @@ def test_to_ms_handles_none_and_numbers():
 def test_to_ms_parses_iso_string():
     assert ds._to_ms("2021-01-01T00:00:00Z") > 0
     assert ds._to_ms("not-a-date") == 0
-
-
-# ── format_digest_email ───────────────────────────────────────────────────
-
-CARDS = [
-    {
-        "id": "c1",
-        "title": "First Card",
-        "summary": "Summary one.",
-        "category": "Tech",
-        "sourceName": "CNN",
-        "metadata": {"estimatedReadTime": 4},
-    },
-    {
-        "id": "c2",
-        "title": "Second Card",
-        "summary": "Summary two.",
-        "category": "Health",
-    },
-]
-
-
-def test_format_digest_email_returns_subject_html_text():
-    subject, html_body, text_body = ds.format_digest_email(CARDS, "smart", None, "weekly")
-    assert isinstance(subject, str) and isinstance(html_body, str) and isinstance(text_body, str)
-    # Subject reflects cadence + card count.
-    assert "Weekly" in subject
-    assert "2 cards" in subject
-
-
-def test_format_digest_email_daily_cadence():
-    subject, _, _ = ds.format_digest_email(CARDS, "smart", None, "daily")
-    assert "Daily" in subject
-
-
-def test_format_digest_email_body_contains_card_content():
-    _, html_body, text_body = ds.format_digest_email(CARDS, "smart", None, "weekly")
-    for card in CARDS:
-        assert card["title"] in html_body
-        assert card["title"] in text_body
-        # Each card links back with its id.
-        assert f"linkId={card['id']}" in html_body
-        assert f"linkId={card['id']}" in text_body
-
-
-def test_format_digest_email_escapes_html_in_titles():
-    dangerous = [{"id": "x", "title": "<script>alert(1)</script>", "summary": "s", "category": "Tech"}]
-    _, html_body, _ = ds.format_digest_email(dangerous, "smart", None, "weekly")
-    assert "<script>alert(1)</script>" not in html_body
-    assert "&lt;script&gt;" in html_body

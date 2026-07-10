@@ -2125,7 +2125,7 @@ def force_check_reminders(req: https_fn.Request) -> https_fn.Response:
 
 
 # ─────────────────────────────────────────────
-# Curated Digest (push + email)
+# Curated Digest (push)
 # ─────────────────────────────────────────────
 
 # Cadence MUST match DIGEST_CADENCE_MINUTES in digest_service.py — is_due() uses
@@ -2189,9 +2189,6 @@ def send_digest_now(req: https_fn.CallableRequest) -> dict:
         short = key.replace("digest_", "")
         if req.data and short in req.data:
             overrides[key] = req.data[short]
-    # NOTE: the delivery address is always the user's own stored email — we do
-    # NOT honor a client-supplied "email" override (that allowed exfiltrating a
-    # digest to an arbitrary address).
     if overrides:
         user_data.setdefault("settings", {})
         user_data["settings"] = {**user_data.get("settings", {}), **overrides}
