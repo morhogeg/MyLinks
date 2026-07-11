@@ -629,10 +629,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         });
     }, []);
 
-    // Stable SwipeDeck (Review mode) action handlers.
-    const swipeFavorite = useCallback((link: Link) => handleStatusChange(link.id, 'favorite'), [handleStatusChange]);
-    const swipeArchive = useCallback((link: Link) => handleStatusChange(link.id, 'archived'), [handleStatusChange]);
-    const swipeResetStatus = useCallback((link: Link) => handleStatusChange(link.id, 'unread'), [handleStatusChange]);
+    // Stable SwipeDeck (Review mode) action handlers. Silent: the deck's own
+    // motion + session tallies confirm each action, and stacked success toasts
+    // were covering the deck's Undo/Archive/Remind/Keep buttons.
+    const swipeFavorite = useCallback((link: Link) => handleStatusChange(link.id, 'favorite', { silent: true }), [handleStatusChange]);
+    const swipeArchive = useCallback((link: Link) => handleStatusChange(link.id, 'archived', { silent: true }), [handleStatusChange]);
+    const swipeResetStatus = useCallback((link: Link) => handleStatusChange(link.id, 'unread', { silent: true }), [handleStatusChange]);
     // Undo of an up-swipe: clear the reminder the deck just set for this card (F-29).
     // Clearing (not restoring a prior state) is safe because reviewQueue.isOpen
     // excludes reminder-pending cards from every deck queue — a dealt card can't

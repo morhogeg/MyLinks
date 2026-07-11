@@ -15,16 +15,19 @@ import { useToast } from '@/components/Toast';
  * surface failures and confirm meaningful actions.
  */
 export function useLinkActions(uid: string | null | undefined, toast: ReturnType<typeof useToast>) {
-    const handleStatusChange = useCallback(async (id: string, status: LinkStatus) => {
+    const handleStatusChange = useCallback(async (id: string, status: LinkStatus, opts?: { silent?: boolean }) => {
         if (!uid) return;
         try {
             await updateLinkStatus(uid, id, status);
+            // silent: callers whose UI already confirms the action (the Review
+            // deck's fling + session tallies) skip the success toast — stacked
+            // per-swipe toasts covered the deck's action buttons. Errors always toast.
             const labels: Record<string, string> = {
                 archived: 'Archived',
                 favorite: 'Added to favorites',
                 unread: 'Marked as unread',
             };
-            if (labels[status]) toast.success(labels[status]);
+            if (!opts?.silent && labels[status]) toast.success(labels[status]);
         } catch {
             toast.error("Couldn't update the link. Please try again.");
         }
