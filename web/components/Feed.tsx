@@ -659,9 +659,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         onAskModeChange?.(viewMode === 'ask');
     }, [viewMode, onAskModeChange]);
 
-    // Hide the add-link FAB in Ask *and* Collections — neither view captures links.
+    // Hide the add-link FAB in Ask, Collections, Digest, and Review — none of
+    // these views capture links (and in Review it overlaps the Keep button).
     useEffect(() => {
-        onHideAddButton?.(viewMode === 'ask' || viewMode === 'collections' || viewMode === 'digest');
+        onHideAddButton?.(viewMode === 'ask' || viewMode === 'collections' || viewMode === 'digest' || viewMode === 'review');
     }, [viewMode, onHideAddButton]);
 
     if (isLoading) {
