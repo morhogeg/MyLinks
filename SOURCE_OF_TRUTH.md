@@ -603,6 +603,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-11 (later) — Review-mode device feedback fixed + reshipped (merge
+  `60c5d23`; TestFlight run #66 → build 1066).** Owner tested build 1065:
+  Review mode didn't read as a Tinder deck — the deck overflowed the viewport
+  (action buttons clipped, page scroll fighting vertical swipes), queue chips
+  wrapped to two rows, giant card. Fix (`fc46556`, SwipeDeck.tsx only): deck
+  height now derives from `visualViewport` (WKWebView innerHeight overstates
+  usable height) with no overflow-forcing floor, re-measures on viewport
+  changes; queue chips compact single-row ("Needs tidying"→"Tidy"); the
+  swipe-instructions caption removed; titles clamp to 2 lines; and a fling
+  wedge-hardening — `finishExit` runs from transitionend OR a 420ms
+  seq-guarded fallback timer, so a dropped transitionend (WKWebView
+  backgrounding) can no longer leave the deck stuck ignoring input. Web live
+  via Vercel. **⚠️ Verify on build 1066:** whole deck on one screen (chips +
+  card + buttons, no scroll), swipes feel right. If it still doesn't feel
+  Tinder-like after this, the next lever is design (card aspect/stack peek),
+  not layout math.
 - **2026-07-11 — SHIPPED: the product-review execution below (merge `b71657a`
   to `main`).** **Desktop web:** live via Vercel auto-deploy. **iOS:
   TestFlight run #65 → build 1065**, fired via the established
