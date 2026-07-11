@@ -72,7 +72,20 @@ the cards.
 stricter prompt, else visibly downgrade ("Machina couldn't tie this answer to your
 saves"). Never render the confident-and-uncited state.
 
-## 4. [ ] The retention loop silently no-ops for a default user
+## 4. [x] The retention loop silently no-ops for a default user
+
+> **DONE 2026-07-11** (commits `006876b`, `875dc12`, remediation sprint; email item
+> was already fixed by an earlier session in `b62bdb7` — verified cut, nothing
+> writes to a dead channel). One-shots: ReminderModal now stores Tomorrow/Next
+> Week/Custom as profile `once` (single fire; reopening shows Custom pre-filled).
+> In-app fallback: the reminder sweep no longer skips pushless users — every due
+> reminder flags the link `reminderDue` and the feed shows a "Reminders due" strip
+> (open/dismiss clears it); push is delivered on top when available. Push asked at
+> first intent: saving a reminder on never-prompted native re-surfaces PushNudge;
+> web modal gets an honest "reminders appear in the app" note. Digest defaults ON
+> weekly for NEW workspaces only (backend + web defaults; existing users
+> untouched). Needs owner deploy: `./deploy-functions.sh` for the reminder-loop
+> and default changes; device-verify the nudge-at-intent + due strip.
 
 **Problem.** Reminders/digests/synthesis all funnel through push, which defaults
 OFF (`useUserSettings.ts:16`), asked once, native-only (`PushNudge`). Reminders are
