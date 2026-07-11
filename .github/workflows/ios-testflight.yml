@@ -28,6 +28,9 @@ on:
   # the native setup is confirmed:
   # push:
   #   branches: [main]
+  # TEMP push trigger — cloud sessions can't call workflow_dispatch (403).
+  push:
+    branches: [claude/ship-tf-trigger-notes]
   #   paths:
   #     - 'web/**'
   #     - '.github/workflows/ios-testflight.yml'
