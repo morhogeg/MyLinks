@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { updateLinkStatus, updateLinkTags, updateLinkCategory, updateLinkTitle, updateLinkSummary, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
+import { updateLinkStatus, updateLinkTags, updateLinkCategory, updateLinkTitle, updateLinkSummary, updateLinkNote, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
 import { publishCard, removeLinkFromCollection } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
 import { useToast } from '@/components/Toast';
@@ -77,6 +77,17 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
         }
     }, [uid, toast]);
 
+    // The user's personal note on a card — their own annotation, distinct from
+    // the AI summary. Optimistic via onSnapshot latency compensation.
+    const handleUpdateNote = useCallback(async (id: string, note: string) => {
+        if (!uid) return;
+        try {
+            await updateLinkNote(uid, id, note);
+        } catch {
+            toast.error("Couldn't save your note. Please try again.");
+        }
+    }, [uid, toast]);
+
     // Retry analysis for a failed capture card (M3). Optimistically flips the card
     // back to `processing` and re-runs analysis in place; on failure it returns to
     // a `failed` card so nothing is ever lost.
@@ -124,6 +135,7 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
         handleUpdateCategory,
         handleUpdateTitle,
         handleUpdateSummary,
+        handleUpdateNote,
         handleRetryProcessing,
         handleRemoveFromCollection,
         handleShareCard,
