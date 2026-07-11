@@ -77,36 +77,83 @@ def safe_get(url: str, *, headers: Optional[dict] = None,
     raise UnsafeURLError("Too many redirects")
 
 
+# A scraped result whose readable text (whitespace removed) is shorter than this
+# is treated as "nothing readable" — a JS shell, a login/paywall gate, or a
+# binary document. We degrade honestly rather than feed markup/junk to the model.
+_MIN_READABLE_CHARS = 40
+
+
+def _readable_len(text: Optional[str]) -> int:
+    """Length of `text` with all whitespace removed — a cheap 'is there real
+    content here?' probe that ignores the scaffolding we add (labels, rules)."""
+    if not text:
+        return 0
+    probe = text.replace("SHARED CAPTION:", "").replace("---", "")
+    return len(re.sub(r"\s+", "", probe))
+
+
+def _unreadable_result(title: str, note: str = "[no text content available]") -> dict:
+    """An honest 'this content couldn't be read' result.
+
+    The body is the EXACT ``[no text content available]`` placeholder the
+    GROUNDING prompt rule (ai_service.py) recognizes, so the model writes a
+    plain "content could not be retrieved" card instead of fabricating a summary
+    of unread bytes. Also sets ``truncated=True`` — the SAME channel Facebook
+    uses — so ``main._analyze_scraped`` appends the capture note."""
+    return {"html": "", "title": title, "text": note, "truncated": True}
+
+
 def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
     """
     Fetch and extract content from a URL.
     Handles Twitter/X and Instagram URLs specially.
 
     Returns:
-        dict with 'html', 'title', 'text' keys
+        dict with 'html', 'title', 'text' keys (plus 'truncated' when the
+        content could only be partially read, or not read at all).
     """
     try:
         # SSRF guard: block private/internal/metadata targets before any fetch.
         validate_public_url(url)
 
+        # Dispatch on the PARSED HOSTNAME (exact domain or a subdomain of it),
+        # never a substring of the raw URL: substring matching lets a hostile
+        # host like `instagram.com.evil.test` (or `evil.test/?x=instagram.com`)
+        # hijack a platform branch. `_host_is` matches `instagram.com` and
+        # `www.instagram.com` but not `instagram.com.evil.test`.
+        host = (urlparse(url).hostname or '').lower()
+
+        def _host_is(*domains: str) -> bool:
+            return any(host == d or host.endswith('.' + d) for d in domains)
+
+        # PDFs (and other non-HTML documents) can't be read as text by the HTML
+        # scraper — the BeautifulSoup pass yields garbled bytes that the model
+        # then "summarizes" with confident nonsense. Detect a .pdf URL up front
+        # (cheap, no fetch) and degrade honestly. Content-Type is also checked
+        # after the fetch below for URLs that don't end in .pdf.
+        path = (urlparse(url).path or '').lower()
+        if path.endswith('.pdf'):
+            logger.info(f"Unreadable content type (.pdf URL): {url}")
+            return _unreadable_result("PDF document")
+
         # Special handling for Twitter/X URLs
-        if 'twitter.com' in url or 'x.com' in url:
+        if _host_is('twitter.com', 'x.com'):
             return _scrape_twitter_url(url)
 
         # Special handling for Instagram URLs
-        if 'instagram.com' in url:
+        if _host_is('instagram.com'):
             return _scrape_instagram_url(url, message_body)
 
         # Special handling for YouTube URLs
-        if 'youtube.com' in url or 'youtu.be' in url:
+        if _host_is('youtube.com', 'youtu.be'):
             return _scrape_youtube_url(url, message_body=message_body)
 
         # Special handling for LinkedIn URLs (capture the post author's name)
-        if 'linkedin.com' in url:
+        if _host_is('linkedin.com'):
             return _scrape_linkedin_url(url)
 
         # Special handling for Facebook URLs (full caption, not just og intro)
-        if 'facebook.com' in url or 'fb.watch' in url or 'fb.com' in url:
+        if _host_is('facebook.com', 'fb.watch', 'fb.com'):
             return _scrape_facebook_url(url, message_body)
 
         # General URL scraping with BeautifulSoup
@@ -116,6 +163,14 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         response = safe_get(url, headers=headers, timeout=10)
         response.raise_for_status()
 
+        # Content-Type honesty: a URL that didn't end in .pdf can still serve a
+        # PDF (or other non-HTML document). Reading its bytes as HTML produces
+        # junk, so degrade honestly here too rather than hand garbage to the model.
+        ctype = (response.headers.get('Content-Type') or '').lower()
+        if 'application/pdf' in ctype:
+            logger.info(f"Unreadable content type ({ctype}): {url}")
+            return _unreadable_result("PDF document")
+
         html = response.text
 
         from bs4 import BeautifulSoup
@@ -123,7 +178,7 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
 
         # Extract title
         title = ""
-        if soup.title:
+        if soup.title and soup.title.string:
             title = soup.title.string.strip()
 
         # Extract text from paragraphs and main content
@@ -136,7 +191,34 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         if article:
             text_parts.append(article.get_text().strip())
 
-        text = " ".join(text_parts)[:5000]
+        text = " ".join(text_parts).strip()[:5000]
+
+        # `truncated` = we could only read a partial preview, not the real body.
+        # It rides the SAME channel Facebook uses; main._analyze_scraped appends
+        # the honest "couldn't get the full text" note when it's set.
+        truncated = False
+
+        # Fallbacks for JS-gated pages (TikTok, JS shells, SPAs) that carry no
+        # <p>/<article> text. First try the body's visible text (scripts/styles
+        # stripped): a server-rendered page keeps its real content in divs, so if
+        # that's substantial we treat it as the genuine body (NOT truncated).
+        if not text:
+            for tag in soup(["script", "style", "noscript", "template"]):
+                tag.decompose()
+            body_text = " ".join(soup.get_text(" ", strip=True).split())[:5000]
+            if _readable_len(body_text) >= _MIN_READABLE_CHARS:
+                text = body_text
+            else:
+                # Only the social-preview meta tags are left — a teaser, never the
+                # real article. Use it (better than nothing) but flag it truncated
+                # so we don't present a preview as the whole thing.
+                og_bits = []
+                for name in ('og:title', 'og:description', 'twitter:title', 'twitter:description'):
+                    tag = soup.find('meta', property=name) or soup.find('meta', attrs={'name': name})
+                    if tag and tag.get('content'):
+                        og_bits.append(tag['content'].strip())
+                text = "\n".join(dict.fromkeys(b for b in og_bits if b))[:5000]
+                truncated = True
 
         # Fold in any caption/text the share carried. For JS-gated pages the
         # on-page extraction is often empty, and this shared text is the only
@@ -147,10 +229,20 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
             if caption_guess and len(caption_guess) > 5 and caption_guess not in text:
                 text = (f"SHARED CAPTION:\n{caption_guess}\n\n---\n\n{text}").strip()
 
+        # If after every fallback there's still essentially no readable content,
+        # this was a JS shell / gated / binary page. Return an honest placeholder
+        # (the grounding rule turns it into a "content could not be retrieved"
+        # card) instead of hallucinating a summary from raw markup — which is
+        # exactly what the old `text or html[:5000]` fallback did.
+        if _readable_len(text) < _MIN_READABLE_CHARS:
+            logger.info(f"No readable content extracted: {url}")
+            return _unreadable_result(title or "")
+
         return {
             "html": html,
             "title": title,
-            "text": text or html[:5000]
+            "text": text,
+            "truncated": truncated,
         }
 
     except Exception as e:
@@ -258,7 +350,7 @@ def _scrape_linkedin_url(url: str) -> dict:
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
     }
     try:
-        response = requests.get(url, headers=headers, timeout=10)
+        response = safe_get(url, headers=headers, timeout=10)
         html = response.text
 
         from bs4 import BeautifulSoup
@@ -301,7 +393,7 @@ def _scrape_twitter_url(url: str) -> dict:
         logger.info(f"Attempting fxtwitter API: {fx_api_url}")
 
         try:
-            response = requests.get(fx_api_url, timeout=10)
+            response = safe_get(fx_api_url, timeout=10)
             if response.ok:
                 data = response.json()
                 if data.get('tweet'):
@@ -326,7 +418,7 @@ def _scrape_twitter_url(url: str) -> dict:
 
         vx_result = None
         try:
-            response = requests.get(vx_api_url, timeout=10)
+            response = safe_get(vx_api_url, timeout=10)
             if response.ok:
                 data = response.json()
 
@@ -353,6 +445,7 @@ def _scrape_twitter_url(url: str) -> dict:
             logger.info("Scrape failed, reverting to thin vxtwitter result")
             return vx_result
 
+        logger.warning(f"All Twitter extraction methods (fxtwitter/vxtwitter/metadata) failed for {url}")
         return {"html": "", "title": "", "text": ""}
 
     except Exception as e:
@@ -366,8 +459,9 @@ def _scrape_twitter_metadata(url: str) -> dict:
         headers = {
             'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
         }
-        response = requests.get(url, headers=headers, timeout=10)
+        response = safe_get(url, headers=headers, timeout=10)
         if not response.ok:
+            logger.warning(f"Twitter metadata scrape got HTTP {response.status_code} for {url}")
             return {"html": "", "title": "", "text": ""}
 
         html = response.text
@@ -379,6 +473,7 @@ def _scrape_twitter_metadata(url: str) -> dict:
         desc = desc_match.group(1) if desc_match else ""
 
         if not title and not desc:
+            logger.warning(f"Twitter metadata scrape found no og:title/og:description for {url}")
             return {"html": "", "title": "", "text": ""}
 
         formatted_text = f"""
@@ -575,7 +670,7 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
         }
-        response = requests.get(url, headers=headers, timeout=10)
+        response = safe_get(url, headers=headers, timeout=10)
         if response.ok:
             from bs4 import BeautifulSoup
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -616,7 +711,7 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
                 bridge_url = url.replace('instagram.com', bridge)
                 logger.info(f"Trying Instagram bridge: {bridge_url}")
                 headers = {"User-Agent": MOBILE_USER_AGENT}
-                response = requests.get(bridge_url, headers=headers, timeout=5)
+                response = safe_get(bridge_url, headers=headers, timeout=5)
                 if response.ok:
                     from bs4 import BeautifulSoup
                     soup = BeautifulSoup(response.text, 'html.parser')
@@ -654,7 +749,7 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
             caption_guess = caption_guess.replace(n, '').strip()
 
         if caption_guess and len(caption_guess) > 5:
-            metadata_lines.append(f"WHATSAPP SHARED CAPTION:\n{caption_guess}")
+            metadata_lines.append(f"SHARED CAPTION:\n{caption_guess}")
             if len(caption_guess) > len(best_desc):
                 best_desc = caption_guess
             if best_title in generic_titles:
@@ -757,7 +852,7 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
         }
-        response = requests.get(url, headers=headers, timeout=10)
+        response = safe_get(url, headers=headers, timeout=10)
         if response.ok:
             from bs4 import BeautifulSoup
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -824,7 +919,7 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
     if message_body and url in message_body:
         caption_guess = message_body.replace(url, '').strip()
         if caption_guess and len(caption_guess) > 5:
-            metadata_lines.append(f"WHATSAPP SHARED CAPTION:\n{caption_guess}")
+            metadata_lines.append(f"SHARED CAPTION:\n{caption_guess}")
             if len(caption_guess) > len(best_desc):
                 best_desc = caption_guess
             if best_title in generic_titles or best_title == "Facebook Post":
@@ -888,7 +983,7 @@ def _scrape_youtube_url(url: str, message_body: Optional[str] = None) -> dict:
     # oEmbed: title + channel + thumbnail (no API key, not IP-blocked).
     try:
         oembed_url = f"https://www.youtube.com/oembed?url={watch_url}&format=json"
-        resp = requests.get(oembed_url, timeout=8)
+        resp = safe_get(oembed_url, timeout=8)
         if resp.ok:
             data = resp.json()
             title = data.get("title") or title
@@ -897,7 +992,7 @@ def _scrape_youtube_url(url: str, message_body: Optional[str] = None) -> dict:
     except Exception as e:
         logger.warning(f"YouTube oEmbed failed: {e}")
 
-    # A caption shared alongside the link (e.g. via WhatsApp) is useful context.
+    # A caption shared alongside the link is useful context.
     shared_note = ""
     if message_body:
         body_clean = message_body.replace(url, "").strip()

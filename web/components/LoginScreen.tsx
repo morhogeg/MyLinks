@@ -47,7 +47,6 @@ export default function LoginScreen({
             <div className="w-full max-w-sm flex flex-col items-center text-center">
                 {/* Brand mark */}
                 <div className="w-16 h-16 rounded-3xl overflow-hidden shadow-lg shadow-purple-500/20 ring-1 ring-white/15">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
                 </div>
                 <h1 className="mt-6 text-2xl font-extrabold tracking-tight bg-[image:var(--accent-gradient)] bg-clip-text text-transparent">

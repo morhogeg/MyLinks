@@ -3,7 +3,6 @@ Link Service
 Handles Firestore operations for links and users.
 """
 
-import re
 import secrets
 import logging
 from datetime import datetime, timezone
@@ -16,7 +15,7 @@ from db import get_db
 logger = logging.getLogger(__name__)
 
 # Defaults for a brand-new workspace. Mirrors DEFAULT_SETTINGS in
-# web/components/SettingsModal.tsx — keep the two in sync.
+# web/lib/useUserSettings.ts — keep the two in sync.
 DEFAULT_USER_SETTINGS = {
     "theme": "dark",
     "daily_digest": False,
@@ -25,7 +24,12 @@ DEFAULT_USER_SETTINGS = {
     # Push flips true client-side once the user grants the OS permission.
     "push_enabled": False,
     "reminders_channel": ["push"],
-    "digest_enabled": False,
+    # Weekly digest is ON by default for NEW workspaces (retention loop). This
+    # default is only written into a brand-new user doc; existing users keep
+    # whatever they had (a missing digest_enabled is treated as off by
+    # digest_service.run — see the `if not settings.get("digest_enabled")`
+    # guards), so nobody is force-enabled retroactively.
+    "digest_enabled": True,
     "digest_frequency": "weekly",
     "digest_channels": ["push"],
     "digest_mode": "smart",
@@ -37,33 +41,6 @@ DEFAULT_USER_SETTINGS = {
     "digest_day": 0,
     "digest_skip_empty": True,
 }
-
-
-def find_user_by_phone(phone_number: str) -> Optional[str]:
-    """
-    Look up user UID by phone number in Firestore.
-    Robust matching: searches both 'phone_number' and 'phoneNumber'.
-    """
-    db = get_db()
-    clean_number = re.sub(r'\D', '', phone_number)
-
-    logger.info(f"Searching for user with normalized phone: {clean_number}")
-
-    users_ref = db.collection('users')
-
-    formats = [f"+{clean_number}", clean_number]
-    fields = ['phone_number', 'phoneNumber']
-
-    for field in fields:
-        for val in formats:
-            query = users_ref.where(field, '==', val).limit(1)
-            docs = query.get()
-            if docs:
-                logger.info(f"Found user {docs[0].id} via {field}={val}")
-                return docs[0].id
-
-    logger.warning(f"User not found for phone: {phone_number} (normalized: {clean_number})")
-    return None
 
 
 def find_data_uid_by_auth_uid(auth_uid: str) -> Optional[str]:
@@ -189,7 +166,7 @@ def is_hebrew(text: str) -> bool:
 
 
 # \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-# Share Ingestion (iOS Shortcut / share sheet)
+# Share Ingestion (iOS Share Extension / browser extension)
 # \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 def ensure_ingest_token(uid: str) -> str:

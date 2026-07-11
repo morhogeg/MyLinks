@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, CheckCircle2, Circle, Check, Network, Play, Users, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2, ChevronLeft } from 'lucide-react';
+import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2, ChevronLeft, StickyNote } from 'lucide-react';
 import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
+import { openExternal } from '@/lib/share';
 import ReadingView from './ReadingView';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
@@ -30,6 +31,11 @@ function parseHighlight(entry: string): { seconds: number | null; label: string 
     return { seconds, label: rest?.trim() || stamp };
 }
 
+/** YouTube watch URL, optionally deep-linked to a timestamp (seconds). */
+function youtubeWatchUrl(id: string, seconds?: number | null): string {
+    return `https://www.youtube.com/watch?v=${id}${seconds != null ? `&t=${Math.floor(seconds)}s` : ''}`;
+}
+
 interface LinkDetailModalProps {
     link: Link;
     allLinks: Link[];
@@ -43,6 +49,9 @@ interface LinkDetailModalProps {
     onReadStatusChange: (id: string, isRead: boolean) => void;
     onUpdateTags: (id: string, tags: string[]) => void;
     onUpdateCategory: (id: string, category: string) => void;
+    onUpdateTitle?: (id: string, title: string) => void;
+    onUpdateSummary?: (id: string, summary: string) => void;
+    onUpdateNote?: (id: string, note: string) => void;
     onDelete: (id: string) => void;
     onUpdateReminder: (link: Link) => void;
     onOpenOtherLink?: (link: Link) => void;
@@ -64,6 +73,9 @@ export default function LinkDetailModal({
     onReadStatusChange,
     onUpdateTags,
     onUpdateCategory,
+    onUpdateTitle,
+    onUpdateSummary,
+    onUpdateNote,
     onDelete,
     onUpdateReminder,
     onOpenOtherLink,
@@ -73,24 +85,51 @@ export default function LinkDetailModal({
 }: LinkDetailModalProps) {
     const [isReading, setIsReading] = useState(false);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
-    const [editedCategory, setEditedCategory] = useState(link.category);
     const [now, setNow] = useState<number>(0);
     const [isAddingTag, setIsAddingTag] = useState(false);
-    // Timestamp (seconds) to seek the embedded video player to; null = start.
-    const [videoStart, setVideoStart] = useState<number | null>(null);
+    // Correctable AI output: the title and summary the model produced are drafts
+    // the user can fix. Drafts are held locally while editing, committed on Save.
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [isEditingSummary, setIsEditingSummary] = useState(false);
+    const [titleDraft, setTitleDraft] = useState('');
+    const [summaryDraft, setSummaryDraft] = useState('');
+    // The user's personal note on this card — their own thought, editable and
+    // held locally while writing, committed on Save.
+    const [isEditingNote, setIsEditingNote] = useState(false);
+    const [noteDraft, setNoteDraft] = useState('');
     const [imgFailed, setImgFailed] = useState(false);
-    useEffect(() => { setImgFailed(false); }, [link.id]);
+    // Reset the broken-image fallback when navigating to a different card. Done
+    // as a render-time state adjustment (React discards this pass and re-renders
+    // synchronously) rather than in an effect, avoiding a set-state-in-effect
+    // cascade while preserving the previous [link.id] reset behavior.
+    const [imgLinkId, setImgLinkId] = useState(link.id);
+    if (imgLinkId !== link.id) {
+        setImgLinkId(link.id);
+        setImgFailed(false);
+        // Abandon any in-progress edit when navigating to another card so a draft
+        // never leaks onto the wrong card.
+        setIsEditingTitle(false);
+        setIsEditingSummary(false);
+        setIsEditingNote(false);
+    }
+
+    const saveTitle = () => {
+        const t = titleDraft.trim();
+        setIsEditingTitle(false);
+        if (t && t !== link.title) onUpdateTitle?.(link.id, t);
+    };
+    const saveSummary = () => {
+        const s = summaryDraft.trim();
+        setIsEditingSummary(false);
+        if (s !== (link.summary || '')) onUpdateSummary?.(link.id, s);
+    };
+    const saveNote = () => {
+        const n = noteDraft.trim();
+        setIsEditingNote(false);
+        if (n !== (link.userNote || '')) onUpdateNote?.(link.id, n);
+    };
+    const startEditNote = () => { setNoteDraft(link.userNote || ''); setIsEditingNote(true); };
     const hasValidImage = !!link.url && /^https?:\/\//.test(link.url);
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(() => {
-        setEditedCategory(link.category);
-    }, [link.category]);
-
-    // Reset the player seek when switching to a different link (related-link nav).
-    useEffect(() => {
-        setVideoStart(null);
-    }, [link.id]);
 
     // Scroll back to the top when the card changes. Opening a related card reuses
     // this same scroll container, so without this it would open scrolled down to
@@ -123,6 +162,42 @@ export default function LinkDetailModal({
     // the keys. No-op on desktop (visualViewport spans the full window).
     const vp = useVisualViewport();
 
+    // A11y: move focus into the dialog on open and restore it to the trigger on
+    // close. Keyed on isOpen only, so navigating between related cards (which
+    // keeps the modal open and only changes link.id) never steals focus.
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const restoreFocusRef = useRef<HTMLElement | null>(null);
+    useEffect(() => {
+        if (!isOpen) return;
+        restoreFocusRef.current = (document.activeElement as HTMLElement) ?? null;
+        const t = setTimeout(() => dialogRef.current?.focus({ preventScroll: true }), 0);
+        return () => {
+            clearTimeout(t);
+            restoreFocusRef.current?.focus?.({ preventScroll: true });
+        };
+    }, [isOpen]);
+
+    // A11y: Escape closes the topmost open layer first — the distraction-free
+    // reader, an inline category edit, or the add-tag input — otherwise it
+    // dismisses the whole modal (same as the X / backdrop). Desktop-web win;
+    // harmless in the native WKWebView where hardware keyboards are rare.
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== 'Escape') return;
+            e.preventDefault();
+            if (isReading) setIsReading(false);
+            else if (isEditingTitle) setIsEditingTitle(false);
+            else if (isEditingSummary) setIsEditingSummary(false);
+            else if (isEditingNote) setIsEditingNote(false);
+            else if (isEditingCategory) setIsEditingCategory(false);
+            else if (isAddingTag) setIsAddingTag(false);
+            else onClose();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [isOpen, isReading, isEditingTitle, isEditingSummary, isEditingNote, isEditingCategory, isAddingTag, onClose]);
+
     if (!isOpen) return null;
 
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary) || (link.detailedSummary ? hasHebrew(link.detailedSummary) : false);
@@ -148,10 +223,13 @@ export default function LinkDetailModal({
         && !['facebook', 'screenshot', 'none'].includes(link.sourceName.trim().toLowerCase())
         ? link.sourceName : null;
 
-    const getTimeAgo = (timestamp: any, now: number): string => {
+    const getTimeAgo = (timestamp: number | string, now: number): string => {
         if (!timestamp || !now) return '...';
-        const time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
-        if (isNaN(time)) return isRtl ? 'לאחרונה' : 'recently';
+        let time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
+        if (isNaN(time) || time <= 0) return isRtl ? 'לאחרונה' : 'recently';
+        // Some ingest paths (Facebook, screenshots) store Unix *seconds*, not ms —
+        // anything below year-2001-in-ms is really a seconds value, so scale it up.
+        if (time < 1e12) time *= 1000;
 
         const seconds = Math.floor((now - time) / 1000);
         if (seconds < 60) return isRtl ? 'זה עתה' : 'just now';
@@ -186,10 +264,12 @@ export default function LinkDetailModal({
             />
 
             <div
+                ref={dialogRef}
+                tabIndex={-1}
                 role="dialog"
                 aria-modal="true"
                 aria-label="Link details"
-                className="relative bg-card border-0 sm:border border-white/10 w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-up"
+                className="relative bg-card border-0 sm:border border-border-strong w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-up focus:outline-none"
             >
                 {/* Header Actions — a single compact row: the item actions scroll
                     horizontally if they don't all fit (so nothing is ever clipped),
@@ -358,22 +438,28 @@ export default function LinkDetailModal({
                         )
                     )}
 
-                    {/* YouTube: embedded player + clickable key moments + speakers */}
-                    {link.sourceType === 'youtube' && link.metadata?.videoId && (
+                    {/* YouTube: thumbnail (the inline player trips a YouTube "error
+                        153" in the WebView) + clickable key moments that deep-link
+                        into the video on YouTube. */}
+                    {link.sourceType === 'youtube' && link.metadata?.videoId && (() => {
+                        const videoId = link.metadata.videoId;
+                        const thumb = link.metadata.thumbnailUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+                        return (
                         <div className="mb-6 space-y-4">
-                            <div className="rounded-2xl overflow-hidden border border-white/10 bg-black aspect-video">
-                                <iframe
-                                    key={videoStart ?? 'start'}
-                                    src={`https://www.youtube-nocookie.com/embed/${link.metadata.videoId}?rel=0${videoStart != null ? `&start=${videoStart}&autoplay=1` : ''}`}
-                                    title={link.title}
-                                    className="w-full h-full"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                    allowFullScreen
-                                />
-                            </div>
+                            <button
+                                onClick={() => openExternal(youtubeWatchUrl(videoId))}
+                                aria-label="Watch on YouTube"
+                                className="group relative block w-full h-28 sm:h-32 rounded-2xl overflow-hidden border border-border-strong bg-black cursor-pointer"
+                            >
+                                <img src={thumb} alt="" className="w-full h-full object-cover" />
+                                <span className="absolute inset-0 bg-black/[0.04] group-hover:bg-transparent transition-colors" />
+                                <span className="absolute bottom-2 end-2 inline-flex items-center gap-1 text-[11px] font-semibold text-white bg-black/60 px-2 py-0.5 rounded-full">
+                                    <Youtube className="w-3.5 h-3.5" /> Watch on YouTube
+                                </span>
+                            </button>
 
                             {!!link.metadata.videoHighlights?.length && (
-                                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                                <div className="rounded-2xl border border-border-strong bg-fill-subtle p-4">
                                     <h4 className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-text-muted mb-3">
                                         <Play className="w-3.5 h-3.5 text-accent" /> Key moments
                                     </h4>
@@ -383,9 +469,9 @@ export default function LinkDetailModal({
                                             return (
                                                 <li key={i}>
                                                     <button
-                                                        onClick={() => seconds != null && setVideoStart(seconds)}
+                                                        onClick={() => seconds != null && openExternal(youtubeWatchUrl(videoId, seconds))}
                                                         disabled={seconds == null}
-                                                        className={`w-full text-start flex items-start gap-3 rounded-lg px-2 py-1.5 transition-colors ${seconds != null ? 'hover:bg-white/5 cursor-pointer' : 'cursor-default'}`}
+                                                        className={`w-full text-start flex items-start gap-3 rounded-lg px-2 py-1.5 transition-colors ${seconds != null ? 'hover:bg-fill-subtle cursor-pointer' : 'cursor-default'}`}
                                                     >
                                                         {seconds != null && (
                                                             <span className="shrink-0 mt-0.5 text-[11px] font-bold text-accent tabular-nums bg-accent/10 px-1.5 py-0.5 rounded">
@@ -400,21 +486,9 @@ export default function LinkDetailModal({
                                     </ul>
                                 </div>
                             )}
-
-                            {!!link.metadata.speakers?.length && (
-                                <div className="flex items-center flex-wrap gap-2">
-                                    <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-text-muted">
-                                        <Users className="w-3.5 h-3.5" /> Speakers
-                                    </span>
-                                    {link.metadata.speakers.map((s, i) => (
-                                        <span key={i} className="text-xs font-medium text-text-secondary bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
-                                            {s}
-                                        </span>
-                                    ))}
-                                </div>
-                            )}
                         </div>
-                    )}
+                        );
+                    })()}
 
                     <div className="mb-4">
                         {(() => {
@@ -455,7 +529,8 @@ export default function LinkDetailModal({
                                                         e.stopPropagation();
                                                         setIsEditingCategory(true);
                                                     }}
-                                                    className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1.5 -ms-1.5 hover:bg-white/5 rounded-md"
+                                                    aria-label="Edit category"
+                                                    className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1.5 -ms-1.5 hover:bg-fill-subtle rounded-md"
                                                 >
                                                     <Pencil className="w-3.5 h-3.5 text-text-muted/40 hover:text-text-muted" />
                                                 </button>
@@ -510,9 +585,14 @@ export default function LinkDetailModal({
                                             <ImageIcon className="w-4 h-4 shrink-0" />
                                             <span>Screenshot</span>
                                         </span>
+                                    ) : link.sourceType === 'note' ? (
+                                        <span className="flex items-center gap-1.5 text-sm font-semibold text-accent whitespace-nowrap" title="Note">
+                                            <StickyNote className="w-4 h-4 shrink-0" />
+                                            <span>Note</span>
+                                        </span>
                                     ) : link.sourceName && link.sourceName !== 'None' ? (
                                         <span
-                                            className="text-[10px] font-black text-text-muted/60 bg-black/5 border border-black/10 dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest px-2.5 py-1.5 rounded-lg shadow-lg shadow-black/5 transition-all"
+                                            className="text-[10px] font-black text-text-muted/60 bg-fill-subtle border border-border-strong uppercase tracking-widest px-2.5 py-1.5 rounded-lg shadow-lg shadow-black/5 transition-all"
                                             title={link.sourceName}
                                         >
                                             {link.sourceName}
@@ -523,12 +603,56 @@ export default function LinkDetailModal({
                         })()}
                     </div>
 
-                    <h2
-                        dir="auto"
-                        className={`font-bold text-2xl text-text mb-4 leading-tight ${isRtl ? 'text-right' : ''}`}
-                    >
-                        {link.title}
-                    </h2>
+                    {isEditingTitle ? (
+                        <div className="mb-4">
+                            <textarea
+                                value={titleDraft}
+                                onChange={(e) => setTitleDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                    // Enter saves (a title is single-line); Shift+Enter is unused.
+                                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveTitle(); }
+                                }}
+                                rows={2}
+                                autoFocus
+                                dir="auto"
+                                aria-label="Edit title"
+                                className={`w-full font-bold text-2xl text-text leading-tight bg-background border border-accent/40 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none ${isRtl ? 'text-right' : ''}`}
+                            />
+                            <div className="flex gap-2 mt-2">
+                                <button
+                                    onClick={saveTitle}
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
+                                >
+                                    <Check className="w-3.5 h-3.5" /> Save
+                                </button>
+                                <button
+                                    onClick={() => setIsEditingTitle(false)}
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-fill-subtle text-text-muted text-xs font-bold hover:text-text hover:bg-fill-strong transition-all"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className={`group/title relative flex items-start gap-2 mb-4 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                            <h2
+                                dir="auto"
+                                className={`font-bold text-2xl text-text leading-tight flex-1 min-w-0 ${isRtl ? 'text-right' : ''}`}
+                            >
+                                {link.title}
+                            </h2>
+                            {onUpdateTitle && (
+                                <button
+                                    onClick={() => { setTitleDraft(link.title); setIsEditingTitle(true); }}
+                                    aria-label="Edit title"
+                                    title="Edit title"
+                                    className="shrink-0 mt-1 opacity-0 group-hover/title:opacity-100 focus:opacity-100 transition-opacity p-1.5 hover:bg-fill-subtle rounded-md"
+                                >
+                                    <Pencil className="w-4 h-4 text-text-muted/50 hover:text-text-muted" />
+                                </button>
+                            )}
+                        </div>
+                    )}
 
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                         {/* Card ↔ open are ONE thought at two zoom levels: the card
@@ -549,14 +673,70 @@ export default function LinkDetailModal({
                                 // Lead with the summary unless doing so would duplicate
                                 // a legacy overview-only (section-less) detailedSummary.
                                 const showLead = !!link.summary && (hasSections || !detailed);
+                                const startEditSummary = () => {
+                                    setSummaryDraft(link.summary || '');
+                                    setIsEditingSummary(true);
+                                };
                                 return (
                                     <>
-                                        {showLead && (
-                                            <SimpleMarkdown
-                                                content={link.summary}
-                                                isRtl={isRtl}
-                                                className={`text-lg ${detailBody ? 'mb-6' : ''}`}
-                                            />
+                                        {isEditingSummary ? (
+                                            <div className={detailBody ? 'mb-6' : ''}>
+                                                <textarea
+                                                    value={summaryDraft}
+                                                    onChange={(e) => setSummaryDraft(e.target.value)}
+                                                    rows={4}
+                                                    autoFocus
+                                                    dir="auto"
+                                                    aria-label="Edit summary"
+                                                    className={`w-full text-base text-text bg-background border border-accent/40 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none ${isRtl ? 'text-right' : ''}`}
+                                                />
+                                                <div className="flex gap-2 mt-2">
+                                                    <button
+                                                        onClick={saveSummary}
+                                                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
+                                                    >
+                                                        <Check className="w-3.5 h-3.5" /> Save
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setIsEditingSummary(false)}
+                                                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-fill-subtle text-text-muted text-xs font-bold hover:text-text hover:bg-fill-strong transition-all"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {showLead && (
+                                                    <div className={`group/summary relative ${detailBody ? 'mb-6' : ''}`}>
+                                                        <SimpleMarkdown
+                                                            content={link.summary}
+                                                            isRtl={isRtl}
+                                                            className="text-base"
+                                                        />
+                                                        {onUpdateSummary && (
+                                                            <button
+                                                                onClick={startEditSummary}
+                                                                aria-label="Edit summary"
+                                                                title="Edit summary"
+                                                                className={`absolute top-0 opacity-0 group-hover/summary:opacity-100 focus:opacity-100 transition-opacity p-1.5 hover:bg-fill-subtle rounded-md ${isRtl ? 'left-0' : 'right-0'}`}
+                                                            >
+                                                                <Pencil className="w-4 h-4 text-text-muted/50 hover:text-text-muted" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {/* Legacy prose-only cards hide the lead to avoid a
+                                                    duplicate — still let the user correct the summary. */}
+                                                {!showLead && onUpdateSummary && (
+                                                    <button
+                                                        onClick={startEditSummary}
+                                                        className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/60 hover:text-accent transition-colors"
+                                                    >
+                                                        <Pencil className="w-3.5 h-3.5" /> Edit summary
+                                                    </button>
+                                                )}
+                                            </>
                                         )}
                                         {detailBody && (
                                             <SimpleMarkdown
@@ -572,11 +752,11 @@ export default function LinkDetailModal({
 
 
                         <div className="flex flex-wrap items-center gap-4 text-sm text-text-muted mb-8">
-                            <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/5">
+                            <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-fill-subtle border border-border-subtle">
                                 <Clock className="w-3.5 h-3.5" />
                                 {link.metadata.estimatedReadTime} {isRtl ? 'דק׳ קריאה' : 'min read'}
                             </span>
-                            <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/5">
+                            <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-fill-subtle border border-border-subtle">
                                 <Tag className="w-3.5 h-3.5 text-accent" />
                                 {getTimeAgo(link.createdAt, now)}
                             </span>
@@ -609,7 +789,7 @@ export default function LinkDetailModal({
                                 return (
                                     <span
                                         key={tag}
-                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/70 hover:text-accent transition-all group/tag bg-white/5 hover:bg-white/10 px-2 py-1 rounded-lg border border-transparent hover:border-accent/10"
+                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/70 hover:text-accent transition-all group/tag bg-fill-subtle hover:bg-fill-strong px-2 py-1 rounded-lg border border-transparent hover:border-accent/10"
                                     >
                                         <span className="flex items-center">
                                             {parents && <span className="opacity-30 font-normal mr-0.5">{parents}/</span>}
@@ -639,13 +819,93 @@ export default function LinkDetailModal({
                             ) : (
                                 <button
                                     onClick={() => setIsAddingTag(true)}
-                                    className="inline-flex items-center gap-1 text-xs font-bold text-text-muted/50 hover:text-accent transition-all bg-white/5 hover:bg-white/10 px-2 py-1 rounded-lg border border-dashed border-white/10 hover:border-accent/30"
+                                    className="inline-flex items-center gap-1 text-xs font-bold text-text-muted/50 hover:text-accent transition-all bg-fill-subtle hover:bg-fill-strong px-2 py-1 rounded-lg border border-dashed border-border-strong hover:border-accent/30"
                                 >
                                     <Plus className="w-3 h-3" />
                                     <span>Add Tag</span>
                                 </button>
                             )}
                         </div>
+
+                        {/* My note — the user's OWN annotation on this card, on
+                            every card regardless of source, kept visually distinct
+                            from the AI summary. Empty state is an inviting one-tap
+                            "Add a note"; a saved note reads back in a warm accent
+                            panel that's tap-anywhere-to-edit. */}
+                        {onUpdateNote && (
+                            <div className="mb-8 border-t border-border-subtle pt-6">
+                                <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider mb-3 flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                                    <StickyNote className="w-4 h-4 text-accent" />
+                                    {isRtl ? 'ההערה שלי' : 'My note'}
+                                </h3>
+                                {isEditingNote ? (
+                                    <div>
+                                        <textarea
+                                            value={noteDraft}
+                                            onChange={(e) => setNoteDraft(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                // Notes are multi-line, so plain Enter adds a line;
+                                                // ⌘/Ctrl+Enter saves (a familiar "commit" chord).
+                                                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveNote(); }
+                                            }}
+                                            rows={4}
+                                            autoFocus
+                                            dir="auto"
+                                            placeholder={isRtl ? 'מה חשבת על זה?' : 'What were you thinking about this?'}
+                                            aria-label="Edit your note"
+                                            className={`w-full text-base text-text bg-background border border-accent/40 rounded-xl px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none placeholder:text-text-muted/50 leading-relaxed ${isRtl ? 'text-right' : ''}`}
+                                        />
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <button
+                                                onClick={saveNote}
+                                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
+                                            >
+                                                <Check className="w-3.5 h-3.5" /> Save note
+                                            </button>
+                                            <button
+                                                onClick={() => setIsEditingNote(false)}
+                                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-fill-subtle text-text-muted text-xs font-bold hover:text-text hover:bg-fill-strong transition-all"
+                                            >
+                                                Cancel
+                                            </button>
+                                            {link.userNote && (
+                                                <button
+                                                    onClick={() => { setIsEditingNote(false); onUpdateNote(link.id, ''); }}
+                                                    className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-text-muted/70 hover:text-red-400 transition-all ${isRtl ? 'mr-auto' : 'ml-auto'}`}
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : link.userNote ? (
+                                    <div
+                                        onClick={startEditNote}
+                                        className="group/note relative rounded-xl bg-accent/[0.06] border border-accent/15 px-4 py-3.5 cursor-text hover:border-accent/30 transition-colors"
+                                    >
+                                        <p dir="auto" className={`text-base text-text whitespace-pre-wrap leading-relaxed ${isRtl ? 'text-right' : ''}`}>
+                                            {link.userNote}
+                                        </p>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); startEditNote(); }}
+                                            aria-label="Edit your note"
+                                            title="Edit note"
+                                            className={`absolute top-2 opacity-0 group-hover/note:opacity-100 focus:opacity-100 transition-opacity p-1.5 hover:bg-fill-subtle rounded-md ${isRtl ? 'left-2' : 'right-2'}`}
+                                        >
+                                            <Pencil className="w-4 h-4 text-text-muted/50 hover:text-text-muted" />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => { setNoteDraft(''); setIsEditingNote(true); }}
+                                        className={`w-full flex items-center gap-2 px-4 py-3 rounded-xl border border-dashed border-border-strong text-text-muted/70 hover:text-accent hover:border-accent/40 hover:bg-accent/[0.04] active:scale-[0.99] transition-all ${isRtl ? 'flex-row-reverse' : ''}`}
+                                    >
+                                        <Plus className="w-4 h-4 shrink-0" />
+                                        <span className="text-sm font-semibold">{isRtl ? 'הוסף הערה' : 'Add a note'}</span>
+                                    </button>
+                                )}
+                            </div>
+                        )}
 
                         {/* Related cards — stored AI relations + live matches
                             (lib/related.ts), each with a one-line "why". Every

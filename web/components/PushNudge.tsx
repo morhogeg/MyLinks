@@ -5,7 +5,7 @@ import { BellRing, X } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { registerPush, writeLocalPushPrompt } from '@/lib/push';
-import { getUserSettings, updateUserSettings } from '@/lib/storage';
+import { updateUserSettings } from '@/lib/storage';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
 import { useToast } from './Toast';
 
@@ -39,12 +39,9 @@ export default function PushNudge({ uid, onDone }: { uid: string; onDone: () => 
         try {
             const granted = await registerPush();
             if (granted) {
-                // Turn the push channel on for reminders too. Legacy accounts
-                // (no reminders_channel yet) implicitly had WhatsApp — keep it.
-                const current = await getUserSettings(uid).catch(() => null);
-                const channels = current?.reminders_channel ?? ['whatsapp'];
-                if (!channels.includes('push')) channels.push('push');
-                updateUserSettings(uid, { push_enabled: true, reminders_channel: channels })
+                // Push is the only reminder channel now — turn it on and record
+                // that reminders should arrive here (folds out any legacy value).
+                updateUserSettings(uid, { push_enabled: true, reminders_channel: ['push'] })
                     .catch(() => {});
                 toast.success('Notifications on — reminders and digests will arrive here.');
             } else {

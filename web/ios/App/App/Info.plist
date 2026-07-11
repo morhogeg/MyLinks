@@ -51,10 +51,11 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
-	<!-- Custom URL scheme so the Share Extension can open the app ("Open Machina"
-	     button on the share progress HUD → machina://shared). The CI build also
-	     appends the Google REVERSED_CLIENT_ID scheme as a second entry; the two
-	     coexist (see .github/workflows/ios-testflight.yml). -->
+	<!-- Custom "machina" URL scheme, retained for Shortcuts / deep-link entry into
+	     the app (e.g. machina://…). The old ShareExt "Open Machina" flow that used
+	     it was removed, but the scheme stays for external launch points. The CI
+	     build also appends the Google REVERSED_CLIENT_ID scheme as a second entry;
+	     the two coexist (see .github/workflows/ios-testflight.yml). -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

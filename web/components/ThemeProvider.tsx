@@ -37,6 +37,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         const root = window.document.documentElement;
         const effectiveTheme = resolveTheme(theme);
 
+        // Intentionally set state from this effect: resolvedTheme is deliberately
+        // seeded to 'dark' and only resolved post-hydration (via matchMedia +
+        // localStorage) so consumers don't hydration-mismatch and the head
+        // bootstrap script's `light` class isn't briefly stripped — this is a
+        // sync with those external systems, not a render-time derivation.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setResolvedTheme(effectiveTheme);
 
         if (effectiveTheme === 'light') {

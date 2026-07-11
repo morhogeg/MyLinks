@@ -3,20 +3,30 @@
 
 
 
-import { useState, useEffect, useRef, useMemo, cloneElement, type ReactElement } from 'react';
-import { Link, LinkStatus, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef } from '@/lib/types';
+import { useState, useEffect, useRef, useMemo, useCallback, cloneElement, type ReactElement } from 'react';
+import { Link, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { getPlatform, PLATFORM_LABELS, platformIcon, platformActiveStyle, platformColor, prettyHost, type PlatformKey } from '@/lib/platform';
-import { getSourceInfo, buildSourceFacets, sourceMatchesQuery } from '@/lib/source';
+import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
 import SourceFacetList from './SourceFacetList';
 import DigestView from './DigestView';
 import Dropdown from './Dropdown';
-import { updateLinkStatus, deleteLink, updateLinkTags, updateLinkReminder, updateLinkCategory, updateLinkReadStatus, retryFailedLink, toLink } from '@/lib/storage';
-import { collection, query, orderBy, onSnapshot, getDocsFromServer, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
-import { db, functions } from '@/lib/firebase';
+import { updateLinkStatus, deleteLink, updateLinkReminder, saveLink } from '@/lib/storage';
+import { EXAMPLE_CARD } from '@/lib/exampleCard';
+import { track } from '@/lib/analytics';
+import { collection, onSnapshot, doc, updateDoc, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
-import { httpsCallable } from 'firebase/functions';
+import { useLinks } from '@/lib/useLinks';
+import { useSemanticSearch } from '@/lib/useSemanticSearch';
+import { useLinkActions } from '@/lib/useLinkActions';
+import { useFeedFilters, type FilterType, type SortType } from '@/lib/useFeedFilters';
+import { isPending, getTimestampNumber } from '@/lib/feedUtils';
+import FeedSkeleton from './feed/FeedSkeleton';
+import PullRefreshSpinner from './feed/PullRefreshSpinner';
+import MobileFiltersSheet from './feed/MobileFiltersSheet';
+import MobileCategoriesTagsSheet from './feed/MobileCategoriesTagsSheet';
+import MobileTagExplorerDrawer from './feed/MobileTagExplorerDrawer';
 import Card from './Card';
 import ListCard from './ListCard';
 import Masonry from './Masonry';
@@ -31,25 +41,23 @@ import CollectionsGallery from './CollectionsGallery';
 import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
-import { Button } from './ui/Button';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, Shapes, Check, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, ChevronLeft, Share2, Globe, Plus, RefreshCw, Newspaper } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, Share2, Globe, Plus, Newspaper, Sparkles } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
-import { subscribeDigests } from '@/lib/digest';
-import DigestCard from './DigestCard';
+import { subscribeDigests, deleteDigest } from '@/lib/digest';
 import { PUSH_INTENT_EVENT, PUSH_FOREGROUND_EVENT, consumePendingPushIntent, readLocalPushPrompt, type PushIntent } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
 import PushNudge from './PushNudge';
-import { publishCard, publishCollection, unpublishCollection, deleteCollection, removeLinkFromCollection } from '@/lib/collections';
+import { publishCollection, unpublishCollection, deleteCollection } from '@/lib/collections';
 import { shareLink, shareUrlFor, openExternal } from '@/lib/share';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import TagExplorer from './TagExplorer';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
-type FilterType = 'all' | 'unread' | 'read' | 'archived' | 'favorite' | 'reminders';
-type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
+// Stable no-op for card slots that don't wire up an action (pending cards).
+const noop = () => { };
 
 /**
  * Main feed component displaying saved links
@@ -60,14 +68,49 @@ type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
  * - Two card views (grid / list), plus review, ask, and collections modes
  * - Deep linking to specific links via URL params
  */
-function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void }) {
+function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void }) {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
-    const [links, setLinks] = useState<Link[]>([]);
+    // Links subscription + pull-refresh (R-3: useLinks).
+    const { links, isLoading, handlePullRefresh } = useLinks(uid, toast);
     const [searchQuery, setSearchQuery] = useState('');
-    const [filter, setFilter] = useState<FilterType>('all');
-    const [selectedCategory, setSelectedCategory] = useState<Set<string>>(new Set());
+    // Debounced, generation-guarded semantic search (R-3: useSemanticSearch).
+    const { debouncedQuery, isSearching, searchResults } = useSemanticSearch(searchQuery);
+    // Selection state + filter/sort pipeline + facet counts (R-3: useFeedFilters).
+    const {
+        filter, setFilter,
+        selectedCategory, setSelectedCategory,
+        sortBy, setSortBy,
+        selectedTags, setSelectedTags,
+        selectedSources, setSelectedSources,
+        selectedCollections, setSelectedCollections,
+        filteredLinks,
+        categoryCounts,
+        categories,
+        tagCounts,
+        allTags,
+        handleToggleTag,
+        sourceFacets,
+        sourceChips,
+        handleToggleSource,
+        handleToggleSourceKeys,
+        matchingSources,
+        reminderCount,
+    } = useFeedFilters(links, debouncedQuery, searchResults);
+    // Card action handlers that depend only on [uid, toast] (R-3: useLinkActions).
+    const {
+        handleStatusChange,
+        handleReadStatusChange,
+        handleUpdateTags,
+        handleUpdateCategory,
+        handleUpdateTitle,
+        handleUpdateSummary,
+        handleUpdateNote,
+        handleRetryProcessing,
+        handleRemoveFromCollection,
+        handleShareCard,
+    } = useLinkActions(uid, toast);
     const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
     // Back-stack for related-card navigation: opening a card *from* another card
     // pushes the current one, so closing returns there instead of dismissing all.
@@ -101,19 +144,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         setLinkStack([]);
         setActiveLinkId(null);
     };
-    const [isLoading, setIsLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'ask' | 'collections' | 'digest'>('grid');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
-    const [sortBy, setSortBy] = useState<SortType>('date-desc');
-    const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
-    const [selectedPlatforms, setSelectedPlatforms] = useState<Set<PlatformKey>>(new Set());
-    // Source (publisher/site) facet — keyed by getSourceInfo().key, e.g. a card
-    // from Ynet, an MKBHD video, or @naval on X. Sits alongside the coarse
-    // platform quick-filters and is unioned with them (see the filter chain).
-    const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
     const [isSourcesOpen, setIsSourcesOpen] = useState(false);
-    const [screenshotOnly, setScreenshotOnly] = useState(false);
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
     const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
@@ -122,12 +156,40 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
     const [isTagExplorerCollapsed, setIsTagExplorerCollapsed] = useState(false);
     const [reminderModalLink, setReminderModalLink] = useState<Link | null>(null);
+    // Outcome of the SwipeDeck-triggered reminder modal, threaded back to the deck
+    // so an up-swipe is only "acted on" if a reminder was actually saved (F-29).
+    const [remindSignal, setRemindSignal] = useState<{ id: string; saved: boolean; seq: number } | null>(null);
+    const remindSeq = useRef(0);
+    // ReminderModal fires onUpdate (saved) and then onClose (dismissed) on a
+    // successful save; this flag keeps that trailing onClose from also emitting
+    // a "cancelled" signal for the same open.
+    const remindSavedRef = useRef(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
+    // One-tap "Try it with an example" on a brand-new empty feed: seed a real,
+    // hand-crafted card so Ask / search / Collections have something to work
+    // against in the first minute. Written through the normal saveLink path (not
+    // the analyze pipeline) so it's instant and offline-safe; the backend embeds
+    // it via the needsEmbedding flag. Guarded so a double-tap can't seed twice.
+    const [seedingExample, setSeedingExample] = useState(false);
+    const handleSeedExample = useCallback(async () => {
+        if (!uid || seedingExample) return;
+        setSeedingExample(true);
+        try {
+            await saveLink(uid, EXAMPLE_CARD);
+            track('example_card_seeded');
+            // The feed is live via onSnapshot, so the card streams in on its own.
+        } catch {
+            toast.error('Could not add the example. Please try again.');
+            setSeedingExample(false);
+        }
+        // On success we deliberately leave seedingExample true: the card arriving
+        // flips the feed out of the empty state, so this button unmounts anyway.
+    }, [uid, seedingExample, toast]);
+
     // Collections
     const [collections, setCollections] = useState<Collection[]>([]);
-    const [selectedCollections, setSelectedCollections] = useState<Set<string>>(new Set());
     const [addToCollectionLink, setAddToCollectionLink] = useState<Link | null>(null);
     const [collectionFormOpen, setCollectionFormOpen] = useState(false);
     const [editingCollection, setEditingCollection] = useState<Collection | null>(null);
@@ -140,7 +202,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
     // Curated digest history — the dedicated Digest section (written
     // server-side to users/{uid}/digests; the in-app view is the always-on
-    // surface, push/WhatsApp/email are extra delivery channels).
+    // surface, push/email are extra delivery channels).
     const [digests, setDigests] = useState<CuratedDigest[]>([]);
 
     // First-run notifications nudge (native only, once per account). By the
@@ -151,21 +213,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         setShowPushNudge(isNativeApp() && readLocalPushPrompt() === null);
     }, []);
 
-    // Semantic Search State
-    const [isSearching, setIsSearching] = useState(false);
-    const [searchResults, setSearchResults] = useState<Link[]>([]);
-    const [searchError, setSearchError] = useState<string | null>(null);
-    const [debouncedQuery, setDebouncedQuery] = useState('');
-
-    // Debounce search query
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedQuery(searchQuery);
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [searchQuery]);
-
-    // Server-side captures (Share Extension / WhatsApp) show up as `processing`
+    // Server-side captures (the iOS Share Extension) show up as `processing`
     // cards; surface the same app-level "Analyzing… N%" banner for them. Report
     // the state up to the page, throttled to meaningful changes so it doesn't
     // fire every ramp frame.
@@ -178,54 +226,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [procSig]);
 
-    // Semantic Search Effect
+    // Lift "does this library have any cards yet" so page.tsx can gate the
+    // first-run tour to a non-empty feed (never spotlight over zero cards).
     useEffect(() => {
-        if (!debouncedQuery.trim()) {
-            setIsSearching(false);
-            setSearchResults([]);
-            setSearchError(null);
-            return;
-        }
-
-        const performSearch = async () => {
-            setIsSearching(true);
-            setSearchError(null);
-            try {
-                const searchFn = httpsCallable(functions, 'search_links');
-                const result = await searchFn({
-                    query: debouncedQuery,
-                    limit: 20
-                    // We can pass uid here if needed for dev, but auth context should handle it
-                });
-                const data = result.data as { links: Link[] };
-                setSearchResults(data.links || []);
-            } catch (err: any) {
-                console.error("Search failed:", err);
-                // Extract error message from the Firebase callable error
-                let errorMessage = 'Search failed. Please try again.';
-                if (err?.message) {
-                    if (err.message.includes('SEMANTIC_SEARCH_NOT_CONFIGURED')) {
-                        errorMessage = 'Semantic search is not configured. Please set GEMINI_API_KEY in Firebase Functions.';
-                    } else if (err.message.includes('SEMANTIC_SEARCH_ERROR')) {
-                        errorMessage = 'Failed to generate search embeddings. Check your API key.';
-                    } else if (err.message.includes('VECTOR_SEARCH_ERROR')) {
-                        errorMessage = 'Vector search failed. Please ensure Firestore vector index is deployed.';
-                    } else if (err.message.includes('GEMINI_API_KEY')) {
-                        errorMessage = 'API key not configured for semantic search.';
-                    } else {
-                        errorMessage = err.message;
-                    }
-                }
-                setSearchError(errorMessage);
-                // Fall back to local filtering only - semantic search errors shouldn't break the app
-                setSearchResults([]);
-            } finally {
-                setIsSearching(false);
-            }
-        };
-
-        performSearch();
-    }, [debouncedQuery]);
+        onHasCardsChange?.(links.length > 0);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [links.length > 0]);
 
     // Load collapsed state from localStorage
     useEffect(() => {
@@ -303,26 +309,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
     // uid comes from AuthProvider — no mock lookup needed
 
-    // 2. Real-time sync from Firestore
-    useEffect(() => {
-        if (!uid) return;
-
-        const linksRef = collection(db, 'users', uid, 'links');
-        const q = query(linksRef, orderBy('createdAt', 'desc'));
-
-        const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
-            const fetchedLinks = snapshot.docs.map(toLink);
-            setLinks(fetchedLinks);
-            setIsLoading(false);
-        }, (error: Error) => {
-            console.error("Firestore sync error:", error);
-            toast.error("Lost connection to your library. Reconnecting…");
-            setIsLoading(false);
-        });
-
-        return () => unsubscribe();
-    }, [uid, toast]);
-
     // 2b. Real-time sync of collections from Firestore
     useEffect(() => {
         if (!uid) return;
@@ -337,16 +323,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         });
         return () => unsubscribe();
     }, [uid]);
-
-    // Helper to get consistent number for timestamps (handles number, string, or Firestore Timestamp)
-    const getTimestampNumber = (val: any): number => {
-        if (!val) return 0;
-        if (typeof val === 'number') return val;
-        if (typeof val === 'string') return new Date(val).getTime();
-        if (val.toMillis && typeof val.toMillis === 'function') return val.toMillis();
-        if (val.seconds) return val.seconds * 1000;
-        return 0;
-    };
 
     // 3. Handle deep linking
     //
@@ -377,25 +353,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         }
     }, [searchParams, links]);
 
-    // Pull-to-refresh (M16). The library already streams live via onSnapshot, so a
-    // pull forces an authoritative server re-read (round-trips the network and
-    // confirms freshness) rather than faking a spinner. A short floor keeps the
-    // native spinner visible long enough to read as a deliberate refresh.
-    const handlePullRefresh = async () => {
-        if (!uid) return;
-        const linksRef = collection(db, 'users', uid, 'links');
-        const q = query(linksRef, orderBy('createdAt', 'desc'));
-        try {
-            const [snap] = await Promise.all([
-                getDocsFromServer(q),
-                new Promise((r) => setTimeout(r, 600)),
-            ]);
-            setLinks(snap.docs.map(toLink));
-        } catch {
-            toast.error("Couldn't refresh. Please try again.");
-        }
-    };
-
     // Only the scrollable card layouts drive pull-to-refresh; disable it while a
     // full-screen mode (Ask/Collections) or any overlay/sheet owns the screen so
     // the gesture never fights a modal's own scrolling.
@@ -418,184 +375,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         return () => { document.body.style.overflow = prev; };
     }, [anyOverlayOpen]);
 
-    // Pending captures (M3) — processing/failed cards. They're excluded from the
-    // normal filtered feed and from every facet derivation below (so a still-empty
-    // card never spawns a phantom "Processing" category/tag), then surfaced
-    // separately, pinned at the top of the library, so a capture is always visible.
-    const isPending = (l: Link) => l.status === 'processing' || l.status === 'failed';
-    const contentLinks = links.filter((l) => !isPending(l));
-
-    // 4. Hybrid Search Logic
-    const filteredLinks = contentLinks
-        .filter((link) => {
-            // Apply status filters
-            if (filter === 'reminders') return link.reminderStatus === 'pending';
-            if (filter === 'unread') return !link.isRead;
-            if (filter === 'read') return !!link.isRead;
-            if (filter !== 'all') return link.status === filter;
-            return true;
-        })
-        .filter((link) => {
-            // Apply category filters
-            if (selectedCategory.size === 0) return true;
-            return selectedCategory.has(link.category);
-        })
-        .filter((link) => {
-            // Apply tag filters
-            if (selectedTags.size === 0) return true;
-            return link.tags.some(tag => {
-                return Array.from(selectedTags).some(selected => {
-                    return tag === selected || tag.startsWith(`${selected}/`);
-                });
-            });
-        })
-        .filter((link) => {
-            // Apply collection filters — keep cards in ANY selected collection.
-            if (selectedCollections.size === 0) return true;
-            return (link.collectionIds ?? []).some(id => selectedCollections.has(id));
-        })
-        .filter((link) => {
-            // Apply source filters — platforms + screenshots + publisher sources,
-            // OR across every selection (picking Ynet AND YouTube shows both).
-            if (selectedPlatforms.size === 0 && !screenshotOnly && selectedSources.size === 0) return true;
-            const platform = getPlatform(link.url);
-            const matchesPlatform = platform != null && selectedPlatforms.has(platform);
-            const matchesScreenshot = screenshotOnly && link.sourceType === 'image';
-            const matchesSource = selectedSources.size > 0 && selectedSources.has(getSourceInfo(link).key);
-            return matchesPlatform || matchesScreenshot || matchesSource;
-        })
-        .filter((link) => {
-            // Apply search (Hybrid: keyword OR semantic result)
-            if (!debouncedQuery.trim()) return true;
-
-            const query = debouncedQuery.toLowerCase();
-
-            // If it's in the semantic search results, it's a match
-            const isSemanticMatch = searchResults.some(r => r.id === link.id);
-            if (isSemanticMatch) return true;
-
-            // Otherwise check keyword matching — including the card's source, so
-            // typing a publisher name ("ynet") surfaces its cards even without a
-            // semantic hit.
-            return (
-                link.title.toLowerCase().includes(query) ||
-                link.summary.toLowerCase().includes(query) ||
-                link.tags.some((tag) => tag.toLowerCase().includes(query)) ||
-                link.category.toLowerCase().includes(query) ||
-                // Source label + platform aliases, so "twitter"/"x" finds every X
-                // card (labelled by @handle), not just hosts containing the letter.
-                sourceMatchesQuery(getSourceInfo(link), query) ||
-                prettyHost(link.url).toLowerCase().includes(query)
-            );
-        })
-        .sort((a, b) => {
-            // Prioritize semantic matches at the top if they exist
-            if (debouncedQuery.trim()) {
-                const aIdx = searchResults.findIndex(r => r.id === a.id);
-                const bIdx = searchResults.findIndex(r => r.id === b.id);
-
-                if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
-                if (aIdx !== -1) return -1;
-                if (bIdx !== -1) return 1;
-            }
-
-            if (filter === 'reminders') {
-                const timeA = a.nextReminderAt || Number.MAX_SAFE_INTEGER;
-                const timeB = b.nextReminderAt || Number.MAX_SAFE_INTEGER;
-                return timeA - timeB;
-            }
-            switch (sortBy) {
-                case 'date-desc':
-                    return getTimestampNumber(b.createdAt) - getTimestampNumber(a.createdAt);
-                case 'date-asc':
-                    return getTimestampNumber(a.createdAt) - getTimestampNumber(b.createdAt);
-                case 'title-asc':
-                    return a.title.toLowerCase().localeCompare(b.title.toLowerCase());
-                case 'category':
-                    return a.category.localeCompare(b.category);
-                default:
-                    return 0;
-            }
-        });
-
-    // Does a link carry any of the currently selected tags? (parent tags match
-    // their children, e.g. "ai" matches "ai/agents"). Shared by the faceted counts.
-    const matchesSelectedTags = (link: Link) =>
-        link.tags.some(tag => Array.from(selectedTags).some(s => tag === s || tag.startsWith(`${s}/`)));
-
-    // Faceted counts — the numbers update live as you tap. Each facet's counts are
-    // computed against the OTHER facet's current selection (but never its own), so
-    // picking the "Tech" category instantly drops a non-overlapping tag like
-    // "politics" to 0, while the category chips keep reflecting the tag selection.
-    // Pure client-side derivation — no extra reads, no backend cost.
-    const linksForCategoryCounts = selectedTags.size === 0 ? contentLinks : contentLinks.filter(matchesSelectedTags);
-    const categoryCounts = linksForCategoryCounts.reduce((acc, link) => {
-        acc[link.category] = (acc[link.category] || 0) + 1;
-        return acc;
-    }, {} as Record<string, number>);
-
-    // Category chips stay derived from the whole library so they never vanish —
-    // they just read 0 when nothing matches the current tag selection.
-    const categories = Array.from(new Set(contentLinks.map(l => l.category).filter(Boolean))).sort();
-
-    const linksForTagCounts = selectedCategory.size === 0 ? contentLinks : contentLinks.filter(link => selectedCategory.has(link.category));
-    const tagCounts = linksForTagCounts.reduce((acc, link) => {
-        link.tags.forEach(tag => {
-            acc[tag] = (acc[tag] || 0) + 1;
-        });
-        return acc;
-    }, {} as Record<string, number>);
-
-    const allTags = Array.from(new Set(contentLinks.flatMap(l => l.tags))).sort();
-
-    const handleToggleTag = (tag: string) => {
-        const next = new Set(selectedTags);
-        if (next.has(tag)) next.delete(tag);
-        else next.add(tag);
-        setSelectedTags(next);
-    };
-
-    // Source/platform filter: only surface platforms actually present in the library.
-    const platformCounts = contentLinks.reduce((acc, link) => {
-        const p = getPlatform(link.url);
-        if (p) acc[p] = (acc[p] || 0) + 1;
-        return acc;
-    }, {} as Record<PlatformKey, number>);
-    const availablePlatforms = (Object.keys(PLATFORM_LABELS) as PlatformKey[]).filter(p => platformCounts[p]);
-    const screenshotCount = contentLinks.filter(l => l.sourceType === 'image').length;
-
-    const handleTogglePlatform = (p: PlatformKey) => {
-        const next = new Set(selectedPlatforms);
-        if (next.has(p)) next.delete(p);
-        else next.add(p);
-        setSelectedPlatforms(next);
-    };
-
-    // Source (publisher/site) facet — every distinct source in the library, ranked
-    // by count. Drives the Sources submenu and the search "Sources" suggestions.
-    const sourceFacets = useMemo(() => buildSourceFacets(contentLinks), [contentLinks]);
-    const sourceLabelByKey = useMemo(() => {
-        const m = new Map<string, string>();
-        sourceFacets.forEach(s => m.set(s.key, s.label));
-        return m;
-    }, [sourceFacets]);
-
-    const handleToggleSource = (key: string) => {
-        const next = new Set(selectedSources);
-        if (next.has(key)) next.delete(key);
-        else next.add(key);
-        setSelectedSources(next);
-    };
-    // Toggle a whole platform group at once: if every key is already on, clear
-    // them; otherwise select them all (used by the grouped Sources list headers).
-    const handleToggleSourceKeys = (keys: string[]) => {
-        setSelectedSources((prev) => {
-            const next = new Set(prev);
-            if (keys.every((k) => next.has(k))) keys.forEach((k) => next.delete(k));
-            else keys.forEach((k) => next.add(k));
-            return next;
-        });
-    };
     // Render the brand icon for a source row (platform logo, screenshot, or a
     // generic globe for plain websites), tinted in the platform's brand color.
     const sourceIconFor = (s: { platform: PlatformKey | null; isScreenshot: boolean }, size = 'w-4 h-4') => {
@@ -603,14 +382,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         if (s.isScreenshot) return <ImageIcon className={`${size} text-text-secondary`} />;
         return <Globe className={`${size} text-text-secondary`} />;
     };
-
-    // Search "Sources" suggestions — the sources whose label matches the live
-    // query, so a search splits into a Sources row (tap to filter) + the Cards grid.
-    const matchingSources = debouncedQuery.trim()
-        ? sourceFacets.filter(s => sourceMatchesQuery(s, debouncedQuery)).slice(0, 8)
-        : [];
-
-    const reminderCount = contentLinks.filter(l => l.reminderStatus === 'pending').length;
 
     // Pending capture cards to surface, pinned above the feed. Only shown on the
     // default library views (All/Unread, no active facet/search) so they're always
@@ -625,23 +396,87 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         && selectedCollections.size === 0
         && selectedCategory.size === 0
         && selectedTags.size === 0
-        && selectedPlatforms.size === 0
         && selectedSources.size === 0
-        && !screenshotOnly
         && !debouncedQuery.trim();
 
-    const pendingCards = isDefaultLibraryView
-        ? links.filter(isPending).sort((a, b) => getTimestampNumber(b.createdAt) - getTimestampNumber(a.createdAt))
-        : [];
+    const pendingCards = useMemo(
+        () => isDefaultLibraryView
+            ? links.filter(isPending).sort((a, b) => getTimestampNumber(b.createdAt) - getTimestampNumber(a.createdAt))
+            : [],
+        [isDefaultLibraryView, links]
+    );
+
+    // Precomputed collection chips per card — built once per links/collections
+    // change instead of filtering `collections` for every card on every render.
+    const cardCollectionsByLink = useMemo(() => {
+        const map = new Map<string, { id: string; name: string }[]>();
+        for (const link of links) {
+            const ids = link.collectionIds;
+            if (!ids || ids.length === 0) continue;
+            const chips = collections
+                .filter(c => ids.includes(c.id))
+                .map(c => ({ id: c.id, name: c.name }));
+            if (chips.length > 0) map.set(link.id, chips);
+        }
+        return map;
+    }, [links, collections]);
+
+    // In-app reminder fallback: the backend flags a link `reminderDue` when its
+    // reminder fires (for EVERY user, push or not). Surface those due links in a
+    // "Reminders due" strip so the promise "I'll remind you" always produces
+    // something visible in-app. Clearing is best-effort — onSnapshot resyncs.
+    const clearReminderDue = useCallback(async (id: string) => {
+        if (!uid) return;
+        try {
+            await updateDoc(doc(db, 'users', uid, 'links', id), { reminderDue: false, reminderDueAt: null });
+        } catch {
+            /* best-effort dismiss; the live snapshot keeps the source of truth */
+        }
+    }, [uid]);
+    const dueLinks = useMemo(() => links.filter((l) => l.reminderDue === true), [links]);
 
     // The proactive feed modules, rendered once and reused in both the grid and
-    // list layouts (above pending + real cards). Just the weekly synthesis recap
-    // now — the connection insight moved into the dedicated Connections view/pill,
-    // so the feed no longer carries a redundant inline banner.
+    // list layouts (above pending + real cards). The weekly synthesis recap plus
+    // the in-app "reminders due" strip — the connection insight moved into the
+    // dedicated Connections view/pill.
     const feedModules = isDefaultLibraryView ? (
         <>
             {showPushNudge && uid && (
                 <PushNudge uid={uid} onDone={() => setShowPushNudge(false)} />
+            )}
+            {dueLinks.length > 0 && (
+                <div className="mb-4 rounded-2xl border border-accent/25 bg-card overflow-hidden shadow-lg shadow-accent/5 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <div className="flex items-center gap-3 px-4 py-3 border-b border-border-subtle">
+                        <div className="w-9 h-9 shrink-0 rounded-xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-md shadow-accent/20">
+                            <Bell className="w-[18px] h-[18px] text-white" />
+                        </div>
+                        <div className="flex-grow min-w-0">
+                            <div className="text-[15px] font-bold text-text">Reminders due</div>
+                            <div className="text-[13px] text-text-secondary leading-snug">
+                                {dueLinks.length} saved {dueLinks.length === 1 ? 'item is' : 'items are'} ready to revisit.
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => dueLinks.forEach((l) => clearReminderDue(l.id))}
+                            aria-label="Dismiss all due reminders"
+                            className="w-9 h-9 flex items-center justify-center rounded-lg text-text-muted hover:text-text hover:bg-card-hover transition-colors shrink-0"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="divide-y divide-border-subtle">
+                        {dueLinks.slice(0, 5).map((l) => (
+                            <button
+                                key={l.id}
+                                onClick={() => { openLinkDetails(l); clearReminderDue(l.id); }}
+                                className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-card-hover transition-colors"
+                            >
+                                <CheckCircle2 className="w-4 h-4 text-accent shrink-0" />
+                                <span className="flex-grow min-w-0 truncate text-[14px] text-text">{l.title}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
             )}
             {latestSynthesis && latestSynthesis.weekId !== dismissedSynthesisWeek && (
                 <SynthesisCard
@@ -655,56 +490,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
 
 
-    // Firestore's onSnapshot applies writes optimistically (latency
-    // compensation) and reverts them if the write fails, so the UI updates
-    // instantly. We just surface failures and confirm meaningful actions.
-    const handleStatusChange = async (id: string, status: LinkStatus) => {
-        if (!uid) return;
-        try {
-            await updateLinkStatus(uid, id, status);
-            const labels: Record<string, string> = {
-                archived: 'Archived',
-                favorite: 'Added to favorites',
-                unread: 'Marked as unread',
-            };
-            if (labels[status]) toast.success(labels[status]);
-        } catch {
-            toast.error("Couldn't update the link. Please try again.");
-        }
-    };
-
-    const handleReadStatusChange = async (id: string, isRead: boolean) => {
-        if (!uid) return;
-        try {
-            await updateLinkReadStatus(uid, id, isRead);
-        } catch {
-            toast.error("Couldn't update read status. Please try again.");
-        }
-    };
-
-    const handleUpdateTags = async (id: string, tags: string[]) => {
-        if (!uid) return;
-        try {
-            await updateLinkTags(uid, id, tags);
-        } catch {
-            toast.error("Couldn't save tags. Please try again.");
-        }
-    };
-
-    const handleUpdateCategory = async (id: string, category: string) => {
-        if (!uid) return;
-        try {
-            await updateLinkCategory(uid, id, category);
-        } catch {
-            toast.error("Couldn't change category. Please try again.");
-        }
-    };
-
     // Open the branded confirm dialog instead of a native window.confirm. The
     // card/sheet/table all call this; actual deletion happens on confirm.
-    const handleDelete = (id: string) => {
+    const handleDelete = useCallback((id: string) => {
         setConfirmDeleteId(id);
-    };
+    }, []);
+
+    // Stable card-open + reminder + add-to-collection handlers so memoized cards
+    // keep identical props across unrelated re-renders.
+    const openLinkDetails = useCallback((link: Link) => setActiveLinkId(link.id), []);
+    const handleAddToCollection = useCallback((link: Link) => setAddToCollectionLink(link), []);
 
     const performDelete = async (id: string) => {
         if (!uid) return;
@@ -743,22 +538,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         setIsSelectionMode(false);
     };
 
-    const handleOpenReminderModal = (link: Link) => {
+    const handleOpenReminderModal = useCallback((link: Link) => {
+        remindSavedRef.current = false;
         setReminderModalLink(link);
-    };
-
-    // Retry analysis for a failed capture card (M3). Optimistically flips the card
-    // back to `processing` and re-runs analysis in place; on failure it returns to
-    // a `failed` card so nothing is ever lost.
-    const handleRetryProcessing = async (link: Link) => {
-        if (!uid) return;
-        try {
-            await retryFailedLink(uid, link);
-            toast.success('Retrying analysis…');
-        } catch {
-            toast.error("Couldn't analyze that link. Please try again.");
-        }
-    };
+    }, []);
 
     // A pending capture (processing / failed) rendered with Card's dedicated
     // skeleton / retry treatment. Reused above both the grid and list layouts.
@@ -767,13 +550,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             key={link.id}
             index={0}
             link={link}
-            onOpenDetails={() => { }}
+            onOpenDetails={noop}
             onStatusChange={handleStatusChange}
             onReadStatusChange={handleReadStatusChange}
             onUpdateCategory={handleUpdateCategory}
             allCategories={categories}
             onDelete={handleDelete}
-            onUpdateReminder={() => { }}
+            onUpdateReminder={noop}
             onRetry={handleRetryProcessing}
         />
     );
@@ -783,33 +566,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const openCollection = (collectionId: string) => {
         setSelectedCollections(new Set([collectionId]));
         setViewMode('grid');
-    };
-
-    const handleRemoveFromCollection = async (link: Link, collectionId: string) => {
-        if (!uid) return;
-        try {
-            await removeLinkFromCollection(uid, link.id, collectionId);
-            toast.success('Removed from collection');
-        } catch {
-            toast.error("Couldn't remove from the collection. Please try again.");
-        }
-    };
-
-    // Share a single card as a public Machina page.
-    const handleShareCard = async (link: Link) => {
-        if (!uid) return;
-        try {
-            const shareId = await publishCard(uid, link);
-            const outcome = await shareLink(
-                shareUrlFor(`/s?id=${shareId}`),
-                link.title,
-                'Saved on Machina'
-            );
-            if (outcome === 'copied') toast.success('Share link copied to clipboard');
-            else if (outcome === 'failed') toast.error("Couldn't create a share link. Please try again.");
-        } catch {
-            toast.error("Couldn't share this card. Please try again.");
-        }
     };
 
     // Publish (or re-publish) a collection snapshot, then open the share sheet.
@@ -865,12 +621,37 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         setCollectionFormOpen(true);
     };
 
-    const toggleSelection = (id: string) => {
-        const next = new Set(selectedIds);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        setSelectedIds(next);
-    };
+    const toggleSelection = useCallback((id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
+
+    // Stable SwipeDeck (Review mode) action handlers. Silent: the deck's own
+    // motion + session tallies confirm each action, and stacked success toasts
+    // were covering the deck's Undo/Archive/Remind/Keep buttons.
+    const swipeFavorite = useCallback((link: Link) => handleStatusChange(link.id, 'favorite', { silent: true }), [handleStatusChange]);
+    const swipeArchive = useCallback((link: Link) => handleStatusChange(link.id, 'archived', { silent: true }), [handleStatusChange]);
+    const swipeResetStatus = useCallback((link: Link) => handleStatusChange(link.id, 'unread', { silent: true }), [handleStatusChange]);
+    // Undo of an up-swipe: clear the reminder the deck just set for this card (F-29).
+    // Clearing (not restoring a prior state) is safe because reviewQueue.isOpen
+    // excludes reminder-pending cards from every deck queue — a dealt card can't
+    // have carried a pre-existing reminder. Keep that invariant if queues change.
+    const swipeCancelRemind = useCallback(async (link: Link) => {
+        if (!uid) return;
+        try {
+            await updateLinkReminder(uid, link.id, false);
+        } catch {
+            toast.error("Couldn't cancel the reminder. Please try again.");
+        }
+    }, [uid, toast]);
+    // Report the reminder modal's outcome back to the deck: saved vs. cancelled.
+    const resolveRemind = useCallback((link: Link, saved: boolean) => {
+        setRemindSignal({ id: link.id, saved, seq: ++remindSeq.current });
+    }, []);
 
     const filterButtons: { key: FilterType; label: string; icon: React.ReactNode }[] = [
         { key: 'all', label: 'All', icon: <Inbox className="w-4 h-4" /> },
@@ -939,7 +720,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const activeCollectionId = selectedCollections.size === 1 ? Array.from(selectedCollections)[0] : undefined;
     // Count of active grid filters — badges the mobile "Filters" button.
     const activeMobileFilters =
-        (filter !== 'all' ? 1 : 0) + selectedPlatforms.size + selectedSources.size + (screenshotOnly ? 1 : 0) + selectedTags.size + selectedCollections.size;
+        (filter !== 'all' ? 1 : 0) + selectedSources.size + selectedTags.size + selectedCollections.size;
 
     // The Digest section's scrollable history — the weekly synthesis rides on
     // top, then every curated digest, newest first. Built once and rendered in
@@ -952,6 +733,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             onOpenSynthesisCard={(id) => setActiveLinkId(id)}
             onDismissSynthesis={dismissSynthesis}
             onOpenDigestSettings={onOpenDigestSettings}
+            onDeleteDigest={uid ? (id) => { void deleteDigest(uid, id); } : undefined}
         />
     );
 
@@ -960,63 +742,21 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         onAskModeChange?.(viewMode === 'ask');
     }, [viewMode, onAskModeChange]);
 
-    // Hide the add-link FAB in Ask *and* Collections — neither view captures links.
+    // Hide the add-link FAB in Ask, Collections, Digest, and Review — none of
+    // these views capture links (and in Review it overlaps the Keep button).
     useEffect(() => {
-        onHideAddButton?.(viewMode === 'ask' || viewMode === 'collections' || viewMode === 'digest');
+        onHideAddButton?.(viewMode === 'ask' || viewMode === 'collections' || viewMode === 'digest' || viewMode === 'review');
     }, [viewMode, onHideAddButton]);
 
     if (isLoading) {
-        return (
-            <div className="space-y-4" aria-busy="true" aria-label="Loading your links">
-                <div className="h-11 rounded-xl bg-card border border-white/5 relative overflow-hidden skeleton-shimmer" />
-                <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))' }}>
-                    {Array.from({ length: 6 }).map((_, i) => (
-                        <div
-                            key={i}
-                            className="bg-card border border-white/5 rounded-2xl p-5 relative overflow-hidden skeleton-shimmer surface-card shadow-[var(--shadow-card)]"
-                        >
-                            <div className="h-3 w-20 bg-white/10 rounded-full mb-4" />
-                            <div className="h-5 w-3/4 bg-white/10 rounded mb-3" />
-                            <div className="space-y-2 mb-5">
-                                <div className="h-3 w-full bg-white/5 rounded" />
-                                <div className="h-3 w-5/6 bg-white/5 rounded" />
-                                <div className="h-3 w-2/3 bg-white/5 rounded" />
-                            </div>
-                            <div className="flex gap-2">
-                                <div className="h-5 w-14 bg-white/5 rounded-full" />
-                                <div className="h-5 w-16 bg-white/5 rounded-full" />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
+        return <FeedSkeleton />;
     }
 
     return (
         <div className={viewMode === 'ask' ? 'space-y-2' : 'space-y-4 lg:space-y-6'}>
             {/* Pull-to-refresh spinner (M16) — rides the finger down from just under
                 the safe-area inset and spins while the refetch is in flight. */}
-            {(pull > 0 || refreshing) && (
-                <div
-                    className="fixed inset-x-0 top-0 z-40 flex justify-center pointer-events-none"
-                    style={{
-                        transform: `translateY(calc(env(safe-area-inset-top, 0px) + ${pull}px))`,
-                        transition: animating ? 'transform 0.3s cubic-bezier(0.32,0.72,0,1)' : 'none',
-                    }}
-                    aria-hidden
-                >
-                    <div
-                        className="mt-1 flex items-center justify-center w-9 h-9 rounded-full bg-card border border-border-subtle shadow-lg"
-                        style={{ opacity: refreshing ? 1 : Math.min(1, pull / 40) }}
-                    >
-                        <RefreshCw
-                            className={`w-4 h-4 text-accent ${refreshing ? 'animate-spin' : ''}`}
-                            style={refreshing ? undefined : { transform: `rotate(${pull * 3}deg)` }}
-                        />
-                    </div>
-                </div>
-            )}
+            <PullRefreshSpinner pull={pull} refreshing={refreshing} animating={animating} />
             {/* Header Section (Not Sticky) */}
             <div className={`pt-2 -mx-4 px-4 sm:mx-0 sm:px-0 transition-all duration-300 ${viewMode === 'ask' ? 'space-y-2 pb-0' : 'space-y-3 sm:space-y-4 pb-3'}`}>
                 {/* Ask mode drops the search bar entirely (typing there just exits Ask)
@@ -1082,7 +822,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         {searchQuery && (
                             <button
                                 onClick={() => setSearchQuery('')}
-                                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-white/10 rounded-full transition-all"
+                                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-fill-strong rounded-full transition-all"
                             >
                                 <X className="w-4 h-4 text-text-muted" />
                             </button>
@@ -1205,7 +945,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     <button
                                         onClick={() => setSearchQuery('')}
                                         aria-label="Clear search"
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-white/10 transition-colors"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-fill-strong transition-colors"
                                     >
                                         <X className="w-4 h-4" />
                                     </button>
@@ -1576,6 +1316,41 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 </div>
             )}
 
+            {/* Active Source filters — removable chips, like tags. */}
+            {isLibraryView && selectedSources.size > 0 && (
+                <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent/5 border border-accent/10">
+                        <Globe className="w-3 h-3 text-accent" />
+                        <span className="text-[10px] font-bold text-accent uppercase tracking-wider">Sources:</span>
+                    </div>
+                    {sourceChips.map(chip => (
+                        <div
+                            key={chip.id}
+                            className="group flex items-center gap-1 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm"
+                        >
+                            <span>{chip.label}</span>
+                            <button
+                                type="button"
+                                onClick={() => handleToggleSourceKeys(chip.keys)}
+                                aria-label={`Remove ${chip.label} filter`}
+                                title="Remove filter"
+                                className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    ))}
+                    {sourceChips.length > 1 && (
+                        <button
+                            onClick={() => setSelectedSources(new Set())}
+                            className="text-[10px] font-bold text-text-muted/60 hover:text-accent hover:underline px-2 transition-colors uppercase tracking-tight"
+                        >
+                            Clear All
+                        </button>
+                    )}
+                </div>
+            )}
+
             {/* Active Collection — banner shown when the feed is scoped to a collection. */}
             {isLibraryView && selectedCollections.size > 0 && (
                 <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
@@ -1667,261 +1442,52 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
                 {/* Filters Sheet (Mobile) — consolidates the grid controls behind one tap,
                     keeping the mobile toolbar to a single tidy row. Desktop is untouched. */}
-                {isFiltersOpen && (
-                    <div className="sm:hidden fixed inset-0 z-50 flex flex-col justify-end isolate">
-                        <div
-                            className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
-                            onClick={() => setIsFiltersOpen(false)}
-                        />
-                        <div className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
-                            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-text-muted/30" />
-                            <div className="flex items-center justify-between mb-5">
-                                <h3 className="text-base font-bold text-text">Filters</h3>
-                                <button
-                                    onClick={() => setIsFiltersOpen(false)}
-                                    aria-label="Close filters"
-                                    className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-
-                            <div className="space-y-5">
-                                {/* Status + Sort */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">Show</label>
-                                        <Dropdown
-                                            ariaLabel="Filter by status"
-                                            value={filter}
-                                            onChange={(v) => setFilter(v as FilterType)}
-                                            leadingIcon={statusTriggerIcon}
-                                            options={statusOptions}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">Sort</label>
-                                        <Dropdown
-                                            ariaLabel="Sort order"
-                                            value={sortBy}
-                                            onChange={(v) => setSortBy(v as SortType)}
-                                            leadingIcon={<ArrowUpDown className="w-4 h-4 text-text-secondary" />}
-                                            options={sortOptions}
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Sources — the grouped source list (platform → account).
-                                    Replaces the old redundant row of platform icons; the
-                                    Screenshots bucket is included in the list. */}
-                                {sourceFacets.length > 0 && (
-                                    <div>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted">Sources</label>
-                                            {selectedSources.size > 0 && (
-                                                <button
-                                                    onClick={() => setSelectedSources(new Set())}
-                                                    className="text-[11px] font-semibold text-text-muted hover:text-accent transition-colors"
-                                                >
-                                                    Clear
-                                                </button>
-                                            )}
-                                        </div>
-                                        <div className="max-h-[38vh] overflow-y-auto overscroll-contain -mx-1 px-1">
-                                            <SourceFacetList
-                                                facets={sourceFacets}
-                                                selected={selectedSources}
-                                                onToggleKey={handleToggleSource}
-                                                onToggleKeys={handleToggleSourceKeys}
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Footer */}
-                                <div className="flex items-center gap-3 pt-1">
-                                    {activeMobileFilters > 0 && (
-                                        <button
-                                            onClick={() => { setFilter('all'); setSelectedPlatforms(new Set()); setSelectedSources(new Set()); setScreenshotOnly(false); setSelectedTags(new Set()); }}
-                                            className="text-sm font-semibold text-text-muted hover:text-accent transition-colors"
-                                        >
-                                            Clear all
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => setIsFiltersOpen(false)}
-                                        className="ms-auto px-6 h-10 rounded-full bg-accent text-white font-semibold text-sm shadow-sm hover:bg-accent-hover transition-colors"
-                                    >
-                                        Done
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                <MobileFiltersSheet
+                    isOpen={isFiltersOpen}
+                    onClose={() => setIsFiltersOpen(false)}
+                    filter={filter}
+                    setFilter={setFilter}
+                    sortBy={sortBy}
+                    setSortBy={setSortBy}
+                    statusTriggerIcon={statusTriggerIcon}
+                    statusOptions={statusOptions}
+                    sortOptions={sortOptions}
+                    sourceFacets={sourceFacets}
+                    selectedSources={selectedSources}
+                    setSelectedSources={setSelectedSources}
+                    onToggleSource={handleToggleSource}
+                    onToggleSourceKeys={handleToggleSourceKeys}
+                    activeMobileFilters={activeMobileFilters}
+                    setSelectedTags={setSelectedTags}
+                />
 
                 {/* Categories & Tags Sheet (Mobile) — categories and the full tag
                     tree live together here, one tap from the home toolbar, so tags
                     aren't buried inside the Filters sheet. */}
-                {isCategoriesOpen && (
-                    <div className="sm:hidden fixed inset-0 z-50 flex flex-col justify-end isolate">
-                        <div
-                            className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
-                            onClick={() => setIsCategoriesOpen(false)}
-                        />
-                        <div className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 max-h-[88vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
-                            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-text-muted/30" />
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-base font-bold text-text">Categories &amp; Tags</h3>
-                                <button
-                                    onClick={() => setIsCategoriesOpen(false)}
-                                    aria-label="Close"
-                                    className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-
-                            {/* Categories — chips breathe directly on the sheet. */}
-                            <div className="flex items-center justify-between mb-3">
-                                <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">
-                                    <Shapes className="w-3.5 h-3.5 text-accent/70" /> Categories
-                                </span>
-                                {selectedCategory.size > 0 && (
-                                    <button
-                                        onClick={() => setSelectedCategory(new Set())}
-                                        className="text-[11px] font-semibold text-text-muted hover:text-accent transition-colors"
-                                    >
-                                        Clear
-                                    </button>
-                                )}
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                <button
-                                    onClick={() => setSelectedCategory(new Set())}
-                                    className={`px-3.5 py-1.5 rounded-full text-[13px] font-semibold border transition-colors ${selectedCategory.size === 0
-                                        ? 'bg-accent text-white border-accent shadow-sm'
-                                        : 'bg-card border-border-subtle text-text-secondary hover:border-text-muted/40 hover:text-text'
-                                        }`}
-                                >
-                                    All
-                                </button>
-                                {categories.map(cat => {
-                                    const isSelected = selectedCategory.has(cat);
-                                    const colorStyle = getCategoryColorStyle(cat);
-                                    return (
-                                        <button
-                                            key={cat}
-                                            onClick={() => {
-                                                const next = new Set(selectedCategory);
-                                                if (isSelected) next.delete(cat); else next.add(cat);
-                                                setSelectedCategory(next);
-                                            }}
-                                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[13px] font-semibold border transition-colors ${isSelected
-                                                ? 'shadow-sm'
-                                                : 'bg-card border-border-subtle text-text-secondary hover:border-text-muted/40 hover:text-text'
-                                                }`}
-                                            style={isSelected ? {
-                                                backgroundColor: colorStyle.backgroundColor,
-                                                color: colorStyle.color,
-                                                borderColor: colorStyle.backgroundColor,
-                                            } : undefined}
-                                        >
-                                            {cat}
-                                            <span className="opacity-50 font-medium tabular-nums">{categoryCounts[cat]}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
-                            {/* Tags — the same explorer used on desktop, flowing freely in
-                                the sheet (no boxed container) so the tree can breathe.
-                                A hairline divider separates it from Categories. */}
-                            {allTags.length > 0 && (
-                                <div className="mt-6 pt-5 border-t border-border-subtle/60">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">
-                                            <TagIcon className="w-3.5 h-3.5 text-accent/70" /> Tags
-                                            {selectedTags.size > 0 && (
-                                                <span className="text-accent normal-case tracking-normal font-semibold">· {selectedTags.size} selected</span>
-                                            )}
-                                        </span>
-                                        {selectedTags.size > 0 && (
-                                            <button
-                                                onClick={() => setSelectedTags(new Set())}
-                                                className="text-[11px] font-semibold text-text-muted hover:text-accent transition-colors"
-                                            >
-                                                Clear
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="max-h-[44vh] overflow-y-auto overscroll-contain -mx-1">
-                                        <TagExplorer
-                                            tags={allTags}
-                                            tagCounts={tagCounts}
-                                            selectedTags={selectedTags}
-                                            onToggleTag={handleToggleTag}
-                                            onClearFilters={() => setSelectedTags(new Set())}
-                                            variant="embedded"
-                                            className="px-1"
-                                        />
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="flex items-center gap-3 pt-5">
-                                {(selectedCategory.size + selectedTags.size) > 0 && (
-                                    <button
-                                        onClick={() => { setSelectedCategory(new Set()); setSelectedTags(new Set()); }}
-                                        className="text-sm font-semibold text-text-muted hover:text-accent transition-colors"
-                                    >
-                                        Clear all
-                                    </button>
-                                )}
-                                <button
-                                    onClick={() => setIsCategoriesOpen(false)}
-                                    className="ms-auto px-6 h-10 rounded-full bg-accent text-white font-semibold text-sm shadow-sm hover:bg-accent-hover transition-colors"
-                                >
-                                    Done
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                <MobileCategoriesTagsSheet
+                    isOpen={isCategoriesOpen}
+                    onClose={() => setIsCategoriesOpen(false)}
+                    categories={categories}
+                    selectedCategory={selectedCategory}
+                    setSelectedCategory={setSelectedCategory}
+                    categoryCounts={categoryCounts}
+                    allTags={allTags}
+                    tagCounts={tagCounts}
+                    selectedTags={selectedTags}
+                    setSelectedTags={setSelectedTags}
+                    onToggleTag={handleToggleTag}
+                />
 
                 {/* Tag Explorer Drawer (Mobile) */}
-                {isTagExplorerOpen && (
-                    <div className="lg:hidden fixed inset-0 z-50 flex justify-end isolate">
-                        <div
-                            className="absolute inset-0 bg-background/80 backdrop-blur-sm"
-                            onClick={() => setIsTagExplorerOpen(false)}
-                        />
-                        <div className="relative w-full sm:w-80 h-[100dvh] bg-card border-l border-white/10 flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
-                            <div className="flex-none p-4 border-b border-white/10 flex justify-between items-center bg-card/50 backdrop-blur-xl z-10 safe-pt">
-                                <h2 className="text-base font-bold flex items-center gap-2">
-                                    <TagIcon className="w-4 h-4 text-accent" />
-                                    Filter Tags
-                                </h2>
-                                <button
-                                    onClick={() => setIsTagExplorerOpen(false)}
-                                    className="p-2 hover:bg-white/5 rounded-full touch-manipulation"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-                            <div className="flex-1 min-h-0 safe-pb">
-                                <TagExplorer
-                                    tags={allTags}
-                                    tagCounts={tagCounts}
-                                    selectedTags={selectedTags}
-                                    onToggleTag={handleToggleTag}
-                                    onClearFilters={() => setSelectedTags(new Set())}
-                                    className="p-4"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )}
+                <MobileTagExplorerDrawer
+                    isOpen={isTagExplorerOpen}
+                    onClose={() => setIsTagExplorerOpen(false)}
+                    tags={allTags}
+                    tagCounts={tagCounts}
+                    selectedTags={selectedTags}
+                    onToggleTag={handleToggleTag}
+                    onClearFilters={() => setSelectedTags(new Set())}
+                />
 
                 {/* Links Grid / Ask */}
                 <div className="flex-grow min-w-0">
@@ -1993,7 +1559,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             totalLinks={links.length}
                             onOpenLink={(id) => setActiveLinkId(id)}
                             onExit={() => setViewMode(lastLayout.current)}
-                            categories={[...categories].sort((a, b) => (categoryCounts[b] || 0) - (categoryCounts[a] || 0))}
+                            links={links}
                         />
                     ) : filteredLinks.length === 0 && pendingCards.length === 0 ? (
                         <div className="text-center py-16 animate-fade-in">
@@ -2034,13 +1600,36 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                                         selectedTags.size > 0 ? 'Try clearing some tag filters' :
                                                             'Add your first link using the + button below'}
                             </p>
-                            {(selectedTags.size > 0 || selectedPlatforms.size > 0 || selectedSources.size > 0 || screenshotOnly || searchQuery) && (
+                            {/* Brand-new, genuinely empty account (no query, no
+                                filters): offer a one-tap seeded example so Ask /
+                                search / Collections demo against something real
+                                in the first minute — instead of a dead end. */}
+                            {links.length === 0 && filter === 'all' && !searchQuery && !debouncedQuery &&
+                                selectedCategory.size === 0 && selectedTags.size === 0 &&
+                                selectedSources.size === 0 && selectedCollections.size === 0 && (
+                                <button
+                                    onClick={handleSeedExample}
+                                    disabled={seedingExample}
+                                    className="mt-5 inline-flex items-center gap-2 px-4 h-11 rounded-full bg-accent text-white text-sm font-bold shadow-sm shadow-accent/20 hover:bg-accent-hover active:scale-95 transition-all disabled:opacity-60 disabled:pointer-events-none"
+                                >
+                                    {seedingExample ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            Adding…
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles className="w-4 h-4" />
+                                            Try it with an example
+                                        </>
+                                    )}
+                                </button>
+                            )}
+                            {(selectedTags.size > 0 || selectedSources.size > 0 || searchQuery) && (
                                 <button
                                     onClick={() => {
                                         setSelectedTags(new Set());
-                                        setSelectedPlatforms(new Set());
                                         setSelectedSources(new Set());
-                                        setScreenshotOnly(false);
                                         setSearchQuery('');
                                     }}
                                     className="mt-4 px-4 py-2 bg-accent text-white rounded-xl text-sm font-bold hover:bg-accent-hover transition-all"
@@ -2052,11 +1641,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     ) : viewMode === 'review' ? (
                         <SwipeDeck
                             links={filteredLinks}
-                            onFavorite={(link) => handleStatusChange(link.id, 'favorite')}
-                            onArchive={(link) => handleStatusChange(link.id, 'archived')}
-                            onRemind={(link) => handleOpenReminderModal(link)}
-                            onOpen={(link) => setActiveLinkId(link.id)}
-                            onResetStatus={(link) => handleStatusChange(link.id, 'unread')}
+                            onFavorite={swipeFavorite}
+                            onArchive={swipeArchive}
+                            onRemind={handleOpenReminderModal}
+                            onOpen={openLinkDetails}
+                            onResetStatus={swipeResetStatus}
+                            onCancelRemind={swipeCancelRemind}
+                            remindSignal={remindSignal}
                         />
                     ) : viewMode === 'list' ? (
                         <div className="flex flex-col gap-2 max-w-3xl mx-auto">
@@ -2067,7 +1658,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     key={link.id}
                                     index={idx}
                                     link={link}
-                                    onOpenDetails={(link) => setActiveLinkId(link.id)}
+                                    onOpenDetails={openLinkDetails}
                                     onStatusChange={handleStatusChange}
                                     onDelete={handleDelete}
                                     isSelectionMode={isSelectionMode}
@@ -2086,22 +1677,20 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     key={link.id}
                                     index={idx}
                                     link={link}
-                                    onOpenDetails={(link) => setActiveLinkId(link.id)}
+                                    onOpenDetails={openLinkDetails}
                                     onStatusChange={handleStatusChange}
                                     onReadStatusChange={handleReadStatusChange}
                                     onUpdateCategory={handleUpdateCategory}
                                     allCategories={categories}
                                     onDelete={handleDelete}
-                                    onUpdateReminder={(link) => handleOpenReminderModal(link)}
+                                    onUpdateReminder={handleOpenReminderModal}
                                     isSelectionMode={isSelectionMode}
                                     isSelected={selectedIds.has(link.id)}
                                     onToggleSelection={toggleSelection}
                                     onTagClick={handleToggleTag}
-                                    onAddToCollection={(link) => setAddToCollectionLink(link)}
+                                    onAddToCollection={handleAddToCollection}
                                     onShare={handleShareCard}
-                                    cardCollections={collections
-                                        .filter(c => (link.collectionIds ?? []).includes(c.id))
-                                        .map(c => ({ id: c.id, name: c.name }))}
+                                    cardCollections={cardCollectionsByLink.get(link.id)}
                                     activeCollectionId={activeCollectionId}
                                     onRemoveFromCollection={handleRemoveFromCollection}
                                 />
@@ -2178,7 +1767,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     onReadStatusChange={handleReadStatusChange}
                     onUpdateTags={handleUpdateTags}
                     onUpdateCategory={handleUpdateCategory}
-                    onUpdateReminder={(link) => handleOpenReminderModal(link)}
+                    onUpdateTitle={handleUpdateTitle}
+                    onUpdateSummary={handleUpdateSummary}
+                    onUpdateNote={handleUpdateNote}
+                    onUpdateReminder={handleOpenReminderModal}
                     onDelete={handleDelete}
                     onOpenOtherLink={openRelatedLink}
                     excludeRelatedIds={linkStack}
@@ -2234,8 +1826,22 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     uid={uid}
                     link={reminderModalLink}
                     isOpen={!!reminderModalLink}
-                    onClose={() => setReminderModalLink(null)}
-                    onUpdate={() => setReminderModalLink(null)}
+                    onClose={() => { if (!remindSavedRef.current) resolveRemind(reminderModalLink, false); setReminderModalLink(null); }}
+                    onUpdate={() => {
+                        remindSavedRef.current = true;
+                        resolveRemind(reminderModalLink, true);
+                        setReminderModalLink(null);
+                        // Moment of intent: the user just asked to be reminded. On
+                        // native, if push has never been prompted (so it's off),
+                        // surface the existing push nudge to offer notifications —
+                        // reusing PushNudge, not a new permission flow. Once
+                        // prompted (granted or dismissed) we respect that choice
+                        // and don't re-nag; the in-app "Reminders due" strip is the
+                        // guaranteed channel either way.
+                        if (isNativeApp() && readLocalPushPrompt() === null) {
+                            setShowPushNudge(true);
+                        }
+                    }}
                 />
             )}
 
@@ -2266,14 +1872,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     );
 }
 
-export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void }) {
+export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void }) {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
-                <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                <div className="w-8 h-8 border-2 border-text/20 border-t-text rounded-full animate-spin" />
             </div>
         }>
-            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onOpenDigestSettings={onOpenDigestSettings} />
+            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} />
         </Suspense>
     );
 }

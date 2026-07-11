@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Newspaper, Sparkles } from 'lucide-react';
 import type { CuratedDigest, WeeklySynthesis, DigestCardRef } from '@/lib/types';
+import { track } from '@/lib/analytics';
 import DigestCard from './DigestCard';
 import SynthesisCard from './SynthesisCard';
 
@@ -35,6 +36,7 @@ interface Props {
     onOpenSynthesisCard: (id: string) => void;
     onDismissSynthesis: () => void;
     onOpenDigestSettings?: () => void;
+    onDeleteDigest?: (id: string) => void;
 }
 
 /**
@@ -45,8 +47,14 @@ interface Props {
  * scroll of collapsed headers.
  */
 export default function DigestView({
-    digests, synthesis, onOpenCard, onOpenSynthesisCard, onDismissSynthesis, onOpenDigestSettings,
+    digests, synthesis, onOpenCard, onOpenSynthesisCard, onDismissSynthesis, onOpenDigestSettings, onDeleteDigest,
 }: Props) {
+    // The Digest section mounts only when the user opens it (Feed swaps it in),
+    // so a mount is a genuine "digest opened" view. Fired once per mount.
+    useEffect(() => {
+        track('digest_opened');
+    }, []);
+
     // Sidebar selection. 'synthesis' or a digest id; falls back to the newest.
     const [selId, setSelId] = useState<string | null>(null);
     const ids = new Set(digests.map((d) => d.id));
@@ -96,7 +104,7 @@ export default function DigestView({
                     <SynthesisCard synthesis={synthesis} onOpenCard={onOpenSynthesisCard} onDismiss={onDismissSynthesis} />
                 )}
                 {digests.map((digest, i) => (
-                    <DigestCard key={digest.id} digest={digest} defaultExpanded={i === 0} onOpenCard={onOpenCard} />
+                    <DigestCard key={digest.id} digest={digest} defaultExpanded={i === 0} onOpenCard={onOpenCard} onOpenSettings={onOpenDigestSettings} onDelete={onDeleteDigest} />
                 ))}
             </div>
 
@@ -133,7 +141,7 @@ export default function DigestView({
                     {activeId === 'synthesis' && synthesis ? (
                         <SynthesisCard synthesis={synthesis} onOpenCard={onOpenSynthesisCard} onDismiss={onDismissSynthesis} />
                     ) : activeDigest ? (
-                        <DigestCard key={activeDigest.id} digest={activeDigest} alwaysOpen onOpenCard={onOpenCard} />
+                        <DigestCard key={activeDigest.id} digest={activeDigest} alwaysOpen onOpenCard={onOpenCard} onOpenSettings={onOpenDigestSettings} onDelete={onDeleteDigest} />
                     ) : null}
                 </div>
             </div>

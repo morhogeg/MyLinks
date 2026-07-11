@@ -3,7 +3,7 @@
 
 export type LinkStatus = 'unread' | 'archived' | 'favorite';
 
-// Async-capture lifecycle (M3). Items saved via the share sheet / WhatsApp are
+// Async-capture lifecycle (M3). Items saved via the share sheet are
 // written as `processing` the instant they're queued, then flip to a normal
 // LinkStatus (ready) or `failed` (retryable) — so a capture is never invisible
 // and never silently dropped. A card's `status` field holds one of these while
@@ -32,7 +32,9 @@ export interface AIAnalysis {
   category: string;
   tags: string[];
   concepts?: string[];
-  actionableTakeaway: string;
+  // Optional: only present when the content genuinely supports a concrete action
+  // (the backend omits it for non-actionable content rather than inventing filler).
+  actionableTakeaway?: string;
   sourceType?: string;
   sourceName?: string;
   // Backend writes a float score here; some legacy docs stored a string label.
@@ -62,7 +64,8 @@ export interface Link {
   error?: string;
   failedAt?: number;
   metadata: LinkMetadata;
-  // AI Analysis metadata
+  // AI Analysis metadata. sourceType is 'web' | 'youtube' | 'image' | 'note'
+  // (a 'note' is a URL-less thought captured directly — it has no `url`).
   sourceType?: string;
   sourceName?: string;
   // Backend writes a float score here; some legacy docs stored a string label.
@@ -82,9 +85,20 @@ export interface Link {
   nextReminderAt?: number; // Unix timestamp (ms)
   reminderCount?: number;
   reminderProfile?: string;
+  // In-app fallback: the reminder sweep flips this true when a reminder fires
+  // so the feed surfaces it even when the user has no push. Cleared when the
+  // user acts on it (opens/dismisses) or re-sets the reminder.
+  reminderDue?: boolean;
+  reminderDueAt?: number; // Unix timestamp (ms) the reminder came due
   lastViewedAt?: number; // Unix timestamp (ms)
   language?: string;
   isRead?: boolean;
+
+  // A personal note the user attaches to ANY card (link, image, or note-card) —
+  // their own annotation, kept distinct from the AI-generated summary. Editable
+  // from the detail view; cleared (field removed) when emptied.
+  userNote?: string;
+  userNoteUpdatedAt?: number; // Unix timestamp (ms) the note was last edited
 
   // Contextual Linking
   concepts?: string[];
@@ -154,14 +168,17 @@ export interface RelatedLink {
 }
 
 export type DigestFrequency = 'daily' | 'weekly';
-export type DigestChannel = 'push' | 'email' | 'whatsapp';
-export type ReminderChannel = 'push' | 'whatsapp';
-export type DigestMode = 'smart' | 'random' | 'topic' | 'unread' | 'favorites' | 'rediscover' | 'synthesis';
+export type DigestChannel = 'push';
+export type ReminderChannel = 'push';
+// Three curation modes survive; 'synthesis' is the separate weekly-recap path.
+// Retired modes (random/unread/favorites) map to 'smart' at load time — see
+// normalizeDigestMode in useUserSettings.ts.
+export type DigestMode = 'smart' | 'topic' | 'rediscover' | 'synthesis';
 
 // ── Weekly "What you learned" synthesis (M12) ────────────────────────────────
 // A narrative recap of the week's saves, generated server-side (digest_service)
 // and stored at users/{uid}/syntheses/{weekId}. Surfaced in-app as a special
-// feed card and also delivered over email/WhatsApp.
+// feed card, and pushed as a notification when the push channel is on.
 export interface SynthesisTheme {
   title: string;
   insight: string;
@@ -191,8 +208,8 @@ export interface WeeklySynthesis {
 
 // ── Curated digest (in-app Digest section) ───────────────────────────────────
 // Every curated digest is persisted server-side (digest_service) to
-// users/{uid}/digests/{digestId} — the always-on surface; push/WhatsApp/email
-// are additional opt-in delivery channels.
+// users/{uid}/digests/{digestId} — the always-on surface; push is an
+// additional opt-in delivery channel.
 
 /** A card denormalized into the digest doc, so it renders even if the source
  *  link is later deleted (the app still deep-links by id when it exists). */
@@ -261,6 +278,10 @@ export interface ChatMessage {
   content: string;
   sources?: ChatSource[];
   error?: boolean;
+  // True when the backend could not tie this answer to any saved card (no valid
+  // citation, even after a stricter re-ask). The UI drops the "grounded" promise
+  // and shows a downgrade notice in place of the source chips.
+  ungrounded?: boolean;
 }
 
 /** A saved conversation in the Ask history sidebar (users/{uid}/chats/{id}). */

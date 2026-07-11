@@ -77,7 +77,6 @@ export function useSharedCaptureBanner(processingActive: boolean): AnalyzingStat
             document.removeEventListener('visibilitychange', onVis);
             window.removeEventListener('focus', check);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Real processing card appeared → hand off (it owns the finish frame).
@@ -85,10 +84,13 @@ export function useSharedCaptureBanner(processingActive: boolean): AnalyzingStat
         if (processingActive && signal) setSignal(null);
     }, [processingActive, signal]);
 
-    // Advance the ramp while active.
+    // Advance the ramp while active. Ticks once a second (down from 200 ms) so
+    // the optimistic banner re-renders ≤1×/s; the banner's CSS width transition
+    // smooths each step, and progress is a pure function of elapsed time so the
+    // ramp still lands at the same value at any given moment.
     useEffect(() => {
         if (!signal) return;
-        const iv = setInterval(() => tick((n) => n + 1), 200);
+        const iv = setInterval(() => tick((n) => n + 1), 1000);
         return () => clearInterval(iv);
     }, [signal]);
 
@@ -99,7 +101,11 @@ export function useSharedCaptureBanner(processingActive: boolean): AnalyzingStat
     const elapsedReal = Math.max(0, now() - signal.openedAt);
     if (elapsedReal > MAX_MS) {
         // No real card ever arrived. Emit exactly one inactive frame so the banner
-        // flashes "Saved" and slides away, then clear.
+        // flashes "Saved" and slides away, then clear. finishedOnce is a deliberate
+        // once-latch (not render-affecting state): it gates the single terminal
+        // frame emitted during the render→setSignal(null) hand-off, so reading it
+        // here is intentional rather than a stale-ref hazard.
+        // eslint-disable-next-line react-hooks/refs
         if (!finishedOnce.current) {
             finishedOnce.current = true;
             Promise.resolve().then(() => setSignal(null));

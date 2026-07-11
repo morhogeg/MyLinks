@@ -33,12 +33,9 @@ Functionality** only; **Used for Tracking = No**.
 
 Notes for edge cases:
 
-- **Phone Number: do not declare.** The app itself never collects a phone
-  number. WhatsApp capture happens entirely outside the app (user messages a
-  Twilio WhatsApp number) and is optional; it is disclosed in the privacy
-  policy, which is the right surface for it. If you prefer maximum caution you
-  *may* add Contact Info → Phone Number (linked, app functionality), but it is
-  not required for data collected outside the app binary.
+- **Phone Number: do not declare — not collected.** The app never collects a
+  phone number. (Capture is via the iOS share sheet, web add, and browser
+  extension; there is no phone-based capture path.)
 - "Linked to user" is **Yes** for everything collected — all data lives in the
   user's own workspace keyed by their UID.
 - The two `PrivacyInfo.xcprivacy` manifests (App + ShareExt, UserDefaults
@@ -87,7 +84,6 @@ them.)
 >
 > CAPTURE FROM ANYWHERE
 > • iOS share sheet — save from Safari, YouTube, X, anywhere
-> • WhatsApp — forward a link or photo to your Machina number (optional)
 > • Web app and browser extension on your computer
 >
 > UNDERSTAND WHAT YOU SAVED
@@ -135,11 +131,8 @@ browser, and no user-to-user interaction). Result: **4+**.
 > saved content and questions are processed by Google Gemini. This is also
 > covered in our privacy policy (https://my-links-sable.vercel.app/privacy).
 >
-> • WhatsApp capture is OPTIONAL and requires messaging an external
-> WhatsApp/Twilio phone number from the user's own WhatsApp — it is not
-> testable from inside the app and no app functionality depends on it. To test
-> capture, please use the share sheet instead: open any page in Safari → Share
-> → Machina → the card appears in the feed within ~15 seconds.
+> • To test capture, use the share sheet: open any page in Safari → Share →
+> Machina → the card appears in the feed within ~15 seconds.
 >
 > • Account deletion is available in-app: Settings → Delete account.
 >
@@ -174,8 +167,8 @@ clean (9:41, full battery). Order matters — the first two sell the app.
    cover images; optionally one shown as a public share page. Caption:
    "Curate it. Share it (or don't)."
 
-iPad: not planned — flip `TARGETED_DEVICE_FAMILY` to `1` (iPhone-only) before
-submission (§4 task 9) instead of producing iPad screenshots.
+iPad: not planned — `TARGETED_DEVICE_FAMILY` is already `1` (iPhone-only) in all
+build configs, so no iPad screenshots are needed.
 
 ## 5. Remaining manual steps (owner)
 
@@ -183,6 +176,6 @@ submission (§4 task 9) instead of producing iPad screenshots.
 - [ ] Enter metadata per §2 (after the auth cutover, when the store build exists).
 - [ ] Create + seed the reviewer demo account; fill credentials into §3.
 - [ ] Take the 6 screenshots per §4.
-- [ ] Set `TARGETED_DEVICE_FAMILY = 1` (or produce iPad screenshots).
+- [x] `TARGETED_DEVICE_FAMILY = 1` (iPhone-only) — already set in all build configs.
 - [ ] Verify the AI-consent screen (§4 task 6) is in the submitted build before
       using the review-notes wording above.

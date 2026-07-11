@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { MessageCircleQuestion, ArrowUp, FileText, Brain, Plus, MessagesSquare, Copy, Check } from 'lucide-react';
+import { MessageCircleQuestion, ArrowUp, FileText, Brain, Plus, MessagesSquare, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -10,8 +10,10 @@ import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl, isNativeApp, fetchWithTimeout } from '@/lib/api';
+import { trackFirstAsk, trackAskNoCitations, trackAskSuggestionUsed, trackAskFollowupUsed, trackAskStopped } from '@/lib/analytics';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
-import { ChatMessage, ChatSource, ChatSession } from '@/lib/types';
+import { ChatMessage, ChatSource, ChatSession, Link } from '@/lib/types';
+import { buildAskSuggestions, buildFollowUps, newestReadyLink } from '@/lib/askSuggestions';
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
 import ConfirmDialog from './ConfirmDialog';
 import ChatHistorySidebar from './ChatHistorySidebar';
@@ -99,22 +101,55 @@ function CopyButton({ text }: { text: string }) {
     );
 }
 
+/** Staged "what Machina is doing" status shown while waiting for the answer —
+ *  honest theater (search → read → write mirrors the real pipeline) that makes
+ *  the wait legible instead of three anonymous dots. Remounts per ask. */
+function ThinkingIndicator({ totalLinks }: { totalLinks: number }) {
+    const stages = [
+        `Searching your ${totalLinks} ${totalLinks === 1 ? 'save' : 'saves'}…`,
+        'Reading the best matches…',
+        'Writing your answer…',
+    ];
+    const [stage, setStage] = useState(0);
+    useEffect(() => {
+        const t1 = setTimeout(() => setStage(1), 1600);
+        const t2 = setTimeout(() => setStage(2), 4200);
+        return () => { clearTimeout(t1); clearTimeout(t2); };
+    }, []);
+    return (
+        <div className="flex justify-start">
+            <div className="px-1 py-1 inline-flex items-center gap-2.5">
+                <span className="inline-flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce [animation-delay:-0.3s]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce [animation-delay:-0.15s]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce" />
+                </span>
+                <span key={stage} className="text-[13px] text-text-muted animate-fade-in">{stages[stage]}</span>
+            </div>
+        </div>
+    );
+}
+
 interface AskBrainProps {
     uid: string | null;
     totalLinks: number;
     onOpenLink: (id: string) => void;
     /** Leave Ask mode (mobile shows a back button; desktop exits via the toolbar). */
     onExit?: () => void;
-    /** The user's saved categories (most-saved first) — seeds relevant prompts. */
-    categories?: string[];
+    /** The live library (Feed's Firestore snapshot) — powers suggestions that
+     *  react the moment a new card lands. */
+    links: Link[];
 }
 
 const HISTORY_COLLAPSE_KEY = 'askbrain:histcollapsed';
 
-export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categories }: AskBrainProps) {
+export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }: AskBrainProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
+    // True while an SSE answer is still writing (isThinking covers only the
+    // pre-first-token wait). Together they gate the Stop affordance.
+    const [isStreaming, setIsStreaming] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -150,25 +185,32 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         return streamGenRef.current;
     };
 
-    // Suggested prompts built from the user's own categories so they're always
-    // relevant to what's actually saved. Rotated by a per-open random offset for
-    // light variety — all client-side, no extra tokens.
-    const rotation = useRef(Math.floor(Math.random() * 997)).current;
-    const suggestions = useMemo(() => {
-        const cats = (categories ?? []).filter(Boolean);
-        if (!cats.length) return [] as string[];
-        const start = rotation % cats.length;
-        const [a, b, c] = [...cats.slice(start), ...cats.slice(0, start)];
-        // Varied, action-oriented prompts (not the same "What have I saved about X?"
-        // each time) — but each must stand on its own, so no forced cross-topic
-        // links between unrelated categories. All client-side.
-        const out: string[] = [`What are the key takeaways from my ${a} saves?`];
-        if (b) out.push(`Summarize what I've saved on ${b}`);
-        if (c && c !== a) out.push(`What's the latest I saved about ${c}?`);
-        out.push('Give me a quick recap of my recent saves');
-        return out.slice(0, 4);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [categories?.join('|'), rotation]);
+    // Living suggested prompts, built from the actual library (newest save,
+    // this week's activity, shared concepts, top categories, a dusty card) and
+    // recomputed on every links snapshot — so a card saved while Ask is open
+    // shows up in the chips immediately. `suggestSalt` rotates the mix and the
+    // phrasing; "More ideas" bumps it. All client-side, no extra tokens.
+    const [suggestSalt, setSuggestSalt] = useState(() => Math.floor(Math.random() * 997));
+    const suggestions = useMemo(() => buildAskSuggestions(links, suggestSalt), [links, suggestSalt]);
+
+    // One-tap follow-ups under a completed answer; rotate per turn.
+    const followUps = useMemo(() => buildFollowUps(messages.length + suggestSalt), [messages.length, suggestSalt]);
+
+    // Watch for a brand-new card landing while a conversation is open and offer
+    // it as a one-tap ask ("Just saved — ask about it"). The empty state doesn't
+    // need this — its latest-save chip already updates live.
+    const seenNewestRef = useRef<{ id: string; ts: number } | null>(null);
+    const [freshCard, setFreshCard] = useState<{ id: string; title: string } | null>(null);
+    useEffect(() => {
+        const newest = newestReadyLink(links);
+        if (!newest) return;
+        const ts = typeof newest.createdAt === 'number' ? newest.createdAt : Date.parse(String(newest.createdAt)) || 0;
+        const seen = seenNewestRef.current;
+        if (seen && newest.id !== seen.id && ts > seen.ts) {
+            setFreshCard({ id: newest.id, title: newest.title });
+        }
+        seenNewestRef.current = { id: newest.id, ts };
+    }, [links]);
 
     // On phones the Ask view is a full-screen chat pinned to the *visual* viewport
     // so the composer rides the keyboard like a native chat app. On desktop it
@@ -322,6 +364,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
     const newChat = () => {
         bumpStreamGen();            // abandon any in-flight stream from the old chat
         setIsThinking(false);
+        setIsStreaming(false);
         setActiveChatId(null);
         activeChatIdRef.current = null;
         setMessages([]);
@@ -335,6 +378,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         if (!chat) return;
         bumpStreamGen();            // abandon any in-flight stream before swapping
         setIsThinking(false);
+        setIsStreaming(false);
         setActiveChatId(id);
         activeChatIdRef.current = id;
         setMessages(chat.messages);
@@ -362,6 +406,24 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         if (el) el.scrollTo({ top: el.scrollHeight, behavior });
     };
 
+    // Reading-aware autoscroll: only stick to the bottom while the user is
+    // already there. Scrolling up to re-read during a streaming answer stops
+    // the forced scroll; a "jump to latest" pill offers the way back.
+    const nearBottomRef = useRef(true);
+    const [showJump, setShowJump] = useState(false);
+    const handleConvScroll = () => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        nearBottomRef.current = near;
+        setShowJump(!near);
+    };
+    const jumpToLatest = () => {
+        nearBottomRef.current = true;
+        setShowJump(false);
+        scrollToBottom();
+    };
+
     // When the input gains focus (keyboard opening), keep the latest message in
     // view. Height tracking is handled by the visual-viewport listeners above.
     const handleFocus = () => {
@@ -382,10 +444,37 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         }
     };
 
-    // Keep the latest message in view as the conversation grows.
-    useEffect(() => { scrollToBottom(); }, [messages, isThinking]);
+    // Keep the latest message in view as the conversation grows — unless the
+    // user has deliberately scrolled up to read.
+    useEffect(() => { if (nearBottomRef.current) scrollToBottom(); }, [messages, isThinking]);
 
-    const send = async (text: string) => {
+    // Grow the composer with its content (capped by max-h-32), shrinking back
+    // when cleared — rows={1} alone never grows.
+    useEffect(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+    }, [input]);
+
+    // Desktop: "/" focuses the composer from anywhere in Ask mode (unless
+    // already typing somewhere), mirroring the common chat-app shortcut.
+    useEffect(() => {
+        if (isMobile) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+            const t = document.activeElement as HTMLElement | null;
+            if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+            e.preventDefault();
+            textareaRef.current?.focus();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [isMobile]);
+
+    /** Ask a question. `base` overrides the conversation the turn builds on —
+     *  used by retry to drop a failed exchange before re-sending. */
+    const send = async (text: string, base?: ChatMessage[]) => {
         const question = text.trim();
         if (!question || isThinking || !uid) return;
 
@@ -397,11 +486,15 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
         const isStale = () => streamGenRef.current !== gen;
 
         // History = the conversation so far (before this turn), trimmed server-side.
-        const history = messages.map(m => ({ role: m.role, content: m.content }));
+        const baseMsgs = base ?? messages;
+        const history = baseMsgs.map(m => ({ role: m.role, content: m.content }));
 
-        setMessages(prev => [...prev, { role: 'user', content: question }]);
+        setMessages([...baseMsgs, { role: 'user', content: question }]);
         setInput('');
         setIsThinking(true);
+        setIsStreaming(false);
+        nearBottomRef.current = true;   // a new turn always starts pinned to the latest
+        setShowJump(false);
 
         // The native shell's WKWebView reads streamed (SSE) response bodies
         // unreliably and aborts mid-stream, which surfaced as "Couldn't reach
@@ -478,16 +571,22 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                         } catch { continue; }
                         if (isStale()) { try { await reader.cancel(); } catch { /* ignore */ } return; }
                         if (evt.type === 'token') {
-                            if (firstToken) { setIsThinking(false); firstToken = false; }
+                            if (firstToken) { setIsThinking(false); setIsStreaming(true); firstToken = false; }
                             appendText(evt.text || '');
                         } else if (evt.type === 'sources') {
                             patchAt({ sources: evt.sources || [] });
+                        } else if (evt.type === 'ungrounded') {
+                            // Answer couldn't be tied to any save — downgrade it
+                            // (arrives after the prose, in place of source chips).
+                            patchAt({ ungrounded: true });
+                            trackAskNoCitations();
                         } else if (evt.type === 'error') {
                             setIsThinking(false);
                             patchAt({ content: evt.error || 'Something went wrong reaching Machina. Please try again.', error: true });
                             done = true;
                         } else if (evt.type === 'done') {
                             done = true;
+                            trackFirstAsk();
                         }
                     }
                 }
@@ -503,7 +602,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                     role: 'assistant',
                     content: data.answer || "I couldn't find an answer for that.",
                     sources: data.sources || [],
+                    ungrounded: Boolean(data.ungrounded),
                 }]);
+                trackFirstAsk();
+                if (data.ungrounded) trackAskNoCitations();
             } else {
                 setMessages(prev => [...prev, {
                     role: 'assistant',
@@ -524,6 +626,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
             // clear the newer stream's thinking state or abort controller.
             if (!isStale()) {
                 setIsThinking(false);
+                setIsStreaming(false);
                 if (streamAbortRef.current === controller) streamAbortRef.current = null;
             }
             // Intentionally do NOT refocus the textarea here. Auto-focusing forced
@@ -539,6 +642,31 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
             e.preventDefault();
             send(input);
         }
+    };
+
+    const busy = isThinking || isStreaming;
+
+    // Stop an in-flight answer. Whatever already streamed in stays (the
+    // debounced auto-save keeps it); the pre-token wait just cancels cleanly.
+    const stopGeneration = () => {
+        if (!busy) return;
+        bumpStreamGen();
+        setIsThinking(false);
+        setIsStreaming(false);
+        trackAskStopped();
+    };
+
+    // One-tap retry for a failed exchange: drop the trailing user+error pair
+    // and re-send the same question, so the history the model sees is clean.
+    const retryLast = () => {
+        const errIdx = messages.length - 1;
+        if (errIdx < 0 || !messages[errIdx].error) return;
+        let userIdx = -1;
+        for (let i = errIdx - 1; i >= 0; i--) {
+            if (messages[i].role === 'user') { userIdx = i; break; }
+        }
+        if (userIdx < 0) return;
+        send(messages[userIdx].content, messages.slice(0, userIdx));
     };
 
     // Library is empty — nothing to ask yet.
@@ -595,6 +723,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                 ref={scrollRef}
                 onTouchStart={onConvTouchStart}
                 onTouchMove={onConvTouchMove}
+                onScroll={handleConvScroll}
                 className="flex-1 flex flex-col overflow-y-auto px-3 sm:px-1 pt-1 pb-4 overscroll-contain scrollbar-soft"
             >
                 {isEmpty ? (
@@ -610,14 +739,31 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                         <div className="flex flex-wrap items-center justify-center gap-2 max-w-xl">
                             {suggestions.map(s => (
                                 <button
-                                    key={s}
-                                    onClick={() => send(s)}
-                                    className="px-3.5 py-2 rounded-full bg-card border border-border-subtle text-text-secondary text-sm font-medium hover:border-accent/40 hover:text-text transition-colors cursor-pointer"
+                                    key={s.key}
+                                    dir="auto"
+                                    onClick={() => { trackAskSuggestionUsed(s.kind); send(s.text); }}
+                                    className={`animate-fade-in inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${
+                                        s.kind === 'latest'
+                                            // The newest save gets the spotlight — it re-animates
+                                            // the moment a fresh card lands (key = card id).
+                                            ? 'bg-accent/10 border border-accent/30 text-text hover:border-accent/60'
+                                            : 'bg-card border border-border-subtle text-text-secondary hover:border-accent/40 hover:text-text'
+                                    }`}
                                 >
-                                    {s}
+                                    {s.kind === 'latest' && <Sparkles className="w-3.5 h-3.5 text-accent shrink-0" />}
+                                    {s.text}
                                 </button>
                             ))}
                         </div>
+                        {suggestions.length > 0 && (
+                            <button
+                                onClick={() => setSuggestSalt(v => v + 1)}
+                                className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-text-muted text-xs font-medium hover:text-text transition-colors cursor-pointer"
+                            >
+                                <RefreshCw className="w-3.5 h-3.5" />
+                                More ideas
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <div className="w-full max-w-2xl mx-auto mt-auto py-2">
@@ -651,8 +797,29 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                                         <CopyButton text={m.content} />
                                     )}
 
+                                    {/* One-tap retry for the most recent failed exchange. */}
+                                    {m.error && i === messages.length - 1 && !busy && (
+                                        <button
+                                            onClick={retryLast}
+                                            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card border border-border-subtle text-text-secondary text-[13px] font-medium hover:border-accent/40 hover:text-text transition-colors cursor-pointer"
+                                        >
+                                            <RotateCcw className="w-3.5 h-3.5" />
+                                            Try again
+                                        </button>
+                                    )}
+
+                                    {/* Ungrounded downgrade — the answer couldn't be tied to any
+                                        save, so we drop the "grounded" promise and say so plainly
+                                        in place of the source chips (never confident-and-uncited). */}
+                                    {m.role === 'assistant' && !m.error && m.ungrounded && (
+                                        <div className="mt-2.5 flex items-start gap-2 max-w-full px-3 py-2 rounded-xl bg-card border border-border-subtle text-text-muted text-[12px] leading-snug">
+                                            <TriangleAlert className="w-3.5 h-3.5 mt-px shrink-0" />
+                                            <span>Machina couldn&apos;t tie this answer to your saves — treat it with extra caution.</span>
+                                        </div>
+                                    )}
+
                                     {/* Citations — clickable proof cards back to the source links */}
-                                    {m.role === 'assistant' && m.sources && m.sources.length > 0 && (
+                                    {m.role === 'assistant' && !m.ungrounded && m.sources && m.sources.length > 0 && (
                                         <div className="mt-2.5 flex flex-wrap gap-2">
                                             {m.sources.map(s => (
                                                 <button
@@ -693,19 +860,71 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                             </div>
                         ))}
 
-                        {isThinking && (
-                            <div className="flex justify-start">
-                                <div className="px-1 py-1 inline-flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce [animation-delay:-0.3s]" />
-                                    <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce [animation-delay:-0.15s]" />
-                                    <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce" />
+                        {isThinking && <ThinkingIndicator totalLinks={totalLinks} />}
+
+                        {/* One-tap follow-ups once the latest answer has settled. */}
+                        {!busy && messages.length > 0 && (() => {
+                            const last = messages[messages.length - 1];
+                            if (last.role !== 'assistant' || last.error || !last.content) return null;
+                            return (
+                                <div className="flex flex-wrap gap-2 ps-1 animate-fade-in">
+                                    {followUps.map(f => (
+                                        <button
+                                            key={f}
+                                            onClick={() => { trackAskFollowupUsed(); send(f); }}
+                                            className="px-3 py-1.5 rounded-full border border-border-subtle text-text-muted text-[13px] hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
+                                        >
+                                            {f}
+                                        </button>
+                                    ))}
                                 </div>
-                            </div>
-                        )}
+                            );
+                        })()}
                         </div>
                     </div>
                 )}
             </div>
+
+            {/* Jump back to the latest message after scrolling up to read. */}
+            {showJump && !isEmpty && (
+                <div className="relative w-full max-w-2xl mx-auto h-0 z-10">
+                    <button
+                        onClick={jumpToLatest}
+                        aria-label="Jump to latest"
+                        className="absolute -top-12 left-1/2 -translate-x-1/2 w-9 h-9 rounded-full bg-card border border-border-subtle shadow-lg flex items-center justify-center text-text-secondary hover:text-text hover:border-accent/40 transition-colors cursor-pointer animate-fade-in"
+                    >
+                        <ArrowDown className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
+
+            {/* A card saved while this conversation was open — offer it as a
+                one-tap ask, so a fresh capture is immediately askable. */}
+            {freshCard && !isEmpty && (
+                <div className="shrink-0 w-full max-w-2xl mx-auto px-3 sm:px-0 pb-1.5 animate-fade-in">
+                    <div className="flex items-center gap-2 ps-3 pe-1.5 py-1.5 rounded-xl bg-accent/10 border border-accent/25">
+                        <Sparkles className="w-3.5 h-3.5 text-accent shrink-0" />
+                        <button
+                            dir="auto"
+                            onClick={() => {
+                                trackAskSuggestionUsed('fresh');
+                                send(`What's the gist of "${freshCard.title}"?`);
+                                setFreshCard(null);
+                            }}
+                            className="flex-1 min-w-0 text-start text-[13px] text-text truncate cursor-pointer hover:underline underline-offset-2"
+                        >
+                            Just saved: <span className="font-medium">{freshCard.title}</span> — ask about it
+                        </button>
+                        <button
+                            onClick={() => setFreshCard(null)}
+                            aria-label="Dismiss"
+                            className="shrink-0 p-1.5 rounded-full text-text-muted hover:text-text transition-colors cursor-pointer"
+                        >
+                            <X className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Composer */}
             <div className="shrink-0 w-full max-w-2xl mx-auto px-3 sm:px-0 pt-2 sm:pt-0 pb-3 sm:pb-0" style={isMobile ? { paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' } : undefined}>
@@ -722,18 +941,30 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                         dir={getDirection(input)}
                         className="flex-1 resize-none bg-transparent px-2 py-1.5 text-[15px] text-text placeholder:text-text-muted focus:outline-none max-h-32 disabled:opacity-60"
                     />
-                    <IconButton
-                        // Don't steal focus from the textarea — keeps the keyboard open
-                        // and lets the click land reliably (no layout shift mid-tap).
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => send(input)}
-                        disabled={!uid || isThinking || !input.trim()}
-                        aria-label="Send"
-                        variant="primary"
-                        className="shrink-0"
-                    >
-                        <ArrowUp className="w-5 h-5" />
-                    </IconButton>
+                    {busy ? (
+                        <IconButton
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={stopGeneration}
+                            aria-label="Stop generating"
+                            variant="secondary"
+                            className="shrink-0"
+                        >
+                            <Square className="w-3.5 h-3.5 fill-current" />
+                        </IconButton>
+                    ) : (
+                        <IconButton
+                            // Don't steal focus from the textarea — keeps the keyboard open
+                            // and lets the click land reliably (no layout shift mid-tap).
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => send(input)}
+                            disabled={!uid || !input.trim()}
+                            aria-label="Send"
+                            variant="primary"
+                            className="shrink-0"
+                        >
+                            <ArrowUp className="w-5 h-5" />
+                        </IconButton>
+                    )}
                 </div>
                 <p className="hidden sm:block text-center text-[11px] text-text-muted mt-2">
                     Answers are grounded only in what you&apos;ve saved.

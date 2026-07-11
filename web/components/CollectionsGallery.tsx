@@ -185,7 +185,7 @@ function CollectionMenu({
             <div
                 role="menu"
                 style={{ position: 'fixed', left, width: WIDTH, ...vertical }}
-                className="z-[91] rounded-xl bg-card border border-white/10 shadow-2xl overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-150"
+                className="z-[91] rounded-xl bg-card border border-border-strong shadow-2xl overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-150"
                 onClick={(e) => e.stopPropagation()}
             >
                 <MenuRow icon={<LayoutGrid className="w-4 h-4" />} label="Manage cards" onClick={onManageCards} />
@@ -203,7 +203,7 @@ function MenuRow({ icon, label, onClick, danger }: { icon: React.ReactNode; labe
         <button
             role="menuitem"
             onClick={onClick}
-            className={`w-full flex items-center gap-2.5 px-3 py-3 min-h-[44px] text-sm font-medium transition-colors ${danger ? 'text-red-400 hover:bg-red-500/10' : 'text-text hover:bg-white/5'}`}
+            className={`w-full flex items-center gap-2.5 px-3 py-3 min-h-[44px] text-sm font-medium transition-colors ${danger ? 'text-red-400 hover:bg-red-500/10' : 'text-text hover:bg-fill-subtle'}`}
         >
             <span className="shrink-0">{icon}</span>
             {label}

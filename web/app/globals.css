@@ -13,6 +13,18 @@
   --accent: #A855F7;
   /* Purple-500 */
 
+  /* Surface fill / inset / strong-border tokens (theme-aware materials).
+     The app was built dark-first with hardcoded white/black alphas
+     (bg-white/5, border-white/10, bg-black/20 …) that only read on the near-black
+     dark bg. These tokens carry the *same* dark values but flip to dark-on-light
+     alphas under `.light`, so every fill/inset/hairline reads correctly in both
+     themes. Call sites use bg-fill-subtle / bg-fill-strong / bg-surface-inset /
+     border-border-strong instead of the raw alpha. */
+  --fill-subtle: rgba(255, 255, 255, 0.05);
+  --fill-strong: rgba(255, 255, 255, 0.10);
+  --surface-inset: rgba(0, 0, 0, 0.20);
+  --border-strong: rgba(255, 255, 255, 0.10);
+
   /* Depth & motion tokens (round 5 / round 6 — amplified for dark UI) */
   /* On a near-black bg, dark drop-shadows are invisible, so elevation is carried by a
      lit top edge (inset highlight) + a hairline outer ring, plus the drop shadow. */
@@ -52,6 +64,13 @@
   --accent: #8B5CF6;
   /* Purple-600 */
 
+  /* Light-theme materials: dark alphas over the light card/bg so fills, insets
+     and hairlines stay visible (white alphas would vanish on white). */
+  --fill-subtle: rgba(0, 0, 0, 0.05);
+  --fill-strong: rgba(0, 0, 0, 0.08);
+  --surface-inset: rgba(0, 0, 0, 0.04);
+  --border-strong: rgba(0, 0, 0, 0.10);
+
   /* Depth & motion tokens (round 5 / round 6 — amplified for light bg). */
   --shadow-card:
     0 0 0 1px rgba(16, 24, 40, 0.04),
@@ -77,6 +96,10 @@
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
   --color-border-subtle: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fill-subtle: var(--fill-subtle);
+  --color-fill-strong: var(--fill-strong);
+  --color-surface-inset: var(--surface-inset);
   --color-accent: var(--accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);

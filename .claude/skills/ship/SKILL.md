@@ -107,7 +107,7 @@ be in a git worktree under `~/MyLinks/.claude/worktrees/<name>` on a `claude/*` 
    arrives in TestFlight after Apple processing, ~10–30 min).
 
 ## Notes / gotchas
-- **Env:** `GEMINI_API_KEY`, `TWILIO_*` are plain env vars in `functions/.env`
+- **Env:** `GEMINI_API_KEY` is a plain env var in `functions/.env`
   (gitignored) — not Secret Manager. Functions deploy needs a local venv so
   firebase-tools can import the source.
 - **Don't redeploy what didn't change** — backend-only → functions only;

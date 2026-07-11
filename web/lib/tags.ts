@@ -46,16 +46,8 @@ export function buildTagTree(tags: string[], tagCounts: Record<string, number>):
     // Populate counts and sort
     const updateCounts = (nodes: TagNode[]) => {
         nodes.forEach(node => {
-            // Count for this specific tag
-            const directCount = tagCounts[node.fullName] || 0;
-
             // Recurse
             updateCounts(node.children);
-
-            // Parent count is direct count + sum of children unique items?
-            // Actually, in a tag system, parent usually represents the union.
-            // However, calculate it simply for now.
-            const childrenCount = node.children.reduce((sum, child) => sum + child.count, 0);
 
             // This is tricky because one link might have both parent and child tags.
             // But let's assume if it has "Work/Task", it implicitly belongs to "Work".
@@ -63,7 +55,7 @@ export function buildTagTree(tags: string[], tagCounts: Record<string, number>):
             // Better: sum of all items that MATCH the prefix.
             node.count = Object.entries(tagCounts)
                 .filter(([path]) => path === node.fullName || path.startsWith(`${node.fullName}/`))
-                .reduce((sum, [_, c]) => sum + c, 0);
+                .reduce((sum, [, c]) => sum + c, 0);
 
             node.children.sort((a, b) => a.name.localeCompare(b.name));
         });
