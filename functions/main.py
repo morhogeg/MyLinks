@@ -497,6 +497,47 @@ def _build_link_data(*, url, title, summary, detailed_summary, source_type,
     return data
 
 
+def _first_line(text: str, limit: int = 120) -> str:
+    """The first non-empty line of a note, trimmed — used as an honest title
+    fallback when the AI doesn't return one (never a fabricated headline)."""
+    for line in (text or "").splitlines():
+        line = line.strip()
+        if line:
+            return line[:limit]
+    return ""
+
+
+# A URL-less thought/note is a first-class card. It has NO url and is NOT scraped
+# — sourceType 'note' tells the frontend to render it as a note (no source link,
+# no reader, no "open original"), and 'Note' is the byline.
+NOTE_SOURCE_TYPE = "note"
+MAX_NOTE_LENGTH = 30000
+
+
+def _note_link_data(analysis: dict, text: str, *, related_links=_OMIT) -> dict:
+    """Build a link document for a URL-less text note (a first-class 'note' card).
+
+    Reuses the shared builder but pins the note-specific shape: empty url (no
+    source to open), sourceType 'note', sourceName 'Note', and a title that
+    falls back to the note's first line when the model returns none. Read time is
+    estimated from the note text itself since there is no scraped article."""
+    title = analysis.get("title") or _first_line(text) or "Note"
+    return _build_link_data(
+        url="",
+        title=title,
+        summary=analysis.get("summary", ""),
+        detailed_summary=analysis.get("detailedSummary", ""),
+        source_type=NOTE_SOURCE_TYPE,
+        source_name=analysis.get("sourceName") or "Note",
+        original_title=_first_line(text),
+        estimated_read_time=_estimate_read_time(text),
+        analysis=analysis,
+        related_links=related_links,
+        confidence=0.8,
+        key_entities=[],
+    )
+
+
 def _embedding_text_from_analysis(analysis: dict) -> str:
     """Map a fresh AI `analysis` dict onto the shared v2 embedding recipe.
 
@@ -768,7 +809,46 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             return _error_response("Invalid JSON body", 400, headers)
 
         url = data.get('url')
+        text = data.get('text') or data.get('note')
         existing_tags = _sanitize_tags(data.get('existingTags'))
+
+        # NOTE PATH — a URL-less thought captured from the "Note" tab. Analyze the
+        # text directly (no scraping) and return a first-class 'note' card. The
+        # client saves the returned link_data exactly like the link/image tabs, so
+        # the embedding trigger fills the vector in on create. Self-contained
+        # (its own auth + per-uid rate-limit) so the URL flow below is untouched.
+        if not url and text and text.strip():
+            note_uid, note_auth_err = _authed_uid(req, headers, data.get('uid'))
+            if note_auth_err:
+                return note_auth_err
+            if note_uid:
+                rl = _rate_limited("analyze-uid", note_uid, headers)
+                if rl:
+                    return rl
+
+            note_text = text.strip()[:MAX_NOTE_LENGTH]
+            logger.info("Analyzing note text synchronously (%d chars)", len(note_text))
+            ai = GeminiService()
+            analysis = ai.analyze_text(note_text, existing_tags=existing_tags)
+
+            related_links = []
+            if note_uid:
+                embedding = ai.embed_text(_embedding_text_from_analysis(analysis))
+                graph_service = GraphService(get_db())
+                related_links = graph_service.find_related_links(
+                    new_link_id="preview",
+                    title=analysis.get("title", ""),
+                    summary=analysis.get("summary", ""),
+                    embedding=embedding,
+                    new_concepts=analysis.get("concepts", []),
+                    uid=note_uid,
+                )
+
+            link_data = _note_link_data(analysis, note_text, related_links=related_links)
+            return https_fn.Response(
+                json.dumps({"success": True, "link": link_data}),
+                status=200, headers=headers, mimetype='application/json'
+            )
 
         if not url:
             return _error_response("URL is required", 400, headers)
@@ -1349,7 +1429,32 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
 
         url = _extract_url(data.get('url'), data.get('text'), data.get('shared'))
         if not url:
-            return _error_response("No URL found in shared content", 400, headers)
+            # NOTE PATH — shared plain text with no URL is a first-class note card,
+            # not an error. Analyze the text directly (no scraping) and write the
+            # card straight into the user's library; the embedding trigger fires on
+            # create and vectorizes it. (The web "Note" tab hits /api/analyze and
+            # lets the client save — here there is no client, so we persist here.)
+            note_text = (data.get('text') or data.get('shared') or data.get('note') or '').strip()
+            if not note_text:
+                return _error_response("No URL or text found in shared content", 400, headers)
+            note_text = note_text[:MAX_NOTE_LENGTH]
+            try:
+                ai = GeminiService()
+                analysis = ai.analyze_text(note_text, existing_tags=get_user_tags(uid))
+                link_data = _note_link_data(analysis, note_text)
+                # A fresh note has no vector yet — flag it so sync_link_embedding
+                # (which fires on this create) generates one.
+                link_data["needsEmbedding"] = True
+                card_ref = get_db().collection('users').document(uid).collection('links').document()
+                card_ref.set(link_data)
+                logger.info(f"Share ingest saved note for user {uid}")
+                return https_fn.Response(
+                    json.dumps({"success": True, "saved": True, "id": card_ref.id, "note": True}),
+                    status=200, headers=headers, mimetype='application/json'
+                )
+            except Exception as e:
+                logger.error(f"Share ingest note failed: {e}", exc_info=True)
+                return _error_response("Failed to analyze note", 500, headers)
 
         # Dedup: skip if already saved or already queued for this user.
         if link_exists_for_url(uid, url) or pending_exists_for_url(uid, url):

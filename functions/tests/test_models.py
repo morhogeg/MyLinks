@@ -86,6 +86,18 @@ def test_ai_analysis_minimal_valid_shape():
     assert a.detailedSummary is None
 
 
+def test_ai_analysis_valid_without_actionable_takeaway():
+    # actionableTakeaway is OPTIONAL — a card for non-actionable content (news,
+    # an anecdote, a personal note) omits it rather than manufacturing filler.
+    a = AIAnalysis(
+        title="T",
+        summary="S",
+        category="News",
+        tags=["a", "b"],
+    )
+    assert a.actionableTakeaway is None
+
+
 def test_ai_analysis_rejects_too_many_tags():
     # tags has max_length=5.
     with pytest.raises(ValidationError):

@@ -113,9 +113,10 @@ Requirements for the analysis:
    - PREFER REUSING EXISTING TAGS provided in the "Existing Tags" list if they are applicable.
    - Only create a new tag if no existing tags fit the content.
 
-8. actionableTakeaway: One concrete, specific action or learning the reader can apply.
+8. actionableTakeaway: One concrete, specific action the reader can apply. This field is OPTIONAL.
    - **LANGUAGE**: Write the takeaway in the SAME language as the input content.
-   - **DO NOT INVENT ADVICE**: Only give a takeaway the content actually supports. If the content is not actionable (e.g. a news event, an anecdote, a personal update), state the single most useful thing the reader now knows instead of manufacturing advice. Never pad this with generic filler.
+   - **INCLUDE ONLY WHEN GENUINE**: Provide a takeaway ONLY if the content genuinely supports one concrete, specific action. If the content is not actionable (e.g. a news event, an anecdote, a personal note or update), OMIT this field entirely — leave it out of the JSON rather than manufacturing advice.
+   - **DO NOT INVENT ADVICE**: Never pad this with generic filler ("stay informed", "consider the implications"). An omitted takeaway is always better than a fabricated one.
 
 CRITICAL RULES:
 - Be a neutral reporter, not a reviewer. Report WHAT is said, not HOW WELL it is said.
