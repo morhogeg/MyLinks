@@ -32,7 +32,9 @@ export interface AIAnalysis {
   category: string;
   tags: string[];
   concepts?: string[];
-  actionableTakeaway: string;
+  // Optional: only present when the content genuinely supports a concrete action
+  // (the backend omits it for non-actionable content rather than inventing filler).
+  actionableTakeaway?: string;
   sourceType?: string;
   sourceName?: string;
   // Backend writes a float score here; some legacy docs stored a string label.
@@ -62,7 +64,8 @@ export interface Link {
   error?: string;
   failedAt?: number;
   metadata: LinkMetadata;
-  // AI Analysis metadata
+  // AI Analysis metadata. sourceType is 'web' | 'youtube' | 'image' | 'note'
+  // (a 'note' is a URL-less thought captured directly — it has no `url`).
   sourceType?: string;
   sourceName?: string;
   // Backend writes a float score here; some legacy docs stored a string label.

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Link, Plus, X, Upload } from 'lucide-react';
+import { Link, Plus, X, Upload, StickyNote, Loader2 } from 'lucide-react';
 import { saveLink, getUserTags, findLinkIdByUrl } from '@/lib/storage';
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
@@ -85,7 +85,8 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
     const router = useRouter();
     const pathname = usePathname();
     const [url, setUrl] = useState('');
-    const [activeTab, setActiveTab] = useState<'link' | 'image'>('link');
+    const [note, setNote] = useState('');
+    const [activeTab, setActiveTab] = useState<'link' | 'image' | 'note'>('link');
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -134,9 +135,11 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
     // success snaps it to 100%.
     // A normal web link/article also gets the phased scan treatment now.
     const isPlainLink = activeTab === 'link' && !isVideo;
+    // A URL-less note is analyzed like a plain page (a few seconds, no scraping).
+    const isNote = activeTab === 'note';
 
     useEffect(() => {
-        const animated = isLoading && (activeTab === 'image' || isVideo || isPlainLink);
+        const animated = isLoading && (activeTab === 'image' || isVideo || isPlainLink || isNote);
         if (animated) {
             setProgress((p) => (p < 8 ? 8 : p));
             // Smaller factor = slower climb. Tuned so video reaches ~97% over a
@@ -156,7 +159,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 progressTimer.current = null;
             }
         };
-    }, [isLoading, activeTab, isVideo, isPlainLink]);
+    }, [isLoading, activeTab, isVideo, isPlainLink, isNote]);
 
     // Publish the in-flight state up to the page so it can render a persistent
     // "Analyzing… N%" banner that survives this form collapsing/closing.
@@ -191,7 +194,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
 
         const formattedUrl = formatUrl(url);
 
-        if ((activeTab === 'link' && !formattedUrl) || (activeTab === 'image' && !imageFile) || isLoading) {
+        if ((activeTab === 'link' && !formattedUrl) || (activeTab === 'image' && !imageFile) || (activeTab === 'note' && !note.trim()) || isLoading) {
             return;
         }
 
@@ -258,6 +261,23 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 data = await parseResponse(response);
                 // Real milestone: analysis came back — jump ahead to "saving".
                 setProgress((p) => Math.max(p, 90));
+            } else if (activeTab === 'note') {
+                // NOTE MODE — a URL-less thought. The SAME /api/analyze endpoint
+                // analyzes raw text (no scraping) and returns a first-class 'note'
+                // card (empty url, sourceType 'note'), saved exactly like a link.
+                let response;
+                try {
+                    response = await fetchWithTimeout(apiUrl('/api/analyze'), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
+                        body: JSON.stringify({ text: note.trim(), existingTags, uid }),
+                    });
+                } catch (netErr) {
+                    if (netErr instanceof Error && 'category' in netErr) throw netErr;
+                    throw saveError(netErr instanceof Error ? netErr.message : `Network error: ${String(netErr)}`, 'network');
+                }
+                data = await parseResponse(response);
+                setProgress((p) => Math.max(p, 90));
             } else {
                 // IMAGE MODE — compress client-side, then send the inline bytes to
                 // the backend, which both analyzes AND stores the image (via the
@@ -304,7 +324,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                         estimatedReadTime: data.link.metadata.estimatedReadTime,
                         actionableTakeaway: data.link.metadata.actionableTakeaway,
                     },
-                    sourceType: activeTab === 'image' ? 'image' : (data.link.sourceType || 'web'),
+                    sourceType: activeTab === 'image' ? 'image' : activeTab === 'note' ? 'note' : (data.link.sourceType || 'web'),
                     sourceName: data.link.sourceName,
                     concepts: data.link.concepts,
                     relatedLinks: data.link.relatedLinks,
@@ -313,8 +333,9 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 throw saveError(`Could not save to Machina: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`, 'save_failed');
             }
 
-            // The capture landed and is persisted — record it.
-            trackSaveSucceeded('web_form');
+            // The capture landed and is persisted — record it. The source label
+            // is content-free (just which tab); a note reports 'note'.
+            trackSaveSucceeded(activeTab === 'note' ? 'note' : 'web_form');
             trackFirstSave();
 
             // Let the scan progress (link, image, or video) land on "Done!" first.
@@ -322,6 +343,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             await new Promise((r) => setTimeout(r, 550));
 
             setUrl('');
+            setNote('');
             setImageFile(null);
             setImagePreview(null);
             setIsExpanded(false);
@@ -393,7 +415,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                 Add to Machina
                             </h3>
                             <p className="text-sm text-text-secondary">
-                                Capture a link or image — Machina reads, summarizes, and files it.
+                                Capture a link, image, or your own note — Machina reads, summarizes, and files it.
                             </p>
                         </div>
 
@@ -418,6 +440,16 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                     }`}
                             >
                                 Image
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('note')}
+                                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'note'
+                                    ? 'bg-accent/10 text-accent shadow-sm border border-accent/20'
+                                    : 'text-text-muted hover:text-text'
+                                    }`}
+                            >
+                                Note
                             </button>
                         </div>
 
@@ -447,6 +479,30 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                             autoFocus
                                         />
                                     </div>
+                                )
+                            ) : activeTab === 'note' ? (
+                                isLoading ? (
+                                    <div className="rounded-xl border border-border-subtle bg-background px-4 py-8 flex flex-col items-center justify-center gap-3 text-center">
+                                        <Loader2 className="w-6 h-6 text-accent animate-spin" />
+                                        <p className="text-sm font-semibold text-text">Reading your note…</p>
+                                        <div className="w-full h-1.5 rounded-full bg-fill-subtle overflow-hidden">
+                                            <div
+                                                className="h-full bg-accent transition-all duration-200"
+                                                style={{ width: `${Math.round(progress)}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <textarea
+                                        id="note"
+                                        value={note}
+                                        onChange={(e) => setNote(e.target.value)}
+                                        placeholder="Write a thought, an idea, a quote — Machina summarizes and files it."
+                                        rows={5}
+                                        className="w-full px-4 py-3 bg-background border border-border-subtle rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-base resize-none"
+                                        disabled={isLoading}
+                                        autoFocus
+                                    />
                                 )
                             ) : isLoading && imagePreview ? (
                                 <ImageScanProgress imageSrc={imagePreview} progress={progress} />
@@ -503,7 +559,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                             {!isLoading && (
                                 <button
                                     type="submit"
-                                    disabled={activeTab === 'link' ? !url.trim() : !imageFile}
+                                    disabled={activeTab === 'link' ? !url.trim() : activeTab === 'note' ? !note.trim() : !imageFile}
                                     className="w-full py-4 bg-accent text-white font-bold rounded-xl hover:bg-accent-hover active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-accent/20"
                                 >
                                     Save

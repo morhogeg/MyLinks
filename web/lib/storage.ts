@@ -233,6 +233,26 @@ export async function updateLinkCategory(uid: string, id: string, category: stri
 }
 
 /**
+ * Update a link's AI-generated title. Makes the "second brain" correctable: the
+ * model's title is a starting point, not a verdict. Persisted to Firestore; no
+ * background process rewrites `title` on a ready card (the embedding trigger only
+ * touches `embedding_vector`), so a user edit sticks.
+ */
+export async function updateLinkTitle(uid: string, id: string, title: string): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    await updateDoc(linkRef, { title });
+}
+
+/**
+ * Update a link's AI-generated summary. Same rationale as updateLinkTitle — the
+ * summary is editable and the edit is durable (nothing rewrites it in place).
+ */
+export async function updateLinkSummary(uid: string, id: string, summary: string): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    await updateDoc(linkRef, { summary });
+}
+
+/**
  * Delete a link from Firestore
  */
 export async function deleteLink(uid: string, id: string): Promise<void> {

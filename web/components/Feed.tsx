@@ -104,6 +104,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         handleReadStatusChange,
         handleUpdateTags,
         handleUpdateCategory,
+        handleUpdateTitle,
+        handleUpdateSummary,
         handleRetryProcessing,
         handleRemoveFromCollection,
         handleShareCard,
@@ -1761,6 +1763,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     onReadStatusChange={handleReadStatusChange}
                     onUpdateTags={handleUpdateTags}
                     onUpdateCategory={handleUpdateCategory}
+                    onUpdateTitle={handleUpdateTitle}
+                    onUpdateSummary={handleUpdateSummary}
                     onUpdateReminder={handleOpenReminderModal}
                     onDelete={handleDelete}
                     onOpenOtherLink={openRelatedLink}
