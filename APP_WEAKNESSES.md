@@ -51,7 +51,15 @@ never saved it."
 - Upgrade the Ask answer model one tier above flash-lite (Ask volume is low; §7 cost
   math supports it).
 
-## 3. [ ] "Grounded in your saves" is a claim the system doesn't enforce
+## 3. [x] "Grounded in your saves" is a claim the system doesn't enforce
+
+> **DONE 2026-07-11** (commit `a08433a`, remediation sprint). Citations are now a
+> hard invariant: the buffered/native path re-asks once with a stricter prompt on a
+> no-valid-citation answer; the streaming path emits a trailing `ungrounded` SSE
+> event (prose already streamed, so it downgrades after the fact). The UI never
+> renders confident-and-uncited — a "couldn't tie this answer to your saves" notice
+> replaces the source chips. Empty-library answers are not flagged. 17 new unit
+> tests (stubbed model) in `test_rag_prompt.py`.
 
 **Problem.** If the model omits/mangles the `[[CITED:]]` marker, the answer renders
 with **zero source chips** and ships anyway (`ai_service.py:499-507`,
