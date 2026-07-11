@@ -623,7 +623,7 @@ exact-match, capped.
   LinkDetailModal on ALL cards (one-tap add, warm accent panel, tap-to-edit,
   ⌘/Ctrl+Enter save, delete), and a quiet StickyNote cue on grid + list cards
   that carry a note. **Desktop web:** live via Vercel. **iOS: TestFlight build
-  TF_BUILD_PLACEHOLDER** (temp-push-trigger `claude/ship-tf-trigger-notes`;
+  1071 (run #71); the older claude/ship-tf-trigger-* branches remain owner-cleanup** (temp-push-trigger `claude/ship-tf-trigger-notes`;
   delete after). tsc + full `next build` green. **No backend deploy needed for
   notes to work** (durable client-side); when the pending `./deploy-functions.sh`
   runs, new note cards additionally get AI tags/category. `firestore.rules`
