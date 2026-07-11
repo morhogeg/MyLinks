@@ -184,7 +184,25 @@ card (`models.py:47`) and the hard-coded "Who It's For" video section
 - Make `actionableTakeaway` optional in the schema; drop the "Who It's For"
   skeleton.
 
-## 7. [ ] Five competing taxonomies and three navigation grammars
+## 7. [~] Five competing taxonomies and three navigation grammars
+
+> **MECHANICAL FIX DONE 2026-07-11** (commit `d0203a2`, remediation sprint): one
+> swipe grammar app-wide — ListCard now matches the review deck (right =
+> favourite, light haptic, yellow Star; left = delete, firmer haptic, red Trash,
+> still guarded by the existing ConfirmDialog). Only two action-swipe surfaces
+> exist (ListCard, SwipeDeck) — both now agree; the edge-swipe-back gesture is
+> navigation, untouched. Tag-entry sprawl audited: the three panels are
+> breakpoint-exclusive, no redundant entry to remove. Needs on-device swipe
+> verification (incl. RTL).
+> **REMAINS OPEN (owner design decision — proposal delivered in the sprint
+> report):** merging categories+tags into one slash-path topic tree (NB: the
+> audit's "data model already agrees" claim is only half-true — the filter
+> engine supports slash-paths but the backend does not emit them and category
+> is a separate English-only field; needs a prompt change + one-time backfill,
+> ~6–8 files), demoting Sources to a search operator, and unifying the six view
+> modes into a lens (Cards/List/Review) × place (Library/Collections/Digest/Ask)
+> model. One-sentence acceptance: "Everything I save is one library of cards; I
+> narrow it by topic, browse it three ways, everything else is a filter."
 
 **Problem.** Cards filter through status AND category AND tags AND collections AND
 sources (`useFeedFilters.ts:36-93`) — five parallel systems, each with its own
