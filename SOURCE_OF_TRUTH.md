@@ -624,7 +624,13 @@ exact-match, capped.
   deleted. (3) Why-lines removed from card faces (owner: uncomfortable).
   Review is now: cards + keep/archive/remind/undo + bounded 12-card sessions
   with the summary screen. Web live via Vercel; combined tree verified (tsc
-  clean, 137/137 pytest).
+  clean, 137/137 pytest). **Follow-up same session (`a9a1fad`, merge
+  `182679c`; next TestFlight run → build 1070):** owner clarified "roasts"
+  meant the TOASTS — stacked per-swipe "Added to favorites" toasts were
+  covering the deck's buttons. handleStatusChange gained a `silent` option;
+  the deck's swipe handlers use it (fling animation + tallies are the
+  confirmation; error toasts unchanged). The removed why-lines stay removed
+  unless the owner asks for them back.
 - **2026-07-11 — SHIPPED: the weaknesses-sprint remediation below
   (merge `e163147` to `main`).** **Desktop web:** live via Vercel auto-deploy
   (includes durable web capture UI, Note tab, editable title/summary, export,
