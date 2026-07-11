@@ -99,7 +99,7 @@ class UserSettings(BaseModel):
     # ── Curated Digest delivery ──────────────────────────────────────────
     # A scheduled, curated set of saved cards delivered over push (plus the
     # always-on in-app Digest section). See digest_service.py for the logic.
-    digest_enabled: bool = False
+    digest_enabled: bool = True  # weekly digest on by default for new users
     # How often to deliver: "daily" | "weekly"
     digest_frequency: str = "weekly"
     # Delivery channels — push only (retired whatsapp/email entries are

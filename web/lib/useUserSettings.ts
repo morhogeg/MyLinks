@@ -15,7 +15,12 @@ export const DEFAULT_SETTINGS: User['settings'] = {
     reminder_frequency: 'smart',
     push_enabled: false,
     reminders_channel: ['push'],
-    digest_enabled: false,
+    // Weekly digest ON by default for NEW users (mirrors DEFAULT_USER_SETTINGS
+    // in functions/link_service.py). loadSettings' read-fallback stays `?? false`
+    // so an EXISTING user whose stored settings lack the key is never
+    // force-enabled — only brand-new workspaces (created with this default
+    // written) get it on.
+    digest_enabled: true,
     digest_frequency: 'weekly',
     digest_channels: ['push'],
     digest_mode: 'smart',

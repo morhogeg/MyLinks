@@ -23,7 +23,7 @@ def test_user_settings_defaults():
     s = UserSettings()
     # The headline default the digest pipeline relies on.
     assert s.digest_channels == ["push"]
-    assert s.digest_enabled is False
+    assert s.digest_enabled is True  # weekly digest on by default for new users
     assert s.digest_frequency == "weekly"
     assert s.digest_mode == "smart"
     assert s.digest_count == 5
