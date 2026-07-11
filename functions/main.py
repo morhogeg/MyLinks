@@ -45,7 +45,11 @@ from graph_service import GraphService
 # pulls in, e.g. BeautifulSoup) off the import path of functions that never
 # scrape — like the hot image-analysis path in analyze_image — so their cold
 # starts stay lighter.
-from search import sync_link_embedding, search_links, perform_search_logic
+from search import (
+    sync_link_embedding, search_links, perform_search_logic,
+    build_embedding_text, rerank_candidates, keyword_query_tokens,
+    keyword_match_score, EmbeddingService, EMBED_TEXT_VERSION,
+)
 from rate_limit import check_rate_limit, client_ip
 # Public share-page subsystem (renderers + publish/unpublish logic). The three
 # HTTP endpoints (publish_share_http, unpublish_share_http, share_page) stay in
@@ -493,6 +497,26 @@ def _build_link_data(*, url, title, summary, detailed_summary, source_type,
     return data
 
 
+def _embedding_text_from_analysis(analysis: dict) -> str:
+    """Map a fresh AI `analysis` dict onto the shared v2 embedding recipe.
+
+    Both new-card embed sites (the synchronous web-add preview and the async
+    background pipeline) embed the SAME rich text the Firestore trigger and the
+    backfill use — title + summary + detailedSummary + takeaway + concepts +
+    video highlights — so a card's stored vector and its live find_related_links
+    query vector are always built the identical way.
+    """
+    return build_embedding_text({
+        "title": analysis.get("title", ""),
+        "summary": analysis.get("summary", ""),
+        "detailedSummary": analysis.get("detailedSummary", ""),
+        "tags": analysis.get("tags", []),
+        "concepts": analysis.get("concepts", []),
+        "metadata": {"actionableTakeaway": analysis.get("actionableTakeaway")},
+        "videoHighlights": analysis.get("videoHighlights", []),
+    })
+
+
 def _card_source_name(c: dict):
     """Best byline for a card: the YouTube channel when present, else the stored
     publisher/source name. Mirrors the web card so Ask citations show the same
@@ -585,6 +609,81 @@ def backfill_related_links(req: https_fn.Request) -> https_fn.Response:
         )
     except Exception as e:
         return _server_error(headers, e, "Backfill related links failed")
+
+
+@https_fn.on_request()
+def backfill_embeddings(req: https_fn.Request) -> https_fn.Response:
+    """One-off migration: re-embed existing cards with the RICH v2 recipe.
+
+    The embedding recipe changed (see search.build_embedding_text /
+    EMBED_TEXT_VERSION): the old vector was built from title + short summary +
+    tags ONLY, so any detail that lived in detailedSummary was invisible to Ask
+    and semantic search. This endpoint recomputes the embedding for every card
+    still stamped below EMBED_TEXT_VERSION and stamps the new version, so the
+    whole existing library becomes findable by its details.
+
+    Optional ?uid=… (or JSON {uid}) limits to one user; otherwise all users.
+    ?force=1 re-embeds even cards already at the current version. Idempotent and
+    re-runnable — a re-run with no ?force skips cards already migrated (they're
+    at the current version), so it's safe to run again if it times out partway.
+
+    OWNER STEP: after deploying functions, call this ONCE (admin-guarded, same as
+    backfill_related_links):
+        curl -X POST "https://<region>-<project>.cloudfunctions.net/backfill_embeddings" \
+             -H "Authorization: Bearer $ADMIN_TOKEN"
+    Then (optionally) re-run rebuild_connections/backfill_related_links so the
+    "See also" graph reflects the new vectors.
+    """
+    headers = _cors_headers(req)
+    if req.method == "OPTIONS":
+        return https_fn.Response("", status=204, headers=headers)
+    guard = _require_admin(req, headers)
+    if guard:
+        return guard
+    try:
+        uid = req.args.get("uid") or (req.get_json(silent=True) or {}).get("uid")
+        force = str(req.args.get("force") or "").lower() in ("1", "true", "yes")
+        db = get_db()
+        service = EmbeddingService()
+        user_refs = ([db.collection("users").document(uid)] if uid
+                     else list(db.collection("users").list_documents()))
+        totals = {"users": 0, "reembedded": 0, "skipped": 0, "failed": 0}
+        for uref in user_refs:
+            totals["users"] += 1
+            for doc in uref.collection("links").stream():
+                d = doc.to_dict() or {}
+                # Skip cards not yet in a searchable state (processing/failed) —
+                # the pipeline/trigger embeds those when they settle.
+                if d.get("status") in ("processing", "failed"):
+                    totals["skipped"] += 1
+                    continue
+                if not force and d.get("embeddingVersion") == EMBED_TEXT_VERSION:
+                    totals["skipped"] += 1
+                    continue
+                text = build_embedding_text(d)
+                if not text:
+                    totals["skipped"] += 1
+                    continue
+                try:
+                    vector = service.generate_embedding(text)
+                except Exception as e:
+                    logger.error(f"Backfill embed failed for {doc.id}: {e}")
+                    vector = None
+                if vector:
+                    doc.reference.update({
+                        "embedding_vector": Vector(vector),
+                        "embeddingVersion": EMBED_TEXT_VERSION,
+                        "needsEmbedding": gc_firestore.DELETE_FIELD,
+                    })
+                    totals["reembedded"] += 1
+                else:
+                    doc.reference.update({"needsEmbedding": True})
+                    totals["failed"] += 1
+        return https_fn.Response(
+            json.dumps(totals), status=200, headers=headers, mimetype="application/json",
+        )
+    except Exception as e:
+        return _server_error(headers, e, "Backfill embeddings failed")
 
 
 # ─────────────────────────────────────────────
@@ -703,7 +802,10 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         analysis = _analyze_scraped(ai, scraped, existing_tags)
 
         # 3. Generate Embedding & Find Connections
-        embedding_text = f"{analysis.get('title', '')}\n{analysis.get('summary', '')}"
+        # Rich v2 recipe (see _embedding_text_from_analysis). Used here only as
+        # the query vector for find_related_links — the stored embedding_vector
+        # is written server-side by the sync_link_embedding trigger.
+        embedding_text = _embedding_text_from_analysis(analysis)
         embedding = ai.embed_text(embedding_text)
 
         related_links = []
@@ -762,15 +864,16 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         return _server_error(headers, e)
 
 
-# Words to ignore when keyword-matching a question against saved cards.
-_ASK_STOPWORDS = {
-    "the", "a", "an", "of", "to", "in", "on", "at", "by", "for", "and", "or",
-    "is", "are", "was", "were", "be", "been", "this", "that", "these", "those",
-    "what", "whats", "which", "who", "whom", "how", "why", "when", "where",
-    "do", "does", "did", "done", "can", "could", "would", "should", "will",
-    "i", "me", "my", "you", "your", "it", "its", "they", "them", "their",
-    "about", "with", "from", "into", "as", "any", "some", "all", "have", "has",
-}
+# How many recent cards the lexical fallback scans. The old scan was an
+# UNORDERED links_ref.limit(300) — for a library over 300 cards it was a coin
+# flip whether the right card was even looked at (Firestore returns docs in an
+# arbitrary order without order_by). We now scan the most-recent 1000 by
+# createdAt, so the scan is deterministic and recency-biased (the cards a user
+# is most likely asking about). Tradeoff: cards older than the newest 1000 are
+# not reachable by the LEXICAL path — but they remain reachable via the semantic
+# top-30 vector search, so nothing is fully invisible, and we keep the per-ask
+# read cost bounded instead of scanning an unbounded collection on every ask.
+_KEYWORD_SCAN_CAP = 1000
 
 
 def _keyword_fallback_cards(uid: str, question: str, exclude_ids: set, limit: int = 5) -> list:
@@ -778,33 +881,30 @@ def _keyword_fallback_cards(uid: str, question: str, exclude_ids: set, limit: in
 
     Vector search can miss a card whose text literally contains the query's
     keywords (ranking, or a card with no embedding yet). This scans the user's
-    links for the question's keywords across title/summary/tags/source/category
-    and returns the best matches not already retrieved — so an obvious title
-    hit like "fact check" is never dropped.
+    most-recent links for the question's keywords across title/summary/tags/
+    source/category and returns the best matches not already retrieved — so an
+    obvious title hit like "fact check" is never dropped.
+
+    Deterministic scan: ordered by createdAt desc and capped, so the same
+    question always sees the same candidate set (the old unordered scan could
+    skip the right card entirely on a large library).
     """
-    tokens = {
-        t for t in re.split(r"[^a-z0-9]+", question.lower())
-        if len(t) >= 3 and t not in _ASK_STOPWORDS
-    }
+    tokens = keyword_query_tokens(question)
     if not tokens:
         return []
 
     db = get_db()
     links_ref = db.collection("users").document(uid).collection("links")
+    query = links_ref.order_by(
+        "createdAt", direction=gc_firestore.Query.DESCENDING
+    ).limit(_KEYWORD_SCAN_CAP)
 
     scored = []
-    for doc in links_ref.limit(300).stream():
+    for doc in query.stream():
         if doc.id in exclude_ids:
             continue
         data = doc.to_dict() or {}
-        haystack = " ".join(str(x) for x in [
-            data.get("title", ""), data.get("summary", ""),
-            " ".join(data.get("tags", []) or []),
-            data.get("sourceName", ""), data.get("category", ""),
-        ]).lower()
-        # Weight title hits higher so a keyword in the title wins.
-        title_l = str(data.get("title", "")).lower()
-        score = sum((2 if t in title_l else 0) + (1 if t in haystack else 0) for t in tokens)
+        score = keyword_match_score(data, tokens)
         if score > 0:
             data.pop("embedding_vector", None)
             data["id"] = doc.id
@@ -874,15 +974,22 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #    that already powers the search bar). Degrade gracefully: if
         #    retrieval fails, answer_from_context returns a friendly "nothing
         #    saved yet" reply rather than erroring the whole request.
+        #
+        #    Retrieve DEEP (top-30) then rerank down to ~10 for the model. Pure
+        #    vector rank alone buries a card that literally answers the question
+        #    but scores slightly lower; reranking blends vector rank with keyword
+        #    overlap + recency to pull it back into context (no extra model call).
         try:
-            cards = perform_search_logic(uid, question, limit=8)
+            candidates = perform_search_logic(uid, question, limit=30)
+            cards = rerank_candidates(question, candidates, top_k=10)
         except Exception as e:
             logger.error(f"ask_brain retrieval failed: {e}")
             cards = []
 
         # 1b. Hybrid retrieval: add lexical keyword matches vector search may
-        #     have missed (e.g. a word literally in a card's title). Merge,
-        #     keeping vector results first, then keyword hits, deduped.
+        #     have missed (e.g. a word literally in a card's title, or a card
+        #     with no embedding yet). Merge, keeping reranked vector results
+        #     first, then keyword hits, deduped.
         try:
             have = {c.get("id") for c in cards}
             cards = cards + _keyword_fallback_cards(uid, question, have, limit=5)
@@ -1904,7 +2011,10 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             analysis = {}
 
         # 3. Generate Embedding & Find Connections
-        embedding_text = f"{analysis.get('title', '')}\n{analysis.get('summary', '')}"
+        # Rich v2 recipe (see _embedding_text_from_analysis) — fold in
+        # detailedSummary/takeaway/concepts so the card is findable by its
+        # details, not just its headline.
+        embedding_text = _embedding_text_from_analysis(analysis)
         embedding = ai.embed_text(embedding_text)
 
         graph_service = GraphService(get_db())
@@ -1952,6 +2062,9 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # write a poisoned near-zero vector that looks embedded but isn't.
         if embedding:
             link_data["embedding_vector"] = Vector(embedding)
+            # Stamp the recipe version so the trigger/backfill know this vector is
+            # already on the current (v2) recipe and skip re-embedding it.
+            link_data["embeddingVersion"] = EMBED_TEXT_VERSION
         else:
             link_data["needsEmbedding"] = True
 
