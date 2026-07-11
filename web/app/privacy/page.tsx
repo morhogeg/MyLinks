@@ -51,11 +51,20 @@ export default function PrivacyPage() {
           <span className="text-text">Preferences.</span> Your in-app settings, including your
           device timezone, which is used to schedule reminders and digests at sensible local times.
         </li>
+        <li>
+          <span className="text-text">Product usage and diagnostics.</span> To understand which
+          features are used and to catch crashes, Machina records a small number of first-party,
+          content-free events — for example that the app was opened, that a save, ask, or export
+          happened, or that an error occurred (with the error message and stack trace). These are
+          stored in your own workspace in our own database. They never include the content of your
+          saves, your titles, URLs, questions, tags, or email, and there is no third-party analytics
+          service involved.
+        </li>
       </ul>
       <p className="mt-4 leading-relaxed text-text-secondary">
-        What we do <span className="text-text">not</span> collect: no analytics or tracking SDKs, no
-        advertising identifiers, no location, no contacts, and no browsing history beyond the pages
-        you explicitly save.
+        What we do <span className="text-text">not</span> collect: no third-party analytics or
+        tracking SDKs, no advertising identifiers, no location, no contacts, and no browsing history
+        beyond the pages you explicitly save.
       </p>
 
       <h2 className="mt-10 text-xl font-semibold text-text">How we use your data</h2>
