@@ -11,7 +11,7 @@ import SourceFacetList from './SourceFacetList';
 import DigestView from './DigestView';
 import Dropdown from './Dropdown';
 import { updateLinkStatus, deleteLink, updateLinkReminder } from '@/lib/storage';
-import { collection, onSnapshot, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
@@ -388,14 +388,62 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         return map;
     }, [links, collections]);
 
+    // In-app reminder fallback: the backend flags a link `reminderDue` when its
+    // reminder fires (for EVERY user, push or not). Surface those due links in a
+    // "Reminders due" strip so the promise "I'll remind you" always produces
+    // something visible in-app. Clearing is best-effort — onSnapshot resyncs.
+    const clearReminderDue = useCallback(async (id: string) => {
+        if (!uid) return;
+        try {
+            await updateDoc(doc(db, 'users', uid, 'links', id), { reminderDue: false, reminderDueAt: null });
+        } catch {
+            /* best-effort dismiss; the live snapshot keeps the source of truth */
+        }
+    }, [uid]);
+    const dueLinks = useMemo(() => links.filter((l) => l.reminderDue === true), [links]);
+
     // The proactive feed modules, rendered once and reused in both the grid and
-    // list layouts (above pending + real cards). Just the weekly synthesis recap
-    // now — the connection insight moved into the dedicated Connections view/pill,
-    // so the feed no longer carries a redundant inline banner.
+    // list layouts (above pending + real cards). The weekly synthesis recap plus
+    // the in-app "reminders due" strip — the connection insight moved into the
+    // dedicated Connections view/pill.
     const feedModules = isDefaultLibraryView ? (
         <>
             {showPushNudge && uid && (
                 <PushNudge uid={uid} onDone={() => setShowPushNudge(false)} />
+            )}
+            {dueLinks.length > 0 && (
+                <div className="mb-4 rounded-2xl border border-accent/25 bg-card overflow-hidden shadow-lg shadow-accent/5 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <div className="flex items-center gap-3 px-4 py-3 border-b border-border-subtle">
+                        <div className="w-9 h-9 shrink-0 rounded-xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-md shadow-accent/20">
+                            <Bell className="w-[18px] h-[18px] text-white" />
+                        </div>
+                        <div className="flex-grow min-w-0">
+                            <div className="text-[15px] font-bold text-text">Reminders due</div>
+                            <div className="text-[13px] text-text-secondary leading-snug">
+                                {dueLinks.length} saved {dueLinks.length === 1 ? 'item is' : 'items are'} ready to revisit.
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => dueLinks.forEach((l) => clearReminderDue(l.id))}
+                            aria-label="Dismiss all due reminders"
+                            className="w-9 h-9 flex items-center justify-center rounded-lg text-text-muted hover:text-text hover:bg-card-hover transition-colors shrink-0"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="divide-y divide-border-subtle">
+                        {dueLinks.slice(0, 5).map((l) => (
+                            <button
+                                key={l.id}
+                                onClick={() => { openLinkDetails(l); clearReminderDue(l.id); }}
+                                className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-card-hover transition-colors"
+                            >
+                                <CheckCircle2 className="w-4 h-4 text-accent shrink-0" />
+                                <span className="flex-grow min-w-0 truncate text-[14px] text-text">{l.title}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
             )}
             {latestSynthesis && latestSynthesis.weekId !== dismissedSynthesisWeek && (
                 <SynthesisCard
@@ -1715,7 +1763,21 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     link={reminderModalLink}
                     isOpen={!!reminderModalLink}
                     onClose={() => { if (!remindSavedRef.current) resolveRemind(reminderModalLink, false); setReminderModalLink(null); }}
-                    onUpdate={() => { remindSavedRef.current = true; resolveRemind(reminderModalLink, true); setReminderModalLink(null); }}
+                    onUpdate={() => {
+                        remindSavedRef.current = true;
+                        resolveRemind(reminderModalLink, true);
+                        setReminderModalLink(null);
+                        // Moment of intent: the user just asked to be reminded. On
+                        // native, if push has never been prompted (so it's off),
+                        // surface the existing push nudge to offer notifications —
+                        // reusing PushNudge, not a new permission flow. Once
+                        // prompted (granted or dismissed) we respect that choice
+                        // and don't re-nag; the in-app "Reminders due" strip is the
+                        // guaranteed channel either way.
+                        if (isNativeApp() && readLocalPushPrompt() === null) {
+                            setShowPushNudge(true);
+                        }
+                    }}
                 />
             )}
 

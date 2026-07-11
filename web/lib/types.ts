@@ -82,6 +82,11 @@ export interface Link {
   nextReminderAt?: number; // Unix timestamp (ms)
   reminderCount?: number;
   reminderProfile?: string;
+  // In-app fallback: the reminder sweep flips this true when a reminder fires
+  // so the feed surfaces it even when the user has no push. Cleared when the
+  // user acts on it (opens/dismisses) or re-sets the reminder.
+  reminderDue?: boolean;
+  reminderDueAt?: number; // Unix timestamp (ms) the reminder came due
   lastViewedAt?: number; // Unix timestamp (ms)
   language?: string;
   isRead?: boolean;

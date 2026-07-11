@@ -238,7 +238,10 @@ export async function updateLinkReminder(
             reminderStatus: 'pending',
             nextReminderAt: nextReminder,
             reminderCount: 0,
-            reminderProfile: profile || 'smart'
+            reminderProfile: profile || 'smart',
+            // Re-setting a reminder clears any stale "due" flag from a prior fire.
+            reminderDue: false,
+            reminderDueAt: null
         });
     } else {
         // Disable reminders
@@ -246,7 +249,9 @@ export async function updateLinkReminder(
             reminderStatus: 'none',
             nextReminderAt: null,
             reminderCount: 0,
-            reminderProfile: null
+            reminderProfile: null,
+            reminderDue: false,
+            reminderDueAt: null
         });
     }
 }
