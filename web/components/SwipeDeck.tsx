@@ -42,10 +42,12 @@ interface SwipeDeckProps {
 
 const THRESHOLD = 110; // px past which a drag commits to a swipe
 
+// Short labels on purpose: all three chips + counts must fit ONE row on a
+// 375pt phone — wrapping to two rows pushes the deck's buttons off-screen.
 const QUEUES: { key: ReviewQueue; label: string; icon: React.ReactNode }[] = [
     { key: 'forgotten', label: 'Forgotten', icon: <Sparkles className="w-3.5 h-3.5" /> },
     { key: 'recent', label: 'Recent', icon: <Clock className="w-3.5 h-3.5" /> },
-    { key: 'tidying', label: 'Needs tidying', icon: <Tag className="w-3.5 h-3.5" /> },
+    { key: 'tidying', label: 'Tidy', icon: <Tag className="w-3.5 h-3.5" /> },
 ];
 
 /**
@@ -168,18 +170,26 @@ export default function SwipeDeck({
     }, [current, acted, lastAction, phase, counts, queue]);
 
     // Size the deck to the space between its top and the viewport bottom so the
-    // whole thing (card + action buttons) fits without scrolling.
+    // WHOLE deck (tabs + card + action buttons) fits on one screen with no page
+    // scroll — a swipe deck that scrolls isn't a deck. Use visualViewport where
+    // available (WKWebView/iOS: innerHeight can overstate the usable height),
+    // and never force a floor taller than the space that actually exists.
     const rootRef = useRef<HTMLDivElement>(null);
     const [maxH, setMaxH] = useState(0);
     useEffect(() => {
         const update = () => {
             if (!rootRef.current) return;
             const top = rootRef.current.getBoundingClientRect().top;
-            setMaxH(Math.max(380, Math.min(window.innerHeight - top - 16, 660)));
+            const vh = window.visualViewport?.height ?? window.innerHeight;
+            setMaxH(Math.min(Math.max(320, vh - top - 12), 640));
         };
         update();
         window.addEventListener('resize', update);
-        return () => window.removeEventListener('resize', update);
+        window.visualViewport?.addEventListener('resize', update);
+        return () => {
+            window.removeEventListener('resize', update);
+            window.visualViewport?.removeEventListener('resize', update);
+        };
     }, [pos]);
 
     const settle = () => {
@@ -237,10 +247,31 @@ export default function SwipeDeck({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [remindSignal]);
 
-    // Animate the top card off-screen; the action fires on transitionend.
+    // Complete a fling exactly once — called by transitionend AND by a fallback
+    // timer (WKWebView can drop transitionend, e.g. on backgrounding, which
+    // would otherwise leave the deck stuck in 'exiting' and ignoring all input).
+    // exitDir is nulled first so whichever fires second is a no-op.
+    const finishExit = () => {
+        const d = exitDir.current;
+        if (!d) return;
+        exitDir.current = null;
+        if (d === 'up') startRemind();
+        else commit(d);
+    };
+    const finishExitRef = useRef(finishExit);
+    finishExitRef.current = finishExit;
+    const flingSeq = useRef(0);
+
+    // Animate the top card off-screen; the action fires on transitionend (or
+    // the 420ms fallback — the transform transition runs 300ms). The seq token
+    // keeps a stale timer from finishing a LATER fling early.
     const fling = (dir: SwipeDir) => {
         hapticLight(); // crisp tap at the moment the card commits to its action
         exitDir.current = dir;
+        const seq = ++flingSeq.current;
+        window.setTimeout(() => {
+            if (flingSeq.current === seq) finishExitRef.current();
+        }, 420);
         setPhase('exiting');
         if (dir === 'right') setDrag({ x: window.innerWidth, y: 0 });
         else if (dir === 'left') setDrag({ x: -window.innerWidth, y: 0 });
@@ -324,7 +355,7 @@ export default function SwipeDeck({
     const upHint = Math.max(0, Math.min(1, -drag.y / THRESHOLD));
 
     const queueTabs = (
-        <div className="flex items-center justify-center gap-2 flex-wrap shrink-0">
+        <div className="flex items-center justify-center gap-1.5 flex-nowrap shrink-0 max-w-full">
             {QUEUES.map((q) => {
                 const active = q.key === queue;
                 const count = counts[q.key];
@@ -333,7 +364,7 @@ export default function SwipeDeck({
                         key={q.key}
                         onClick={() => selectQueue(q.key)}
                         aria-pressed={active}
-                        className={`h-9 inline-flex items-center gap-1.5 px-3 rounded-full text-[13px] font-semibold cursor-pointer select-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+                        className={`h-8 inline-flex items-center gap-1 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer select-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
                             active
                                 ? 'bg-accent/15 border border-accent/40 text-accent'
                                 : 'bg-card border border-border-subtle text-text-secondary hover:bg-card-hover hover:text-text hover:border-text-muted/40'
@@ -422,11 +453,7 @@ export default function SwipeDeck({
                             onPointerDown={isTop ? onPointerDown : undefined}
                             onPointerMove={isTop ? onPointerMove : undefined}
                             onPointerUp={isTop ? onPointerUp : undefined}
-                            onTransitionEnd={
-                                isTop && phase === 'exiting'
-                                    ? () => (exitDir.current === 'up' ? startRemind() : exitDir.current ? commit(exitDir.current) : undefined)
-                                    : undefined
-                            }
+                            onTransitionEnd={isTop && phase === 'exiting' ? finishExit : undefined}
                             className={`absolute inset-0 ${isTop ? 'cursor-grab active:cursor-grabbing z-30' : 'z-10'}`}
                             style={{
                                 transform,
@@ -465,9 +492,6 @@ export default function SwipeDeck({
                 </DeckAction>
             </div>
 
-            <p className="text-[11px] text-text-muted/70 text-center max-w-xs shrink-0">
-                Swipe the card left to archive, right to keep, up to set a reminder — or tap a button. Tap the card to open it.
-            </p>
         </div>
     );
 }
@@ -575,7 +599,7 @@ const CardFace = memo(function CardFace({ link, queue }: { link: Link; queue: Re
             </div>
 
             {/* Title */}
-            <h3 dir="auto" className={`font-bold text-xl sm:text-2xl text-text leading-tight mb-2 ${isRtl ? 'text-right' : ''}`}>
+            <h3 dir="auto" className={`font-bold text-xl sm:text-2xl text-text leading-tight mb-2 line-clamp-2 ${isRtl ? 'text-right' : ''}`}>
                 {link.title}
             </h3>
 
