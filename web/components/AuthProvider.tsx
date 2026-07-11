@@ -12,6 +12,8 @@ import {
 } from '@/lib/auth';
 import { syncShareConfigToNative } from '@/lib/shareConfig';
 import { readLocalAiConsent, writeLocalAiConsent } from '@/lib/aiConsent';
+import { setAnalyticsUid, flushSignIn, trackAppOpen, track } from '@/lib/analytics';
+import { installErrorReporter } from '@/lib/errorReporter';
 import {
     initPushListeners, refreshPushRegistration, unregisterPush,
     readLocalPushPrompt, writeLocalPushPrompt,
@@ -117,7 +119,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         setAiConsented(readLocalAiConsent() !== null);
+        // Install the global JS error handlers once, as early as possible.
+        installErrorReporter();
     }, []);
+
+    // Keep the analytics/error-reporter workspace uid in sync with the resolved
+    // data doc. When a workspace is active, emit the once-per-session `sign_in`
+    // (if a deliberate sign-in is pending) and the once-per-day `app_open`
+    // heartbeat that powers D1/D7 retention.
+    useEffect(() => {
+        setAnalyticsUid(uid);
+        if (uid) {
+            flushSignIn();
+            trackAppOpen();
+        }
+    }, [uid]);
 
     // Reconcile the two consent records once the data doc is known: a doc
     // timestamp wins (cache it locally); otherwise mirror a local acceptance
@@ -166,6 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const now = Date.now();
         setAiConsented(true);
         writeLocalAiConsent(now);
+        track('consent_accepted');
         if (uid) {
             updateDoc(doc(db, 'users', uid), { aiConsentAt: now }).catch(() => {});
         }

@@ -45,7 +45,11 @@ from graph_service import GraphService
 # pulls in, e.g. BeautifulSoup) off the import path of functions that never
 # scrape — like the hot image-analysis path in analyze_image — so their cold
 # starts stay lighter.
-from search import sync_link_embedding, search_links, perform_search_logic
+from search import (
+    sync_link_embedding, search_links, perform_search_logic,
+    build_embedding_text, rerank_candidates, keyword_query_tokens,
+    keyword_match_score, EmbeddingService, EMBED_TEXT_VERSION,
+)
 from rate_limit import check_rate_limit, client_ip
 # Public share-page subsystem (renderers + publish/unpublish logic). The three
 # HTTP endpoints (publish_share_http, unpublish_share_http, share_page) stay in
@@ -348,18 +352,20 @@ def _estimate_read_time(text: str, words_per_minute: int = 200) -> int:
 
 
 def _append_capture_note(detailed: str, language: str) -> str:
-    """Append an honest note to detailedSummary when Facebook gave the scraper
-    only a partial caption (a truncated ~200-char og:description) or nothing at
-    all (a login wall). Either way the summary is incomplete for a reason the user
-    can't see, so we say so and tell them how to get the full one. Rendered as a
-    trailing blockquote, so it never violates the 'start with ## Key Points' rule."""
+    """Append an honest note to detailedSummary when the scraper could only read
+    a partial preview (Facebook's truncated og:description, a social-teaser
+    fallback on a JS shell) or nothing at all (login wall, PDF). Either way the
+    summary is incomplete for a reason the user can't see, so we say so and
+    suggest the workaround. Wording is source-agnostic — every `truncated`
+    scrape rides this channel now, not just Facebook. Rendered as a trailing
+    blockquote, so it never violates the 'start with ## Key Points' rule."""
     he = (language or "").lower().startswith("he")
     if he:
-        note = ("> ⚠️ **הערה:** פייסבוק לא סיפקה לאפליקציה את הטקסט המלא של הפוסט. "
-                "לסיכום מלא, שמרו צילום מסך של הפוסט במקום את הקישור.")
+        note = ("> ⚠️ **הערה:** לא ניתן היה לקרוא את הטקסט המלא של התוכן הזה. "
+                "לסיכום מלא, נסו לשמור צילום מסך במקום את הקישור.")
     else:
-        note = ("> ⚠️ **Note:** Facebook didn't provide this post's full text to the app. "
-                "For a complete summary, save a screenshot of the post instead.")
+        note = ("> ⚠️ **Note:** The full text of this content couldn't be read. "
+                "For a complete summary, try saving a screenshot instead.")
     detailed = (detailed or "").rstrip()
     return f"{detailed}\n\n{note}" if detailed else note
 
@@ -491,6 +497,67 @@ def _build_link_data(*, url, title, summary, detailed_summary, source_type,
     return data
 
 
+def _first_line(text: str, limit: int = 120) -> str:
+    """The first non-empty line of a note, trimmed — used as an honest title
+    fallback when the AI doesn't return one (never a fabricated headline)."""
+    for line in (text or "").splitlines():
+        line = line.strip()
+        if line:
+            return line[:limit]
+    return ""
+
+
+# A URL-less thought/note is a first-class card. It has NO url and is NOT scraped
+# — sourceType 'note' tells the frontend to render it as a note (no source link,
+# no reader, no "open original"), and 'Note' is the byline.
+NOTE_SOURCE_TYPE = "note"
+MAX_NOTE_LENGTH = 30000
+
+
+def _note_link_data(analysis: dict, text: str, *, related_links=_OMIT) -> dict:
+    """Build a link document for a URL-less text note (a first-class 'note' card).
+
+    Reuses the shared builder but pins the note-specific shape: empty url (no
+    source to open), sourceType 'note', sourceName 'Note', and a title that
+    falls back to the note's first line when the model returns none. Read time is
+    estimated from the note text itself since there is no scraped article."""
+    title = analysis.get("title") or _first_line(text) or "Note"
+    return _build_link_data(
+        url="",
+        title=title,
+        summary=analysis.get("summary", ""),
+        detailed_summary=analysis.get("detailedSummary", ""),
+        source_type=NOTE_SOURCE_TYPE,
+        source_name=analysis.get("sourceName") or "Note",
+        original_title=_first_line(text),
+        estimated_read_time=_estimate_read_time(text),
+        analysis=analysis,
+        related_links=related_links,
+        confidence=0.8,
+        key_entities=[],
+    )
+
+
+def _embedding_text_from_analysis(analysis: dict) -> str:
+    """Map a fresh AI `analysis` dict onto the shared v2 embedding recipe.
+
+    Both new-card embed sites (the synchronous web-add preview and the async
+    background pipeline) embed the SAME rich text the Firestore trigger and the
+    backfill use — title + summary + detailedSummary + takeaway + concepts +
+    video highlights — so a card's stored vector and its live find_related_links
+    query vector are always built the identical way.
+    """
+    return build_embedding_text({
+        "title": analysis.get("title", ""),
+        "summary": analysis.get("summary", ""),
+        "detailedSummary": analysis.get("detailedSummary", ""),
+        "tags": analysis.get("tags", []),
+        "concepts": analysis.get("concepts", []),
+        "metadata": {"actionableTakeaway": analysis.get("actionableTakeaway")},
+        "videoHighlights": analysis.get("videoHighlights", []),
+    })
+
+
 def _card_source_name(c: dict):
     """Best byline for a card: the YouTube channel when present, else the stored
     publisher/source name. Mirrors the web card so Ask citations show the same
@@ -585,6 +652,81 @@ def backfill_related_links(req: https_fn.Request) -> https_fn.Response:
         return _server_error(headers, e, "Backfill related links failed")
 
 
+@https_fn.on_request()
+def backfill_embeddings(req: https_fn.Request) -> https_fn.Response:
+    """One-off migration: re-embed existing cards with the RICH v2 recipe.
+
+    The embedding recipe changed (see search.build_embedding_text /
+    EMBED_TEXT_VERSION): the old vector was built from title + short summary +
+    tags ONLY, so any detail that lived in detailedSummary was invisible to Ask
+    and semantic search. This endpoint recomputes the embedding for every card
+    still stamped below EMBED_TEXT_VERSION and stamps the new version, so the
+    whole existing library becomes findable by its details.
+
+    Optional ?uid=… (or JSON {uid}) limits to one user; otherwise all users.
+    ?force=1 re-embeds even cards already at the current version. Idempotent and
+    re-runnable — a re-run with no ?force skips cards already migrated (they're
+    at the current version), so it's safe to run again if it times out partway.
+
+    OWNER STEP: after deploying functions, call this ONCE (admin-guarded, same as
+    backfill_related_links):
+        curl -X POST "https://<region>-<project>.cloudfunctions.net/backfill_embeddings" \
+             -H "Authorization: Bearer $ADMIN_TOKEN"
+    Then (optionally) re-run rebuild_connections/backfill_related_links so the
+    "See also" graph reflects the new vectors.
+    """
+    headers = _cors_headers(req)
+    if req.method == "OPTIONS":
+        return https_fn.Response("", status=204, headers=headers)
+    guard = _require_admin(req, headers)
+    if guard:
+        return guard
+    try:
+        uid = req.args.get("uid") or (req.get_json(silent=True) or {}).get("uid")
+        force = str(req.args.get("force") or "").lower() in ("1", "true", "yes")
+        db = get_db()
+        service = EmbeddingService()
+        user_refs = ([db.collection("users").document(uid)] if uid
+                     else list(db.collection("users").list_documents()))
+        totals = {"users": 0, "reembedded": 0, "skipped": 0, "failed": 0}
+        for uref in user_refs:
+            totals["users"] += 1
+            for doc in uref.collection("links").stream():
+                d = doc.to_dict() or {}
+                # Skip cards not yet in a searchable state (processing/failed) —
+                # the pipeline/trigger embeds those when they settle.
+                if d.get("status") in ("processing", "failed"):
+                    totals["skipped"] += 1
+                    continue
+                if not force and d.get("embeddingVersion") == EMBED_TEXT_VERSION:
+                    totals["skipped"] += 1
+                    continue
+                text = build_embedding_text(d)
+                if not text:
+                    totals["skipped"] += 1
+                    continue
+                try:
+                    vector = service.generate_embedding(text)
+                except Exception as e:
+                    logger.error(f"Backfill embed failed for {doc.id}: {e}")
+                    vector = None
+                if vector:
+                    doc.reference.update({
+                        "embedding_vector": Vector(vector),
+                        "embeddingVersion": EMBED_TEXT_VERSION,
+                        "needsEmbedding": gc_firestore.DELETE_FIELD,
+                    })
+                    totals["reembedded"] += 1
+                else:
+                    doc.reference.update({"needsEmbedding": True})
+                    totals["failed"] += 1
+        return https_fn.Response(
+            json.dumps(totals), status=200, headers=headers, mimetype="application/json",
+        )
+    except Exception as e:
+        return _server_error(headers, e, "Backfill embeddings failed")
+
+
 # ─────────────────────────────────────────────
 # HTTP Endpoints
 # ─────────────────────────────────────────────
@@ -667,7 +809,46 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             return _error_response("Invalid JSON body", 400, headers)
 
         url = data.get('url')
+        text = data.get('text') or data.get('note')
         existing_tags = _sanitize_tags(data.get('existingTags'))
+
+        # NOTE PATH — a URL-less thought captured from the "Note" tab. Analyze the
+        # text directly (no scraping) and return a first-class 'note' card. The
+        # client saves the returned link_data exactly like the link/image tabs, so
+        # the embedding trigger fills the vector in on create. Self-contained
+        # (its own auth + per-uid rate-limit) so the URL flow below is untouched.
+        if not url and text and text.strip():
+            note_uid, note_auth_err = _authed_uid(req, headers, data.get('uid'))
+            if note_auth_err:
+                return note_auth_err
+            if note_uid:
+                rl = _rate_limited("analyze-uid", note_uid, headers)
+                if rl:
+                    return rl
+
+            note_text = text.strip()[:MAX_NOTE_LENGTH]
+            logger.info("Analyzing note text synchronously (%d chars)", len(note_text))
+            ai = GeminiService()
+            analysis = ai.analyze_text(note_text, existing_tags=existing_tags)
+
+            related_links = []
+            if note_uid:
+                embedding = ai.embed_text(_embedding_text_from_analysis(analysis))
+                graph_service = GraphService(get_db())
+                related_links = graph_service.find_related_links(
+                    new_link_id="preview",
+                    title=analysis.get("title", ""),
+                    summary=analysis.get("summary", ""),
+                    embedding=embedding,
+                    new_concepts=analysis.get("concepts", []),
+                    uid=note_uid,
+                )
+
+            link_data = _note_link_data(analysis, note_text, related_links=related_links)
+            return https_fn.Response(
+                json.dumps({"success": True, "link": link_data}),
+                status=200, headers=headers, mimetype='application/json'
+            )
 
         if not url:
             return _error_response("URL is required", 400, headers)
@@ -701,7 +882,10 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         analysis = _analyze_scraped(ai, scraped, existing_tags)
 
         # 3. Generate Embedding & Find Connections
-        embedding_text = f"{analysis.get('title', '')}\n{analysis.get('summary', '')}"
+        # Rich v2 recipe (see _embedding_text_from_analysis). Used here only as
+        # the query vector for find_related_links — the stored embedding_vector
+        # is written server-side by the sync_link_embedding trigger.
+        embedding_text = _embedding_text_from_analysis(analysis)
         embedding = ai.embed_text(embedding_text)
 
         related_links = []
@@ -760,15 +944,16 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         return _server_error(headers, e)
 
 
-# Words to ignore when keyword-matching a question against saved cards.
-_ASK_STOPWORDS = {
-    "the", "a", "an", "of", "to", "in", "on", "at", "by", "for", "and", "or",
-    "is", "are", "was", "were", "be", "been", "this", "that", "these", "those",
-    "what", "whats", "which", "who", "whom", "how", "why", "when", "where",
-    "do", "does", "did", "done", "can", "could", "would", "should", "will",
-    "i", "me", "my", "you", "your", "it", "its", "they", "them", "their",
-    "about", "with", "from", "into", "as", "any", "some", "all", "have", "has",
-}
+# How many recent cards the lexical fallback scans. The old scan was an
+# UNORDERED links_ref.limit(300) — for a library over 300 cards it was a coin
+# flip whether the right card was even looked at (Firestore returns docs in an
+# arbitrary order without order_by). We now scan the most-recent 1000 by
+# createdAt, so the scan is deterministic and recency-biased (the cards a user
+# is most likely asking about). Tradeoff: cards older than the newest 1000 are
+# not reachable by the LEXICAL path — but they remain reachable via the semantic
+# top-30 vector search, so nothing is fully invisible, and we keep the per-ask
+# read cost bounded instead of scanning an unbounded collection on every ask.
+_KEYWORD_SCAN_CAP = 1000
 
 
 def _keyword_fallback_cards(uid: str, question: str, exclude_ids: set, limit: int = 5) -> list:
@@ -776,33 +961,30 @@ def _keyword_fallback_cards(uid: str, question: str, exclude_ids: set, limit: in
 
     Vector search can miss a card whose text literally contains the query's
     keywords (ranking, or a card with no embedding yet). This scans the user's
-    links for the question's keywords across title/summary/tags/source/category
-    and returns the best matches not already retrieved — so an obvious title
-    hit like "fact check" is never dropped.
+    most-recent links for the question's keywords across title/summary/tags/
+    source/category and returns the best matches not already retrieved — so an
+    obvious title hit like "fact check" is never dropped.
+
+    Deterministic scan: ordered by createdAt desc and capped, so the same
+    question always sees the same candidate set (the old unordered scan could
+    skip the right card entirely on a large library).
     """
-    tokens = {
-        t for t in re.split(r"[^a-z0-9]+", question.lower())
-        if len(t) >= 3 and t not in _ASK_STOPWORDS
-    }
+    tokens = keyword_query_tokens(question)
     if not tokens:
         return []
 
     db = get_db()
     links_ref = db.collection("users").document(uid).collection("links")
+    query = links_ref.order_by(
+        "createdAt", direction=gc_firestore.Query.DESCENDING
+    ).limit(_KEYWORD_SCAN_CAP)
 
     scored = []
-    for doc in links_ref.limit(300).stream():
+    for doc in query.stream():
         if doc.id in exclude_ids:
             continue
         data = doc.to_dict() or {}
-        haystack = " ".join(str(x) for x in [
-            data.get("title", ""), data.get("summary", ""),
-            " ".join(data.get("tags", []) or []),
-            data.get("sourceName", ""), data.get("category", ""),
-        ]).lower()
-        # Weight title hits higher so a keyword in the title wins.
-        title_l = str(data.get("title", "")).lower()
-        score = sum((2 if t in title_l else 0) + (1 if t in haystack else 0) for t in tokens)
+        score = keyword_match_score(data, tokens)
         if score > 0:
             data.pop("embedding_vector", None)
             data["id"] = doc.id
@@ -821,7 +1003,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
     returning the source ids it cited so the UI can link straight back to them.
 
     Body: { uid, question, history?: [{role, content}] }
-    Returns: { success, answer, citedIds, sources: [{id, title, category, sourceName}] }
+    Returns: { success, answer, citedIds, sources: [{id, title, category, sourceName}], ungrounded }
     """
     if req.method == 'OPTIONS':
         return _cors_preflight(req)
@@ -872,15 +1054,22 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #    that already powers the search bar). Degrade gracefully: if
         #    retrieval fails, answer_from_context returns a friendly "nothing
         #    saved yet" reply rather than erroring the whole request.
+        #
+        #    Retrieve DEEP (top-30) then rerank down to ~10 for the model. Pure
+        #    vector rank alone buries a card that literally answers the question
+        #    but scores slightly lower; reranking blends vector rank with keyword
+        #    overlap + recency to pull it back into context (no extra model call).
         try:
-            cards = perform_search_logic(uid, question, limit=8)
+            candidates = perform_search_logic(uid, question, limit=30)
+            cards = rerank_candidates(question, candidates, top_k=10)
         except Exception as e:
             logger.error(f"ask_brain retrieval failed: {e}")
             cards = []
 
         # 1b. Hybrid retrieval: add lexical keyword matches vector search may
-        #     have missed (e.g. a word literally in a card's title). Merge,
-        #     keeping vector results first, then keyword hits, deduped.
+        #     have missed (e.g. a word literally in a card's title, or a card
+        #     with no embedding yet). Merge, keeping reranked vector results
+        #     first, then keyword hits, deduped.
         try:
             have = {c.get("id") for c in cards}
             cards = cards + _keyword_fallback_cards(uid, question, have, limit=5)
@@ -927,6 +1116,13 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                             yield "data: " + json.dumps(
                                 {"type": "sources", "sources": sources}
                             ) + "\n\n"
+                        elif kind == "ungrounded":
+                            # The answer couldn't be tied to any saved card. The
+                            # prose is already streamed, so tell the UI to
+                            # downgrade the "grounded" promise after the fact.
+                            yield "data: " + json.dumps(
+                                {"type": "ungrounded"}
+                            ) + "\n\n"
                     yield "data: " + json.dumps({"type": "done"}) + "\n\n"
                 except Exception as stream_exc:
                     # Mirror _server_error: log full detail, emit a sanitized message.
@@ -964,6 +1160,10 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                 "answer": result.get("answer", ""),
                 "citedIds": cited_ids,
                 "sources": sources,
+                # True when the answer could not be tied to any saved card (even
+                # after a stricter re-ask). The client downgrades the "grounded"
+                # promise for this message instead of showing source chips.
+                "ungrounded": bool(result.get("ungrounded", False)),
             }),
             status=200, headers=headers, mimetype='application/json'
         )
@@ -1148,6 +1348,31 @@ def _extract_url(*candidates: str) -> str:
     return ""
 
 
+def _pending_url_doc(uid: str, url: str, *, card_id: Optional[str] = None,
+                     body: str = "", source: str = "share") -> dict:
+    """Build the ``pending_processing`` queue doc for a URL capture.
+
+    Shared by the iOS share sheet (``source='share'``) and the durable
+    web-capture flow (``source='web'``). When ``card_id`` is set the WEB CLIENT
+    has ALREADY written a ``processing`` placeholder card into its library;
+    ``process_link_background`` reuses that card (instead of creating a fresh
+    one) so a slow scrape never loses the capture, never duplicates it, and never
+    rides the synchronous ``/api/analyze`` request that used to time out at 60s.
+    """
+    doc = {
+        "uid": uid,
+        "url": url,
+        "source": source,
+        "body": body,
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "status": "queued",
+        "attempts": 0,
+    }
+    if card_id:
+        doc["cardId"] = card_id
+    return doc
+
+
 @https_fn.on_request()
 def share_ingest(req: https_fn.Request) -> https_fn.Response:
     """
@@ -1171,12 +1396,21 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
         data = req.get_json(silent=True) or {}
 
         token = req.headers.get('X-Ingest-Token') or data.get('token')
-        if not token:
-            return _error_response("Missing ingest token", 401, headers)
-
-        uid = find_user_by_ingest_token(token)
-        if not uid:
-            return _error_response("Invalid ingest token", 403, headers)
+        if token:
+            uid = find_user_by_ingest_token(token)
+            if not uid:
+                return _error_response("Invalid ingest token", 403, headers)
+        else:
+            # Web / in-app client path (durable web capture — no share-extension
+            # token). Authenticate like the other first-party endpoints: App Check
+            # + (soft) ID token. This lets AddLinkForm enqueue a URL into the SAME
+            # background pipeline the iOS share sheet uses, instead of blocking on
+            # the synchronous /api/analyze request that could time out at 60s.
+            if not _require_app_check(req, headers):
+                return _error_response("App Check verification failed", 401, headers)
+            uid, auth_err = _authed_uid(req, headers, data.get('uid'))
+            if auth_err:
+                return auth_err
 
         # Image share path: the native Share Extension can send a raw image
         # (base64) when the user shares a photo/screenshot rather than a link.
@@ -1229,10 +1463,43 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
 
         url = _extract_url(data.get('url'), data.get('text'), data.get('shared'))
         if not url:
-            return _error_response("No URL found in shared content", 400, headers)
+            # NOTE PATH — shared plain text with no URL is a first-class note card,
+            # not an error. Analyze the text directly (no scraping) and write the
+            # card straight into the user's library; the embedding trigger fires on
+            # create and vectorizes it. (The web "Note" tab hits /api/analyze and
+            # lets the client save — here there is no client, so we persist here.)
+            note_text = (data.get('text') or data.get('shared') or data.get('note') or '').strip()
+            if not note_text:
+                return _error_response("No URL or text found in shared content", 400, headers)
+            note_text = note_text[:MAX_NOTE_LENGTH]
+            try:
+                ai = GeminiService()
+                analysis = ai.analyze_text(note_text, existing_tags=get_user_tags(uid))
+                link_data = _note_link_data(analysis, note_text)
+                # A fresh note has no vector yet — flag it so sync_link_embedding
+                # (which fires on this create) generates one.
+                link_data["needsEmbedding"] = True
+                card_ref = get_db().collection('users').document(uid).collection('links').document()
+                card_ref.set(link_data)
+                logger.info(f"Share ingest saved note for user {uid}")
+                return https_fn.Response(
+                    json.dumps({"success": True, "saved": True, "id": card_ref.id, "note": True}),
+                    status=200, headers=headers, mimetype='application/json'
+                )
+            except Exception as e:
+                logger.error(f"Share ingest note failed: {e}", exc_info=True)
+                return _error_response("Failed to analyze note", 500, headers)
 
         # Dedup: skip if already saved or already queued for this user.
-        if link_exists_for_url(uid, url) or pending_exists_for_url(uid, url):
+        #
+        # EXCEPTION — the durable web path supplies a `cardId`: AddLinkForm has
+        # already run its own pre-write dedup AND written a `processing`
+        # placeholder card at this exact URL. Re-checking link_exists here would
+        # match that very placeholder and wrongly drop a legitimate new save, so
+        # when a cardId is present we skip the dedup and let the trigger finalize
+        # the client's card in place.
+        card_id = data.get('cardId')
+        if not card_id and (link_exists_for_url(uid, url) or pending_exists_for_url(uid, url)):
             logger.info(f"Share ingest skipped (duplicate): {url}")
             return https_fn.Response(
                 json.dumps({"success": True, "duplicate": True, "url": url}),
@@ -1241,15 +1508,10 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
 
         db = get_db()
         process_ref = db.collection('pending_processing').document()
-        process_ref.set({
-            "uid": uid,
-            "url": url,
-            "source": "share",
-            "body": data.get('note', ''),
-            "createdAt": datetime.now(timezone.utc).isoformat(),
-            "status": "queued",
-            "attempts": 0
-        })
+        process_ref.set(_pending_url_doc(
+            uid, url, card_id=card_id, body=data.get('note', ''),
+            source="web" if card_id else "share",
+        ))
 
         logger.info(f"Share ingest queued: {url} for user {uid}")
         return https_fn.Response(
@@ -1801,33 +2063,44 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     # to the stored Storage URL below). Kept so a FAILED card records the original.
     original_url = url
 
-    # M3 — durable capture lifecycle. Write a visible "processing" card into the
-    # user's library the instant work begins, then update THIS SAME card to ready
-    # (on success) or a retryable "failed" state (on error). A captured item is
+    # M3 — durable capture lifecycle. A captured item becomes a visible
+    # "processing" card the instant work is queued, then updates THIS SAME card to
+    # ready (on success) or a retryable "failed" state (on error). A capture is
     # therefore never invisible and never silently dropped, even if analysis fails.
-    card_ref = get_db().collection('users').document(uid).collection('links').document()
-    card_id = card_ref.id
-    try:
-        card_ref.set({
-            "url": original_url,
-            "title": _capture_placeholder_title(original_url, is_image),
-            "summary": "",
-            "tags": [],
-            "category": "",
-            "status": LinkStatus.PROCESSING.value,
-            "sourceType": "image" if is_image else "web",
-            "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
-            # When processing began — the janitor uses this (not createdAt, which
-            # a retry preserves) to age out cards stuck in `processing`.
-            "processingStartedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
-            "metadata": {"originalTitle": "", "estimatedReadTime": 0},
-        })
-        ref.update({"cardId": card_id})
-    except Exception as placeholder_err:
-        # Non-fatal: if we can't write the placeholder, fall back to the legacy
-        # "create the real card at the end" behaviour so a save is never lost.
-        logger.error(f"Failed to write processing placeholder card: {placeholder_err}", exc_info=True)
-        card_ref = None
+    #
+    # WEB durable path (Weakness #5): AddLinkForm has ALREADY written the
+    # `processing` placeholder card itself (instant feed feedback, no synchronous
+    # 60s wait) and passes its `cardId` through the queue doc — reuse that card so
+    # we neither duplicate it nor overwrite the client's createdAt/ordering.
+    # SHARE path: no cardId, so we create the placeholder card here.
+    existing_card_id = data.get("cardId")
+    if existing_card_id:
+        card_ref = get_db().collection('users').document(uid).collection('links').document(existing_card_id)
+        card_id = existing_card_id
+    else:
+        card_ref = get_db().collection('users').document(uid).collection('links').document()
+        card_id = card_ref.id
+        try:
+            card_ref.set({
+                "url": original_url,
+                "title": _capture_placeholder_title(original_url, is_image),
+                "summary": "",
+                "tags": [],
+                "category": "",
+                "status": LinkStatus.PROCESSING.value,
+                "sourceType": "image" if is_image else "web",
+                "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+                # When processing began — the janitor uses this (not createdAt,
+                # which a retry preserves) to age out cards stuck in `processing`.
+                "processingStartedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+                "metadata": {"originalTitle": "", "estimatedReadTime": 0},
+            })
+            ref.update({"cardId": card_id})
+        except Exception as placeholder_err:
+            # Non-fatal: if we can't write the placeholder, fall back to the legacy
+            # "create the real card at the end" behaviour so a save is never lost.
+            logger.error(f"Failed to write processing placeholder card: {placeholder_err}", exc_info=True)
+            card_ref = None
 
     analysis = {}
     scraped = {"html": "", "title": "", "text": ""}
@@ -1891,7 +2164,10 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             analysis = {}
 
         # 3. Generate Embedding & Find Connections
-        embedding_text = f"{analysis.get('title', '')}\n{analysis.get('summary', '')}"
+        # Rich v2 recipe (see _embedding_text_from_analysis) — fold in
+        # detailedSummary/takeaway/concepts so the card is findable by its
+        # details, not just its headline.
+        embedding_text = _embedding_text_from_analysis(analysis)
         embedding = ai.embed_text(embedding_text)
 
         graph_service = GraphService(get_db())
@@ -1939,6 +2215,9 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # write a poisoned near-zero vector that looks embedded but isn't.
         if embedding:
             link_data["embedding_vector"] = Vector(embedding)
+            # Stamp the recipe version so the trigger/backfill know this vector is
+            # already on the current (v2) recipe and skip re-embedding it.
+            link_data["embeddingVersion"] = EMBED_TEXT_VERSION
         else:
             link_data["needsEmbedding"] = True
 

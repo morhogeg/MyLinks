@@ -5,13 +5,9 @@ import {
     X,
     ArrowRight,
     ArrowLeft,
-    Sparkles,
     Plus,
     Search,
     MessageCircleQuestion,
-    Layers,
-    LayoutGrid,
-    Settings as SettingsIcon,
 } from 'lucide-react';
 
 /**
@@ -41,20 +37,16 @@ type Step = {
     padding?: number;
 };
 
+// Kept deliberately short (≤3 steps). It fires once a card exists (the seeded
+// example or a real save), so it demos over a NON-EMPTY feed: Ask actually
+// answers, search actually finds. The old 8-step tour walked a brand-new user
+// through Ask/search/Collections over zero cards — a wall, not a welcome.
 const STEPS: Step[] = [
     {
-        target: null,
-        icon: <Sparkles className="w-5 h-5" />,
-        title: 'Welcome to Machina AI',
-        body: "Your AI second brain. Save anything and Machina reads it, organizes it, and hands it back the moment you need it. Here's a quick 60-second tour.",
-    },
-    {
-        target: 'add',
-        icon: <Plus className="w-5 h-5" />,
-        title: 'Save anything, instantly',
-        body: 'Tap the + button to drop in a link, image, or screenshot. Machina reads it, writes a clean summary, and auto-tags it into the right category — no filing required.',
-        radius: 999,
-        padding: 10,
+        target: 'ask',
+        icon: <MessageCircleQuestion className="w-5 h-5" />,
+        title: 'Ask your brain',
+        body: 'Chat with everything you’ve saved. Ask a question and Machina answers from your own library, pointing back to the exact cards it drew from.',
     },
     {
         target: 'search',
@@ -63,35 +55,12 @@ const STEPS: Step[] = [
         body: "Search by keyword or plain-English idea. Machina understands what you meant, so “that article on focus” surfaces the right card even when those exact words aren't in it.",
     },
     {
-        target: 'ask',
-        icon: <MessageCircleQuestion className="w-5 h-5" />,
-        title: 'Ask your brain',
-        body: 'Chat with everything you’ve saved. Ask a question and Machina answers from your own library, pointing back to the exact cards it drew from.',
-    },
-    {
-        target: 'collections',
-        icon: <Layers className="w-5 h-5" />,
-        title: 'Group it. Share it.',
-        body: 'Bundle related cards into Collections — a reading list, a project, a trip. Publish one as a shareable page, or send a single card as a link anyone can open.',
-    },
-    {
-        target: 'views',
-        icon: <LayoutGrid className="w-5 h-5" />,
-        title: 'See it your way',
-        body: 'Switch between Grid and List layouts — or flip to Review to swipe through your cards one at a time and revisit what you saved.',
-    },
-    {
-        target: 'settings',
-        icon: <SettingsIcon className="w-5 h-5" />,
-        title: 'Make it yours',
-        body: 'Set your theme, tune reminders, and build a curated digest that resurfaces the gems you’d otherwise forget. You can replay this tour from here anytime.',
+        target: 'add',
+        icon: <Plus className="w-5 h-5" />,
+        title: 'Save your own',
+        body: 'Tap the + button to drop in a link, image, or screenshot. Machina reads it, writes a clean summary, and auto-tags it — no filing required.',
         radius: 999,
-    },
-    {
-        target: null,
-        icon: <Sparkles className="w-5 h-5" />,
-        title: "You're all set",
-        body: 'That’s the whole loop: Capture. Connect. Recall. Start by saving your first link with the + button.',
+        padding: 10,
     },
 ];
 
@@ -369,7 +338,7 @@ export default function OnboardingTour({
                         onClick={next}
                         className="inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-accent text-white text-[13px] font-semibold shadow-sm shadow-accent/20 hover:bg-accent-hover active:scale-95 transition-all cursor-pointer"
                     >
-                        {isLast ? 'Start saving' : isFirst ? 'Take the tour' : 'Next'}
+                        {isLast ? 'Start saving' : 'Next'}
                         {!isLast && <ArrowRight className="w-4 h-4" />}
                     </button>
                 </div>

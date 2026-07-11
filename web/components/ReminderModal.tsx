@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Link } from '@/lib/types';
 import { X, Sparkles, Calendar, Clock, Bell, BellOff, Loader2, Check } from 'lucide-react';
 import { updateLinkReminder } from '@/lib/storage';
+import { isNativeApp } from '@/lib/api';
+import { trackReminderSet } from '@/lib/analytics';
 import { useToast } from '@/components/Toast';
 
 interface ReminderModalProps {
@@ -63,19 +65,18 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                 setSpacedInterval(parseInt(profile.split('-')[1]) || 3);
             } else if (profile === 'smart') {
                 setSelectedOption('smart');
-            } else if (profile === 'tomorrow') {
-                setSelectedOption('tomorrow');
-            } else if (profile === 'next-week') {
-                setSelectedOption('next-week');
-            } else if (profile === 'custom') {
+            } else {
+                // One-shot reminders are stored as profile 'once' (Tomorrow /
+                // Next Week / Custom all collapse to a single fire). We can't
+                // recover which preset was picked, so reopening shows Custom
+                // pre-filled with the stored fire time — sensible and editable.
+                // Legacy 'tomorrow'/'next-week'/'custom' values land here too.
                 setSelectedOption('custom');
                 if (link.nextReminderAt) {
                     const date = new Date(link.nextReminderAt);
                     setCustomDate(formatLocalDate(date));
                     setCustomTime(`${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`);
                 }
-            } else {
-                setSelectedOption('smart');
             }
         }
     }, [isOpen, link]);
@@ -171,13 +172,22 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
             }
 
             if (nextReminderTime) {
+                // Profile drives recurrence on the backend. 'smart' and
+                // 'spaced-N' recur; Tomorrow / Next Week / Custom are true
+                // one-shots and MUST be stored as 'once' so they fire a single
+                // time (otherwise "remind me tomorrow" re-fires at +7d/+30d).
+                const profileToStore =
+                    selectedOption === 'spaced' ? `spaced-${spacedInterval}` :
+                    selectedOption === 'smart' ? 'smart' :
+                    'once';
                 await updateLinkReminder(
                     uid,
                     link.id,
                     true,
                     nextReminderTime,
-                    selectedOption === 'spaced' ? `spaced-${spacedInterval}` : selectedOption
+                    profileToStore
                 );
+                trackReminderSet();
                 toast.success(`Reminder set for ${new Date(nextReminderTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}`);
                 // onUpdate (saved) before onClose (dismissed) so callers that
                 // treat a bare onClose as "cancelled" see the save first.
@@ -501,6 +511,16 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                 Turn off Reminder
                             </button>
                         </div>
+                    )}
+
+                    {/* Web has no push channel — reminders surface in the app
+                        itself. Set expectations so "remind me" doesn't imply a
+                        notification that can't arrive. (Native handles this via
+                        the push nudge after saving.) */}
+                    {!isNativeApp() && (
+                        <p className="px-2 text-[11px] text-text-muted leading-snug">
+                            Reminders will appear here in the app when they come due.
+                        </p>
                     )}
 
                     {/* Action Buttons */}

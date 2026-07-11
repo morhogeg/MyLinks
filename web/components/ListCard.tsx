@@ -31,8 +31,9 @@ const TRIGGER = 64;
  * stack of headlines. The headline (up to three lines) gets the full row width;
  * the metadata line below carries the source's brand icon, source label and a
  * compact category chip (the 6px colour bar on the row edge stays the primary
- * category cue, M-P3). On touch, swipe right to delete or left to favourite;
- * tapping opens the link.
+ * category cue, M-P3). On touch, swipe right to favourite or left to delete
+ * (one swipe grammar app-wide — right is always the positive, non-destructive
+ * action, matching the review deck); tapping opens the link.
  */
 function ListCard({
     link,
@@ -100,11 +101,11 @@ function ListCard({
         const o = offsetRef.current;
         if (axis.current === 'h' && Math.abs(o) >= TRIGGER) {
             if (o > 0) {
-                hapticMedium(); // swipe-to-delete: a firmer tap acknowledges the destructive intent
-                onDelete?.(link.id);
-            } else {
-                hapticLight(); // swipe-to-favorite: a crisp light tap
+                hapticLight(); // swipe-right-to-favorite: positive, non-destructive — a crisp light tap
                 onStatusChange(link.id, isFavorite ? 'unread' : 'favorite');
+            } else {
+                hapticMedium(); // swipe-left-to-delete: a firmer tap acknowledges the destructive intent (parent confirms)
+                onDelete?.(link.id);
             }
         }
         setOff(0);
@@ -128,15 +129,16 @@ function ListCard({
                 : 'border-border-subtle hover:border-accent/30'
                 } ${link.isRead ? 'opacity-60' : ''}`}
         >
-            {/* Swipe action revealed behind the row: delete (right) / favourite (left). */}
+            {/* Swipe action revealed behind the row: favourite (right) / delete (left).
+                Right is the positive, non-destructive action everywhere (M-swipe). */}
             {offset > 0 && (
-                <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-start ps-5 bg-red-500 text-white">
-                    <Trash2 className={`w-5 h-5 transition-transform ${armed ? 'scale-125' : 'scale-100'}`} />
+                <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-start ps-5 bg-yellow-500 text-white">
+                    <Star className={`w-5 h-5 fill-current transition-transform ${armed ? 'scale-125' : 'scale-100'}`} />
                 </div>
             )}
             {offset < 0 && (
-                <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-end pe-5 bg-yellow-500 text-white">
-                    <Star className={`w-5 h-5 fill-current transition-transform ${armed ? 'scale-125' : 'scale-100'}`} />
+                <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-end pe-5 bg-red-500 text-white">
+                    <Trash2 className={`w-5 h-5 transition-transform ${armed ? 'scale-125' : 'scale-100'}`} />
                 </div>
             )}
 

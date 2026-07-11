@@ -237,8 +237,13 @@ The multi-user auth work is **fully written but not live**:
      it can't time out). The admin all-users `backfill_related_links` HTTP fn
      still exists as a fallback (`curl -H "X-Admin-Token: $ADMIN_TOKEN" …`).
    - Confirm `backfill_youtube_channels` was run (channel-name repair).
-   - `/api/analyze` 60s timeout on slow YouTube videos — route around Hosting's
-     60s cap like `/api/chat` did (touches all link-saving; test carefully).
+   - `/api/analyze` 60s timeout on slow YouTube videos — **largely moot as of
+     2026-07-11 (weaknesses sprint):** web link saves no longer ride the
+     synchronous `/api/analyze` request; they write a `processing` placeholder
+     and enqueue via `/api/share` into `process_link_background` (300s budget).
+     `/api/analyze` remains in use only for the card **Retry** flow, image
+     analysis, and the Note tab (all short) — the slow-YouTube exposure there is
+     retry-only and tolerable.
 5. **[ ] Security config + key hygiene (30 min, do with #2):** set `ADMIN_TOKEN`,
    `APPCHECK_ENFORCE=true`, `OWNER_EMAIL` in functions env. **Rotate the Gemini
    key** (was pasted in chat 2026-06-23) and the **App Store Connect API `.p8`**
@@ -603,6 +608,58 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-11 (latest) — SHIPPED: the weaknesses-sprint remediation below
+  (merge `e163147` to `main`).** **Desktop web:** live via Vercel auto-deploy
+  (includes durable web capture UI, Note tab, editable title/summary, export,
+  onboarding redesign, swipe grammar, analytics/error reporting client side).
+  **iOS: TestFlight run #68 → build 1068**, fired via the temp-push-trigger
+  pattern (API dispatch still 403 from cloud sessions; temp branch
+  `claude/ship-tf-trigger-1yngsi`). ⚠️ Remote branch deletes are ALSO no-ops
+  from cloud sessions ("Everything up-to-date" but the ref survives) — owner
+  should delete BOTH stale trigger branches (`claude/ship-tf-trigger-bvwize`,
+  `claude/ship-tf-trigger-1yngsi`) once run #68 is done. **Backend: NOT
+  deployed — owner step** (no Firebase creds in cloud): from `main` run
+  `./deploy-functions.sh functions:analyze_link,functions:analyze_image,functions:ask_brain,functions:share_ingest,functions:process_link_background,functions:sync_link_embedding,functions:backfill_embeddings,functions:check_reminders,functions:force_check_reminders,functions:get_article,functions:claim_workspace,functions:claim_workspace_http`
+  — until then the durable web capture ENQUEUE fails honestly (placeholder
+  flips to a retryable failed card, Retry uses the old sync path — degraded but
+  never lossy), and citations re-ask/ungrounded, retrieval v2, reminder in-app
+  fallback and the note share-path stay dark; the web UI changes are live and
+  read-compatible. **Then:** (1) run `backfill_embeddings` once (`curl -X POST
+  .../backfill_embeddings -H "Authorization: Bearer $ADMIN_TOKEN"`); (2) add
+  permissive `analytics_events` + `client_errors` matches inside `match
+  /users/{uid}` in LIVE firestore.rules (shapes staged in
+  `firestore.rules.locked`) or analytics writes are silently denied; (3) `cd
+  firestore-rules-test && npm test`; (4) on-device QA for build 1068: swipe
+  directions in List view (right=favourite, left=delete+confirm, incl. RTL),
+  push nudge after setting a reminder, "Reminders due" strip, iOS welcome +
+  example-card seed, web link save placeholder→ready flip (after functions
+  deploy), Note tab, title/summary edit. `firebase.json` unchanged — no
+  hosting deploy.
+- **2026-07-11 — Weaknesses-sprint remediation (branch
+  `claude/machina-remediation-orchestrator-1yngsi` — merged to `main` this
+  ship; see the ship entry prepended above).** Orchestrated 7 Opus agents over
+  4 waves against `APP_WEAKNESSES.md` (the 2026-07-10 8-item product critique;
+  that file is the detailed tracker with per-item commits + owner steps). All 8
+  items landed: **#3** citations are a hard invariant (re-ask once, else
+  visible `ungrounded` downgrade — never confident-and-uncited); **#4**
+  reminder one-shots fixed (`once` profile), in-app "Reminders due" strip for
+  pushless users, push asked at first intent, digest default ON (new users);
+  **#8** self-hosted content-free analytics (`users/{uid}/analytics_events`),
+  client error reporting, Settings → Export (JSON+MD); **#2** rich v2
+  embeddings + `backfill_embeddings` endpoint, top-30→rerank→10 retrieval, Ask
+  on `gemini-3.1-flash`; **#5** honest timeout copy, web dedup, PDF/JS-shell
+  honest degradation, and durable web capture (placeholder + `/api/share`
+  enqueue — the 60s loss window is gone); **#1** platform-aware onboarding +
+  1-tap example card + tour cut to 3 steps and gated to a non-empty feed;
+  **#6** URL-less notes (share + web Note tab), editable title/summary,
+  optional `actionableTakeaway`; **#7** unified swipe grammar (right never
+  destructive; taxonomy merge written up as a design proposal, not built).
+  Tests 70→137, tsc clean throughout. **Owner steps:** `./deploy-functions.sh`;
+  run `backfill_embeddings` once (`$ADMIN_TOKEN`); add permissive
+  `analytics_events`/`client_errors` matches to LIVE firestore.rules
+  (pre-cutover) or events are silently denied; run `firestore-rules-test` on
+  the owner machine; device-verify swipes, push nudge, onboarding, and the
+  durable-capture placeholder→ready flip.
 - **2026-07-11 (later) — Review-mode device feedback fixed + reshipped (merge
   `60c5d23`; TestFlight run #66 → build 1066).** Owner tested build 1065:
   Review mode didn't read as a Tinder deck — the deck overflowed the viewport

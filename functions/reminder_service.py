@@ -128,10 +128,29 @@ def calculate_next_reminder(reminder_count: int, profile: str = "smart") -> date
         return now + interval
 
 
+def should_complete_reminder(profile: str, new_reminder_count: int) -> bool:
+    """
+    Decide whether a just-fired reminder is finished (stops recurring).
+
+    A reminder completes when it's a true one-shot ('once' — the "tomorrow",
+    "next week", "custom" and numbered quick-reply choices) or when it has
+    fired the maximum number of times (>= 3). Every other profile ('smart',
+    'spaced-N') recurs via calculate_next_reminder until it hits that cap.
+
+    Pure decision so it can be unit-tested offline without Firestore.
+    """
+    return profile == "once" or new_reminder_count >= 3
+
+
 def run_reminder_check() -> dict:
     """
-    Main logic for checking pending reminders and delivering them over the
-    user's reminder channels (iOS push).
+    Main logic for checking pending reminders and delivering them.
+
+    Every due reminder is surfaced IN-APP (the link is flagged reminderDue so
+    the feed can show it) regardless of push — the promise "I'll remind you"
+    must always produce something the user can see in-app. Push is delivered on
+    top when the user has it enabled with a live token. The schedule (advance/
+    complete) runs identically whether or not push was sent.
     Returns a summary dict.
     """
     # Import here to avoid circular dependency
@@ -148,6 +167,7 @@ def run_reminder_check() -> dict:
         "users_with_reminders_enabled": 0,
         "reminders_found": 0,
         "reminders_sent": 0,
+        "reminders_surfaced": 0,
         "errors": []
     }
 
@@ -166,11 +186,12 @@ def run_reminder_check() -> dict:
 
         fcm_tokens = user_data.get('fcmTokens') or []
 
-        # Delivery channels. Reminders are push-only. Users predating the push
-        # rollout (or with a legacy 'whatsapp' entry stored) are migrated to
-        # push at read time: a missing setting defaults to ['push'], and any
-        # stored 'whatsapp' entry is normalized to 'push' (deduped). New
-        # workspaces default to ["push"] (DEFAULT_USER_SETTINGS in link_service.py).
+        # Push channel resolution. In-app surfacing (below) is always on; push
+        # is the extra notification channel when the user has it. Users predating
+        # the push rollout (or with a legacy 'whatsapp' entry stored) are migrated
+        # at read time: a missing setting defaults to ['push'], and any stored
+        # 'whatsapp' entry is normalized to 'push' (deduped). New workspaces
+        # default to ["push"] (DEFAULT_USER_SETTINGS in link_service.py).
         stored = settings.get('reminders_channel')
         if stored is None:
             channels = ['push']
@@ -180,8 +201,8 @@ def run_reminder_check() -> dict:
             ))
         wants_push = 'push' in channels and bool(fcm_tokens)
 
-        if not wants_push:
-            continue
+        # NOTE: we no longer skip users without push. Reminders are surfaced
+        # in-app for everyone (see below); push is an extra channel on top.
 
         links_ref = db.collection('users').document(uid).collection('links')
         now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
@@ -221,44 +242,45 @@ def run_reminder_check() -> dict:
             is_he = is_hebrew(title)
 
             try:
-                delivered = False
+                # In-app is the always-available channel: flag the link so the
+                # feed surfaces a "Reminders due" strip even with no push. This
+                # write is the delivery — it can't silently fail the way a dead
+                # push token can, so a reminder is never stuck pending in the past.
+                updates = {'reminderDue': True, 'reminderDueAt': now_ms}
 
+                pushed = False
                 if wants_push:
                     push_title = "🧠 זמן לחזור אל" if is_he else "🧠 Time to revisit"
                     push_body = title if not category else f"{title} · {category}"
                     push_result = send_push(uid, push_title, push_body, {"linkId": link_id})
-                    if push_result.get("sent"):
-                        delivered = True
+                    pushed = bool(push_result.get("sent"))
 
-                if not delivered:
-                    # e.g. a push-only user whose tokens all just went dead —
-                    # leave the reminder pending so the next sweep retries it.
-                    logger.warning(f"Reminder for link {link_id} not delivered on any channel")
-                    continue
-
-                report["reminders_sent"] += 1
+                if pushed:
+                    report["reminders_sent"] += 1
+                else:
+                    # No push (user hasn't enabled it, or the token just died) —
+                    # the in-app strip is how they'll see it.
+                    report["reminders_surfaced"] += 1
 
                 new_reminder_count = reminder_count + 1
                 profile = link_data.get('reminderProfile', 'smart')
 
-                # "once" = a numbered quick-reply ("remind me in N days"); it
-                # fires a single time and completes. Other profiles recur up to
-                # 3 times via the spaced-repetition schedule.
-                if profile == "once" or new_reminder_count >= 3:
-                    link_doc.reference.update({
+                # One-shots ('once' — tomorrow / next week / custom / numbered
+                # quick-reply) fire exactly once. 'smart' and 'spaced-N' recur up
+                # to 3 times via the spaced-repetition schedule.
+                if should_complete_reminder(profile, new_reminder_count):
+                    updates.update({
                         'reminderStatus': ReminderStatus.COMPLETED.value,
                         'reminderCount': new_reminder_count,
-                        'nextReminderAt': None
+                        'nextReminderAt': None,
                     })
                 else:
                     next_reminder = calculate_next_reminder(new_reminder_count, profile=profile)
-                    next_reminder_ms = int(next_reminder.timestamp() * 1000)
-                    link_doc.reference.update({
-                        'reminderCount': new_reminder_count,
-                        'nextReminderAt': next_reminder_ms
-                    })
+                    updates['reminderCount'] = new_reminder_count
+                    updates['nextReminderAt'] = int(next_reminder.timestamp() * 1000)
 
-                logger.info(f"Successfully sent reminder for link {link_id}")
+                link_doc.reference.update(updates)
+                logger.info(f"Delivered reminder for link {link_id} (push={pushed})")
             except Exception as e:
                 err_msg = f"Failed to send reminder for link {link_id}: {e}"
                 logger.error(err_msg)

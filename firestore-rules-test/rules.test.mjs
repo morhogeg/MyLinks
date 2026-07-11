@@ -167,6 +167,27 @@ for (const sub of ['links', 'chats', 'collections']) {
   });
 }
 
+// ── analytics_events / client_errors: owner-only, client-appended ─────────────
+//
+// Self-hosted product analytics (lib/analytics.ts) and client error reports
+// (lib/errorReporter.ts). The owner appends content-free docs; strangers and
+// anon are fully denied. Same owner check as links/chats/collections.
+
+for (const sub of ['analytics_events', 'client_errors']) {
+  test(`owner can append and read users/{uid}/${sub}`, async () => {
+    const db = ownerDb();
+    await assertSucceeds(addDoc(collection(db, 'users', OWNER_DOC, sub), { event: 'x', ts: 1 }));
+    await assertSucceeds(getDocs(collection(db, 'users', OWNER_DOC, sub)));
+  });
+
+  test(`stranger and anon cannot touch users/{uid}/${sub}`, async () => {
+    await assertFails(addDoc(collection(strangerDb(), 'users', OWNER_DOC, sub), { event: 'x', ts: 1 }));
+    await assertFails(getDocs(collection(strangerDb(), 'users', OWNER_DOC, sub)));
+    await assertFails(addDoc(collection(anonDb(), 'users', OWNER_DOC, sub), { event: 'x', ts: 1 }));
+    await assertFails(getDocs(collection(anonDb(), 'users', OWNER_DOC, sub)));
+  });
+}
+
 // ── syntheses: client read-only ──────────────────────────────────────────────
 
 test('owner can read syntheses (latest-synthesis subscription)', async () => {

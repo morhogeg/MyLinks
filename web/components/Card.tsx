@@ -3,7 +3,7 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Youtube, ExternalLink, Layers, Share2, X, Loader2, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Youtube, ExternalLink, Layers, Share2, X, Loader2, RotateCcw, AlertTriangle, StickyNote } from 'lucide-react';
 import { useState, memo } from 'react';
 import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
 import { useNow } from '@/lib/useNow';
@@ -479,7 +479,16 @@ function Card({
                                 <span>Screenshot</span>
                             </span>
                         )}
-                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && link.sourceType !== 'image' && link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None' && (
+                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && link.sourceType === 'note' && (
+                            <span
+                                className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-accent whitespace-nowrap"
+                                title="Note"
+                            >
+                                <StickyNote className="w-3.5 h-3.5 shrink-0" />
+                                <span>Note</span>
+                            </span>
+                        )}
+                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && link.sourceType !== 'image' && link.sourceType !== 'note' && link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None' && (
                             <span
                                 className="flex items-center gap-1 text-[9px] font-bold text-text-muted/60 bg-fill-subtle border border-border-strong px-2 py-1 rounded-lg uppercase tracking-widest whitespace-nowrap transition-all max-w-[220px]"
                                 title={link.sourceName}

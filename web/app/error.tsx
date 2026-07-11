@@ -13,6 +13,9 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
     useEffect(() => {
         // Surface for debugging; the branded UI is what the user sees.
         console.error('Render error boundary caught:', error);
+        // Report to the self-hosted client_errors log (no-op when signed out).
+        // Dynamic (client-only) import keeps Firebase out of any prerender graph.
+        import('@/lib/errorReporter').then((m) => m.reportError(error, 'react')).catch(() => {});
     }, [error]);
 
     return (
