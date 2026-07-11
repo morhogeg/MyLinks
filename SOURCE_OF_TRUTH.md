@@ -615,10 +615,10 @@ exact-match, capped.
   wedge-hardening — `finishExit` runs from transitionend OR a 420ms
   seq-guarded fallback timer, so a dropped transitionend (WKWebView
   backgrounding) can no longer leave the deck stuck ignoring input. Web live
-  via Vercel. **⚠️ Verify on build 1066:** whole deck on one screen (chips +
-  card + buttons, no scroll), swipes feel right. If it still doesn't feel
-  Tinder-like after this, the next lever is design (card aspect/stack peek),
-  not layout math.
+  via Vercel. **Owner confirmed build 1066 "much better."** Follow-up
+  (`6549705`, merge `f54c620`; TestFlight run #67 → build 1067): the add-link
+  FAB is now hidden in Review mode — it overlapped the deck's Keep button, and
+  Review doesn't capture links (joins the Ask/Collections/Digest hide list).
 - **2026-07-11 — SHIPPED: the product-review execution below (merge `b71657a`
   to `main`).** **Desktop web:** live via Vercel auto-deploy. **iOS:
   TestFlight run #65 → build 1065**, fired via the established
