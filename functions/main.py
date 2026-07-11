@@ -348,18 +348,20 @@ def _estimate_read_time(text: str, words_per_minute: int = 200) -> int:
 
 
 def _append_capture_note(detailed: str, language: str) -> str:
-    """Append an honest note to detailedSummary when Facebook gave the scraper
-    only a partial caption (a truncated ~200-char og:description) or nothing at
-    all (a login wall). Either way the summary is incomplete for a reason the user
-    can't see, so we say so and tell them how to get the full one. Rendered as a
-    trailing blockquote, so it never violates the 'start with ## Key Points' rule."""
+    """Append an honest note to detailedSummary when the scraper could only read
+    a partial preview (Facebook's truncated og:description, a social-teaser
+    fallback on a JS shell) or nothing at all (login wall, PDF). Either way the
+    summary is incomplete for a reason the user can't see, so we say so and
+    suggest the workaround. Wording is source-agnostic — every `truncated`
+    scrape rides this channel now, not just Facebook. Rendered as a trailing
+    blockquote, so it never violates the 'start with ## Key Points' rule."""
     he = (language or "").lower().startswith("he")
     if he:
-        note = ("> ⚠️ **הערה:** פייסבוק לא סיפקה לאפליקציה את הטקסט המלא של הפוסט. "
-                "לסיכום מלא, שמרו צילום מסך של הפוסט במקום את הקישור.")
+        note = ("> ⚠️ **הערה:** לא ניתן היה לקרוא את הטקסט המלא של התוכן הזה. "
+                "לסיכום מלא, נסו לשמור צילום מסך במקום את הקישור.")
     else:
-        note = ("> ⚠️ **Note:** Facebook didn't provide this post's full text to the app. "
-                "For a complete summary, save a screenshot of the post instead.")
+        note = ("> ⚠️ **Note:** The full text of this content couldn't be read. "
+                "For a complete summary, try saving a screenshot instead.")
     detailed = (detailed or "").rstrip()
     return f"{detailed}\n\n{note}" if detailed else note
 
