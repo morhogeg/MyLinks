@@ -46,7 +46,20 @@ Chrome/Edge/Brave desktop extension to a user on an iPhone (`Onboarding.tsx:44-5
 - One-tap "try it with this example" seeded card so Ask works in the first minute.
 - Teach the rest contextually (after first save, after first ask). Wow before tap 3.
 
-## 2. [ ] The hero feature can't find what people actually saved
+## 2. [x] The hero feature can't find what people actually saved
+
+> **DONE 2026-07-11** (commits `89e5b36`, `bdda041`, `8e90537`, remediation
+> sprint). Embeddings now use a versioned rich recipe (`build_embedding_text`
+> v2: title + summary + detailedSummary + takeaway + concepts + video
+> highlights, 8k-char cap; raw body isn't stored so can't be embedded) stamped
+> as `embeddingVersion`; new admin `backfill_embeddings` endpoint re-embeds the
+> existing library idempotently. Ask retrieval: top-30 vector → lexical/recency
+> rerank → best 10 to the model; keyword fallback now ordered createdAt-desc
+> with a 1000 cap (older cards stay reachable semantically). Ask answers moved
+> to `gemini-3.1-flash` (RAG paths only — analysis/vision/synthesis stay on
+> flash-lite; citations invariant preserved byte-for-byte). 19 new tests.
+> **Owner steps:** deploy functions, then run `backfill_embeddings` once with
+> `$ADMIN_TOKEN` (optionally rebuild connections after); small per-ask cost bump.
 
 **Problem.** Ask/search embeddings are built from **title + short summary + tags
 only** — never the content body or `detailedSummary` (`functions/search.py:94`).
