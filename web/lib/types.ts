@@ -126,6 +126,10 @@ export interface Collection {
   updatedAt: number;
   shareId?: string;      // set when published; key into shared_collections/{shareId}
   isPublic?: boolean;
+  publishedAt?: number;  // when the public snapshot was last written
+  // Signature of (name, description, member ids) at publish time — comparing it
+  // against the live signature tells the UI the public page is out of date.
+  publishedSignature?: string;
 }
 
 /** A frozen, denormalized copy of a card for a public share page. */

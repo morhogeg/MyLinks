@@ -394,7 +394,12 @@ The multi-user auth work is **fully written but not live**:
 22. **[ ] M18 Proactive brain** (contradiction/reinforcement observations). Push
     notifications now EXIST (shipped 2026-07-06: reminder + digest push over
     FCM/APNs, see §9) — M18 only needs the observation engine on top.
-23. **[ ] M20 Auto-collections** (cluster `concepts`/embeddings into suggested collections).
+23. **[~] M20 Auto-collections** (cluster `concepts`/embeddings into suggested
+    collections). **Client-side half shipped 2026-07-11** (collections-elevation
+    branch): tag/concept clustering over the loaded feed proposes up to 3
+    one-tap collections in the gallery (`web/lib/collectionSuggest.ts`), and the
+    Add-to-collection sheet ranks suggested targets per card. Still open:
+    embedding-based clustering server-side for deeper/semantic groupings.
 24. **[ ] T10 export** (MD/PDF/HTML from ReadingView), **T11 highlights**, T5/T6
     connector framework + YouTube liked-videos sync (pull connectors; IG/FB saved
     have no legitimate API — won't do), Chrome Web Store listing for the extension.
@@ -613,10 +618,13 @@ exact-match, capped.
   frontend (zero backend-deploy dependency). **Desktop web:** live via Vercel
   auto-deploy. **iOS:** TestFlight **run #72 → build 1072**, fired via the
   temp-push-trigger pattern (API dispatch still 403 from cloud sessions; temp
-  branch `claude/ship-tf-trigger-ask`). ⚠️ Owner cleanup: remote branch
+  branch `claude/ship-tf-trigger-ask`). Build 1072 was cut from `4fcd01d`, so
+  it carries Ask but NOT the parallel Collections merge (`bcc3698`) — the next
+  TestFlight build picks that up. ⚠️ Owner cleanup: remote branch
   deletes are no-ops from cloud sessions — delete the stale trigger branches
   (`claude/ship-tf-trigger-bvwize`, `-1yngsi`, `-notes`, and `-ask` once run
-  #72 is done) plus the merged `claude/ask-feature-elevation-3aoz26`. (1) **Living suggestions:** new `web/lib/askSuggestions.ts`
+  #72 is done) plus the merged `claude/ask-feature-elevation-3aoz26`.
+  Details of what shipped: (1) **Living suggestions:** new `web/lib/askSuggestions.ts`
   builds the empty-state chips from the LIVE library instead of static
   category names — a spotlighted "latest save" chip (re-animates the moment a
   new card lands; keyed by card id), this-week catch-up (count-aware),
@@ -641,6 +649,39 @@ exact-match, capped.
   on iOS (buffered path just cancels the wait — no partial text, by design),
   follow-up chips vs. keyboard, "/" is desktop-only. `firebase.json` and
   `functions/` unchanged — no hosting or functions deploy.
+- **2026-07-11 — Collections elevation (merged to `main` in `bcc3698`;
+  `share_page` functions deploy PENDING — owner step).**
+  Product pass on collections with sharing as the growth surface. (1) **Sharing
+  is now a deliberate flow**: new `ShareCollectionSheet` (preview of what goes
+  public → explicit Publish → copy link / native share / View page / Stop
+  sharing, plus the one-line privacy promise) replaces the old blind
+  tap-Share-→-instant-publish-→-OS-sheet; the feed banner routes to it and its
+  separate Stop-sharing button was folded in. (2) **Stale-share detection**:
+  `publishCollection` now stamps `publishedAt` + `publishedSignature` (djb2 of
+  name+description+sorted member ids, `web/lib/collections.ts`); when the live
+  collection drifts, the sheet shows an amber "Update" prompt and gallery tiles
+  flip their badge to "Update page" (legacy signature-less shares are treated
+  as fresh, never nagged). (3) **Elevated public `/c` page**
+  (`functions/share_service.py`): thumbnail-mosaic hero (1–4 tiles), per-card
+  rows with thumbnail + source kicker + title linked to the original
+  (image-type cards never link their stored file), card count + updated date,
+  >50-card overflow note, better OG description — covered by new
+  `tests/test_share_page.py` (incl. XSS + `javascript:`-URL guards; suite now
+  143 passed). (4) **M20-lite suggested collections** (`web/lib/
+  collectionSuggest.ts`, client-only): clusters ready cards by shared
+  tags/concepts (≥4 cards, dedup vs existing collections + near-identical
+  clusters, localStorage dismissals), rendered as dashed Sparkles tiles in the
+  gallery with one-tap Create (batched `addLinksToCollection`); the
+  Add-to-collection sheet now floats affinity-ranked "Suggested" targets above
+  the A–Z list. (5) Gallery polish: mosaic covers (explicit cover first), a
+  real empty state with create CTA. Analytics: `collection_shared`,
+  `collection_share_updated`, `collection_suggestion_accepted`. Verified: `tsc
+  --noEmit` clean, 143/143 pytest, share page visually verified via headless
+  Chromium (full `next build` fails only at Firebase init in the cloud sandbox
+  — no env keys — pre-existing). **To ship:** merge + Vercel auto (web);
+  `./deploy-functions.sh functions:share_page` for the public-page redesign
+  (publish/unpublish logic unchanged — old pages keep working, they just
+  render the old way until deploy).
 - **2026-07-11 — SHIPPED: notes fix + personal notes on every card
   (`a150ce2`, merged to `main`).** Owner reported the **Note tab errored "URL
   is required"** on device — root cause: the Note tab POSTed to `/api/analyze`,

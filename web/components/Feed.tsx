@@ -49,8 +49,10 @@ import { subscribeDigests, deleteDigest } from '@/lib/digest';
 import { PUSH_INTENT_EVENT, PUSH_FOREGROUND_EVENT, consumePendingPushIntent, readLocalPushPrompt, type PushIntent } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
 import PushNudge from './PushNudge';
-import { publishCollection, unpublishCollection, deleteCollection } from '@/lib/collections';
-import { shareLink, shareUrlFor, openExternal } from '@/lib/share';
+import { deleteCollection, createCollection, addLinksToCollection } from '@/lib/collections';
+import { suggestNewCollections, dismissSuggestion, type CollectionSuggestion } from '@/lib/collectionSuggest';
+import ShareCollectionSheet from './ShareCollectionSheet';
+import { openExternal } from '@/lib/share';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import TagExplorer from './TagExplorer';
 import { useSearchParams } from 'next/navigation';
@@ -195,6 +197,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const [editingCollection, setEditingCollection] = useState<Collection | null>(null);
     const [confirmDeleteCollection, setConfirmDeleteCollection] = useState<Collection | null>(null);
     const [manageCardsCollection, setManageCardsCollection] = useState<Collection | null>(null);
+    const [shareCollection, setShareCollection] = useState<Collection | null>(null);
+    // Bumped when a suggestion is dismissed so the memo below re-reads localStorage.
+    const [suggestionTick, setSuggestionTick] = useState(0);
 
     // Weekly synthesis (M12) — the in-app "What you learned" special card.
     const [latestSynthesis, setLatestSynthesis] = useState<WeeklySynthesis | null>(null);
@@ -360,7 +365,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         activeLinkId !== null || isTagExplorerOpen || isFiltersOpen || isCategoriesOpen ||
         reminderModalLink !== null || confirmDeleteId !== null || confirmBulkDelete ||
         addToCollectionLink !== null || collectionFormOpen || confirmDeleteCollection !== null ||
-        manageCardsCollection !== null;
+        manageCardsCollection !== null || shareCollection !== null;
     const { pull, refreshing, animating } = usePullToRefresh({
         onRefresh: handlePullRefresh,
         enabled: (viewMode === 'grid' || viewMode === 'list') && !anyOverlayOpen,
@@ -568,33 +573,34 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         setViewMode('grid');
     };
 
-    // Publish (or re-publish) a collection snapshot, then open the share sheet.
-    const handleShareCollection = async (col: Collection) => {
+    // Sharing lives in a dedicated sheet (preview → publish → copy/share/update/
+    // stop) instead of blind-publishing on tap.
+    const handleShareCollection = (col: Collection) => setShareCollection(col);
+
+    // Suggested collections — topic clusters detected client-side from the
+    // loaded feed (M20-lite). Only surfaced in the Collections view.
+    const collectionSuggestions = useMemo(
+        () => (viewMode === 'collections' ? suggestNewCollections(links, collections) : []),
+        // suggestionTick re-reads the localStorage dismissal list after a dismiss.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [viewMode, links, collections, suggestionTick]
+    );
+
+    const handleCreateSuggestion = async (s: CollectionSuggestion) => {
         if (!uid) return;
         try {
-            const members = links.filter(l => (l.collectionIds ?? []).includes(col.id));
-            const shareId = await publishCollection(uid, col, members);
-            const outcome = await shareLink(
-                shareUrlFor(`/c?id=${shareId}`),
-                col.name,
-                `${col.name} — a collection on Machina`
-            );
-            if (outcome === 'copied') toast.success('Share link copied to clipboard');
-            else if (outcome === 'failed') toast.error("Couldn't create a share link. Please try again.");
-            else toast.success('Collection published');
+            const id = await createCollection(uid, { name: s.name });
+            await addLinksToCollection(uid, s.linkIds, id);
+            track('collection_suggestion_accepted', { cards: s.linkIds.length });
+            toast.success(`Created “${s.name}” with ${s.linkIds.length} cards`);
         } catch {
-            toast.error("Couldn't share this collection. Please try again.");
+            toast.error("Couldn't create the collection. Please try again.");
         }
     };
 
-    const handleUnpublishCollection = async (col: Collection) => {
-        if (!uid) return;
-        try {
-            await unpublishCollection(uid, col);
-            toast.success('Sharing turned off');
-        } catch {
-            toast.error("Couldn't stop sharing. Please try again.");
-        }
+    const handleDismissSuggestion = (s: CollectionSuggestion) => {
+        dismissSuggestion(s.key);
+        setSuggestionTick(t => t + 1);
     };
 
     const performDeleteCollection = async (col: Collection) => {
@@ -1385,21 +1391,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 </button>
                                 <button
                                     onClick={() => handleShareCollection(col)}
-                                    title={col.isPublic ? 'Re-share (updates the public snapshot)' : 'Share this collection'}
+                                    title={col.isPublic ? 'Manage sharing (copy link, update, or stop)' : 'Share this collection'}
                                     className={`${ctrlBase} px-2.5 h-7 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
                                 >
                                     {col.isPublic ? <Globe className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
-                                    <span>Share</span>
+                                    <span>{col.isPublic ? 'Shared' : 'Share'}</span>
                                 </button>
-                                {col.isPublic && (
-                                    <button
-                                        onClick={() => handleUnpublishCollection(col)}
-                                        title="Stop sharing this collection"
-                                        className={`${ctrlBase} px-2.5 h-7 ${ctrlIdle} hover:text-red-400 hover:border-red-400/40`}
-                                    >
-                                        <span>Stop sharing</span>
-                                    </button>
-                                )}
                             </div>
                         );
                     })}
@@ -1546,11 +1543,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             <CollectionsGallery
                                 collections={collections}
                                 links={links}
+                                suggestions={collectionSuggestions}
                                 onOpen={openCollection}
                                 onEdit={openEditCollectionForm}
                                 onShare={handleShareCollection}
                                 onDelete={(col) => setConfirmDeleteCollection(col)}
                                 onManageCards={(col) => setManageCardsCollection(col)}
+                                onCreate={openNewCollectionForm}
+                                onCreateSuggestion={handleCreateSuggestion}
+                                onDismissSuggestion={handleDismissSuggestion}
                             />
                         </div>
                     ) : viewMode === 'ask' ? (
@@ -1727,11 +1728,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         <CollectionsGallery
                             collections={collections}
                             links={links}
+                            suggestions={collectionSuggestions}
                             onOpen={openCollection}
                             onEdit={openEditCollectionForm}
                             onShare={handleShareCollection}
                             onDelete={(col) => setConfirmDeleteCollection(col)}
                             onManageCards={(col) => setManageCardsCollection(col)}
+                            onCreate={openNewCollectionForm}
+                            onCreateSuggestion={handleCreateSuggestion}
+                            onDismissSuggestion={handleDismissSuggestion}
                         />
                     </div>
                 </div>
@@ -1785,8 +1790,20 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     uid={uid}
                     link={links.find(l => l.id === addToCollectionLink.id) ?? addToCollectionLink}
                     collections={collections}
+                    links={links}
                     isOpen={!!addToCollectionLink}
                     onClose={() => setAddToCollectionLink(null)}
+                />
+            )}
+
+            {/* Share collection — preview, publish/update, copy link, stop sharing. */}
+            {shareCollection && (
+                <ShareCollectionSheet
+                    uid={uid}
+                    collection={collections.find(c => c.id === shareCollection.id) ?? shareCollection}
+                    memberLinks={links.filter(l => (l.collectionIds ?? []).includes(shareCollection.id))}
+                    isOpen={!!shareCollection}
+                    onClose={() => setShareCollection(null)}
                 />
             )}
 

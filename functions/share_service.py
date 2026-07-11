@@ -242,9 +242,27 @@ def _share_html_shell(*, title: str, description: str, image: str, url: str, bod
   .btn-primary {{ background:linear-gradient(135deg,#8b5cf6,#d946ef); color:#fff; }}
   .btn-ghost {{ background:#161618; color:#ededed; border:1px solid #262629; }}
   .card {{ background:#0e0e10; border:1px solid #1c1c1f; border-radius:18px; padding:24px; }}
-  .col-item {{ padding:18px 0; border-top:1px solid #1c1c1f; }}
+  /* Collection pages: thumbnail-mosaic hero + per-card rows. */
+  .mosaic {{ display:grid; gap:2px; border-radius:14px; overflow:hidden; margin:8px 0 22px;
+            aspect-ratio:2/1; }}
+  .mosaic.n1 {{ grid-template-columns:1fr; }}
+  .mosaic.n2 {{ grid-template-columns:1fr 1fr; }}
+  .mosaic.n3 {{ grid-template-columns:2fr 1fr; grid-template-rows:1fr 1fr; }}
+  .mosaic.n3 img:first-child {{ grid-row:span 2; }}
+  .mosaic.n4 {{ grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; }}
+  .mosaic img {{ width:100%; height:100%; object-fit:cover; display:block; }}
+  .col-meta {{ color:#71717a; font-size:14px; margin:0 0 4px; }}
+  .col-item {{ display:flex; gap:14px; padding:18px 0; border-top:1px solid #1c1c1f; }}
+  .col-item .thumb {{ width:56px; height:56px; border-radius:10px; object-fit:cover;
+                     flex-shrink:0; background:#161618; }}
+  .col-item .body {{ min-width:0; flex:1; }}
+  .col-item .kicker {{ font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+                      color:#8b8b93; margin:0 0 3px; }}
   .col-item h3 {{ margin:0 0 6px; font-size:18px; }}
+  .col-item h3 a {{ color:#ededed; text-decoration:none; }}
+  .col-item h3 a:hover {{ color:#c4b5fd; }}
   .col-item p {{ margin:0; color:#a1a1aa; font-size:15px; }}
+  .col-item .visit {{ font-size:13px; color:#c4b5fd; text-decoration:none; }}
   .foot {{ margin-top:40px; font-size:13px; color:#71717a; text-align:center; }}
   a {{ color:#c4b5fd; }}
 </style>
@@ -300,28 +318,75 @@ def _render_shared_card(card: dict, share_url: str) -> str:
     )
 
 
+def _card_thumb(card: dict) -> Optional[str]:
+    """A card's real preview image, or None (no icon fallback here)."""
+    img = _share_card_image(card)
+    return img if img and not img.endswith("/icon-512.png") else None
+
+
+def _render_collection_item(card: dict) -> str:
+    """One member card on the public collection page: thumbnail, source kicker,
+    title (linked to the original where one exists), and the summary."""
+    title = _esc(card.get("title") or "Untitled")
+    url = card.get("url") or ""
+    # Screenshot/image cards store the image itself as `url` — don't link those.
+    linkable = url.startswith("http") and card.get("sourceType") != "image"
+
+    thumb = _card_thumb(card)
+    thumb_html = f'<img class="thumb" src="{_esc(thumb)}" alt="" loading="lazy">' if thumb else ""
+
+    kicker = card.get("sourceName") or card.get("category") or ""
+    kicker_html = f'<p class="kicker" dir="auto">{_esc(kicker)}</p>' if kicker else ""
+
+    title_html = (
+        f'<a href="{_esc(url)}" rel="noopener nofollow" target="_blank">{title}</a>'
+        if linkable else title
+    )
+    return (
+        f'<div class="col-item">{thumb_html}<div class="body">{kicker_html}'
+        f'<h3 dir="auto">{title_html}</h3>'
+        f'<div class="md" dir="auto">{_md_to_html(card.get("summary"))}</div>'
+        f"</div></div>"
+    )
+
+
 def _render_shared_collection(data: dict, share_url: str) -> str:
     name = data.get("name") or "Shared collection"
     description = data.get("description") or ""
     cards = data.get("cards") or []
+    count = len(cards)
     image = _share_card_image(cards[0]) if cards else f"{APP_URL}/icon-512.png"
 
-    items = "".join(
-        f'<div class="col-item"><h3 dir="auto">{_esc(c.get("title"))}</h3>'
-        f'<div class="md" dir="auto">{_md_to_html(c.get("summary"))}</div></div>'
-        for c in cards[:50]
-    )
+    # Hero: a mosaic of up to 4 member thumbnails (skipped when none exist).
+    thumbs = [t for t in (_card_thumb(c) for c in cards) if t][:4]
+    mosaic = ""
+    if thumbs:
+        imgs = "".join(f'<img src="{_esc(t)}" alt="" loading="lazy">' for t in thumbs)
+        mosaic = f'<div class="mosaic n{len(thumbs)}">{imgs}</div>'
+
+    published_at = data.get("publishedAt")
+    updated = ""
+    if isinstance(published_at, (int, float)) and published_at > 0:
+        dt = datetime.fromtimestamp(published_at / 1000, tz=timezone.utc)
+        updated = f' · updated {dt.strftime("%b %-d, %Y")}'
+
+    items = "".join(_render_collection_item(c) for c in cards[:50])
+    overflow = ""
+    if count > 50:
+        overflow = f'<div class="col-item"><div class="body"><p>…and {count - 50} more cards.</p></div></div>'
     desc_html = f'<div class="summary md" dir="auto">{_md_to_html(description)}</div>' if description else ""
-    count = len(cards)
     body = f"""<div class="card">
-      <div class="badge">Collection · {count} card{'s' if count != 1 else ''}</div>
+      <div class="badge">Collection</div>
       <h1 dir="auto">{_esc(name)}</h1>
+      <p class="col-meta">{count} curated card{'s' if count != 1 else ''}{updated}</p>
       {desc_html}
-      {items}
+      {mosaic}
+      {items}{overflow}
       <div class="actions"><a class="btn btn-primary" href="{_esc(APP_URL)}">Open in Machina</a></div>
     </div>"""
+    og_desc = description or f"A curated collection of {count} card{'s' if count != 1 else ''} on Machina — summaries, sources, and links."
     return _share_html_shell(
-        title=name, description=description or f"A collection of {count} cards on Machina",
+        title=name, description=og_desc,
         image=image, url=share_url, body=body,
     )
 
