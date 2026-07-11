@@ -186,7 +186,7 @@ card (`models.py:47`) and the hard-coded "Who It's For" video section
 
 ## 7. [~] Five competing taxonomies and three navigation grammars
 
-> **MECHANICAL FIX DONE 2026-07-11** (commit `d0203a2`, remediation sprint): one
+> **MECHANICAL FIX DONE 2026-07-11** (commit `56a8481`, remediation sprint): one
 > swipe grammar app-wide — ListCard now matches the review deck (right =
 > favourite, light haptic, yellow Star; left = delete, firmer haptic, red Trash,
 > still guarded by the existing ConfirmDialog). Only two action-swipe surfaces
