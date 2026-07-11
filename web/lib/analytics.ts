@@ -200,6 +200,23 @@ export function trackAskNoCitations(): void {
     track('ask_no_citations');
 }
 
+/** A suggested prompt chip was tapped. `kind` is a fixed engine label
+ *  ('latest' | 'week' | 'concept' | 'category' | 'rediscover' | 'recap' |
+ *  'fresh'), never chip text. */
+export function trackAskSuggestionUsed(kind: string): void {
+    track('ask_suggestion_used', { kind });
+}
+
+/** A one-tap follow-up chip under an answer was tapped. */
+export function trackAskFollowupUsed(): void {
+    track('ask_followup_used');
+}
+
+/** The user stopped an in-flight answer (engagement/latency signal). */
+export function trackAskStopped(): void {
+    track('ask_stopped');
+}
+
 /** A reminder was set on a card. */
 export function trackReminderSet(): void {
     track('reminder_set');
