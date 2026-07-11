@@ -608,6 +608,26 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-11 (latest) — SHIPPED: notes fix + personal notes on every card
+  (`a150ce2`, merged to `main`).** Owner reported the **Note tab errored "URL
+  is required"** on device — root cause: the Note tab POSTed to `/api/analyze`,
+  whose note branch is in the undeployed backend, so it hit the URL-required
+  guard. Fixed by making note capture **durable client-side**: `createNoteCard`
+  (web/lib/storage.ts) writes the note card instantly (needsEmbedding →
+  searchable), `enrichNoteCard` folds in tags/category/concepts in the
+  background best-effort and NEVER rewrites the user's title/body (their words
+  stay verbatim; a short one-liner becomes a clean headline card). Works
+  regardless of backend deploy state — the "URL is required" failure is gone.
+  Also added **personal notes on every card**: new `userNote` field +
+  `updateLinkNote` (deleteField on empty), a polished "My note" section in
+  LinkDetailModal on ALL cards (one-tap add, warm accent panel, tap-to-edit,
+  ⌘/Ctrl+Enter save, delete), and a quiet StickyNote cue on grid + list cards
+  that carry a note. **Desktop web:** live via Vercel. **iOS: TestFlight build
+  TF_BUILD_PLACEHOLDER** (temp-push-trigger `claude/ship-tf-trigger-notes`;
+  delete after). tsc + full `next build` green. **No backend deploy needed for
+  notes to work** (durable client-side); when the pending `./deploy-functions.sh`
+  runs, new note cards additionally get AI tags/category. `firestore.rules`
+  unchanged (userNote is a client write to the already-writable `links` doc).
 - **2026-07-11 (latest) — Review mode simplified per owner device feedback +
   first-render collapse fixed (`af08fe1`, merges `522035b`/`3c7960d`;
   TestFlight run #69 → build 1069, fired after cross-merging the parallel
