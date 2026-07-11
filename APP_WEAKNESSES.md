@@ -167,7 +167,21 @@ just addDocs).
   extend the `truncated` flag to all partial scrapes (paywalls, TikTok, JS shells).
 - Dedup on the web path like the share path.
 
-## 6. [ ] A "second brain" that rejects thoughts and can't be corrected
+## 6. [x] A "second brain" that rejects thoughts and can't be corrected
+
+> **DONE 2026-07-11** (commits `f94932b`, `662b597`, remediation sprint; the
+> "Who It's For" skeleton was already removed by an earlier session in
+> `a6db873` — verified). URL-less text is now a first-class note card on BOTH
+> paths: share_ingest analyzes bare text directly (no more 400) and the web form
+> gained a Note tab — sourceType 'note', empty url (never fabricated), title
+> falls back to the first line, StickyNote byline, no dead affordances on
+> url-less cards. Title + summary are editable in LinkDetailModal (hover pencil
+> → inline edit, matching the category/tag pattern) via new
+> updateLinkTitle/updateLinkSummary; nothing clobbers edits. actionableTakeaway
+> is Optional in the schema + prompt ("only if genuinely concrete — else omit");
+> all consumers tolerate absence. 9 new tests (130 total). Owner: functions
+> deploy required; note that editing title/summary doesn't re-embed (stale
+> vector until next backfill — acceptable).
 
 **Problem.** Plain-text share with no URL → 400 "No URL found in shared content"
 (`main.py:1230-1232`); web form has only Link/Image tabs. And the AI's output is
