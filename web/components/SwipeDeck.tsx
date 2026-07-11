@@ -7,17 +7,8 @@ import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platfor
 import SimpleMarkdown from './SimpleMarkdown';
 import { hasHebrew } from '@/lib/rtl';
 import { hapticLight } from '@/lib/haptics';
-import { Star, Archive, Bell, RotateCcw, Youtube, Sparkles, Image as ImageIcon, Clock, Tag } from 'lucide-react';
-import {
-    ReviewQueue,
-    REVIEW_SESSION_SIZE,
-    buildReviewQueue,
-    forgottenQueue,
-    isOpen,
-    recentQueue,
-    tidyingQueue,
-    whyThisCard,
-} from '@/lib/reviewQueue';
+import { Star, Archive, Bell, RotateCcw, Youtube, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { REVIEW_SESSION_SIZE, isOpen, reviewSessionQueue } from '@/lib/reviewQueue';
 
 type SwipeDir = 'left' | 'right' | 'up';
 type Phase = 'idle' | 'dragging' | 'exiting' | 'waiting';
@@ -42,23 +33,16 @@ interface SwipeDeckProps {
 
 const THRESHOLD = 110; // px past which a drag commits to a swipe
 
-// Short labels on purpose: all three chips + counts must fit ONE row on a
-// 375pt phone — wrapping to two rows pushes the deck's buttons off-screen.
-const QUEUES: { key: ReviewQueue; label: string; icon: React.ReactNode }[] = [
-    { key: 'forgotten', label: 'Forgotten', icon: <Sparkles className="w-3.5 h-3.5" /> },
-    { key: 'recent', label: 'Recent', icon: <Clock className="w-3.5 h-3.5" /> },
-    { key: 'tidying', label: 'Tidy', icon: <Tag className="w-3.5 h-3.5" /> },
-];
-
 /**
  * The interactive twin of the digest: a short, curated resurfacing session.
  * Swipe right to keep, left to archive, up to set a reminder; tap to open.
  *
- * The session is built from one of three curated queues (see lib/reviewQueue),
- * narrowed by the active feed filters. Card ORDER is snapshotted per session
- * (no mid-session reshuffle) but every card face reads LIVE data from the `links`
- * prop, and cards deleted or already acted on drop out. Every action is
- * reversible via Undo — including an up-swipe reminder (F-29).
+ * The session is dealt from ONE smart order (see lib/reviewQueue: forgotten
+ * cards first, then newest unread, then the rest — no user-facing queue
+ * selection), narrowed by the active feed filters. Card ORDER is snapshotted
+ * per session (no mid-session reshuffle) but every card face reads LIVE data
+ * from the `links` prop, and cards deleted or already acted on drop out.
+ * Every action is reversible via Undo — including an up-swipe reminder (F-29).
  */
 export default function SwipeDeck({
     links,
@@ -70,11 +54,10 @@ export default function SwipeDeck({
     onCancelRemind,
     remindSignal,
 }: SwipeDeckProps) {
-    const [queue, setQueue] = useState<ReviewQueue>('forgotten');
     // Ordered card ids for the current session window. Snapshotted so acting on a
     // card never reshuffles the stack mid-session (F-32 keeps order stable).
     const [sessionIds, setSessionIds] = useState<string[]>(
-        () => buildReviewQueue(links, 'forgotten').slice(0, REVIEW_SESSION_SIZE).map((l) => l.id),
+        () => reviewSessionQueue(links).slice(0, REVIEW_SESSION_SIZE).map((l) => l.id),
     );
     const [pos, setPos] = useState(0);
     const [drag, setDrag] = useState({ x: 0, y: 0 });
@@ -124,17 +107,12 @@ export default function SwipeDeck({
     const passed = slots.slice(0, currentIndex).filter(Boolean).length;
     const remaining = slots.slice(currentIndex).filter(isDealable).length;
 
-    // Full candidate pools drive the queue counts and the "review more" offer.
-    const counts = useMemo<Record<ReviewQueue, number>>(() => ({
-        forgotten: forgottenQueue(links).length,
-        recent: recentQueue(links).length,
-        tidying: tidyingQueue(links).length,
-    }), [links]);
-    const queueCount = counts[queue];
+    // The full candidate pool drives the "review more" offer.
+    const poolCount = useMemo(() => reviewSessionQueue(links).length, [links]);
 
-    // Deal a fresh session window from the current live pool for `q`.
-    const deal = (q: ReviewQueue) => {
-        setSessionIds(buildReviewQueue(links, q).slice(0, REVIEW_SESSION_SIZE).map((l) => l.id));
+    // Deal a fresh session window from the current live pool.
+    const deal = () => {
+        setSessionIds(reviewSessionQueue(links).slice(0, REVIEW_SESSION_SIZE).map((l) => l.id));
         setPos(0);
         setLastAction(null);
         setKept(0);
@@ -147,27 +125,16 @@ export default function SwipeDeck({
         undoneIds.current = new Set();
     };
 
-    const selectQueue = (q: ReviewQueue) => {
-        if (q === queue) return;
-        setQueue(q);
-        deal(q);
-    };
-
     // Self-heal an empty, untouched session: the deck mounted before links
     // streamed in, or the feed filter changed under it and every dealt id
-    // dropped out. Re-deal — falling back to the first queue with candidates so
-    // the default tab is never a dead end for users with no 30-day-old saves.
-    // Guarded to zero-activity states so a finished session's summary (tallies
-    // or an undoable action present) is never skipped past.
+    // dropped out. Guarded to zero-activity states so a finished session's
+    // summary (tallies or an undoable action present) is never skipped past.
     const acted = kept + archived + reminders;
     useEffect(() => {
-        if (current || acted > 0 || lastAction || phase === 'waiting') return;
-        const next = counts[queue] > 0 ? queue : QUEUES.map((q) => q.key).find((k) => counts[k] > 0);
-        if (!next) return;
-        if (next !== queue) setQueue(next);
-        deal(next);
+        if (current || acted > 0 || lastAction || phase === 'waiting' || poolCount === 0) return;
+        deal();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [current, acted, lastAction, phase, counts, queue]);
+    }, [current, acted, lastAction, phase, poolCount]);
 
     // Size the deck to the space between its top and the viewport bottom so the
     // WHOLE deck (tabs + card + action buttons) fits on one screen with no page
@@ -190,7 +157,13 @@ export default function SwipeDeck({
             window.removeEventListener('resize', update);
             window.visualViewport?.removeEventListener('resize', update);
         };
-    }, [pos]);
+        // Keyed on the current card too, not just the advance pointer: the deck
+        // can mount on an empty pool (whose empty-state render has no rootRef)
+        // and be dealt by the self-heal effect with pos unchanged — keyed only
+        // on pos, the measure never re-ran and the stack rendered collapsed at
+        // height 0 (the build-1067 first-tap bug).
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pos, current?.id]);
 
     const settle = () => {
         setPhase('idle');
@@ -354,76 +327,48 @@ export default function SwipeDeck({
     const leftHint = Math.max(0, Math.min(1, -drag.x / THRESHOLD));
     const upHint = Math.max(0, Math.min(1, -drag.y / THRESHOLD));
 
-    const queueTabs = (
-        <div className="flex items-center justify-center gap-1.5 flex-nowrap shrink-0 max-w-full">
-            {QUEUES.map((q) => {
-                const active = q.key === queue;
-                const count = counts[q.key];
-                return (
-                    <button
-                        key={q.key}
-                        onClick={() => selectQueue(q.key)}
-                        aria-pressed={active}
-                        className={`h-8 inline-flex items-center gap-1 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer select-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
-                            active
-                                ? 'bg-accent/15 border border-accent/40 text-accent'
-                                : 'bg-card border border-border-subtle text-text-secondary hover:bg-card-hover hover:text-text hover:border-text-muted/40'
-                        }`}
-                    >
-                        {q.icon}
-                        {q.label}
-                        <span className={`tabular-nums text-[11px] ${active ? 'text-accent/80' : 'text-text-muted'}`}>{count}</span>
-                    </button>
-                );
-            })}
-        </div>
-    );
-
     if (!current) {
         const acted = kept + archived + reminders;
-        const moreAvailable = queueCount > 0;
+        const moreAvailable = poolCount > 0;
         return (
-            <div className="flex flex-col items-center gap-5 pt-2">
-                {queueTabs}
-                <div className="flex flex-col items-center justify-center text-center py-16 gap-4">
-                    <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center">
-                        <Sparkles className="w-8 h-8 text-accent" />
-                    </div>
-                    <h3 className="text-lg font-bold text-text">{acted > 0 ? 'Session complete' : 'Nothing to review here'}</h3>
-                    {acted > 0 ? (
-                        <p className="text-sm text-text-muted max-w-xs">
-                            {[
-                                kept > 0 ? `${kept} kept` : null,
-                                archived > 0 ? `${archived} archived` : null,
-                                reminders > 0 ? `${reminders} reminder${reminders === 1 ? '' : 's'} set` : null,
-                            ]
-                                .filter(Boolean)
-                                .join(' · ') || 'All caught up.'}
-                        </p>
-                    ) : (
-                        <p className="text-sm text-text-muted max-w-xs">
-                            No cards in this queue right now. Try another queue or adjust your filters.
-                        </p>
+            <div className="flex flex-col items-center justify-center text-center py-16 gap-4">
+                <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center">
+                    <Sparkles className="w-8 h-8 text-accent" />
+                </div>
+                <h3 className="text-lg font-bold text-text">{acted > 0 ? 'Session complete' : 'All caught up'}</h3>
+                {acted > 0 ? (
+                    <p className="text-sm text-text-muted max-w-xs">
+                        {[
+                            kept > 0 ? `${kept} kept` : null,
+                            archived > 0 ? `${archived} archived` : null,
+                            reminders > 0 ? `${reminders} reminder${reminders === 1 ? '' : 's'} set` : null,
+                        ]
+                            .filter(Boolean)
+                            .join(' · ') || 'All caught up.'}
+                    </p>
+                ) : (
+                    <p className="text-sm text-text-muted max-w-xs">
+                        Nothing to review right now — new saves show up here.
+                    </p>
+                )}
+                <div className="flex items-center gap-3 mt-1">
+                    {lastAction && (
+                        <button
+                            onClick={undo}
+                            className="inline-flex items-center gap-2 h-10 px-4 rounded-full bg-card border border-border-subtle text-text-secondary hover:text-text hover:bg-card-hover transition-colors cursor-pointer text-sm font-semibold"
+                        >
+                            <RotateCcw className="w-4 h-4" /> Undo last
+                        </button>
                     )}
-                    <div className="flex items-center gap-3 mt-1">
-                        {lastAction && (
-                            <button
-                                onClick={undo}
-                                className="inline-flex items-center gap-2 h-10 px-4 rounded-full bg-card border border-border-subtle text-text-secondary hover:text-text hover:bg-card-hover transition-colors cursor-pointer text-sm font-semibold"
-                            >
-                                <RotateCcw className="w-4 h-4" /> Undo last
-                            </button>
-                        )}
-                        {moreAvailable && (
-                            <button
-                                onClick={() => deal(queue)}
-                                className="inline-flex items-center gap-2 h-10 px-5 rounded-full text-white transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold"
-                                style={{ backgroundImage: 'var(--accent-gradient)' }}
-                            >
-                                Review {Math.min(REVIEW_SESSION_SIZE, queueCount)} more
-                            </button>
-                        )}
-                    </div>
+                    {moreAvailable && (
+                        <button
+                            onClick={deal}
+                            className="inline-flex items-center gap-2 h-10 px-5 rounded-full text-white transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold"
+                            style={{ backgroundImage: 'var(--accent-gradient)' }}
+                        >
+                            Review {Math.min(REVIEW_SESSION_SIZE, poolCount)} more
+                        </button>
+                    )}
                 </div>
             </div>
         );
@@ -431,7 +376,6 @@ export default function SwipeDeck({
 
     return (
         <div ref={rootRef} className="flex flex-col items-center gap-3 select-none" style={{ height: maxH ? maxH : undefined }}>
-            {queueTabs}
             <div className="text-xs font-semibold text-text-muted tabular-nums shrink-0">
                 {passed + 1} of {passed + remaining} · {remaining} left
             </div>
@@ -462,7 +406,7 @@ export default function SwipeDeck({
                                 pointerEvents: isTop ? 'auto' : 'none',
                             }}
                         >
-                            <CardFace link={link} queue={queue} />
+                            <CardFace link={link} />
                             {isTop && (
                                 <>
                                     <HintBadge label="KEEP" color="34,197,94" icon={<Star className="w-4 h-4" />} opacity={rightHint} pos="left" />
@@ -544,13 +488,11 @@ function HintBadge({ label, color, icon, opacity, pos }: { label: string; color:
     );
 }
 
-/** The visible card content (category, source, why-this-card, title, gist, tags).
+/** The visible card content (category, source, title, gist, tags).
  *  Memoized: the deck re-renders on every drag pointermove frame, and without
- *  the memo all three stacked faces would re-run SimpleMarkdown parsing (and the
- *  why-line derivation) at pointer-event rate — only the wrapper's transform
- *  actually changes per frame. */
-const CardFace = memo(function CardFace({ link, queue }: { link: Link; queue: ReviewQueue }) {
-    const why = whyThisCard(link, queue);
+ *  the memo all three stacked faces would re-run SimpleMarkdown parsing at
+ *  pointer-event rate — only the wrapper's transform changes per frame. */
+const CardFace = memo(function CardFace({ link }: { link: Link }) {
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
     const colorStyle = getCategoryColorStyle(link.category);
     const platform = getPlatform(link.url);
@@ -599,14 +541,9 @@ const CardFace = memo(function CardFace({ link, queue }: { link: Link; queue: Re
             </div>
 
             {/* Title */}
-            <h3 dir="auto" className={`font-bold text-xl sm:text-2xl text-text leading-tight mb-2 line-clamp-2 ${isRtl ? 'text-right' : ''}`}>
+            <h3 dir="auto" className={`font-bold text-xl sm:text-2xl text-text leading-tight mb-3 line-clamp-2 ${isRtl ? 'text-right' : ''}`}>
                 {link.title}
             </h3>
-
-            {/* Why this card — one muted line, from data already on the doc */}
-            {why && (
-                <p className={`text-xs text-text-muted mb-3 ${isRtl ? 'text-right' : ''}`}>{why}</p>
-            )}
 
             {/* Highlighted gist — clamped; tap opens full details */}
             <div className="relative flex-1 min-h-0 overflow-hidden">
