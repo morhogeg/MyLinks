@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import re
 import time
 from typing import List, Optional
 from google import genai
@@ -212,6 +213,75 @@ User question: {question}
 """
 
 
+# The whole point of a Machina answer is trust: the answer must demonstrably
+# derive from the user's saved cards, which is why every answer carries the ids
+# it relied on. When those citations come back empty/garbled AND we did supply
+# context cards, the answer is "ungrounded" — we can no longer prove it came
+# from the library. The two RAG paths handle that differently: the buffered JSON
+# path re-asks once with a stricter prompt, the streaming path can only flag it
+# after the fact because the prose has already been sent. Both reuse these pure
+# helpers so the "what counts as a valid citation" rule lives in exactly one
+# place and can be unit-tested without a live model.
+
+# Output-format instruction appended to the buffered JSON RAG prompt.
+_CITED_JSON_SUFFIX = (
+    'Return ONLY a JSON object: {"answer": string, "citedIds": string[]} '
+    "where citedIds are the ids (without brackets) of the sources you relied on."
+)
+
+# Stricter variant used for the single re-ask when the first answer came back
+# with no valid citations. It hammers on the invariant without licensing the
+# model to fabricate a citation for an answer the sources don't actually support.
+_CITED_JSON_STRICT_SUFFIX = (
+    "IMPORTANT: your previous answer did not cite any of the saved sources, which "
+    "is not allowed. Answer again and you MUST populate citedIds with the exact "
+    "ids (shown in square brackets above, without the brackets) of the saved "
+    "sources your answer actually relies on. If — and only if — the saved sources "
+    "genuinely contain nothing that answers the question, say that plainly in the "
+    "answer text and return an empty citedIds. Never invent an id. "
+    'Return ONLY a JSON object: {"answer": string, "citedIds": string[]}.'
+)
+
+
+def _valid_cited_ids(cited, cards: list) -> list:
+    """Filter model-supplied citation ids down to ids we actually provided.
+
+    Pure and defensive: `cited` may be None, a non-list, or contain hallucinated
+    or non-string ids. Returns the subset that appears in `cards`, preserving the
+    model's order and dropping duplicates. This is the single definition of a
+    "valid citation" shared by both RAG paths.
+    """
+    if not isinstance(cited, (list, tuple)):
+        return []
+    valid = {c.get("id") for c in cards if isinstance(c, dict)}
+    seen = set()
+    out = []
+    for cid in cited:
+        if cid in valid and cid not in seen:
+            seen.add(cid)
+            out.append(cid)
+    return out
+
+
+def _parse_cited_marker(full_text: str) -> list:
+    """Extract the raw id list from a `[[CITED: id1, id2]]` marker in `full_text`.
+
+    Returns the trimmed, comma-split ids exactly as the model wrote them (no
+    validation against the supplied cards — callers pass the result through
+    `_valid_cited_ids` for that). Missing or unparseable marker → empty list.
+    Pure, so the streaming path's marker handling is unit-testable offline.
+    """
+    if not full_text:
+        return []
+    try:
+        m = re.search(r"\[\[CITED:(.*?)\]\]", full_text, re.DOTALL)
+    except Exception:
+        return []
+    if not m:
+        return []
+    return [t.strip() for t in m.group(1).split(",") if t.strip()]
+
+
 class GeminiService:
     """
     Wrapper for Google Gemini AI.
@@ -353,13 +423,21 @@ If the image is an article, extract the headline and body."""
         """Answer a user question grounded ONLY in their saved cards (RAG).
 
         `cards` is a list of dicts with id/title/summary/category/tags. Returns
-        {"answer": str, "citedIds": [str]}. Raises AnalysisError on failure.
+        {"answer": str, "citedIds": [str], "ungrounded": bool}. Raises
+        AnalysisError on failure.
 
         The whole point of a Machina AI answer is trust: the model must
         speak only from what the user actually saved, and cite it. Generation is
         schema-constrained (BrainAnswer) so the model returns valid, fully
         escaped JSON even when the answer contains quotes or newlines — a plain
         response_mime_type call breaks on such content (notably Hebrew).
+
+        Citations are a hard invariant here (buffered path): if the first answer
+        cites nothing valid, we re-ask ONCE with a stricter prompt. If the retry
+        still cites nothing, we do NOT fail the request — we return the answer
+        with ``ungrounded=True`` and empty citedIds so the client can downgrade
+        honestly instead of presenting an unverifiable answer as grounded. The
+        empty-library case is NOT ungrounded (there was nothing to cite).
         """
         if not self.client:
             raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
@@ -369,29 +447,46 @@ If the image is an article, extract the headline and body."""
                 "answer": "I couldn't find anything in your library about that yet. "
                           "Try saving a few links on the topic, then ask me again.",
                 "citedIds": [],
+                "ungrounded": False,
             }
 
-        prompt = _build_rag_prompt(question, cards, history) + (
-            'Return ONLY a JSON object: {"answer": string, "citedIds": string[]} '
-            "where citedIds are the ids (without brackets) of the sources you relied on."
-        )
-
+        prompt = _build_rag_prompt(question, cards, history) + _CITED_JSON_SUFFIX
         data = self._generate_json([prompt], "answer", config_extra={"response_schema": BrainAnswer})
-
         answer = data.get("answer") or ""
-        cited = data.get("citedIds") or []
-        # Guard against hallucinated ids — keep only ones we actually supplied.
-        valid_ids = {c.get("id") for c in cards}
-        cited = [cid for cid in cited if cid in valid_ids]
-        return {"answer": answer, "citedIds": cited}
+        cited = _valid_cited_ids(data.get("citedIds"), cards)
+        if cited:
+            return {"answer": answer, "citedIds": cited, "ungrounded": False}
+
+        # No valid citation on the first pass. Re-ask ONCE with a stricter prompt
+        # that demands the model name the ids it relied on. A transient failure
+        # here must not sink the request — fall through to the ungrounded return.
+        retry_prompt = _build_rag_prompt(question, cards, history) + _CITED_JSON_STRICT_SUFFIX
+        try:
+            retry = self._generate_json(
+                [retry_prompt], "answer (citation retry)",
+                config_extra={"response_schema": BrainAnswer},
+            )
+            retry_answer = retry.get("answer") or ""
+            retry_cited = _valid_cited_ids(retry.get("citedIds"), cards)
+            if retry_cited:
+                return {"answer": retry_answer, "citedIds": retry_cited, "ungrounded": False}
+        except AnalysisError as e:
+            logger.warning(f"ask citation retry failed: {e}")
+
+        # Still uncited after the retry: keep the (best) answer but flag it so the
+        # UI drops the "grounded" promise rather than shipping a confident,
+        # unverifiable answer with no source chips.
+        logger.warning("ask answer returned no valid citations after retry — flagging ungrounded")
+        return {"answer": answer, "citedIds": [], "ungrounded": True}
 
     def answer_from_context_stream(self, question: str, cards: list, history: list = None):
         """Streaming variant of `answer_from_context` (RAG over saved cards).
 
         Yields ("token", text) tuples as the answer streams in, then a final
-        ("citedIds", [str]) tuple with the ids the model used. Reuses the same
-        grounding/system instructions as `answer_from_context` so answer quality
-        and Hebrew handling are preserved.
+        ("citedIds", [str]) tuple with the ids the model used, and — when the
+        answer ended up with NO valid citation — a trailing ("ungrounded", True)
+        tuple. Reuses the same grounding/system instructions as
+        `answer_from_context` so answer quality and Hebrew handling are preserved.
 
         Because schema-constrained JSON cannot be streamed token-by-token, the
         model instead writes a plain-text answer and ends with a machine-readable
@@ -401,13 +496,21 @@ If the image is an article, extract the headline and body."""
         list) — mirroring the non-streaming path — rather than over-crediting the
         answer to every retrieved card.
 
+        Citations are the same hard invariant as the buffered path, but the
+        streaming path CANNOT re-ask: the prose has already been streamed to the
+        client token-by-token, so a full re-ask mid-stream is not possible.
+        Instead we flag it after the fact — a final ("ungrounded", True) event —
+        and let the UI downgrade the already-rendered answer. (A retry would mean
+        buffering the whole answer and defeating streaming; the flag is the
+        smallest correct design here. The buffered/native path does the re-ask.)
+        The empty-library case is NOT flagged ungrounded — there was nothing to
+        cite — matching `answer_from_context`.
+
         On mid-stream failure this raises AnalysisError; callers should wrap the
         consumption in a try/except and emit a sanitized error to the client.
         """
         if not self.client:
             raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
-
-        valid_ids = [c.get("id") for c in cards if c.get("id")]
 
         if not cards:
             yield ("token",
@@ -484,26 +587,21 @@ If the image is an article, extract the headline and body."""
             logger.error(f"Gemini answer stream failed: {e}")
             raise AnalysisError(f"AI answer failed: {e}")
 
-        # Parse the citation marker out of the accumulated full text.
-        cited = []
-        try:
-            import re as _re
-            m = _re.search(r"\[\[CITED:(.*?)\]\]", full_text, _re.DOTALL)
-            if m:
-                raw = m.group(1)
-                cited = [t.strip() for t in raw.split(",") if t.strip()]
-        except Exception:
-            cited = []
-
-        # Guard against hallucinated ids AND mirror the non-streaming path's
-        # semantics exactly: keep only ids the model actually named that we in
-        # fact supplied. If the [[CITED:]] marker is missing, unparseable, or
-        # names nothing valid, cite NOTHING (empty list). The old fallback
-        # re-cited EVERY supplied id, attributing the answer to up to ~13 cards
-        # the model may never have used — a trust bug, not a safety net.
-        valid_set = set(valid_ids)
-        cited = [cid for cid in cited if cid in valid_set]
+        # Parse the citation marker out of the accumulated full text, then keep
+        # only ids the model actually named that we in fact supplied. If the
+        # [[CITED:]] marker is missing, unparseable, or names nothing valid, cite
+        # NOTHING (empty list) — the old fallback re-cited EVERY supplied id,
+        # attributing the answer to cards the model may never have used.
+        cited = _valid_cited_ids(_parse_cited_marker(full_text), cards)
         yield ("citedIds", cited)
+
+        # No valid citation → the answer can't be proven grounded in the saves.
+        # We can't re-ask (tokens already streamed), so flag it for the UI. cards
+        # is non-empty here (the empty-library case returned early above), so an
+        # empty `cited` unambiguously means "uncited", not "nothing to cite".
+        if not cited:
+            logger.warning("ask stream produced no valid citations — flagging ungrounded")
+            yield ("ungrounded", True)
 
     def synthesize_week(self, cards: list) -> dict:
         """Write a narrative "What you learned this week" synthesis over `cards`.

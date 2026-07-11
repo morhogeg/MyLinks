@@ -264,6 +264,10 @@ export interface ChatMessage {
   content: string;
   sources?: ChatSource[];
   error?: boolean;
+  // True when the backend could not tie this answer to any saved card (no valid
+  // citation, even after a stricter re-ask). The UI drops the "grounded" promise
+  // and shows a downgrade notice in place of the source chips.
+  ungrounded?: boolean;
 }
 
 /** A saved conversation in the Ask history sidebar (users/{uid}/chats/{id}). */

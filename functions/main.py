@@ -821,7 +821,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
     returning the source ids it cited so the UI can link straight back to them.
 
     Body: { uid, question, history?: [{role, content}] }
-    Returns: { success, answer, citedIds, sources: [{id, title, category, sourceName}] }
+    Returns: { success, answer, citedIds, sources: [{id, title, category, sourceName}], ungrounded }
     """
     if req.method == 'OPTIONS':
         return _cors_preflight(req)
@@ -927,6 +927,13 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                             yield "data: " + json.dumps(
                                 {"type": "sources", "sources": sources}
                             ) + "\n\n"
+                        elif kind == "ungrounded":
+                            # The answer couldn't be tied to any saved card. The
+                            # prose is already streamed, so tell the UI to
+                            # downgrade the "grounded" promise after the fact.
+                            yield "data: " + json.dumps(
+                                {"type": "ungrounded"}
+                            ) + "\n\n"
                     yield "data: " + json.dumps({"type": "done"}) + "\n\n"
                 except Exception as stream_exc:
                     # Mirror _server_error: log full detail, emit a sanitized message.
@@ -964,6 +971,10 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                 "answer": result.get("answer", ""),
                 "citedIds": cited_ids,
                 "sources": sources,
+                # True when the answer could not be tied to any saved card (even
+                # after a stricter re-ask). The client downgrades the "grounded"
+                # promise for this message instead of showing source chips.
+                "ungrounded": bool(result.get("ungrounded", False)),
             }),
             status=200, headers=headers, mimetype='application/json'
         )
