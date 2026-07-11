@@ -17,7 +17,21 @@
 
 ---
 
-## 1. [ ] The activation cliff: ~11 taps and four interstitials ending on an empty screen
+## 1. [x] The activation cliff: ~11 taps and four interstitials ending on an empty screen
+
+> **DONE (smallest good version) 2026-07-11** (commits `87e18b4` + `b0eeb48`,
+> remediation sprint). Welcome screen is now platform-aware: on iOS it teaches
+> ONE thing — the share sheet, including the one-time "More… → enable Machina"
+> step — as a numbered token-styled step list; desktop keeps the (correct there)
+> extension pitch in the same one-goal structure. Empty feed offers a one-tap
+> "Try it with an example" that seeds a hand-crafted spaced-repetition card via
+> saveLink (no analyze round-trip; needsEmbedding so it becomes askable) — taps
+> to first value: 1. Tour cut 8 → 3 steps (Ask / search / save, toolbar-anchored)
+> and gated to a non-empty feed via a hasCards lift into page.tsx. Design
+> decisions deliberately NOT built (owner call): animated share-sheet demo asset,
+> just-in-time coach-marks after first save/ask, killing the welcome entirely,
+> example-card lifecycle policy (auto-remove after first real save?). Needs
+> on-device verification of the iOS welcome + seed flow.
 
 **Problem.** Fresh user: sign-in → AI-consent legalese → welcome screen → **8-step
 spotlight tour** → "Your Machina is empty" (`Feed.tsx:1455`). The tour demos Ask,
@@ -106,7 +120,19 @@ smart-schedule fallback at `:121-128`).
 - Ask for push at the moment of first intent (reminder set → explain → OS prompt).
 - Default the digest ON at weekly cadence.
 
-## 5. [ ] Capture integrity holes — one of them lies to the user
+## 5. [~] Capture integrity holes — one of them lies to the user
+
+> **LITE SCOPE DONE 2026-07-11** (commits `aeea7dd`, `e5c3ab4`, `6eb1d4d`, remediation sprint): (1) timeout copy is honest ("nothing was saved…
+> tap Save to try again"; URL stays for one-tap retry); (2) web-path dedup via
+> `findLinkIdByUrl` — same exact-URL semantics as the share path, checked before
+> analysis, deep-links to the existing card, never blocks a save on probe
+> failure; (3) content-type honesty in scraper.py — PDFs (URL + Content-Type),
+> JS shells/TikTok degrade to the `[no text content available]` placeholder or a
+> flagged og-teaser via the same `truncated` channel as Facebook (9 new tests);
+> capture note reworded source-agnostic. **REMAINS OPEN: durable web capture** —
+> route the web form through the processing-placeholder + background-analysis
+> pipeline (`process_link_background` infra) so a timeout can never lose a
+> capture; scheduled as the sprint's final implementation wave.
 
 **Problem.** The web/desktop Add Link path has **no durable capture**:
 `analyze_link` never persists (`main.py:646-757`); the client waits synchronously
