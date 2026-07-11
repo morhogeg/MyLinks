@@ -17,6 +17,10 @@ on:
           Default OFF = legacy pre-cutover behavior (no sign-in UI).
         type: boolean
         default: false
+  # TEMPORARY: trigger the collections-elevation build (share sheet, suggested
+  # collections, gallery polish). Remove this branch trigger after green.
+  push:
+    branches: [claude/ship-tf-trigger-xw9z9o]
   # AUTO-BUILD TEMPORARILY GATED during the multi-user auth cutover.
   # The build now includes the Sign in with Apple entitlement and the
   # @capacitor-firebase/authentication pod (native Firebase SDK). Archiving
