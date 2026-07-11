@@ -133,7 +133,7 @@ smart-schedule fallback at `:121-128`).
 - Ask for push at the moment of first intent (reminder set → explain → OS prompt).
 - Default the digest ON at weekly cadence.
 
-## 5. [~] Capture integrity holes — one of them lies to the user
+## 5. [x] Capture integrity holes — one of them lies to the user
 
 > **LITE SCOPE DONE 2026-07-11** (commits `aeea7dd`, `e5c3ab4`, `6eb1d4d`, remediation sprint): (1) timeout copy is honest ("nothing was saved…
 > tap Save to try again"; URL stays for one-tap retry); (2) web-path dedup via
@@ -142,10 +142,23 @@ smart-schedule fallback at `:121-128`).
 > failure; (3) content-type honesty in scraper.py — PDFs (URL + Content-Type),
 > JS shells/TikTok degrade to the `[no text content available]` placeholder or a
 > flagged og-teaser via the same `truncated` channel as Facebook (9 new tests);
-> capture note reworded source-agnostic. **REMAINS OPEN: durable web capture** —
-> route the web form through the processing-placeholder + background-analysis
-> pipeline (`process_link_background` infra) so a timeout can never lose a
-> capture; scheduled as the sprint's final implementation wave.
+> capture note reworded source-agnostic.
+>
+> **DURABLE WEB CAPTURE DONE 2026-07-11** (commit `7d6ae1e`): web link saves now
+> write a `processing` placeholder card client-side, then enqueue via the
+> already-routed `/api/share` (share_ingest gained an App Check + soft-auth
+> branch for tokenless first-party calls; queue doc carries `cardId`);
+> `process_link_background` reuses the client's card instead of creating one.
+> The 60s synchronous window is gone for web links — a timeout can no longer
+> lose a capture, and the §4 task-4 "/api/analyze 60s cap on slow YouTube"
+> concern is moot for web captures (they analyze in the 300s background fn).
+> Dedup is skipped server-side when `cardId` is present (client already deduped;
+> re-checking would match the placeholder itself). Enqueue failure flips the
+> placeholder to a retryable `failed` card — never a stuck spinner. Analytics
+> fire at the durable moment (successful enqueue). Image tab stays synchronous
+> (storage.rules block client uploads for the trigger path); Note tab stays
+> synchronous (near-instant). 7 new tests (137 total). **Owner:** functions
+> deploy; live-verify placeholder→ready flip, no duplicate card, failed+Retry.
 
 **Problem.** The web/desktop Add Link path has **no durable capture**:
 `analyze_link` never persists (`main.py:646-757`); the client waits synchronously
