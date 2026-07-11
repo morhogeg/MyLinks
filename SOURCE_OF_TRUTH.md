@@ -603,9 +603,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-11 — SHIPPED: the product-review execution below (merge `b71657a`
+  to `main`).** **Desktop web:** live via Vercel auto-deploy. **iOS:
+  TestFlight run #65 → build 1065**, fired via the established
+  temp-push-trigger pattern (API dispatch is still 403 from cloud sessions;
+  temp branch `claude/ship-tf-trigger-bvwize`, trigger commit `5ca16e1` —
+  delete the remote branch once the run finishes if the session didn't get to
+  it). **Backend: NOT deployed — owner step** (this cloud session has no
+  Firebase creds and egress to firebase.googleapis.com is blocked): run from
+  `main` — `./deploy-functions.sh functions:analyze_link,functions:analyze_image,functions:ask_brain,functions:process_link_background,functions:send_digests,functions:send_digest_now,functions:force_send_digests`
+  (the digest email-cut + mode-collapse and the ai_service "Who It's For"
+  prompt fix are dark until then; the web changes are live immediately and
+  read-compatible with the old backend — worst case a legacy-mode digest still
+  curates via its old branch until the deploy). Remember the 2026-07-10
+  gotcha: `git pull` before deploying. `firebase.json` unchanged — no hosting
+  deploy. On-device QA list for build 1065 is in the entry below.
 - **2026-07-10 — Product-review execution: subtraction + Review-mode upgrade
-  (branch `claude/machina-review-execution-bvwize`, 8 commits — NOT yet merged;
-  owner reviews and ships).** Orchestrated 7 work packages (one Opus agent
+  (branch `claude/machina-review-execution-bvwize`, 9 commits; merged + shipped
+  2026-07-11 — see the entry above).** Orchestrated 7 work packages (one Opus agent
   each) + an 8-angle code review. Shipped on the branch: **(A) Review mode
   upgraded** into the digest's interactive twin — three curated queues
   (Forgotten default / Recent / Needs tidying, pure logic in
