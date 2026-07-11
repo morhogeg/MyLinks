@@ -136,7 +136,7 @@ function Card({
         })();
         return (
             <article
-                className={`surface-card animate-card-enter bg-card rounded-2xl border shadow-[var(--shadow-card)] relative flex flex-col h-full overflow-hidden ${failed ? 'border-red-500/30' : 'border-white/5'
+                className={`surface-card animate-card-enter bg-card rounded-2xl border shadow-[var(--shadow-card)] relative flex flex-col h-full overflow-hidden ${failed ? 'border-red-500/30' : 'border-border-subtle'
                     }`}
                 aria-busy={!failed}
             >
@@ -162,13 +162,13 @@ function Card({
                         </p>
                     ) : (
                         <div className="space-y-2 flex-grow">
-                            <div className="h-3 w-full bg-white/5 rounded animate-pulse" />
-                            <div className="h-3 w-5/6 bg-white/5 rounded animate-pulse" />
-                            <div className="h-3 w-2/3 bg-white/5 rounded animate-pulse" />
+                            <div className="h-3 w-full bg-fill-subtle rounded animate-pulse" />
+                            <div className="h-3 w-5/6 bg-fill-subtle rounded animate-pulse" />
+                            <div className="h-3 w-2/3 bg-fill-subtle rounded animate-pulse" />
                         </div>
                     )}
 
-                    <div className="flex items-center gap-2 pt-2 mt-auto border-t border-white/5">
+                    <div className="flex items-center gap-2 pt-2 mt-auto border-t border-border-subtle">
                         <a
                             href={link.url}
                             target="_blank"
@@ -210,7 +210,7 @@ function Card({
             style={{ ['--enter-delay' as string]: enterDelay }}
             className={`group surface-card animate-card-enter bg-card rounded-2xl border shadow-[var(--shadow-card)] transition-all duration-300 ease-[var(--ease-spring)] cursor-pointer relative flex flex-col items-stretch h-full [@media(hover:hover)]:hover:-translate-y-1 [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] ${isSelected
                 ? 'border-accent bg-accent/5 ring-1 ring-accent'
-                : 'border-white/5 hover:border-accent/30'
+                : 'border-border-subtle hover:border-accent/30'
                 } ${link.isRead ? 'opacity-60 grayscale-[0.3]' : ''} ${isEditingCategory ? 'overflow-visible z-50' : 'overflow-hidden'}`}
             onClick={() => {
                 if (isSelectionMode && onToggleSelection) {
@@ -287,7 +287,7 @@ function Card({
                                                     e.stopPropagation();
                                                     setIsEditingCategory(true);
                                                 }}
-                                                className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ms-1 hover:bg-white/5 rounded-md flex-shrink-0"
+                                                className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ms-1 hover:bg-fill-subtle rounded-md flex-shrink-0"
                                             >
                                                 <Pencil className="w-3 h-3 text-text-muted/40 hover:text-text-muted" />
                                             </button>
@@ -304,7 +304,7 @@ function Card({
                         mirrors the row and the icons land in a different order
                         per language. */}
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none group-hover:pointer-events-auto">
-                        <div dir="ltr" className="flex items-center gap-1 bg-card/90 backdrop-blur-md border border-white/10 p-1 rounded-full shadow-xl">
+                        <div dir="ltr" className="flex items-center gap-1 bg-card/90 backdrop-blur-md border border-border-strong p-1 rounded-full shadow-xl">
                             {/* Only render as a link for real http(s) URLs — never make a
                                 stored javascript:/data: value clickable. */}
                             {!!link.url && /^https?:\/\//i.test(link.url) && (
@@ -325,7 +325,7 @@ function Card({
                                     onReadStatusChange(link.id, !link.isRead);
                                 }}
                                 title={link.isRead ? 'Mark as unread' : 'Mark as read'}
-                                className={`p-1.5 rounded-full transition-all flex items-center justify-center ${link.isRead ? 'text-text bg-white/10' : 'text-text-muted/40 hover:text-text'
+                                className={`p-1.5 rounded-full transition-all flex items-center justify-center ${link.isRead ? 'text-text bg-fill-strong' : 'text-text-muted/40 hover:text-text'
                                     }`}
                             >
                                 {link.isRead ? (
@@ -481,7 +481,7 @@ function Card({
                         )}
                         {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && link.sourceType !== 'image' && link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None' && (
                             <span
-                                className="flex items-center gap-1 text-[9px] font-bold text-text-muted/60 bg-black/5 border border-black/10 px-2 py-1 rounded-lg dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all max-w-[220px]"
+                                className="flex items-center gap-1 text-[9px] font-bold text-text-muted/60 bg-fill-subtle border border-border-strong px-2 py-1 rounded-lg uppercase tracking-widest whitespace-nowrap transition-all max-w-[220px]"
                                 title={link.sourceName}
                             >
                                 {sourceIcon}
@@ -498,7 +498,7 @@ function Card({
                             setIsSheetOpen(true);
                         }}
                         aria-label="Actions"
-                        className="hidden [@media(hover:none)]:flex items-center justify-center p-1.5 -me-1 ms-1 rounded-full text-text-muted hover:text-text active:bg-white/10 z-20 flex-shrink-0"
+                        className="hidden [@media(hover:none)]:flex items-center justify-center p-1.5 -me-1 ms-1 rounded-full text-text-muted hover:text-text active:bg-fill-strong z-20 flex-shrink-0"
                     >
                         <MoreHorizontal className="w-4 h-4" />
                     </button>
@@ -521,7 +521,7 @@ function Card({
                 />
 
                 {/* Footer Section */}
-                <div className="pt-3 sm:pt-4 border-t border-white/5 flex flex-col space-y-2 sm:space-y-3">
+                <div className="pt-3 sm:pt-4 border-t border-border-subtle flex flex-col space-y-2 sm:space-y-3">
                     {/* Collection memberships — subtle chips. When viewing inside a
                         collection, that chip becomes a one-tap "remove from collection". */}
                     {cardCollections && cardCollections.length > 0 && (
@@ -567,7 +567,7 @@ function Card({
                                         e.stopPropagation();
                                         onTagClick?.(tag);
                                     }}
-                                    className="inline-flex items-center text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-white/5 text-text-muted/60 group-hover:text-accent group-hover:bg-accent/10 hover:!bg-accent/20 hover:!text-accent active:scale-95 transition-all border border-transparent group-hover:border-accent/10 cursor-pointer"
+                                    className="inline-flex items-center text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-fill-subtle text-text-muted/60 group-hover:text-accent group-hover:bg-accent/10 hover:!bg-accent/20 hover:!text-accent active:scale-95 transition-all border border-transparent group-hover:border-accent/10 cursor-pointer"
                                 >
                                     {parents && <span className="opacity-40 font-normal mr-0.5">{parents}/</span>}
                                     {leaf}

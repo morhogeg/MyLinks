@@ -36,20 +36,6 @@ function youtubeWatchUrl(id: string, seconds?: number | null): string {
     return `https://www.youtube.com/watch?v=${id}${seconds != null ? `&t=${Math.floor(seconds)}s` : ''}`;
 }
 
-/** Drop a markdown section (a `## Heading` and its body up to the next `##`)
-    whose heading matches `re`. Used to strip the AI's "Who It's For" block from
-    video summaries. */
-function stripMarkdownSection(md: string, re: RegExp): string {
-    if (!md) return md;
-    const out: string[] = [];
-    let skipping = false;
-    for (const line of md.split('\n')) {
-        if (/^\s*##\s+/.test(line)) skipping = re.test(line);
-        if (!skipping) out.push(line);
-    }
-    return out.join('\n').trim();
-}
-
 interface LinkDetailModalProps {
     link: Link;
     allLinks: Link[];
@@ -242,7 +228,7 @@ export default function LinkDetailModal({
                 role="dialog"
                 aria-modal="true"
                 aria-label="Link details"
-                className="relative bg-card border-0 sm:border border-white/10 w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-up focus:outline-none"
+                className="relative bg-card border-0 sm:border border-border-strong w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-scale-up focus:outline-none"
             >
                 {/* Header Actions — a single compact row: the item actions scroll
                     horizontally if they don't all fit (so nothing is ever clipped),
@@ -422,7 +408,7 @@ export default function LinkDetailModal({
                             <button
                                 onClick={() => openExternal(youtubeWatchUrl(videoId))}
                                 aria-label="Watch on YouTube"
-                                className="group relative block w-full h-28 sm:h-32 rounded-2xl overflow-hidden border border-white/10 bg-black cursor-pointer"
+                                className="group relative block w-full h-28 sm:h-32 rounded-2xl overflow-hidden border border-border-strong bg-black cursor-pointer"
                             >
                                 <img src={thumb} alt="" className="w-full h-full object-cover" />
                                 <span className="absolute inset-0 bg-black/[0.04] group-hover:bg-transparent transition-colors" />
@@ -432,7 +418,7 @@ export default function LinkDetailModal({
                             </button>
 
                             {!!link.metadata.videoHighlights?.length && (
-                                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                                <div className="rounded-2xl border border-border-strong bg-fill-subtle p-4">
                                     <h4 className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-text-muted mb-3">
                                         <Play className="w-3.5 h-3.5 text-accent" /> Key moments
                                     </h4>
@@ -444,7 +430,7 @@ export default function LinkDetailModal({
                                                     <button
                                                         onClick={() => seconds != null && openExternal(youtubeWatchUrl(videoId, seconds))}
                                                         disabled={seconds == null}
-                                                        className={`w-full text-start flex items-start gap-3 rounded-lg px-2 py-1.5 transition-colors ${seconds != null ? 'hover:bg-white/5 cursor-pointer' : 'cursor-default'}`}
+                                                        className={`w-full text-start flex items-start gap-3 rounded-lg px-2 py-1.5 transition-colors ${seconds != null ? 'hover:bg-fill-subtle cursor-pointer' : 'cursor-default'}`}
                                                     >
                                                         {seconds != null && (
                                                             <span className="shrink-0 mt-0.5 text-[11px] font-bold text-accent tabular-nums bg-accent/10 px-1.5 py-0.5 rounded">
@@ -503,7 +489,7 @@ export default function LinkDetailModal({
                                                         setIsEditingCategory(true);
                                                     }}
                                                     aria-label="Edit category"
-                                                    className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1.5 -ms-1.5 hover:bg-white/5 rounded-md"
+                                                    className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1.5 -ms-1.5 hover:bg-fill-subtle rounded-md"
                                                 >
                                                     <Pencil className="w-3.5 h-3.5 text-text-muted/40 hover:text-text-muted" />
                                                 </button>
@@ -560,7 +546,7 @@ export default function LinkDetailModal({
                                         </span>
                                     ) : link.sourceName && link.sourceName !== 'None' ? (
                                         <span
-                                            className="text-[10px] font-black text-text-muted/60 bg-black/5 border border-black/10 dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest px-2.5 py-1.5 rounded-lg shadow-lg shadow-black/5 transition-all"
+                                            className="text-[10px] font-black text-text-muted/60 bg-fill-subtle border border-border-strong uppercase tracking-widest px-2.5 py-1.5 rounded-lg shadow-lg shadow-black/5 transition-all"
                                             title={link.sourceName}
                                         >
                                             {link.sourceName}
@@ -590,11 +576,7 @@ export default function LinkDetailModal({
                             to strip, so we show it alone to avoid duplicating it. */}
                         <div className="mb-6">
                             {(() => {
-                                // Videos: drop the AI's "Who It's For" section (the user
-                                // finds it noise on YouTube cards).
-                                const detailed = isYouTube
-                                    ? stripMarkdownSection(link.detailedSummary || '', /who\s*it'?s?\s*for/i)
-                                    : (link.detailedSummary || '');
+                                const detailed = link.detailedSummary || '';
                                 const headingIdx = detailed.indexOf('## ');
                                 const hasSections = headingIdx >= 0;
                                 const detailBody = hasSections ? detailed.slice(headingIdx) : detailed;
@@ -624,11 +606,11 @@ export default function LinkDetailModal({
 
 
                         <div className="flex flex-wrap items-center gap-4 text-sm text-text-muted mb-8">
-                            <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/5">
+                            <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-fill-subtle border border-border-subtle">
                                 <Clock className="w-3.5 h-3.5" />
                                 {link.metadata.estimatedReadTime} {isRtl ? 'דק׳ קריאה' : 'min read'}
                             </span>
-                            <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/5">
+                            <span className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-fill-subtle border border-border-subtle">
                                 <Tag className="w-3.5 h-3.5 text-accent" />
                                 {getTimeAgo(link.createdAt, now)}
                             </span>
@@ -661,7 +643,7 @@ export default function LinkDetailModal({
                                 return (
                                     <span
                                         key={tag}
-                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/70 hover:text-accent transition-all group/tag bg-white/5 hover:bg-white/10 px-2 py-1 rounded-lg border border-transparent hover:border-accent/10"
+                                        className="inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/70 hover:text-accent transition-all group/tag bg-fill-subtle hover:bg-fill-strong px-2 py-1 rounded-lg border border-transparent hover:border-accent/10"
                                     >
                                         <span className="flex items-center">
                                             {parents && <span className="opacity-30 font-normal mr-0.5">{parents}/</span>}
@@ -691,7 +673,7 @@ export default function LinkDetailModal({
                             ) : (
                                 <button
                                     onClick={() => setIsAddingTag(true)}
-                                    className="inline-flex items-center gap-1 text-xs font-bold text-text-muted/50 hover:text-accent transition-all bg-white/5 hover:bg-white/10 px-2 py-1 rounded-lg border border-dashed border-white/10 hover:border-accent/30"
+                                    className="inline-flex items-center gap-1 text-xs font-bold text-text-muted/50 hover:text-accent transition-all bg-fill-subtle hover:bg-fill-strong px-2 py-1 rounded-lg border border-dashed border-border-strong hover:border-accent/30"
                                 >
                                     <Plus className="w-3 h-3" />
                                     <span>Add Tag</span>

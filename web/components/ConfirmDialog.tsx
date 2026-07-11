@@ -76,7 +76,7 @@ export default function ConfirmDialog({
             <div
                 role="alertdialog"
                 aria-modal="true"
-                className="relative bg-card w-full max-w-md rounded-2xl border border-white/5 shadow-2xl p-6 overflow-hidden animate-scale-up"
+                className="relative bg-card w-full max-w-md rounded-2xl border border-border-subtle shadow-2xl p-6 overflow-hidden animate-scale-up"
             >
                 {/* Header */}
                 <div className="flex items-start gap-4 mb-4">
@@ -95,7 +95,7 @@ export default function ConfirmDialog({
                     <button
                         onClick={onClose}
                         aria-label="Close"
-                        className="p-1 hover:bg-white/5 rounded-full text-text-muted transition-colors"
+                        className="p-1 hover:bg-fill-subtle rounded-full text-text-muted transition-colors"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -105,7 +105,7 @@ export default function ConfirmDialog({
                 <div className="flex gap-3 mt-6">
                     <button
                         onClick={onClose}
-                        className="flex-1 px-4 py-2.5 rounded-xl bg-white/5 text-text font-medium hover:bg-white/10 transition-colors"
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-fill-subtle text-text font-medium hover:bg-fill-strong transition-colors"
                     >
                         {cancelLabel}
                     </button>

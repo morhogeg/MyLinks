@@ -1134,7 +1134,7 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
 
 
 # ─────────────────────────────────────────────
-# Share Ingestion (iOS Shortcut / share sheet)
+# Share Ingestion (iOS Share Extension / browser extension)
 # ─────────────────────────────────────────────
 
 def _extract_url(*candidates: str) -> str:
@@ -1151,7 +1151,7 @@ def _extract_url(*candidates: str) -> str:
 @https_fn.on_request()
 def share_ingest(req: https_fn.Request) -> https_fn.Response:
     """
-    HTTP endpoint for the iOS share Shortcut (and any share-sheet client).
+    HTTP endpoint for the iOS Share Extension (and any share-sheet client).
     Authenticates with a per-user ingest token, then queues the shared URL
     into the existing background processing pipeline.
 
@@ -1266,7 +1266,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
 def get_share_config(req: https_fn.CallableRequest) -> dict:
     """
     Returns the share-ingest endpoint and the caller's personal ingest token
-    (generating one on first use). Used by Settings to configure the Shortcut.
+    (generating one on first use). Used by Settings to configure the browser extension.
     """
     # Prefer the verified caller; fall back to the client uid only while
     # REQUIRE_AUTH is off (staged rollout).
@@ -2125,7 +2125,7 @@ def force_check_reminders(req: https_fn.Request) -> https_fn.Response:
 
 
 # ─────────────────────────────────────────────
-# Curated Digest (push + email)
+# Curated Digest (push)
 # ─────────────────────────────────────────────
 
 # Cadence MUST match DIGEST_CADENCE_MINUTES in digest_service.py — is_due() uses
@@ -2189,9 +2189,6 @@ def send_digest_now(req: https_fn.CallableRequest) -> dict:
         short = key.replace("digest_", "")
         if req.data and short in req.data:
             overrides[key] = req.data[short]
-    # NOTE: the delivery address is always the user's own stored email — we do
-    # NOT honor a client-supplied "email" override (that allowed exfiltrating a
-    # digest to an arbitrary address).
     if overrides:
         user_data.setdefault("settings", {})
         user_data["settings"] = {**user_data.get("settings", {}), **overrides}

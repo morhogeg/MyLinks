@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { DigestMode, DigestChannel } from '@/lib/types';
-import { Sparkles, Check, BrainCircuit, Mail, Shuffle, Tag, Inbox, Star, History, Search, Info } from 'lucide-react';
+import { DigestMode } from '@/lib/types';
+import { Sparkles, Check, BrainCircuit, Tag, History, Search, Info } from 'lucide-react';
 import { X } from 'lucide-react';
 import type { Settings, SetSettings, View } from './types';
 import {
@@ -15,11 +15,8 @@ import {
 export const DIGEST_MODES: { value: DigestMode; label: string; icon: ReactNode; note: string }[] = [
     { value: 'smart', label: 'Smart mix', icon: <Sparkles className="w-[18px] h-[18px]" />, note: 'A balanced blend of your backlog and older gems worth a second look.' },
     { value: 'synthesis', label: 'Weekly synthesis', icon: <BrainCircuit className="w-[18px] h-[18px]" />, note: 'A short "what you learned" recap that ties your week\'s saves together — themes, a standout, and an open question.' },
-    { value: 'unread', label: 'Backlog', icon: <Inbox className="w-[18px] h-[18px]" />, note: 'Chip away at what you saved but never read (oldest first).' },
     { value: 'rediscover', label: 'Rediscover', icon: <History className="w-[18px] h-[18px]" />, note: 'Resurface older saves you haven\'t opened in a while.' },
-    { value: 'random', label: 'Surprise me', icon: <Shuffle className="w-[18px] h-[18px]" />, note: 'A random handful from across your whole library.' },
     { value: 'topic', label: 'By topic', icon: <Tag className="w-[18px] h-[18px]" />, note: 'Only cards from a category or tag you choose.' },
-    { value: 'favorites', label: 'Favorites', icon: <Star className="w-[18px] h-[18px]" />, note: 'Bring your starred cards back for an encore.' },
 ];
 
 export const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -38,14 +35,13 @@ export const formatTime = (hour: number, minute: number) => {
 };
 
 export function ResurfacingView({
-    settings, setSettings, cadenceLabel, modeLabel, scheduleValue, deliveryValue, go,
+    settings, setSettings, cadenceLabel, modeLabel, scheduleValue, go,
 }: {
     settings: Settings;
     setSettings: SetSettings;
     cadenceLabel: string;
     modeLabel: string;
     scheduleValue: string;
-    deliveryValue: string;
     go: (v: View) => void;
 }) {
     return (
@@ -73,7 +69,6 @@ export function ResurfacingView({
                 {settings.digest_enabled && <NavRow title="Style" value={modeLabel} onClick={() => go('style')} />}
                 {settings.digest_enabled && <NavRow title="Schedule" value={scheduleValue} onClick={() => go('schedule')} />}
                 {settings.digest_enabled && <NavRow title="Cards per digest" value={String(settings.digest_count)} onClick={() => go('cards')} />}
-                {settings.digest_enabled && <NavRow title="Delivery" value={deliveryValue} onClick={() => go('delivery')} />}
                 {settings.digest_enabled && (
                     <RowShell>
                         <div className="flex-1 min-w-0 py-[11px]">
@@ -264,40 +259,6 @@ export function ScheduleView({ settings, setSettings }: { settings: Settings; se
                 </div>
             </div>
             <Footnote>Your digest arrives around this time. Delivery may vary by a few minutes.</Footnote>
-        </>
-    );
-}
-
-export function DeliveryView({
-    settings, toggleChannel, email, setEmail,
-}: {
-    settings: Settings;
-    toggleChannel: (c: DigestChannel) => void;
-    email: string;
-    setEmail: (e: string) => void;
-}) {
-    return (
-        <>
-            <LargeTitle>Delivery</LargeTitle>
-            <List tight>
-                <RowShell tile={<Mail className="w-[16px] h-[16px]" />} tileClass="bg-indigo-500">
-                    <RowText title="Email" />
-                    <Toggle on={settings.digest_channels.includes('email')} onChange={() => toggleChannel('email')} />
-                </RowShell>
-            </List>
-            {settings.digest_channels.includes('email') && (
-                <div className="mt-2.5 px-1 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                    <label className="text-[12px] font-semibold text-text-secondary">Email address</label>
-                    <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        className="w-full h-10 px-3 rounded-xl bg-card border border-border-subtle text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent/50 transition-colors"
-                    />
-                </div>
-            )}
-            <Footnote>Every digest lands in the in-app Digest section, and as a push notification when notifications are on. These are extra channels on top of that.</Footnote>
         </>
     );
 }

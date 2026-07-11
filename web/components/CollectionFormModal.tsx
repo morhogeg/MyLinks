@@ -119,13 +119,13 @@ export default function CollectionFormModal({
                 role="dialog"
                 aria-modal="true"
                 aria-label={isEdit ? 'Edit collection' : 'New collection'}
-                className="relative w-full sm:max-w-md max-h-full overflow-y-auto bg-card border-t sm:border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up sm:animate-scale-up safe-pb"
+                className="relative w-full sm:max-w-md max-h-full overflow-y-auto bg-card border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up sm:animate-scale-up safe-pb"
             >
                 <div className="sm:hidden flex justify-center pt-3 pb-1">
-                    <div className="h-1.5 w-10 rounded-full bg-white/15" />
+                    <div className="h-1.5 w-10 rounded-full bg-fill-strong" />
                 </div>
 
-                <div className="flex items-center gap-3 px-5 pt-3 pb-4 border-b border-white/5">
+                <div className="flex items-center gap-3 px-5 pt-3 pb-4 border-b border-border-subtle">
                     <Layers className="w-5 h-5 text-accent" />
                     <h3 className="flex-1 text-lg font-bold text-text">
                         {isEdit ? 'Edit collection' : 'New collection'}
@@ -133,7 +133,7 @@ export default function CollectionFormModal({
                     <button
                         onClick={onClose}
                         aria-label="Close"
-                        className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-white/5 transition-colors"
+                        className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -206,7 +206,7 @@ export default function CollectionFormModal({
                 <div className="flex gap-3 px-5 pb-5">
                     <button
                         onClick={onClose}
-                        className="flex-1 px-4 py-2.5 rounded-xl bg-white/5 text-text font-medium hover:bg-white/10 transition-colors"
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-fill-subtle text-text font-medium hover:bg-fill-strong transition-colors"
                     >
                         Cancel
                     </button>

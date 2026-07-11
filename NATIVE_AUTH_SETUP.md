@@ -140,7 +140,7 @@ for parity, but claim gating is now enforced server-side by `OWNER_EMAIL`.
      trigger a paid all-user embedding backfill. Add the guard before/at cutover
      (then pass `X-Admin-Token` when running the M9 backfill).
    - Unaffected by the flag (verified): `share_ingest` still authenticates by
-     ingest token (Share Extension, Shortcut, browser extension keep working);
+     ingest token (Share Extension, browser extension keep working);
      the callables (`search_links`, `get_share_config`, `send_digest_now`,
      `claim_workspace`, `delete_account`) take the SDK-attached token; the Vercel
      proxy routes (`web/app/api/*/route.ts`) forward the `Authorization` header.

@@ -16,6 +16,34 @@ interface ReminderModalProps {
 
 type ReminderOption = 'smart' | 'tomorrow' | 'next-week' | 'spaced' | 'custom' | 'off';
 
+// Format a Date to a `YYYY-MM-DD` string in LOCAL time. Using toISOString() here
+// would emit the UTC date, which shifts by a day for users west of UTC.
+function formatLocalDate(d: Date): string {
+    const y = d.getFullYear();
+    const m = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+// Parse a `YYYY-MM-DD` string as LOCAL midnight. `new Date('YYYY-MM-DD')` parses
+// as UTC midnight, so combining it with local setHours() rolls the day over.
+function parseLocalDate(str: string): Date {
+    const [y, m, d] = str.split('-').map(Number);
+    return new Date(y, m - 1, d);
+}
+
+function daysInMonth(year: number, month: number): number {
+    return new Date(year, month + 1, 0).getDate();
+}
+
+// Move a date to another month/year keeping the day-of-month, clamped to the
+// target month's length — bare setMonth/setFullYear overflows (Jul 31 → setMonth
+// Feb → Mar 3), silently landing the reminder a month off the selection.
+function withMonthClamped(d: Date, year: number, month: number): Date {
+    const day = Math.min(d.getDate(), daysInMonth(year, month));
+    return new Date(year, month, day);
+}
+
 export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: ReminderModalProps) {
     const toast = useToast();
     const [selectedOption, setSelectedOption] = useState<ReminderOption | null>(null);
@@ -43,7 +71,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                 setSelectedOption('custom');
                 if (link.nextReminderAt) {
                     const date = new Date(link.nextReminderAt);
-                    setCustomDate(date.toISOString().split('T')[0]);
+                    setCustomDate(formatLocalDate(date));
                     setCustomTime(`${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`);
                 }
             } else {
@@ -116,7 +144,9 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                         setIsSaving(false);
                         return;
                     }
-                    const picked = new Date(customDate);
+                    // Build the timestamp in LOCAL time: parseLocalDate avoids the
+                    // UTC-midnight parse that would otherwise roll the day over.
+                    const picked = parseLocalDate(customDate);
                     const [hours, minutes] = customTime.split(':').map(Number);
                     picked.setHours(hours, minutes, 0, 0);
                     nextReminderTime = picked.getTime();
@@ -124,9 +154,20 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                 case 'off':
                     await updateLinkReminder(uid, link.id, false);
                     toast.success('Reminder turned off');
-                    onClose();
+                    // onUpdate (saved) before onClose (dismissed) so callers that
+                    // treat a bare onClose as "cancelled" see the save first.
                     if (onUpdate) onUpdate();
+                    onClose();
                     return;
+            }
+
+            // Hard invariant: a reminder can NEVER be created in the past. `now` is
+            // re-derived at save (above), so this holds even if the modal sat open
+            // across midnight or the picked time has since elapsed.
+            if (nextReminderTime && nextReminderTime <= now.getTime()) {
+                toast.error('Please pick a time in the future — that moment has already passed.');
+                setIsSaving(false);
+                return;
             }
 
             if (nextReminderTime) {
@@ -138,8 +179,10 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     selectedOption === 'spaced' ? `spaced-${spacedInterval}` : selectedOption
                 );
                 toast.success(`Reminder set for ${new Date(nextReminderTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}`);
-                onClose();
+                // onUpdate (saved) before onClose (dismissed) so callers that
+                // treat a bare onClose as "cancelled" see the save first.
                 if (onUpdate) onUpdate();
+                onClose();
             }
 
         } catch (error) {
@@ -154,6 +197,33 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
     };
 
     const isReminderActive = link.reminderStatus === 'pending';
+
+    // Materialize the custom default date the moment "Custom" is chosen (the
+    // selects otherwise render a today fallback that was never committed to
+    // state, so Save silently no-ops on an untouched picker). Late at night —
+    // past the last 15-min slot — default to tomorrow so the picker doesn't
+    // open onto a day with every time slot disabled.
+    useEffect(() => {
+        if (!isOpen || selectedOption !== 'custom' || customDate) return;
+        const base = new Date();
+        if (base.getHours() * 60 + base.getMinutes() >= 23 * 60 + 45) base.setDate(base.getDate() + 1);
+        setCustomDate(formatLocalDate(base));
+    }, [isOpen, selectedOption, customDate]);
+
+    // Selection-time guards for the custom picker so past dates/times can't be
+    // chosen in the first place. Recomputed every render (cheap), so the "today"
+    // reference never goes stale while the modal sits open. The save-time check
+    // above remains the hard backstop.
+    const nowForGuards = new Date();
+    const nowYear = nowForGuards.getFullYear();
+    const nowMonth = nowForGuards.getMonth();
+    const nowDay = nowForGuards.getDate();
+    const nowMinutes = nowForGuards.getHours() * 60 + nowForGuards.getMinutes();
+    const selDate = customDate ? parseLocalDate(customDate) : nowForGuards;
+    const selYear = selDate.getFullYear();
+    const selMonth = selDate.getMonth();
+    const selDay = selDate.getDate();
+    const selIsToday = selYear === nowYear && selMonth === nowMonth && selDay === nowDay;
 
     const OptionButton = ({
         option,
@@ -179,7 +249,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                         ? 'bg-accent/20 border-accent ring-2 ring-accent'
                         : highlighted
                             ? 'bg-accent/5 border-accent/10 hover:bg-accent/10'
-                            : 'bg-white/5 border-white/5 hover:bg-white/10'
+                            : 'bg-fill-subtle border-border-subtle hover:bg-fill-strong'
                     }
                     ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}
                 `}
@@ -189,7 +259,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                         ? 'bg-accent text-white'
                         : highlighted
                             ? 'bg-accent/10 text-accent group-hover:bg-accent group-hover:text-white'
-                            : 'bg-white/5 text-text-muted'
+                            : 'bg-fill-subtle text-text-muted'
                     }
                 `}>
                     {isSelected ? (
@@ -221,9 +291,9 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                 role="dialog"
                 aria-modal="true"
                 aria-label="Set reminder"
-                className="relative bg-card border border-white/10 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 safe-pt focus:outline-none"
+                className="relative bg-card border border-border-strong w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 safe-pt focus:outline-none"
             >
-                <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle">
                     <h2 className="text-lg font-bold text-text flex items-center gap-2">
                         <Bell className="w-5 h-5 text-accent" />
                         Set Reminder
@@ -232,7 +302,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                         onClick={onClose}
                         disabled={isSaving}
                         aria-label="Close"
-                        className="p-2 rounded-full hover:bg-white/5 transition-all disabled:opacity-50"
+                        className="p-2 rounded-full hover:bg-fill-subtle transition-all disabled:opacity-50"
                     >
                         <X className="w-5 h-5 text-text-muted" />
                     </button>
@@ -293,7 +363,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                 subtitle="Initial interval for review"
                             />
                             {selectedOption === 'spaced' && (
-                                <div className="flex gap-2 mx-2 p-1 bg-white/5 rounded-xl border border-white/5 animate-in slide-in-from-top-2 duration-300">
+                                <div className="flex gap-2 mx-2 p-1 bg-fill-subtle rounded-xl border border-border-subtle animate-in slide-in-from-top-2 duration-300">
                                     {[3, 5, 7].map((interval) => (
                                         <button
                                             key={interval}
@@ -301,7 +371,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                             className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all
                                                 ${spacedInterval === interval
                                                     ? 'bg-accent text-white shadow-sm'
-                                                    : 'text-text-muted hover:bg-white/5 hover:text-text'
+                                                    : 'text-text-muted hover:bg-fill-subtle hover:text-text'
                                                 }
                                             `}
                                         >
@@ -314,9 +384,9 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
 
                         {/* Separator */}
                         <div className="flex items-center gap-3 py-2">
-                            <div className="flex-1 h-px bg-white/10"></div>
+                            <div className="flex-1 h-px bg-fill-strong"></div>
                             <span className="text-xs text-text-muted uppercase tracking-wider">Or</span>
-                            <div className="flex-1 h-px bg-white/10"></div>
+                            <div className="flex-1 h-px bg-fill-strong"></div>
                         </div>
 
                         {/* Custom Date & Time */}
@@ -326,14 +396,14 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                             className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left w-full
                                 ${selectedOption === 'custom'
                                     ? 'bg-accent/20 border-accent ring-2 ring-accent'
-                                    : 'bg-white/5 border-white/5 hover:bg-white/10'
+                                    : 'bg-fill-subtle border-border-subtle hover:bg-fill-strong'
                                 }
                             `}
                         >
                             <div className={`p-2 rounded-lg transition-colors
                                 ${selectedOption === 'custom'
                                     ? 'bg-accent text-white'
-                                    : 'bg-white/5 text-text-muted'
+                                    : 'bg-fill-subtle text-text-muted'
                                 }
                             `}>
                                 {selectedOption === 'custom' ? (
@@ -352,41 +422,39 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                             <div className="pl-3 pr-3 pb-3 space-y-2">
                                 <div className="grid grid-cols-3 gap-2">
                                     <select
-                                        className="bg-black/20 border border-white/10 rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
+                                        className="bg-surface-inset border border-border-strong rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
                                         onChange={(e) => {
-                                            const currentDate = customDate ? new Date(customDate) : new Date();
-                                            currentDate.setMonth(parseInt(e.target.value));
-                                            setCustomDate(currentDate.toISOString().split('T')[0]);
+                                            const currentDate = customDate ? parseLocalDate(customDate) : new Date();
+                                            setCustomDate(formatLocalDate(withMonthClamped(currentDate, currentDate.getFullYear(), parseInt(e.target.value))));
                                         }}
-                                        value={customDate ? new Date(customDate).getMonth() : new Date().getMonth()}
+                                        value={selMonth}
                                         disabled={isSaving}
                                     >
                                         {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, i) => (
-                                            <option key={i} value={i}>{month}</option>
+                                            <option key={i} value={i} disabled={selYear === nowYear && i < nowMonth}>{month}</option>
                                         ))}
                                     </select>
                                     <select
-                                        className="bg-black/20 border border-white/10 rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
+                                        className="bg-surface-inset border border-border-strong rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
                                         onChange={(e) => {
-                                            const currentDate = customDate ? new Date(customDate) : new Date();
+                                            const currentDate = customDate ? parseLocalDate(customDate) : new Date();
                                             currentDate.setDate(parseInt(e.target.value));
-                                            setCustomDate(currentDate.toISOString().split('T')[0]);
+                                            setCustomDate(formatLocalDate(currentDate));
                                         }}
-                                        value={customDate ? new Date(customDate).getDate() : new Date().getDate()}
+                                        value={selDay}
                                         disabled={isSaving}
                                     >
-                                        {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
-                                            <option key={day} value={day}>{day}</option>
+                                        {Array.from({ length: daysInMonth(selYear, selMonth) }, (_, i) => i + 1).map(day => (
+                                            <option key={day} value={day} disabled={selYear === nowYear && selMonth === nowMonth && day < nowDay}>{day}</option>
                                         ))}
                                     </select>
                                     <select
-                                        className="bg-black/20 border border-white/10 rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
+                                        className="bg-surface-inset border border-border-strong rounded-lg px-2 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
                                         onChange={(e) => {
-                                            const currentDate = customDate ? new Date(customDate) : new Date();
-                                            currentDate.setFullYear(parseInt(e.target.value));
-                                            setCustomDate(currentDate.toISOString().split('T')[0]);
+                                            const currentDate = customDate ? parseLocalDate(customDate) : new Date();
+                                            setCustomDate(formatLocalDate(withMonthClamped(currentDate, parseInt(e.target.value), currentDate.getMonth())));
                                         }}
-                                        value={customDate ? new Date(customDate).getFullYear() : new Date().getFullYear()}
+                                        value={selYear}
                                         disabled={isSaving}
                                     >
                                         {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() + i).map(year => (
@@ -395,19 +463,21 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                     </select>
                                 </div>
                                 <select
-                                    className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
+                                    className="w-full bg-surface-inset border border-border-strong rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:ring-1 focus:ring-accent/50 cursor-pointer"
                                     onChange={(e) => setCustomTime(e.target.value)}
                                     value={customTime}
                                     disabled={isSaving}
                                 >
                                     {Array.from({ length: 24 }, (_, i) => {
                                         const hour = i.toString().padStart(2, '0');
-                                        return [
-                                            <option key={`${hour}:00`} value={`${hour}:00`}>{`${hour}:00`}</option>,
-                                            <option key={`${hour}:15`} value={`${hour}:15`}>{`${hour}:15`}</option>,
-                                            <option key={`${hour}:30`} value={`${hour}:30`}>{`${hour}:30`}</option>,
-                                            <option key={`${hour}:45`} value={`${hour}:45`}>{`${hour}:45`}</option>
-                                        ];
+                                        return ['00', '15', '30', '45'].map((min) => {
+                                            const value = `${hour}:${min}`;
+                                            // For today, disable slots at or before the current minute.
+                                            const isPast = selIsToday && (i * 60 + parseInt(min)) <= nowMinutes;
+                                            return (
+                                                <option key={value} value={value} disabled={isPast}>{value}</option>
+                                            );
+                                        });
                                     }).flat()}
                                 </select>
                             </div>
@@ -415,7 +485,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     </div>
 
                     {isReminderActive && (
-                        <div className="pt-2 border-t border-white/5 mt-2">
+                        <div className="pt-2 border-t border-border-subtle mt-2">
                             <button
                                 onClick={() => handleSelectOption('off')}
                                 disabled={isSaving}
@@ -438,7 +508,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                         <button
                             onClick={onClose}
                             disabled={isSaving}
-                            className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-text-muted transition-all disabled:opacity-50"
+                            className="flex-1 py-3 rounded-xl bg-fill-subtle hover:bg-fill-strong text-text-muted transition-all disabled:opacity-50"
                         >
                             Cancel
                         </button>

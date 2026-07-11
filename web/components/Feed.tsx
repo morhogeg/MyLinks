@@ -10,7 +10,7 @@ import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
 import SourceFacetList from './SourceFacetList';
 import DigestView from './DigestView';
 import Dropdown from './Dropdown';
-import { updateLinkStatus, deleteLink } from '@/lib/storage';
+import { updateLinkStatus, deleteLink, updateLinkReminder } from '@/lib/storage';
 import { collection, onSnapshot, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
@@ -151,6 +151,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
     const [isTagExplorerCollapsed, setIsTagExplorerCollapsed] = useState(false);
     const [reminderModalLink, setReminderModalLink] = useState<Link | null>(null);
+    // Outcome of the SwipeDeck-triggered reminder modal, threaded back to the deck
+    // so an up-swipe is only "acted on" if a reminder was actually saved (F-29).
+    const [remindSignal, setRemindSignal] = useState<{ id: string; saved: boolean; seq: number } | null>(null);
+    const remindSeq = useRef(0);
+    // ReminderModal fires onUpdate (saved) and then onClose (dismissed) on a
+    // successful save; this flag keeps that trailing onClose from also emitting
+    // a "cancelled" signal for the same open.
+    const remindSavedRef = useRef(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
@@ -450,6 +458,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     };
 
     const handleOpenReminderModal = useCallback((link: Link) => {
+        remindSavedRef.current = false;
         setReminderModalLink(link);
     }, []);
 
@@ -544,6 +553,22 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const swipeFavorite = useCallback((link: Link) => handleStatusChange(link.id, 'favorite'), [handleStatusChange]);
     const swipeArchive = useCallback((link: Link) => handleStatusChange(link.id, 'archived'), [handleStatusChange]);
     const swipeResetStatus = useCallback((link: Link) => handleStatusChange(link.id, 'unread'), [handleStatusChange]);
+    // Undo of an up-swipe: clear the reminder the deck just set for this card (F-29).
+    // Clearing (not restoring a prior state) is safe because reviewQueue.isOpen
+    // excludes reminder-pending cards from every deck queue — a dealt card can't
+    // have carried a pre-existing reminder. Keep that invariant if queues change.
+    const swipeCancelRemind = useCallback(async (link: Link) => {
+        if (!uid) return;
+        try {
+            await updateLinkReminder(uid, link.id, false);
+        } catch {
+            toast.error("Couldn't cancel the reminder. Please try again.");
+        }
+    }, [uid, toast]);
+    // Report the reminder modal's outcome back to the deck: saved vs. cancelled.
+    const resolveRemind = useCallback((link: Link, saved: boolean) => {
+        setRemindSignal({ id: link.id, saved, seq: ++remindSeq.current });
+    }, []);
 
     const filterButtons: { key: FilterType; label: string; icon: React.ReactNode }[] = [
         { key: 'all', label: 'All', icon: <Inbox className="w-4 h-4" /> },
@@ -713,7 +738,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         {searchQuery && (
                             <button
                                 onClick={() => setSearchQuery('')}
-                                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-white/10 rounded-full transition-all"
+                                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-fill-strong rounded-full transition-all"
                             >
                                 <X className="w-4 h-4 text-text-muted" />
                             </button>
@@ -836,7 +861,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     <button
                                         onClick={() => setSearchQuery('')}
                                         aria-label="Clear search"
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-white/10 transition-colors"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-fill-strong transition-colors"
                                     >
                                         <X className="w-4 h-4" />
                                     </button>
@@ -1512,6 +1537,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             onRemind={handleOpenReminderModal}
                             onOpen={openLinkDetails}
                             onResetStatus={swipeResetStatus}
+                            onCancelRemind={swipeCancelRemind}
+                            remindSignal={remindSignal}
                         />
                     ) : viewMode === 'list' ? (
                         <div className="flex flex-col gap-2 max-w-3xl mx-auto">
@@ -1687,8 +1714,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     uid={uid}
                     link={reminderModalLink}
                     isOpen={!!reminderModalLink}
-                    onClose={() => setReminderModalLink(null)}
-                    onUpdate={() => setReminderModalLink(null)}
+                    onClose={() => { if (!remindSavedRef.current) resolveRemind(reminderModalLink, false); setReminderModalLink(null); }}
+                    onUpdate={() => { remindSavedRef.current = true; resolveRemind(reminderModalLink, true); setReminderModalLink(null); }}
                 />
             )}
 
@@ -1723,7 +1750,7 @@ export default function Feed({ onAskModeChange, onHideAddButton, onProcessingCha
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
-                <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                <div className="w-8 h-8 border-2 border-text/20 border-t-text rounded-full animate-spin" />
             </div>
         }>
             <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onOpenDigestSettings={onOpenDigestSettings} />

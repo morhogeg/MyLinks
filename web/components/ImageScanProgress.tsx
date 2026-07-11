@@ -33,7 +33,7 @@ export default function ImageScanProgress({ imageSrc, progress }: ImageScanProgr
 
     return (
         <div className="space-y-3">
-            <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-white/10">
+            <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-border-strong">
                 <img src={imageSrc} alt="Analyzing" className="w-full h-full object-cover" />
 
                 {/* Dim + subtle blur so the scan line reads clearly */}
@@ -68,7 +68,7 @@ export default function ImageScanProgress({ imageSrc, progress }: ImageScanProgr
 
             {/* Indeterminate progress bar — motion, not a lying number. */}
             <div
-                className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden"
+                className="h-1.5 w-full rounded-full bg-fill-strong overflow-hidden"
                 role="progressbar"
                 aria-valuenow={Math.round(clamped)}
                 aria-valuemin={0}

@@ -104,7 +104,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * `get_share_config` callable — the single server-side source of truth, which
  * mints a token on first use. Used both by the native bridge's token-less
  * fallback below and by the web Settings "Browser extension" screen (so the
- * extension / iOS Shortcut can be configured). No new backend endpoint.
+ * browser extension can be configured). No new backend endpoint.
  * Throws if the callable fails or returns nothing usable.
  */
 export async function fetchShareConfig(uid: string): Promise<{ endpoint: string; token: string }> {
