@@ -10,7 +10,8 @@ import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
 import SourceFacetList from './SourceFacetList';
 import DigestView from './DigestView';
 import Dropdown from './Dropdown';
-import { updateLinkStatus, deleteLink, updateLinkReminder } from '@/lib/storage';
+import { updateLinkStatus, deleteLink, updateLinkReminder, saveLink } from '@/lib/storage';
+import { EXAMPLE_CARD } from '@/lib/exampleCard';
 import { collection, onSnapshot, doc, updateDoc, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
@@ -39,7 +40,7 @@ import CollectionsGallery from './CollectionsGallery';
 import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, Share2, Globe, Plus, Newspaper } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, Share2, Globe, Plus, Newspaper, Sparkles } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
@@ -161,6 +162,26 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const remindSavedRef = useRef(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+
+    // One-tap "Try it with an example" on a brand-new empty feed: seed a real,
+    // hand-crafted card so Ask / search / Collections have something to work
+    // against in the first minute. Written through the normal saveLink path (not
+    // the analyze pipeline) so it's instant and offline-safe; the backend embeds
+    // it via the needsEmbedding flag. Guarded so a double-tap can't seed twice.
+    const [seedingExample, setSeedingExample] = useState(false);
+    const handleSeedExample = useCallback(async () => {
+        if (!uid || seedingExample) return;
+        setSeedingExample(true);
+        try {
+            await saveLink(uid, EXAMPLE_CARD);
+            // The feed is live via onSnapshot, so the card streams in on its own.
+        } catch {
+            toast.error('Could not add the example. Please try again.');
+            setSeedingExample(false);
+        }
+        // On success we deliberately leave seedingExample true: the card arriving
+        // flips the feed out of the empty state, so this button unmounts anyway.
+    }, [uid, seedingExample, toast]);
 
     // Collections
     const [collections, setCollections] = useState<Collection[]>([]);
@@ -1564,6 +1585,31 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                                         selectedTags.size > 0 ? 'Try clearing some tag filters' :
                                                             'Add your first link using the + button below'}
                             </p>
+                            {/* Brand-new, genuinely empty account (no query, no
+                                filters): offer a one-tap seeded example so Ask /
+                                search / Collections demo against something real
+                                in the first minute — instead of a dead end. */}
+                            {links.length === 0 && filter === 'all' && !searchQuery && !debouncedQuery &&
+                                selectedCategory.size === 0 && selectedTags.size === 0 &&
+                                selectedSources.size === 0 && selectedCollections.size === 0 && (
+                                <button
+                                    onClick={handleSeedExample}
+                                    disabled={seedingExample}
+                                    className="mt-5 inline-flex items-center gap-2 px-4 h-11 rounded-full bg-accent text-white text-sm font-bold shadow-sm shadow-accent/20 hover:bg-accent-hover active:scale-95 transition-all disabled:opacity-60 disabled:pointer-events-none"
+                                >
+                                    {seedingExample ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            Adding…
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles className="w-4 h-4" />
+                                            Try it with an example
+                                        </>
+                                    )}
+                                </button>
+                            )}
                             {(selectedTags.size > 0 || selectedSources.size > 0 || searchQuery) && (
                                 <button
                                     onClick={() => {
