@@ -23,7 +23,7 @@ def test_user_settings_defaults():
     s = UserSettings()
     # The headline default the digest pipeline relies on.
     assert s.digest_channels == ["push"]
-    assert s.digest_enabled is False
+    assert s.digest_enabled is True  # weekly digest on by default for new users
     assert s.digest_frequency == "weekly"
     assert s.digest_mode == "smart"
     assert s.digest_count == 5
@@ -84,6 +84,18 @@ def test_ai_analysis_minimal_valid_shape():
     assert a.concepts == []  # default_factory list
     assert a.videoHighlights == []
     assert a.detailedSummary is None
+
+
+def test_ai_analysis_valid_without_actionable_takeaway():
+    # actionableTakeaway is OPTIONAL — a card for non-actionable content (news,
+    # an anecdote, a personal note) omits it rather than manufacturing filler.
+    a = AIAnalysis(
+        title="T",
+        summary="S",
+        category="News",
+        tags=["a", "b"],
+    )
+    assert a.actionableTakeaway is None
 
 
 def test_ai_analysis_rejects_too_many_tags():

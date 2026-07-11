@@ -3,6 +3,7 @@
 import { Bell, Sun, Moon, Monitor, RefreshCw, Clock, Compass, Network, Puzzle } from 'lucide-react';
 import { policyUrl, openExternal } from '@/lib/share';
 import ProfileAvatar from '../ProfileAvatar';
+import DataExport from './DataExport';
 import type { Settings, View } from './types';
 import {
     SectionHeader, Footnote, List, RowShell, RowText, Chevron,
@@ -90,6 +91,10 @@ export function MainView({
                 <b className="text-text-secondary font-semibold">Powered by Google Gemini.</b> Saved content and your questions are sent to Gemini for summaries and answers.
                 {aiConsentAt !== null && ` You agreed on ${new Date(aiConsentAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}.`}
             </Footnote>
+
+            <SectionHeader>Your data</SectionHeader>
+            <DataExport />
+            <Footnote>Download everything you&apos;ve saved — cards and collections — as a full JSON backup plus a readable Markdown file. Your data is yours to take anywhere.</Footnote>
 
             <SectionHeader>Advanced</SectionHeader>
             <List>

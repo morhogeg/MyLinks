@@ -32,6 +32,7 @@ import {
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { isNativeApp } from '@/lib/api';
+import { markSignIn } from '@/lib/analytics';
 
 export type AuthProviderId = 'google' | 'apple';
 
@@ -112,9 +113,16 @@ async function signInWithAppleNative(): Promise<void> {
 /** Start a sign-in with the given provider, picking the web or native flow. */
 export async function signIn(provider: AuthProviderId): Promise<void> {
     if (isNativeApp()) {
-        return provider === 'apple' ? signInWithAppleNative() : signInWithGoogleNative();
+        await (provider === 'apple' ? signInWithAppleNative() : signInWithGoogleNative());
+    } else {
+        await (provider === 'apple' ? signInWithAppleWeb() : signInWithGoogleWeb());
     }
-    return provider === 'apple' ? signInWithAppleWeb() : signInWithGoogleWeb();
+    // A deliberate sign-in just completed via the popup or native credential
+    // flow. AuthProvider emits the `sign_in` analytics event once the workspace
+    // uid resolves (track() needs the data uid, unknown at this instant). For
+    // the web redirect fallback the page navigates away before this line, so
+    // completeRedirectSignIn() marks that case on return instead.
+    markSignIn(provider);
 }
 
 /** Back-compat named helpers. */
@@ -130,6 +138,11 @@ export async function completeRedirectSignIn(): Promise<User | null> {
     if (isNativeApp()) return null;
     try {
         const result = await getRedirectResult(auth, browserPopupRedirectResolver);
+        if (result?.user) {
+            // Mark the redirect-based sign-in so AuthProvider emits `sign_in`
+            // once the workspace uid resolves.
+            markSignIn(result.providerId === 'apple.com' ? 'apple' : 'google');
+        }
         return result?.user ?? null;
     } catch {
         return null;

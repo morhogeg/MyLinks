@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { updateLinkStatus, updateLinkTags, updateLinkCategory, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
+import { updateLinkStatus, updateLinkTags, updateLinkCategory, updateLinkTitle, updateLinkSummary, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
 import { publishCard, removeLinkFromCollection } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
 import { useToast } from '@/components/Toast';
@@ -57,6 +57,26 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
         }
     }, [uid, toast]);
 
+    // Editable AI output — the summary/title the model produced is a draft, not a
+    // verdict. Optimistic via onSnapshot latency compensation (same as the others).
+    const handleUpdateTitle = useCallback(async (id: string, title: string) => {
+        if (!uid) return;
+        try {
+            await updateLinkTitle(uid, id, title);
+        } catch {
+            toast.error("Couldn't save the title. Please try again.");
+        }
+    }, [uid, toast]);
+
+    const handleUpdateSummary = useCallback(async (id: string, summary: string) => {
+        if (!uid) return;
+        try {
+            await updateLinkSummary(uid, id, summary);
+        } catch {
+            toast.error("Couldn't save the summary. Please try again.");
+        }
+    }, [uid, toast]);
+
     // Retry analysis for a failed capture card (M3). Optimistically flips the card
     // back to `processing` and re-runs analysis in place; on failure it returns to
     // a `failed` card so nothing is ever lost.
@@ -102,6 +122,8 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
         handleReadStatusChange,
         handleUpdateTags,
         handleUpdateCategory,
+        handleUpdateTitle,
+        handleUpdateSummary,
         handleRetryProcessing,
         handleRemoveFromCollection,
         handleShareCard,

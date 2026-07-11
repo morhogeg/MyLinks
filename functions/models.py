@@ -44,7 +44,10 @@ class AIAnalysis(BaseModel):
     summary: str = Field(description="2-4 sentences for snackable preview")
     category: str = Field(description="One high-level category")
     tags: List[str] = Field(max_length=5, description="3-5 relevant tags")
-    actionableTakeaway: str = Field(description="One concrete specific action")
+    # Optional: a genuine, concrete action the content actually supports — omitted
+    # entirely when there is none (a news event, an anecdote, a personal note),
+    # rather than manufacturing generic filler onto every card.
+    actionableTakeaway: Optional[str] = Field(None, description="One concrete specific action, only when the content genuinely supports one")
     detailedSummary: Optional[str] = Field(None, description="Markdown formatted detailed summary")
     sourceName: Optional[str] = Field(None, description="Name of the source/publisher (e.g., CNN, X)")
     concepts: List[str] = Field(default_factory=list, description="3-5 abstract concepts or mental models")
@@ -99,7 +102,7 @@ class UserSettings(BaseModel):
     # ── Curated Digest delivery ──────────────────────────────────────────
     # A scheduled, curated set of saved cards delivered over push (plus the
     # always-on in-app Digest section). See digest_service.py for the logic.
-    digest_enabled: bool = False
+    digest_enabled: bool = True  # weekly digest on by default for new users
     # How often to deliver: "daily" | "weekly"
     digest_frequency: str = "weekly"
     # Delivery channels — push only (retired whatsapp/email entries are

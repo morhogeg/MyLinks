@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { MessageCircleQuestion, ArrowUp, FileText, Brain, Plus, MessagesSquare, Copy, Check } from 'lucide-react';
+import { MessageCircleQuestion, ArrowUp, FileText, Brain, Plus, MessagesSquare, Copy, Check, TriangleAlert } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -10,6 +10,7 @@ import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl, isNativeApp, fetchWithTimeout } from '@/lib/api';
+import { trackFirstAsk, trackAskNoCitations } from '@/lib/analytics';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { ChatMessage, ChatSource, ChatSession } from '@/lib/types';
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
@@ -482,12 +483,18 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                             appendText(evt.text || '');
                         } else if (evt.type === 'sources') {
                             patchAt({ sources: evt.sources || [] });
+                        } else if (evt.type === 'ungrounded') {
+                            // Answer couldn't be tied to any save — downgrade it
+                            // (arrives after the prose, in place of source chips).
+                            patchAt({ ungrounded: true });
+                            trackAskNoCitations();
                         } else if (evt.type === 'error') {
                             setIsThinking(false);
                             patchAt({ content: evt.error || 'Something went wrong reaching Machina. Please try again.', error: true });
                             done = true;
                         } else if (evt.type === 'done') {
                             done = true;
+                            trackFirstAsk();
                         }
                     }
                 }
@@ -503,7 +510,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                     role: 'assistant',
                     content: data.answer || "I couldn't find an answer for that.",
                     sources: data.sources || [],
+                    ungrounded: Boolean(data.ungrounded),
                 }]);
+                trackFirstAsk();
+                if (data.ungrounded) trackAskNoCitations();
             } else {
                 setMessages(prev => [...prev, {
                     role: 'assistant',
@@ -651,8 +661,18 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                                         <CopyButton text={m.content} />
                                     )}
 
+                                    {/* Ungrounded downgrade — the answer couldn't be tied to any
+                                        save, so we drop the "grounded" promise and say so plainly
+                                        in place of the source chips (never confident-and-uncited). */}
+                                    {m.role === 'assistant' && !m.error && m.ungrounded && (
+                                        <div className="mt-2.5 flex items-start gap-2 max-w-full px-3 py-2 rounded-xl bg-card border border-border-subtle text-text-muted text-[12px] leading-snug">
+                                            <TriangleAlert className="w-3.5 h-3.5 mt-px shrink-0" />
+                                            <span>Machina couldn&apos;t tie this answer to your saves — treat it with extra caution.</span>
+                                        </div>
+                                    )}
+
                                     {/* Citations — clickable proof cards back to the source links */}
-                                    {m.role === 'assistant' && m.sources && m.sources.length > 0 && (
+                                    {m.role === 'assistant' && !m.ungrounded && m.sources && m.sources.length > 0 && (
                                         <div className="mt-2.5 flex flex-wrap gap-2">
                                             {m.sources.map(s => (
                                                 <button

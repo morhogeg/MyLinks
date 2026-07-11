@@ -237,8 +237,13 @@ The multi-user auth work is **fully written but not live**:
      it can't time out). The admin all-users `backfill_related_links` HTTP fn
      still exists as a fallback (`curl -H "X-Admin-Token: $ADMIN_TOKEN" …`).
    - Confirm `backfill_youtube_channels` was run (channel-name repair).
-   - `/api/analyze` 60s timeout on slow YouTube videos — route around Hosting's
-     60s cap like `/api/chat` did (touches all link-saving; test carefully).
+   - `/api/analyze` 60s timeout on slow YouTube videos — **largely moot as of
+     2026-07-11 (weaknesses sprint):** web link saves no longer ride the
+     synchronous `/api/analyze` request; they write a `processing` placeholder
+     and enqueue via `/api/share` into `process_link_background` (300s budget).
+     `/api/analyze` remains in use only for the card **Retry** flow, image
+     analysis, and the Note tab (all short) — the slow-YouTube exposure there is
+     retry-only and tolerable.
 5. **[ ] Security config + key hygiene (30 min, do with #2):** set `ADMIN_TOKEN`,
    `APPCHECK_ENFORCE=true`, `OWNER_EMAIL` in functions env. **Rotate the Gemini
    key** (was pasted in chat 2026-06-23) and the **App Store Connect API `.p8`**
@@ -603,6 +608,31 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-11 — Weaknesses-sprint remediation (branch
+  `claude/machina-remediation-orchestrator-1yngsi` — merged to `main` this
+  ship; see the ship entry prepended above).** Orchestrated 7 Opus agents over
+  4 waves against `APP_WEAKNESSES.md` (the 2026-07-10 8-item product critique;
+  that file is the detailed tracker with per-item commits + owner steps). All 8
+  items landed: **#3** citations are a hard invariant (re-ask once, else
+  visible `ungrounded` downgrade — never confident-and-uncited); **#4**
+  reminder one-shots fixed (`once` profile), in-app "Reminders due" strip for
+  pushless users, push asked at first intent, digest default ON (new users);
+  **#8** self-hosted content-free analytics (`users/{uid}/analytics_events`),
+  client error reporting, Settings → Export (JSON+MD); **#2** rich v2
+  embeddings + `backfill_embeddings` endpoint, top-30→rerank→10 retrieval, Ask
+  on `gemini-3.1-flash`; **#5** honest timeout copy, web dedup, PDF/JS-shell
+  honest degradation, and durable web capture (placeholder + `/api/share`
+  enqueue — the 60s loss window is gone); **#1** platform-aware onboarding +
+  1-tap example card + tour cut to 3 steps and gated to a non-empty feed;
+  **#6** URL-less notes (share + web Note tab), editable title/summary,
+  optional `actionableTakeaway`; **#7** unified swipe grammar (right never
+  destructive; taxonomy merge written up as a design proposal, not built).
+  Tests 70→137, tsc clean throughout. **Owner steps:** `./deploy-functions.sh`;
+  run `backfill_embeddings` once (`$ADMIN_TOKEN`); add permissive
+  `analytics_events`/`client_errors` matches to LIVE firestore.rules
+  (pre-cutover) or events are silently denied; run `firestore-rules-test` on
+  the owner machine; device-verify swipes, push nudge, onboarding, and the
+  durable-capture placeholder→ready flip.
 - **2026-07-11 (later) — Review-mode device feedback fixed + reshipped (merge
   `60c5d23`; TestFlight run #66 → build 1066).** Owner tested build 1065:
   Review mode didn't read as a Tinder deck — the deck overflowed the viewport

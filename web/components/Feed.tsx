@@ -10,8 +10,10 @@ import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
 import SourceFacetList from './SourceFacetList';
 import DigestView from './DigestView';
 import Dropdown from './Dropdown';
-import { updateLinkStatus, deleteLink, updateLinkReminder } from '@/lib/storage';
-import { collection, onSnapshot, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { updateLinkStatus, deleteLink, updateLinkReminder, saveLink } from '@/lib/storage';
+import { EXAMPLE_CARD } from '@/lib/exampleCard';
+import { track } from '@/lib/analytics';
+import { collection, onSnapshot, doc, updateDoc, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
@@ -39,7 +41,7 @@ import CollectionsGallery from './CollectionsGallery';
 import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, Share2, Globe, Plus, Newspaper } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, Share2, Globe, Plus, Newspaper, Sparkles } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
@@ -66,7 +68,7 @@ const noop = () => { };
  * - Two card views (grid / list), plus review, ask, and collections modes
  * - Deep linking to specific links via URL params
  */
-function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void }) {
+function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void }) {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
@@ -102,6 +104,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         handleReadStatusChange,
         handleUpdateTags,
         handleUpdateCategory,
+        handleUpdateTitle,
+        handleUpdateSummary,
         handleRetryProcessing,
         handleRemoveFromCollection,
         handleShareCard,
@@ -162,6 +166,27 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
+    // One-tap "Try it with an example" on a brand-new empty feed: seed a real,
+    // hand-crafted card so Ask / search / Collections have something to work
+    // against in the first minute. Written through the normal saveLink path (not
+    // the analyze pipeline) so it's instant and offline-safe; the backend embeds
+    // it via the needsEmbedding flag. Guarded so a double-tap can't seed twice.
+    const [seedingExample, setSeedingExample] = useState(false);
+    const handleSeedExample = useCallback(async () => {
+        if (!uid || seedingExample) return;
+        setSeedingExample(true);
+        try {
+            await saveLink(uid, EXAMPLE_CARD);
+            track('example_card_seeded');
+            // The feed is live via onSnapshot, so the card streams in on its own.
+        } catch {
+            toast.error('Could not add the example. Please try again.');
+            setSeedingExample(false);
+        }
+        // On success we deliberately leave seedingExample true: the card arriving
+        // flips the feed out of the empty state, so this button unmounts anyway.
+    }, [uid, seedingExample, toast]);
+
     // Collections
     const [collections, setCollections] = useState<Collection[]>([]);
     const [addToCollectionLink, setAddToCollectionLink] = useState<Link | null>(null);
@@ -199,6 +224,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         onProcessingChange?.(processingBanner);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [procSig]);
+
+    // Lift "does this library have any cards yet" so page.tsx can gate the
+    // first-run tour to a non-empty feed (never spotlight over zero cards).
+    useEffect(() => {
+        onHasCardsChange?.(links.length > 0);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [links.length > 0]);
 
     // Load collapsed state from localStorage
     useEffect(() => {
@@ -388,14 +420,62 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         return map;
     }, [links, collections]);
 
+    // In-app reminder fallback: the backend flags a link `reminderDue` when its
+    // reminder fires (for EVERY user, push or not). Surface those due links in a
+    // "Reminders due" strip so the promise "I'll remind you" always produces
+    // something visible in-app. Clearing is best-effort — onSnapshot resyncs.
+    const clearReminderDue = useCallback(async (id: string) => {
+        if (!uid) return;
+        try {
+            await updateDoc(doc(db, 'users', uid, 'links', id), { reminderDue: false, reminderDueAt: null });
+        } catch {
+            /* best-effort dismiss; the live snapshot keeps the source of truth */
+        }
+    }, [uid]);
+    const dueLinks = useMemo(() => links.filter((l) => l.reminderDue === true), [links]);
+
     // The proactive feed modules, rendered once and reused in both the grid and
-    // list layouts (above pending + real cards). Just the weekly synthesis recap
-    // now — the connection insight moved into the dedicated Connections view/pill,
-    // so the feed no longer carries a redundant inline banner.
+    // list layouts (above pending + real cards). The weekly synthesis recap plus
+    // the in-app "reminders due" strip — the connection insight moved into the
+    // dedicated Connections view/pill.
     const feedModules = isDefaultLibraryView ? (
         <>
             {showPushNudge && uid && (
                 <PushNudge uid={uid} onDone={() => setShowPushNudge(false)} />
+            )}
+            {dueLinks.length > 0 && (
+                <div className="mb-4 rounded-2xl border border-accent/25 bg-card overflow-hidden shadow-lg shadow-accent/5 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <div className="flex items-center gap-3 px-4 py-3 border-b border-border-subtle">
+                        <div className="w-9 h-9 shrink-0 rounded-xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-md shadow-accent/20">
+                            <Bell className="w-[18px] h-[18px] text-white" />
+                        </div>
+                        <div className="flex-grow min-w-0">
+                            <div className="text-[15px] font-bold text-text">Reminders due</div>
+                            <div className="text-[13px] text-text-secondary leading-snug">
+                                {dueLinks.length} saved {dueLinks.length === 1 ? 'item is' : 'items are'} ready to revisit.
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => dueLinks.forEach((l) => clearReminderDue(l.id))}
+                            aria-label="Dismiss all due reminders"
+                            className="w-9 h-9 flex items-center justify-center rounded-lg text-text-muted hover:text-text hover:bg-card-hover transition-colors shrink-0"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="divide-y divide-border-subtle">
+                        {dueLinks.slice(0, 5).map((l) => (
+                            <button
+                                key={l.id}
+                                onClick={() => { openLinkDetails(l); clearReminderDue(l.id); }}
+                                className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-card-hover transition-colors"
+                            >
+                                <CheckCircle2 className="w-4 h-4 text-accent shrink-0" />
+                                <span className="flex-grow min-w-0 truncate text-[14px] text-text">{l.title}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
             )}
             {latestSynthesis && latestSynthesis.weekId !== dismissedSynthesisWeek && (
                 <SynthesisCard
@@ -1517,6 +1597,31 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                                         selectedTags.size > 0 ? 'Try clearing some tag filters' :
                                                             'Add your first link using the + button below'}
                             </p>
+                            {/* Brand-new, genuinely empty account (no query, no
+                                filters): offer a one-tap seeded example so Ask /
+                                search / Collections demo against something real
+                                in the first minute — instead of a dead end. */}
+                            {links.length === 0 && filter === 'all' && !searchQuery && !debouncedQuery &&
+                                selectedCategory.size === 0 && selectedTags.size === 0 &&
+                                selectedSources.size === 0 && selectedCollections.size === 0 && (
+                                <button
+                                    onClick={handleSeedExample}
+                                    disabled={seedingExample}
+                                    className="mt-5 inline-flex items-center gap-2 px-4 h-11 rounded-full bg-accent text-white text-sm font-bold shadow-sm shadow-accent/20 hover:bg-accent-hover active:scale-95 transition-all disabled:opacity-60 disabled:pointer-events-none"
+                                >
+                                    {seedingExample ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            Adding…
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles className="w-4 h-4" />
+                                            Try it with an example
+                                        </>
+                                    )}
+                                </button>
+                            )}
                             {(selectedTags.size > 0 || selectedSources.size > 0 || searchQuery) && (
                                 <button
                                     onClick={() => {
@@ -1659,6 +1764,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     onReadStatusChange={handleReadStatusChange}
                     onUpdateTags={handleUpdateTags}
                     onUpdateCategory={handleUpdateCategory}
+                    onUpdateTitle={handleUpdateTitle}
+                    onUpdateSummary={handleUpdateSummary}
                     onUpdateReminder={handleOpenReminderModal}
                     onDelete={handleDelete}
                     onOpenOtherLink={openRelatedLink}
@@ -1716,7 +1823,21 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     link={reminderModalLink}
                     isOpen={!!reminderModalLink}
                     onClose={() => { if (!remindSavedRef.current) resolveRemind(reminderModalLink, false); setReminderModalLink(null); }}
-                    onUpdate={() => { remindSavedRef.current = true; resolveRemind(reminderModalLink, true); setReminderModalLink(null); }}
+                    onUpdate={() => {
+                        remindSavedRef.current = true;
+                        resolveRemind(reminderModalLink, true);
+                        setReminderModalLink(null);
+                        // Moment of intent: the user just asked to be reminded. On
+                        // native, if push has never been prompted (so it's off),
+                        // surface the existing push nudge to offer notifications —
+                        // reusing PushNudge, not a new permission flow. Once
+                        // prompted (granted or dismissed) we respect that choice
+                        // and don't re-nag; the in-app "Reminders due" strip is the
+                        // guaranteed channel either way.
+                        if (isNativeApp() && readLocalPushPrompt() === null) {
+                            setShowPushNudge(true);
+                        }
+                    }}
                 />
             )}
 
@@ -1747,14 +1868,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     );
 }
 
-export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void }) {
+export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void }) {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-2 border-text/20 border-t-text rounded-full animate-spin" />
             </div>
         }>
-            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onOpenDigestSettings={onOpenDigestSettings} />
+            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} />
         </Suspense>
     );
 }

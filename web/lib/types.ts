@@ -32,7 +32,9 @@ export interface AIAnalysis {
   category: string;
   tags: string[];
   concepts?: string[];
-  actionableTakeaway: string;
+  // Optional: only present when the content genuinely supports a concrete action
+  // (the backend omits it for non-actionable content rather than inventing filler).
+  actionableTakeaway?: string;
   sourceType?: string;
   sourceName?: string;
   // Backend writes a float score here; some legacy docs stored a string label.
@@ -62,7 +64,8 @@ export interface Link {
   error?: string;
   failedAt?: number;
   metadata: LinkMetadata;
-  // AI Analysis metadata
+  // AI Analysis metadata. sourceType is 'web' | 'youtube' | 'image' | 'note'
+  // (a 'note' is a URL-less thought captured directly — it has no `url`).
   sourceType?: string;
   sourceName?: string;
   // Backend writes a float score here; some legacy docs stored a string label.
@@ -82,6 +85,11 @@ export interface Link {
   nextReminderAt?: number; // Unix timestamp (ms)
   reminderCount?: number;
   reminderProfile?: string;
+  // In-app fallback: the reminder sweep flips this true when a reminder fires
+  // so the feed surfaces it even when the user has no push. Cleared when the
+  // user acts on it (opens/dismisses) or re-sets the reminder.
+  reminderDue?: boolean;
+  reminderDueAt?: number; // Unix timestamp (ms) the reminder came due
   lastViewedAt?: number; // Unix timestamp (ms)
   language?: string;
   isRead?: boolean;
@@ -264,6 +272,10 @@ export interface ChatMessage {
   content: string;
   sources?: ChatSource[];
   error?: boolean;
+  // True when the backend could not tie this answer to any saved card (no valid
+  // citation, even after a stricter re-ask). The UI drops the "grounded" promise
+  // and shows a downgrade notice in place of the source chips.
+  ungrounded?: boolean;
 }
 
 /** A saved conversation in the Ask history sidebar (users/{uid}/chats/{id}). */

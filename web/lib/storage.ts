@@ -1,4 +1,4 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, getDocs, getDoc, serverTimestamp, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, where, limit, orderBy, getDocs, getDoc, serverTimestamp, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { db, appCheckHeaders } from './firebase';
 import { authHeaders } from './auth';
 import { apiUrl, fetchWithTimeout } from './api';
@@ -62,6 +62,89 @@ export async function getUserTags(uid: string): Promise<string[]> {
     });
 
     return Array.from(tags).sort();
+}
+
+/**
+ * Return the id of an existing saved link with this exact URL, or null.
+ *
+ * Mirrors the iOS share path's dedup (functions/link_service.py
+ * `link_exists_for_url`): an exact-equality match on the stored `url` field,
+ * one indexed Firestore query, `limit(1)`. Firestore auto-indexes single
+ * fields, so no composite index is required. The web analyze endpoint stores
+ * `link.url` === the URL that was submitted, so a pre-analysis check on the
+ * formatted URL agrees with what the share path writes — the two capture paths
+ * dedup against the same value.
+ *
+ * Callers MUST treat a thrown error as "unknown" and fall through to saving —
+ * a failed dedup probe (e.g. offline) must never block a capture.
+ */
+export async function findLinkIdByUrl(uid: string, url: string): Promise<string | null> {
+    if (!url) return null;
+    const linksRef = collection(db, 'users', uid, 'links');
+    const q = query(linksRef, where('url', '==', url), limit(1));
+    const snapshot = await getDocs(q);
+    return snapshot.empty ? null : snapshot.docs[0].id;
+}
+
+/** Friendly placeholder title for an in-flight capture — the URL's host, or a
+ *  generic fallback. Mirrors functions/main.py `_capture_placeholder_title` so a
+ *  web-added processing card reads the same as an iOS-shared one. */
+function placeholderTitle(url: string): string {
+    try {
+        const host = new URL(url).hostname.replace(/^www\./, '');
+        return host || 'Analyzing link…';
+    } catch {
+        return 'Analyzing link…';
+    }
+}
+
+/**
+ * Write a `processing` placeholder card for a DURABLE web link capture
+ * (Weakness #5).
+ *
+ * Mirrors the card `process_link_background` writes for the iOS share path, so
+ * the feed's `useProcessingBanner` + Card rendering treat a web-added capture
+ * identically — a processing skeleton the instant the user hits Save. AddLinkForm
+ * then enqueues the URL (via /api/share, passing this card's id as `cardId`) into
+ * the SAME background pipeline, which flips THIS card to ready/failed when
+ * analysis lands. A slow scrape can therefore never trip a request timeout or
+ * lose the capture. Returns the new card id.
+ */
+export async function createProcessingPlaceholder(uid: string, url: string): Promise<string> {
+    const linksRef = collection(db, 'users', uid, 'links');
+    // A client ms clock (mirrors the trigger's int-ms writes) so feed ordering
+    // and useProcessingBanner's ramp work the instant the card streams in — unlike
+    // serverTimestamp(), which reads as 0 until the server resolves it.
+    const now = Date.now();
+    const ref = await addDoc(linksRef, {
+        url,
+        title: placeholderTitle(url),
+        summary: '',
+        tags: [],
+        category: '',
+        status: 'processing',
+        sourceType: 'web',
+        isRead: false,
+        createdAt: now,
+        // The processing janitor ages out cards stuck here past its timeout.
+        processingStartedAt: now,
+        metadata: { originalTitle: '', estimatedReadTime: 0 },
+    });
+    return ref.id;
+}
+
+/**
+ * Flip a capture card to a retryable `failed` state — used when the durable web
+ * enqueue can't be reached, so the placeholder never rots as an eternal spinner.
+ * The existing Retry flow (`retryFailedLink`) re-runs analysis on this same card.
+ */
+export async function markLinkFailed(uid: string, id: string, error: string): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    await updateDoc(linkRef, {
+        status: 'failed',
+        error: error.slice(0, 300),
+        failedAt: Date.now(),
+    });
 }
 
 /**
@@ -211,6 +294,26 @@ export async function updateLinkCategory(uid: string, id: string, category: stri
 }
 
 /**
+ * Update a link's AI-generated title. Makes the "second brain" correctable: the
+ * model's title is a starting point, not a verdict. Persisted to Firestore; no
+ * background process rewrites `title` on a ready card (the embedding trigger only
+ * touches `embedding_vector`), so a user edit sticks.
+ */
+export async function updateLinkTitle(uid: string, id: string, title: string): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    await updateDoc(linkRef, { title });
+}
+
+/**
+ * Update a link's AI-generated summary. Same rationale as updateLinkTitle — the
+ * summary is editable and the edit is durable (nothing rewrites it in place).
+ */
+export async function updateLinkSummary(uid: string, id: string, summary: string): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    await updateDoc(linkRef, { summary });
+}
+
+/**
  * Delete a link from Firestore
  */
 export async function deleteLink(uid: string, id: string): Promise<void> {
@@ -238,7 +341,10 @@ export async function updateLinkReminder(
             reminderStatus: 'pending',
             nextReminderAt: nextReminder,
             reminderCount: 0,
-            reminderProfile: profile || 'smart'
+            reminderProfile: profile || 'smart',
+            // Re-setting a reminder clears any stale "due" flag from a prior fire.
+            reminderDue: false,
+            reminderDueAt: null
         });
     } else {
         // Disable reminders
@@ -246,7 +352,9 @@ export async function updateLinkReminder(
             reminderStatus: 'none',
             nextReminderAt: null,
             reminderCount: 0,
-            reminderProfile: null
+            reminderProfile: null,
+            reminderDue: false,
+            reminderDueAt: null
         });
     }
 }

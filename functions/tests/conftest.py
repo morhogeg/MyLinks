@@ -97,15 +97,32 @@ def _install_fakes():
         fa.storage = types.SimpleNamespace()
         fa.auth = types.SimpleNamespace()
 
-    # firebase_functions (only imported by main/search, which these tests avoid,
-    # but faked defensively so an incidental import never explodes)
+    # firebase_functions — needed so search.py (module-level @firestore_fn /
+    # @https_fn decorators) imports offline for the pure-helper tests. Every
+    # attribute doubles as a passthrough decorator factory: `@https_fn.on_call()`
+    # and `@firestore_fn.on_document_written(document=...)` both resolve to an
+    # identity decorator. (A SimpleNamespace with an instance `__getattr__` does
+    # NOT work — dunder lookups go through the type — so use a real class.)
     if not _real_import("firebase_functions"):
         ff = _ensure_pkg("firebase_functions")
-        _passthrough = lambda *a, **k: (lambda f: f)
+
+        class _FnAttr:
+            """Callable (decorator factory), subscriptable (generic type
+            annotations like ``Event[Change[Snapshot]]``), and further
+            attribute access all resolve to another _FnAttr."""
+            def __call__(self, *a, **k):
+                return lambda f: f
+            def __getitem__(self, _item):
+                return self
+            def __getattr__(self, _name):
+                return _FnAttr()
+
+        class _FnNamespace:
+            def __getattr__(self, _name):
+                return _FnAttr()
+
         for name in ("https_fn", "scheduler_fn", "firestore_fn", "options"):
-            ns = types.SimpleNamespace()
-            setattr(ns, "__getattr__", lambda attr: _passthrough)
-            setattr(ff, name, ns)
+            setattr(ff, name, _FnNamespace())
 
     # requests  (digest_service / main import it at top)
     if not _real_import("requests"):

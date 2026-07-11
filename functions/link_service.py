@@ -15,7 +15,7 @@ from db import get_db
 logger = logging.getLogger(__name__)
 
 # Defaults for a brand-new workspace. Mirrors DEFAULT_SETTINGS in
-# web/components/SettingsModal.tsx — keep the two in sync.
+# web/lib/useUserSettings.ts — keep the two in sync.
 DEFAULT_USER_SETTINGS = {
     "theme": "dark",
     "daily_digest": False,
@@ -24,7 +24,12 @@ DEFAULT_USER_SETTINGS = {
     # Push flips true client-side once the user grants the OS permission.
     "push_enabled": False,
     "reminders_channel": ["push"],
-    "digest_enabled": False,
+    # Weekly digest is ON by default for NEW workspaces (retention loop). This
+    # default is only written into a brand-new user doc; existing users keep
+    # whatever they had (a missing digest_enabled is treated as off by
+    # digest_service.run — see the `if not settings.get("digest_enabled")`
+    # guards), so nobody is force-enabled retroactively.
+    "digest_enabled": True,
     "digest_frequency": "weekly",
     "digest_channels": ["push"],
     "digest_mode": "smart",

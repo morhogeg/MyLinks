@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Newspaper, Sparkles } from 'lucide-react';
 import type { CuratedDigest, WeeklySynthesis, DigestCardRef } from '@/lib/types';
+import { track } from '@/lib/analytics';
 import DigestCard from './DigestCard';
 import SynthesisCard from './SynthesisCard';
 
@@ -48,6 +49,12 @@ interface Props {
 export default function DigestView({
     digests, synthesis, onOpenCard, onOpenSynthesisCard, onDismissSynthesis, onOpenDigestSettings, onDeleteDigest,
 }: Props) {
+    // The Digest section mounts only when the user opens it (Feed swaps it in),
+    // so a mount is a genuine "digest opened" view. Fired once per mount.
+    useEffect(() => {
+        track('digest_opened');
+    }, []);
+
     // Sidebar selection. 'synthesis' or a digest id; falls back to the newest.
     const [selId, setSelId] = useState<string | null>(null);
     const ids = new Set(digests.map((d) => d.id));

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
-import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2, ChevronLeft } from 'lucide-react';
+import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2, ChevronLeft, StickyNote } from 'lucide-react';
 import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import { openExternal } from '@/lib/share';
@@ -49,6 +49,8 @@ interface LinkDetailModalProps {
     onReadStatusChange: (id: string, isRead: boolean) => void;
     onUpdateTags: (id: string, tags: string[]) => void;
     onUpdateCategory: (id: string, category: string) => void;
+    onUpdateTitle?: (id: string, title: string) => void;
+    onUpdateSummary?: (id: string, summary: string) => void;
     onDelete: (id: string) => void;
     onUpdateReminder: (link: Link) => void;
     onOpenOtherLink?: (link: Link) => void;
@@ -70,6 +72,8 @@ export default function LinkDetailModal({
     onReadStatusChange,
     onUpdateTags,
     onUpdateCategory,
+    onUpdateTitle,
+    onUpdateSummary,
     onDelete,
     onUpdateReminder,
     onOpenOtherLink,
@@ -81,6 +85,12 @@ export default function LinkDetailModal({
     const [isEditingCategory, setIsEditingCategory] = useState(false);
     const [now, setNow] = useState<number>(0);
     const [isAddingTag, setIsAddingTag] = useState(false);
+    // Correctable AI output: the title and summary the model produced are drafts
+    // the user can fix. Drafts are held locally while editing, committed on Save.
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [isEditingSummary, setIsEditingSummary] = useState(false);
+    const [titleDraft, setTitleDraft] = useState('');
+    const [summaryDraft, setSummaryDraft] = useState('');
     const [imgFailed, setImgFailed] = useState(false);
     // Reset the broken-image fallback when navigating to a different card. Done
     // as a render-time state adjustment (React discards this pass and re-renders
@@ -90,7 +100,22 @@ export default function LinkDetailModal({
     if (imgLinkId !== link.id) {
         setImgLinkId(link.id);
         setImgFailed(false);
+        // Abandon any in-progress edit when navigating to another card so a draft
+        // never leaks onto the wrong card.
+        setIsEditingTitle(false);
+        setIsEditingSummary(false);
     }
+
+    const saveTitle = () => {
+        const t = titleDraft.trim();
+        setIsEditingTitle(false);
+        if (t && t !== link.title) onUpdateTitle?.(link.id, t);
+    };
+    const saveSummary = () => {
+        const s = summaryDraft.trim();
+        setIsEditingSummary(false);
+        if (s !== (link.summary || '')) onUpdateSummary?.(link.id, s);
+    };
     const hasValidImage = !!link.url && /^https?:\/\//.test(link.url);
 
     // Scroll back to the top when the card changes. Opening a related card reuses
@@ -149,13 +174,15 @@ export default function LinkDetailModal({
             if (e.key !== 'Escape') return;
             e.preventDefault();
             if (isReading) setIsReading(false);
+            else if (isEditingTitle) setIsEditingTitle(false);
+            else if (isEditingSummary) setIsEditingSummary(false);
             else if (isEditingCategory) setIsEditingCategory(false);
             else if (isAddingTag) setIsAddingTag(false);
             else onClose();
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [isOpen, isReading, isEditingCategory, isAddingTag, onClose]);
+    }, [isOpen, isReading, isEditingTitle, isEditingSummary, isEditingCategory, isAddingTag, onClose]);
 
     if (!isOpen) return null;
 
@@ -544,6 +571,11 @@ export default function LinkDetailModal({
                                             <ImageIcon className="w-4 h-4 shrink-0" />
                                             <span>Screenshot</span>
                                         </span>
+                                    ) : link.sourceType === 'note' ? (
+                                        <span className="flex items-center gap-1.5 text-sm font-semibold text-accent whitespace-nowrap" title="Note">
+                                            <StickyNote className="w-4 h-4 shrink-0" />
+                                            <span>Note</span>
+                                        </span>
                                     ) : link.sourceName && link.sourceName !== 'None' ? (
                                         <span
                                             className="text-[10px] font-black text-text-muted/60 bg-fill-subtle border border-border-strong uppercase tracking-widest px-2.5 py-1.5 rounded-lg shadow-lg shadow-black/5 transition-all"
@@ -557,12 +589,56 @@ export default function LinkDetailModal({
                         })()}
                     </div>
 
-                    <h2
-                        dir="auto"
-                        className={`font-bold text-2xl text-text mb-4 leading-tight ${isRtl ? 'text-right' : ''}`}
-                    >
-                        {link.title}
-                    </h2>
+                    {isEditingTitle ? (
+                        <div className="mb-4">
+                            <textarea
+                                value={titleDraft}
+                                onChange={(e) => setTitleDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                    // Enter saves (a title is single-line); Shift+Enter is unused.
+                                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveTitle(); }
+                                }}
+                                rows={2}
+                                autoFocus
+                                dir="auto"
+                                aria-label="Edit title"
+                                className={`w-full font-bold text-2xl text-text leading-tight bg-background border border-accent/40 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none ${isRtl ? 'text-right' : ''}`}
+                            />
+                            <div className="flex gap-2 mt-2">
+                                <button
+                                    onClick={saveTitle}
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
+                                >
+                                    <Check className="w-3.5 h-3.5" /> Save
+                                </button>
+                                <button
+                                    onClick={() => setIsEditingTitle(false)}
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-fill-subtle text-text-muted text-xs font-bold hover:text-text hover:bg-fill-strong transition-all"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className={`group/title relative flex items-start gap-2 mb-4 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                            <h2
+                                dir="auto"
+                                className={`font-bold text-2xl text-text leading-tight flex-1 min-w-0 ${isRtl ? 'text-right' : ''}`}
+                            >
+                                {link.title}
+                            </h2>
+                            {onUpdateTitle && (
+                                <button
+                                    onClick={() => { setTitleDraft(link.title); setIsEditingTitle(true); }}
+                                    aria-label="Edit title"
+                                    title="Edit title"
+                                    className="shrink-0 mt-1 opacity-0 group-hover/title:opacity-100 focus:opacity-100 transition-opacity p-1.5 hover:bg-fill-subtle rounded-md"
+                                >
+                                    <Pencil className="w-4 h-4 text-text-muted/50 hover:text-text-muted" />
+                                </button>
+                            )}
+                        </div>
+                    )}
 
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                         {/* Card ↔ open are ONE thought at two zoom levels: the card
@@ -583,14 +659,70 @@ export default function LinkDetailModal({
                                 // Lead with the summary unless doing so would duplicate
                                 // a legacy overview-only (section-less) detailedSummary.
                                 const showLead = !!link.summary && (hasSections || !detailed);
+                                const startEditSummary = () => {
+                                    setSummaryDraft(link.summary || '');
+                                    setIsEditingSummary(true);
+                                };
                                 return (
                                     <>
-                                        {showLead && (
-                                            <SimpleMarkdown
-                                                content={link.summary}
-                                                isRtl={isRtl}
-                                                className={`text-base ${detailBody ? 'mb-6' : ''}`}
-                                            />
+                                        {isEditingSummary ? (
+                                            <div className={detailBody ? 'mb-6' : ''}>
+                                                <textarea
+                                                    value={summaryDraft}
+                                                    onChange={(e) => setSummaryDraft(e.target.value)}
+                                                    rows={4}
+                                                    autoFocus
+                                                    dir="auto"
+                                                    aria-label="Edit summary"
+                                                    className={`w-full text-base text-text bg-background border border-accent/40 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none ${isRtl ? 'text-right' : ''}`}
+                                                />
+                                                <div className="flex gap-2 mt-2">
+                                                    <button
+                                                        onClick={saveSummary}
+                                                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
+                                                    >
+                                                        <Check className="w-3.5 h-3.5" /> Save
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setIsEditingSummary(false)}
+                                                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-fill-subtle text-text-muted text-xs font-bold hover:text-text hover:bg-fill-strong transition-all"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {showLead && (
+                                                    <div className={`group/summary relative ${detailBody ? 'mb-6' : ''}`}>
+                                                        <SimpleMarkdown
+                                                            content={link.summary}
+                                                            isRtl={isRtl}
+                                                            className="text-base"
+                                                        />
+                                                        {onUpdateSummary && (
+                                                            <button
+                                                                onClick={startEditSummary}
+                                                                aria-label="Edit summary"
+                                                                title="Edit summary"
+                                                                className={`absolute top-0 opacity-0 group-hover/summary:opacity-100 focus:opacity-100 transition-opacity p-1.5 hover:bg-fill-subtle rounded-md ${isRtl ? 'left-0' : 'right-0'}`}
+                                                            >
+                                                                <Pencil className="w-4 h-4 text-text-muted/50 hover:text-text-muted" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {/* Legacy prose-only cards hide the lead to avoid a
+                                                    duplicate — still let the user correct the summary. */}
+                                                {!showLead && onUpdateSummary && (
+                                                    <button
+                                                        onClick={startEditSummary}
+                                                        className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/60 hover:text-accent transition-colors"
+                                                    >
+                                                        <Pencil className="w-3.5 h-3.5" /> Edit summary
+                                                    </button>
+                                                )}
+                                            </>
                                         )}
                                         {detailBody && (
                                             <SimpleMarkdown
