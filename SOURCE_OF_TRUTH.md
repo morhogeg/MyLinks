@@ -608,7 +608,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-11 (latest) — SHIPPED: the weaknesses-sprint remediation below
+- **2026-07-11 (latest) — Review mode simplified per owner device feedback +
+  first-render collapse fixed (`af08fe1`, merges `522035b`/`3c7960d`;
+  TestFlight run #69 → build 1069, fired after cross-merging the parallel
+  weaknesses-sprint main).** Owner's build-1067 report: first tap into Review
+  rendered a collapsed deck (squashed card strips, dead space), and the
+  Forgotten/Recent/Tidy chips + the "Saved X ago · never opened" lines should
+  go. (1) Collapse root cause: the deck can mount on an empty pool — the empty
+  state has no measuring rootRef — then get dealt by the self-heal effect with
+  `pos` unchanged, so the height measure (keyed on pos) never re-ran and maxH
+  stayed 0; the measure is now also keyed on the current card id. (2) Queue
+  chips REMOVED: `reviewQueue.ts` now builds ONE smart order — dustiest
+  forgotten first, then newest unread, then remaining open cards (the deck
+  never dead-ends); no user-facing queue selection; dead per-queue exports
+  deleted. (3) Why-lines removed from card faces (owner: uncomfortable).
+  Review is now: cards + keep/archive/remind/undo + bounded 12-card sessions
+  with the summary screen. Web live via Vercel; combined tree verified (tsc
+  clean, 137/137 pytest).
+- **2026-07-11 — SHIPPED: the weaknesses-sprint remediation below
   (merge `e163147` to `main`).** **Desktop web:** live via Vercel auto-deploy
   (includes durable web capture UI, Note tab, editable title/summary, export,
   onboarding redesign, swipe grammar, analytics/error reporting client side).
