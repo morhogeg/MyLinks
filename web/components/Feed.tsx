@@ -12,6 +12,7 @@ import DigestView from './DigestView';
 import Dropdown from './Dropdown';
 import { updateLinkStatus, deleteLink, updateLinkReminder, saveLink } from '@/lib/storage';
 import { EXAMPLE_CARD } from '@/lib/exampleCard';
+import { track } from '@/lib/analytics';
 import { collection, onSnapshot, doc, updateDoc, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
@@ -67,7 +68,7 @@ const noop = () => { };
  * - Two card views (grid / list), plus review, ask, and collections modes
  * - Deep linking to specific links via URL params
  */
-function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void }) {
+function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void }) {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
@@ -174,6 +175,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         setSeedingExample(true);
         try {
             await saveLink(uid, EXAMPLE_CARD);
+            track('example_card_seeded');
             // The feed is live via onSnapshot, so the card streams in on its own.
         } catch {
             toast.error('Could not add the example. Please try again.');
@@ -220,6 +222,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         onProcessingChange?.(processingBanner);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [procSig]);
+
+    // Lift "does this library have any cards yet" so page.tsx can gate the
+    // first-run tour to a non-empty feed (never spotlight over zero cards).
+    useEffect(() => {
+        onHasCardsChange?.(links.length > 0);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [links.length > 0]);
 
     // Load collapsed state from localStorage
     useEffect(() => {
@@ -1854,14 +1863,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     );
 }
 
-export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void }) {
+export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void }) {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-2 border-text/20 border-t-text rounded-full animate-spin" />
             </div>
         }>
-            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onOpenDigestSettings={onOpenDigestSettings} />
+            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} />
         </Suspense>
     );
 }
