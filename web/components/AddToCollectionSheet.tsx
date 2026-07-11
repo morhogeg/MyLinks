@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Collection, Link } from '@/lib/types';
-import { Check, X, Layers, FolderPlus } from 'lucide-react';
+import { Check, X, Layers, FolderPlus, Sparkles } from 'lucide-react';
 import { getColorStyleByKey } from '@/lib/colors';
 import {
     addLinkToCollection,
     removeLinkFromCollection,
     createCollection,
 } from '@/lib/collections';
+import { rankCollectionsForLink } from '@/lib/collectionSuggest';
 import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 
@@ -16,14 +17,18 @@ interface AddToCollectionSheetProps {
     uid: string | null;
     link: Link;
     collections: Collection[];
+    /** The full feed — used to rank collections by topical affinity with the card. */
+    links?: Link[];
     isOpen: boolean;
     onClose: () => void;
 }
 
 /**
  * Bottom sheet (desktop: centered card) for adding/removing a card to/from
- * collections. Toggle rows mirror CardActionSheet styling; an inline field
- * creates a new collection and immediately adds the card to it.
+ * collections. Toggle rows mirror CardActionSheet styling; collections that
+ * topically match the card (shared tags/concepts with existing members) float
+ * to the top under a "Suggested" heading; an inline field creates a new
+ * collection and immediately adds the card to it.
  *
  * Writes go straight to Firestore; the feed's collections + links onSnapshot
  * listeners reflect changes optimistically, so this component holds no membership
@@ -33,6 +38,7 @@ export default function AddToCollectionSheet({
     uid,
     link,
     collections,
+    links = [],
     isOpen,
     onClose,
 }: AddToCollectionSheetProps) {
@@ -69,10 +75,18 @@ export default function AddToCollectionSheet({
 
     const memberIds = useMemo(() => new Set(link.collectionIds ?? []), [link.collectionIds]);
 
-    const sorted = useMemo(
-        () => [...collections].sort((a, b) => a.name.localeCompare(b.name)),
-        [collections]
+    // Best-matching non-member collections for this card, shown first.
+    const suggested = useMemo(
+        () => (isOpen ? rankCollectionsForLink(link, collections, links) : []),
+        [isOpen, link, collections, links]
     );
+
+    const sorted = useMemo(() => {
+        const suggestedIds = new Set(suggested.map((c) => c.id));
+        return [...collections]
+            .filter((c) => !suggestedIds.has(c.id))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [collections, suggested]);
 
     if (!isOpen) return null;
 
@@ -140,39 +154,26 @@ export default function AddToCollectionSheet({
 
                 {/* Collection rows */}
                 <div className="py-1 overflow-y-auto">
-                    {sorted.length === 0 && !creating && (
+                    {sorted.length === 0 && suggested.length === 0 && !creating && (
                         <p className="px-5 py-6 text-center text-sm text-text-muted">
                             No collections yet. Create your first one below.
                         </p>
                     )}
-                    {sorted.map((c) => {
-                        const isMember = memberIds.has(c.id);
-                        const dot = getColorStyleByKey(c.color || c.name);
-                        return (
-                            <button
-                                key={c.id}
-                                role="menuitemcheckbox"
-                                aria-checked={isMember}
-                                onClick={() => toggle(c)}
-                                className="w-full flex items-center gap-3 px-5 py-3 min-h-[52px] text-[15px] font-medium text-text transition-colors active:bg-fill-strong hover:bg-fill-subtle"
-                            >
-                                <span
-                                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                                    style={{ backgroundColor: dot.color }}
-                                />
-                                <span className="flex-1 text-start truncate">{c.name}</span>
-                                <span
-                                    className={`flex items-center justify-center w-6 h-6 rounded-full border transition-colors ${
-                                        isMember
-                                            ? 'bg-accent border-accent text-white'
-                                            : 'border-border-strong text-transparent'
-                                    }`}
-                                >
-                                    <Check className="w-3.5 h-3.5" />
-                                </span>
-                            </button>
-                        );
-                    })}
+                    {/* Topical matches for this card, ranked by affinity. */}
+                    {suggested.length > 0 && (
+                        <>
+                            <p className="flex items-center gap-1.5 px-5 pt-2.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-accent">
+                                <Sparkles className="w-3 h-3" /> Suggested
+                            </p>
+                            {suggested.map((c) => (
+                                <CollectionRow key={c.id} collection={c} isMember={memberIds.has(c.id)} onToggle={toggle} />
+                            ))}
+                            {sorted.length > 0 && <div className="mx-5 my-1 border-t border-border-subtle" />}
+                        </>
+                    )}
+                    {sorted.map((c) => (
+                        <CollectionRow key={c.id} collection={c} isMember={memberIds.has(c.id)} onToggle={toggle} />
+                    ))}
                 </div>
 
                 {/* Create new */}
@@ -210,5 +211,41 @@ export default function AddToCollectionSheet({
                 </div>
             </div>
         </div>
+    );
+}
+
+/** One toggleable membership row — shared by the Suggested and A–Z sections. */
+function CollectionRow({
+    collection,
+    isMember,
+    onToggle,
+}: {
+    collection: Collection;
+    isMember: boolean;
+    onToggle: (c: Collection) => void;
+}) {
+    const dot = getColorStyleByKey(collection.color || collection.name);
+    return (
+        <button
+            role="menuitemcheckbox"
+            aria-checked={isMember}
+            onClick={() => onToggle(collection)}
+            className="w-full flex items-center gap-3 px-5 py-3 min-h-[52px] text-[15px] font-medium text-text transition-colors active:bg-fill-strong hover:bg-fill-subtle"
+        >
+            <span
+                className="w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ backgroundColor: dot.color }}
+            />
+            <span className="flex-1 text-start truncate">{collection.name}</span>
+            <span
+                className={`flex items-center justify-center w-6 h-6 rounded-full border transition-colors ${
+                    isMember
+                        ? 'bg-accent border-accent text-white'
+                        : 'border-border-strong text-transparent'
+                }`}
+            >
+                <Check className="w-3.5 h-3.5" />
+            </span>
+        </button>
     );
 }

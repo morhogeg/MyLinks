@@ -104,6 +104,48 @@ export async function setLinkCollections(uid: string, linkId: string, collection
     await updateDoc(ref, { collectionIds });
 }
 
+/** Add many cards to a collection in one batched write (suggested collections). */
+export async function addLinksToCollection(uid: string, linkIds: string[], collectionId: string): Promise<void> {
+    if (linkIds.length === 0) return;
+    const batch = writeBatch(db);
+    for (const linkId of linkIds) {
+        batch.update(doc(db, 'users', uid, 'links', linkId), { collectionIds: arrayUnion(collectionId) });
+    }
+    await batch.commit();
+}
+
+/**
+ * Stable signature of what a public snapshot would contain: the collection's
+ * name + description + the sorted member ids. Stored on the collection doc at
+ * publish time; when the live signature differs the UI can offer "Update the
+ * public page" instead of leaving the share silently stale.
+ */
+export function collectionSignature(
+    col: Pick<Collection, 'name' | 'description'>,
+    memberLinks: Pick<Link, 'id'>[]
+): string {
+    const base = [
+        col.name.trim(),
+        (col.description ?? '').trim(),
+        ...memberLinks.map((l) => l.id).sort(),
+    ].join('\u0000');
+    // djb2 — tiny, stable, and plenty for change detection (not security).
+    let hash = 5381;
+    for (let i = 0; i < base.length; i++) {
+        hash = ((hash << 5) + hash + base.charCodeAt(i)) | 0;
+    }
+    return `${memberLinks.length}.${(hash >>> 0).toString(36)}`;
+}
+
+/** True when a published collection's public snapshot no longer matches it. */
+export function isShareStale(col: Collection, memberLinks: Pick<Link, 'id'>[]): boolean {
+    if (!col.isPublic || !col.shareId) return false;
+    // Legacy shares published before signatures existed: assume fresh rather
+    // than nagging about an update we can't actually detect.
+    if (!col.publishedSignature) return false;
+    return col.publishedSignature !== collectionSignature(col, memberLinks);
+}
+
 /** Build a frozen, denormalized snapshot card from a live Link (no undefined keys). */
 export function toSharedCard(link: Link): SharedCard {
     const card: SharedCard = { title: link.title, summary: link.summary, url: link.url };
@@ -169,6 +211,8 @@ export async function publishCollection(
     await updateDoc(doc(db, 'users', uid, 'collections', collectionDoc.id), {
         shareId,
         isPublic: true,
+        publishedAt: Date.now(),
+        publishedSignature: collectionSignature(collectionDoc, memberLinks),
         updatedAt: Date.now(),
     });
     return shareId;
@@ -184,6 +228,8 @@ export async function unpublishCollection(uid: string, collectionDoc: Collection
     await updateDoc(doc(db, 'users', uid, 'collections', collectionDoc.id), {
         isPublic: false,
         shareId: null,
+        publishedAt: null,
+        publishedSignature: null,
         updatedAt: Date.now(),
     });
 }
