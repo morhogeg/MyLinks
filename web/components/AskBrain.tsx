@@ -10,6 +10,7 @@ import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl, isNativeApp, fetchWithTimeout } from '@/lib/api';
+import { trackFirstAsk, trackAskNoCitations } from '@/lib/analytics';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { ChatMessage, ChatSource, ChatSession } from '@/lib/types';
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
@@ -486,12 +487,14 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                             // Answer couldn't be tied to any save — downgrade it
                             // (arrives after the prose, in place of source chips).
                             patchAt({ ungrounded: true });
+                            trackAskNoCitations();
                         } else if (evt.type === 'error') {
                             setIsThinking(false);
                             patchAt({ content: evt.error || 'Something went wrong reaching Machina. Please try again.', error: true });
                             done = true;
                         } else if (evt.type === 'done') {
                             done = true;
+                            trackFirstAsk();
                         }
                     }
                 }
@@ -509,6 +512,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, categori
                     sources: data.sources || [],
                     ungrounded: Boolean(data.ungrounded),
                 }]);
+                trackFirstAsk();
+                if (data.ungrounded) trackAskNoCitations();
             } else {
                 setMessages(prev => [...prev, {
                     role: 'assistant',

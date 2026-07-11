@@ -5,6 +5,7 @@ import { Link } from '@/lib/types';
 import { X, Sparkles, Calendar, Clock, Bell, BellOff, Loader2, Check } from 'lucide-react';
 import { updateLinkReminder } from '@/lib/storage';
 import { isNativeApp } from '@/lib/api';
+import { trackReminderSet } from '@/lib/analytics';
 import { useToast } from '@/components/Toast';
 
 interface ReminderModalProps {
@@ -186,6 +187,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     nextReminderTime,
                     profileToStore
                 );
+                trackReminderSet();
                 toast.success(`Reminder set for ${new Date(nextReminderTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}`);
                 // onUpdate (saved) before onClose (dismissed) so callers that
                 // treat a bare onClose as "cancelled" see the save first.
