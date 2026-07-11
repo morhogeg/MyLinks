@@ -1348,6 +1348,31 @@ def _extract_url(*candidates: str) -> str:
     return ""
 
 
+def _pending_url_doc(uid: str, url: str, *, card_id: Optional[str] = None,
+                     body: str = "", source: str = "share") -> dict:
+    """Build the ``pending_processing`` queue doc for a URL capture.
+
+    Shared by the iOS share sheet (``source='share'``) and the durable
+    web-capture flow (``source='web'``). When ``card_id`` is set the WEB CLIENT
+    has ALREADY written a ``processing`` placeholder card into its library;
+    ``process_link_background`` reuses that card (instead of creating a fresh
+    one) so a slow scrape never loses the capture, never duplicates it, and never
+    rides the synchronous ``/api/analyze`` request that used to time out at 60s.
+    """
+    doc = {
+        "uid": uid,
+        "url": url,
+        "source": source,
+        "body": body,
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "status": "queued",
+        "attempts": 0,
+    }
+    if card_id:
+        doc["cardId"] = card_id
+    return doc
+
+
 @https_fn.on_request()
 def share_ingest(req: https_fn.Request) -> https_fn.Response:
     """
@@ -1371,12 +1396,21 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
         data = req.get_json(silent=True) or {}
 
         token = req.headers.get('X-Ingest-Token') or data.get('token')
-        if not token:
-            return _error_response("Missing ingest token", 401, headers)
-
-        uid = find_user_by_ingest_token(token)
-        if not uid:
-            return _error_response("Invalid ingest token", 403, headers)
+        if token:
+            uid = find_user_by_ingest_token(token)
+            if not uid:
+                return _error_response("Invalid ingest token", 403, headers)
+        else:
+            # Web / in-app client path (durable web capture — no share-extension
+            # token). Authenticate like the other first-party endpoints: App Check
+            # + (soft) ID token. This lets AddLinkForm enqueue a URL into the SAME
+            # background pipeline the iOS share sheet uses, instead of blocking on
+            # the synchronous /api/analyze request that could time out at 60s.
+            if not _require_app_check(req, headers):
+                return _error_response("App Check verification failed", 401, headers)
+            uid, auth_err = _authed_uid(req, headers, data.get('uid'))
+            if auth_err:
+                return auth_err
 
         # Image share path: the native Share Extension can send a raw image
         # (base64) when the user shares a photo/screenshot rather than a link.
@@ -1457,7 +1491,15 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 return _error_response("Failed to analyze note", 500, headers)
 
         # Dedup: skip if already saved or already queued for this user.
-        if link_exists_for_url(uid, url) or pending_exists_for_url(uid, url):
+        #
+        # EXCEPTION — the durable web path supplies a `cardId`: AddLinkForm has
+        # already run its own pre-write dedup AND written a `processing`
+        # placeholder card at this exact URL. Re-checking link_exists here would
+        # match that very placeholder and wrongly drop a legitimate new save, so
+        # when a cardId is present we skip the dedup and let the trigger finalize
+        # the client's card in place.
+        card_id = data.get('cardId')
+        if not card_id and (link_exists_for_url(uid, url) or pending_exists_for_url(uid, url)):
             logger.info(f"Share ingest skipped (duplicate): {url}")
             return https_fn.Response(
                 json.dumps({"success": True, "duplicate": True, "url": url}),
@@ -1466,15 +1508,10 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
 
         db = get_db()
         process_ref = db.collection('pending_processing').document()
-        process_ref.set({
-            "uid": uid,
-            "url": url,
-            "source": "share",
-            "body": data.get('note', ''),
-            "createdAt": datetime.now(timezone.utc).isoformat(),
-            "status": "queued",
-            "attempts": 0
-        })
+        process_ref.set(_pending_url_doc(
+            uid, url, card_id=card_id, body=data.get('note', ''),
+            source="web" if card_id else "share",
+        ))
 
         logger.info(f"Share ingest queued: {url} for user {uid}")
         return https_fn.Response(
@@ -2026,33 +2063,44 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
     # to the stored Storage URL below). Kept so a FAILED card records the original.
     original_url = url
 
-    # M3 — durable capture lifecycle. Write a visible "processing" card into the
-    # user's library the instant work begins, then update THIS SAME card to ready
-    # (on success) or a retryable "failed" state (on error). A captured item is
+    # M3 — durable capture lifecycle. A captured item becomes a visible
+    # "processing" card the instant work is queued, then updates THIS SAME card to
+    # ready (on success) or a retryable "failed" state (on error). A capture is
     # therefore never invisible and never silently dropped, even if analysis fails.
-    card_ref = get_db().collection('users').document(uid).collection('links').document()
-    card_id = card_ref.id
-    try:
-        card_ref.set({
-            "url": original_url,
-            "title": _capture_placeholder_title(original_url, is_image),
-            "summary": "",
-            "tags": [],
-            "category": "",
-            "status": LinkStatus.PROCESSING.value,
-            "sourceType": "image" if is_image else "web",
-            "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
-            # When processing began — the janitor uses this (not createdAt, which
-            # a retry preserves) to age out cards stuck in `processing`.
-            "processingStartedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
-            "metadata": {"originalTitle": "", "estimatedReadTime": 0},
-        })
-        ref.update({"cardId": card_id})
-    except Exception as placeholder_err:
-        # Non-fatal: if we can't write the placeholder, fall back to the legacy
-        # "create the real card at the end" behaviour so a save is never lost.
-        logger.error(f"Failed to write processing placeholder card: {placeholder_err}", exc_info=True)
-        card_ref = None
+    #
+    # WEB durable path (Weakness #5): AddLinkForm has ALREADY written the
+    # `processing` placeholder card itself (instant feed feedback, no synchronous
+    # 60s wait) and passes its `cardId` through the queue doc — reuse that card so
+    # we neither duplicate it nor overwrite the client's createdAt/ordering.
+    # SHARE path: no cardId, so we create the placeholder card here.
+    existing_card_id = data.get("cardId")
+    if existing_card_id:
+        card_ref = get_db().collection('users').document(uid).collection('links').document(existing_card_id)
+        card_id = existing_card_id
+    else:
+        card_ref = get_db().collection('users').document(uid).collection('links').document()
+        card_id = card_ref.id
+        try:
+            card_ref.set({
+                "url": original_url,
+                "title": _capture_placeholder_title(original_url, is_image),
+                "summary": "",
+                "tags": [],
+                "category": "",
+                "status": LinkStatus.PROCESSING.value,
+                "sourceType": "image" if is_image else "web",
+                "createdAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+                # When processing began — the janitor uses this (not createdAt,
+                # which a retry preserves) to age out cards stuck in `processing`.
+                "processingStartedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+                "metadata": {"originalTitle": "", "estimatedReadTime": 0},
+            })
+            ref.update({"cardId": card_id})
+        except Exception as placeholder_err:
+            # Non-fatal: if we can't write the placeholder, fall back to the legacy
+            # "create the real card at the end" behaviour so a save is never lost.
+            logger.error(f"Failed to write processing placeholder card: {placeholder_err}", exc_info=True)
+            card_ref = None
 
     analysis = {}
     scraped = {"html": "", "title": "", "text": ""}

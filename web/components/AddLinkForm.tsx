@@ -3,10 +3,10 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Link, Plus, X, Upload, StickyNote, Loader2 } from 'lucide-react';
-import { saveLink, getUserTags, findLinkIdByUrl } from '@/lib/storage';
+import { saveLink, getUserTags, findLinkIdByUrl, createProcessingPlaceholder, markLinkFailed } from '@/lib/storage';
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
-import { apiUrl } from '@/lib/api';
+import { apiUrl, fetchWithTimeout as apiFetch } from '@/lib/api';
 import { trackSaveSucceeded, trackFirstSave, trackSaveFailed } from '@/lib/analytics';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
@@ -225,6 +225,83 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             } catch {
                 // Dedup probe failed — proceed to save rather than block capture.
             }
+
+            // DURABLE WEB LINK CAPTURE (Weakness #5). A link no longer blocks on
+            // an up-to-60s synchronous /api/analyze call that a slow scrape could
+            // time out and lose. Instead: write a `processing` placeholder card
+            // (instant feed feedback) and enqueue the URL into the SAME background
+            // pipeline the iOS share sheet uses. Analysis finishes asynchronously
+            // and flips this very card to ready/failed — the capture is durable
+            // the moment the placeholder is written. (Note & Image stay
+            // synchronous below — see the report: images upload inline bytes the
+            // trigger path doesn't handle, and a note is near-instant.)
+            setIsLoading(true);
+            setError(null);
+            setProgress(0);
+
+            let cardId: string;
+            try {
+                cardId = await createProcessingPlaceholder(uid, formattedUrl);
+            } catch (writeErr) {
+                // The placeholder write IS the capture — if it fails, nothing was
+                // saved. Keep the URL in the field so retry is one tap.
+                trackSaveFailed('save_failed');
+                const message = `Could not save to Machina: ${writeErr instanceof Error ? writeErr.message : String(writeErr)}`;
+                setError(message);
+                toast.error(message);
+                setIsLoading(false);
+                return;
+            }
+
+            try {
+                // Enqueue for background analysis. This request is FAST — it only
+                // writes the queue doc; no scraping/AI runs in it — so the 60s
+                // Hosting cap that hurt slow YouTube links no longer applies.
+                const response = await apiFetch(apiUrl('/api/share'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
+                    // uid kept for the pre-cutover soft-auth fallback; ignored once REQUIRE_AUTH is on.
+                    body: JSON.stringify({ url: formattedUrl, cardId, uid }),
+                }, 30_000);
+                const text = await response.text();
+                let resData: { success?: boolean; error?: string };
+                try { resData = JSON.parse(text); } catch { resData = {}; }
+                if (!response.ok || !resData.success) {
+                    throw new Error(resData?.error || 'Could not start analysis. Please try again.');
+                }
+            } catch (enqueueErr) {
+                // Couldn't hand the capture to the pipeline. The placeholder card
+                // exists, so flip it to a retryable `failed` card (never a stuck
+                // spinner) rather than lose it — the feed's Retry re-runs analysis.
+                try {
+                    await markLinkFailed(uid, cardId, enqueueErr instanceof Error ? enqueueErr.message : String(enqueueErr));
+                } catch {
+                    // Best-effort; the 15-min processing janitor ages it out otherwise.
+                }
+                trackSaveFailed('network');
+                toast.error("Saved your link, but analysis couldn't start — tap the card to retry.");
+                setUrl('');
+                setIsExpanded(false);
+                setIsLoading(false);
+                onLinkAdded();
+                return;
+            }
+
+            // Durably captured AND queued. Record the save now: even if analysis
+            // later fails, the card survives as a retryable card, so this is the
+            // honest success moment. The feed is live via onSnapshot — the
+            // processing card streams in and useProcessingBanner drives the
+            // app-level "Analyzing…" banner, exactly as an iOS-shared capture does.
+            trackSaveSucceeded('web_form');
+            trackFirstSave();
+            setProgress(100);
+            hapticSuccess();
+            toast.success('Saved to Machina');
+            setUrl('');
+            setIsExpanded(false);
+            setIsLoading(false);
+            onLinkAdded();
+            return;
         }
 
         setIsLoading(true);
@@ -242,26 +319,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
 
             let data;
 
-            if (activeTab === 'link') {
-                // LINK MODE — analysis happens in the canonical Python backend.
-                let response;
-                try {
-                    response = await fetchWithTimeout(apiUrl('/api/analyze'), {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
-                        // uid kept for the pre-cutover soft-auth fallback; ignored once REQUIRE_AUTH is on.
-                        body: JSON.stringify({ url: formattedUrl, existingTags, uid }),
-                    });
-                } catch (netErr) {
-                    // Preserve a categorized error (e.g. the timeout) as-is; only a
-                    // genuine transport failure gets wrapped as 'network'.
-                    if (netErr instanceof Error && 'category' in netErr) throw netErr;
-                    throw saveError(netErr instanceof Error ? netErr.message : `Network error: ${String(netErr)}`, 'network');
-                }
-                data = await parseResponse(response);
-                // Real milestone: analysis came back — jump ahead to "saving".
-                setProgress((p) => Math.max(p, 90));
-            } else if (activeTab === 'note') {
+            if (activeTab === 'note') {
                 // NOTE MODE — a URL-less thought. The SAME /api/analyze endpoint
                 // analyzes raw text (no scraping) and returns a first-class 'note'
                 // card (empty url, sourceType 'note'), saved exactly like a link.

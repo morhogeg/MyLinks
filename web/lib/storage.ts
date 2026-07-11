@@ -86,6 +86,67 @@ export async function findLinkIdByUrl(uid: string, url: string): Promise<string 
     return snapshot.empty ? null : snapshot.docs[0].id;
 }
 
+/** Friendly placeholder title for an in-flight capture — the URL's host, or a
+ *  generic fallback. Mirrors functions/main.py `_capture_placeholder_title` so a
+ *  web-added processing card reads the same as an iOS-shared one. */
+function placeholderTitle(url: string): string {
+    try {
+        const host = new URL(url).hostname.replace(/^www\./, '');
+        return host || 'Analyzing link…';
+    } catch {
+        return 'Analyzing link…';
+    }
+}
+
+/**
+ * Write a `processing` placeholder card for a DURABLE web link capture
+ * (Weakness #5).
+ *
+ * Mirrors the card `process_link_background` writes for the iOS share path, so
+ * the feed's `useProcessingBanner` + Card rendering treat a web-added capture
+ * identically — a processing skeleton the instant the user hits Save. AddLinkForm
+ * then enqueues the URL (via /api/share, passing this card's id as `cardId`) into
+ * the SAME background pipeline, which flips THIS card to ready/failed when
+ * analysis lands. A slow scrape can therefore never trip a request timeout or
+ * lose the capture. Returns the new card id.
+ */
+export async function createProcessingPlaceholder(uid: string, url: string): Promise<string> {
+    const linksRef = collection(db, 'users', uid, 'links');
+    // A client ms clock (mirrors the trigger's int-ms writes) so feed ordering
+    // and useProcessingBanner's ramp work the instant the card streams in — unlike
+    // serverTimestamp(), which reads as 0 until the server resolves it.
+    const now = Date.now();
+    const ref = await addDoc(linksRef, {
+        url,
+        title: placeholderTitle(url),
+        summary: '',
+        tags: [],
+        category: '',
+        status: 'processing',
+        sourceType: 'web',
+        isRead: false,
+        createdAt: now,
+        // The processing janitor ages out cards stuck here past its timeout.
+        processingStartedAt: now,
+        metadata: { originalTitle: '', estimatedReadTime: 0 },
+    });
+    return ref.id;
+}
+
+/**
+ * Flip a capture card to a retryable `failed` state — used when the durable web
+ * enqueue can't be reached, so the placeholder never rots as an eternal spinner.
+ * The existing Retry flow (`retryFailedLink`) re-runs analysis on this same card.
+ */
+export async function markLinkFailed(uid: string, id: string, error: string): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    await updateDoc(linkRef, {
+        status: 'failed',
+        error: error.slice(0, 300),
+        failedAt: Date.now(),
+    });
+}
+
 /**
  * Save a new link to Firestore
  */
