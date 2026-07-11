@@ -613,9 +613,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-11 (latest) — Collections elevation (branch
-  `claude/collection-feature-elevation-xw9z9o`, NOT yet merged/shipped).**
-  Product pass on collections with sharing as the growth surface. (1) **Sharing
+- **2026-07-11 (latest) — SHIPPED: Collections elevation (branch
+  `claude/collection-feature-elevation-xw9z9o`, merged to `main` as
+  `bcc3698`).** **Desktop web:** live via Vercel auto-deploy. **iOS:
+  TestFlight run #73 → build 1073**, fired via the temp-push-trigger pattern
+  (API dispatch still 403 from cloud sessions; temp branch
+  `claude/ship-tf-trigger-xw9z9o` — owner should delete after green, plus the
+  parallel Ask session's `claude/ship-tf-trigger-ask`; remote branch deletes
+  are no-ops from cloud). The parallel Ask-elevation run #72 (build 1072) was
+  in progress when #73 queued — 1073 was cut from the merged main so it
+  contains BOTH elevations; 1072 has only Ask. **Backend: NOT deployed —
+  owner step:** from `main` run `./deploy-functions.sh functions:share_page`
+  to make the redesigned public collection page live (publish/unpublish logic
+  unchanged; existing share links keep working with the old rendering until
+  then). **On-device QA for build 1073 (collections bits):** share sheet flow
+  (publish → copy/share/view → stop), stale-share amber "Update" after adding
+  a card to a published collection, suggested-collection tiles in the gallery
+  (needs ≥4 cards sharing a tag/concept), "Suggested" section in the
+  add-to-collection sheet, mosaic tile covers, empty state. Feature summary: (1) **Sharing
   is now a deliberate flow**: new `ShareCollectionSheet` (preview of what goes
   public → explicit Publish → copy link / native share / View page / Stop
   sharing, plus the one-line privacy promise) replaces the old blind
@@ -642,10 +657,7 @@ exact-match, capped.
   `collection_share_updated`, `collection_suggestion_accepted`. Verified: `tsc
   --noEmit` clean, 143/143 pytest, share page visually verified via headless
   Chromium (full `next build` fails only at Firebase init in the cloud sandbox
-  — no env keys — pre-existing). **To ship:** merge + Vercel auto (web);
-  `./deploy-functions.sh functions:share_page` for the public-page redesign
-  (publish/unpublish logic unchanged — old pages keep working, they just
-  render the old way until deploy).
+  — no env keys — pre-existing).
 - **2026-07-11 — Ask Machina elevation (branch
   `claude/ask-feature-elevation-3aoz26` — NOT yet merged/shipped).** Product
   polish pass on the hero feature, all frontend (zero backend-deploy
