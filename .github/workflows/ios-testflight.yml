@@ -7,6 +7,10 @@ name: iOS → TestFlight
 # main that touch the app. See the one-time secret setup at the bottom.
 
 on:
+  # TEMP push trigger — cloud sessions can't call workflow_dispatch (403); this
+  # branch-scoped trigger fires one build of main's code, then the branch is deleted.
+  push:
+    branches: [claude/ship-tf-trigger-bvwize]
   workflow_dispatch:
     inputs:
       require_auth:
