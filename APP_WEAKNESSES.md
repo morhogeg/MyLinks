@@ -164,7 +164,25 @@ deck (`SwipeDeck.tsx:103`).
   Ask/Collections/Digest/views into one consistent navigation surface.
 - Acceptance test: the organization model explainable in one sentence.
 
-## 8. [ ] Launching blind: no analytics, no crash reporting, no export
+## 8. [x] Launching blind: no analytics, no crash reporting, no export
+
+> **DONE 2026-07-11** (commits `d894569`, `334b628`, `f5dcc39` + wiring commit,
+> remediation sprint). Self-hosted analytics: `web/lib/analytics.ts` writes
+> content-free events (allowlisted scalar props, 40-char cap — content physically
+> can't leak) to `users/{uid}/analytics_events`; instrumented: sign_in,
+> consent_accepted, app_open daily heartbeat (D1/D7), digest_opened, export_used,
+> first_ask, ask_no_citations, reminder_set (save events wire in with the #5 fix).
+> Error reporting: `web/lib/errorReporter.ts` (window.onerror/unhandledrejection +
+> error boundaries → `users/{uid}/client_errors`, 8/session cap, deduped).
+> Export: Settings → "Your data" downloads machina-export.json + .md (paginated
+> reads, Timestamps normalized); honest "use the web app" note on native. Privacy
+> page updated (first-party, content-free wording). Staged `firestore.rules.locked`
+> + rules tests cover the two new subcollections.
+> **Owner steps:** (1) add the two permissive subcollection matches to LIVE
+> firestore.rules (pre-cutover, else events are silently denied) — see the locked
+> file for the shape; (2) run `cd firestore-rules-test && npm test` on the owner
+> machine; (3) native Crashlytics deliberately not added (needs Xcode) — decide
+> post-launch; (4) optional `NEXT_PUBLIC_APP_VERSION` env in Vercel.
 
 **Problem.** Zero product telemetry and zero crash/error reporting anywhere in the
 codebase — every failure above will be invisible in production, and the marketing
