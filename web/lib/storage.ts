@@ -1,4 +1,4 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, where, limit, orderBy, getDocs, getDoc, serverTimestamp, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, deleteField, doc, query, where, limit, orderBy, getDocs, getDoc, serverTimestamp, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { db, appCheckHeaders } from './firebase';
 import { authHeaders } from './auth';
 import { apiUrl, fetchWithTimeout } from './api';
@@ -174,6 +174,90 @@ export async function saveLink(uid: string, linkData: Partial<Link>): Promise<vo
 }
 
 /**
+ * Create a URL-less **note card** durably and instantly, returning its id.
+ *
+ * A note is the user's own words — capturing it must never depend on a slow (or
+ * undeployed) AI round-trip the way the old synchronous path did (it POSTed to
+ * `/api/analyze` and failed with "URL is required" whenever the note branch
+ * wasn't live). So we write the card immediately, client-side, with the note
+ * text as its body and `needsEmbedding` set so the backend trigger makes it
+ * searchable/askable. `enrichNoteCard` then upgrades it (AI title/tags/category)
+ * in the background — best-effort, so the note stands on its own if that never
+ * lands.
+ */
+export async function createNoteCard(uid: string, text: string): Promise<string> {
+    const trimmed = text.trim();
+    const firstLine = (trimmed.split('\n').map(l => l.trim()).find(Boolean) || 'Note');
+    // A short one-liner IS its own title, so we leave the body empty to avoid a
+    // card that prints the same sentence twice. A longer/multi-line note gets a
+    // truncated first-line title with the full text as the body. (AI enrichment
+    // later refines the title either way.)
+    const isShortSingleLine = !trimmed.includes('\n') && firstLine.length <= 90;
+    const title = firstLine.length > 90 ? `${firstLine.slice(0, 90).trimEnd()}…` : firstLine;
+    const summary = isShortSingleLine ? '' : trimmed;
+    const words = trimmed ? trimmed.split(/\s+/).length : 0;
+    const ref = await addDoc(collection(db, 'users', uid, 'links'), {
+        url: '',
+        title,
+        summary,
+        tags: [],
+        category: '',
+        status: 'unread',
+        isRead: false,
+        sourceType: 'note',
+        sourceName: 'Note',
+        createdAt: serverTimestamp(),
+        // Let the sync_link_embedding trigger vectorize it → searchable + askable.
+        needsEmbedding: true,
+        metadata: { originalTitle: firstLine, estimatedReadTime: Math.max(1, Math.round(words / 200)) },
+    });
+    return ref.id;
+}
+
+/**
+ * Best-effort AI *organization* for a note card created by `createNoteCard`.
+ *
+ * A note is the user's own words, so we deliberately DON'T let the model rewrite
+ * the title or body — we only fold in tags, a category, and concepts so the note
+ * files and surfaces like everything else (and, for a short note whose text
+ * lives in the title, overwriting the title would lose it). Sends the raw text
+ * to the `/api/analyze` note branch and patches only those organizational
+ * fields. Never throws: if the branch isn't deployed or the call fails, the note
+ * simply stays untagged — still saved, still searchable, still the user's words.
+ */
+export async function enrichNoteCard(uid: string, cardId: string, text: string): Promise<void> {
+    try {
+        let existingTags: string[] = [];
+        try { existingTags = await getUserTags(uid); } catch { /* optional */ }
+
+        const response = await fetchWithTimeout(apiUrl('/api/analyze'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
+            body: JSON.stringify({ text: text.trim(), existingTags, uid }),
+        });
+        if (!response.ok) return; // e.g. the note branch isn't deployed — leave the note as-is.
+
+        const data = await response.json().catch(() => null);
+        const l = data?.link;
+        if (!data?.success || !l) return;
+
+        // Organizational fields only — never title/summary (the user's words stay
+        // verbatim). concepts/relatedLinks power the knowledge graph; tags/category
+        // power filtering.
+        const patch: Record<string, unknown> = {};
+        if (Array.isArray(l.tags) && l.tags.length) patch.tags = l.tags;
+        if (l.category) patch.category = l.category;
+        if (Array.isArray(l.concepts) && l.concepts.length) patch.concepts = l.concepts;
+        if (Array.isArray(l.relatedLinks) && l.relatedLinks.length) patch.relatedLinks = l.relatedLinks;
+        if (Object.keys(patch).length) {
+            await updateDoc(doc(db, 'users', uid, 'links', cardId), patch);
+        }
+    } catch {
+        // Best-effort only — the note is already saved with the user's own text.
+    }
+}
+
+/**
  * Retry analysis for a `failed` capture card (M3).
  *
  * Re-runs the same synchronous analysis the Add-Link form uses, then updates the
@@ -311,6 +395,21 @@ export async function updateLinkTitle(uid: string, id: string, title: string): P
 export async function updateLinkSummary(uid: string, id: string, summary: string): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', id);
     await updateDoc(linkRef, { summary });
+}
+
+/**
+ * Set (or clear) the user's **personal note** on any card — their own thought
+ * about a saved item, distinct from the AI summary. An empty note removes the
+ * field entirely (via deleteField) so a card is cleanly "note-less" again rather
+ * than carrying an empty string. Nothing else writes `userNote`, so the edit is
+ * durable.
+ */
+export async function updateLinkNote(uid: string, id: string, note: string): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    const trimmed = note.trim();
+    await updateDoc(linkRef, trimmed
+        ? { userNote: trimmed, userNoteUpdatedAt: Date.now() }
+        : { userNote: deleteField(), userNoteUpdatedAt: deleteField() });
 }
 
 /**

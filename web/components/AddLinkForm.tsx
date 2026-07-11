@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Link, Plus, X, Upload, StickyNote, Loader2 } from 'lucide-react';
-import { saveLink, getUserTags, findLinkIdByUrl, createProcessingPlaceholder, markLinkFailed } from '@/lib/storage';
+import { Link, Plus, X, Upload, Loader2 } from 'lucide-react';
+import { saveLink, getUserTags, findLinkIdByUrl, createProcessingPlaceholder, markLinkFailed, createNoteCard, enrichNoteCard } from '@/lib/storage';
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl, fetchWithTimeout as apiFetch } from '@/lib/api';
@@ -304,6 +304,47 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             return;
         }
 
+        // DURABLE NOTE CAPTURE. A note is the user's own words — saving it must
+        // never hinge on a slow (or undeployed) AI call the way the old path did
+        // (it POSTed to /api/analyze and errored "URL is required" whenever the
+        // note branch wasn't live). Write the card instantly client-side, then
+        // enrich it (AI title/tags/category) in the background, best-effort.
+        if (activeTab === 'note') {
+            setIsLoading(true);
+            setError(null);
+            setProgress(0);
+
+            const text = note.trim();
+            let cardId: string;
+            try {
+                cardId = await createNoteCard(uid, text);
+            } catch (writeErr) {
+                trackSaveFailed('save_failed');
+                const message = `Couldn't save your note: ${writeErr instanceof Error ? writeErr.message : String(writeErr)}`;
+                setError(message);
+                toast.error(message);
+                setIsLoading(false);
+                return;
+            }
+
+            // Saved durably. Record and close immediately — the feed streams the
+            // note card in via onSnapshot, exactly like any other capture.
+            trackSaveSucceeded('note');
+            trackFirstSave();
+            setProgress(100);
+            hapticSuccess();
+            toast.success('Note saved');
+            setNote('');
+            setIsExpanded(false);
+            setIsLoading(false);
+            onLinkAdded();
+
+            // Background AI enrichment (title/tags/category). Fire-and-forget: the
+            // note already stands on its own with the user's text if this never lands.
+            void enrichNoteCard(uid, cardId, text);
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
         setProgress(0);
@@ -319,24 +360,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
 
             let data;
 
-            if (activeTab === 'note') {
-                // NOTE MODE — a URL-less thought. The SAME /api/analyze endpoint
-                // analyzes raw text (no scraping) and returns a first-class 'note'
-                // card (empty url, sourceType 'note'), saved exactly like a link.
-                let response;
-                try {
-                    response = await fetchWithTimeout(apiUrl('/api/analyze'), {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
-                        body: JSON.stringify({ text: note.trim(), existingTags, uid }),
-                    });
-                } catch (netErr) {
-                    if (netErr instanceof Error && 'category' in netErr) throw netErr;
-                    throw saveError(netErr instanceof Error ? netErr.message : `Network error: ${String(netErr)}`, 'network');
-                }
-                data = await parseResponse(response);
-                setProgress((p) => Math.max(p, 90));
-            } else {
+            {
                 // IMAGE MODE — compress client-side, then send the inline bytes to
                 // the backend, which both analyzes AND stores the image (via the
                 // admin SDK, bypassing storage.rules that block client writes).
@@ -382,7 +406,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                         estimatedReadTime: data.link.metadata.estimatedReadTime,
                         actionableTakeaway: data.link.metadata.actionableTakeaway,
                     },
-                    sourceType: activeTab === 'image' ? 'image' : activeTab === 'note' ? 'note' : (data.link.sourceType || 'web'),
+                    sourceType: 'image',
                     sourceName: data.link.sourceName,
                     concepts: data.link.concepts,
                     relatedLinks: data.link.relatedLinks,
@@ -391,9 +415,9 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 throw saveError(`Could not save to Machina: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`, 'save_failed');
             }
 
-            // The capture landed and is persisted — record it. The source label
-            // is content-free (just which tab); a note reports 'note'.
-            trackSaveSucceeded(activeTab === 'note' ? 'note' : 'web_form');
+            // The capture landed and is persisted — record it (image tab only;
+            // link and note captures returned durably above).
+            trackSaveSucceeded('web_form');
             trackFirstSave();
 
             // Let the scan progress (link, image, or video) land on "Done!" first.

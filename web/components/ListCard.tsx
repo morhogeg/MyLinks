@@ -6,7 +6,7 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformColor, PLATFORM_LABELS, xHandle, prettyHost } from '@/lib/platform';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
-import { Star, Check, Trash2 } from 'lucide-react';
+import { Star, Check, Trash2, StickyNote } from 'lucide-react';
 
 interface ListCardProps {
     link: Link;
@@ -204,6 +204,12 @@ function ListCard({
                         >
                             {link.category}
                         </span>
+                        {/* Personal-note cue — this card carries your own note. */}
+                        {link.userNote && link.sourceType !== 'note' && (
+                            <span className="shrink-0 inline-flex items-center text-accent/70" title="You added a note">
+                                <StickyNote className="w-3 h-3" />
+                            </span>
+                        )}
                     </div>
                 </div>
 

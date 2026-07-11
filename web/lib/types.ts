@@ -94,6 +94,12 @@ export interface Link {
   language?: string;
   isRead?: boolean;
 
+  // A personal note the user attaches to ANY card (link, image, or note-card) —
+  // their own annotation, kept distinct from the AI-generated summary. Editable
+  // from the detail view; cleared (field removed) when emptied.
+  userNote?: string;
+  userNoteUpdatedAt?: number; // Unix timestamp (ms) the note was last edited
+
   // Contextual Linking
   concepts?: string[];
   relatedLinks?: RelatedLink[];

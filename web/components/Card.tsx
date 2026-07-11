@@ -593,6 +593,13 @@ function Card({
                                 {link.metadata.estimatedReadTime}{isRtl ? ' דק׳' : 'm'}
                             </span>
                             {now > 0 && <span>{getTimeAgo(link.createdAt, now)}</span>}
+                            {/* You've added a personal note to this card — a quiet
+                                accent cue so your own thoughts are findable at a glance. */}
+                            {link.userNote && link.sourceType !== 'note' && (
+                                <span className="flex items-center text-accent/70" title="You added a note">
+                                    <StickyNote className="w-3 h-3" />
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
