@@ -608,6 +608,33 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-11 (latest) — SHIPPED: the weaknesses-sprint remediation below
+  (merge `e163147` to `main`).** **Desktop web:** live via Vercel auto-deploy
+  (includes durable web capture UI, Note tab, editable title/summary, export,
+  onboarding redesign, swipe grammar, analytics/error reporting client side).
+  **iOS: TestFlight run #68 → build 1068**, fired via the temp-push-trigger
+  pattern (API dispatch still 403 from cloud sessions; temp branch
+  `claude/ship-tf-trigger-1yngsi`). ⚠️ Remote branch deletes are ALSO no-ops
+  from cloud sessions ("Everything up-to-date" but the ref survives) — owner
+  should delete BOTH stale trigger branches (`claude/ship-tf-trigger-bvwize`,
+  `claude/ship-tf-trigger-1yngsi`) once run #68 is done. **Backend: NOT
+  deployed — owner step** (no Firebase creds in cloud): from `main` run
+  `./deploy-functions.sh functions:analyze_link,functions:analyze_image,functions:ask_brain,functions:share_ingest,functions:process_link_background,functions:sync_link_embedding,functions:backfill_embeddings,functions:check_reminders,functions:force_check_reminders,functions:get_article,functions:claim_workspace,functions:claim_workspace_http`
+  — until then the durable web capture ENQUEUE fails honestly (placeholder
+  flips to a retryable failed card, Retry uses the old sync path — degraded but
+  never lossy), and citations re-ask/ungrounded, retrieval v2, reminder in-app
+  fallback and the note share-path stay dark; the web UI changes are live and
+  read-compatible. **Then:** (1) run `backfill_embeddings` once (`curl -X POST
+  .../backfill_embeddings -H "Authorization: Bearer $ADMIN_TOKEN"`); (2) add
+  permissive `analytics_events` + `client_errors` matches inside `match
+  /users/{uid}` in LIVE firestore.rules (shapes staged in
+  `firestore.rules.locked`) or analytics writes are silently denied; (3) `cd
+  firestore-rules-test && npm test`; (4) on-device QA for build 1068: swipe
+  directions in List view (right=favourite, left=delete+confirm, incl. RTL),
+  push nudge after setting a reminder, "Reminders due" strip, iOS welcome +
+  example-card seed, web link save placeholder→ready flip (after functions
+  deploy), Note tab, title/summary edit. `firebase.json` unchanged — no
+  hosting deploy.
 - **2026-07-11 — Weaknesses-sprint remediation (branch
   `claude/machina-remediation-orchestrator-1yngsi` — merged to `main` this
   ship; see the ship entry prepended above).** Orchestrated 7 Opus agents over
