@@ -646,6 +646,32 @@ exact-match, capped.
   `./deploy-functions.sh functions:share_page` for the public-page redesign
   (publish/unpublish logic unchanged — old pages keep working, they just
   render the old way until deploy).
+- **2026-07-11 — Ask Machina elevation (branch
+  `claude/ask-feature-elevation-3aoz26` — NOT yet merged/shipped).** Product
+  polish pass on the hero feature, all frontend (zero backend-deploy
+  dependency). (1) **Living suggestions:** new `web/lib/askSuggestions.ts`
+  builds the empty-state chips from the LIVE library instead of static
+  category names — a spotlighted "latest save" chip (re-animates the moment a
+  new card lands; keyed by card id), this-week catch-up (count-aware),
+  recurring-concept "connect the dots", top-category takeaways, and a dusty
+  never-opened card to rediscover — plus a "More ideas" shuffle;
+  Feed now passes `links` into AskBrain (replaces the `categories` prop).
+  (2) **"Just saved — ask about it" pill** above the composer when a card
+  lands mid-conversation (guarded against delete-reshuffles via createdAt).
+  (3) **One-tap follow-up chips** under each completed answer (rotating pool).
+  (4) **Stop generation** (send button flips to a stop square while
+  thinking/streaming; partial answer kept) and **one-tap "Try again"** on the
+  last error bubble (drops the failed user+error pair so history stays clean).
+  (5) **Staged thinking status** — "Searching your N saves… → Reading the best
+  matches… → Writing your answer…" mirrors the real RAG pipeline. (6)
+  **Reading-aware autoscroll** (streaming no longer forces you to the bottom
+  once you scroll up; a jump-to-latest pill appears), **composer auto-grow**,
+  and desktop **"/" focuses the composer**. New content-free analytics:
+  `ask_suggestion_used` (kind label only), `ask_followup_used`, `ask_stopped`.
+  tsc + eslint clean; `next build` compiles (prerender fails only on missing
+  Firebase env in the cloud sandbox). Ship = merge to main (Vercel) + a
+  TestFlight build; on-device QA: chip re-animation on a fresh save, stop
+  mid-stream on iOS (buffered path just cancels), keyboard vs. follow-up chips.
 - **2026-07-11 — SHIPPED: notes fix + personal notes on every card
   (`a150ce2`, merged to `main`).** Owner reported the **Note tab errored "URL
   is required"** on device — root cause: the Note tab POSTed to `/api/analyze`,

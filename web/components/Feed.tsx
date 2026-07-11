@@ -1560,7 +1560,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             totalLinks={links.length}
                             onOpenLink={(id) => setActiveLinkId(id)}
                             onExit={() => setViewMode(lastLayout.current)}
-                            categories={[...categories].sort((a, b) => (categoryCounts[b] || 0) - (categoryCounts[a] || 0))}
+                            links={links}
                         />
                     ) : filteredLinks.length === 0 && pendingCards.length === 0 ? (
                         <div className="text-center py-16 animate-fade-in">
