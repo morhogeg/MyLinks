@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef, FormEvent } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { Link, Plus, X, Upload } from 'lucide-react';
-import { saveLink, getUserTags } from '@/lib/storage';
+import { saveLink, getUserTags, findLinkIdByUrl } from '@/lib/storage';
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl } from '@/lib/api';
+import { trackSaveSucceeded, trackFirstSave, trackSaveFailed } from '@/lib/analytics';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useAuth } from '@/components/AuthProvider';
@@ -48,6 +50,14 @@ const youTubeId = (input: string): string | null => {
 // message instead of an indefinite spinner.
 const ANALYZE_TIMEOUT_MS = 60_000;
 
+// A save can fail for a few distinct reasons; we surface an honest message to
+// the user AND record a short, fixed failure category for analytics (never the
+// raw error text). `category` rides on the Error so the catch block can read it.
+type SaveFailReason = 'timeout' | 'network' | 'analyze_failed' | 'save_failed';
+
+const saveError = (message: string, category: SaveFailReason): Error =>
+    Object.assign(new Error(message), { category });
+
 const fetchWithTimeout = async (input: string, init: RequestInit) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
@@ -55,7 +65,10 @@ const fetchWithTimeout = async (input: string, init: RequestInit) => {
         return await fetch(input, { ...init, signal: controller.signal });
     } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') {
-            throw new Error('Analysis is taking longer than expected. It may still finish in the background — check your feed in a moment.');
+            // HONEST copy: the synchronous save did NOT complete — nothing was
+            // persisted and nothing will appear in the feed. Tell the truth and
+            // invite a retry (the URL stays in the field, so retry is one tap).
+            throw saveError('That took too long, so nothing was saved. Your link is still here — tap Save to try again.', 'timeout');
         }
         throw err;
     } finally {
@@ -69,6 +82,8 @@ const fetchWithTimeout = async (input: string, init: RequestInit) => {
 export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingChange }: AddLinkFormProps) {
     const { uid } = useAuth();
     const toast = useToast();
+    const router = useRouter();
+    const pathname = usePathname();
     const [url, setUrl] = useState('');
     const [activeTab, setActiveTab] = useState<'link' | 'image'>('link');
     const [imageFile, setImageFile] = useState<File | null>(null);
@@ -163,10 +178,10 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
         try {
             data = JSON.parse(responseText);
         } catch {
-            throw new Error('The analysis service returned an unexpected response. Please try again.');
+            throw saveError('The analysis service returned an unexpected response. Please try again.', 'analyze_failed');
         }
         if (!response.ok || !data.success) {
-            throw new Error(data?.error || 'Failed to analyze. Please try again.');
+            throw saveError(data?.error || 'Failed to analyze. Please try again.', 'analyze_failed');
         }
         return data;
     };
@@ -183,6 +198,30 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
         if (!uid) {
             setError('User not ready yet. Please wait a moment and try again.');
             return;
+        }
+
+        // Web-path dedup (link mode only — an image gets its URL post-analysis).
+        // Mirror the iOS share path: exact match on the stored `url` field. Do it
+        // BEFORE the expensive analysis so a repeat paste is caught instantly and
+        // no work is wasted. The check is best-effort: any failure (offline, query
+        // error) falls through to a normal save — a save is NEVER blocked on it.
+        if (activeTab === 'link') {
+            try {
+                const existingId = await findLinkIdByUrl(uid, formattedUrl);
+                if (existingId) {
+                    trackSaveFailed('duplicate');
+                    toast.info("You already saved this — opening it now.");
+                    setUrl('');
+                    setError(null);
+                    setIsExpanded(false);
+                    // Deep-link to the existing card; Feed consumes ?linkId and
+                    // opens it (see Feed.tsx's searchParams effect).
+                    router.push(`${pathname}?linkId=${existingId}`);
+                    return;
+                }
+            } catch {
+                // Dedup probe failed — proceed to save rather than block capture.
+            }
         }
 
         setIsLoading(true);
@@ -211,7 +250,10 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                         body: JSON.stringify({ url: formattedUrl, existingTags, uid }),
                     });
                 } catch (netErr) {
-                    throw new Error(netErr instanceof Error ? netErr.message : `Network error: ${String(netErr)}`);
+                    // Preserve a categorized error (e.g. the timeout) as-is; only a
+                    // genuine transport failure gets wrapped as 'network'.
+                    if (netErr instanceof Error && 'category' in netErr) throw netErr;
+                    throw saveError(netErr instanceof Error ? netErr.message : `Network error: ${String(netErr)}`, 'network');
                 }
                 data = await parseResponse(response);
                 // Real milestone: analysis came back — jump ahead to "saving".
@@ -238,7 +280,10 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                         }),
                     });
                 } catch (netErr) {
-                    throw new Error(netErr instanceof Error ? netErr.message : `Network error: ${String(netErr)}`);
+                    // Preserve a categorized error (e.g. the timeout) as-is; only a
+                    // genuine transport failure gets wrapped as 'network'.
+                    if (netErr instanceof Error && 'category' in netErr) throw netErr;
+                    throw saveError(netErr instanceof Error ? netErr.message : `Network error: ${String(netErr)}`, 'network');
                 }
                 data = await parseResponse(response);
                 // The backend returns the stored image's public URL as link.url.
@@ -265,8 +310,12 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                     relatedLinks: data.link.relatedLinks,
                 });
             } catch (saveErr) {
-                throw new Error(`Could not save to Machina: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
+                throw saveError(`Could not save to Machina: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`, 'save_failed');
             }
+
+            // The capture landed and is persisted — record it.
+            trackSaveSucceeded('web_form');
+            trackFirstSave();
 
             // Let the scan progress (link, image, or video) land on "Done!" first.
             setProgress(100);
@@ -281,6 +330,12 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             onLinkAdded();
         } catch (err) {
             const message = err instanceof Error ? err.message : `Unknown error: ${String(err)}`;
+            // Record a SHORT, FIXED failure category (never raw error text). An
+            // uncategorized error is an unexpected code path → 'analyze_failed'.
+            const category = (err instanceof Error && 'category' in err
+                ? (err as { category?: SaveFailReason }).category
+                : undefined) ?? 'analyze_failed';
+            trackSaveFailed(category);
             setError(message);
             toast.error(message);
         } finally {

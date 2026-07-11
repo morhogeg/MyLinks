@@ -1,4 +1,4 @@
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, getDocs, getDoc, serverTimestamp, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, where, limit, orderBy, getDocs, getDoc, serverTimestamp, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { db, appCheckHeaders } from './firebase';
 import { authHeaders } from './auth';
 import { apiUrl, fetchWithTimeout } from './api';
@@ -62,6 +62,28 @@ export async function getUserTags(uid: string): Promise<string[]> {
     });
 
     return Array.from(tags).sort();
+}
+
+/**
+ * Return the id of an existing saved link with this exact URL, or null.
+ *
+ * Mirrors the iOS share path's dedup (functions/link_service.py
+ * `link_exists_for_url`): an exact-equality match on the stored `url` field,
+ * one indexed Firestore query, `limit(1)`. Firestore auto-indexes single
+ * fields, so no composite index is required. The web analyze endpoint stores
+ * `link.url` === the URL that was submitted, so a pre-analysis check on the
+ * formatted URL agrees with what the share path writes — the two capture paths
+ * dedup against the same value.
+ *
+ * Callers MUST treat a thrown error as "unknown" and fall through to saving —
+ * a failed dedup probe (e.g. offline) must never block a capture.
+ */
+export async function findLinkIdByUrl(uid: string, url: string): Promise<string | null> {
+    if (!url) return null;
+    const linksRef = collection(db, 'users', uid, 'links');
+    const q = query(linksRef, where('url', '==', url), limit(1));
+    const snapshot = await getDocs(q);
+    return snapshot.empty ? null : snapshot.docs[0].id;
 }
 
 /**
