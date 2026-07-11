@@ -28,6 +28,10 @@ on:
   # the native setup is confirmed:
   # push:
   #   branches: [main]
+  # TEMP push trigger — cloud sessions can't call workflow_dispatch (403); this
+  # branch-scoped trigger fires one build of main's code, then the branch is deleted.
+  push:
+    branches: [claude/ship-tf-trigger-1yngsi]
   #   paths:
   #     - 'web/**'
   #     - '.github/workflows/ios-testflight.yml'
