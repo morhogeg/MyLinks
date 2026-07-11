@@ -608,10 +608,15 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-11 (latest) — Ask Machina elevation (branch
-  `claude/ask-feature-elevation-3aoz26` — NOT yet merged/shipped).** Product
-  polish pass on the hero feature, all frontend (zero backend-deploy
-  dependency). (1) **Living suggestions:** new `web/lib/askSuggestions.ts`
+- **2026-07-11 (latest) — SHIPPED: Ask Machina elevation (`581d71b`, merge
+  `4fcd01d` to `main`).** Product polish pass on the hero feature, all
+  frontend (zero backend-deploy dependency). **Desktop web:** live via Vercel
+  auto-deploy. **iOS:** TestFlight **run #72 → build 1072**, fired via the
+  temp-push-trigger pattern (API dispatch still 403 from cloud sessions; temp
+  branch `claude/ship-tf-trigger-ask`). ⚠️ Owner cleanup: remote branch
+  deletes are no-ops from cloud sessions — delete the stale trigger branches
+  (`claude/ship-tf-trigger-bvwize`, `-1yngsi`, `-notes`, and `-ask` once run
+  #72 is done) plus the merged `claude/ask-feature-elevation-3aoz26`. (1) **Living suggestions:** new `web/lib/askSuggestions.ts`
   builds the empty-state chips from the LIVE library instead of static
   category names — a spotlighted "latest save" chip (re-animates the moment a
   new card lands; keyed by card id), this-week catch-up (count-aware),
@@ -631,9 +636,11 @@ exact-match, capped.
   and desktop **"/" focuses the composer**. New content-free analytics:
   `ask_suggestion_used` (kind label only), `ask_followup_used`, `ask_stopped`.
   tsc + eslint clean; `next build` compiles (prerender fails only on missing
-  Firebase env in the cloud sandbox). Ship = merge to main (Vercel) + a
-  TestFlight build; on-device QA: chip re-animation on a fresh save, stop
-  mid-stream on iOS (buffered path just cancels), keyboard vs. follow-up chips.
+  Firebase env in the cloud sandbox). On-device QA for build 1072: chip
+  re-animation on a fresh save (empty state + mid-chat pill), stop mid-answer
+  on iOS (buffered path just cancels the wait — no partial text, by design),
+  follow-up chips vs. keyboard, "/" is desktop-only. `firebase.json` and
+  `functions/` unchanged — no hosting or functions deploy.
 - **2026-07-11 — SHIPPED: notes fix + personal notes on every card
   (`a150ce2`, merged to `main`).** Owner reported the **Note tab errored "URL
   is required"** on device — root cause: the Note tab POSTed to `/api/analyze`,
