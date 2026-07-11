@@ -166,7 +166,9 @@ def _svc_with_json_responses(responses):
     svc.client = object()  # truthy → passes the "configured" guard
     calls = {"n": 0}
 
-    def fake_generate_json(contents, what, config_extra=None):
+    def fake_generate_json(contents, what, config_extra=None, model=None):
+        # `model` accepts the RAG paths' GEMINI_ASK_MODEL override.
+        calls.setdefault("models", []).append(model)
         i = calls["n"]
         calls["n"] += 1
         resp = responses[i]
@@ -241,8 +243,10 @@ class _FakeChunk:
 class _FakeModels:
     def __init__(self, pieces):
         self._pieces = pieces
+        self.used_model = None
 
     def generate_content_stream(self, model, contents, config=None):
+        self.used_model = model
         return iter(_FakeChunk(p) for p in self._pieces)
 
 
@@ -300,3 +304,24 @@ def test_stream_empty_library_not_flagged():
     assert cited == []
     assert ungrounded is False
     assert "couldn't find anything" in text.lower()
+
+
+# ── RAG answer paths use the higher-tier ASK model, not analysis flash-lite ──
+
+def test_buffered_answer_uses_ask_model_on_both_passes():
+    from ai_service import GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL
+    assert GEMINI_ASK_MODEL != GEMINI_ANALYSIS_MODEL  # it's genuinely a tier up
+    # First pass uncited → forces the strict re-ask; BOTH calls must use ASK model.
+    svc = _svc_with_json_responses([
+        {"answer": "uncited", "citedIds": []},
+        {"answer": "now cited", "citedIds": ["id2"]},
+    ])
+    svc.answer_from_context("q?", _CARDS)
+    assert svc._calls["models"] == [GEMINI_ASK_MODEL, GEMINI_ASK_MODEL]
+
+
+def test_stream_answer_uses_ask_model():
+    from ai_service import GEMINI_ASK_MODEL
+    svc = _svc_with_stream(["Body.\n", "[[CITED: id1]]"])
+    _drain(svc.answer_from_context_stream("q?", _CARDS))
+    assert svc.client.models.used_model == GEMINI_ASK_MODEL

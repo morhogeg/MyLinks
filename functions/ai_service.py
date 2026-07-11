@@ -43,6 +43,12 @@ def embedding_needs_repair(raw) -> bool:
 # Single source of truth for the analysis/generation model. Flows to text
 # analysis, image vision, and graph_service. Change here to swap tiers everywhere.
 GEMINI_ANALYSIS_MODEL = "gemini-3.1-flash-lite"
+# The ASK (RAG) answer model — one tier above flash-lite. Used ONLY by the two
+# grounded-answer paths (answer_from_context / answer_from_context_stream), where
+# reasoning quality over the retrieved context matters most and volume is low
+# (a handful of asks per user per day), so the tier bump is affordable. Analysis,
+# vision, and synthesis deliberately stay on GEMINI_ANALYSIS_MODEL.
+GEMINI_ASK_MODEL = "gemini-3.1-flash"
 EMBEDDING_MODEL = "models/gemini-embedding-001"
 EMBEDDING_DIMENSIONS = 768
 
@@ -296,13 +302,17 @@ class GeminiService:
         self.client = genai.Client(api_key=self.api_key) if self.api_key else None
         self.model = GEMINI_ANALYSIS_MODEL
 
-    def _generate_json(self, contents: list, what: str, config_extra: dict = None) -> dict:
+    def _generate_json(self, contents: list, what: str, config_extra: dict = None,
+                       model: str = None) -> dict:
         """Call Gemini with a structured-output (response_schema) config and
         return a parsed dict. Retries once on transient failures, then raises
         AnalysisError so the caller can surface a real error.
 
         config_extra lets callers add generation options (e.g. media_resolution
-        for video) without changing the base structured-output config.
+        for video) without changing the base structured-output config. `model`
+        overrides the model for this call only (the RAG answer paths pass the
+        higher-tier GEMINI_ASK_MODEL); it defaults to self.model
+        (GEMINI_ANALYSIS_MODEL) for every analysis/vision/synthesis call.
         """
         if not self.client:
             raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
@@ -324,7 +334,7 @@ class GeminiService:
         for attempt in range(2):
             try:
                 response = self.client.models.generate_content(
-                    model=self.model,
+                    model=model or self.model,
                     contents=contents,
                     config=config,
                 )
@@ -451,7 +461,9 @@ If the image is an article, extract the headline and body."""
             }
 
         prompt = _build_rag_prompt(question, cards, history) + _CITED_JSON_SUFFIX
-        data = self._generate_json([prompt], "answer", config_extra={"response_schema": BrainAnswer})
+        data = self._generate_json([prompt], "answer",
+                                   config_extra={"response_schema": BrainAnswer},
+                                   model=GEMINI_ASK_MODEL)
         answer = data.get("answer") or ""
         cited = _valid_cited_ids(data.get("citedIds"), cards)
         if cited:
@@ -465,6 +477,7 @@ If the image is an article, extract the headline and body."""
             retry = self._generate_json(
                 [retry_prompt], "answer (citation retry)",
                 config_extra={"response_schema": BrainAnswer},
+                model=GEMINI_ASK_MODEL,
             )
             retry_answer = retry.get("answer") or ""
             retry_cited = _valid_cited_ids(retry.get("citedIds"), cards)
@@ -551,7 +564,9 @@ If the image is an article, extract the headline and body."""
 
         try:
             stream = self.client.models.generate_content_stream(
-                model=self.model,
+                # Higher-tier ASK model (see GEMINI_ASK_MODEL), matching the
+                # non-streaming answer path — RAG answers, not analysis.
+                model=GEMINI_ASK_MODEL,
                 contents=[prompt],
                 # Match the non-streaming answer path: this is a grounded,
                 # factual answer, so keep temperature low for stability. Without
