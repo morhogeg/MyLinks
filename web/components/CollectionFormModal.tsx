@@ -7,6 +7,7 @@ import { COLOR_KEYS, getColorStyleByKey } from '@/lib/colors';
 import { createCollection, updateCollection } from '@/lib/collections';
 import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
+import { useScrollLock } from '@/lib/useScrollLock';
 
 /** Pick a random palette key — used so users never have to choose a color. */
 function randomColorKey(): string {
@@ -69,13 +70,14 @@ export default function CollectionFormModal({
         };
         if (isOpen) {
             window.addEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'hidden';
         }
         return () => {
             window.removeEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'unset';
         };
     }, [isOpen, onClose]);
+
+    // Ref-counted so closing this overlay never unlocks a still-open parent (F-16).
+    useScrollLock(isOpen);
 
     if (!isOpen) return null;
 

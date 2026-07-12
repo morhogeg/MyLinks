@@ -1,6 +1,31 @@
 import UIKit
 import ImageIO
 
+/// The ONE progress curve, shared by convention with the web app. Progress is a
+/// deterministic function of elapsed wall-clock time since the capture started,
+/// so the Share Extension HUD and the in-app loaders (which anchor to the same
+/// start timestamp — see `writePendingShareHint` / the placeholder's
+/// `processingStartedAt`) compute the identical percentage at the same moment.
+/// Switching from the share sheet to the app never restarts the loader.
+///
+///     progress(t) = ceiling − (ceiling − start) · e^(−t / tau)
+///
+/// TWIN: keep these constants + formula identical to web/lib/shareProgress.ts
+/// (START_PCT, CEILING, TAU_MS). Change one, change the other, or the two
+/// screens drift.
+enum ShareProgressCurve {
+    static let start: Double = 6      // START_PCT
+    static let ceiling: Double = 92   // CEILING
+    static let tauMs: Double = 10_000 // TAU_MS
+
+    /// Progress (percent, start…ceiling) for `elapsedMs` since capture start.
+    static func progress(forElapsedMs elapsedMs: Double) -> Double {
+        let t = max(0, elapsedMs)
+        let p = ceiling - (ceiling - start) * exp(-t / tauMs)
+        return min(ceiling, max(start, p))
+    }
+}
+
 /// Share Extension entry point. Pulls the shared item (link, text, or image)
 /// out of the share sheet, reads the user's ingest endpoint + token from the
 /// App Group (written by the main app, see ShareConfigPlugin.swift), uploads it
@@ -77,7 +102,12 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
 
     private var displayLink: CADisplayLink?
     private var progress: CGFloat = 0             // 0…100, what's shown on screen
-    private var ceiling: CGFloat = 90             // animation eases toward this while uploading
+    private var ceiling: CGFloat = CGFloat(ShareProgressCurve.ceiling) // eases toward this while uploading
+    // Capture-start wall clock — the shared anchor the whole progress ramp is a
+    // pure function of, and the value handed to the app so its in-app loader
+    // resumes from the same point instead of restarting. Set when the scan HUD
+    // first appears (beginScanAnimation).
+    private var captureStartedAt: Date?
     private var isImageFlow = false
     private var isLinkFlow = false
     private var finished = false
@@ -212,10 +242,16 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         guard let defaults = UserDefaults(suiteName: Self.appGroup) else { return }
         defaults.set(Date().timeIntervalSince1970, forKey: "pendingShareAt")
         defaults.set(isImageFlow ? "image" : "link", forKey: "pendingShareKind")
-        // Hand off the EXACT percentage the HUD is showing right now, so the
-        // in-app banner picks up from the same value instead of restarting near
-        // zero — the user sees one continuous progress across the two screens.
+        // Hand off the EXACT percentage the HUD is showing right now, so an older
+        // app build that can't read the start time still resumes near this value.
         defaults.set(Double(progress), forKey: "pendingShareProgress")
+        // The continuity anchor: the absolute capture-start wall clock (epoch ms).
+        // The in-app loader ramps `progressFor(now - startedAt)` off this exact
+        // value using the SAME curve (ShareProgressCurve / lib/shareProgress.ts),
+        // so the two screens show one continuous progress — never a restart.
+        if let start = captureStartedAt {
+            defaults.set(start.timeIntervalSince1970 * 1000.0, forKey: "pendingShareStartedAt")
+        }
     }
 
     // MARK: - Scan UI (images)
@@ -522,18 +558,24 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     private func beginScanAnimation() {
         card.isHidden = true
         scanContainer.isHidden = false
-        // Seed the hand-off flag immediately so opening Machina even a beat later
-        // resumes from the start rather than a blank banner.
+        // Anchor the shared clock the ramp is a pure function of, THEN seed the
+        // hand-off flag immediately so opening Machina even a beat later resumes
+        // from the same point rather than a blank banner.
+        if captureStartedAt == nil { captureStartedAt = Date() }
         writePendingShareHint()
         displayLink = CADisplayLink(target: self, selector: #selector(tick))
         displayLink?.add(to: .main, forMode: .common)
     }
 
     @objc private func tick() {
-        guard progress < ceiling else { return }
-        // Ease toward the ceiling: fast early, slowing as it approaches.
-        let step = max((ceiling - progress) * 0.018, 0.05)
-        progress = min(progress + step, ceiling)
+        guard let start = captureStartedAt else { return }
+        // Progress is a deterministic function of elapsed wall-clock time via the
+        // shared curve — the SAME value the in-app loader computes for the same
+        // moment. Monotonic by construction (the curve only rises), and we never
+        // render below what we've already shown as a belt-and-braces guard.
+        let elapsedMs = Date().timeIntervalSince(start) * 1000.0
+        let next = CGFloat(ShareProgressCurve.progress(forElapsedMs: elapsedMs))
+        if next > progress { progress = next }
         renderProgress(progress, done: false)
         syncProgressHint()
     }

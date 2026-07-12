@@ -83,6 +83,9 @@ export function useFeedFilters(links: Link[], debouncedQuery: string, searchResu
             return (
                 link.title.toLowerCase().includes(query) ||
                 link.summary.toLowerCase().includes(query) ||
+                // Your own note is searchable — recall a card by what you wrote
+                // about it, not only by the AI summary.
+                (!!link.userNote && link.userNote.toLowerCase().includes(query)) ||
                 link.tags.some((tag) => tag.toLowerCase().includes(query)) ||
                 link.category.toLowerCase().includes(query) ||
                 // Source label + platform aliases, so "twitter"/"x" finds every X

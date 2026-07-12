@@ -86,6 +86,9 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
         if (!uid) return;
         try {
             await updateLinkNote(uid, id, note);
+            // Quiet confirmation — a note is user content (like a favorite/collection
+            // add, which also confirm), so we acknowledge the save/removal.
+            toast.success(note.trim() ? 'Note saved' : 'Note removed');
         } catch {
             toast.error("Couldn't save your note. Please try again.");
         }

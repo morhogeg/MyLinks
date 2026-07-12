@@ -10,17 +10,16 @@ import { useAuth } from './AuthProvider';
 import { deleteAccount } from '@/lib/auth';
 import { auth } from '@/lib/firebase';
 import ConfirmDialog from './ConfirmDialog';
-import { useToast } from './Toast';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useUserSettings } from '@/lib/useUserSettings';
 import type { View } from './settings/types';
 import { MainView } from './settings/MainView';
 import { AccountView } from './settings/AccountSection';
-import { ExtensionView } from './settings/ExtensionView';
 import {
     DIGEST_MODES, DAYS, COUNT_OPTIONS, formatTime,
     ResurfacingView, StyleView, ScheduleView, PickerView,
 } from './settings/DigestSettings';
+import { useScrollLock } from '@/lib/useScrollLock';
 
 interface SettingsModalProps {
     uid: string;
@@ -43,7 +42,6 @@ const VIEW_TITLE: Record<View, string> = {
     style: 'Digest style',
     schedule: 'Schedule',
     cards: 'Cards per digest',
-    extension: 'Browser extension',
 };
 
 const FREQUENCY_NOTE: Record<string, string> = {
@@ -55,7 +53,6 @@ const FREQUENCY_NOTE: Record<string, string> = {
 const CADENCE_LABEL: Record<string, string> = { smart: 'Smart', daily: 'Daily', weekly: 'Weekly' };
 
 export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, initialSection }: SettingsModalProps) {
-    const toast = useToast();
     const { theme, setTheme } = useTheme();
     const { authUid, email: accountEmail, displayName, photoURL, signOut } = useAuth();
 
@@ -155,12 +152,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     }, []);
 
     // Lock the page behind Settings while it's open.
-    useEffect(() => {
-        if (!isOpen) return;
-        const prev = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = prev; };
-    }, [isOpen]);
+    useScrollLock(isOpen);
 
     // Swipe in from the left edge to leave: pop one screen, or close from the root.
     useEdgeSwipeBack(() => {
@@ -352,10 +344,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                                 value={String(settings.digest_count)}
                                 onSelect={(v) => setSettings((p) => ({ ...p, digest_count: Number(v) }))}
                             />
-                        )}
-
-                        {view === 'extension' && (
-                            <ExtensionView uid={uid} toast={toast} />
                         )}
                     </div>
                 </div>

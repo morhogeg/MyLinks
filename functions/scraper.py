@@ -648,6 +648,76 @@ Source: vxtwitter API
     }
 
 
+# Instagram username charset/length: letters, digits, dot, underscore; ≤30 chars.
+_IG_HANDLE_RE = re.compile(r"^[A-Za-z0-9._]{1,30}$")
+
+# First path segments on instagram.com that are ROUTES, not profiles — so a
+# short-code URL (/p/…, /reel/…) is never mistaken for a username.
+_IG_RESERVED_SEGMENTS = frozenset({
+    "p", "reel", "reels", "tv", "stories", "explore", "accounts", "direct",
+    "about", "developer", "legal", "web", "graphql", "api", "oauth", "login",
+    "emails", "session", "challenge", "privacy", "terms", "directory", "s", "ar",
+})
+
+# Generic tokens IG titles use when there's no real author — never a handle.
+_IG_GENERIC_HANDLES = frozenset({"instagram", "login", "video", "reel", "post", "photo"})
+
+
+def _valid_ig_handle(candidate: Optional[str]) -> Optional[str]:
+    """Return a clean IG handle (no leading @) when ``candidate`` is a plausible
+    username, else None. Rejects generic labels like 'instagram'."""
+    if not candidate:
+        return None
+    h = candidate.strip().lstrip("@")
+    if not _IG_HANDLE_RE.match(h) or h.lower() in _IG_GENERIC_HANDLES:
+        return None
+    return h
+
+
+def _extract_instagram_handle(url: str, *texts: str) -> Optional[str]:
+    """Best-effort extraction of the Instagram author's @handle.
+
+    Order (first hit wins): (1) an explicit ``(@handle)`` in the
+    og:title/description, (2) a ``<handle> on Instagram`` byline — a single
+    username token anchored to the start or a separator so a multi-word display
+    name never yields a stray word, (3) the URL's first path segment when it's a
+    profile — never for short-code routes like /p/, /reel/, /tv/, /stories/.
+
+    Returns the bare handle (no @) or None.
+    """
+    for text in texts:
+        if not text:
+            continue
+        # 1. "Cristiano Ronaldo (@cristiano) • Instagram photos and videos"
+        m = re.search(r"\(@([A-Za-z0-9._]{1,30})\)", text)
+        h = _valid_ig_handle(m.group(1)) if m else None
+        if h:
+            return h
+        # 2. "cristiano on Instagram: …" / "… - cristiano on Instagram"
+        m = re.search(r"(?:^|[-–—|:•·])\s*@?([A-Za-z0-9._]{1,30})\s+on\s+Instagram\b",
+                      text, flags=re.I)
+        h = _valid_ig_handle(m.group(1)) if m else None
+        if h:
+            return h
+
+    # 3. URL first path segment (profile-scoped URLs only).
+    try:
+        segs = [s for s in (urlparse(url).path or "").split("/") if s]
+    except Exception:
+        segs = []
+    if segs and segs[0].lower() not in _IG_RESERVED_SEGMENTS:
+        return _valid_ig_handle(segs[0])
+    return None
+
+
+def _instagram_source_name(url: str, *texts: str) -> Optional[str]:
+    """The card ``source_name`` for an Instagram card: ``@handle`` when an author
+    handle can be extracted, else None (so the AI's sourceName / plain
+    "Instagram" label is used as the fallback)."""
+    handle = _extract_instagram_handle(url, *texts)
+    return f"@{handle}" if handle else None
+
+
 def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
     """
     Scrape Instagram URLs using direct scraping first (reliable with mobile headers),
@@ -756,7 +826,8 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
                 best_title = caption_guess[:100].split('\n')[0]
 
     if not metadata_lines and not best_desc:
-        return {"html": "", "title": "Instagram Link", "text": "Instagram content (metadata extraction failed)"}
+        return {"html": "", "title": "Instagram Link", "text": "Instagram content (metadata extraction failed)",
+                "source_name": _instagram_source_name(url, best_title)}
 
     # Final Title fallback
     if best_title in generic_titles and best_desc:
@@ -774,7 +845,8 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
     return {
         "html": final_text,
         "title": best_title,
-        "text": final_text
+        "text": final_text,
+        "source_name": _instagram_source_name(url, best_title, best_desc),
     }
 
 

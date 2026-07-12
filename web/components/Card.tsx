@@ -5,7 +5,7 @@
 import { Link, LinkStatus } from '@/lib/types';
 import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Youtube, ExternalLink, Layers, Share2, X, Loader2, RotateCcw, AlertTriangle, StickyNote } from 'lucide-react';
 import { useState, memo } from 'react';
-import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
+import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle } from '@/lib/platform';
 import { useNow } from '@/lib/useNow';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -101,6 +101,10 @@ function Card({
     const fbAuthor = isFacebook && link.sourceName
         && !['facebook', 'screenshot', 'none'].includes(link.sourceName.trim().toLowerCase())
         ? link.sourceName : null;
+    // Instagram: credit the author @handle (extracted by the scraper and stored
+    // in sourceName as "@handle") in the same branded byline style as X. Falls
+    // back to the plain "Instagram" chip when no handle was captured.
+    const igAuthor = platform === 'instagram' ? instagramHandle(link.sourceName) : null;
 
     // Format relative time (e.g., "2h ago")
     const getTimeAgo = (timestamp: number | string, now: number): string => {
@@ -470,7 +474,19 @@ function Card({
                                 {fbAuthor && <span className="truncate">{fbAuthor}</span>}
                             </span>
                         )}
-                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && link.sourceType === 'image' && (
+                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && igAuthor && (
+                            <span
+                                dir="ltr"
+                                className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-text-secondary whitespace-nowrap max-w-[220px]"
+                                title={`@${igAuthor}`}
+                            >
+                                <span className="shrink-0 inline-flex" style={{ color: platformColor('instagram') }}>
+                                    {platformIcon('instagram', 'w-3.5 h-3.5')}
+                                </span>
+                                <span className="truncate">@{igAuthor}</span>
+                            </span>
+                        )}
+                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && !igAuthor && link.sourceType === 'image' && (
                             <span
                                 className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-accent whitespace-nowrap"
                                 title="Screenshot"
@@ -479,7 +495,7 @@ function Card({
                                 <span>Screenshot</span>
                             </span>
                         )}
-                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && link.sourceType === 'note' && (
+                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && !igAuthor && link.sourceType === 'note' && (
                             <span
                                 className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-accent whitespace-nowrap"
                                 title="Note"
@@ -488,7 +504,7 @@ function Card({
                                 <span>Note</span>
                             </span>
                         )}
-                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && link.sourceType !== 'image' && link.sourceType !== 'note' && link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None' && (
+                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && !igAuthor && link.sourceType !== 'image' && link.sourceType !== 'note' && link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None' && (
                             <span
                                 className="flex items-center gap-1 text-[9px] font-bold text-text-muted/60 bg-fill-subtle border border-border-strong px-2 py-1 rounded-lg uppercase tracking-widest whitespace-nowrap transition-all max-w-[220px]"
                                 title={link.sourceName}
@@ -585,6 +601,21 @@ function Card({
                         })}
                     </div>
 
+                    {/* Your own note — shown in YOUR voice (accent, italic, quote
+                        bar) so it reads as distinct from the machine summary above.
+                        Clamped to 2 lines with dir="auto" so it stays RTL-safe and
+                        never bloats the card. Note-cards ARE the note, so skip them. */}
+                    {link.userNote && link.sourceType !== 'note' && (
+                        <div
+                            dir="auto"
+                            title={link.userNote}
+                            className="flex items-start gap-1.5 border-s-2 border-accent/30 ps-2 text-[12px] leading-snug text-accent/90"
+                        >
+                            <StickyNote className="w-3 h-3 shrink-0 mt-[3px] opacity-70" />
+                            <span className="line-clamp-2 italic">{link.userNote}</span>
+                        </div>
+                    )}
+
                     {/* Metadata Buttons Row */}
                     <div className="flex items-center justify-between mt-auto">
                         <div className="flex items-center gap-3 text-text-muted/60 text-[11px] font-medium">
@@ -593,13 +624,6 @@ function Card({
                                 {link.metadata.estimatedReadTime}{isRtl ? ' דק׳' : 'm'}
                             </span>
                             {now > 0 && <span>{getTimeAgo(link.createdAt, now)}</span>}
-                            {/* You've added a personal note to this card — a quiet
-                                accent cue so your own thoughts are findable at a glance. */}
-                            {link.userNote && link.sourceType !== 'note' && (
-                                <span className="flex items-center text-accent/70" title="You added a note">
-                                    <StickyNote className="w-3 h-3" />
-                                </span>
-                            )}
                         </div>
                     </div>
                 </div>

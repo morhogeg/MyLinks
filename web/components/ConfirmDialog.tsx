@@ -3,6 +3,7 @@
 import { X, AlertTriangle } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { hapticWarning, hapticMedium } from '@/lib/haptics';
+import { useScrollLock } from '@/lib/useScrollLock';
 
 interface ConfirmDialogProps {
     isOpen: boolean;
@@ -54,13 +55,14 @@ export default function ConfirmDialog({
         };
         if (isOpen) {
             window.addEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'hidden';
         }
         return () => {
             window.removeEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'unset';
         };
     }, [isOpen, onClose]);
+
+    // Ref-counted so closing this overlay never unlocks a still-open parent (F-16).
+    useScrollLock(isOpen);
 
     if (!isOpen) return null;
 

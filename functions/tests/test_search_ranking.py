@@ -58,6 +58,17 @@ def test_embed_text_order_puts_headline_before_detail():
     assert text.index("Details: D") < text.index("Tags:") < text.index("Concepts:")
 
 
+def test_embed_text_folds_in_user_note():
+    # The user's own note (their voice) is embedded so a card is findable by what
+    # the user wrote about it — placed after Details, before Tags.
+    text = build_embedding_text({
+        "title": "T", "summary": "S", "detailedSummary": "D",
+        "userNote": "reminded me of the 2008 crash", "tags": ["tag"],
+    })
+    assert "Note: reminded me of the 2008 crash" in text
+    assert text.index("Details: D") < text.index("Note:") < text.index("Tags:")
+
+
 def test_embed_text_omits_missing_fields_cleanly():
     text = build_embedding_text({"title": "Only a title"})
     assert text == "Title: Only a title"

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
 import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2, ChevronLeft, StickyNote } from 'lucide-react';
-import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
+import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import { openExternal } from '@/lib/share';
 import ReadingView from './ReadingView';
@@ -14,6 +14,7 @@ import { hasHebrew } from '@/lib/rtl';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { getRelatedCards } from '@/lib/related';
+import { hapticSuccess, hapticMedium } from '@/lib/haptics';
 
 /**
  * Split a "M:SS — description" (or "H:MM:SS …") video highlight into its
@@ -123,12 +124,46 @@ export default function LinkDetailModal({
         setIsEditingSummary(false);
         if (s !== (link.summary || '')) onUpdateSummary?.(link.id, s);
     };
+    // The note composer: refs + a pointer-down intent flag so save-on-blur can
+    // never fight an explicit Save/Cancel/Delete tap. On iOS a button tap often
+    // reports a null blur relatedTarget, so we record intent on pointerdown
+    // (which fires before blur) rather than inferring it from focus movement.
+    const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
+    const noteEditorRef = useRef<HTMLDivElement>(null);
+    const noteActionRef = useRef<'save' | 'cancel' | 'delete' | null>(null);
+
+    // Auto-grow the composer to fit its content (capped by CSS max-height, which
+    // then scrolls) so the whole note is visible while writing — no inner
+    // scrollbar until it gets genuinely long.
+    const autoGrowNote = (el: HTMLTextAreaElement | null) => {
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight}px`;
+    };
+
     const saveNote = () => {
+        noteActionRef.current = 'save';
         const n = noteDraft.trim();
         setIsEditingNote(false);
-        if (n !== (link.userNote || '')) onUpdateNote?.(link.id, n);
+        if (n !== (link.userNote || '')) { onUpdateNote?.(link.id, n); hapticSuccess(); }
     };
-    const startEditNote = () => { setNoteDraft(link.userNote || ''); setIsEditingNote(true); };
+    const cancelNote = () => { noteActionRef.current = 'cancel'; setIsEditingNote(false); };
+    const deleteNote = () => {
+        noteActionRef.current = 'delete';
+        setIsEditingNote(false);
+        if (link.userNote) { onUpdateNote?.(link.id, ''); hapticMedium(); }
+    };
+    // Save-on-blur guard: if the composer loses focus with NO explicit action
+    // pending (tapped elsewhere, keyboard dismissed), auto-commit a non-empty
+    // draft so writing is never lost. An empty draft is left alone — blur never
+    // silently deletes an existing note (that needs the explicit Delete button).
+    const onNoteBlur = () => {
+        if (noteActionRef.current) { noteActionRef.current = null; return; }
+        const n = noteDraft.trim();
+        setIsEditingNote(false);
+        if (n && n !== (link.userNote || '')) { onUpdateNote?.(link.id, n); hapticSuccess(); }
+    };
+    const startEditNote = () => { setNoteDraft(link.userNote || ''); noteActionRef.current = null; setIsEditingNote(true); };
     const hasValidImage = !!link.url && /^https?:\/\//.test(link.url);
 
     // Scroll back to the top when the card changes. Opening a related card reuses
@@ -161,6 +196,32 @@ export default function LinkDetailModal({
     // focused field into the shrunken visible area instead of extending under
     // the keys. No-op on desktop (visualViewport spans the full window).
     const vp = useVisualViewport();
+
+    // Note composer focus: when the editor opens, focus it, place the caret at
+    // the END of any existing text (so editing continues where the note left
+    // off, not with the whole thing selected), and size it to its content.
+    useEffect(() => {
+        if (!isEditingNote) return;
+        const el = noteTextareaRef.current;
+        if (!el) return;
+        autoGrowNote(el);
+        el.focus({ preventScroll: true });
+        const end = el.value.length;
+        try { el.setSelectionRange(end, end); } catch { /* older WebViews */ }
+    }, [isEditingNote]);
+
+    // Keep the composer above the on-screen keyboard (M5, visual-viewport). The
+    // modal is already clamped to the visible viewport; here we scroll the
+    // composer into that shrunken area. Re-runs when the keyboard animates in and
+    // changes vp.height, so the input + its Save/Cancel row never sit under the
+    // keys — the core "keyboard covers the note field" fix.
+    useEffect(() => {
+        if (!isEditingNote) return;
+        const t = setTimeout(() => {
+            noteEditorRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }, 100);
+        return () => clearTimeout(t);
+    }, [isEditingNote, vp.height]);
 
     // A11y: move focus into the dialog on open and restore it to the trigger on
     // close. Keyed on isOpen only, so navigating between related cards (which
@@ -222,6 +283,9 @@ export default function LinkDetailModal({
     const fbAuthor = isFacebook && link.sourceName
         && !['facebook', 'screenshot', 'none'].includes(link.sourceName.trim().toLowerCase())
         ? link.sourceName : null;
+    // Instagram: the author @handle captured by the scraper (stored in
+    // sourceName as "@handle"), credited in the same byline style as X.
+    const igAuthor = platform === 'instagram' ? instagramHandle(link.sourceName) : null;
 
     const getTimeAgo = (timestamp: number | string, now: number): string => {
         if (!timestamp || !now) return '...';
@@ -580,6 +644,17 @@ export default function LinkDetailModal({
                                             </span>
                                             {fbAuthor && <span className="truncate">{fbAuthor}</span>}
                                         </span>
+                                    ) : igAuthor ? (
+                                        <span
+                                            dir="ltr"
+                                            className="flex items-center gap-1.5 min-w-0 text-sm font-semibold text-text-secondary whitespace-nowrap max-w-[240px]"
+                                            title={`@${igAuthor}`}
+                                        >
+                                            <span className="shrink-0 inline-flex" style={{ color: platformColor('instagram') }}>
+                                                {platformIcon('instagram', 'w-4 h-4')}
+                                            </span>
+                                            <span className="truncate">@{igAuthor}</span>
+                                        </span>
                                     ) : link.sourceType === 'image' ? (
                                         <span className="flex items-center gap-1.5 text-sm font-semibold text-accent whitespace-nowrap" title="Screenshot">
                                             <ImageIcon className="w-4 h-4 shrink-0" />
@@ -839,38 +914,48 @@ export default function LinkDetailModal({
                                     {isRtl ? 'ההערה שלי' : 'My note'}
                                 </h3>
                                 {isEditingNote ? (
-                                    <div>
+                                    // onBlur bubbles from the textarea: the guard in onNoteBlur
+                                    // auto-commits a non-empty draft if focus leaves the composer
+                                    // without an explicit Save/Cancel/Delete, so writing is never
+                                    // lost. scroll-mt keeps a little breathing room above the
+                                    // composer when it's scrolled into view over the keyboard.
+                                    <div ref={noteEditorRef} onBlur={onNoteBlur} className="scroll-mt-6">
                                         <textarea
+                                            ref={noteTextareaRef}
                                             value={noteDraft}
-                                            onChange={(e) => setNoteDraft(e.target.value)}
+                                            onChange={(e) => { setNoteDraft(e.target.value); autoGrowNote(e.target); }}
                                             onKeyDown={(e) => {
                                                 // Notes are multi-line, so plain Enter adds a line;
                                                 // ⌘/Ctrl+Enter saves (a familiar "commit" chord).
                                                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveNote(); }
+                                                // Escape discards the draft (explicit cancel).
+                                                else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancelNote(); }
                                             }}
-                                            rows={4}
-                                            autoFocus
+                                            rows={3}
                                             dir="auto"
-                                            placeholder={isRtl ? 'מה חשבת על זה?' : 'What were you thinking about this?'}
+                                            placeholder={isRtl ? 'מה דעתך על זה?' : 'Add your take…'}
                                             aria-label="Edit your note"
-                                            className={`w-full text-base text-text bg-background border border-accent/40 rounded-xl px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none placeholder:text-text-muted/50 leading-relaxed ${isRtl ? 'text-right' : ''}`}
+                                            className={`w-full min-h-[6.5rem] max-h-[45vh] overflow-y-auto text-base text-text bg-background border border-accent/40 rounded-xl px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none placeholder:text-text-muted/50 leading-relaxed ${isRtl ? 'text-right' : ''}`}
                                         />
                                         <div className="flex items-center gap-2 mt-2">
                                             <button
+                                                onPointerDown={() => { noteActionRef.current = 'save'; }}
                                                 onClick={saveNote}
                                                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
                                             >
                                                 <Check className="w-3.5 h-3.5" /> Save note
                                             </button>
                                             <button
-                                                onClick={() => setIsEditingNote(false)}
+                                                onPointerDown={() => { noteActionRef.current = 'cancel'; }}
+                                                onClick={cancelNote}
                                                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-fill-subtle text-text-muted text-xs font-bold hover:text-text hover:bg-fill-strong transition-all"
                                             >
                                                 Cancel
                                             </button>
                                             {link.userNote && (
                                                 <button
-                                                    onClick={() => { setIsEditingNote(false); onUpdateNote(link.id, ''); }}
+                                                    onPointerDown={() => { noteActionRef.current = 'delete'; }}
+                                                    onClick={deleteNote}
                                                     className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-text-muted/70 hover:text-red-400 transition-all ${isRtl ? 'mr-auto' : 'ml-auto'}`}
                                                 >
                                                     <Trash2 className="w-3.5 h-3.5" /> Delete
@@ -897,7 +982,7 @@ export default function LinkDetailModal({
                                     </div>
                                 ) : (
                                     <button
-                                        onClick={() => { setNoteDraft(''); setIsEditingNote(true); }}
+                                        onClick={startEditNote}
                                         className={`w-full flex items-center gap-2 px-4 py-3 rounded-xl border border-dashed border-border-strong text-text-muted/70 hover:text-accent hover:border-accent/40 hover:bg-accent/[0.04] active:scale-[0.99] transition-all ${isRtl ? 'flex-row-reverse' : ''}`}
                                     >
                                         <Plus className="w-4 h-4 shrink-0" />

@@ -379,9 +379,11 @@ The multi-user auth work is **fully written but not live**:
     and App/ShareExt build-number lockstep in CI (I-1/I-2). **Still open:** decompose
     `Feed.tsx` + `SettingsModal.tsx` (R-3/R-4) and extract `share_service.py` from
     `main.py` (R-1); consolidate the two markdown stacks (A-7, needs on-device visual
-    QA); run the `firestore-rules-test` suite in CI (N-2a); add the extension
-    token-copy UI in Settings (F-2); ShareExt background-upload pending-record
-    reconciliation (P-7, device work).
+    QA); run the `firestore-rules-test` suite in CI (N-2a); ShareExt
+    background-upload pending-record reconciliation (P-7, device work).
+    ~~Extension token-copy UI in Settings (F-2)~~ — **WON'T DO, owner call
+    2026-07-12:** the Settings browser-extension section was removed entirely
+    (the `/extension` page and the extension itself remain).
 
 ### 🟢 P3 — product roadmap (post-launch)
 
@@ -403,10 +405,12 @@ The multi-user auth work is **fully written but not live**:
 24. **[ ] T10 export** (MD/PDF/HTML from ReadingView), **T11 highlights**, T5/T6
     connector framework + YouTube liked-videos sync (pull connectors; IG/FB saved
     have no legitimate API — won't do), Chrome Web Store listing for the extension.
-25. **[ ] QA backlog leftovers** (from the F-series, still open): F-16 ref-counted
-    scroll locks, F-21 offline signal for optimistic writes, F-24/25/26
-    SimpleMarkdown + RTL unification, F-31 Reader "Listen" reliability, L-5
-    unbounded `deleteCollection` batch. **✅ Fixed 2026-07-10:** F-20 (ReminderModal
+25. **[ ] QA backlog leftovers** (from the F-series, still open): F-21 offline
+    signal for optimistic writes, F-24/25/26 SimpleMarkdown + RTL unification,
+    F-31 Reader "Listen" reliability. **✅ Fixed 2026-07-12 (polish sprint):**
+    F-16 (ref-counted body scroll lock — `web/lib/useScrollLock.ts`, all 10
+    overlay lock sites swapped), L-5 (`deleteCollection`/`addLinksToCollection`
+    chunked under Firestore's 500-op batch cap). **✅ Fixed 2026-07-10:** F-20 (ReminderModal
     past-times/date-rollover — local-time parsing, picker guards, save-time
     invariant), F-29 (up-swipe remind is now outcome-aware: cancel returns the
     card, Undo clears the created reminder), F-32 (deck order snapshotted as ids,
@@ -613,7 +617,47 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-12 (latest) — Ask elevation, device-feedback round (`1e433b6`,
+- **2026-07-12 (latest) — App-polish sprint, 10 owner fixes + extras (branch
+  `claude/app-polish-multi-agent-0gqmaf`; multi-agent session, every slice
+  reviewed + re-verified after merge).** (1) **Share→app loader continuity:**
+  progress is now a deterministic curve over elapsed time since capture start
+  (`web/lib/shareProgress.ts` ⇄ Swift `ShareProgressCurve` twin, constants
+  lock-stepped); the extension writes `pendingShareStartedAt` to the App Group,
+  the app ramps from it / the placeholder's `processingStartedAt` — switching
+  to the app never restarts the loader, no flash when already done. (2)
+  **Instagram @handle** in the source tag (scraper extracts from og-title/
+  byline/profile URL into `source_name`; Card/LinkDetailModal render IG logo +
+  @handle like X; new `test_instagram_handle.py`, 12 tests). (3) **Ask
+  follow-up chips are content-aware** (`askSuggestions.ts` classifier:
+  recipe/news/howto/research/video angles from the cited cards; news/politics
+  never gets action-item chips; multi-card → compare; used chips never
+  re-offered). (4+5) **Collections are a place** (new `viewMode 'collection'`
+  detail screen with header/actions, back button + edge-swipe to the GALLERY,
+  never home) and **Digest tab opens a list** of all stored digests
+  (`digestDetail` opens one, back to list). (6+7) Settings: browser-extension
+  section removed (ExtensionView deleted); the one `Toggle` primitive
+  hardened (structural flex geometry, `shrink-0`, RTL-safe knob travel). (8)
+  **Tour rebuilt**: 5-step story (share-sheet capture → structured card → cited
+  Ask → resurfacing → CTA) with theme-token mock visuals, Skip everywhere,
+  swipe/keyboard/haptics; same persistence + Settings replay. (9) **Home
+  command surface**: Ask hero bar + unified Feed·Collections·Digest nav in one
+  container, single Filter affordance (categories/tags folded into
+  MobileFiltersSheet; MobileCategoriesTagsSheet deleted). (10) **Notes revamp**:
+  keyboard never covers the composer (visual-viewport + scroll-into-view),
+  auto-grow, save-on-blur that can't lose text, Save/Cancel/Delete + shortcuts,
+  note shown on Card/ListCard in the user's voice (quote bar, accent, italic,
+  `dir="auto"`), notes searchable client-side AND folded into embeddings
+  (`EMBED_TEXT_VERSION` → 3, note writes flip `needsEmbedding`) + Ask RAG
+  context. **Extras found & fixed:** L-5 batch-cap chunking, F-16 ref-counted
+  scroll lock (`useScrollLock.ts`, 10 sites), ReminderModal conditional-hook
+  violation, capture-bridge render purity — eslint back to 0 errors. Verified:
+  `tsc --noEmit` clean, eslint 0 errors/5 warnings, functions 160/160 pytest,
+  `py_compile` clean. **Not deployed** — needs `/ship` (web + functions deploy
+  incl. scraper/search/ai_service changes + a TestFlight build; then run
+  `backfill_embeddings` once for the v3 recipe). On-device QA: share→app loader
+  hand-off, collection/digest back-swipe, note editor keyboard, new tour,
+  toggle alignment in Settings.
+- **2026-07-12 — Ask elevation, device-feedback round (`1e433b6`,
   merge `e3a96db` to `main`).** Owner QA'd build 1072 and sent five fixes,
   all landed: (1) latest-save suggestion chip de-spotlighted (no purple/
   sparkle; live re-animation kept); (2) thinking status now count-free

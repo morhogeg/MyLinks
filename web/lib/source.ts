@@ -7,6 +7,7 @@
 // Resolution order (first match wins):
 //   1. X / Twitter post  → the author @handle
 //   2. LinkedIn post     → the author's name (from the stored name or the URL slug)
+//   2b. Instagram post   → the author @handle the scraper stored in sourceName
 //   3. A real sourceName → the AI/scraper-extracted publisher (skips the generic
 //                          "None"/"Screenshot" placeholders)
 //   4. A known platform  → the platform label (YouTube/Instagram/…)
@@ -17,6 +18,7 @@ import {
     getPlatform,
     PLATFORM_LABELS,
     xHandle,
+    instagramHandle,
     linkedinDisplayName,
     prettyHost,
     type PlatformKey,
@@ -58,6 +60,15 @@ export function getSourceInfo(link: Pick<Link, 'url' | 'sourceName' | 'sourceTyp
         const name = linkedinDisplayName(link.url, link.sourceName);
         if (name) {
             return { key: `linkedin:${name.toLowerCase()}`, label: name, platform: 'linkedin', isScreenshot: false };
+        }
+    }
+
+    // 2b. Instagram → the author @handle the scraper captured (stored in
+    // sourceName as "@handle"), its own source like X — e.g. "@cristiano".
+    if (platform === 'instagram') {
+        const igHandle = instagramHandle(link.sourceName);
+        if (igHandle) {
+            return { key: `instagram:@${igHandle.toLowerCase()}`, label: `@${igHandle}`, platform: 'instagram', isScreenshot: false };
         }
     }
 

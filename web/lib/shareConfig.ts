@@ -11,7 +11,7 @@ import { apiUrl } from './api';
  */
 interface ShareConfigPlugin {
     save(options: { endpoint: string; token: string }): Promise<void>;
-    consumePendingShare(): Promise<{ pending: boolean; kind?: string; ageMs?: number; progress?: number }>;
+    consumePendingShare(): Promise<{ pending: boolean; kind?: string; ageMs?: number; progress?: number; startedAt?: number }>;
 }
 
 const ShareConfigNative = registerPlugin<ShareConfigPlugin>('ShareConfig');
@@ -27,6 +27,10 @@ export interface PendingShare {
     /** The % (0–100) the Share Extension HUD showed at hand-off, if known — lets
         the in-app banner resume from the same value. Undefined on older builds. */
     progress?: number;
+    /** Absolute capture-start wall clock (epoch ms) the Share Extension anchored
+        its progress ramp to — the shared clock the in-app loaders ramp from, so
+        progress carries across continuously. Undefined on older builds. */
+    startedAt?: number;
 }
 
 /**
@@ -43,7 +47,8 @@ export async function consumePendingShare(): Promise<PendingShare> {
         const kind: PendingShareKind =
             res.kind === 'image' ? 'image' : res.kind === 'video' ? 'video' : 'link';
         const progress = typeof res.progress === 'number' && res.progress > 0 ? res.progress : undefined;
-        return { pending: true, kind, ageMs: Math.max(0, res.ageMs ?? 0), progress };
+        const startedAt = typeof res.startedAt === 'number' && res.startedAt > 0 ? res.startedAt : undefined;
+        return { pending: true, kind, ageMs: Math.max(0, res.ageMs ?? 0), progress, startedAt };
     } catch {
         // Older builds without the native method, or no App Group — treat as none.
         return { pending: false, kind: 'link', ageMs: 0 };

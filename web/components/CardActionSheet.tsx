@@ -4,6 +4,7 @@ import { Link, LinkStatus } from '@/lib/types';
 import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink, Layers, Share2, FolderMinus } from 'lucide-react';
 import { useEffect } from 'react';
 import { IconButton } from './ui/Button';
+import { useScrollLock } from '@/lib/useScrollLock';
 
 interface CardActionSheetProps {
     link: Link;
@@ -47,13 +48,14 @@ export default function CardActionSheet({
         };
         if (isOpen) {
             window.addEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'hidden';
         }
         return () => {
             window.removeEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'unset';
         };
     }, [isOpen, onClose]);
+
+    // Ref-counted so closing this overlay never unlocks a still-open parent (F-16).
+    useScrollLock(isOpen);
 
     if (!isOpen) return null;
 
