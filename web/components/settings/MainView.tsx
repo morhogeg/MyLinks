@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, Sun, Moon, Monitor, RefreshCw, Clock, Compass, Network, Puzzle } from 'lucide-react';
+import { Bell, Sun, Moon, Monitor, RefreshCw, Clock, Compass, Network } from 'lucide-react';
 import { policyUrl, openExternal } from '@/lib/share';
 import ProfileAvatar from '../ProfileAvatar';
 import DataExport from './DataExport';
@@ -58,12 +58,6 @@ export function MainView({
                 <NavRow tile={<Clock className="w-[17px] h-[17px]" />} tileClass="bg-pink-500" title="Reminders & Digest" value={remindersOrDigest ? 'On' : 'Off'} onClick={() => go('resurfacing')} />
             </List>
             {pushNote && <p className="text-[12px] text-amber-500 leading-snug px-2 pt-1.5">{pushNote}</p>}
-
-            <SectionHeader>Integrations</SectionHeader>
-            <List>
-                <NavRow tile={<Puzzle className="w-[16px] h-[16px]" />} tileClass="bg-violet-500" title="Browser extension" onClick={() => go('extension')} />
-            </List>
-            <Footnote>Save any page into your library from Chrome, Edge, or Brave with one click.</Footnote>
 
             <SectionHeader>Appearance</SectionHeader>
             <List>
