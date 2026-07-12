@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from './types';
 import type { AnalyzingState } from '@/components/AnalyzingBanner';
+import { progressFor } from './shareProgress';
 
 /**
  * Drives the app-level "Analyzing…" banner for captures shared from OTHER apps
@@ -13,13 +14,25 @@ import type { AnalyzingState } from '@/components/AnalyzingBanner';
  * synthesize a forward-moving percentage so the user gets the same reassurance
  * the in-app add flow shows.
  *
- * Progress is time-based, eased toward a 95% ceiling from when WE first saw the
- * card (not its createdAt — a card already mid-flight when the app opens starts
- * advanced but not stuck). When the last processing card resolves we return an
- * inactive state once, so the banner can flash "Saved" and slide away.
+ * CONTINUITY: progress is ramped from the card's own `processingStartedAt`
+ * (fallback `createdAt`) — the SAME epoch-ms wall clock the Share Extension
+ * anchored its HUD to — using the shared {@link progressFor} curve. So when the
+ * user switches to the app mid-capture, this banner shows the point on the ramp
+ * the extension had already reached, never a restart from 0. Only if a card
+ * carries no usable timestamp do we fall back to when WE first saw it. When the
+ * last processing card resolves we return an inactive state once, so the banner
+ * can flash "Saved" and slide away.
  */
-const EXPECTED_MS = 18_000; // typical server analysis time; tunes the ramp
-const CEILING = 95;
+
+/** Coerce a Firestore timestamp field (ms number, or legacy ISO string) to ms. */
+function toMs(v: number | string | undefined): number | null {
+    if (typeof v === 'number' && isFinite(v) && v > 0) return v;
+    if (typeof v === 'string') {
+        const t = Date.parse(v);
+        if (!isNaN(t)) return t;
+    }
+    return null;
+}
 
 export function useProcessingBanner(links: Link[]): AnalyzingState | null {
     const firstSeen = useRef<Map<string, number>>(new Map());
@@ -29,6 +42,9 @@ export function useProcessingBanner(links: Link[]): AnalyzingState | null {
     // render pure (no react-hooks/purity violation).
     const [now, setNow] = useState(0);
     const wasActive = useRef(false);
+    // Monotonic guard: the displayed % must never step backwards across the
+    // hand-off from the optimistic banner or between successive `now` ticks.
+    const lastPct = useRef(0);
 
     const processing = links.filter((l) => l.status === 'processing');
     const active = processing.length > 0;
@@ -38,11 +54,12 @@ export function useProcessingBanner(links: Link[]): AnalyzingState | null {
     const liveKey = processing.map((l) => l.id).sort().join(',');
 
     // Prune first-seen entries for cards that are no longer processing, and
-    // stamp newly-seen ones. Done in an effect (not during render) so render
-    // stays pure. Uses performance.now for a monotonic clock, falling back to
-    // Date.now where performance is unavailable.
+    // stamp newly-seen ones (only used as a last-resort clock when a card has no
+    // usable timestamp). Done in an effect (not during render) so render stays
+    // pure. Uses Date.now (a wall clock) so it shares the same time base as the
+    // cards' `processingStartedAt`, keeping the ramp continuous either way.
     useEffect(() => {
-        const t = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        const t = Date.now();
         const liveIds = new Set(processing.map((l) => l.id));
         for (const id of firstSeen.current.keys()) {
             if (!liveIds.has(id)) firstSeen.current.delete(id);
@@ -53,18 +70,22 @@ export function useProcessingBanner(links: Link[]): AnalyzingState | null {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [liveKey]);
 
-    // While anything is processing, snap `now` to the clock once a second so the
-    // ramp moves forward. The banner's own CSS width transition smooths the step.
+    // While anything is processing, snap `now` to the wall clock once a second so
+    // the ramp moves forward. The banner's own CSS width transition smooths the
+    // step. Date.now (not performance.now) so it matches the cards' timestamps.
     useEffect(() => {
         if (!active) return;
-        const read = () => setNow(typeof performance !== 'undefined' ? performance.now() : Date.now());
+        const read = () => setNow(Date.now());
+        read();
         const iv = setInterval(read, 1000);
         return () => clearInterval(iv);
     }, [active]);
 
     if (!active) {
         // Emit one inactive frame right after the last card resolves so the
-        // banner finishes gracefully; then nothing.
+        // banner finishes gracefully; then nothing. Reset the monotonic guard so
+        // the next capture starts a fresh ramp.
+        lastPct.current = 0;
         if (wasActive.current) {
             wasActive.current = false;
             return { active: false, progress: 100, kind: 'link' };
@@ -75,12 +96,21 @@ export function useProcessingBanner(links: Link[]): AnalyzingState | null {
 
     // Drive the banner from the MOST RECENTLY shared card still processing —
     // the one the user most likely just added.
-    const newest = processing.reduce((a, b) => ((a.createdAt ?? 0) >= (b.createdAt ?? 0) ? a : b));
-    const seen = firstSeen.current.get(newest.id) ?? now;
-    const elapsed = Math.max(0, now - seen);
-    // Ease-out toward the ceiling: fast at first, slowing as it approaches 95%.
-    const frac = 1 - Math.exp(-elapsed / (EXPECTED_MS * 0.6));
-    const progress = Math.min(CEILING, 6 + frac * (CEILING - 6));
+    const newest = processing.reduce((a, b) =>
+        ((toMs(a.createdAt) ?? 0) >= (toMs(b.createdAt) ?? 0) ? a : b),
+    );
+    const clock = now || Date.now();
+    // Prefer the shared start clock stamped on the card (processingStartedAt, then
+    // createdAt); only fall back to first-seen when a card carries neither.
+    const startMs =
+        toMs(newest.processingStartedAt) ??
+        toMs(newest.createdAt) ??
+        firstSeen.current.get(newest.id) ??
+        clock;
+    const elapsed = Math.max(0, clock - startMs);
+    // Non-decreasing: clamp to the highest % shown so far this capture.
+    const progress = Math.max(progressFor(elapsed), lastPct.current);
+    lastPct.current = progress;
 
     const kind: AnalyzingState['kind'] =
         newest.sourceType === 'image' ? 'image' : newest.sourceType === 'youtube' ? 'video' : 'link';

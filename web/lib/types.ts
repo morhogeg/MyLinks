@@ -59,6 +59,13 @@ export interface Link {
   category: string;
   status: CaptureState;
   createdAt: number | string; // Handle both Unix timestamp and ISO string
+  // When the current processing attempt began (epoch ms). Stamped on the
+  // placeholder card by the backend (share path) and createProcessingPlaceholder
+  // (web path); a retry re-stamps it while preserving createdAt. It's the shared
+  // wall clock the capture-progress loaders ramp from (see lib/shareProgress.ts),
+  // so the in-app ramp resumes where the Share Extension left off instead of
+  // restarting at 0.
+  processingStartedAt?: number;
   // Async-capture (M3): populated on a `failed` card so the UI can explain what
   // went wrong and offer a retry that re-runs analysis for `url`.
   error?: string;

@@ -3,41 +3,44 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AnalyzingState } from '@/components/AnalyzingBanner';
 import { consumePendingShare } from './shareConfig';
+import { progressFor, elapsedForProgress } from './shareProgress';
 
 /**
  * Optimistic "Analyzing… N%" banner for a capture the user just handed over from
- * the iOS Share Extension by tapping **Open Machina** on the share progress HUD.
+ * the iOS Share Extension.
  *
- * The extension stamps a short-lived flag in the App Group and opens the app;
- * this hook reads that flag (on mount and whenever the app foregrounds) and
- * shows the SAME banner the in-app add flow shows when its dialog is closed —
- * so the moment the app opens, the user sees the save advancing, with no blank
- * gap while the server-side `processing` card is still being written.
+ * The extension stamps a short-lived flag in the App Group as it scans; this
+ * hook reads that flag (on mount and whenever the app foregrounds) and shows the
+ * SAME banner the in-app add flow shows — so the moment the app opens, the user
+ * sees the save advancing, with no blank gap while the server-side `processing`
+ * card is still being written.
  *
- * It's a bridge, not the source of truth: the real, Firestore-driven
- * `useProcessingBanner` takes over the instant the `processing` card streams in
- * (`processingActive` → we stand down and let it own the finish). If no card
- * ever appears (e.g. a deduped re-share is a server no-op), the optimistic
- * banner eases to its ceiling and then finishes gracefully on its own.
+ * CONTINUITY: it ramps from the SAME shared start timestamp the extension wrote
+ * (`startedAt`, an epoch-ms wall clock) using the SAME {@link progressFor} curve,
+ * so the banner resumes at the exact point on the ramp the extension HUD had
+ * reached — never a restart at 0. It's a bridge, not the source of truth: the
+ * real Firestore-driven `useProcessingBanner` (which ramps from the placeholder
+ * card's `processingStartedAt`, the same clock) takes over the instant the
+ * `processing` card streams in. If no card ever appears (e.g. a deduped re-share
+ * is a server no-op), the optimistic banner eases to its ceiling and then
+ * finishes gracefully on its own.
  */
-const EXPECTED_MS = 16_000; // typical server analysis time; tunes the ramp
-const CEILING = 90;
-const MAX_MS = 28_000; // give up the optimistic banner if no real card lands
+const MAX_MS = 30_000; // give up (or never start) the optimistic banner past this age
 
 export function useSharedCaptureBanner(processingActive: boolean): AnalyzingState | null {
-    // `startedAt` anchors the progress RAMP (may sit in the past so the ramp
-    // resumes at the hand-off %); `openedAt` is the real wall-clock the app
-    // foregrounded, used only for the give-up timer.
-    const [signal, setSignal] = useState<{ startedAt: number; openedAt: number; kind: AnalyzingState['kind'] } | null>(null);
+    // `startMs` is the shared capture-start wall clock (epoch ms) — progress is a
+    // pure function of `Date.now() - startMs`, identical to what the extension
+    // and the real processing banner compute.
+    const [signal, setSignal] = useState<{ startMs: number; kind: AnalyzingState['kind'] } | null>(null);
     const [, tick] = useState(0);
     const finishedOnce = useRef(false);
+    // Monotonic guard so a hand-off can never step the % backwards.
+    const lastPct = useRef(0);
     // Latest processingActive, readable inside the async check without re-binding.
     const procRef = useRef(processingActive);
     useEffect(() => {
         procRef.current = processingActive;
     }, [processingActive]);
-
-    const now = () => (typeof performance !== 'undefined' ? performance.now() : 0);
 
     // Poll the native App Group flag on mount and on every foreground. WKWebView
     // fires visibilitychange/focus when the app returns from the Share sheet, so
@@ -50,21 +53,24 @@ export function useSharedCaptureBanner(processingActive: boolean): AnalyzingStat
             // The real card already covers this save — consume the flag but don't
             // show a second banner on top of it.
             if (procRef.current) return;
-            // Resume from the EXACT % the share sheet was showing at hand-off, so
-            // the two screens read as one continuous progress. Invert the ease-out
-            // to find the ramp origin that yields that %, then let it keep rising.
-            // Older extension builds don't report a %, so fall back to the elapsed-
-            // time offset (keeps the ramp from restarting at zero).
-            const t = now();
-            let startedAt: number;
-            if (res.progress !== undefined) {
-                const frac = Math.min(0.999, Math.max(0, (res.progress - 6) / (CEILING - 6)));
-                startedAt = t + EXPECTED_MS * 0.6 * Math.log(1 - frac); // log(...) ≤ 0 → origin in the past
+            // Recover the shared capture-start wall clock. Prefer the absolute
+            // `startedAt` the extension wrote; older builds reported only a % or
+            // an age, so reconstruct an equivalent start from those.
+            const nowMs = Date.now();
+            let startMs: number;
+            if (res.startedAt && res.startedAt > 0) {
+                startMs = res.startedAt;
+            } else if (res.progress !== undefined) {
+                startMs = nowMs - elapsedForProgress(res.progress);
             } else {
-                const age = Math.max(0, Math.min(res.ageMs, EXPECTED_MS * 0.6));
-                startedAt = t - age;
+                startMs = nowMs - Math.max(0, res.ageMs);
             }
-            setSignal((cur) => cur ?? { startedAt, openedAt: t, kind: res.kind });
+            // Req 3 — no flash when it's already done: if the capture started long
+            // enough ago that any processing card would already be present (and
+            // would be driving the banner) or the work has finished, don't open an
+            // optimistic loader at all. The ready card just appears.
+            if (nowMs - startMs > MAX_MS) return;
+            setSignal((cur) => cur ?? { startMs, kind: res.kind });
         };
         void check();
         const onVis = () => {
@@ -79,32 +85,35 @@ export function useSharedCaptureBanner(processingActive: boolean): AnalyzingStat
         };
     }, []);
 
-    // Real processing card appeared → hand off (it owns the finish frame).
+    // Real processing card appeared → hand off (it owns the finish frame). It
+    // ramps from the same shared clock, so the % carries across seamlessly.
     useEffect(() => {
         if (processingActive && signal) setSignal(null);
     }, [processingActive, signal]);
 
-    // Advance the ramp while active. Ticks once a second (down from 200 ms) so
-    // the optimistic banner re-renders ≤1×/s; the banner's CSS width transition
-    // smooths each step, and progress is a pure function of elapsed time so the
-    // ramp still lands at the same value at any given moment.
+    // Advance the ramp while active. Ticks once a second; progress is a pure
+    // function of elapsed time so the value is exact at any given moment and the
+    // banner's CSS width transition smooths each step.
     useEffect(() => {
         if (!signal) return;
         const iv = setInterval(() => tick((n) => n + 1), 1000);
         return () => clearInterval(iv);
     }, [signal]);
 
-    if (!signal) return null;
+    if (!signal) {
+        lastPct.current = 0;
+        return null;
+    }
 
-    // Give-up timer runs on the real clock since the app opened — not the ramp
-    // anchor, which can start well in the past when the hand-off % was high.
-    const elapsedReal = Math.max(0, now() - signal.openedAt);
-    if (elapsedReal > MAX_MS) {
-        // No real card ever arrived. Emit exactly one inactive frame so the banner
-        // flashes "Saved" and slides away, then clear. finishedOnce is a deliberate
-        // once-latch (not render-affecting state): it gates the single terminal
-        // frame emitted during the render→setSignal(null) hand-off, so reading it
-        // here is intentional rather than a stale-ref hazard.
+    const elapsed = Math.max(0, Date.now() - signal.startMs);
+
+    // Give-up timer on the shared start clock: if no real card ever arrived and
+    // the ramp has run its course, emit exactly one inactive frame so the banner
+    // flashes "Saved" and slides away, then clear.
+    if (elapsed > MAX_MS) {
+        // finishedOnce is a deliberate once-latch (not render-affecting state): it
+        // gates the single terminal frame emitted during the render→setSignal(null)
+        // hand-off, so reading it here is intentional rather than a stale-ref hazard.
         // eslint-disable-next-line react-hooks/refs
         if (!finishedOnce.current) {
             finishedOnce.current = true;
@@ -114,9 +123,8 @@ export function useSharedCaptureBanner(processingActive: boolean): AnalyzingStat
         return null;
     }
 
-    // Ease-out toward the ceiling: fast at first, slowing as it approaches.
-    const elapsed = Math.max(0, now() - signal.startedAt);
-    const frac = 1 - Math.exp(-elapsed / (EXPECTED_MS * 0.6));
-    const progress = Math.min(CEILING, 6 + frac * (CEILING - 6));
+    // Non-decreasing across ticks / hand-offs.
+    const progress = Math.max(progressFor(elapsed), lastPct.current);
+    lastPct.current = progress;
     return { active: true, progress, kind: signal.kind };
 }
