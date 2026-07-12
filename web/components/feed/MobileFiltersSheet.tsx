@@ -1,14 +1,17 @@
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
-import { X, ArrowUpDown } from 'lucide-react';
+import { X, ArrowUpDown, Tag as TagIcon, Shapes } from 'lucide-react';
 import Dropdown, { type DropdownOption } from '../Dropdown';
 import SourceFacetList from '../SourceFacetList';
+import TagExplorer from '../TagExplorer';
+import { getCategoryColorStyle } from '@/lib/colors';
 import type { SourceFacet } from '@/lib/source';
 import type { FilterType, SortType } from '@/lib/useFeedFilters';
 
 /**
- * Filters Sheet (Mobile) — consolidates the grid controls (status, sort, sources)
- * behind one tap, keeping the mobile toolbar to a single tidy row. Desktop is
- * untouched. Extracted verbatim from Feed (R-3). Renders nothing when closed.
+ * Filters Sheet (Mobile) — the single "Filter" affordance behind the home
+ * toolbar. Holds everything that narrows the library: categories, tags, status,
+ * sort, and sources — so the home screen shows one well-labelled control instead
+ * of a scatter of filter buttons. Desktop is untouched. Renders nothing when closed.
  */
 export default function MobileFiltersSheet({
     isOpen,
@@ -27,6 +30,14 @@ export default function MobileFiltersSheet({
     onToggleSourceKeys,
     activeMobileFilters,
     setSelectedTags,
+    categories,
+    selectedCategory,
+    setSelectedCategory,
+    categoryCounts,
+    allTags,
+    tagCounts,
+    selectedTags,
+    onToggleTag,
 }: {
     isOpen: boolean;
     onClose: () => void;
@@ -44,6 +55,14 @@ export default function MobileFiltersSheet({
     onToggleSourceKeys: (keys: string[]) => void;
     activeMobileFilters: number;
     setSelectedTags: Dispatch<SetStateAction<Set<string>>>;
+    categories: string[];
+    selectedCategory: Set<string>;
+    setSelectedCategory: Dispatch<SetStateAction<Set<string>>>;
+    categoryCounts: Record<string, number>;
+    allTags: string[];
+    tagCounts: Record<string, number>;
+    selectedTags: Set<string>;
+    onToggleTag: (tag: string) => void;
 }) {
     if (!isOpen) return null;
     return (
@@ -66,6 +85,95 @@ export default function MobileFiltersSheet({
                 </div>
 
                 <div className="space-y-5">
+                    {/* Categories — chips breathe directly on the sheet. */}
+                    {categories.length > 0 && (
+                        <div>
+                            <div className="flex items-center justify-between mb-2.5">
+                                <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">
+                                    <Shapes className="w-3.5 h-3.5 text-accent/70" /> Categories
+                                </span>
+                                {selectedCategory.size > 0 && (
+                                    <button
+                                        onClick={() => setSelectedCategory(new Set())}
+                                        className="text-[11px] font-semibold text-text-muted hover:text-accent transition-colors"
+                                    >
+                                        Clear
+                                    </button>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    onClick={() => setSelectedCategory(new Set())}
+                                    className={`px-3.5 py-1.5 rounded-full text-[13px] font-semibold border transition-colors ${selectedCategory.size === 0
+                                        ? 'bg-accent text-white border-accent shadow-sm'
+                                        : 'bg-card border-border-subtle text-text-secondary hover:border-text-muted/40 hover:text-text'
+                                        }`}
+                                >
+                                    All
+                                </button>
+                                {categories.map((cat) => {
+                                    const isSelected = selectedCategory.has(cat);
+                                    const colorStyle = getCategoryColorStyle(cat);
+                                    return (
+                                        <button
+                                            key={cat}
+                                            onClick={() => {
+                                                const next = new Set(selectedCategory);
+                                                if (isSelected) next.delete(cat); else next.add(cat);
+                                                setSelectedCategory(next);
+                                            }}
+                                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[13px] font-semibold border transition-colors ${isSelected
+                                                ? 'shadow-sm'
+                                                : 'bg-card border-border-subtle text-text-secondary hover:border-text-muted/40 hover:text-text'
+                                                }`}
+                                            style={isSelected ? {
+                                                backgroundColor: colorStyle.backgroundColor,
+                                                color: colorStyle.color,
+                                                borderColor: colorStyle.backgroundColor,
+                                            } : undefined}
+                                        >
+                                            {cat}
+                                            <span className="opacity-50 font-medium tabular-nums">{categoryCounts[cat]}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Tags — the same explorer used on desktop, flowing freely. */}
+                    {allTags.length > 0 && (
+                        <div>
+                            <div className="flex items-center justify-between mb-2.5">
+                                <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">
+                                    <TagIcon className="w-3.5 h-3.5 text-accent/70" /> Tags
+                                    {selectedTags.size > 0 && (
+                                        <span className="text-accent normal-case tracking-normal font-semibold">· {selectedTags.size} selected</span>
+                                    )}
+                                </span>
+                                {selectedTags.size > 0 && (
+                                    <button
+                                        onClick={() => setSelectedTags(new Set())}
+                                        className="text-[11px] font-semibold text-text-muted hover:text-accent transition-colors"
+                                    >
+                                        Clear
+                                    </button>
+                                )}
+                            </div>
+                            <div className="max-h-[38vh] overflow-y-auto overscroll-contain -mx-1">
+                                <TagExplorer
+                                    tags={allTags}
+                                    tagCounts={tagCounts}
+                                    selectedTags={selectedTags}
+                                    onToggleTag={onToggleTag}
+                                    onClearFilters={() => setSelectedTags(new Set())}
+                                    variant="embedded"
+                                    className="px-1"
+                                />
+                            </div>
+                        </div>
+                    )}
+
                     {/* Status + Sort */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -121,7 +229,7 @@ export default function MobileFiltersSheet({
                     <div className="flex items-center gap-3 pt-1">
                         {activeMobileFilters > 0 && (
                             <button
-                                onClick={() => { setFilter('all'); setSelectedSources(new Set()); setSelectedTags(new Set()); }}
+                                onClick={() => { setFilter('all'); setSelectedSources(new Set()); setSelectedTags(new Set()); setSelectedCategory(new Set()); }}
                                 className="text-sm font-semibold text-text-muted hover:text-accent transition-colors"
                             >
                                 Clear all

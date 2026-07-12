@@ -5,10 +5,11 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback, cloneElement, type ReactElement } from 'react';
 import { Link, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef } from '@/lib/types';
-import { getCategoryColorStyle } from '@/lib/colors';
+import { getCategoryColorStyle, getColorStyleByKey } from '@/lib/colors';
 import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
 import SourceFacetList from './SourceFacetList';
 import DigestView from './DigestView';
+import DigestCard from './DigestCard';
 import Dropdown from './Dropdown';
 import { updateLinkStatus, deleteLink, updateLinkReminder, saveLink } from '@/lib/storage';
 import { EXAMPLE_CARD } from '@/lib/exampleCard';
@@ -25,7 +26,6 @@ import { isPending, getTimestampNumber } from '@/lib/feedUtils';
 import FeedSkeleton from './feed/FeedSkeleton';
 import PullRefreshSpinner from './feed/PullRefreshSpinner';
 import MobileFiltersSheet from './feed/MobileFiltersSheet';
-import MobileCategoriesTagsSheet from './feed/MobileCategoriesTagsSheet';
 import MobileTagExplorerDrawer from './feed/MobileTagExplorerDrawer';
 import Card from './Card';
 import ListCard from './ListCard';
@@ -41,7 +41,7 @@ import CollectionsGallery from './CollectionsGallery';
 import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, Share2, Globe, Plus, Newspaper, Sparkles } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, ArrowRight, Share2, Globe, Plus, Pencil, Newspaper, Sparkles } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
@@ -49,7 +49,7 @@ import { subscribeDigests, deleteDigest } from '@/lib/digest';
 import { PUSH_INTENT_EVENT, PUSH_FOREGROUND_EVENT, consumePendingPushIntent, readLocalPushPrompt, type PushIntent } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
 import PushNudge from './PushNudge';
-import { deleteCollection, createCollection, addLinksToCollection } from '@/lib/collections';
+import { deleteCollection, createCollection, addLinksToCollection, isShareStale } from '@/lib/collections';
 import { suggestNewCollections, dismissSuggestion, type CollectionSuggestion } from '@/lib/collectionSuggest';
 import ShareCollectionSheet from './ShareCollectionSheet';
 import { openExternal } from '@/lib/share';
@@ -146,13 +146,23 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         setLinkStack([]);
         setActiveLinkId(null);
     };
-    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'ask' | 'collections' | 'digest'>('grid');
+    // View modes. The card-browsing layouts (grid/list/review) share the search +
+    // filter chrome; 'ask' is the full-screen chat; 'collections' is the gallery
+    // and 'collection' is a single collection opened as its own place (Task A);
+    // 'digest' is the list of digests and 'digestDetail' is one opened digest
+    // (Task B). The detail places are history-like: back returns to their parent
+    // list, never to the home library.
+    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'ask' | 'collections' | 'collection' | 'digest' | 'digestDetail'>('grid');
+    // The collection currently open as a place (viewMode 'collection').
+    const [openCollectionId, setOpenCollectionId] = useState<string | null>(null);
+    // The digest currently open as a place (viewMode 'digestDetail'); the sentinel
+    // 'synthesis' opens the weekly-synthesis entry.
+    const [openDigestId, setOpenDigestId] = useState<string | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [isSourcesOpen, setIsSourcesOpen] = useState(false);
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
-    const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
     // Mobile: the search bar is collapsed to an icon; tapping it expands a large
     // search field in place, so the card grid gets the vertical space back.
     const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
@@ -362,7 +372,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // full-screen mode (Ask/Collections) or any overlay/sheet owns the screen so
     // the gesture never fights a modal's own scrolling.
     const anyOverlayOpen =
-        activeLinkId !== null || isTagExplorerOpen || isFiltersOpen || isCategoriesOpen ||
+        activeLinkId !== null || isTagExplorerOpen || isFiltersOpen ||
         reminderModalLink !== null || confirmDeleteId !== null || confirmBulkDelete ||
         addToCollectionLink !== null || collectionFormOpen || confirmDeleteCollection !== null ||
         manageCardsCollection !== null || shareCollection !== null;
@@ -567,10 +577,37 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     );
 
     // ── Collections ──────────────────────────────────────────────────────────
-    // Open a collection: scope the feed to it and drop back into the card grid.
+    // Open a collection as its own place (Task A): a dedicated detail view with
+    // its own header + back navigation, NOT the generic filtered grid. We scope
+    // the feed to just this collection (clearing every other filter so it shows
+    // the whole collection), then switch into the 'collection' view mode.
     const openCollection = (collectionId: string) => {
         setSelectedCollections(new Set([collectionId]));
-        setViewMode('grid');
+        setSelectedCategory(new Set());
+        setSelectedTags(new Set());
+        setSelectedSources(new Set());
+        setFilter('all');
+        setSearchQuery('');
+        setOpenCollectionId(collectionId);
+        setViewMode('collection');
+    };
+    // Leave a collection: always back to the gallery it was opened from — never
+    // dumped to the home library (the old clear-filter behaviour).
+    const closeCollectionToGallery = () => {
+        setSelectedCollections(new Set());
+        setOpenCollectionId(null);
+        setViewMode('collections');
+    };
+    // ── Digest ───────────────────────────────────────────────────────────────
+    // Open one digest (or the weekly synthesis) as its own place (Task B).
+    const openDigestDetail = (id: string) => {
+        setOpenDigestId(id);
+        setViewMode('digestDetail');
+    };
+    // Leave a digest: back to the list of all digests.
+    const closeDigestToList = () => {
+        setOpenDigestId(null);
+        setViewMode('digest');
     };
 
     // Sharing lives in a dedicated sheet (preview → publish → copy/share/update/
@@ -715,43 +752,195 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         mq.addEventListener('change', onChange);
         return () => mq.removeEventListener('change', onChange);
     }, []);
+    // One back gesture, target chosen by where you are: a detail place pops to
+    // its parent list; a top-level sub-view pops home. Mirrors the visible back
+    // button so the chevron and the swipe always agree.
+    const handleEdgeBack = useCallback(() => {
+        if (viewMode === 'collection') closeCollectionToGallery();
+        else if (viewMode === 'digestDetail') closeDigestToList();
+        else setViewMode(lastLayout.current);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [viewMode]);
     useEdgeSwipeBack(
-        () => setViewMode(lastLayout.current),
-        isMobileView && (viewMode === 'digest' || viewMode === 'collections'),
+        handleEdgeBack,
+        isMobileView && (viewMode === 'digest' || viewMode === 'collections' || viewMode === 'collection' || viewMode === 'digestDetail'),
     );
+
+    // If the open collection is deleted out from under the detail view (e.g. from
+    // another device), fall back to the gallery instead of a blank place.
+    useEffect(() => {
+        if (viewMode === 'collection' && openCollectionId && collections.length > 0
+            && !collections.some((c) => c.id === openCollectionId)) {
+            closeCollectionToGallery();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [viewMode, openCollectionId, collections]);
     // True for the card-browsing layouts (everything except the full-screen
     // Ask chat and the Collections gallery), which share the search/filter chrome.
     const isLibraryView = viewMode === 'grid' || viewMode === 'list' || viewMode === 'review';
     // When scoped to exactly one collection, cards offer a quick "remove from it".
     const activeCollectionId = selectedCollections.size === 1 ? Array.from(selectedCollections)[0] : undefined;
-    // Count of active grid filters — badges the mobile "Filters" button.
-    const activeMobileFilters =
-        (filter !== 'all' ? 1 : 0) + selectedSources.size + selectedTags.size + selectedCollections.size;
+    // Everything tucked behind the single mobile "Filter" affordance (Task C):
+    // status, categories, tags, and sources. Collections are their own place now,
+    // so they no longer count as a filter here. This count badges the button and
+    // drives the sheet's "Clear all".
+    const activeFilterCount =
+        (filter !== 'all' ? 1 : 0) + selectedCategory.size + selectedTags.size + selectedSources.size;
 
     // The Digest section's scrollable history — the weekly synthesis rides on
     // top, then every curated digest, newest first. Built once and rendered in
     // both layouts (desktop inline / mobile full-screen overlay).
+    const activeSynthesis = latestSynthesis && latestSynthesis.weekId !== dismissedSynthesisWeek ? latestSynthesis : null;
     const digestContent = (
         <DigestView
             digests={digests}
-            synthesis={latestSynthesis && latestSynthesis.weekId !== dismissedSynthesisWeek ? latestSynthesis : null}
+            synthesis={activeSynthesis}
             onOpenCard={openDigestCard}
             onOpenSynthesisCard={(id) => setActiveLinkId(id)}
             onDismissSynthesis={dismissSynthesis}
             onOpenDigestSettings={onOpenDigestSettings}
             onDeleteDigest={uid ? (id) => { void deleteDigest(uid, id); } : undefined}
+            onOpenDigest={openDigestDetail}
         />
     );
+
+    // One digest opened as its own place (Task B). 'synthesis' opens the weekly
+    // synthesis; any other id opens that curated digest, pinned open with no
+    // collapse chrome. Deleting from here pops back to the list.
+    const openDigest = openDigestId && openDigestId !== 'synthesis' ? digests.find((d) => d.id === openDigestId) ?? null : null;
+    const digestDetailTitle = openDigestId === 'synthesis'
+        ? (activeSynthesis?.title || 'Weekly synthesis')
+        : (openDigest?.title || 'Digest');
+    const digestDetailContent = openDigestId === 'synthesis' && activeSynthesis ? (
+        <SynthesisCard synthesis={activeSynthesis} onOpenCard={(id) => setActiveLinkId(id)} onDismiss={dismissSynthesis} />
+    ) : openDigest ? (
+        <DigestCard
+            key={openDigest.id}
+            digest={openDigest}
+            alwaysOpen
+            onOpenCard={openDigestCard}
+            onOpenSettings={onOpenDigestSettings}
+            onDelete={uid ? (id: string) => { void deleteDigest(uid, id); closeDigestToList(); } : undefined}
+        />
+    ) : (
+        <div className="text-center py-16 text-text-secondary text-sm">That digest is no longer available.</div>
+    );
+
+    // One collection opened as its own place (Task A): a real header (name,
+    // description, count, share status + actions) over the normal card grid.
+    const openCol = openCollectionId ? collections.find((c) => c.id === openCollectionId) ?? null : null;
+    const collectionDetailContent = openCol ? (() => {
+        const members = links.filter((l) => (l.collectionIds ?? []).includes(openCol.id));
+        const count = members.length;
+        const stale = isShareStale(openCol, members.map((m) => ({ id: m.id })));
+        const colStyle = getColorStyleByKey(openCol.color || openCol.name);
+        return (
+            <div>
+                {/* Header — the collection's identity + its own actions, not a
+                    filter pill. iOS large-title feel: the bar carries the name,
+                    this hero restates it big with the collection's meta below. */}
+                <div className="mb-5">
+                    <div className="flex items-center gap-2.5">
+                        <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: colStyle.color }} />
+                        <h1 className="text-[22px] sm:text-[26px] font-extrabold tracking-tight text-text truncate">{openCol.name}</h1>
+                    </div>
+                    {openCol.description && (
+                        <p className="mt-1.5 text-[14px] leading-relaxed text-text-secondary max-w-2xl">{openCol.description}</p>
+                    )}
+                    <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[13px] font-medium text-text-muted">
+                        <span className="inline-flex items-center gap-1.5"><Layers className="w-3.5 h-3.5" />{count} {count === 1 ? 'card' : 'cards'}</span>
+                        {openCol.isPublic && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide ${stale ? 'bg-amber-500/15 text-amber-600' : 'bg-accent/10 text-accent'}`}>
+                                <Globe className="w-3 h-3" /> {stale ? 'Update page' : 'Shared'}
+                            </span>
+                        )}
+                    </div>
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <button
+                            onClick={() => handleShareCollection(openCol)}
+                            className={`${ctrlBase} px-3.5 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
+                        >
+                            {openCol.isPublic ? <Globe className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
+                            <span>{openCol.isPublic ? 'Shared' : 'Share'}</span>
+                        </button>
+                        <button
+                            onClick={() => setManageCardsCollection(openCol)}
+                            className={`${ctrlBase} px-3.5 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
+                        >
+                            <Plus className="w-4 h-4" /><span>Add cards</span>
+                        </button>
+                        <button
+                            onClick={() => openEditCollectionForm(openCol)}
+                            className={`${ctrlBase} px-3.5 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
+                        >
+                            <Pencil className="w-4 h-4" /><span>Edit</span>
+                        </button>
+                        <button
+                            onClick={() => setConfirmDeleteCollection(openCol)}
+                            aria-label="Delete collection"
+                            className={`${ctrlBase} w-9 px-0 ${ctrlIdle} hover:text-red-500 hover:border-red-500/40`}
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Cards — the normal card grid, scoped to this collection. */}
+                {filteredLinks.length === 0 ? (
+                    <div className="text-center py-16">
+                        <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-accent/10 flex items-center justify-center">
+                            <Layers className="w-7 h-7 text-accent" />
+                        </div>
+                        <h3 className="text-base font-bold text-text">Nothing here yet</h3>
+                        <p className="mt-1.5 text-sm text-text-muted">Add cards to build out this collection.</p>
+                        <button
+                            onClick={() => setManageCardsCollection(openCol)}
+                            className="mt-5 inline-flex items-center gap-2 px-4 h-11 rounded-full bg-accent text-white text-sm font-bold shadow-sm shadow-accent/20 hover:bg-accent-hover transition-colors"
+                        >
+                            <Plus className="w-4 h-4" /> Add cards
+                        </button>
+                    </div>
+                ) : (
+                    <Masonry columnWidth={340} gap={16}>
+                        {filteredLinks.map((link, idx) => (
+                            <Card
+                                key={link.id}
+                                index={idx}
+                                link={link}
+                                onOpenDetails={openLinkDetails}
+                                onStatusChange={handleStatusChange}
+                                onReadStatusChange={handleReadStatusChange}
+                                onUpdateCategory={handleUpdateCategory}
+                                allCategories={categories}
+                                onDelete={handleDelete}
+                                onUpdateReminder={handleOpenReminderModal}
+                                onTagClick={handleToggleTag}
+                                onAddToCollection={handleAddToCollection}
+                                onShare={handleShareCard}
+                                cardCollections={cardCollectionsByLink.get(link.id)}
+                                activeCollectionId={openCol.id}
+                                onRemoveFromCollection={handleRemoveFromCollection}
+                            />
+                        ))}
+                    </Masonry>
+                )}
+            </div>
+        );
+    })() : null;
 
     // Tell the page when we're in Ask mode (drives the full-height chat layout).
     useEffect(() => {
         onAskModeChange?.(viewMode === 'ask');
     }, [viewMode, onAskModeChange]);
 
-    // Hide the add-link FAB in Ask, Collections, Digest, and Review — none of
-    // these views capture links (and in Review it overlaps the Keep button).
+    // Hide the add-link FAB in Ask, Collections (gallery + detail), Digest (list
+    // + detail), and Review — none of these views capture links (and in Review it
+    // overlaps the Keep button).
     useEffect(() => {
-        onHideAddButton?.(viewMode === 'ask' || viewMode === 'collections' || viewMode === 'digest' || viewMode === 'review');
+        onHideAddButton?.(
+            viewMode === 'ask' || viewMode === 'collections' || viewMode === 'collection'
+            || viewMode === 'digest' || viewMode === 'digestDetail' || viewMode === 'review'
+        );
     }, [viewMode, onHideAddButton]);
 
     if (isLoading) {
@@ -802,6 +991,18 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             </button>
                         </MobileSubheader>
                     </div>
+                ) : viewMode === 'collection' ? (
+                    // Desktop/tablet: the collection detail flows inline beneath a
+                    // subheader whose back returns to the gallery (Task A). Mobile
+                    // renders its own full-screen overlay below.
+                    <div className="hidden sm:block">
+                        <MobileSubheader
+                            onBack={closeCollectionToGallery}
+                            backLabel="Back to collections"
+                            icon={<Layers className="w-5 h-5" />}
+                            title={openCol?.name ?? 'Collection'}
+                        />
+                    </div>
                 ) : viewMode === 'digest' ? (
                     // Desktop only: the digest history flows inline beneath this
                     // subheader. Mobile renders its own full-screen overlay below.
@@ -811,6 +1012,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             backLabel="Back to your library"
                             icon={<Newspaper className="w-5 h-5" />}
                             title="Digest"
+                        />
+                    </div>
+                ) : viewMode === 'digestDetail' ? (
+                    // Tablet: one digest opened inline beneath a subheader whose
+                    // back returns to the list (Task B). Mobile uses the overlay.
+                    <div className="hidden sm:block">
+                        <MobileSubheader
+                            onBack={closeDigestToList}
+                            backLabel="Back to digests"
+                            icon={<Newspaper className="w-5 h-5" />}
+                            title={digestDetailTitle}
                         />
                     </div>
                 ) : (
@@ -930,12 +1142,53 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
                 </>)}
 
-                {/* Mobile: one tidy line — Categories & Tags · Filters/Sort · Search.
-                    The big search bar is gone (desktop-only above); tapping the search
-                    icon expands a large field right here, so the grid keeps the space. */}
+                {/* ── Mobile home controls (Task C) ──────────────────────────────
+                    One coherent command surface: Ask is the hero, the three browse
+                    destinations (Feed / Collections / Digest) sit beneath it as one
+                    system, and every filter tucks behind a single "Filter" button.
+                    Desktop keeps its own inline toolbar (below, sm:flex). */}
                 {isLibraryView && (
-                    mobileSearchOpen ? (
-                        <div className="flex sm:hidden items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                <div className="sm:hidden space-y-2.5">
+                    {/* Ask hero + primary nav, wrapped as one unit so the four
+                        destinations read as a single system with Ask elevated. */}
+                    <div className="rounded-2xl border border-border-subtle bg-card overflow-hidden shadow-[var(--shadow-card)]">
+                        <button
+                            data-tour="ask"
+                            onClick={() => setViewMode('ask')}
+                            className="group w-full flex items-center gap-3 px-4 py-3 text-left bg-accent/[0.06] active:bg-accent/10 transition-colors"
+                            style={{ transitionTimingFunction: 'var(--ease-spring)' }}
+                        >
+                            <span className="w-9 h-9 shrink-0 rounded-xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-md shadow-accent/25">
+                                <Sparkles className="w-[18px] h-[18px] text-white" />
+                            </span>
+                            <span className="flex-1 min-w-0">
+                                <span className="block text-[15px] font-bold text-text leading-tight">Ask your library</span>
+                                <span className="block text-[12px] text-text-muted leading-tight mt-0.5">Answers from everything you’ve saved</span>
+                            </span>
+                            <ArrowRight className="w-4 h-4 text-text-muted group-active:translate-x-0.5 transition-transform shrink-0" />
+                        </button>
+                        <div className="grid grid-cols-3 border-t border-border-subtle divide-x divide-border-subtle">
+                            <NavTab active label="Feed" icon={<LayoutGrid className="w-[18px] h-[18px]" />} onClick={() => { /* already home */ }} />
+                            <NavTab
+                                dataTour="collections"
+                                label="Collections"
+                                icon={<Layers className="w-[18px] h-[18px]" />}
+                                count={collections.length}
+                                onClick={() => setViewMode('collections')}
+                            />
+                            <NavTab
+                                label="Digest"
+                                icon={<Newspaper className="w-[18px] h-[18px]" />}
+                                count={digests.length}
+                                onClick={() => setViewMode('digest')}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Library tools — one Filter affordance, the view switcher, search,
+                        and multi-select. Search expands in place over this row. */}
+                    {mobileSearchOpen ? (
+                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
                             <div className="relative flex-1 min-w-0">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
                                 <input
@@ -965,68 +1218,69 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             </button>
                         </div>
                     ) : (
-                    <div className="flex sm:hidden items-center gap-2">
-                        {selectedCollections.size === 0 && (
+                        <div className="flex items-center gap-2">
+                            {/* The single, well-labelled filter affordance. */}
                             <button
-                                onClick={() => setIsCategoriesOpen(true)}
-                                aria-label="Filter by categories and tags"
-                                className={`${ctrlBase} flex-1 min-w-0 justify-between px-3.5 ${(selectedCategory.size + selectedTags.size) > 0
+                                onClick={() => setIsFiltersOpen(true)}
+                                aria-label="Filter and sort"
+                                className={`${ctrlBase} flex-1 min-w-0 justify-center px-3.5 gap-2 ${activeFilterCount > 0
                                     ? 'bg-accent text-white border border-accent shadow-sm'
                                     : ctrlIdle
                                     }`}
                             >
-                                <span className="inline-flex items-center gap-2 min-w-0">
-                                    <Tags className="w-4 h-4 shrink-0" />
-                                    <span className="truncate">
-                                        {(selectedCategory.size + selectedTags.size) === 0
-                                            ? 'Categories & Tags'
-                                            : `${selectedCategory.size + selectedTags.size} selected`}
-                                    </span>
-                                </span>
-                                <ChevronDown className="w-4 h-4 opacity-60 shrink-0" />
+                                <Filter className="w-4 h-4 shrink-0" />
+                                <span className="truncate">{activeFilterCount > 0 ? `Filtered · ${activeFilterCount}` : 'Filter'}</span>
                             </button>
-                        )}
-                        {/* When scoped to a collection the category button is hidden — keep
-                            the remaining controls pinned to the trailing edge. */}
-                        {selectedCollections.size > 0 && <span className="flex-1" />}
-                        {/* Filters + sort live in the same sheet, so the button just shows
-                            both icons (no label) — keeping it compact so the category
-                            selector can take the rest of the row. */}
-                        <button
-                            onClick={() => setIsFiltersOpen(true)}
-                            aria-label="Filters and sort"
-                            className={`${ctrlBase} shrink-0 px-3 gap-1.5 ${activeMobileFilters > 0
-                                ? 'bg-accent text-white border border-accent shadow-sm'
-                                : ctrlIdle
-                                }`}
-                        >
-                            <Filter className="w-4 h-4" />
-                            <ArrowUpDown className="w-4 h-4" />
-                            {activeMobileFilters > 0 && (
-                                <span className="text-xs font-bold tabular-nums">{activeMobileFilters}</span>
+                            {/* View switcher — icon-only pills. */}
+                            <div data-tour="views" className="inline-flex items-center gap-0.5 p-1 rounded-full bg-card border border-border-subtle shrink-0">
+                                {viewModes.map(vm => {
+                                    const active = viewMode === vm.key;
+                                    return (
+                                        <button
+                                            key={vm.key}
+                                            onClick={() => setViewMode(vm.key)}
+                                            aria-pressed={active}
+                                            aria-label={vm.hint}
+                                            className={`h-7 w-7 inline-flex items-center justify-center rounded-full cursor-pointer transition-colors ${active
+                                                ? 'bg-accent text-white shadow-sm'
+                                                : 'text-text-muted hover:text-text hover:bg-card-hover'}`}
+                                        >
+                                            {vm.icon}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            {/* Search — expands in place. */}
+                            <button
+                                data-tour="search"
+                                onClick={() => setMobileSearchOpen(true)}
+                                aria-label="Search"
+                                className={`${ctrlBase} shrink-0 w-9 px-0 ${searchQuery
+                                    ? 'bg-accent text-white border border-accent shadow-sm'
+                                    : ctrlIdle}`}
+                            >
+                                <Search className="w-4 h-4" />
+                            </button>
+                            {/* Multi-select. */}
+                            {!isSelectionMode && (
+                                <button
+                                    onClick={() => setIsSelectionMode(true)}
+                                    aria-label="Select multiple"
+                                    className={`${ctrlBase} shrink-0 w-9 px-0 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
+                                >
+                                    <CheckSquare className="w-4 h-4" />
+                                </button>
                             )}
-                        </button>
-                        {/* Search — icon only; expands into a large field in place. Reads
-                            accent when a query is active so it's clear a search is on. */}
-                        <button
-                            data-tour="search"
-                            onClick={() => setMobileSearchOpen(true)}
-                            aria-label="Search"
-                            className={`${ctrlBase} shrink-0 w-9 px-0 ${searchQuery
-                                ? 'bg-accent text-white border border-accent shadow-sm'
-                                : ctrlIdle
-                                }`}
-                        >
-                            <Search className="w-4 h-4" />
-                        </button>
-                    </div>
-                    )
+                        </div>
+                    )}
+                </div>
                 )}
 
-                {/* Row 2: Toolbar — filter / sort / source on the left, view & actions on the
-                    right. Card-browsing layouts only; Ask and Collections hide it. */}
+                {/* Row 2: Toolbar (desktop/tablet only) — filter / sort / source on the
+                    left, view & actions on the right. On mobile these controls live in
+                    the command surface above (Task C). Card-browsing layouts only. */}
                 {isLibraryView && (
-                <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-2 -mx-2 px-2 sm:mx-0 sm:px-0">
+                <div className="hidden sm:flex flex-wrap items-center justify-between gap-y-3 gap-x-2 -mx-2 px-2 sm:mx-0 sm:px-0">
                     {/* Grid filters — inline on desktop/tablet; on mobile they move into the
                         Filters sheet. Hidden entirely in Ask mode (no grid to filter). */}
                     <div className="hidden sm:flex items-center gap-2">
@@ -1437,8 +1691,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 </aside>
                 )}
 
-                {/* Filters Sheet (Mobile) — consolidates the grid controls behind one tap,
-                    keeping the mobile toolbar to a single tidy row. Desktop is untouched. */}
+                {/* Filters Sheet (Mobile) — the single "Filter" affordance behind the
+                    home toolbar: categories, tags, status, sort, and sources all in
+                    one place (Task C). Desktop is untouched. */}
                 <MobileFiltersSheet
                     isOpen={isFiltersOpen}
                     onClose={() => setIsFiltersOpen(false)}
@@ -1454,16 +1709,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     setSelectedSources={setSelectedSources}
                     onToggleSource={handleToggleSource}
                     onToggleSourceKeys={handleToggleSourceKeys}
-                    activeMobileFilters={activeMobileFilters}
+                    activeMobileFilters={activeFilterCount}
                     setSelectedTags={setSelectedTags}
-                />
-
-                {/* Categories & Tags Sheet (Mobile) — categories and the full tag
-                    tree live together here, one tap from the home toolbar, so tags
-                    aren't buried inside the Filters sheet. */}
-                <MobileCategoriesTagsSheet
-                    isOpen={isCategoriesOpen}
-                    onClose={() => setIsCategoriesOpen(false)}
                     categories={categories}
                     selectedCategory={selectedCategory}
                     setSelectedCategory={setSelectedCategory}
@@ -1471,7 +1718,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     allTags={allTags}
                     tagCounts={tagCounts}
                     selectedTags={selectedTags}
-                    setSelectedTags={setSelectedTags}
                     onToggleTag={handleToggleTag}
                 />
 
@@ -1530,7 +1776,18 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             )}
                         </div>
                     )}
-                    {viewMode === 'digest' ? (
+                    {viewMode === 'collection' ? (
+                        // Desktop/tablet: the collection detail place, inline beneath
+                        // its subheader. Mobile renders the full-screen overlay below.
+                        <div className="hidden sm:block">
+                            {collectionDetailContent}
+                        </div>
+                    ) : viewMode === 'digestDetail' ? (
+                        // Desktop/tablet: one opened digest, inline. Mobile overlay below.
+                        <div className="hidden sm:block">
+                            {digestDetailContent}
+                        </div>
+                    ) : viewMode === 'digest' ? (
                         // Desktop only: the digest history flows inline beneath the
                         // subheader. Mobile renders the full-screen overlay below.
                         <div className="hidden sm:block">
@@ -1757,6 +2014,38 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 </div>
             )}
 
+            {/* Collection detail — mobile full-screen place (Task A). Back returns
+                to the gallery (button + edge-swipe), never to the home library. */}
+            {viewMode === 'collection' && openCol && (
+                <div className="sm:hidden fixed inset-x-0 top-0 bottom-0 z-50 bg-background flex flex-col animate-fade-in">
+                    <MobileSubheader
+                        onBack={closeCollectionToGallery}
+                        backLabel="Back to collections"
+                        icon={<Layers className="w-5 h-5" />}
+                        title={openCol.name}
+                    />
+                    <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+                        {collectionDetailContent}
+                    </div>
+                </div>
+            )}
+
+            {/* Digest detail — mobile full-screen place (Task B). Back returns to
+                the list of digests. */}
+            {viewMode === 'digestDetail' && (
+                <div className="sm:hidden fixed inset-x-0 top-0 bottom-0 z-50 bg-background flex flex-col animate-fade-in">
+                    <MobileSubheader
+                        onBack={closeDigestToList}
+                        backLabel="Back to digests"
+                        icon={<Newspaper className="w-5 h-5" />}
+                        title={digestDetailTitle}
+                    />
+                    <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+                        {digestDetailContent}
+                    </div>
+                </div>
+            )}
+
             {/* Active Link Modal */}
             {activeLink && (
                 <LinkDetailModal
@@ -1886,6 +2175,42 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 variant="danger"
             />
         </div>
+    );
+}
+
+/**
+ * One destination in the mobile primary-nav strip (Task C). Feed is shown active
+ * because it's the home surface; Collections / Digest read as its peers, each
+ * with a live count so the strip doubles as a glance at what's inside.
+ */
+function NavTab({ label, icon, active = false, count, onClick, dataTour }: {
+    label: string;
+    icon: React.ReactNode;
+    active?: boolean;
+    count?: number;
+    onClick: () => void;
+    dataTour?: string;
+}) {
+    return (
+        <button
+            data-tour={dataTour}
+            onClick={onClick}
+            aria-current={active ? 'page' : undefined}
+            className={`relative flex flex-col items-center justify-center gap-1 py-2.5 min-h-[56px] transition-colors ${active
+                ? 'text-accent'
+                : 'text-text-secondary active:bg-card-hover'}`}
+        >
+            <span className="relative">
+                {icon}
+                {count !== undefined && count > 0 && (
+                    <span className="absolute -top-1.5 -end-2.5 flex items-center justify-center min-w-[15px] h-[15px] px-1 rounded-full text-[9px] font-bold bg-accent/15 text-accent tabular-nums">
+                        {count}
+                    </span>
+                )}
+            </span>
+            <span className="text-[11px] font-bold tracking-tight">{label}</span>
+            {active && <span className="absolute bottom-0 inset-x-4 h-0.5 rounded-full bg-accent" />}
+        </button>
     );
 }
 
