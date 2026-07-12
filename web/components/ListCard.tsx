@@ -204,13 +204,20 @@ function ListCard({
                         >
                             {link.category}
                         </span>
-                        {/* Personal-note cue — this card carries your own note. */}
-                        {link.userNote && link.sourceType !== 'note' && (
-                            <span className="shrink-0 inline-flex items-center text-accent/70" title="You added a note">
-                                <StickyNote className="w-3 h-3" />
-                            </span>
-                        )}
                     </div>
+                    {/* Your own note in YOUR voice — one accented, quote-styled line
+                        (distinct from the machine byline above). Truncated to keep
+                        the row compact; dir="auto" keeps it RTL-safe. */}
+                    {link.userNote && link.sourceType !== 'note' && (
+                        <p
+                            dir="auto"
+                            title={link.userNote}
+                            className="mt-1 flex items-center gap-1 min-w-0 text-[11px] italic text-accent/85"
+                        >
+                            <StickyNote className="w-3 h-3 shrink-0 opacity-70" />
+                            <span className="truncate">{link.userNote}</span>
+                        </p>
+                    )}
                 </div>
 
                 {/* Favourite toggle — stays put as you scan. Keeps its 44px hit

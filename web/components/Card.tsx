@@ -601,6 +601,21 @@ function Card({
                         })}
                     </div>
 
+                    {/* Your own note — shown in YOUR voice (accent, italic, quote
+                        bar) so it reads as distinct from the machine summary above.
+                        Clamped to 2 lines with dir="auto" so it stays RTL-safe and
+                        never bloats the card. Note-cards ARE the note, so skip them. */}
+                    {link.userNote && link.sourceType !== 'note' && (
+                        <div
+                            dir="auto"
+                            title={link.userNote}
+                            className="flex items-start gap-1.5 border-s-2 border-accent/30 ps-2 text-[12px] leading-snug text-accent/90"
+                        >
+                            <StickyNote className="w-3 h-3 shrink-0 mt-[3px] opacity-70" />
+                            <span className="line-clamp-2 italic">{link.userNote}</span>
+                        </div>
+                    )}
+
                     {/* Metadata Buttons Row */}
                     <div className="flex items-center justify-between mt-auto">
                         <div className="flex items-center gap-3 text-text-muted/60 text-[11px] font-medium">
@@ -609,13 +624,6 @@ function Card({
                                 {link.metadata.estimatedReadTime}{isRtl ? ' דק׳' : 'm'}
                             </span>
                             {now > 0 && <span>{getTimeAgo(link.createdAt, now)}</span>}
-                            {/* You've added a personal note to this card — a quiet
-                                accent cue so your own thoughts are findable at a glance. */}
-                            {link.userNote && link.sourceType !== 'note' && (
-                                <span className="flex items-center text-accent/70" title="You added a note">
-                                    <StickyNote className="w-3 h-3" />
-                                </span>
-                            )}
                         </div>
                     </div>
                 </div>

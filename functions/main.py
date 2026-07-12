@@ -1087,6 +1087,9 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             # (e.g. "the CNN fact-check") — it's not in the title/summary text.
             "sourceName": _card_source_name(c),
             "url": c.get("url"),
+            # The user's own note — passed through so the model can ground an
+            # answer in what the user personally wrote about the card.
+            "userNote": c.get("userNote", ""),
         } for c in cards]
 
         # 3. Generate a grounded answer with citations.

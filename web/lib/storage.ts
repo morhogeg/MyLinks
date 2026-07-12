@@ -403,13 +403,20 @@ export async function updateLinkSummary(uid: string, id: string, summary: string
  * field entirely (via deleteField) so a card is cleanly "note-less" again rather
  * than carrying an empty string. Nothing else writes `userNote`, so the edit is
  * durable.
+ *
+ * The note is part of the card's embedded/searchable text (search.py folds
+ * `userNote` into build_embedding_text), so every note write also flips
+ * `needsEmbedding` — the `sync_link_embedding` trigger only re-embeds when that
+ * flag (or a repair condition) is set, so without it a note edit would never
+ * refresh the vector. Clearing a note sets the same flag so the stale note text
+ * is dropped from the embedding on the next pass.
  */
 export async function updateLinkNote(uid: string, id: string, note: string): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', id);
     const trimmed = note.trim();
     await updateDoc(linkRef, trimmed
-        ? { userNote: trimmed, userNoteUpdatedAt: Date.now() }
-        : { userNote: deleteField(), userNoteUpdatedAt: deleteField() });
+        ? { userNote: trimmed, userNoteUpdatedAt: Date.now(), needsEmbedding: true }
+        : { userNote: deleteField(), userNoteUpdatedAt: deleteField(), needsEmbedding: true });
 }
 
 /**

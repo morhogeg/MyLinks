@@ -175,10 +175,16 @@ def _rag_card_block(c: dict) -> str:
     meta = [f"source: {src}"] if src else []
     meta.append(f"category: {c.get('category', 'General')}")
     meta.append(f"tags: {', '.join(c.get('tags', []) or [])}")
-    return (
+    block = (
         f"[{c.get('id')}] {c.get('title', 'Untitled')} "
         f"({'; '.join(meta)})\n{c.get('summary', '')}"
     )
+    # The user's OWN note on the card — their words, distinct from the machine
+    # summary. Surfaced to the model so it can answer "what did I think about…".
+    note = (c.get("userNote") or "").strip()
+    if note:
+        block += f"\nMy note: {note}"
+    return block
 
 
 def _build_rag_prompt(question: str, cards: list, history: list = None) -> str:

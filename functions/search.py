@@ -27,8 +27,10 @@ logger = logging.getLogger(__name__)
 # `backfill_embeddings` admin endpoint re-embeds any card whose stamp is behind
 # this number, so a recipe change can be rolled out to the whole existing
 # library. v1 = title + short summary + tags only (the old, too-thin recipe that
-# left detail invisible to Ask). v2 = the richer recipe below.
-EMBED_TEXT_VERSION = 2
+# left detail invisible to Ask). v2 = the richer recipe below. v3 folds in the
+# user's OWN note (userNote) so a card is findable by what the user thought about
+# it, not only by the machine-written summary.
+EMBED_TEXT_VERSION = 3
 
 # gemini-embedding-001 accepts ~2048 input tokens. We cap the assembled text at
 # a conservative character budget (roughly that many tokens) so a long
@@ -59,6 +61,8 @@ def build_embedding_text(data: dict) -> str:
     title = (data.get("title") or "").strip()
     summary = (data.get("summary") or "").strip()
     detailed = (data.get("detailedSummary") or "").strip()
+    # The user's own annotation — high-signal, their words, not the model's.
+    note = (data.get("userNote") or "").strip()
     tags = ", ".join(t for t in (data.get("tags") or []) if t)
     concepts = ", ".join(c for c in (data.get("concepts") or []) if c)
     meta = data.get("metadata") or {}
@@ -72,6 +76,8 @@ def build_embedding_text(data: dict) -> str:
         parts.append(f"Summary: {summary}")
     if detailed:
         parts.append(f"Details: {detailed}")
+    if note:
+        parts.append(f"Note: {note}")
     if takeaway:
         parts.append(f"Takeaway: {takeaway}")
     if tags:
@@ -110,6 +116,9 @@ def _card_haystack(data: dict) -> str:
         data.get("title", ""), data.get("summary", ""),
         " ".join(data.get("tags", []) or []),
         data.get("sourceName", ""), data.get("category", ""),
+        # The user's own note is searchable too — a literal word they wrote
+        # should surface the card in keyword fallback and rerank.
+        data.get("userNote", ""),
     ]).lower()
 
 
