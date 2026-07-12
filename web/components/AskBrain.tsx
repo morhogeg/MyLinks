@@ -15,6 +15,7 @@ import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { ChatMessage, ChatSource, ChatSession, Link } from '@/lib/types';
 import { buildAskSuggestions, buildFollowUps, newestReadyLink } from '@/lib/askSuggestions';
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
+import { hapticLight } from '@/lib/haptics';
 import ConfirmDialog from './ConfirmDialog';
 import ChatHistorySidebar from './ChatHistorySidebar';
 import MobileSubheader from './MobileSubheader';
@@ -50,6 +51,18 @@ function sourceTag(s: ChatSource): { label: string; platform: ReturnType<typeof 
     return null;
 }
 
+/** The model sometimes writes bullets as literal glyphs ("• a • b • c"),
+ *  often inline in one paragraph — Markdown doesn't parse those as a list, so
+ *  they render as a wall of text. Normalize them to real Markdown list items:
+ *  line-leading bullet glyphs become "- ", inline " • " separators break into
+ *  new items, and "1)" numbering becomes "1.". */
+function normalizeListMarkers(md: string): string {
+    return md
+        .replace(/^([ \t]*)[•◦▪‣·][ \t]+/gm, '$1- ')
+        .replace(/[ \t]+[•◦▪‣][ \t]+/g, '\n- ')
+        .replace(/^([ \t]*)(\d{1,2})\)[ \t]+/gm, '$1$2. ');
+}
+
 /** Renders an assistant answer as Markdown, styled to match the chat. GFM gives
  *  us tables/strikethrough; remark-breaks turns single newlines into <br> so the
  *  model's line breaks survive (like the old whitespace-pre-wrap). */
@@ -74,17 +87,25 @@ function MarkdownMessage({ content }: { content: string }) {
                 code: ({ children }) => <code className="px-1 py-0.5 rounded bg-card-hover text-[13px] font-mono">{children}</code>,
             }}
         >
-            {content}
+            {normalizeListMarkers(content)}
         </ReactMarkdown>
     );
 }
 
-/** Subtle "copy this answer" affordance shown under each assistant bubble. */
-function CopyButton({ text }: { text: string }) {
+/** Subtle "copy this answer" affordance shown under each assistant bubble.
+ *  When the answer has citations, the copied text carries them along as a
+ *  "Sources:" list — a pasted answer keeps its proof. */
+function CopyButton({ text, sources }: { text: string; sources?: ChatSource[] }) {
     const [copied, setCopied] = useState(false);
     const onCopy = async () => {
         try {
-            await navigator.clipboard.writeText(text);
+            let full = text;
+            if (sources && sources.length > 0) {
+                full += '\n\nSources:\n' + sources
+                    .map(s => (s.url ? `- ${s.title} — ${s.url}` : `- ${s.title}`))
+                    .join('\n');
+            }
+            await navigator.clipboard.writeText(full);
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
         } catch { /* clipboard unavailable — silently no-op */ }
@@ -104,10 +125,12 @@ function CopyButton({ text }: { text: string }) {
 /** Staged "what Machina is doing" status shown while waiting for the answer —
  *  honest theater (search → read → write mirrors the real pipeline) that makes
  *  the wait legible instead of three anonymous dots. Remounts per ask. */
-function ThinkingIndicator({ totalLinks }: { totalLinks: number }) {
+function ThinkingIndicator() {
+    // Count-free phrasing on purpose: a question about a single card makes
+    // "searching your N saves" read wrong, and these are always true.
     const stages = [
-        `Searching your ${totalLinks} ${totalLinks === 1 ? 'save' : 'saves'}…`,
-        'Reading the best matches…',
+        'Searching your library…',
+        'Reviewing relevant cards…',
         'Writing your answer…',
     ];
     const [stage, setStage] = useState(0);
@@ -384,6 +407,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }:
         setMessages(chat.messages);
         lastSavedRef.current = JSON.stringify(chat.messages);
         setInput('');
+        // Open on the last exchange, question-first (consistent with new asks).
+        let lastUser = -1;
+        for (let i = chat.messages.length - 1; i >= 0; i--) {
+            if (chat.messages[i].role === 'user') { lastUser = i; break; }
+        }
+        if (lastUser >= 0) pinQuestionToTop(lastUser, 'auto');
     };
 
     const renameChat = (id: string, title: string) => {
@@ -406,29 +435,37 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }:
         if (el) el.scrollTo({ top: el.scrollHeight, behavior });
     };
 
-    // Reading-aware autoscroll: only stick to the bottom while the user is
-    // already there. Scrolling up to re-read during a streaming answer stops
-    // the forced scroll; a "jump to latest" pill offers the way back.
-    const nearBottomRef = useRef(true);
+    // Answer-first scrolling: instead of pinning the view to the BOTTOM of a
+    // new answer (which forces a scroll-up to read from the start), pin the
+    // asked QUESTION to the top of the viewport — the user sees their question
+    // and the beginning of the reply, and reads downward. A "jump to latest"
+    // pill covers long answers.
     const [showJump, setShowJump] = useState(false);
     const handleConvScroll = () => {
         const el = scrollRef.current;
         if (!el) return;
-        const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-        nearBottomRef.current = near;
-        setShowJump(!near);
+        setShowJump(el.scrollHeight - el.scrollTop - el.clientHeight >= 80);
     };
     const jumpToLatest = () => {
-        nearBottomRef.current = true;
         setShowJump(false);
         scrollToBottom();
     };
+    /** Scroll so the message at `idx` sits at the top of the conversation view. */
+    const pinQuestionToTop = (idx: number, behavior: ScrollBehavior = 'smooth') => {
+        requestAnimationFrame(() => {
+            const container = scrollRef.current;
+            if (!container) return;
+            const el = container.querySelector(`[data-msg-idx="${idx}"]`) as HTMLElement | null;
+            if (!el) return;
+            const top = el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - 8;
+            container.scrollTo({ top: Math.max(0, top), behavior });
+        });
+    };
 
-    // When the input gains focus (keyboard opening), keep the latest message in
-    // view. Height tracking is handled by the visual-viewport listeners above.
+    // When the input gains focus (keyboard opening), re-sync the surface height.
+    // Deliberately no scroll — the reader keeps their place in the answer.
     const handleFocus = () => {
-        setTimeout(() => { syncViewportRef.current(); scrollToBottom('auto'); }, 120);
-        setTimeout(() => scrollToBottom('auto'), 350);
+        setTimeout(() => { syncViewportRef.current(); }, 120);
     };
 
     // Scroll-to-dismiss: dragging the conversation collapses the keyboard (like
@@ -443,10 +480,6 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }:
             textareaRef.current?.blur();
         }
     };
-
-    // Keep the latest message in view as the conversation grows — unless the
-    // user has deliberately scrolled up to read.
-    useEffect(() => { if (nearBottomRef.current) scrollToBottom(); }, [messages, isThinking]);
 
     // Grow the composer with its content (capped by max-h-32), shrinking back
     // when cleared — rows={1} alone never grows.
@@ -493,8 +526,11 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }:
         setInput('');
         setIsThinking(true);
         setIsStreaming(false);
-        nearBottomRef.current = true;   // a new turn always starts pinned to the latest
         setShowJump(false);
+        // Bring the fresh question to the top of the view; the thinking status
+        // and then the answer unfold right below it.
+        const questionIdx = baseMsgs.length;
+        pinQuestionToTop(questionIdx);
 
         // The native shell's WKWebView reads streamed (SSE) response bodies
         // unreliably and aborts mid-stream, which surfaced as "Couldn't reach
@@ -571,7 +607,14 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }:
                         } catch { continue; }
                         if (isStale()) { try { await reader.cancel(); } catch { /* ignore */ } return; }
                         if (evt.type === 'token') {
-                            if (firstToken) { setIsThinking(false); setIsStreaming(true); firstToken = false; }
+                            if (firstToken) {
+                                setIsThinking(false);
+                                setIsStreaming(true);
+                                firstToken = false;
+                                // Re-pin now that content can actually overflow —
+                                // the first pin may have had no scroll room yet.
+                                pinQuestionToTop(questionIdx);
+                            }
                             appendText(evt.text || '');
                         } else if (evt.type === 'sources') {
                             patchAt({ sources: evt.sources || [] });
@@ -587,6 +630,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }:
                         } else if (evt.type === 'done') {
                             done = true;
                             trackFirstAsk();
+                            hapticLight();
                         }
                     }
                 }
@@ -605,6 +649,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }:
                     ungrounded: Boolean(data.ungrounded),
                 }]);
                 trackFirstAsk();
+                hapticLight();
+                // Buffered path (native): the whole answer just landed at once —
+                // show it from the top, question first.
+                pinQuestionToTop(questionIdx);
                 if (data.ungrounded) trackAskNoCitations();
             } else {
                 setMessages(prev => [...prev, {
@@ -733,24 +781,19 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }:
                         </div>
                         <h2 className="text-xl font-semibold text-text mb-1.5">Ask Machina</h2>
                         <p className="text-text-secondary text-sm max-w-md mb-6">
-                            Ask anything about the {totalLinks} {totalLinks === 1 ? 'thing' : 'things'} you&apos;ve saved.
+                            Ask anything about the {totalLinks} {totalLinks === 1 ? 'thing' : 'things'}{' '}you&apos;ve saved.
                             Answers come only from your library, with sources you can open.
                         </p>
                         <div className="flex flex-wrap items-center justify-center gap-2 max-w-xl">
                             {suggestions.map(s => (
                                 <button
+                                    // key = underlying card/topic, so a fresh save still
+                                    // re-animates its chip in — just with no special dress-up.
                                     key={s.key}
                                     dir="auto"
                                     onClick={() => { trackAskSuggestionUsed(s.kind); send(s.text); }}
-                                    className={`animate-fade-in inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${
-                                        s.kind === 'latest'
-                                            // The newest save gets the spotlight — it re-animates
-                                            // the moment a fresh card lands (key = card id).
-                                            ? 'bg-accent/10 border border-accent/30 text-text hover:border-accent/60'
-                                            : 'bg-card border border-border-subtle text-text-secondary hover:border-accent/40 hover:text-text'
-                                    }`}
+                                    className="animate-fade-in px-3.5 py-2 rounded-full bg-card border border-border-subtle text-text-secondary text-sm font-medium hover:border-accent/40 hover:text-text transition-colors cursor-pointer"
                                 >
-                                    {s.kind === 'latest' && <Sparkles className="w-3.5 h-3.5 text-accent shrink-0" />}
                                     {s.text}
                                 </button>
                             ))}
@@ -766,15 +809,17 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }:
                         )}
                     </div>
                 ) : (
-                    <div className="w-full max-w-2xl mx-auto mt-auto py-2">
+                    <div className="w-full max-w-2xl mx-auto py-2">
                         <div className="space-y-5">
                         {messages.map((m, i) => (
-                            <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start group'}>
+                            <div key={i} data-msg-idx={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start group'}>
                                 <div className={m.role === 'user' ? 'max-w-[85%]' : 'max-w-[90%] w-full'}>
                                     <div
-                                        // Assistant answers can mix languages → let each
-                                        // line auto-detect; user/error stay single-direction.
-                                        dir={m.role === 'assistant' && !m.error ? 'auto' : getDirection(m.content)}
+                                        // dir="auto" everywhere: first-strong detection keeps a
+                                        // mostly-English question with an embedded Hebrew title
+                                        // LTR (getDirection flips RTL on ANY Hebrew char, which
+                                        // scrambled mixed-language bubbles).
+                                        dir="auto"
                                         className={
                                             m.role === 'user'
                                                 // User message: a compact accent pill.
@@ -794,7 +839,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }:
 
                                     {/* Copy affordance — subtle, under non-error assistant answers. */}
                                     {m.role === 'assistant' && !m.error && m.content && (
-                                        <CopyButton text={m.content} />
+                                        <CopyButton text={m.content} sources={m.ungrounded ? undefined : m.sources} />
                                     )}
 
                                     {/* One-tap retry for the most recent failed exchange. */}
@@ -841,13 +886,16 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }:
                                                                 <span className="min-w-0 flex flex-col">
                                                                     {tag && (
                                                                         <span
-                                                                            className="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wide text-text-muted"
+                                                                            dir="auto"
+                                                                            className="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wide text-text-muted text-start"
                                                                             style={tag.platform ? { color: platformColor(tag.platform) } : undefined}
                                                                         >
                                                                             {tag.label}
                                                                         </span>
                                                                     )}
-                                                                    <span className="text-[13px] font-medium text-text leading-snug">{s.title}</span>
+                                                                    {/* dir="auto" per title: a Hebrew title renders RTL inside
+                                                                        the chip instead of scrambling around the LTR layout. */}
+                                                                    <span dir="auto" className="text-[13px] font-medium text-text leading-snug text-start">{s.title}</span>
                                                                 </span>
                                                             </>
                                                         );
@@ -860,7 +908,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }:
                             </div>
                         ))}
 
-                        {isThinking && <ThinkingIndicator totalLinks={totalLinks} />}
+                        {isThinking && <ThinkingIndicator />}
 
                         {/* One-tap follow-ups once the latest answer has settled. */}
                         {!busy && messages.length > 0 && (() => {
@@ -913,7 +961,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }:
                             }}
                             className="flex-1 min-w-0 text-start text-[13px] text-text truncate cursor-pointer hover:underline underline-offset-2"
                         >
-                            Just saved: <span className="font-medium">{freshCard.title}</span> — ask about it
+                            Just saved: <span dir="auto" className="font-medium">{freshCard.title}</span> — ask about it
                         </button>
                         <button
                             onClick={() => setFreshCard(null)}
