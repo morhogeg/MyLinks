@@ -652,11 +652,19 @@ exact-match, capped.
   scroll lock (`useScrollLock.ts`, 10 sites), ReminderModal conditional-hook
   violation, capture-bridge render purity — eslint back to 0 errors. Verified:
   `tsc --noEmit` clean, eslint 0 errors/5 warnings, functions 160/160 pytest,
-  `py_compile` clean. **Not deployed** — needs `/ship` (web + functions deploy
-  incl. scraper/search/ai_service changes + a TestFlight build; then run
-  `backfill_embeddings` once for the v3 recipe). On-device QA: share→app loader
-  hand-off, collection/digest back-swipe, note editor keyboard, new tour,
-  toggle alignment in Settings.
+  `py_compile` clean. **SHIPPED (same session):** merged to `main` as `e65c62b`
+  → **desktop web live via Vercel**. **iOS: TestFlight run #75 → build 1075**
+  (fired via temp branch `claude/ship-tf-trigger-polish` — API dispatch still
+  403 from cloud sessions; owner should delete that branch after green, remote
+  deletes are no-ops from cloud). **Backend NOT deployed — owner step** (no
+  firebase credentials in the cloud sandbox): from `main` run
+  `./deploy-functions.sh functions:analyze_link,functions:analyze_image,functions:share_ingest,functions:process_link_background,functions:ask_brain,functions:sync_link_embedding,functions:search_links,functions:backfill_embeddings`
+  then hit `backfill_embeddings` once with `$ADMIN_TOKEN` so existing cards get
+  the v3 note-aware embeddings. Until that deploy, Instagram handles and
+  note-aware search/Ask are dark server-side (frontend degrades gracefully).
+  On-device QA for build 1075: share→app loader hand-off, collection/digest
+  back-swipe, note editor keyboard, new 5-step tour, toggle alignment in
+  Settings.
 - **2026-07-12 — Ask elevation, device-feedback round (`1e433b6`,
   merge `e3a96db` to `main`).** Owner QA'd build 1072 and sent five fixes,
   all landed: (1) latest-save suggestion chip de-spotlighted (no purple/
