@@ -7,6 +7,7 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import { addLinkToCollection, removeLinkFromCollection } from '@/lib/collections';
 import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
+import { useScrollLock } from '@/lib/useScrollLock';
 
 interface ManageCollectionCardsSheetProps {
     uid: string | null;
@@ -50,13 +51,14 @@ export default function ManageCollectionCardsSheet({
         const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
         if (isOpen) {
             window.addEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'hidden';
         }
         return () => {
             window.removeEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'unset';
         };
     }, [isOpen, onClose]);
+
+    // Ref-counted so closing this overlay never unlocks a still-open parent (F-16).
+    useScrollLock(isOpen);
 
     const rows = useMemo(() => {
         const query = q.trim().toLowerCase();

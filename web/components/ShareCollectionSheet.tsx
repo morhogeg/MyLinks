@@ -11,6 +11,7 @@ import { shareLink, shareUrlFor, openExternal } from '@/lib/share';
 import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { track } from '@/lib/analytics';
+import { useScrollLock } from '@/lib/useScrollLock';
 
 interface ShareCollectionSheetProps {
     uid: string | null;
@@ -50,13 +51,14 @@ export default function ShareCollectionSheet({
         const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
         if (isOpen) {
             window.addEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'hidden';
         }
         return () => {
             window.removeEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'unset';
         };
     }, [isOpen, onClose]);
+
+    // Ref-counted so closing this overlay never unlocks a still-open parent (F-16).
+    useScrollLock(isOpen);
 
     const isPublic = !!collection.isPublic && !!collection.shareId;
     const stale = useMemo(() => isShareStale(collection, memberLinks), [collection, memberLinks]);

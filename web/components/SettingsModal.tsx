@@ -19,6 +19,7 @@ import {
     DIGEST_MODES, DAYS, COUNT_OPTIONS, formatTime,
     ResurfacingView, StyleView, ScheduleView, PickerView,
 } from './settings/DigestSettings';
+import { useScrollLock } from '@/lib/useScrollLock';
 
 interface SettingsModalProps {
     uid: string;
@@ -151,12 +152,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     }, []);
 
     // Lock the page behind Settings while it's open.
-    useEffect(() => {
-        if (!isOpen) return;
-        const prev = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = prev; };
-    }, [isOpen]);
+    useScrollLock(isOpen);
 
     // Swipe in from the left edge to leave: pop one screen, or close from the root.
     useEdgeSwipeBack(() => {

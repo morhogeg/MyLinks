@@ -20,6 +20,7 @@ import ConfirmDialog from './ConfirmDialog';
 import ChatHistorySidebar from './ChatHistorySidebar';
 import MobileSubheader from './MobileSubheader';
 import { IconButton } from './ui/Button';
+import { lockBodyScroll, unlockBodyScroll } from '@/lib/useScrollLock';
 
 /** A usable source name, or null for placeholders the backend stores. */
 function meaningfulName(name?: string | null): string | null {
@@ -295,14 +296,13 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }:
         vvObj?.addEventListener('scroll', sync);
         window.addEventListener('resize', sync);
         window.addEventListener('orientationchange', sync);
-        const prevOverflow = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
+        lockBodyScroll();
         return () => {
             vvObj?.removeEventListener('resize', sync);
             vvObj?.removeEventListener('scroll', sync);
             window.removeEventListener('resize', sync);
             window.removeEventListener('orientationchange', sync);
-            document.body.style.overflow = prevOverflow;
+            unlockBodyScroll();
             syncViewportRef.current = () => {};
             if (el) { el.style.height = ''; el.style.transform = ''; }
         };

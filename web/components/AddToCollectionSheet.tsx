@@ -12,6 +12,7 @@ import {
 import { rankCollectionsForLink } from '@/lib/collectionSuggest';
 import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
+import { useScrollLock } from '@/lib/useScrollLock';
 
 interface AddToCollectionSheetProps {
     uid: string | null;
@@ -57,13 +58,14 @@ export default function AddToCollectionSheet({
         };
         if (isOpen) {
             window.addEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'hidden';
         }
         return () => {
             window.removeEventListener('keydown', handleEscape);
-            document.body.style.overflow = 'unset';
         };
     }, [isOpen, onClose]);
+
+    // Ref-counted so closing this overlay never unlocks a still-open parent (F-16).
+    useScrollLock(isOpen);
 
     // Reset transient state whenever the sheet reopens.
     useEffect(() => {

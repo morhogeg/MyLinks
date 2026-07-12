@@ -57,6 +57,7 @@ import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import TagExplorer from './TagExplorer';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { useScrollLock } from '@/lib/useScrollLock';
 
 // Stable no-op for card slots that don't wire up an action (pending cards).
 const noop = () => { };
@@ -383,12 +384,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
     // Lock the page behind any open overlay/sheet so scrolling inside a menu (the
     // Filters sheet, a confirm dialog, etc.) never scrolls the feed behind it.
-    useEffect(() => {
-        if (!anyOverlayOpen) return;
-        const prev = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = prev; };
-    }, [anyOverlayOpen]);
+    useScrollLock(anyOverlayOpen);
 
     // Render the brand icon for a source row (platform logo, screenshot, or a
     // generic globe for plain websites), tinted in the platform's brand color.
