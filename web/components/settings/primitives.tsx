@@ -131,7 +131,7 @@ export function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) 
             aria-checked={on}
             className={`inline-flex items-center shrink-0 w-[51px] h-[31px] p-[2px] rounded-full transition-colors duration-200 cursor-pointer ${on ? 'bg-accent' : 'bg-text-muted/30'}`}
         >
-            <span className={`block w-[27px] h-[27px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.2),0_2px_5px_rgba(0,0,0,0.18)] transition-transform duration-200 ease-out ${on ? 'translate-x-[20px]' : 'translate-x-0'}`} />
+            <span className={`block w-[27px] h-[27px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.2),0_2px_5px_rgba(0,0,0,0.18)] transition-transform duration-200 ease-out ${on ? 'translate-x-[20px] rtl:-translate-x-[20px]' : 'translate-x-0'}`} />
         </button>
     );
 }
