@@ -613,7 +613,32 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-11 (latest) — SHIPPED: Collections elevation (branch
+- **2026-07-12 (latest) — Ask elevation, device-feedback round (`1e433b6`,
+  merge `e3a96db` to `main`).** Owner QA'd build 1072 and sent five fixes,
+  all landed: (1) latest-save suggestion chip de-spotlighted (no purple/
+  sparkle; live re-animation kept); (2) thinking status now count-free
+  ("Searching your library… / Reviewing relevant cards… / Writing your
+  answer…") — "your N saves" read wrong on single-card questions; (3)
+  **answer-first scrolling**: a new answer pins the QUESTION to the top of
+  the view (send + first-token/buffered arrival; old chats open on their
+  last exchange) instead of dumping the user at the bottom; keyboard focus
+  no longer force-scrolls; (4) literal glyph bullets from the model ("a • b
+  • c" inline, line-start "•", "1)" numbering) are normalized into real
+  Markdown lists before render (`normalizeListMarkers`); (5) RTL: `dir="auto"`
+  on message bubbles (old `getDirection` flipped mixed-language questions
+  fully RTL), citation-chip titles/bylines, fresh-pill title, history rows;
+  also fixed the "N thingsyou've saved" missing space. Plus three additions:
+  **Copy carries citations** (Sources list with titles+URLs), **chat history
+  search** (≥6 chats, matches titles AND message text), **light haptic on
+  answer arrival** (native, M11 grammar). tsc+eslint clean; bullet
+  normalizer unit-tested ad hoc. **Desktop web: live via Vercel** (merge
+  `e3a96db`). **iOS: TestFlight build NOT yet fired** — the auto-mode
+  classifier blocked the temp-trigger push pending explicit owner approval;
+  the trigger commit sits locally; fire via Actions → "iOS → TestFlight" →
+  Run workflow on `main`, or tell the session to ship. On-device QA once
+  built: question-pinned scroll on the buffered path, bullet lists, Hebrew
+  citation chips, history search.
+- **2026-07-11 — SHIPPED: Collections elevation (branch
   `claude/collection-feature-elevation-xw9z9o`, merged to `main` as
   `bcc3698`).** **Desktop web:** live via Vercel auto-deploy. **iOS:
   TestFlight run #73 → build 1073**, fired via the temp-push-trigger pattern
