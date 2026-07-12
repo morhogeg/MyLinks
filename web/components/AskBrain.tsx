@@ -13,7 +13,7 @@ import { apiUrl, isNativeApp, fetchWithTimeout } from '@/lib/api';
 import { trackFirstAsk, trackAskNoCitations, trackAskSuggestionUsed, trackAskFollowupUsed, trackAskStopped } from '@/lib/analytics';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { ChatMessage, ChatSource, ChatSession, Link } from '@/lib/types';
-import { buildAskSuggestions, buildFollowUps, newestReadyLink } from '@/lib/askSuggestions';
+import { buildAskSuggestions, buildFollowUps, newestReadyLink, ClassifiableCard } from '@/lib/askSuggestions';
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
 import { hapticLight } from '@/lib/haptics';
 import ConfirmDialog from './ConfirmDialog';
@@ -216,8 +216,24 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }:
     const [suggestSalt, setSuggestSalt] = useState(() => Math.floor(Math.random() * 997));
     const suggestions = useMemo(() => buildAskSuggestions(links, suggestSalt), [links, suggestSalt]);
 
-    // One-tap follow-ups under a completed answer; rotate per turn.
-    const followUps = useMemo(() => buildFollowUps(messages.length + suggestSalt), [messages.length, suggestSalt]);
+    // One-tap follow-ups under the latest answer, tailored to what it actually
+    // discussed. The answer's citations only carry id/title/category, but the
+    // full library card (tags/concepts/summary/type) is already loaded — so we
+    // resolve each cited id to its Link and let the classifier read it. Pure,
+    // client-side, no extra call. Recomputed as the conversation and library move.
+    const followUps = useMemo(() => {
+        if (messages.length === 0) return [];
+        const last = messages[messages.length - 1];
+        if (last.role !== 'assistant' || last.error || !last.content) return [];
+        const byId = new Map(links.map(l => [l.id, l]));
+        const citedCards: ClassifiableCard[] = (last.sources ?? []).map(s =>
+            byId.get(s.id) ?? { id: s.id, title: s.title, category: s.category ?? undefined }
+        );
+        // Everything asked/tapped this session, so a used chip is never re-offered.
+        const askedTexts = messages.filter(m => m.role === 'user').map(m => m.content);
+        const exchangeCount = messages.filter(m => m.role === 'assistant' && !m.error).length;
+        return buildFollowUps({ citedCards, allLinks: links, askedTexts, exchangeCount });
+    }, [messages, links]);
 
     // Watch for a brand-new card landing while a conversation is open and offer
     // it as a one-tap ask ("Just saved — ask about it"). The empty state doesn't
@@ -910,24 +926,22 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }:
 
                         {isThinking && <ThinkingIndicator />}
 
-                        {/* One-tap follow-ups once the latest answer has settled. */}
-                        {!busy && messages.length > 0 && (() => {
-                            const last = messages[messages.length - 1];
-                            if (last.role !== 'assistant' || last.error || !last.content) return null;
-                            return (
-                                <div className="flex flex-wrap gap-2 ps-1 animate-fade-in">
-                                    {followUps.map(f => (
-                                        <button
-                                            key={f}
-                                            onClick={() => { trackAskFollowupUsed(); send(f); }}
-                                            className="px-3 py-1.5 rounded-full border border-border-subtle text-text-muted text-[13px] hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
-                                        >
-                                            {f}
-                                        </button>
-                                    ))}
-                                </div>
-                            );
-                        })()}
+                        {/* Content-aware one-tap follow-ups once the latest answer has
+                            settled (empty when the turn can't produce a tailored set). */}
+                        {!busy && followUps.length > 0 && (
+                            <div className="flex flex-wrap gap-2 ps-1 animate-fade-in">
+                                {followUps.map(f => (
+                                    <button
+                                        key={f}
+                                        dir="auto"
+                                        onClick={() => { trackAskFollowupUsed(); send(f); }}
+                                        className="px-3 py-1.5 rounded-full border border-border-subtle text-text-muted text-[13px] hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
+                                    >
+                                        {f}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         </div>
                     </div>
                 )}
