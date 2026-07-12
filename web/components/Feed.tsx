@@ -838,19 +838,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 <div className="mb-5">
                     <div className="flex items-center gap-2.5">
                         <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: colStyle.color }} />
-                        <h1 className="text-[22px] sm:text-[26px] font-extrabold tracking-tight text-text truncate">{openCol.name}</h1>
+                        <h1 className="min-w-0 truncate text-[22px] sm:text-[26px] font-extrabold tracking-tight text-text">{openCol.name}</h1>
+                        <span className="shrink-0 whitespace-nowrap text-[13px] sm:text-[14px] font-medium text-text-muted tabular-nums">· {count} {count === 1 ? 'card' : 'cards'}</span>
+                        {openCol.isPublic && (
+                            <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide ${stale ? 'bg-amber-500/15 text-amber-600' : 'bg-accent/10 text-accent'}`}>
+                                <Globe className="w-3 h-3" /> {stale ? 'Update link' : 'Shared'}
+                            </span>
+                        )}
                     </div>
                     {openCol.description && (
                         <p className="mt-1.5 text-[14px] leading-relaxed text-text-secondary max-w-2xl">{openCol.description}</p>
                     )}
-                    <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[13px] font-medium text-text-muted">
-                        <span className="inline-flex items-center gap-1.5"><Layers className="w-3.5 h-3.5" />{count} {count === 1 ? 'card' : 'cards'}</span>
-                        {openCol.isPublic && (
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide ${stale ? 'bg-amber-500/15 text-amber-600' : 'bg-accent/10 text-accent'}`}>
-                                <Globe className="w-3 h-3" /> {stale ? 'Update page' : 'Shared'}
-                            </span>
-                        )}
-                    </div>
                     <div className="mt-4 flex flex-wrap items-center gap-2">
                         <button
                             onClick={() => handleShareCollection(openCol)}

@@ -177,7 +177,7 @@ export default function ShareCollectionSheet({
                     {!isPublic ? (
                         <>
                             <p className="text-sm text-text-muted leading-relaxed">
-                                Publishing creates a public page with a snapshot of these {count === 1 ? 'card' : `${count} cards`} —
+                                Sharing creates a page with a snapshot of these {count === 1 ? 'card' : `${count} cards`} —
                                 titles, summaries, and sources. Anyone with the link can view it; nothing
                                 identifies you, and your library stays private.
                             </p>
@@ -187,7 +187,7 @@ export default function ShareCollectionSheet({
                                 className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-accent text-white font-semibold hover:bg-accent-hover transition-colors disabled:opacity-40"
                             >
                                 <Globe className="w-4 h-4" />
-                                {busy === 'publish' ? 'Publishing…' : 'Publish public page'}
+                                {busy === 'publish' ? 'Creating…' : 'Create share link'}
                             </button>
                             {count === 0 && (
                                 <p className="text-xs text-text-muted text-center">Add a card first — an empty collection has nothing to show.</p>
@@ -232,7 +232,7 @@ export default function ShareCollectionSheet({
                                         disabled={busy !== null}
                                         className="shrink-0 px-3 h-8 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 transition-colors disabled:opacity-40"
                                     >
-                                        {busy === 'publish' ? 'Updating…' : 'Update'}
+                                        {busy === 'publish' ? 'Updating…' : 'Update share link'}
                                     </button>
                                 </div>
                             )}

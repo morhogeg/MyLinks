@@ -113,7 +113,7 @@ export default function CollectionsGallery({
                             {/* Public badge — amber when the page is behind the live collection. */}
                             {c.isPublic && (
                                 <span className={`absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full backdrop-blur-sm text-[9px] font-bold uppercase tracking-wide text-white ${stale ? 'bg-amber-600/80' : 'bg-black/55'}`}>
-                                    <Globe className="w-2.5 h-2.5" /> {stale ? 'Update page' : 'Shared'}
+                                    <Globe className="w-2.5 h-2.5" /> {stale ? 'Update link' : 'Shared'}
                                 </span>
                             )}
                         </div>
