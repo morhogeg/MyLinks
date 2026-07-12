@@ -85,7 +85,7 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
         const t = chipTitle(latest.title)!;
         const phrasings = [
             `What's the gist of "${t}"?`,
-            `Give me the key points from "${t}"`,
+            `Key points from "${t}"`,
             `Why is "${t}" worth my time?`,
         ];
         latestChips.push({
@@ -99,12 +99,19 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
     const pool: AskSuggestion[] = [];
 
     // This week's activity (only when there's enough to be worth a catch-up).
+    // Count-free by design: the client's "this week" tally never matches what the
+    // RAG retrieval actually pulls server-side, so a number here reads as a broken
+    // promise. The threshold still gates on the real count; only the copy is mute.
     const weekCount = ready.filter(l => now - toMs(l.createdAt) < WEEK_MS).length;
     if (weekCount >= 3) {
+        const phrasings = [
+            `Catch me up on this week's saves`,
+            `What did I save this week?`,
+        ];
         pool.push({
-            text: `Catch me up on the ${weekCount} things I saved this week`,
+            text: rotate(phrasings, salt)[0],
             kind: 'week',
-            key: `week:${weekCount}`,
+            key: 'week',
         });
     }
 
@@ -125,7 +132,7 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
     if (sharedConcepts.length > 0) {
         const pick = rotate(sharedConcepts, salt)[0];
         const phrasings = [
-            `Connect the dots across my saves about ${pick.label}`,
+            `Connect my saves on ${pick.label}`,
             `What do my saves say about ${pick.label}?`,
         ];
         pool.push({
@@ -148,8 +155,8 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
         .slice(0, 5);
     rotate(cats, salt).slice(0, 2).forEach((cat, i) => {
         const phrasings = i === 0
-            ? [`What are the key takeaways from my ${cat} saves?`, `Summarize what I've saved on ${cat}`]
-            : [`What's the latest I saved about ${cat}?`, `Anything surprising in my ${cat} saves?`];
+            ? [`Key takeaways from my ${cat} saves`, `Summarize what I saved on ${cat}`]
+            : [`What's my latest ${cat} save about?`, `Anything surprising in my ${cat} saves?`];
         pool.push({
             text: rotate(phrasings, salt)[0],
             kind: 'category',
@@ -164,7 +171,7 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
     if (dusty) {
         const t = chipTitle(dusty.title)!;
         pool.push({
-            text: `I saved "${t}" a while back — what was it about?`,
+            text: `What was "${t}" about again?`,
             kind: 'rediscover',
             key: `rediscover:${dusty.id}`,
         });
@@ -172,7 +179,7 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
 
     // Generic fallback so there are always chips, even in a tiny library.
     pool.push({
-        text: 'Give me a quick recap of my recent saves',
+        text: 'Recap my recent saves',
         kind: 'recap',
         key: 'recap',
     });

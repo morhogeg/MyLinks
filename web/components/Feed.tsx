@@ -1776,6 +1776,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             totalLinks={links.length}
                             onOpenLink={(id) => setActiveLinkId(id)}
                             onExit={() => setViewMode(lastLayout.current)}
+                            // A cited-card modal (or any Feed sheet/dialog) open over
+                            // Ask owns the edge-swipe; Ask stands down so one swipe
+                            // pops only the modal, back to the chat — not out to home.
+                            overlayOpen={anyOverlayOpen}
                             links={links}
                         />
                     ) : filteredLinks.length === 0 && pendingCards.length === 0 ? (
