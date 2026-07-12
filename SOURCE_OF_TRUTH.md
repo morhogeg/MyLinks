@@ -632,12 +632,13 @@ exact-match, capped.
   search** (≥6 chats, matches titles AND message text), **light haptic on
   answer arrival** (native, M11 grammar). tsc+eslint clean; bullet
   normalizer unit-tested ad hoc. **Desktop web: live via Vercel** (merge
-  `e3a96db`). **iOS: TestFlight build NOT yet fired** — the auto-mode
-  classifier blocked the temp-trigger push pending explicit owner approval;
-  the trigger commit sits locally; fire via Actions → "iOS → TestFlight" →
-  Run workflow on `main`, or tell the session to ship. On-device QA once
-  built: question-pinned scroll on the buffered path, bullet lists, Hebrew
-  citation chips, history search.
+  `e3a96db`). **iOS: TestFlight run #74 → build 1074** (owner approved with
+  "Ship it"; fired via temp branch `claude/ship-tf-trigger-ask` — delete
+  after green, along with the other stale `claude/ship-tf-trigger-*`
+  branches; cloud sessions can't delete remote branches). Build 1074 is cut
+  from `605ed5d`, so it carries BOTH the Ask fixes and the Collections
+  elevation. On-device QA: question-pinned scroll on the buffered path,
+  bullet lists, Hebrew citation chips, history search.
 - **2026-07-11 — SHIPPED: Collections elevation (branch
   `claude/collection-feature-elevation-xw9z9o`, merged to `main` as
   `bcc3698`).** **Desktop web:** live via Vercel auto-deploy. **iOS:
