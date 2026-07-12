@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
 import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2, ChevronLeft, StickyNote } from 'lucide-react';
-import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
+import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import { openExternal } from '@/lib/share';
 import ReadingView from './ReadingView';
@@ -222,6 +222,9 @@ export default function LinkDetailModal({
     const fbAuthor = isFacebook && link.sourceName
         && !['facebook', 'screenshot', 'none'].includes(link.sourceName.trim().toLowerCase())
         ? link.sourceName : null;
+    // Instagram: the author @handle captured by the scraper (stored in
+    // sourceName as "@handle"), credited in the same byline style as X.
+    const igAuthor = platform === 'instagram' ? instagramHandle(link.sourceName) : null;
 
     const getTimeAgo = (timestamp: number | string, now: number): string => {
         if (!timestamp || !now) return '...';
@@ -579,6 +582,17 @@ export default function LinkDetailModal({
                                                 {platformIcon('facebook', 'w-4 h-4')}
                                             </span>
                                             {fbAuthor && <span className="truncate">{fbAuthor}</span>}
+                                        </span>
+                                    ) : igAuthor ? (
+                                        <span
+                                            dir="ltr"
+                                            className="flex items-center gap-1.5 min-w-0 text-sm font-semibold text-text-secondary whitespace-nowrap max-w-[240px]"
+                                            title={`@${igAuthor}`}
+                                        >
+                                            <span className="shrink-0 inline-flex" style={{ color: platformColor('instagram') }}>
+                                                {platformIcon('instagram', 'w-4 h-4')}
+                                            </span>
+                                            <span className="truncate">@{igAuthor}</span>
                                         </span>
                                     ) : link.sourceType === 'image' ? (
                                         <span className="flex items-center gap-1.5 text-sm font-semibold text-accent whitespace-nowrap" title="Screenshot">
