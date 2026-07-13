@@ -650,10 +650,12 @@ exact-match, capped.
   ask must contain its own retrieval anchor in the question text; history
   does not help retrieval. Proper server-side fix (query rewriting or pinning
   retrieval to prior citation ids in ask_brain) is the backlog follow-up.
-  **SHIPPED:** Vercel live; **iOS: TestFlight run #91 → build 1091** via temp
-  trigger `claude/ship-tf-trigger-followups` (queued behind #89/#90 — the
-  concurrency group serializes). Build 1091 = today's full stack; owner
-  should install it and delete all `claude/ship-tf-trigger-*` branches.
+  **SHIPPED:** Vercel live. **iOS: run #91 FAILED on a transient** (macOS
+  runner lost the network downloading Google's grpc.zip binary during SPM
+  resolve — not a code failure); re-fired as **run #92 → build 1092** via an
+  empty commit on `claude/ship-tf-trigger-followups`. Build 1092 = today's
+  full stack (identical code to the failed 1091 attempt); owner should
+  install it and delete all `claude/ship-tf-trigger-*` branches.
 - **2026-07-13 — Steady Add-to-Machina dialog (merge `0c0e89b`,
   commit `b062064`).** Owner screenshot: the capture dialog jumped up/down
   when toggling Link/Image/Note — it was vertically centered on its LIVE
