@@ -617,7 +617,34 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — Private collections (PIN vault), branch
+- **2026-07-13 (latest) — Private CARDS + privacy polish round (merge
+  `85d8b90`, feature commit `668c138`).** Owner feedback on build 1086, all
+  shipped same-day: (1) **Per-card private** — every card's ⋯ action sheet
+  gets "Make private" (Photos-Hidden model, deliberately different from
+  collections: a private card lives ONLY under the new PIN-gated **Show →
+  Private** status filter and never appears in the main feed, search, facets,
+  Ask client context, due-reminder strip, or suggestions, even while the vault
+  is unlocked; `Link.isPrivate` + `privateCards` split in `useFeedFilters`,
+  gate in Feed's `handleFilterSelect`). First-time use runs inline PIN setup;
+  the Private option only appears in Show once a PIN or a private card exists.
+  (2) Collections get **Make private / Remove private** in the tile 3-dot menu
+  (auto-unpublishes a shared collection; removing protection is PIN-gated).
+  (3) **Aggressive relock**: backing out of a private collection or leaving
+  the Private filter relocks the vault immediately (no waiting for app
+  background). (4) PIN dialog centers in the visible viewport above the iOS
+  keyboard (`useVisualViewport`, was hidden behind it — owner screenshot).
+  (5) PIN pad shows each typed digit for ~0.7s before masking (standard
+  affordance). (6) Privacy badges are icon-only lock glyphs (no "PRIVATE"
+  wording) on collection tiles, grid cards, and list rows. **SHIPPED:** Vercel
+  live off `main`; **iOS: TestFlight run #87 → build 1087** via temp-push-
+  trigger branch `claude/ship-tf-trigger-private2` (run #86/build 1086 = the
+  previous PIN-vault build, confirmed green + on device). KNOWN LIMITS carried
+  from the vault: server-side Ask/RAG + semantic search + digests/reminder
+  pushes still index/mention private cards (backend `isPrivate` exclusion is
+  the natural follow-up); Face ID still stubbed. Owner cleanup: delete
+  `claude/ship-tf-trigger-private2`, `-pinvault`, and older stale trigger
+  branches once green.
+- **2026-07-13 — Private collections (PIN vault), branch
   `claude/private-collection-connections-akvphm`.** Any collection can be
   marked **Private** in the create/edit sheet, protected by ONE app-level
   4-digit PIN (the iOS-Notes model, not a PIN per collection). PIN is
