@@ -617,7 +617,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — Steady Add-to-Machina dialog (merge `0c0e89b`,
+- **2026-07-13 (latest) — Ask follow-ups made SELF-CONTAINED (merge `64eb72a`,
+  commit `fba0b1e`).** Build 1089's evidence gating was NOT sufficient — owner
+  repro'd "Give me more detail" → "sources do not contain…" on a cited card.
+  Root cause: the backend retrieves by the question text alone (no query
+  rewriting from history), so a context-free follow-up retrieves nothing and
+  the grounded prompt refuses. Fix: `buildFollowUps` now returns
+  `{label, question}` pairs — the chip shows the short label, the SENT
+  question is anchored with the cited card's title ("Give me more detail on
+  'X'"), compare chips carry both titles, and no chips are shown if no cited
+  card has a usable title. LESSON for future Ask work: any client-initiated
+  ask must contain its own retrieval anchor in the question text; history
+  does not help retrieval. Proper server-side fix (query rewriting or pinning
+  retrieval to prior citation ids in ask_brain) is the backlog follow-up.
+  **SHIPPED:** Vercel live; **iOS: TestFlight run #91 → build 1091** via temp
+  trigger `claude/ship-tf-trigger-followups` (queued behind #89/#90 — the
+  concurrency group serializes). Build 1091 = today's full stack; owner
+  should install it and delete all `claude/ship-tf-trigger-*` branches.
+- **2026-07-13 — Steady Add-to-Machina dialog (merge `0c0e89b`,
   commit `b062064`).** Owner screenshot: the capture dialog jumped up/down
   when toggling Link/Image/Note — it was vertically centered on its LIVE
   content height, so each tab re-centered the frame. Fix: the mobile top is
