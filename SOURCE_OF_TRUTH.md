@@ -617,7 +617,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — Private CARDS + privacy polish round (merge
+- **2026-07-13 (latest) — Private collections now make their cards private
+  too (merge `523814a`, feature commit `3222b3f`).** Owner call: a private
+  collection's members should be private, period. Implemented as INHERITED
+  privacy, not stamped flags — `useFeedFilters` takes `privateCollectionIds`
+  and treats a card as effectively private when `isPrivate` OR it belongs to a
+  private collection, computed live (cards added later hide automatically;
+  removing a card / un-privating the collection restores instantly, no
+  migration sweep, no flag drift). Effectively-private cards are excluded from
+  the main feed, search, facets, suggested collections, and the due-reminders
+  strip EVEN WHILE UNLOCKED; they surface only inside their PIN-opened private
+  collection (via a selectedCollections+private exception in contentLinks) and
+  under Show → Private (which now lists inherited members too). Privacy
+  inherited from one collection follows the card into its other non-private
+  collections. **SHIPPED:** Vercel live; **iOS: TestFlight run #88 → build
+  1088** via temp trigger branch `claude/ship-tf-trigger-inherit` (run #87 /
+  build 1087 = the per-card-private build, green). Owner cleanup: delete
+  trigger branches `-inherit`, `-private2`, `-pinvault` + older stale ones.
+- **2026-07-13 — Private CARDS + privacy polish round (merge
   `85d8b90`, feature commit `668c138`).** Owner feedback on build 1086, all
   shipped same-day: (1) **Per-card private** — every card's ⋯ action sheet
   gets "Make private" (Photos-Hidden model, deliberately different from
