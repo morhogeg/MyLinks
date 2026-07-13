@@ -12,6 +12,7 @@ import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { track } from '@/lib/analytics';
 import { useScrollLock } from '@/lib/useScrollLock';
+import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 
 interface ShareCollectionSheetProps {
     uid: string | null;
@@ -59,6 +60,10 @@ export default function ShareCollectionSheet({
 
     // Ref-counted so closing this overlay never unlocks a still-open parent (F-16).
     useScrollLock(isOpen);
+
+    // Bottom sheet on mobile, centered modal on desktop — drag only on mobile.
+    const isMobile = useIsMobile();
+    const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose, enabled: isMobile });
 
     const isPublic = !!collection.isPublic && !!collection.shareId;
     const stale = useMemo(() => isShareStale(collection, memberLinks), [collection, memberLinks]);
@@ -123,29 +128,33 @@ export default function ShareCollectionSheet({
             className="fixed inset-x-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
             style={{ top: vp.offsetTop || 0, height: vp.height || '100%', bottom: 'auto' }}
         >
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div ref={scrimRef} className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
             <div
+                ref={sheetRef}
                 role="dialog"
                 aria-modal="true"
                 aria-label={`Share ${collection.name}`}
                 className="relative w-full sm:max-w-md max-h-full overflow-y-auto bg-card border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up sm:animate-scale-up safe-pb"
             >
-                <div className="sm:hidden flex justify-center pt-3 pb-1">
-                    <div className="h-1.5 w-10 rounded-full bg-fill-strong" />
-                </div>
+                {/* Grab handle + header: the drag-to-dismiss zone on mobile. */}
+                <div {...handleProps}>
+                    <div className="sm:hidden flex justify-center pt-3 pb-1">
+                        <div className="h-1.5 w-10 rounded-full bg-fill-strong" />
+                    </div>
 
-                {/* Header */}
-                <div className="flex items-center gap-3 px-5 pt-3 pb-4 border-b border-border-subtle">
-                    <Share2 className="w-5 h-5 text-accent shrink-0" />
-                    <h3 className="flex-1 text-lg font-bold text-text truncate">Share collection</h3>
-                    <button
-                        onClick={onClose}
-                        aria-label="Close"
-                        className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
+                    {/* Header */}
+                    <div className="flex items-center gap-3 px-5 pt-3 pb-4 border-b border-border-subtle">
+                        <Share2 className="w-5 h-5 text-accent shrink-0" />
+                        <h3 className="flex-1 text-lg font-bold text-text truncate">Share collection</h3>
+                        <button
+                            onClick={onClose}
+                            aria-label="Close"
+                            className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="p-5 space-y-4">
@@ -177,7 +186,7 @@ export default function ShareCollectionSheet({
                     {!isPublic ? (
                         <>
                             <p className="text-sm text-text-muted leading-relaxed">
-                                Publishing creates a public page with a snapshot of these {count === 1 ? 'card' : `${count} cards`} —
+                                Sharing creates a page with a snapshot of these {count === 1 ? 'card' : `${count} cards`} —
                                 titles, summaries, and sources. Anyone with the link can view it; nothing
                                 identifies you, and your library stays private.
                             </p>
@@ -187,7 +196,7 @@ export default function ShareCollectionSheet({
                                 className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-accent text-white font-semibold hover:bg-accent-hover transition-colors disabled:opacity-40"
                             >
                                 <Globe className="w-4 h-4" />
-                                {busy === 'publish' ? 'Publishing…' : 'Publish public page'}
+                                {busy === 'publish' ? 'Creating…' : 'Create share link'}
                             </button>
                             {count === 0 && (
                                 <p className="text-xs text-text-muted text-center">Add a card first — an empty collection has nothing to show.</p>
@@ -232,7 +241,7 @@ export default function ShareCollectionSheet({
                                         disabled={busy !== null}
                                         className="shrink-0 px-3 h-8 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 transition-colors disabled:opacity-40"
                                     >
-                                        {busy === 'publish' ? 'Updating…' : 'Update'}
+                                        {busy === 'publish' ? 'Updating…' : 'Update share link'}
                                     </button>
                                 </div>
                             )}

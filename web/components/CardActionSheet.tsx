@@ -5,6 +5,7 @@ import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink, Layers, Sh
 import { useEffect } from 'react';
 import { IconButton } from './ui/Button';
 import { useScrollLock } from '@/lib/useScrollLock';
+import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 
 interface CardActionSheetProps {
     link: Link;
@@ -56,6 +57,10 @@ export default function CardActionSheet({
 
     // Ref-counted so closing this overlay never unlocks a still-open parent (F-16).
     useScrollLock(isOpen);
+
+    // Bottom sheet on mobile, centered modal on desktop — drag only on mobile.
+    const isMobile = useIsMobile();
+    const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose, enabled: isMobile });
 
     if (!isOpen) return null;
 
@@ -136,23 +141,26 @@ export default function CardActionSheet({
         <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center animate-fade-in">
             {/* Backdrop */}
             <div
+                ref={scrimRef}
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                 onClick={onClose}
             />
 
             {/* Sheet */}
             <div
+                ref={sheetRef}
                 role="menu"
                 aria-label="Card actions"
                 className="relative w-full sm:max-w-sm bg-card border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up overflow-hidden safe-pb"
             >
-                {/* Grab handle (mobile affordance) */}
-                <div className="sm:hidden flex justify-center pt-3 pb-1">
-                    <div className="h-1.5 w-10 rounded-full bg-fill-strong" />
-                </div>
+                {/* Grab handle + header: the drag-to-dismiss zone on mobile. */}
+                <div {...handleProps}>
+                    <div className="sm:hidden flex justify-center pt-3 pb-1">
+                        <div className="h-1.5 w-10 rounded-full bg-fill-strong" />
+                    </div>
 
-                {/* Header: link context + close */}
-                <div className="flex items-center gap-3 px-5 pt-2 pb-3 border-b border-border-subtle">
+                    {/* Header: link context + close */}
+                    <div className="flex items-center gap-3 px-5 pt-2 pb-3 border-b border-border-subtle">
                     <p className="flex-1 text-sm font-semibold text-text truncate" title={link.title}>
                         {link.title}
                     </p>
@@ -165,6 +173,7 @@ export default function CardActionSheet({
                     >
                         <X className="w-5 h-5" />
                     </IconButton>
+                    </div>
                 </div>
 
                 {/* Action rows */}

@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from './types';
 import type { AnalyzingState } from '@/components/AnalyzingBanner';
-import { progressFor } from './shareProgress';
+import { progressFor, CEILING } from './shareProgress';
+import { lastShareHandoff } from './shareConfig';
 
 /**
  * Drives the app-level "Analyzing…" banner for captures shared from OTHER apps
@@ -102,14 +103,26 @@ export function useProcessingBanner(links: Link[]): AnalyzingState | null {
     const clock = now || Date.now();
     // Prefer the shared start clock stamped on the card (processingStartedAt, then
     // createdAt); only fall back to first-seen when a card carries neither.
-    const startMs =
+    const cardStartMs =
         toMs(newest.processingStartedAt) ??
         toMs(newest.createdAt) ??
         firstSeen.current.get(newest.id) ??
         clock;
+    // CONTINUITY ACROSS PROCESSES: the extension anchors its HUD at capture
+    // start, but the card's processingStartedAt is stamped when the server
+    // receives the upload — seconds LATER. Anchoring here at the card's stamp
+    // made the in-app banner restart near 0 after the extension showed a high
+    // number (owner-reported, 2026-07-13). If a Share-Extension hand-off from
+    // the same capture era exists, anchor at the EARLIER of the two clocks and
+    // never display less than the % the extension already showed (capped at the
+    // curve ceiling so a legacy "100" hint can't fake completion).
+    const handoff = lastShareHandoff();
+    const matching = handoff && Math.abs(handoff.startMs - cardStartMs) < 10 * 60_000 ? handoff : null;
+    const startMs = matching ? Math.min(cardStartMs, matching.startMs) : cardStartMs;
+    const handoffFloor = matching?.pct !== undefined ? Math.min(matching.pct, CEILING) : 0;
     const elapsed = Math.max(0, clock - startMs);
     // Non-decreasing: clamp to the highest % shown so far this capture.
-    const progress = Math.max(progressFor(elapsed), lastPct.current);
+    const progress = Math.max(progressFor(elapsed), handoffFloor, lastPct.current);
     lastPct.current = progress;
 
     const kind: AnalyzingState['kind'] =

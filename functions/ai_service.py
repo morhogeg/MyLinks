@@ -154,6 +154,32 @@ IMPORTANT: You are analyzing an **actual YouTube video that you can watch** (its
 """
 
 
+def collect_notes_text(data: dict) -> str:
+    """All of the user's personal notes on a card, joined into one string.
+
+    Reconciles the two note shapes so both feed embedding, lexical search, and
+    RAG grounding through ONE recipe (mirrors the client's lib/notes.getNotes):
+      - Legacy: a single ``userNote`` string (cards saved before multi-note).
+      - Current: a ``userNotes`` array of ``{id, text, createdAt}`` notes.
+    Cards normally carry EITHER shape (a client edit migrates the string into
+    the array and clears it), but merging both is harmless if they ever coexist.
+
+    Lives here (not in search.py) because search.py imports ai_service, so this
+    is the shared, non-circular home both sides can import.
+    """
+    data = data or {}
+    parts = []
+    legacy = (data.get("userNote") or "").strip()
+    if legacy:
+        parts.append(legacy)
+    for n in (data.get("userNotes") or []):
+        if isinstance(n, dict):
+            t = (n.get("text") or "").strip()
+            if t:
+                parts.append(t)
+    return "\n".join(parts)
+
+
 def _rag_source_label(c: dict) -> str:
     """Publisher name for the card — explicit sourceName, else the URL's
     host. Lets the model answer questions that name the source (e.g.
@@ -179,9 +205,10 @@ def _rag_card_block(c: dict) -> str:
         f"[{c.get('id')}] {c.get('title', 'Untitled')} "
         f"({'; '.join(meta)})\n{c.get('summary', '')}"
     )
-    # The user's OWN note on the card — their words, distinct from the machine
+    # The user's OWN notes on the card — their words, distinct from the machine
     # summary. Surfaced to the model so it can answer "what did I think about…".
-    note = (c.get("userNote") or "").strip()
+    # Merges the legacy string + the multi-note array via the shared reader.
+    note = collect_notes_text(c).strip()
     if note:
         block += f"\nMy note: {note}"
     return block

@@ -8,6 +8,7 @@ import { createCollection, updateCollection } from '@/lib/collections';
 import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { useScrollLock } from '@/lib/useScrollLock';
+import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 
 /** Pick a random palette key — used so users never have to choose a color. */
 function randomColorKey(): string {
@@ -79,6 +80,10 @@ export default function CollectionFormModal({
     // Ref-counted so closing this overlay never unlocks a still-open parent (F-16).
     useScrollLock(isOpen);
 
+    // Bottom sheet on mobile, centered modal on desktop — drag only on mobile.
+    const isMobile = useIsMobile();
+    const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose, enabled: isMobile });
+
     if (!isOpen) return null;
 
     const handleSave = async () => {
@@ -115,30 +120,34 @@ export default function CollectionFormModal({
             className="fixed inset-x-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
             style={{ top: vp.offsetTop || 0, height: vp.height || '100%', bottom: 'auto' }}
         >
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div ref={scrimRef} className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
             <div
+                ref={sheetRef}
                 role="dialog"
                 aria-modal="true"
                 aria-label={isEdit ? 'Edit collection' : 'New collection'}
                 className="relative w-full sm:max-w-md max-h-full overflow-y-auto bg-card border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up sm:animate-scale-up safe-pb"
             >
-                <div className="sm:hidden flex justify-center pt-3 pb-1">
-                    <div className="h-1.5 w-10 rounded-full bg-fill-strong" />
-                </div>
+                {/* Grab handle + header: the drag-to-dismiss zone on mobile. */}
+                <div {...handleProps}>
+                    <div className="sm:hidden flex justify-center pt-3 pb-1">
+                        <div className="h-1.5 w-10 rounded-full bg-fill-strong" />
+                    </div>
 
-                <div className="flex items-center gap-3 px-5 pt-3 pb-4 border-b border-border-subtle">
-                    <Layers className="w-5 h-5 text-accent" />
-                    <h3 className="flex-1 text-lg font-bold text-text">
-                        {isEdit ? 'Edit collection' : 'New collection'}
-                    </h3>
-                    <button
-                        onClick={onClose}
-                        aria-label="Close"
-                        className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-3 px-5 pt-3 pb-4 border-b border-border-subtle">
+                        <Layers className="w-5 h-5 text-accent" />
+                        <h3 className="flex-1 text-lg font-bold text-text">
+                            {isEdit ? 'Edit collection' : 'New collection'}
+                        </h3>
+                        <button
+                            onClick={onClose}
+                            aria-label="Close"
+                            className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="p-5 space-y-4">

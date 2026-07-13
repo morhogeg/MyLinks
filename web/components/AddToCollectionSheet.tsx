@@ -13,6 +13,7 @@ import { rankCollectionsForLink } from '@/lib/collectionSuggest';
 import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { useScrollLock } from '@/lib/useScrollLock';
+import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 
 interface AddToCollectionSheetProps {
     uid: string | null;
@@ -66,6 +67,10 @@ export default function AddToCollectionSheet({
 
     // Ref-counted so closing this overlay never unlocks a still-open parent (F-16).
     useScrollLock(isOpen);
+
+    // Bottom sheet on mobile, centered modal on desktop — drag only on mobile.
+    const isMobile = useIsMobile();
+    const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose, enabled: isMobile });
 
     // Reset transient state whenever the sheet reopens.
     useEffect(() => {
@@ -128,30 +133,34 @@ export default function AddToCollectionSheet({
             className="fixed inset-x-0 z-[95] flex items-end sm:items-center justify-center animate-fade-in"
             style={{ top: vp.offsetTop || 0, height: vp.height || '100%', bottom: 'auto' }}
         >
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div ref={scrimRef} className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
             <div
+                ref={sheetRef}
                 role="dialog"
                 aria-modal="true"
                 aria-label="Add to collection"
                 className="relative w-full sm:max-w-sm bg-card border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up overflow-hidden safe-pb max-h-full sm:max-h-[80vh] flex flex-col"
             >
-                {/* Grab handle (mobile) */}
-                <div className="sm:hidden flex justify-center pt-3 pb-1">
-                    <div className="h-1.5 w-10 rounded-full bg-fill-strong" />
-                </div>
+                {/* Grab handle + header: the drag-to-dismiss zone on mobile. */}
+                <div {...handleProps}>
+                    {/* Grab handle (mobile) */}
+                    <div className="sm:hidden flex justify-center pt-3 pb-1">
+                        <div className="h-1.5 w-10 rounded-full bg-fill-strong" />
+                    </div>
 
-                {/* Header */}
-                <div className="flex items-center gap-3 px-5 pt-2 pb-3 border-b border-border-subtle">
-                    <Layers className="w-4 h-4 text-accent shrink-0" />
-                    <p className="flex-1 text-sm font-semibold text-text truncate">Add to collection</p>
-                    <button
-                        onClick={onClose}
-                        aria-label="Close"
-                        className="p-2 -me-2 rounded-full text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
+                    {/* Header */}
+                    <div className="flex items-center gap-3 px-5 pt-2 pb-3 border-b border-border-subtle">
+                        <Layers className="w-4 h-4 text-accent shrink-0" />
+                        <p className="flex-1 text-sm font-semibold text-text truncate">Add to collection</p>
+                        <button
+                            onClick={onClose}
+                            aria-label="Close"
+                            className="p-2 -me-2 rounded-full text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Collection rows */}

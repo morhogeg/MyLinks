@@ -617,7 +617,46 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-12 (latest) — App-polish sprint, 10 owner fixes + extras (branch
+- **2026-07-13 (latest) — Polish round 2: owner feedback on build 1075 (branch
+  `claude/app-polish-multi-agent-0gqmaf`, multi-agent session).** (1) **Home
+  header REVERTED** to the pre-redesign layout (owner: "the top chips design
+  is terrible") — `MobileCategoriesTagsSheet` restored, `MobileFiltersSheet`
+  un-folded; the collections/digest *navigation* from round 1 (detail places,
+  back button + edge swipe to gallery/list) is KEPT. A mockup of modest size
+  tweaks (smaller filter row, soft-accent Ask chip) awaits owner approval
+  before building (claude.ai artifact "header-mockup"). (2) **Multiple notes
+  per card** (`Link.userNotes[]`; legacy `userNote` merged via
+  `web/lib/notes.ts` and migrated on first edit; editor is a newest-first
+  list; closed cards show newest snippet + "+N"; ALL notes searchable
+  client-side; backend `collect_notes_text` feeds embeddings —
+  **`EMBED_TEXT_VERSION` 3→4** — lexical search and RAG blocks; 170 pytest).
+  (3) Closed-card note restyle: vertical accent bar removed, StickyNote glyph
+  leads the snippet inline. (4) Collection header: count inline with title
+  ("Name · 12 cards"), standalone count line removed. (5) Share wording
+  calmed: "Publish public page"→"Create share link", "Update page"→"Update
+  link". (6) **Drag-to-dismiss on all bottom sheets** (`web/lib/useSheetDrag.ts`;
+  7 sheets wired: filters, card actions, add-to-collection, share, manage
+  cards, collection form, tag input; drag routes through the same onClose as
+  the X so dirty-guards hold). (7) Ask: chips are now ALL count-free (client
+  counts never match RAG retrieval — the "13 vs 8" bug class is eliminated),
+  copy tightened. (8) **Edge-swipe layering fixed**: only the top-most surface
+  handles the swipe (a cited card opened over Ask closes back to the chat,
+  not home; AskBrain gates on Feed's `anyOverlayOpen`). (9) **Share hotfixes
+  from owner device testing:** re-sharing an already-saved URL is deduped
+  server-side (200 + `duplicate:true`, NO new card) but the extension showed
+  a plain "Saved ✓" and the app floated a phantom ~20% loader — the extension
+  now says "Already in your library" and clears the App-Group hint (that was
+  the "Instagram won't save" report: the card was already in the library; to
+  re-test the handle, delete the card first — and the handle only appears
+  after the backend deploy). Also killed the structural 100→20% dip: the
+  extension no longer snaps to 100 on queue-ack (green check + "Saved —
+  Machina is reading it…" over the shared-curve %), and `useProcessingBanner`
+  anchors at the earlier of the extension clock vs `processingStartedAt`,
+  floored at the handed-off % (`lastShareHandoff()` in `shareConfig.ts`).
+  Verified: tsc clean, eslint 0 errors/5 warnings, 170/170 pytest. **Backend
+  owner deploy still pending and now also carries the notes/EMBED-v4 changes
+  — same command as the 2026-07-12 entry, then `backfill_embeddings` once.**
+- **2026-07-12 — App-polish sprint, 10 owner fixes + extras (branch
   `claude/app-polish-multi-agent-0gqmaf`; multi-agent session, every slice
   reviewed + re-verified after merge).** (1) **Share→app loader continuity:**
   progress is now a deterministic curve over elapsed time since capture start

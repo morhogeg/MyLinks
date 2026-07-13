@@ -26,6 +26,7 @@ import { isPending, getTimestampNumber } from '@/lib/feedUtils';
 import FeedSkeleton from './feed/FeedSkeleton';
 import PullRefreshSpinner from './feed/PullRefreshSpinner';
 import MobileFiltersSheet from './feed/MobileFiltersSheet';
+import MobileCategoriesTagsSheet from './feed/MobileCategoriesTagsSheet';
 import MobileTagExplorerDrawer from './feed/MobileTagExplorerDrawer';
 import Card from './Card';
 import ListCard from './ListCard';
@@ -41,7 +42,7 @@ import CollectionsGallery from './CollectionsGallery';
 import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, ArrowRight, Share2, Globe, Plus, Pencil, Newspaper, Sparkles } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, Share2, Globe, Plus, Pencil, Newspaper, Sparkles } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
@@ -109,7 +110,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         handleUpdateCategory,
         handleUpdateTitle,
         handleUpdateSummary,
-        handleUpdateNote,
+        handleUpdateNotes,
         handleRetryProcessing,
         handleRemoveFromCollection,
         handleShareCard,
@@ -164,6 +165,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const [isSourcesOpen, setIsSourcesOpen] = useState(false);
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+    const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
     // Mobile: the search bar is collapsed to an icon; tapping it expands a large
     // search field in place, so the card grid gets the vertical space back.
     const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
@@ -373,7 +375,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // full-screen mode (Ask/Collections) or any overlay/sheet owns the screen so
     // the gesture never fights a modal's own scrolling.
     const anyOverlayOpen =
-        activeLinkId !== null || isTagExplorerOpen || isFiltersOpen ||
+        activeLinkId !== null || isTagExplorerOpen || isFiltersOpen || isCategoriesOpen ||
         reminderModalLink !== null || confirmDeleteId !== null || confirmBulkDelete ||
         addToCollectionLink !== null || collectionFormOpen || confirmDeleteCollection !== null ||
         manageCardsCollection !== null || shareCollection !== null;
@@ -776,12 +778,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const isLibraryView = viewMode === 'grid' || viewMode === 'list' || viewMode === 'review';
     // When scoped to exactly one collection, cards offer a quick "remove from it".
     const activeCollectionId = selectedCollections.size === 1 ? Array.from(selectedCollections)[0] : undefined;
-    // Everything tucked behind the single mobile "Filter" affordance (Task C):
-    // status, categories, tags, and sources. Collections are their own place now,
-    // so they no longer count as a filter here. This count badges the button and
-    // drives the sheet's "Clear all".
-    const activeFilterCount =
-        (filter !== 'all' ? 1 : 0) + selectedCategory.size + selectedTags.size + selectedSources.size;
+    // Count of active grid filters — badges the mobile "Filters" button.
+    const activeMobileFilters =
+        (filter !== 'all' ? 1 : 0) + selectedSources.size + selectedTags.size + selectedCollections.size;
 
     // The Digest section's scrollable history — the weekly synthesis rides on
     // top, then every curated digest, newest first. Built once and rendered in
@@ -838,19 +837,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 <div className="mb-5">
                     <div className="flex items-center gap-2.5">
                         <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: colStyle.color }} />
-                        <h1 className="text-[22px] sm:text-[26px] font-extrabold tracking-tight text-text truncate">{openCol.name}</h1>
+                        <h1 className="min-w-0 truncate text-[22px] sm:text-[26px] font-extrabold tracking-tight text-text">{openCol.name}</h1>
+                        <span className="shrink-0 whitespace-nowrap text-[13px] sm:text-[14px] font-medium text-text-muted tabular-nums">· {count} {count === 1 ? 'card' : 'cards'}</span>
+                        {openCol.isPublic && (
+                            <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide ${stale ? 'bg-amber-500/15 text-amber-600' : 'bg-accent/10 text-accent'}`}>
+                                <Globe className="w-3 h-3" /> {stale ? 'Update link' : 'Shared'}
+                            </span>
+                        )}
                     </div>
                     {openCol.description && (
                         <p className="mt-1.5 text-[14px] leading-relaxed text-text-secondary max-w-2xl">{openCol.description}</p>
                     )}
-                    <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[13px] font-medium text-text-muted">
-                        <span className="inline-flex items-center gap-1.5"><Layers className="w-3.5 h-3.5" />{count} {count === 1 ? 'card' : 'cards'}</span>
-                        {openCol.isPublic && (
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide ${stale ? 'bg-amber-500/15 text-amber-600' : 'bg-accent/10 text-accent'}`}>
-                                <Globe className="w-3 h-3" /> {stale ? 'Update page' : 'Shared'}
-                            </span>
-                        )}
-                    </div>
                     <div className="mt-4 flex flex-wrap items-center gap-2">
                         <button
                             onClick={() => handleShareCollection(openCol)}
@@ -1138,53 +1135,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
                 </>)}
 
-                {/* ── Mobile home controls (Task C) ──────────────────────────────
-                    One coherent command surface: Ask is the hero, the three browse
-                    destinations (Feed / Collections / Digest) sit beneath it as one
-                    system, and every filter tucks behind a single "Filter" button.
-                    Desktop keeps its own inline toolbar (below, sm:flex). */}
+                {/* Mobile: one tidy line — Categories & Tags · Filters/Sort · Search.
+                    The big search bar is gone (desktop-only above); tapping the search
+                    icon expands a large field right here, so the grid keeps the space. */}
                 {isLibraryView && (
-                <div className="sm:hidden space-y-2.5">
-                    {/* Ask hero + primary nav, wrapped as one unit so the four
-                        destinations read as a single system with Ask elevated. */}
-                    <div className="rounded-2xl border border-border-subtle bg-card overflow-hidden shadow-[var(--shadow-card)]">
-                        <button
-                            data-tour="ask"
-                            onClick={() => setViewMode('ask')}
-                            className="group w-full flex items-center gap-3 px-4 py-3 text-left bg-accent/[0.06] active:bg-accent/10 transition-colors"
-                            style={{ transitionTimingFunction: 'var(--ease-spring)' }}
-                        >
-                            <span className="w-9 h-9 shrink-0 rounded-xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-md shadow-accent/25">
-                                <Sparkles className="w-[18px] h-[18px] text-white" />
-                            </span>
-                            <span className="flex-1 min-w-0">
-                                <span className="block text-[15px] font-bold text-text leading-tight">Ask your library</span>
-                                <span className="block text-[12px] text-text-muted leading-tight mt-0.5">Answers from everything you’ve saved</span>
-                            </span>
-                            <ArrowRight className="w-4 h-4 text-text-muted group-active:translate-x-0.5 transition-transform shrink-0" />
-                        </button>
-                        <div className="grid grid-cols-3 border-t border-border-subtle divide-x divide-border-subtle">
-                            <NavTab active label="Feed" icon={<LayoutGrid className="w-[18px] h-[18px]" />} onClick={() => { /* already home */ }} />
-                            <NavTab
-                                dataTour="collections"
-                                label="Collections"
-                                icon={<Layers className="w-[18px] h-[18px]" />}
-                                count={collections.length}
-                                onClick={() => setViewMode('collections')}
-                            />
-                            <NavTab
-                                label="Digest"
-                                icon={<Newspaper className="w-[18px] h-[18px]" />}
-                                count={digests.length}
-                                onClick={() => setViewMode('digest')}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Library tools — one Filter affordance, the view switcher, search,
-                        and multi-select. Search expands in place over this row. */}
-                    {mobileSearchOpen ? (
-                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                    mobileSearchOpen ? (
+                        <div className="flex sm:hidden items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
                             <div className="relative flex-1 min-w-0">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
                                 <input
@@ -1214,69 +1170,68 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             </button>
                         </div>
                     ) : (
-                        <div className="flex items-center gap-2">
-                            {/* The single, well-labelled filter affordance. */}
+                    <div className="flex sm:hidden items-center gap-2">
+                        {selectedCollections.size === 0 && (
                             <button
-                                onClick={() => setIsFiltersOpen(true)}
-                                aria-label="Filter and sort"
-                                className={`${ctrlBase} flex-1 min-w-0 justify-center px-3.5 gap-2 ${activeFilterCount > 0
+                                onClick={() => setIsCategoriesOpen(true)}
+                                aria-label="Filter by categories and tags"
+                                className={`${ctrlBase} flex-1 min-w-0 justify-between px-3.5 ${(selectedCategory.size + selectedTags.size) > 0
                                     ? 'bg-accent text-white border border-accent shadow-sm'
                                     : ctrlIdle
                                     }`}
                             >
-                                <Filter className="w-4 h-4 shrink-0" />
-                                <span className="truncate">{activeFilterCount > 0 ? `Filtered · ${activeFilterCount}` : 'Filter'}</span>
+                                <span className="inline-flex items-center gap-2 min-w-0">
+                                    <Tags className="w-4 h-4 shrink-0" />
+                                    <span className="truncate">
+                                        {(selectedCategory.size + selectedTags.size) === 0
+                                            ? 'Categories & Tags'
+                                            : `${selectedCategory.size + selectedTags.size} selected`}
+                                    </span>
+                                </span>
+                                <ChevronDown className="w-4 h-4 opacity-60 shrink-0" />
                             </button>
-                            {/* View switcher — icon-only pills. */}
-                            <div data-tour="views" className="inline-flex items-center gap-0.5 p-1 rounded-full bg-card border border-border-subtle shrink-0">
-                                {viewModes.map(vm => {
-                                    const active = viewMode === vm.key;
-                                    return (
-                                        <button
-                                            key={vm.key}
-                                            onClick={() => setViewMode(vm.key)}
-                                            aria-pressed={active}
-                                            aria-label={vm.hint}
-                                            className={`h-7 w-7 inline-flex items-center justify-center rounded-full cursor-pointer transition-colors ${active
-                                                ? 'bg-accent text-white shadow-sm'
-                                                : 'text-text-muted hover:text-text hover:bg-card-hover'}`}
-                                        >
-                                            {vm.icon}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                            {/* Search — expands in place. */}
-                            <button
-                                data-tour="search"
-                                onClick={() => setMobileSearchOpen(true)}
-                                aria-label="Search"
-                                className={`${ctrlBase} shrink-0 w-9 px-0 ${searchQuery
-                                    ? 'bg-accent text-white border border-accent shadow-sm'
-                                    : ctrlIdle}`}
-                            >
-                                <Search className="w-4 h-4" />
-                            </button>
-                            {/* Multi-select. */}
-                            {!isSelectionMode && (
-                                <button
-                                    onClick={() => setIsSelectionMode(true)}
-                                    aria-label="Select multiple"
-                                    className={`${ctrlBase} shrink-0 w-9 px-0 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
-                                >
-                                    <CheckSquare className="w-4 h-4" />
-                                </button>
+                        )}
+                        {/* When scoped to a collection the category button is hidden — keep
+                            the remaining controls pinned to the trailing edge. */}
+                        {selectedCollections.size > 0 && <span className="flex-1" />}
+                        {/* Filters + sort live in the same sheet, so the button just shows
+                            both icons (no label) — keeping it compact so the category
+                            selector can take the rest of the row. */}
+                        <button
+                            onClick={() => setIsFiltersOpen(true)}
+                            aria-label="Filters and sort"
+                            className={`${ctrlBase} shrink-0 px-3 gap-1.5 ${activeMobileFilters > 0
+                                ? 'bg-accent text-white border border-accent shadow-sm'
+                                : ctrlIdle
+                                }`}
+                        >
+                            <Filter className="w-4 h-4" />
+                            <ArrowUpDown className="w-4 h-4" />
+                            {activeMobileFilters > 0 && (
+                                <span className="text-xs font-bold tabular-nums">{activeMobileFilters}</span>
                             )}
-                        </div>
-                    )}
-                </div>
+                        </button>
+                        {/* Search — icon only; expands into a large field in place. Reads
+                            accent when a query is active so it's clear a search is on. */}
+                        <button
+                            data-tour="search"
+                            onClick={() => setMobileSearchOpen(true)}
+                            aria-label="Search"
+                            className={`${ctrlBase} shrink-0 w-9 px-0 ${searchQuery
+                                ? 'bg-accent text-white border border-accent shadow-sm'
+                                : ctrlIdle
+                                }`}
+                        >
+                            <Search className="w-4 h-4" />
+                        </button>
+                    </div>
+                    )
                 )}
 
-                {/* Row 2: Toolbar (desktop/tablet only) — filter / sort / source on the
-                    left, view & actions on the right. On mobile these controls live in
-                    the command surface above (Task C). Card-browsing layouts only. */}
+                {/* Row 2: Toolbar — filter / sort / source on the left, view & actions on the
+                    right. Card-browsing layouts only; Ask and Collections hide it. */}
                 {isLibraryView && (
-                <div className="hidden sm:flex flex-wrap items-center justify-between gap-y-3 gap-x-2 -mx-2 px-2 sm:mx-0 sm:px-0">
+                <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-2 -mx-2 px-2 sm:mx-0 sm:px-0">
                     {/* Grid filters — inline on desktop/tablet; on mobile they move into the
                         Filters sheet. Hidden entirely in Ask mode (no grid to filter). */}
                     <div className="hidden sm:flex items-center gap-2">
@@ -1687,9 +1642,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 </aside>
                 )}
 
-                {/* Filters Sheet (Mobile) — the single "Filter" affordance behind the
-                    home toolbar: categories, tags, status, sort, and sources all in
-                    one place (Task C). Desktop is untouched. */}
+                {/* Filters Sheet (Mobile) — consolidates the grid controls behind one tap,
+                    keeping the mobile toolbar to a single tidy row. Desktop is untouched. */}
                 <MobileFiltersSheet
                     isOpen={isFiltersOpen}
                     onClose={() => setIsFiltersOpen(false)}
@@ -1705,8 +1659,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     setSelectedSources={setSelectedSources}
                     onToggleSource={handleToggleSource}
                     onToggleSourceKeys={handleToggleSourceKeys}
-                    activeMobileFilters={activeFilterCount}
+                    activeMobileFilters={activeMobileFilters}
                     setSelectedTags={setSelectedTags}
+                />
+
+                {/* Categories & Tags Sheet (Mobile) — categories and the full tag
+                    tree live together here, one tap from the home toolbar, so tags
+                    aren't buried inside the Filters sheet. */}
+                <MobileCategoriesTagsSheet
+                    isOpen={isCategoriesOpen}
+                    onClose={() => setIsCategoriesOpen(false)}
                     categories={categories}
                     selectedCategory={selectedCategory}
                     setSelectedCategory={setSelectedCategory}
@@ -1714,6 +1676,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     allTags={allTags}
                     tagCounts={tagCounts}
                     selectedTags={selectedTags}
+                    setSelectedTags={setSelectedTags}
                     onToggleTag={handleToggleTag}
                 />
 
@@ -1813,6 +1776,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             totalLinks={links.length}
                             onOpenLink={(id) => setActiveLinkId(id)}
                             onExit={() => setViewMode(lastLayout.current)}
+                            // A cited-card modal (or any Feed sheet/dialog) open over
+                            // Ask owns the edge-swipe; Ask stands down so one swipe
+                            // pops only the modal, back to the chat — not out to home.
+                            overlayOpen={anyOverlayOpen}
                             links={links}
                         />
                     ) : filteredLinks.length === 0 && pendingCards.length === 0 ? (
@@ -2059,7 +2026,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     onUpdateCategory={handleUpdateCategory}
                     onUpdateTitle={handleUpdateTitle}
                     onUpdateSummary={handleUpdateSummary}
-                    onUpdateNote={handleUpdateNote}
+                    onUpdateNotes={handleUpdateNotes}
                     onUpdateReminder={handleOpenReminderModal}
                     onDelete={handleDelete}
                     onOpenOtherLink={openRelatedLink}
@@ -2171,42 +2138,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 variant="danger"
             />
         </div>
-    );
-}
-
-/**
- * One destination in the mobile primary-nav strip (Task C). Feed is shown active
- * because it's the home surface; Collections / Digest read as its peers, each
- * with a live count so the strip doubles as a glance at what's inside.
- */
-function NavTab({ label, icon, active = false, count, onClick, dataTour }: {
-    label: string;
-    icon: React.ReactNode;
-    active?: boolean;
-    count?: number;
-    onClick: () => void;
-    dataTour?: string;
-}) {
-    return (
-        <button
-            data-tour={dataTour}
-            onClick={onClick}
-            aria-current={active ? 'page' : undefined}
-            className={`relative flex flex-col items-center justify-center gap-1 py-2.5 min-h-[56px] transition-colors ${active
-                ? 'text-accent'
-                : 'text-text-secondary active:bg-card-hover'}`}
-        >
-            <span className="relative">
-                {icon}
-                {count !== undefined && count > 0 && (
-                    <span className="absolute -top-1.5 -end-2.5 flex items-center justify-center min-w-[15px] h-[15px] px-1 rounded-full text-[9px] font-bold bg-accent/15 text-accent tabular-nums">
-                        {count}
-                    </span>
-                )}
-            </span>
-            <span className="text-[11px] font-bold tracking-tight">{label}</span>
-            {active && <span className="absolute bottom-0 inset-x-4 h-0.5 rounded-full bg-accent" />}
-        </button>
     );
 }
 

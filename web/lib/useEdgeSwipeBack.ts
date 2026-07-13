@@ -37,6 +37,15 @@ function startsInHorizontalGestureRegion(target: EventTarget | null): boolean {
  * Kept deliberately simple: a flick past the threshold triggers, with no
  * interactive drag-follow. Horizontal travel must dominate vertical so it never
  * competes with scrolling.
+ *
+ * Layering rule (IMPORTANT): every enabled instance attaches its own listeners
+ * to `document`, so there is NO stacking or priority coordination — a single
+ * edge swipe fires the `onBack` of EVERY currently-enabled instance at once. So
+ * when surfaces stack (a modal over Ask, a drawer over the feed), the caller
+ * MUST keep exactly one instance enabled: the top-most surface registers its own
+ * and the surfaces beneath it pass `enabled: false` while it's open. Otherwise
+ * the swipe pops several layers together (the bug where opening a cited card
+ * from Ask and swiping back closed the modal AND exited Ask to the home screen).
  */
 export function useEdgeSwipeBack(onBack: () => void, enabled = true) {
     useEffect(() => {

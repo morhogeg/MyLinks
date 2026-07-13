@@ -160,6 +160,12 @@ interface AskBrainProps {
     onOpenLink: (id: string) => void;
     /** Leave Ask mode (mobile shows a back button; desktop exits via the toolbar). */
     onExit?: () => void;
+    /** True while a Feed-owned overlay (the cited-card LinkDetailModal, a sheet,
+     *  a confirm dialog) is open ON TOP of Ask. That surface owns the edge-swipe
+     *  back gesture and registers its own handler, so Ask must stand down —
+     *  otherwise the single swipe fires both and pops Ask out to the home screen
+     *  underneath the closing modal. See useEdgeSwipeBack's layering rule. */
+    overlayOpen?: boolean;
     /** The live library (Feed's Firestore snapshot) — powers suggestions that
      *  react the moment a new card lands. */
     links: Link[];
@@ -167,7 +173,7 @@ interface AskBrainProps {
 
 const HISTORY_COLLAPSE_KEY = 'askbrain:histcollapsed';
 
-export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }: AskBrainProps) {
+export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayOpen = false, links }: AskBrainProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
@@ -271,10 +277,18 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, links }:
 
     // Swipe in from the left edge to go back — closes the history drawer first if
     // it's open, otherwise leaves Ask mode (matching the iOS pop gesture).
+    //
+    // Only fires when Ask is the top-most surface. When a stacked surface is open
+    // above the chat it owns the back gesture and Ask stands down (see the
+    // layering rule in useEdgeSwipeBack): a Feed-owned overlay (`overlayOpen` —
+    // the cited-card modal / sheets, which register their own edge-swipe) or Ask's
+    // own delete-confirm dialog. The history drawer stays handled here (it has no
+    // handler of its own), so the swipe closes it rather than exiting Ask.
+    const askEdgeSwipeEnabled = isMobile && !overlayOpen && chatToDelete === null;
     useEdgeSwipeBack(() => {
         if (historyOpen) setHistoryOpen(false);
         else onExit?.();
-    }, isMobile);
+    }, askEdgeSwipeEnabled);
 
     // Drive the mobile surface height from the visual viewport with *direct DOM
     // writes* (no React re-render) so it tracks the keyboard frame-for-frame

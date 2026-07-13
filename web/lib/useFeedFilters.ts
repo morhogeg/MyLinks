@@ -3,6 +3,7 @@ import { Link } from '@/lib/types';
 import { getSourceInfo, buildSourceFacets, sourceMatchesQuery } from '@/lib/source';
 import { PLATFORM_LABELS, prettyHost, type PlatformKey } from '@/lib/platform';
 import { isPending, getTimestampNumber } from '@/lib/feedUtils';
+import { noteMatchesQuery } from '@/lib/notes';
 
 export type FilterType = 'all' | 'unread' | 'read' | 'archived' | 'favorite' | 'reminders';
 export type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
@@ -83,9 +84,10 @@ export function useFeedFilters(links: Link[], debouncedQuery: string, searchResu
             return (
                 link.title.toLowerCase().includes(query) ||
                 link.summary.toLowerCase().includes(query) ||
-                // Your own note is searchable — recall a card by what you wrote
-                // about it, not only by the AI summary.
-                (!!link.userNote && link.userNote.toLowerCase().includes(query)) ||
+                // Your own notes are searchable — recall a card by what you wrote
+                // about it, not only by the AI summary. Matches ALL notes (legacy
+                // string + the multi-note array), via the shared reader.
+                noteMatchesQuery(link, query) ||
                 link.tags.some((tag) => tag.toLowerCase().includes(query)) ||
                 link.category.toLowerCase().includes(query) ||
                 // Source label + platform aliases, so "twitter"/"x" finds every X
