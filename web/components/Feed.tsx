@@ -1158,18 +1158,18 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     disabled={selectedIds.size === 0}
                                     title="Archive selected"
                                     aria-label="Archive selected"
-                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="h-[26px] w-[26px] inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                 >
-                                    <Archive className="w-4 h-4" />
+                                    <Archive className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                     onClick={() => setConfirmBulkDelete(true)}
                                     disabled={selectedIds.size === 0}
                                     title="Delete selected"
                                     aria-label="Delete selected"
-                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-red-500 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="h-[26px] w-[26px] inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-red-500 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                 >
-                                    <Trash2 className="w-4 h-4" />
+                                    <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                     onClick={() => {
@@ -1178,9 +1178,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     }}
                                     title="Cancel selection"
                                     aria-label="Cancel selection"
-                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-card-hover hover:text-text transition-colors"
+                                    className="h-[26px] w-[26px] inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-card-hover hover:text-text transition-colors"
                                 >
-                                    <X className="w-4 h-4" />
+                                    <X className="w-3.5 h-3.5" />
                                 </button>
                             </div>
                         </div>
@@ -1286,7 +1286,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                         title={vm.hint}
                                         aria-pressed={active}
                                         aria-label={vm.hint}
-                                        className={`h-[26px] w-[26px] inline-flex items-center justify-center rounded-full cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${active
+                                        className={`h-[26px] w-[26px] inline-flex items-center justify-center rounded-full cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 [&>svg]:w-3.5 [&>svg]:h-3.5 ${active
                                             ? 'bg-accent text-white shadow-sm'
                                             : 'text-text-muted hover:text-text hover:bg-card-hover'
                                             }`}
