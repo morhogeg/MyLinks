@@ -54,6 +54,10 @@
       "destination": "https://secondbrain-app-94da2.web.app/api/claim-workspace"
     },
     {
+      "source": "/api/search",
+      "destination": "https://secondbrain-app-94da2.web.app/api/search"
+    },
+    {
       "source": "/api/delete-account",
       "destination": "https://secondbrain-app-94da2.web.app/api/delete-account"
     },
