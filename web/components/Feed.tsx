@@ -164,6 +164,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const [isSourcesOpen, setIsSourcesOpen] = useState(false);
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+    const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
     // Mobile: the search bar is collapsed to an icon; tapping it expands a large
     // search field in place, so the card grid gets the vertical space back.
     const [isTagExplorerCollapsed, setIsTagExplorerCollapsed] = useState(false);
@@ -1177,50 +1178,71 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 </button>
                             </div>
                         </div>
-                    ) : (
-                    <div className="flex sm:hidden items-center gap-2">
-                        {/* Search — a real field, always visible. Filters (categories,
-                            tags, status, sort, sources) live behind the funnel inside
-                            the field, with one count badge for everything active. */}
-                        <div className="relative flex-1 min-w-0">
-                            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
-                            <input
-                                data-tour="search"
-                                type="text"
-                                enterKeyHint="search"
-                                dir="auto"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Search"
-                                className={`w-full h-10 ps-9 bg-card border border-border-subtle rounded-full text-[15px] text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-transparent transition-shadow ${searchQuery ? 'pe-[4.5rem]' : 'pe-10'}`}
-                            />
-                            <div className="absolute end-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                    ) : mobileSearchOpen ? (
+                        <div className="flex sm:hidden items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="relative flex-1 min-w-0">
+                                <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    enterKeyHint="search"
+                                    dir="auto"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Escape') setMobileSearchOpen(false); }}
+                                    placeholder="Search Machina…"
+                                    className="w-full h-10 ps-9 pe-9 bg-card border border-border-subtle rounded-full text-[15px] text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-transparent transition-shadow"
+                                />
                                 {searchQuery && (
                                     <button
                                         onClick={() => setSearchQuery('')}
                                         aria-label="Clear search"
-                                        className="h-7 w-7 inline-flex items-center justify-center rounded-full text-text-muted hover:text-text hover:bg-fill-strong transition-colors"
+                                        className="absolute end-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-fill-strong transition-colors"
                                     >
-                                        <X className="w-3.5 h-3.5" />
+                                        <X className="w-4 h-4" />
                                     </button>
                                 )}
-                                <button
-                                    onClick={() => setIsFiltersOpen(true)}
-                                    aria-label="Filters — categories, tags, status, sort, sources"
-                                    className={`relative h-7 w-7 inline-flex items-center justify-center rounded-full transition-colors cursor-pointer ${activeMobileFilters > 0
-                                        ? 'bg-accent text-white shadow-sm'
-                                        : 'text-text-muted hover:text-text hover:bg-fill-strong'
-                                        }`}
-                                >
-                                    <Filter className="w-3.5 h-3.5" />
-                                    {activeMobileFilters > 0 && (
-                                        <span className="absolute -top-1 -end-1 flex items-center justify-center min-w-[15px] h-[15px] px-0.5 rounded-full text-[9px] font-bold tabular-nums bg-white text-accent border border-background shadow-sm">
-                                            {activeMobileFilters}
-                                        </span>
-                                    )}
-                                </button>
                             </div>
+                            <button
+                                onClick={() => setMobileSearchOpen(false)}
+                                className="shrink-0 text-[13px] font-semibold text-accent px-1.5 py-2"
+                            >
+                                Done
+                            </button>
                         </div>
+                    ) : (
+                    <div className="flex sm:hidden items-center gap-2">
+                        {/* Search — icon only; expands into the full field in place.
+                            Accent-filled while a query is active. */}
+                        <button
+                            data-tour="search"
+                            onClick={() => setMobileSearchOpen(true)}
+                            aria-label="Search"
+                            className={`h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-full border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${searchQuery
+                                ? 'bg-accent text-white border-accent shadow-sm'
+                                : 'bg-card border-border-subtle text-text-muted hover:text-text hover:bg-card-hover'
+                                }`}
+                        >
+                            <Search className="w-4 h-4" />
+                        </button>
+                        {/* Filters — categories, tags, status, sort, sources in one
+                            sheet; one badge for everything active. */}
+                        <button
+                            onClick={() => setIsFiltersOpen(true)}
+                            aria-label="Filters — categories, tags, status, sort, sources"
+                            className={`relative h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-full border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${activeMobileFilters > 0
+                                ? 'bg-accent text-white border-accent shadow-sm'
+                                : 'bg-card border-border-subtle text-text-muted hover:text-text hover:bg-card-hover'
+                                }`}
+                        >
+                            <Filter className="w-4 h-4" />
+                            {activeMobileFilters > 0 && (
+                                <span className="absolute -top-1 -end-1 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold tabular-nums bg-white text-accent border border-background shadow-sm">
+                                    {activeMobileFilters}
+                                </span>
+                            )}
+                        </button>
+                        <span className="flex-1" />
                         {/* Tools capsule — the three view pills and select in ONE shape,
                             separated by a hairline. */}
                         <div data-tour="views" className="flex items-center h-10 px-1 rounded-full bg-card border border-border-subtle shrink-0">
@@ -1354,13 +1376,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             hairlines (the QuickType-bar pattern) — a single object
                             instead of three floating pills. Ask holds the center by
                             construction. */}
-                        <div className="grid sm:hidden grid-cols-3 items-stretch h-10 w-full rounded-full bg-card border border-border-subtle overflow-hidden divide-x divide-border-subtle rtl:divide-x-reverse">
+                        <div className="grid sm:hidden grid-cols-3 items-stretch h-10 w-full gap-2">
                             <button
                                 data-tour="collections"
                                 onClick={() => setViewMode('collections')}
                                 title="Browse collections"
                                 aria-label="Browse collections"
-                                className="inline-flex items-center justify-center gap-1.5 text-[13px] font-semibold text-text-secondary hover:text-text hover:bg-card-hover active:bg-card-hover transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
+                                className="inline-flex items-center justify-center gap-1.5 rounded-full bg-card border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:bg-card-hover active:bg-card-hover transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                             >
                                 <Layers className="w-4 h-4" />
                                 <span>Collections</span>
@@ -1370,7 +1392,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 onClick={() => setViewMode('ask')}
                                 title="Ask your brain"
                                 aria-label="Ask your brain"
-                                className="inline-flex items-center justify-center gap-1.5 text-[13px] font-semibold text-text-secondary hover:text-text hover:bg-card-hover active:bg-card-hover transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
+                                className="inline-flex items-center justify-center gap-1.5 rounded-full bg-card border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:bg-card-hover active:bg-card-hover transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                             >
                                 <MessagesSquare className="w-4 h-4" />
                                 <span>Ask</span>
@@ -1379,7 +1401,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 onClick={() => setViewMode('digest')}
                                 title="Your curated digests"
                                 aria-label="Digest"
-                                className="inline-flex items-center justify-center gap-1.5 text-[13px] font-semibold text-text-secondary hover:text-text hover:bg-card-hover active:bg-card-hover transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
+                                className="inline-flex items-center justify-center gap-1.5 rounded-full bg-card border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:bg-card-hover active:bg-card-hover transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                             >
                                 <Newspaper className="w-4 h-4" />
                                 <span>Digest</span>
