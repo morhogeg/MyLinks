@@ -70,21 +70,22 @@ export default function DigestView({
     if (isEmpty) {
         return (
             <div className="max-w-3xl mx-auto">
-                <div className="text-center py-16 animate-fade-in">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-accent/20">
-                        <Newspaper className="w-8 h-8 text-white" />
+                <div className="text-center py-16 px-6 animate-fade-in">
+                    <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-accent/10 flex items-center justify-center">
+                        <Newspaper className="w-7 h-7 text-accent" strokeWidth={1.75} />
                     </div>
-                    <h3 className="text-lg font-medium text-text mb-2">No digests yet</h3>
-                    <p className="text-text-secondary text-sm">
-                        Your hand-picked batches will collect here once the curated digest is on.
-                        {onOpenDigestSettings && (
-                            <> {' '}
-                                <button onClick={onOpenDigestSettings} className="text-accent font-medium hover:underline cursor-pointer">
-                                    Set up your digest
-                                </button>
-                            </>
-                        )}
+                    <h3 className="text-base font-bold text-text">No digests yet</h3>
+                    <p className="mt-1.5 max-w-xs mx-auto text-sm text-text-muted leading-relaxed">
+                        On your schedule, Machina picks a few saves worth revisiting and delivers them here.
                     </p>
+                    {onOpenDigestSettings && (
+                        <button
+                            onClick={onOpenDigestSettings}
+                            className="mt-5 inline-flex items-center gap-2 px-4 h-10 rounded-full bg-accent text-white text-sm font-bold hover:bg-accent-hover active:scale-95 transition-all cursor-pointer"
+                        >
+                            Set up your digest
+                        </button>
+                    )}
                 </div>
             </div>
         );

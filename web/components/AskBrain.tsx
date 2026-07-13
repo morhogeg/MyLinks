@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { MessageCircleQuestion, ArrowUp, FileText, Brain, Plus, MessagesSquare, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X } from 'lucide-react';
+import { MessageCircleQuestion, ArrowUp, FileText, Plus, MessagesSquare, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -770,12 +770,14 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
     // Library is empty — nothing to ask yet.
     if (totalLinks === 0) {
         return (
-            <div className="text-center py-20 animate-fade-in">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-accent/20">
-                    <Brain className="w-8 h-8 text-white" />
+            <div className="text-center py-20 px-6 animate-fade-in">
+                <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-accent/10 flex items-center justify-center">
+                    <MessageCircleQuestion className="w-7 h-7 text-accent" strokeWidth={1.75} />
                 </div>
-                <h3 className="text-lg font-medium text-text mb-2">Nothing in Machina yet</h3>
-                <p className="text-text-secondary text-sm">Save a few links first, then ask Machina anything about them.</p>
+                <h3 className="text-base font-bold text-text">Nothing to ask about yet</h3>
+                <p className="mt-1.5 max-w-xs mx-auto text-sm text-text-muted leading-relaxed">
+                    Machina answers only from what you&apos;ve saved. Add a few links first, then ask away.
+                </p>
             </div>
         );
     }
@@ -826,13 +828,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
             >
                 {isEmpty ? (
                     <div className="h-full flex flex-col items-center justify-center text-center px-4">
-                        <div className="w-14 h-14 mb-4 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-accent/20">
-                            <MessageCircleQuestion className="w-7 h-7 text-white" />
+                        <div className="w-14 h-14 mb-4 rounded-2xl bg-accent/10 flex items-center justify-center">
+                            <MessageCircleQuestion className="w-7 h-7 text-accent" strokeWidth={1.75} />
                         </div>
-                        <h2 className="text-xl font-semibold text-text mb-1.5">Ask Machina</h2>
-                        <p className="text-text-secondary text-sm max-w-md mb-6">
-                            Ask anything about the {totalLinks} {totalLinks === 1 ? 'thing' : 'things'}{' '}you&apos;ve saved.
-                            Answers come only from your library, with sources you can open.
+                        <h2 className="text-xl font-semibold text-text mb-1.5">What do you want to recall?</h2>
+                        <p className="text-text-muted text-sm max-w-xs mb-6 leading-relaxed">
+                            Answers come only from your {totalLinks} {totalLinks === 1 ? 'save' : 'saves'} — with sources you can open.
                         </p>
                         <div className="flex flex-wrap items-center justify-center gap-2 max-w-xl">
                             {suggestions.map(s => (

@@ -332,8 +332,8 @@ export default function SwipeDeck({
         const moreAvailable = poolCount > 0;
         return (
             <div className="flex flex-col items-center justify-center text-center py-16 gap-4">
-                <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center">
-                    <Sparkles className="w-8 h-8 text-accent" />
+                <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center">
+                    <Sparkles className="w-7 h-7 text-accent" strokeWidth={1.75} />
                 </div>
                 <h3 className="text-lg font-bold text-text">{acted > 0 ? 'Session complete' : 'All caught up'}</h3>
                 {acted > 0 ? (

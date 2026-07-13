@@ -42,7 +42,7 @@ import CollectionsGallery from './CollectionsGallery';
 import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, Share2, Globe, Plus, Pencil, Newspaper, Sparkles, Lock } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, Share2, Globe, Plus, Pencil, Newspaper, Sparkles, Lock, BookOpenCheck } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
@@ -2049,50 +2049,73 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             links={visibleLinks}
                         />
                     ) : filteredLinks.length === 0 && pendingCards.length === 0 ? (
-                        <div className="text-center py-16 animate-fade-in">
-                            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-accent/20">
-                                {filter === 'favorite' ? (
-                                    <Star className="w-8 h-8 text-white" />
-                                ) : filter === 'archived' ? (
-                                    <Archive className="w-8 h-8 text-white" />
-                                ) : filter === 'reminders' ? (
-                                    <Bell className="w-8 h-8 text-white" />
-                                ) : filter === 'private' ? (
-                                    <Lock className="w-8 h-8 text-white" />
-                                ) : (
-                                    <Inbox className="w-8 h-8 text-white" />
-                                )}
+                        (() => {
+                            // One (icon, title, body) per state, matched to the view's
+                            // actual topic — the search case wins over the filter cases,
+                            // and every FilterType has its own branch so a filtered view
+                            // never falls through to the "empty account" pitch.
+                            const empty = searchQuery
+                                ? {
+                                    Icon: Search, title: 'No matches',
+                                    body: isSearching ? null
+                                        : searchError ? 'No keyword matches, and meaning search is unavailable right now.'
+                                        : 'Try different words — search reads titles, summaries, and meaning.',
+                                }
+                                : filter === 'reminders' ? {
+                                    Icon: Bell, title: 'No reminders set',
+                                    body: 'Pick “Remind me” on any card and it will resurface here when it’s due.',
+                                }
+                                : filter === 'favorite' ? {
+                                    Icon: Star, title: 'No favorites yet',
+                                    body: 'Tap the star on a card to keep your best saves in one place.',
+                                }
+                                : filter === 'archived' ? {
+                                    Icon: Archive, title: 'Nothing archived',
+                                    body: 'Archive cards you’re done with to keep your feed focused.',
+                                }
+                                : filter === 'unread' ? {
+                                    Icon: CheckCircle2, title: 'All caught up',
+                                    body: 'Every save has been read. New links land here first.',
+                                }
+                                : filter === 'read' ? {
+                                    Icon: BookOpenCheck, title: 'Nothing read yet',
+                                    body: 'Cards you open and finish collect here.',
+                                }
+                                : filter === 'private' ? {
+                                    Icon: Lock, title: 'No private cards',
+                                    body: 'Choose “Make private” on a card to keep it behind your PIN.',
+                                }
+                                : selectedCategory.size > 0 ? {
+                                    Icon: LayoutGrid, title: `Nothing in ${Array.from(selectedCategory).join(', ')}`,
+                                    body: 'Machina files new saves automatically — try another category for now.',
+                                }
+                                : selectedTags.size > 0 ? {
+                                    Icon: TagIcon, title: 'No cards with these tags',
+                                    body: 'Remove a tag or two to widen the results.',
+                                }
+                                : (selectedSources.size > 0 || selectedCollections.size > 0) ? {
+                                    Icon: Filter, title: 'Nothing matches these filters',
+                                    body: 'Clear a filter or two to widen the results.',
+                                }
+                                : {
+                                    Icon: Inbox, title: 'Your Machina is empty',
+                                    body: 'Save your first link with the + button — Machina reads it, tags it, and files it for you.',
+                                };
+                            return (
+                        <div className="text-center py-16 px-6 animate-fade-in">
+                            <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-accent/10 flex items-center justify-center">
+                                <empty.Icon className="w-7 h-7 text-accent" strokeWidth={1.75} />
                             </div>
-                            <h3 className="text-lg font-medium text-text mb-2">
-                                {searchQuery ? 'No results found' :
-                                    filter === 'private' ? 'No private cards yet' :
-                                    filter === 'favorite' ? 'No favorites yet' :
-                                        filter === 'archived' ? 'No archived links' :
-                                            filter === 'unread' ? 'No unread links' :
-                                                filter === 'read' ? 'No read links yet' :
-                                                    selectedCategory.size > 0 ? `No links in ${Array.from(selectedCategory).join(', ')}` :
-                                                        selectedTags.size > 0 ? 'No links match selected tags' :
-                                                            'Your Machina is empty'}
-                            </h3>
+                            <h3 className="text-base font-bold text-text">{empty.title}</h3>
                             {debouncedQuery && isSearching && (
                                 <div className="flex items-center justify-center gap-2 text-accent mt-2">
                                     <div className="w-4 h-4 border-2 border-accent/20 border-t-accent rounded-full animate-spin" />
                                     <span className="text-sm font-medium">Searching by meaning…</span>
                                 </div>
                             )}
-                            <p className="text-text-secondary text-sm">
-                                {searchQuery ? (isSearching ? 'No keyword matches yet — searching by meaning…'
-                                    : searchError ? 'No keyword matches, and meaning search is unavailable right now.'
-                                    : 'Try a different search term') :
-                                    filter === 'private' ? 'Use a card’s ⋯ menu → Make private to hide it here' :
-                                    filter === 'favorite' ? 'Star links to add them to your favorites' :
-                                        filter === 'archived' ? 'Archive links to see them here' :
-                                            filter === 'unread' ? 'All caught up! No unread links' :
-                                                filter === 'read' ? 'Items you mark as read will appear here' :
-                                                    selectedCategory.size > 0 ? 'Try selecting a different category' :
-                                                        selectedTags.size > 0 ? 'Try clearing some tag filters' :
-                                                            'Add your first link using the + button below'}
-                            </p>
+                            {empty.body && (
+                                <p className="mt-1.5 max-w-xs mx-auto text-sm text-text-muted leading-relaxed">{empty.body}</p>
+                            )}
                             {/* Brand-new, genuinely empty account (no query, no
                                 filters): offer a one-tap seeded example so Ask /
                                 search / Collections demo against something real
@@ -2118,19 +2141,24 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     )}
                                 </button>
                             )}
-                            {(selectedTags.size > 0 || selectedSources.size > 0 || searchQuery) && (
+                            {(selectedTags.size > 0 || selectedSources.size > 0 || selectedCategory.size > 0 || selectedCollections.size > 0 || searchQuery) && (
                                 <button
                                     onClick={() => {
                                         setSelectedTags(new Set());
                                         setSelectedSources(new Set());
+                                        setSelectedCategory(new Set());
+                                        setSelectedCollections(new Set());
                                         setSearchQuery('');
                                     }}
-                                    className="mt-4 px-4 py-2 bg-accent text-white rounded-xl text-sm font-bold hover:bg-accent-hover transition-all"
+                                    className="mt-5 inline-flex items-center gap-2 px-4 h-10 rounded-full bg-accent text-white text-sm font-bold hover:bg-accent-hover active:scale-95 transition-all"
                                 >
-                                    Reset Filters
+                                    <X className="w-4 h-4" />
+                                    Clear filters
                                 </button>
                             )}
                         </div>
+                            );
+                        })()
                     ) : viewMode === 'review' ? (
                         <SwipeDeck
                             links={filteredLinks}
