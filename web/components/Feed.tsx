@@ -53,6 +53,8 @@ import PushNudge from './PushNudge';
 import { deleteCollection, createCollection, addLinksToCollection, isShareStale } from '@/lib/collections';
 import { suggestNewCollections, dismissSuggestion, type CollectionSuggestion } from '@/lib/collectionSuggest';
 import ShareCollectionSheet from './ShareCollectionSheet';
+import PinLockModal from './PinLockModal';
+import { usePrivacyLock } from '@/lib/privacyLock';
 import { openExternal } from '@/lib/share';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import TagExplorer from './TagExplorer';
@@ -78,6 +80,21 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const toast = useToast();
     // Links subscription + pull-refresh (R-3: useLinks).
     const { links, isLoading, handlePullRefresh } = useLinks(uid, toast);
+    // Collections — declared before the filter pipeline so private-collection
+    // membership can hide cards from it while the privacy vault is locked.
+    const [collections, setCollections] = useState<Collection[]>([]);
+    // Privacy vault: one app-level PIN protects every collection marked
+    // Private. While locked, member cards vanish from the library, search,
+    // related cards, Ask context, and suggestions.
+    const { locked: vaultLocked } = usePrivacyLock(uid);
+    const privateCollectionIds = useMemo(
+        () => new Set(collections.filter((c) => c.isPrivate).map((c) => c.id)),
+        [collections]
+    );
+    const visibleLinks = useMemo(() => {
+        if (!vaultLocked || privateCollectionIds.size === 0) return links;
+        return links.filter((l) => !(l.collectionIds ?? []).some((id) => privateCollectionIds.has(id)));
+    }, [links, vaultLocked, privateCollectionIds]);
     const [searchQuery, setSearchQuery] = useState('');
     // Debounced, generation-guarded semantic search (R-3: useSemanticSearch).
     const { debouncedQuery, isSearching, searchResults, searchError } = useSemanticSearch(searchQuery, uid);
@@ -101,7 +118,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         handleToggleSourceKeys,
         matchingSources,
         reminderCount,
-    } = useFeedFilters(links, debouncedQuery, searchResults);
+    } = useFeedFilters(visibleLinks, debouncedQuery, searchResults);
     // Card action handlers that depend only on [uid, toast] (R-3: useLinkActions).
     const {
         handleStatusChange,
@@ -124,7 +141,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const isDraggingRef = useRef(false);
     const [startX, setStartX] = useState(0);
     const [scrollLeft, setScrollLeft] = useState(0);
-    const activeLink = links.find(l => l.id === activeLinkId) || null;
+    // Resolved against visibleLinks so a locked private card can never be opened
+    // (deep link, push tap) — and an open one closes itself when the vault relocks.
+    const activeLink = visibleLinks.find(l => l.id === activeLinkId) || null;
 
     // Open a card reached from another card's "Related" list — remember where we
     // came from so the back-stack can return there.
@@ -181,6 +200,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const remindSavedRef = useRef(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+    // PIN prompt for a gated private-collection action (see withPrivacyGate).
+    const [unlockPrompt, setUnlockPrompt] = useState<(() => void) | null>(null);
 
     // One-tap "Try it with an example" on a brand-new empty feed: seed a real,
     // hand-crafted card so Ask / search / Collections have something to work
@@ -203,8 +224,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         // flips the feed out of the empty state, so this button unmounts anyway.
     }, [uid, seedingExample, toast]);
 
-    // Collections
-    const [collections, setCollections] = useState<Collection[]>([]);
+    // Collections (the `collections` state itself is declared above the filter
+    // pipeline — see the privacy-vault block near useLinks).
     const [addToCollectionLink, setAddToCollectionLink] = useState<Link | null>(null);
     const [collectionFormOpen, setCollectionFormOpen] = useState(false);
     const [editingCollection, setEditingCollection] = useState<Collection | null>(null);
@@ -378,7 +399,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         activeLinkId !== null || isTagExplorerOpen || isFiltersOpen || isSortOpen ||
         reminderModalLink !== null || confirmDeleteId !== null || confirmBulkDelete ||
         addToCollectionLink !== null || collectionFormOpen || confirmDeleteCollection !== null ||
-        manageCardsCollection !== null || shareCollection !== null;
+        manageCardsCollection !== null || shareCollection !== null || unlockPrompt !== null;
     const { pull, refreshing, animating } = usePullToRefresh({
         onRefresh: handlePullRefresh,
         enabled: (viewMode === 'grid' || viewMode === 'list') && !anyOverlayOpen,
@@ -446,7 +467,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             /* best-effort dismiss; the live snapshot keeps the source of truth */
         }
     }, [uid]);
-    const dueLinks = useMemo(() => links.filter((l) => l.reminderDue === true), [links]);
+    // Derived from visibleLinks so a due reminder never leaks a locked private
+    // card's title into the feed strip.
+    const dueLinks = useMemo(() => visibleLinks.filter((l) => l.reminderDue === true), [visibleLinks]);
 
     // The proactive feed modules, rendered once and reused in both the grid and
     // list layouts (above pending + real cards). The weekly synthesis recap plus
@@ -575,6 +598,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     );
 
     // ── Collections ──────────────────────────────────────────────────────────
+    // Privacy gate: any action on a private collection while the vault is
+    // locked first routes through the PIN pad; the intended action runs after
+    // a successful unlock (which opens the whole vault for the session).
+    // (unlockPrompt state lives up with the other overlay states.)
+    const withPrivacyGate = useCallback((col: Collection, fn: () => void) => {
+        if (col.isPrivate && vaultLocked) setUnlockPrompt(() => fn);
+        else fn();
+    }, [vaultLocked]);
+
     // Open a collection as its own place (Task A): a dedicated detail view with
     // its own header + back navigation, NOT the generic filtered grid. We scope
     // the feed to just this collection (clearing every other filter so it shows
@@ -612,13 +644,27 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // stop) instead of blind-publishing on tap.
     const handleShareCollection = (col: Collection) => setShareCollection(col);
 
+    // Gallery handlers, privacy-gated (the gallery itself masks locked tiles;
+    // the gate here is what actually demands the PIN before anything opens).
+    const gatedOpenCollection = useCallback((collectionId: string) => {
+        const col = collections.find((c) => c.id === collectionId);
+        if (!col) return;
+        withPrivacyGate(col, () => openCollection(collectionId));
+        // openCollection only touches state, so the stale-closure risk is nil.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [collections, withPrivacyGate]);
+    const gatedEditCollection = (col: Collection) => withPrivacyGate(col, () => openEditCollectionForm(col));
+    const gatedShareCollection = (col: Collection) => withPrivacyGate(col, () => handleShareCollection(col));
+    const gatedDeleteCollection = (col: Collection) => withPrivacyGate(col, () => setConfirmDeleteCollection(col));
+    const gatedManageCollection = (col: Collection) => withPrivacyGate(col, () => setManageCardsCollection(col));
+
     // Suggested collections — topic clusters detected client-side from the
     // loaded feed (M20-lite). Only surfaced in the Collections view.
     const collectionSuggestions = useMemo(
-        () => (viewMode === 'collections' ? suggestNewCollections(links, collections) : []),
+        () => (viewMode === 'collections' ? suggestNewCollections(visibleLinks, collections) : []),
         // suggestionTick re-reads the localStorage dismissal list after a dismiss.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [viewMode, links, collections, suggestionTick]
+        [viewMode, visibleLinks, collections, suggestionTick]
     );
 
     const handleCreateSuggestion = async (s: CollectionSuggestion) => {
@@ -774,8 +820,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             && !collections.some((c) => c.id === openCollectionId)) {
             closeCollectionToGallery();
         }
+        // Likewise, if the vault re-locks (app backgrounded) while a private
+        // collection is open, bounce back to the gallery — its masked tile.
+        if (viewMode === 'collection' && openCollectionId && vaultLocked
+            && privateCollectionIds.has(openCollectionId)) {
+            closeCollectionToGallery();
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [viewMode, openCollectionId, collections]);
+    }, [viewMode, openCollectionId, collections, vaultLocked, privateCollectionIds]);
     // True for the card-browsing layouts (everything except the full-screen
     // Ask chat and the Collections gallery), which share the search/filter chrome.
     const isLibraryView = viewMode === 'grid' || viewMode === 'list' || viewMode === 'review';
@@ -828,7 +880,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // description, count, share status + actions) over the normal card grid.
     const openCol = openCollectionId ? collections.find((c) => c.id === openCollectionId) ?? null : null;
     const collectionDetailContent = openCol ? (() => {
-        const members = links.filter((l) => (l.collectionIds ?? []).includes(openCol.id));
+        // visibleLinks so a card that's ALSO in a locked private collection
+        // doesn't surface here through a non-private one.
+        const members = visibleLinks.filter((l) => (l.collectionIds ?? []).includes(openCol.id));
         const count = members.length;
         const stale = isShareStale(openCol, members.map((m) => ({ id: m.id })));
         const colStyle = getColorStyleByKey(openCol.color || openCol.name);
@@ -852,13 +906,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         <p className="mt-1.5 text-[14px] leading-relaxed text-text-secondary max-w-2xl">{openCol.description}</p>
                     )}
                     <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <button
-                            onClick={() => handleShareCollection(openCol)}
-                            className={`${ctrlBase} px-3.5 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
-                        >
-                            {openCol.isPublic ? <Globe className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
-                            <span>{openCol.isPublic ? 'Shared' : 'Share'}</span>
-                        </button>
+                        {/* A private collection can't have a public page — no Share. */}
+                        {!openCol.isPrivate && (
+                            <button
+                                onClick={() => handleShareCollection(openCol)}
+                                className={`${ctrlBase} px-3.5 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
+                            >
+                                {openCol.isPublic ? <Globe className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
+                                <span>{openCol.isPublic ? 'Shared' : 'Share'}</span>
+                            </button>
+                        )}
                         <button
                             onClick={() => setManageCardsCollection(openCol)}
                             className={`${ctrlBase} px-3.5 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
@@ -1869,13 +1926,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         <div className="hidden sm:block">
                             <CollectionsGallery
                                 collections={collections}
-                                links={links}
+                                links={visibleLinks}
                                 suggestions={collectionSuggestions}
-                                onOpen={openCollection}
-                                onEdit={openEditCollectionForm}
-                                onShare={handleShareCollection}
-                                onDelete={(col) => setConfirmDeleteCollection(col)}
-                                onManageCards={(col) => setManageCardsCollection(col)}
+                                lockedIds={vaultLocked ? privateCollectionIds : undefined}
+                                onOpen={gatedOpenCollection}
+                                onEdit={gatedEditCollection}
+                                onShare={gatedShareCollection}
+                                onDelete={gatedDeleteCollection}
+                                onManageCards={gatedManageCollection}
                                 onCreate={openNewCollectionForm}
                                 onCreateSuggestion={handleCreateSuggestion}
                                 onDismissSuggestion={handleDismissSuggestion}
@@ -1884,14 +1942,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     ) : viewMode === 'ask' ? (
                         <AskBrain
                             uid={uid}
-                            totalLinks={links.length}
+                            totalLinks={visibleLinks.length}
                             onOpenLink={(id) => setActiveLinkId(id)}
                             onExit={() => setViewMode(lastLayout.current)}
                             // A cited-card modal (or any Feed sheet/dialog) open over
                             // Ask owns the edge-swipe; Ask stands down so one swipe
                             // pops only the modal, back to the chat — not out to home.
                             overlayOpen={anyOverlayOpen}
-                            links={links}
+                            links={visibleLinks}
                         />
                     ) : filteredLinks.length === 0 && pendingCards.length === 0 ? (
                         <div className="text-center py-16 animate-fade-in">
@@ -2060,13 +2118,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
                         <CollectionsGallery
                             collections={collections}
-                            links={links}
+                            links={visibleLinks}
                             suggestions={collectionSuggestions}
-                            onOpen={openCollection}
-                            onEdit={openEditCollectionForm}
-                            onShare={handleShareCollection}
-                            onDelete={(col) => setConfirmDeleteCollection(col)}
-                            onManageCards={(col) => setManageCardsCollection(col)}
+                            lockedIds={vaultLocked ? privateCollectionIds : undefined}
+                            onOpen={gatedOpenCollection}
+                            onEdit={gatedEditCollection}
+                            onShare={gatedShareCollection}
+                            onDelete={gatedDeleteCollection}
+                            onManageCards={gatedManageCollection}
                             onCreate={openNewCollectionForm}
                             onCreateSuggestion={handleCreateSuggestion}
                             onDismissSuggestion={handleDismissSuggestion}
@@ -2126,7 +2185,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             {activeLink && (
                 <LinkDetailModal
                     link={activeLink}
-                    allLinks={links}
+                    allLinks={visibleLinks}
                     allCategories={categories}
                     uid={uid}
                     isOpen={!!activeLink}
@@ -2155,7 +2214,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     uid={uid}
                     link={links.find(l => l.id === addToCollectionLink.id) ?? addToCollectionLink}
                     collections={collections}
-                    links={links}
+                    links={visibleLinks}
                     isOpen={!!addToCollectionLink}
                     onClose={() => setAddToCollectionLink(null)}
                 />
@@ -2185,9 +2244,26 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 <ManageCollectionCardsSheet
                     uid={uid}
                     collection={collections.find(c => c.id === manageCardsCollection.id) ?? manageCardsCollection}
-                    links={links}
+                    links={visibleLinks}
                     isOpen={!!manageCardsCollection}
                     onClose={() => setManageCardsCollection(null)}
+                />
+            )}
+
+            {/* Privacy vault — PIN prompt gating actions on a private collection.
+                A successful unlock opens the vault for the session (until the
+                app is backgrounded) and then runs the intended action. */}
+            {unlockPrompt && uid && (
+                <PinLockModal
+                    uid={uid}
+                    mode="unlock"
+                    isOpen
+                    onClose={() => setUnlockPrompt(null)}
+                    onSuccess={() => {
+                        const run = unlockPrompt;
+                        setUnlockPrompt(null);
+                        run();
+                    }}
                 />
             )}
 

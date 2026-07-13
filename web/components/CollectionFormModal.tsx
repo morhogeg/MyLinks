@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { Collection } from '@/lib/types';
-import { X, Check, Layers, Shuffle } from 'lucide-react';
+import { X, Check, Layers, Shuffle, Lock } from 'lucide-react';
 import { COLOR_KEYS, getColorStyleByKey } from '@/lib/colors';
-import { createCollection, updateCollection } from '@/lib/collections';
+import { createCollection, updateCollection, unpublishCollection } from '@/lib/collections';
+import { usePrivacyLock } from '@/lib/privacyLock';
+import PinLockModal from './PinLockModal';
 import { useToast } from '@/components/Toast';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { useScrollLock } from '@/lib/useScrollLock';
@@ -42,6 +44,10 @@ export default function CollectionFormModal({
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [color, setColor] = useState<string>(COLOR_KEYS[0]);
+    const [isPrivate, setIsPrivate] = useState(false);
+    // Turning Private on for the first time requires setting up the vault PIN.
+    const [pinSetupOpen, setPinSetupOpen] = useState(false);
+    const { hasPin } = usePrivacyLock(uid);
     const [busy, setBusy] = useState(false);
     // Track the visible viewport so the bottom sheet rides *above* the keyboard
     // instead of being hidden behind it while typing the name. No-op on desktop
@@ -61,6 +67,8 @@ export default function CollectionFormModal({
             setDescription(collection?.description ?? '');
             // New collections get a random color so picking one is optional.
             setColor(collection?.color ?? randomColorKey());
+            setIsPrivate(collection?.isPrivate ?? false);
+            setPinSetupOpen(false);
             setBusy(false);
         }
     }
@@ -92,10 +100,16 @@ export default function CollectionFormModal({
         setBusy(true);
         try {
             if (isEdit && collection) {
+                // A collection can't be private AND have a public page — going
+                // private tears the share down first.
+                if (isPrivate && !collection.isPrivate && collection.isPublic) {
+                    await unpublishCollection(uid, collection);
+                }
                 await updateCollection(uid, collection.id, {
                     name: trimmed,
                     description: description.trim() || undefined,
                     color,
+                    isPrivate,
                 });
                 toast.success('Collection updated');
                 onSaved?.(collection.id);
@@ -104,6 +118,7 @@ export default function CollectionFormModal({
                     name: trimmed,
                     description: description.trim() || undefined,
                     color,
+                    isPrivate,
                 });
                 toast.success(`Created “${trimmed}”`);
                 onSaved?.(id);
@@ -212,6 +227,38 @@ export default function CollectionFormModal({
                             })}
                         </div>
                     </div>
+
+                    {/* Private — behind the app-level privacy PIN (lib/privacyLock). */}
+                    <div className="rounded-xl bg-background p-3.5">
+                        <div className="flex items-center gap-3">
+                            <Lock className={`w-4 h-4 shrink-0 ${isPrivate ? 'text-accent' : 'text-text-muted'}`} />
+                            <div className="flex-1 min-w-0">
+                                <div className="text-sm font-semibold text-text">Private</div>
+                                <p className="mt-0.5 text-[11px] text-text-muted leading-snug">
+                                    Requires your PIN to open. Its cards are hidden from your
+                                    library, search, and suggestions while locked.
+                                    {collection?.isPublic && isPrivate && !collection?.isPrivate
+                                        ? ' Saving will also stop sharing its public page.'
+                                        : ''}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={isPrivate}
+                                aria-label="Private collection"
+                                onClick={() => {
+                                    if (isPrivate) { setIsPrivate(false); return; }
+                                    // First private collection ever → set up the vault PIN.
+                                    if (hasPin) setIsPrivate(true);
+                                    else setPinSetupOpen(true);
+                                }}
+                                className={`relative w-11 h-[26px] rounded-full transition-colors shrink-0 ${isPrivate ? 'bg-accent' : 'bg-fill-strong'}`}
+                            >
+                                <span className={`absolute top-[3px] w-5 h-5 rounded-full bg-white shadow transition-all ${isPrivate ? 'start-[21px]' : 'start-[3px]'}`} />
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="flex gap-3 px-5 pb-5">
@@ -230,6 +277,17 @@ export default function CollectionFormModal({
                     </button>
                 </div>
             </div>
+
+            {/* First-time PIN setup — opens above this sheet (z-120 > z-100). */}
+            {uid && (
+                <PinLockModal
+                    uid={uid}
+                    mode="setup"
+                    isOpen={pinSetupOpen}
+                    onClose={() => setPinSetupOpen(false)}
+                    onSuccess={() => setIsPrivate(true)}
+                />
+            )}
         </div>
     );
 }
