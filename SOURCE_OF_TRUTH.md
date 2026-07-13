@@ -617,7 +617,30 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — Search "not working" diagnosed: NOT a code bug —
+- **2026-07-13 (latest) — SHIPPED: Empty-state revamp across Feed / Ask /
+  Digest / Review (merge `0503e04`, commit `7596854`).** Owner screenshots
+  showed two problems: (1) BUG — the Reminders filter's empty view fell
+  through to "Your Machina is empty / Add your first link…" because
+  `Feed.tsx` had an icon branch for `filter === 'reminders'` but no
+  title/body branch (same hole for source/collection facets); (2) the loud
+  purple `--accent-gradient` icon squares + loose microcopy. Revamp: every
+  empty state now uses the soft `bg-accent/10` rounded-2xl tile with an
+  accent-colored icon (the Collections-gallery pattern; gradient tiles
+  removed from Feed, AskBrain ×2, DigestView, SwipeDeck harmonized), and
+  each FilterType/facet gets its own topic-correct icon + one-line copy
+  (reminders→Bell "No reminders set", unread→"All caught up",
+  read→BookOpenCheck, private→Lock/PIN, category/tags/sources branches).
+  Ask hero de-duplicated ("Ask Machina" was in the header AND the hero — now
+  "What do you want to recall?", tighter grounding line); Ask library-empty
+  state now speaks to asking; Digest empty got a real "Set up your digest"
+  button. "Clear filters" now also resets category + collection facets.
+  Verified `tsc --noEmit` clean. **SHIPPED:** Vercel live via `main`; **iOS:
+  TestFlight run #93 → build 1093** via temp trigger
+  `claude/ship-tf-trigger-emptystates` (API dispatch still 403 from cloud
+  sessions). Owner cleanup: delete `claude/ship-tf-trigger-*` branches after
+  the run (remote deletes are no-ops from cloud sessions). Backend still NOT
+  deployed — the owner deploy steps in the entry below remain pending.
+- **2026-07-13 — Search "not working" diagnosed: NOT a code bug —
   the pending owner backend deploy.** Owner screenshot: "Muffins" → no
   results + "meaning search is unavailable right now" on device. Root cause
   chain: on-device semantic search (polish round 3's `search_links_http` +
