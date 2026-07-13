@@ -1150,7 +1150,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 {isLibraryView && (
                     isSelectionMode ? (
                         <div className="flex sm:hidden items-center animate-in fade-in slide-in-from-top-1 duration-200">
-                            <div className="flex items-center gap-1 h-9 px-1.5 rounded-full bg-accent/10 border border-accent/20 animate-slide-up">
+                            {/* Same 30px height as the tools row it replaces — no layout hop. */}
+                            <div className="flex items-center gap-1 h-[30px] px-1.5 rounded-full bg-accent/10 border border-accent/20 animate-slide-up">
                                 <span className="text-xs font-bold text-accent px-1.5 tabular-nums">{selectedIds.size}</span>
                                 <button
                                     onClick={handleBulkArchive}
@@ -1239,20 +1240,23 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         ) : (
                             <span className="w-9 shrink-0" aria-hidden="true" />
                         )}
-                        {/* Filters + sort live in the same sheet, so the button just shows
-                            both icons (no label) — keeping the count badge when active. */}
+                        {/* Filters (sort lives in the same sheet — one funnel is the whole
+                            signal). Same square shape and overlay count badge as the
+                            Categories chip: one badge language, and the chip never changes
+                            width when filters activate. */}
                         <button
                             onClick={() => setIsFiltersOpen(true)}
                             aria-label="Filters and sort"
-                            className={`${rowACtrl} shrink-0 px-3 gap-1.5 ${activeMobileFilters > 0
+                            className={`${rowACtrl} shrink-0 relative w-9 px-0 ${activeMobileFilters > 0
                                 ? 'bg-accent text-white border border-accent shadow-sm'
                                 : rowAIdle
                                 }`}
                         >
                             <Filter className="w-3.5 h-3.5" />
-                            <ArrowUpDown className="w-3.5 h-3.5" />
                             {activeMobileFilters > 0 && (
-                                <span className="text-xs font-bold tabular-nums">{activeMobileFilters}</span>
+                                <span className="absolute -top-1 -end-1 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold tabular-nums bg-white text-accent border border-background shadow-sm">
+                                    {activeMobileFilters}
+                                </span>
                             )}
                         </button>
                         {/* Search — icon only; expands into a large field in place. Reads
