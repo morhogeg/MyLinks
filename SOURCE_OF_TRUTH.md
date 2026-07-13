@@ -617,7 +617,12 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — Polish round 8: header REVAMP (owner: "production
+- **2026-07-13 (latest) — Polish round 8b: owner refinements on the revamp.**
+  Search collapses to an icon chip (tap → full field expands in place; accent
+  while a query is active) with the filter funnel as its own matching 40px
+  chip; destinations split back into three separate equal pills with gaps
+  (airier), Ask still centered. Ships as run #84/build 1084.
+- **2026-07-13 — Polish round 8: header REVAMP (owner: "production
   grade at Apple/Google").** Stopped iterating pills; new composition with two
   anchored objects per row. Row 1: an always-live SEARCH FIELD owns the row
   (no expand dance) with the filter funnel inside it as a trailing accessory
