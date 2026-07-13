@@ -70,6 +70,23 @@ export function noteMatchesQuery(link: Link, lowerQuery: string): boolean {
     return false;
 }
 
+/**
+ * All of a card's note text (legacy string + array) concatenated into one string,
+ * for building the keyword-search haystack. Not lowercased — the caller lowercases
+ * the whole blob once. Iterates both shapes directly, no sort, so it's cheap in the
+ * per-keystroke filter loop.
+ */
+export function getNotesText(link: Link): string {
+    const parts: string[] = [];
+    if (link.userNote && link.userNote.trim()) parts.push(link.userNote);
+    if (Array.isArray(link.userNotes)) {
+        for (const n of link.userNotes) {
+            if (n?.text) parts.push(n.text);
+        }
+    }
+    return parts.join(' ');
+}
+
 /** Build a brand-new note from composer text, stamped with `createdAt` now. */
 export function makeNote(text: string): UserNote {
     return { id: newNoteId(), text: text.trim(), createdAt: Date.now() };

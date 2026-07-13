@@ -2,8 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Link } from '@/lib/types';
 import { getSourceInfo, buildSourceFacets, sourceMatchesQuery } from '@/lib/source';
 import { PLATFORM_LABELS, prettyHost, type PlatformKey } from '@/lib/platform';
-import { isPending, getTimestampNumber } from '@/lib/feedUtils';
-import { noteMatchesQuery } from '@/lib/notes';
+import { isPending, getTimestampNumber, tokenizeQuery, buildSearchHaystack, matchesAllTokens } from '@/lib/feedUtils';
 
 export type FilterType = 'all' | 'unread' | 'read' | 'archived' | 'favorite' | 'reminders';
 export type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
@@ -30,6 +29,11 @@ export function useFeedFilters(links: Link[], debouncedQuery: string, searchResu
     // card never spawns a phantom "Processing" category/tag), then surfaced
     // separately, pinned at the top of the library, so a capture is always visible.
     const contentLinks = useMemo(() => links.filter((l) => !isPending(l)), [links]);
+
+    // Keyword-search tokens for the current query, prepped ONCE per query (not per
+    // card): lowercased, punctuation-stripped, stopwords dropped. Every token must
+    // then appear in a card's text for a keyword match (see the search filter below).
+    const queryTokens = useMemo(() => tokenizeQuery(debouncedQuery), [debouncedQuery]);
 
     // 4. Hybrid Search Logic — memoized so a banner tick or any unrelated state
     // change (search typing, overlay toggles) doesn't re-run the 6-stage filter +
@@ -78,20 +82,24 @@ export function useFeedFilters(links: Link[], debouncedQuery: string, searchResu
             const isSemanticMatch = searchResults.some(r => r.id === link.id);
             if (isSemanticMatch) return true;
 
-            // Otherwise check keyword matching — including the card's source, so
-            // typing a publisher name ("ynet") surfaces its cards even without a
-            // semantic hit.
+            // Token-based keyword match: EVERY query token must appear (as a
+            // substring, or its light singular) somewhere in the card's searchable
+            // text — title, summary, detailedSummary, tags, concepts, category,
+            // sourceName, and your own notes (all folded into one haystack). This is
+            // what makes a natural-language query like "a collection of articles"
+            // match on "collection" AND "article", instead of the old whole-phrase
+            // substring test that any multi-word query failed. Skipped for a query
+            // that tokenizes to nothing (e.g. punctuation only), which then falls
+            // through to the precise source/host tests below.
+            if (queryTokens.length > 0 && matchesAllTokens(buildSearchHaystack(link), queryTokens)) {
+                return true;
+            }
+
+            // Precise source matching — publisher label + platform aliases, so
+            // "twitter"/"x" finds every X card (labelled by @handle) and "ynet"
+            // surfaces its cards even when that word isn't in the card's text.
+            // Kept on the raw query so single-word source/host search never regresses.
             return (
-                link.title.toLowerCase().includes(query) ||
-                link.summary.toLowerCase().includes(query) ||
-                // Your own notes are searchable — recall a card by what you wrote
-                // about it, not only by the AI summary. Matches ALL notes (legacy
-                // string + the multi-note array), via the shared reader.
-                noteMatchesQuery(link, query) ||
-                link.tags.some((tag) => tag.toLowerCase().includes(query)) ||
-                link.category.toLowerCase().includes(query) ||
-                // Source label + platform aliases, so "twitter"/"x" finds every X
-                // card (labelled by @handle), not just hosts containing the letter.
                 sourceMatchesQuery(getSourceInfo(link), query) ||
                 prettyHost(link.url).toLowerCase().includes(query)
             );
@@ -125,7 +133,7 @@ export function useFeedFilters(links: Link[], debouncedQuery: string, searchResu
                     return 0;
             }
         }),
-        [contentLinks, filter, selectedCategory, selectedTags, selectedCollections, selectedSources, debouncedQuery, searchResults, sortBy]);
+        [contentLinks, filter, selectedCategory, selectedTags, selectedCollections, selectedSources, debouncedQuery, queryTokens, searchResults, sortBy]);
 
     // Faceted counts — the numbers update live as you tap. Each facet's counts are
     // computed against the OTHER facet's current selection (but never its own), so
