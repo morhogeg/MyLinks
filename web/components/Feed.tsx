@@ -26,7 +26,6 @@ import { isPending, getTimestampNumber } from '@/lib/feedUtils';
 import FeedSkeleton from './feed/FeedSkeleton';
 import PullRefreshSpinner from './feed/PullRefreshSpinner';
 import MobileFiltersSheet from './feed/MobileFiltersSheet';
-import MobileCategoriesTagsSheet from './feed/MobileCategoriesTagsSheet';
 import MobileTagExplorerDrawer from './feed/MobileTagExplorerDrawer';
 import Card from './Card';
 import ListCard from './ListCard';
@@ -42,7 +41,7 @@ import CollectionsGallery from './CollectionsGallery';
 import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Tags, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, Share2, Globe, Plus, Pencil, Newspaper, Sparkles } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, Share2, Globe, Plus, Pencil, Newspaper, Sparkles } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
@@ -165,10 +164,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const [isSourcesOpen, setIsSourcesOpen] = useState(false);
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
-    const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
     // Mobile: the search bar is collapsed to an icon; tapping it expands a large
     // search field in place, so the card grid gets the vertical space back.
-    const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
     const [isTagExplorerCollapsed, setIsTagExplorerCollapsed] = useState(false);
     const [reminderModalLink, setReminderModalLink] = useState<Link | null>(null);
     // Outcome of the SwipeDeck-triggered reminder modal, threaded back to the deck
@@ -375,7 +372,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // full-screen mode (Ask/Collections) or any overlay/sheet owns the screen so
     // the gesture never fights a modal's own scrolling.
     const anyOverlayOpen =
-        activeLinkId !== null || isTagExplorerOpen || isFiltersOpen || isCategoriesOpen ||
+        activeLinkId !== null || isTagExplorerOpen || isFiltersOpen ||
         reminderModalLink !== null || confirmDeleteId !== null || confirmBulkDelete ||
         addToCollectionLink !== null || collectionFormOpen || confirmDeleteCollection !== null ||
         manageCardsCollection !== null || shareCollection !== null;
@@ -712,10 +709,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // Row A (mobile "Categories & Tags / Filters / Search") is secondary chrome —
     // a quieter, smaller variant of ctrlBase scoped to that row only (never mutate
     // the shared ctrlBase). Active/accent states reuse the filled style inline.
-    const rowACtrl =
-        'h-[30px] inline-flex items-center justify-center gap-1.5 rounded-full text-[12px] font-semibold cursor-pointer select-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40';
-    const rowAIdle =
-        'bg-card border border-border-subtle text-text-muted hover:bg-card-hover hover:text-text hover:border-text-muted/40';
 
     // Status filter options for the custom dropdown (Reminders has its own toggle).
     const statusOptions = [
@@ -787,7 +780,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const activeCollectionId = selectedCollections.size === 1 ? Array.from(selectedCollections)[0] : undefined;
     // Count of active grid filters — badges the mobile "Filters" button.
     const activeMobileFilters =
-        (filter !== 'all' ? 1 : 0) + selectedSources.size + selectedTags.size + selectedCollections.size;
+        (filter !== 'all' ? 1 : 0) + selectedCategory.size + selectedTags.size + selectedSources.size;
 
     // The Digest section's scrollable history — the weekly synthesis rides on
     // top, then every curated digest, newest first. Built once and rendered in
@@ -1143,33 +1136,33 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
                 </>)}
 
-                {/* Mobile Row 1 — TOOLS: compact icon controls on one line
-                    (Categories & Tags · Filters/Sort · Search · View switcher · Select).
-                    Selection mode and the expanded search field each swap in for this
-                    whole row, mirroring how desktop swaps the selection toolbar. */}
+                {/* Mobile Row 1 — the ANCHOR: an always-live search field (tap, type,
+                    results — no expand dance) with the filter funnel inside it as a
+                    trailing accessory, plus ONE tools capsule (view switcher ‖ select).
+                    Selection mode swaps in for the whole row. */}
                 {isLibraryView && (
                     isSelectionMode ? (
                         <div className="flex sm:hidden items-center animate-in fade-in slide-in-from-top-1 duration-200">
-                            {/* Same 30px height as the tools row it replaces — no layout hop. */}
-                            <div className="flex items-center gap-1 h-[30px] px-1.5 rounded-full bg-accent/10 border border-accent/20 animate-slide-up">
+                            {/* Same 40px height as the row it replaces — no layout hop. */}
+                            <div className="flex items-center gap-1 h-10 px-1.5 rounded-full bg-accent/10 border border-accent/20 animate-slide-up">
                                 <span className="text-xs font-bold text-accent px-1.5 tabular-nums">{selectedIds.size}</span>
                                 <button
                                     onClick={handleBulkArchive}
                                     disabled={selectedIds.size === 0}
                                     title="Archive selected"
                                     aria-label="Archive selected"
-                                    className="h-[26px] w-[26px] inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="h-8 w-8 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                 >
-                                    <Archive className="w-3.5 h-3.5" />
+                                    <Archive className="w-4 h-4" />
                                 </button>
                                 <button
                                     onClick={() => setConfirmBulkDelete(true)}
                                     disabled={selectedIds.size === 0}
                                     title="Delete selected"
                                     aria-label="Delete selected"
-                                    className="h-[26px] w-[26px] inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-red-500 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="h-8 w-8 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-red-500 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                 >
-                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <Trash2 className="w-4 h-4" />
                                 </button>
                                 <button
                                     onClick={() => {
@@ -1178,105 +1171,59 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     }}
                                     title="Cancel selection"
                                     aria-label="Cancel selection"
-                                    className="h-[26px] w-[26px] inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-card-hover hover:text-text transition-colors"
+                                    className="h-8 w-8 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-card-hover hover:text-text transition-colors"
                                 >
-                                    <X className="w-3.5 h-3.5" />
+                                    <X className="w-4 h-4" />
                                 </button>
                             </div>
                         </div>
-                    ) : mobileSearchOpen ? (
-                        <div className="flex sm:hidden items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                            <div className="relative flex-1 min-w-0">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
-                                <input
-                                    type="text"
-                                    autoFocus
-                                    dir="auto"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    onKeyDown={(e) => { if (e.key === 'Escape') setMobileSearchOpen(false); }}
-                                    placeholder="Search Machina…"
-                                    className="w-full h-10 pl-9 pr-9 bg-card border border-border-subtle rounded-full text-[15px] text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-transparent transition-all"
-                                />
+                    ) : (
+                    <div className="flex sm:hidden items-center gap-2">
+                        {/* Search — a real field, always visible. Filters (categories,
+                            tags, status, sort, sources) live behind the funnel inside
+                            the field, with one count badge for everything active. */}
+                        <div className="relative flex-1 min-w-0">
+                            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
+                            <input
+                                data-tour="search"
+                                type="text"
+                                enterKeyHint="search"
+                                dir="auto"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Search"
+                                className={`w-full h-10 ps-9 bg-card border border-border-subtle rounded-full text-[15px] text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-transparent transition-shadow ${searchQuery ? 'pe-[4.5rem]' : 'pe-10'}`}
+                            />
+                            <div className="absolute end-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                                 {searchQuery && (
                                     <button
                                         onClick={() => setSearchQuery('')}
                                         aria-label="Clear search"
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-fill-strong transition-colors"
+                                        className="h-7 w-7 inline-flex items-center justify-center rounded-full text-text-muted hover:text-text hover:bg-fill-strong transition-colors"
                                     >
-                                        <X className="w-4 h-4" />
+                                        <X className="w-3.5 h-3.5" />
                                     </button>
                                 )}
+                                <button
+                                    onClick={() => setIsFiltersOpen(true)}
+                                    aria-label="Filters — categories, tags, status, sort, sources"
+                                    className={`relative h-7 w-7 inline-flex items-center justify-center rounded-full transition-colors cursor-pointer ${activeMobileFilters > 0
+                                        ? 'bg-accent text-white shadow-sm'
+                                        : 'text-text-muted hover:text-text hover:bg-fill-strong'
+                                        }`}
+                                >
+                                    <Filter className="w-3.5 h-3.5" />
+                                    {activeMobileFilters > 0 && (
+                                        <span className="absolute -top-1 -end-1 flex items-center justify-center min-w-[15px] h-[15px] px-0.5 rounded-full text-[9px] font-bold tabular-nums bg-white text-accent border border-background shadow-sm">
+                                            {activeMobileFilters}
+                                        </span>
+                                    )}
+                                </button>
                             </div>
-                            <button
-                                onClick={() => setMobileSearchOpen(false)}
-                                className="shrink-0 text-[13px] font-semibold text-accent px-1.5 py-2"
-                            >
-                                Done
-                            </button>
                         </div>
-                    ) : (
-                    <div className="flex sm:hidden items-center gap-2">
-                        {/* Categories & Tags — icon-only chip. Accent-filled with a numeric
-                            count badge when categories/tags are selected (the label is gone,
-                            so the badge is the signal). Hidden when scoped to a collection;
-                            a same-width placeholder keeps the row from shifting. */}
-                        {selectedCollections.size === 0 ? (
-                            <button
-                                onClick={() => setIsCategoriesOpen(true)}
-                                aria-label="Filter by categories and tags"
-                                className={`${rowACtrl} shrink-0 relative w-9 px-0 ${(selectedCategory.size + selectedTags.size) > 0
-                                    ? 'bg-accent text-white border border-accent shadow-sm'
-                                    : rowAIdle
-                                    }`}
-                            >
-                                <Tags className="w-3.5 h-3.5" />
-                                {(selectedCategory.size + selectedTags.size) > 0 && (
-                                    <span className="absolute -top-1 -end-1 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold tabular-nums bg-white text-accent border border-background shadow-sm">
-                                        {selectedCategory.size + selectedTags.size}
-                                    </span>
-                                )}
-                            </button>
-                        ) : (
-                            <span className="w-9 shrink-0" aria-hidden="true" />
-                        )}
-                        {/* Filters (sort lives in the same sheet — one funnel is the whole
-                            signal). Same square shape and overlay count badge as the
-                            Categories chip: one badge language, and the chip never changes
-                            width when filters activate. */}
-                        <button
-                            onClick={() => setIsFiltersOpen(true)}
-                            aria-label="Filters and sort"
-                            className={`${rowACtrl} shrink-0 relative w-9 px-0 ${activeMobileFilters > 0
-                                ? 'bg-accent text-white border border-accent shadow-sm'
-                                : rowAIdle
-                                }`}
-                        >
-                            <Filter className="w-3.5 h-3.5" />
-                            {activeMobileFilters > 0 && (
-                                <span className="absolute -top-1 -end-1 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold tabular-nums bg-white text-accent border border-background shadow-sm">
-                                    {activeMobileFilters}
-                                </span>
-                            )}
-                        </button>
-                        {/* Search — icon only; expands into a large field in place. Reads
-                            accent when a query is active so it's clear a search is on. */}
-                        <button
-                            data-tour="search"
-                            onClick={() => setMobileSearchOpen(true)}
-                            aria-label="Search"
-                            className={`${rowACtrl} shrink-0 w-9 px-0 ${searchQuery
-                                ? 'bg-accent text-white border border-accent shadow-sm'
-                                : rowAIdle
-                                }`}
-                        >
-                            <Search className="w-3.5 h-3.5" />
-                        </button>
-                        {/* Spacer — pins the view switcher + select chip to the trailing edge. */}
-                        <span className="flex-1" />
-                        {/* View switcher — compact (30px) pills, icon-only, matched to the
-                            other Row 1 chips. */}
-                        <div data-tour="views" className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-card border border-border-subtle shrink-0">
+                        {/* Tools capsule — the three view pills and select in ONE shape,
+                            separated by a hairline. */}
+                        <div data-tour="views" className="flex items-center h-10 px-1 rounded-full bg-card border border-border-subtle shrink-0">
                             {viewModes.map(vm => {
                                 const active = viewMode === vm.key;
                                 return (
@@ -1286,7 +1233,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                         title={vm.hint}
                                         aria-pressed={active}
                                         aria-label={vm.hint}
-                                        className={`h-[26px] w-[26px] inline-flex items-center justify-center rounded-full cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 [&>svg]:w-3.5 [&>svg]:h-3.5 ${active
+                                        className={`h-8 w-8 inline-flex items-center justify-center rounded-full cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${active
                                             ? 'bg-accent text-white shadow-sm'
                                             : 'text-text-muted hover:text-text hover:bg-card-hover'
                                             }`}
@@ -1295,20 +1242,20 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     </button>
                                 );
                             })}
+                            <span className="w-px h-5 bg-border-subtle mx-1" aria-hidden="true" />
+                            <button
+                                onClick={() => setIsSelectionMode(true)}
+                                title="Select multiple"
+                                aria-label="Select multiple"
+                                className="h-8 w-8 inline-flex items-center justify-center rounded-full text-text-muted hover:text-accent hover:bg-card-hover cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                            >
+                                <CheckSquare className="w-4 h-4" />
+                            </button>
                         </div>
-                        {/* Select multiple — enters selection mode (which swaps the whole
-                            row for the accent toolbar above). */}
-                        <button
-                            onClick={() => setIsSelectionMode(true)}
-                            title="Select multiple"
-                            aria-label="Select multiple"
-                            className={`${rowACtrl} shrink-0 w-9 px-0 ${rowAIdle} hover:text-accent hover:border-accent/40`}
-                        >
-                            <CheckSquare className="w-3.5 h-3.5" />
-                        </button>
                     </div>
                     )
                 )}
+
 
                 {/* Row 2: Toolbar — filter / sort / source on the left, view & actions on the
                     right. Card-browsing layouts only; Ask and Collections hide it. */}
@@ -1402,42 +1349,72 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         those live here desktop-only (`hidden sm:contents`); on desktop
                         every `sm:contents` wrapper dissolves back into the inline cluster
                         (`sm:w-auto` on the chips restores their intrinsic width). */}
-                    <div className="grid grid-cols-3 items-center w-full gap-2 sm:flex sm:flex-nowrap sm:w-auto">
-                        <div className="flex sm:contents">
+                    <div className="flex items-center w-full gap-2 sm:w-auto">
+                        {/* Mobile: ONE continuous bar, three equal zones divided by
+                            hairlines (the QuickType-bar pattern) — a single object
+                            instead of three floating pills. Ask holds the center by
+                            construction. */}
+                        <div className="grid sm:hidden grid-cols-3 items-stretch h-10 w-full rounded-full bg-card border border-border-subtle overflow-hidden divide-x divide-border-subtle rtl:divide-x-reverse">
                             <button
                                 data-tour="collections"
                                 onClick={() => setViewMode('collections')}
                                 title="Browse collections"
                                 aria-label="Browse collections"
-                                className={`${ctrlBase} px-1 sm:px-3.5 w-full justify-center sm:w-auto sm:justify-start ${ctrlIdle}`}
+                                className="inline-flex items-center justify-center gap-1.5 text-[13px] font-semibold text-text-secondary hover:text-text hover:bg-card-hover active:bg-card-hover transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
                             >
                                 <Layers className="w-4 h-4" />
                                 <span>Collections</span>
                             </button>
+                            <button
+                                data-tour="ask"
+                                onClick={() => setViewMode('ask')}
+                                title="Ask your brain"
+                                aria-label="Ask your brain"
+                                className="inline-flex items-center justify-center gap-1.5 text-[13px] font-semibold text-text-secondary hover:text-text hover:bg-card-hover active:bg-card-hover transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
+                            >
+                                <MessagesSquare className="w-4 h-4" />
+                                <span>Ask</span>
+                            </button>
+                            <button
+                                onClick={() => setViewMode('digest')}
+                                title="Your curated digests"
+                                aria-label="Digest"
+                                className="inline-flex items-center justify-center gap-1.5 text-[13px] font-semibold text-text-secondary hover:text-text hover:bg-card-hover active:bg-card-hover transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
+                            >
+                                <Newspaper className="w-4 h-4" />
+                                <span>Digest</span>
+                            </button>
                         </div>
 
-                        {/* Ask — the hero destination, center segment. */}
-                        <div className="flex sm:contents">
+                        {/* Desktop: the original inline chips. */}
+                        <div className="hidden sm:contents">
+                            <button
+                                data-tour="collections"
+                                onClick={() => setViewMode('collections')}
+                                title="Browse collections"
+                                aria-label="Browse collections"
+                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
+                            >
+                                <Layers className="w-4 h-4" />
+                                <span>Collections</span>
+                            </button>
                             {isLibraryView && (
                             <button
                                 data-tour="ask"
                                 onClick={() => setViewMode('ask')}
                                 title="Ask your brain"
                                 aria-label="Ask your brain"
-                                className={`${ctrlBase} px-1 sm:px-3.5 w-full justify-center sm:w-auto sm:justify-start ${ctrlIdle}`}
+                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
                             >
                                 <MessagesSquare className="w-4 h-4" />
                                 <span>Ask</span>
                             </button>
                             )}
-                        </div>
-
-                        <div className="flex sm:contents">
                             <button
                                 onClick={() => setViewMode('digest')}
                                 title="Your curated digests"
                                 aria-label="Digest"
-                                className={`${ctrlBase} px-1 sm:px-3.5 w-full justify-center sm:w-auto sm:justify-start ${ctrlIdle}`}
+                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
                             >
                                 <Newspaper className="w-4 h-4" />
                                 <span>Digest</span>
@@ -1745,14 +1722,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     onToggleSourceKeys={handleToggleSourceKeys}
                     activeMobileFilters={activeMobileFilters}
                     setSelectedTags={setSelectedTags}
-                />
-
-                {/* Categories & Tags Sheet (Mobile) — categories and the full tag
-                    tree live together here, one tap from the home toolbar, so tags
-                    aren't buried inside the Filters sheet. */}
-                <MobileCategoriesTagsSheet
-                    isOpen={isCategoriesOpen}
-                    onClose={() => setIsCategoriesOpen(false)}
                     categories={categories}
                     selectedCategory={selectedCategory}
                     setSelectedCategory={setSelectedCategory}
@@ -1760,7 +1729,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     allTags={allTags}
                     tagCounts={tagCounts}
                     selectedTags={selectedTags}
-                    setSelectedTags={setSelectedTags}
                     onToggleTag={handleToggleTag}
                 />
 
@@ -1796,7 +1764,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                                 handleToggleSource(s.key);
                                                 // Jump to the source's library view: filter, drop the query.
                                                 setSearchQuery('');
-                                                setMobileSearchOpen(false);
                                             }}
                                             className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[13px] font-semibold border transition-colors ${active
                                                 ? 'bg-accent/12 border-accent/40 text-text'
