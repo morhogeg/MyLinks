@@ -617,7 +617,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — Ask follow-ups made SELF-CONTAINED (merge `64eb72a`,
+- **2026-07-13 (latest) — Search "not working" diagnosed: NOT a code bug —
+  the pending owner backend deploy.** Owner screenshot: "Muffins" → no
+  results + "meaning search is unavailable right now" on device. Root cause
+  chain: on-device semantic search (polish round 3's `search_links_http` +
+  firebase.json `/api/search` rewrite) has NEVER been deployed — every ship
+  since 2026-07-10 says "Backend NOT deployed — owner step" (cloud sessions
+  have no Firebase creds; egress to the project is proxy-blocked, re-verified
+  today). So native's POST /api/search 404s at Hosting → the hook degrades to
+  keyword-only → a Hebrew-titled (or private-collection) muffins card can't
+  keyword-match an English query. Code verified ready: `search_links_http`
+  compiles, rewrite committed, `py_compile` clean. **OWNER FIX (one-time, from
+  `main` on the Mac):**
+  1. `./deploy-functions.sh functions:analyze_image,functions:analyze_link,functions:ask_brain,functions:backfill_embeddings,functions:backfill_related_links,functions:backfill_youtube_channels,functions:check_reminders,functions:claim_workspace,functions:claim_workspace_http,functions:debug_status,functions:delete_account,functions:delete_account_http,functions:force_check_reminders,functions:force_send_digests,functions:force_sweep_stuck_processing,functions:get_article,functions:get_share_config,functions:ping,functions:process_link_background,functions:publish_share_http,functions:rebuild_connections,functions:register_device_token_http,functions:search_links,functions:search_links_http,functions:send_digest_now,functions:send_digests,functions:share_ingest,functions:share_page,functions:sweep_stuck_processing,functions:sync_link_embedding,functions:unpublish_share_http,functions:unregister_device_token_http`
+     (ALL functions — weeks of backend work are pending, incl. the search
+     twin, embedding sync, share/service/digest/reminder changes.)
+  2. `./deploy-hosting.sh` (REQUIRED once — publishes the `/api/search`
+     rewrite so the native app can reach the search twin).
+  3. Hit `backfill_embeddings` once with `$ADMIN_TOKEN` so pre-existing cards
+     get embeddings (new saves embed via `sync_link_embedding` post-deploy).
+  Until these run, device search stays keyword-only by graceful degradation.
+- **2026-07-13 — Ask follow-ups made SELF-CONTAINED (merge `64eb72a`,
   commit `fba0b1e`).** Build 1089's evidence gating was NOT sufficient — owner
   repro'd "Give me more detail" → "sources do not contain…" on a cited card.
   Root cause: the backend retrieves by the question text alone (no query
