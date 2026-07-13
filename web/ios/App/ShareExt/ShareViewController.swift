@@ -254,6 +254,17 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         }
     }
 
+    /// Remove the hand-off flag entirely — used when NO card will follow (the
+    /// server deduped this URL against an existing card), so the app never
+    /// floats a progress banner for a card that will never arrive.
+    private func clearPendingShareHint() {
+        guard let defaults = UserDefaults(suiteName: Self.appGroup) else { return }
+        defaults.removeObject(forKey: "pendingShareAt")
+        defaults.removeObject(forKey: "pendingShareKind")
+        defaults.removeObject(forKey: "pendingShareProgress")
+        defaults.removeObject(forKey: "pendingShareStartedAt")
+    }
+
     // MARK: - Scan UI (images)
 
     private func setupScanUI() {
@@ -596,15 +607,55 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         UIView.animate(withDuration: 0.2) { self.barTrack.layoutIfNeeded() }
     }
 
-    /// Drive the counter to 100% + green check, then dismiss.
+    /// Mark the save as acknowledged — green check — while the bar KEEPS the
+    /// shared-curve value. The server has only queued the item; analysis runs
+    /// 15–20s more, and the in-app banner resumes from this same number. The old
+    /// snap-to-100 here made the app's honest % look like a restart (owner bug:
+    /// "extension showed done, app was at 20%").
     private func completeScanSuccess(then: @escaping () -> Void) {
         DispatchQueue.main.async {
             self.displayLink?.invalidate()
             self.displayLink = nil
-            self.ceiling = 100
-            self.progress = 100
-            self.renderProgress(100, done: true)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { then() }
+            self.sweepView.isHidden = true
+            self.linkGlyph.alpha = 0
+            self.percentLabel.alpha = 0
+            self.checkLabel.alpha = 1
+            self.barFill.backgroundColor = Self.successGreen
+            self.phaseLabel.text = "Saved — Machina is reading it…"
+            // Hand the app EXACTLY this % (the hint carries progress + start
+            // clock) so its loader continues the ramp instead of restarting.
+            self.writePendingShareHint()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) { then() }
+        }
+    }
+
+    /// 2xx but the server deduped: this URL is already a card in the library and
+    /// no new card will appear. Say so honestly — a plain "Saved ✓" promises a
+    /// new card — and clear the hand-off hint so the app shows no phantom loader.
+    private func showDuplicateResult() {
+        DispatchQueue.main.async {
+            guard !self.resultShown else { return }
+            self.resultShown = true
+            self.displayLink?.invalidate()
+            self.displayLink = nil
+            self.clearPendingShareHint()
+            if self.isImageFlow || self.isLinkFlow {
+                self.sweepView.isHidden = true
+                self.linkGlyph.alpha = 0
+                self.percentLabel.alpha = 0
+                self.checkLabel.alpha = 1
+                self.barFill.backgroundColor = Self.successGreen
+                self.barFillWidth.constant = self.barTrack.bounds.width
+                self.phaseLabel.text = "Already in your library"
+                self.hintLabel.text = "This one is saved in Machina — no new card was added."
+                UIView.animate(withDuration: 0.2) { self.barTrack.layoutIfNeeded() }
+            } else {
+                self.card.isHidden = false
+                self.label.text = "Already in your library"
+                self.spinner.stopAnimating()
+                self.spinner.isHidden = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { self.finish() }
         }
     }
 
@@ -984,7 +1035,14 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         } else {
             let code = (task.response as? HTTPURLResponse)?.statusCode ?? 0
             if (200...299).contains(code) {
-                showResult("Saved to Machina ✓", success: true)
+                // The server acks duplicates with 200 + {"duplicate": true} and
+                // creates NO new card — that must not read as a fresh save.
+                let body = (try? JSONSerialization.jsonObject(with: responseData)) as? [String: Any]
+                if (body?["duplicate"] as? Bool) == true {
+                    showDuplicateResult()
+                } else {
+                    showResult("Saved to Machina ✓", success: true)
+                }
             } else if code == 403 || code == 401 {
                 showResult("Auth failed — reopen Machina", success: false)
             } else {

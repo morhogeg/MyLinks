@@ -48,11 +48,38 @@ export async function consumePendingShare(): Promise<PendingShare> {
             res.kind === 'image' ? 'image' : res.kind === 'video' ? 'video' : 'link';
         const progress = typeof res.progress === 'number' && res.progress > 0 ? res.progress : undefined;
         const startedAt = typeof res.startedAt === 'number' && res.startedAt > 0 ? res.startedAt : undefined;
+        const now = Date.now();
+        // Remember the hand-off for the rest of the surfaces: the flag itself is
+        // one-shot (native clears it on read), but the REAL processing banner
+        // takes over later and must still anchor/floor to what the extension
+        // showed — see lastShareHandoff().
+        lastHandoff = {
+            startMs: startedAt ?? now - Math.max(0, res.ageMs ?? 0),
+            pct: progress,
+            consumedAt: now,
+        };
         return { pending: true, kind, ageMs: Math.max(0, res.ageMs ?? 0), progress, startedAt };
     } catch {
         // Older builds without the native method, or no App Group — treat as none.
         return { pending: false, kind: 'link', ageMs: 0 };
     }
+}
+
+export interface ShareHandoff {
+    /** Capture-start wall clock (epoch ms) the extension anchored to. */
+    startMs: number;
+    /** The % the extension HUD showed at hand-off, if known. */
+    pct?: number;
+    /** When the app consumed the hint (epoch ms). */
+    consumedAt: number;
+}
+
+let lastHandoff: ShareHandoff | null = null;
+
+/** The most recent Share-Extension hand-off consumed this session, or null.
+    Callers should ignore stale entries (compare consumedAt to their own clock). */
+export function lastShareHandoff(): ShareHandoff | null {
+    return lastHandoff;
 }
 
 export type ShareBridgeState = 'ok' | 'error' | 'pending' | 'n/a';
