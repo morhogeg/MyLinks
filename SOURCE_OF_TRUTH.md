@@ -617,7 +617,29 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — Polish round 2: owner feedback on build 1075 (branch
+- **2026-07-13 (latest) — Polish round 3: meaning search + header refinement.**
+  (1) **Home search finds by MEANING on device now** — root cause: semantic
+  search ran only through the `search_links` **callable**, which fails the
+  `capacitor://localhost` CORS preflight (the documented claim_workspace bug
+  class) and the hook swallowed the error, silently degrading iPhone search to
+  keyword-only. Fix mirrors the proven twin pattern: new `search_links_http`
+  (bearer/App Check/rate-limited, reuses `perform_search_logic`), firebase.json
+  + vercel.json `/api/search` rewrites, native branch in `useSemanticSearch`
+  (`authHeaders`+`appCheckHeaders`+`fetchWithTimeout`), `searchError` surfaced
+  with graceful keyword-only degradation, "Searching by meaning…" in-flight
+  line above the grid, distinct empty-state copy, `dir="auto"` on search
+  inputs; +4 backend tests (174 total). (2) **Header refinement (owner-approved
+  mockup variant B):** Row A (Categories & Tags / Filters / Search) shrunk to
+  30px/12px muted with active states unchanged, mobile row gap tightened, Ask
+  chip soft accent fill (mobile only). (3) **Clip bug fixed:** Row B could
+  exceed the 358px content width (owner screenshot) — `flex-wrap` added so the
+  selection-mode toolbar (incl. its X) drops to its own fully-visible line;
+  arithmetic in commit `44ea20c`. (4) Digest count badge removed. **OWNER
+  DEPLOY STEPS (grew this round):** functions deploy (same list + NEW
+  `search_links_http`), **`./deploy-hosting.sh`** (firebase.json `/api/search`
+  rewrite — REQUIRED for native meaning-search), `backfill_embeddings` once.
+  Until then device search stays keyword-only (graceful).
+- **2026-07-13 — Polish round 2: owner feedback on build 1075 (branch
   `claude/app-polish-multi-agent-0gqmaf`, multi-agent session).** (1) **Home
   header REVERTED** to the pre-redesign layout (owner: "the top chips design
   is terrible") — `MobileCategoriesTagsSheet` restored, `MobileFiltersSheet`
