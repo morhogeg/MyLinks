@@ -617,7 +617,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — Ask polish: origin-aware thinking status + airtight
+- **2026-07-13 (latest) — Steady Add-to-Machina dialog (merge `0c0e89b`,
+  commit `b062064`).** Owner screenshot: the capture dialog jumped up/down
+  when toggling Link/Image/Note — it was vertically centered on its LIVE
+  content height, so each tab re-centered the frame. Fix: the mobile top is
+  now computed by centering a FIXED estimated height (460px constant across
+  tabs), and the three tabs share an equal-height 170px content area (note
+  textarea + image drop zone pinned to it, link input centered within), so
+  the frame, tabs, and Save button all hold one position; the form scrolls
+  internally (`max-h-full overflow-y-auto`) when the visible viewport is
+  shorter than the card. **SHIPPED:** Vercel live; **iOS: TestFlight run #90
+  → build 1090** via temp trigger `claude/ship-tf-trigger-addform` (queued
+  behind run #89 — the ios-testflight concurrency group serializes runs).
+- **2026-07-13 — Ask polish: origin-aware thinking status + airtight
   follow-up chips (merge `3e11c48`, feature commit `1668545`).** Owner flagged
   two Ask quality bugs on device. (1) Thinking micro-copy now matches the
   ask's origin (`AskOrigin` in AskBrain: free/card/library/followup) — tapping
