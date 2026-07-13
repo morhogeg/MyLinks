@@ -22,6 +22,7 @@ from search import (
     EMBED_TEXT_VERSION,
     _EMBED_TEXT_MAX_CHARS,
 )
+from ai_service import collect_notes_text
 
 
 # ── build_embedding_text ───────────────────────────────────────────────────
@@ -60,13 +61,41 @@ def test_embed_text_order_puts_headline_before_detail():
 
 def test_embed_text_folds_in_user_note():
     # The user's own note (their voice) is embedded so a card is findable by what
-    # the user wrote about it — placed after Details, before Tags.
+    # the user wrote about it — placed after Details, before Tags. Legacy single
+    # `userNote` string still works after the multi-note change.
     text = build_embedding_text({
         "title": "T", "summary": "S", "detailedSummary": "D",
         "userNote": "reminded me of the 2008 crash", "tags": ["tag"],
     })
     assert "Note: reminded me of the 2008 crash" in text
     assert text.index("Details: D") < text.index("Note:") < text.index("Tags:")
+
+
+def test_embed_text_folds_in_multi_note_array():
+    # v4: the multi-note `userNotes` array is embedded too — every note's text,
+    # so a card is findable by ANY of the user's notes, not just the first.
+    text = build_embedding_text({
+        "title": "T", "summary": "S",
+        "userNotes": [
+            {"id": "a", "text": "first take on it", "createdAt": 2},
+            {"id": "b", "text": "second thought later", "createdAt": 1},
+        ],
+        "tags": ["tag"],
+    })
+    assert "first take on it" in text
+    assert "second thought later" in text
+    assert text.index("Note:") < text.index("Tags:")
+
+
+def test_embed_text_merges_legacy_and_array_notes():
+    # A card mid-migration (both shapes) contributes both to the embedding.
+    text = build_embedding_text({
+        "title": "T",
+        "userNote": "legacy note",
+        "userNotes": [{"id": "a", "text": "array note", "createdAt": 1}],
+    })
+    assert "legacy note" in text
+    assert "array note" in text
 
 
 def test_embed_text_omits_missing_fields_cleanly():
@@ -90,7 +119,44 @@ def test_embed_text_is_truncated_to_model_budget():
 
 
 def test_embed_version_is_current():
-    assert EMBED_TEXT_VERSION >= 2  # v1 was the too-thin title+summary+tags recipe
+    assert EMBED_TEXT_VERSION >= 4  # v4 folds in the multi-note userNotes array
+
+
+# ── collect_notes_text (shared legacy+array note reader) ───────────────────
+
+def test_collect_notes_text_legacy_only():
+    assert collect_notes_text({"userNote": "just one"}) == "just one"
+
+
+def test_collect_notes_text_array_only():
+    out = collect_notes_text({"userNotes": [
+        {"id": "a", "text": "one", "createdAt": 1},
+        {"id": "b", "text": "two", "createdAt": 2},
+    ]})
+    assert "one" in out and "two" in out
+
+
+def test_collect_notes_text_merges_both_shapes():
+    out = collect_notes_text({
+        "userNote": "legacy",
+        "userNotes": [{"id": "a", "text": "array", "createdAt": 1}],
+    })
+    assert "legacy" in out and "array" in out
+
+
+def test_collect_notes_text_skips_blank_and_malformed():
+    out = collect_notes_text({"userNotes": [
+        {"id": "a", "text": "   "},          # blank → dropped
+        {"id": "b", "text": "kept"},
+        "not-a-dict",                          # malformed → ignored
+        {"id": "c"},                           # no text → ignored
+    ]})
+    assert out == "kept"
+
+
+def test_collect_notes_text_empty_for_note_less_card():
+    assert collect_notes_text({}) == ""
+    assert collect_notes_text({"userNote": "   "}) == ""
 
 
 # ── keyword_query_tokens / keyword_match_score ─────────────────────────────

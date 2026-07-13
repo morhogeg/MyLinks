@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Link, LinkStatus } from '@/lib/types';
+import { Link, LinkStatus, UserNote } from '@/lib/types';
 import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2, ChevronLeft, StickyNote } from 'lucide-react';
 import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
@@ -14,7 +14,12 @@ import { hasHebrew } from '@/lib/rtl';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { getRelatedCards } from '@/lib/related';
+import { getNotes, makeNote, touchNote } from '@/lib/notes';
 import { hapticSuccess, hapticMedium } from '@/lib/haptics';
+
+// Sentinel `editingNoteId` for the composer when adding a brand-new note (as
+// opposed to editing an existing one, keyed by its real id).
+const NEW_NOTE_ID = '__new_note__';
 
 /**
  * Split a "M:SS — description" (or "H:MM:SS …") video highlight into its
@@ -52,7 +57,7 @@ interface LinkDetailModalProps {
     onUpdateCategory: (id: string, category: string) => void;
     onUpdateTitle?: (id: string, title: string) => void;
     onUpdateSummary?: (id: string, summary: string) => void;
-    onUpdateNote?: (id: string, note: string) => void;
+    onUpdateNotes?: (id: string, notes: UserNote[], removed?: boolean) => void;
     onDelete: (id: string) => void;
     onUpdateReminder: (link: Link) => void;
     onOpenOtherLink?: (link: Link) => void;
@@ -76,7 +81,7 @@ export default function LinkDetailModal({
     onUpdateCategory,
     onUpdateTitle,
     onUpdateSummary,
-    onUpdateNote,
+    onUpdateNotes,
     onDelete,
     onUpdateReminder,
     onOpenOtherLink,
@@ -94,9 +99,11 @@ export default function LinkDetailModal({
     const [isEditingSummary, setIsEditingSummary] = useState(false);
     const [titleDraft, setTitleDraft] = useState('');
     const [summaryDraft, setSummaryDraft] = useState('');
-    // The user's personal note on this card — their own thought, editable and
-    // held locally while writing, committed on Save.
-    const [isEditingNote, setIsEditingNote] = useState(false);
+    // The user's personal notes on this card — a list, newest first. One note is
+    // open in the composer at a time: `editingNoteId` holds its id (or NEW_NOTE_ID
+    // when adding a fresh note, or null when the list is just being read). The
+    // draft text is held locally while writing, committed on Save/blur.
+    const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [noteDraft, setNoteDraft] = useState('');
     const [imgFailed, setImgFailed] = useState(false);
     // Reset the broken-image fallback when navigating to a different card. Done
@@ -111,7 +118,7 @@ export default function LinkDetailModal({
         // never leaks onto the wrong card.
         setIsEditingTitle(false);
         setIsEditingSummary(false);
-        setIsEditingNote(false);
+        setEditingNoteId(null);
     }
 
     const saveTitle = () => {
@@ -141,17 +148,44 @@ export default function LinkDetailModal({
         el.style.height = `${el.scrollHeight}px`;
     };
 
-    const saveNote = () => {
-        noteActionRef.current = 'save';
-        const n = noteDraft.trim();
-        setIsEditingNote(false);
-        if (n !== (link.userNote || '')) { onUpdateNote?.(link.id, n); hapticSuccess(); }
+    // The card's notes, newest first — the ONE reader that reconciles the legacy
+    // `userNote` string with the `userNotes` array (lib/notes). Every write goes
+    // back through onUpdateNotes with the full list, so saving ANY note migrates a
+    // legacy-only card to the array shape and clears the legacy field.
+    const notes = getNotes(link);
+    const isNewNote = editingNoteId === NEW_NOTE_ID;
+
+    // Commit the current draft into the note list. Shared by explicit Save and the
+    // save-on-blur guard so writing can never be lost. A new note is prepended
+    // (newest first); an existing note has its text + updatedAt replaced. An empty
+    // draft is a no-op here — emptying an existing note is a Delete, not a Save.
+    const commitNoteDraft = () => {
+        const text = noteDraft.trim();
+        if (!text) return;
+        if (isNewNote) {
+            onUpdateNotes?.(link.id, [makeNote(text), ...notes]);
+            hapticSuccess();
+        } else {
+            const existing = notes.find(n => n.id === editingNoteId);
+            if (!existing || existing.text === text) return; // unchanged — skip the write
+            onUpdateNotes?.(link.id, notes.map(n => n.id === editingNoteId ? touchNote(n, text) : n));
+            hapticSuccess();
+        }
     };
-    const cancelNote = () => { noteActionRef.current = 'cancel'; setIsEditingNote(false); };
-    const deleteNote = () => {
+    const saveNote = () => { noteActionRef.current = 'save'; setEditingNoteId(null); commitNoteDraft(); };
+    const cancelNote = () => { noteActionRef.current = 'cancel'; setEditingNoteId(null); };
+    // Remove a note — from the composer's Delete button (removes the note being
+    // edited) or a list row's trash (removes that row). A brand-new, unsaved note
+    // just closes the composer. Mirrors the inline tag-delete pattern: instant,
+    // confirmed by a toast, no modal.
+    const deleteNote = (id: string) => {
         noteActionRef.current = 'delete';
-        setIsEditingNote(false);
-        if (link.userNote) { onUpdateNote?.(link.id, ''); hapticMedium(); }
+        setEditingNoteId(null);
+        if (id === NEW_NOTE_ID) { hapticMedium(); return; }
+        if (notes.some(n => n.id === id)) {
+            onUpdateNotes?.(link.id, notes.filter(n => n.id !== id), true);
+            hapticMedium();
+        }
     };
     // Save-on-blur guard: if the composer loses focus with NO explicit action
     // pending (tapped elsewhere, keyboard dismissed), auto-commit a non-empty
@@ -159,11 +193,11 @@ export default function LinkDetailModal({
     // silently deletes an existing note (that needs the explicit Delete button).
     const onNoteBlur = () => {
         if (noteActionRef.current) { noteActionRef.current = null; return; }
-        const n = noteDraft.trim();
-        setIsEditingNote(false);
-        if (n && n !== (link.userNote || '')) { onUpdateNote?.(link.id, n); hapticSuccess(); }
+        setEditingNoteId(null);
+        commitNoteDraft();
     };
-    const startEditNote = () => { setNoteDraft(link.userNote || ''); noteActionRef.current = null; setIsEditingNote(true); };
+    const startAddNote = () => { setNoteDraft(''); noteActionRef.current = null; setEditingNoteId(NEW_NOTE_ID); };
+    const startEditNote = (n: UserNote) => { setNoteDraft(n.text); noteActionRef.current = null; setEditingNoteId(n.id); };
     const hasValidImage = !!link.url && /^https?:\/\//.test(link.url);
 
     // Scroll back to the top when the card changes. Opening a related card reuses
@@ -201,14 +235,14 @@ export default function LinkDetailModal({
     // the END of any existing text (so editing continues where the note left
     // off, not with the whole thing selected), and size it to its content.
     useEffect(() => {
-        if (!isEditingNote) return;
+        if (!editingNoteId) return;
         const el = noteTextareaRef.current;
         if (!el) return;
         autoGrowNote(el);
         el.focus({ preventScroll: true });
         const end = el.value.length;
         try { el.setSelectionRange(end, end); } catch { /* older WebViews */ }
-    }, [isEditingNote]);
+    }, [editingNoteId]);
 
     // Keep the composer above the on-screen keyboard (M5, visual-viewport). The
     // modal is already clamped to the visible viewport; here we scroll the
@@ -216,12 +250,12 @@ export default function LinkDetailModal({
     // changes vp.height, so the input + its Save/Cancel row never sit under the
     // keys — the core "keyboard covers the note field" fix.
     useEffect(() => {
-        if (!isEditingNote) return;
+        if (!editingNoteId) return;
         const t = setTimeout(() => {
             noteEditorRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
         }, 100);
         return () => clearTimeout(t);
-    }, [isEditingNote, vp.height]);
+    }, [editingNoteId, vp.height]);
 
     // A11y: move focus into the dialog on open and restore it to the trigger on
     // close. Keyed on isOpen only, so navigating between related cards (which
@@ -250,14 +284,14 @@ export default function LinkDetailModal({
             if (isReading) setIsReading(false);
             else if (isEditingTitle) setIsEditingTitle(false);
             else if (isEditingSummary) setIsEditingSummary(false);
-            else if (isEditingNote) setIsEditingNote(false);
+            else if (editingNoteId) setEditingNoteId(null);
             else if (isEditingCategory) setIsEditingCategory(false);
             else if (isAddingTag) setIsAddingTag(false);
             else onClose();
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [isOpen, isReading, isEditingTitle, isEditingSummary, isEditingNote, isEditingCategory, isAddingTag, onClose]);
+    }, [isOpen, isReading, isEditingTitle, isEditingSummary, editingNoteId, isEditingCategory, isAddingTag, onClose]);
 
     if (!isOpen) return null;
 
@@ -314,6 +348,61 @@ export default function LinkDetailModal({
     };
 
     const allTags = Array.from(new Set(allLinks.flatMap(l => l.tags))).sort();
+
+    // The note composer — one instance, rendered either at the top of the list
+    // (adding a new note) or in place of the row being edited. Keeps every good
+    // property of the revamp: keyboard-safe (noteEditorRef is scrolled above the
+    // keyboard), auto-growing, explicit Save/Cancel/Delete, ⌘/Ctrl+Enter to save,
+    // Escape to cancel, save-on-blur (onNoteBlur) so writing is never lost, and
+    // RTL-safe via dir="auto".
+    const renderNoteComposer = () => (
+        <div ref={noteEditorRef} onBlur={onNoteBlur} className="scroll-mt-6">
+            <textarea
+                ref={noteTextareaRef}
+                value={noteDraft}
+                onChange={(e) => { setNoteDraft(e.target.value); autoGrowNote(e.target); }}
+                onKeyDown={(e) => {
+                    // Notes are multi-line, so plain Enter adds a line;
+                    // ⌘/Ctrl+Enter saves (a familiar "commit" chord).
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveNote(); }
+                    // Escape discards the draft (explicit cancel).
+                    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancelNote(); }
+                }}
+                rows={3}
+                dir="auto"
+                placeholder={isRtl ? 'מה דעתך על זה?' : 'Add your take…'}
+                aria-label="Edit your note"
+                className={`w-full min-h-[6.5rem] max-h-[45vh] overflow-y-auto text-base text-text bg-background border border-accent/40 rounded-xl px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none placeholder:text-text-muted/50 leading-relaxed ${isRtl ? 'text-right' : ''}`}
+            />
+            <div className="flex items-center gap-2 mt-2">
+                <button
+                    onPointerDown={() => { noteActionRef.current = 'save'; }}
+                    onClick={saveNote}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
+                >
+                    <Check className="w-3.5 h-3.5" /> {isRtl ? 'שמור הערה' : 'Save note'}
+                </button>
+                <button
+                    onPointerDown={() => { noteActionRef.current = 'cancel'; }}
+                    onClick={cancelNote}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-fill-subtle text-text-muted text-xs font-bold hover:text-text hover:bg-fill-strong transition-all"
+                >
+                    {isRtl ? 'ביטול' : 'Cancel'}
+                </button>
+                {/* Delete only when editing an existing note; a brand-new note is
+                    discarded by Cancel, not deleted. */}
+                {!isNewNote && (
+                    <button
+                        onPointerDown={() => { noteActionRef.current = 'delete'; }}
+                        onClick={() => deleteNote(editingNoteId as string)}
+                        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-text-muted/70 hover:text-red-400 transition-all ${isRtl ? 'mr-auto' : 'ml-auto'}`}
+                    >
+                        <Trash2 className="w-3.5 h-3.5" /> {isRtl ? 'מחק' : 'Delete'}
+                    </button>
+                )}
+            </div>
+        </div>
+    );
 
     return (
         <>
@@ -902,91 +991,75 @@ export default function LinkDetailModal({
                             )}
                         </div>
 
-                        {/* My note — the user's OWN annotation on this card, on
+                        {/* My notes — the user's OWN annotations on this card, on
                             every card regardless of source, kept visually distinct
-                            from the AI summary. Empty state is an inviting one-tap
-                            "Add a note"; a saved note reads back in a warm accent
-                            panel that's tap-anywhere-to-edit. */}
-                        {onUpdateNote && (
+                            from the AI summary. A list, newest first: each note
+                            reads back in a calm accent panel with its relative date,
+                            tap-anywhere-to-edit, and hover edit/delete. "Add a note"
+                            appends another. One composer is open at a time. Kept
+                            calm — a notes list, not a chat. */}
+                        {onUpdateNotes && (
                             <div className="mb-8 border-t border-border-subtle pt-6">
                                 <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider mb-3 flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
                                     <StickyNote className="w-4 h-4 text-accent" />
-                                    {isRtl ? 'ההערה שלי' : 'My note'}
+                                    {isRtl ? (notes.length > 1 ? 'ההערות שלי' : 'ההערה שלי') : (notes.length > 1 ? 'My notes' : 'My note')}
                                 </h3>
-                                {isEditingNote ? (
-                                    // onBlur bubbles from the textarea: the guard in onNoteBlur
-                                    // auto-commits a non-empty draft if focus leaves the composer
-                                    // without an explicit Save/Cancel/Delete, so writing is never
-                                    // lost. scroll-mt keeps a little breathing room above the
-                                    // composer when it's scrolled into view over the keyboard.
-                                    <div ref={noteEditorRef} onBlur={onNoteBlur} className="scroll-mt-6">
-                                        <textarea
-                                            ref={noteTextareaRef}
-                                            value={noteDraft}
-                                            onChange={(e) => { setNoteDraft(e.target.value); autoGrowNote(e.target); }}
-                                            onKeyDown={(e) => {
-                                                // Notes are multi-line, so plain Enter adds a line;
-                                                // ⌘/Ctrl+Enter saves (a familiar "commit" chord).
-                                                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveNote(); }
-                                                // Escape discards the draft (explicit cancel).
-                                                else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancelNote(); }
-                                            }}
-                                            rows={3}
-                                            dir="auto"
-                                            placeholder={isRtl ? 'מה דעתך על זה?' : 'Add your take…'}
-                                            aria-label="Edit your note"
-                                            className={`w-full min-h-[6.5rem] max-h-[45vh] overflow-y-auto text-base text-text bg-background border border-accent/40 rounded-xl px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none placeholder:text-text-muted/50 leading-relaxed ${isRtl ? 'text-right' : ''}`}
-                                        />
-                                        <div className="flex items-center gap-2 mt-2">
-                                            <button
-                                                onPointerDown={() => { noteActionRef.current = 'save'; }}
-                                                onClick={saveNote}
-                                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
+
+                                <div className="space-y-2.5">
+                                    {/* A brand-new note is the newest, so its composer
+                                        opens at the top of the list. */}
+                                    {isNewNote && renderNoteComposer()}
+
+                                    {notes.map((n) => (
+                                        editingNoteId === n.id ? (
+                                            <div key={n.id}>{renderNoteComposer()}</div>
+                                        ) : (
+                                            <div
+                                                key={n.id}
+                                                className="group/note relative rounded-xl bg-accent/[0.06] border border-accent/15 hover:border-accent/30 transition-colors"
                                             >
-                                                <Check className="w-3.5 h-3.5" /> Save note
-                                            </button>
-                                            <button
-                                                onPointerDown={() => { noteActionRef.current = 'cancel'; }}
-                                                onClick={cancelNote}
-                                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-fill-subtle text-text-muted text-xs font-bold hover:text-text hover:bg-fill-strong transition-all"
-                                            >
-                                                Cancel
-                                            </button>
-                                            {link.userNote && (
-                                                <button
-                                                    onPointerDown={() => { noteActionRef.current = 'delete'; }}
-                                                    onClick={deleteNote}
-                                                    className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-text-muted/70 hover:text-red-400 transition-all ${isRtl ? 'mr-auto' : 'ml-auto'}`}
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" /> Delete
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                ) : link.userNote ? (
-                                    <div
-                                        onClick={startEditNote}
-                                        className="group/note relative rounded-xl bg-accent/[0.06] border border-accent/15 px-4 py-3.5 cursor-text hover:border-accent/30 transition-colors"
-                                    >
-                                        <p dir="auto" className={`text-base text-text whitespace-pre-wrap leading-relaxed ${isRtl ? 'text-right' : ''}`}>
-                                            {link.userNote}
-                                        </p>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); startEditNote(); }}
-                                            aria-label="Edit your note"
-                                            title="Edit note"
-                                            className={`absolute top-2 opacity-0 group-hover/note:opacity-100 focus:opacity-100 transition-opacity p-1.5 hover:bg-fill-subtle rounded-md ${isRtl ? 'left-2' : 'right-2'}`}
-                                        >
-                                            <Pencil className="w-4 h-4 text-text-muted/50 hover:text-text-muted" />
-                                        </button>
-                                    </div>
-                                ) : (
+                                                <div onClick={() => startEditNote(n)} className="px-4 py-3.5 cursor-text">
+                                                    <p dir="auto" className={`text-base text-text whitespace-pre-wrap leading-relaxed ${isRtl ? 'text-right' : ''}`}>
+                                                        {n.text}
+                                                    </p>
+                                                    <span className={`mt-2 block text-[11px] font-medium text-text-muted/60 ${isRtl ? 'text-right' : ''}`}>
+                                                        {getTimeAgo(n.updatedAt ?? n.createdAt, now)}
+                                                    </span>
+                                                </div>
+                                                <div className={`absolute top-2 flex items-center gap-0.5 opacity-0 group-hover/note:opacity-100 focus-within:opacity-100 transition-opacity ${isRtl ? 'left-2' : 'right-2'}`}>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); startEditNote(n); }}
+                                                        aria-label="Edit note"
+                                                        title="Edit note"
+                                                        className="p-1.5 hover:bg-fill-subtle rounded-md"
+                                                    >
+                                                        <Pencil className="w-4 h-4 text-text-muted/50 hover:text-text-muted" />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); deleteNote(n.id); }}
+                                                        aria-label="Delete note"
+                                                        title="Delete note"
+                                                        className="p-1.5 hover:bg-fill-subtle rounded-md"
+                                                    >
+                                                        <Trash2 className="w-4 h-4 text-text-muted/50 hover:text-red-400" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )
+                                    ))}
+                                </div>
+
+                                {/* Add another note — hidden while a new-note composer
+                                    is already open (there's nothing to add on top of). */}
+                                {!isNewNote && (
                                     <button
-                                        onClick={startEditNote}
-                                        className={`w-full flex items-center gap-2 px-4 py-3 rounded-xl border border-dashed border-border-strong text-text-muted/70 hover:text-accent hover:border-accent/40 hover:bg-accent/[0.04] active:scale-[0.99] transition-all ${isRtl ? 'flex-row-reverse' : ''}`}
+                                        onClick={startAddNote}
+                                        className={`mt-2.5 w-full flex items-center gap-2 px-4 py-3 rounded-xl border border-dashed border-border-strong text-text-muted/70 hover:text-accent hover:border-accent/40 hover:bg-accent/[0.04] active:scale-[0.99] transition-all ${isRtl ? 'flex-row-reverse' : ''}`}
                                     >
                                         <Plus className="w-4 h-4 shrink-0" />
-                                        <span className="text-sm font-semibold">{isRtl ? 'הוסף הערה' : 'Add a note'}</span>
+                                        <span className="text-sm font-semibold">
+                                            {notes.length ? (isRtl ? 'הוסף הערה' : 'Add note') : (isRtl ? 'הוסף הערה' : 'Add a note')}
+                                        </span>
                                     </button>
                                 )}
                             </div>

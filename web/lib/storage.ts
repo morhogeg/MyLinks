@@ -3,7 +3,7 @@ import { db, appCheckHeaders } from './firebase';
 import { authHeaders } from './auth';
 import { apiUrl, fetchWithTimeout } from './api';
 
-import { AnalyzeResponse, Link, LinkMetadata, LinkStatus, User } from './types';
+import { AnalyzeResponse, Link, LinkMetadata, LinkStatus, User, UserNote } from './types';
 
 /**
  * Normalize a Firestore link doc into a safe `Link`.
@@ -398,25 +398,34 @@ export async function updateLinkSummary(uid: string, id: string, summary: string
 }
 
 /**
- * Set (or clear) the user's **personal note** on any card — their own thought
- * about a saved item, distinct from the AI summary. An empty note removes the
- * field entirely (via deleteField) so a card is cleanly "note-less" again rather
- * than carrying an empty string. Nothing else writes `userNote`, so the edit is
- * durable.
+ * Write the user's **personal notes** on a card — their own thoughts, distinct
+ * from the AI summary. Takes the full desired note list (the editor computes it
+ * from getNotes + its edit) and persists it to `userNotes`, always **migrating
+ * away from the legacy `userNote` string**: the legacy field is deleted on every
+ * write, so a card converges to the array shape the first time its notes are
+ * touched. An empty list removes `userNotes` too, so a note-less card carries no
+ * empty array.
  *
- * The note is part of the card's embedded/searchable text (search.py folds
- * `userNote` into build_embedding_text), so every note write also flips
- * `needsEmbedding` — the `sync_link_embedding` trigger only re-embeds when that
- * flag (or a repair condition) is set, so without it a note edit would never
- * refresh the vector. Clearing a note sets the same flag so the stale note text
- * is dropped from the embedding on the next pass.
+ * Notes are part of the card's embedded/searchable text (search.py folds every
+ * note into build_embedding_text), so every write flips `needsEmbedding` — the
+ * `sync_link_embedding` trigger only re-embeds when that flag (or a repair
+ * condition) is set, so without it a note edit would never refresh the vector.
  */
-export async function updateLinkNote(uid: string, id: string, note: string): Promise<void> {
+export async function updateLinkNotes(uid: string, id: string, notes: UserNote[]): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', id);
-    const trimmed = note.trim();
-    await updateDoc(linkRef, trimmed
-        ? { userNote: trimmed, userNoteUpdatedAt: Date.now(), needsEmbedding: true }
-        : { userNote: deleteField(), userNoteUpdatedAt: deleteField(), needsEmbedding: true });
+    // Drop empties and strip undefined fields — Firestore rejects `undefined`,
+    // so `updatedAt` is only included when present.
+    const clean = notes
+        .filter(n => n.text && n.text.trim())
+        .map(n => ({
+            id: n.id,
+            text: n.text.trim(),
+            createdAt: n.createdAt,
+            ...(n.updatedAt ? { updatedAt: n.updatedAt } : {}),
+        }));
+    await updateDoc(linkRef, clean.length
+        ? { userNotes: clean, userNote: deleteField(), userNoteUpdatedAt: deleteField(), needsEmbedding: true }
+        : { userNotes: deleteField(), userNote: deleteField(), userNoteUpdatedAt: deleteField(), needsEmbedding: true });
 }
 
 /**

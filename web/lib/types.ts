@@ -49,6 +49,18 @@ export interface AIAnalysis {
   };
 }
 
+/**
+ * One personal note the user wrote on a card. A card can carry several. Stored
+ * in `Link.userNotes`; a legacy single `userNote` string is treated as one of
+ * these at read time (see lib/notes.ts).
+ */
+export interface UserNote {
+  id: string;
+  text: string;
+  createdAt: number;   // Unix ms — when the note was first added
+  updatedAt?: number;  // Unix ms — when its text was last edited
+}
+
 export interface Link {
   id: string;
   url: string;
@@ -101,11 +113,20 @@ export interface Link {
   language?: string;
   isRead?: boolean;
 
-  // A personal note the user attaches to ANY card (link, image, or note-card) —
-  // their own annotation, kept distinct from the AI-generated summary. Editable
-  // from the detail view; cleared (field removed) when emptied.
+  // Personal notes the user attaches to ANY card (link, image, or note-card) —
+  // their own annotations, kept distinct from the AI-generated summary. Editable
+  // from the detail view.
+  //
+  // Two shapes coexist for backward compatibility (see lib/notes.ts):
+  //   - Legacy: a single `userNote` string (every card saved before multi-note).
+  //   - Current: a `userNotes` array of discrete notes.
+  // `getNotes(link)` merges both into one newest-first list, so every reader
+  // (cards, search, editor) treats a legacy note as one note. New writes go to
+  // `userNotes`; editing a legacy-only card migrates `userNote` into the array
+  // and clears the legacy field, so data converges over time.
   userNote?: string;
-  userNoteUpdatedAt?: number; // Unix timestamp (ms) the note was last edited
+  userNoteUpdatedAt?: number; // Unix timestamp (ms) the legacy note was last edited
+  userNotes?: UserNote[];
 
   // Contextual Linking
   concepts?: string[];

@@ -12,6 +12,7 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import CardActionSheet from './CardActionSheet';
 import { hasHebrew } from '@/lib/rtl';
+import { getNotes } from '@/lib/notes';
 
 interface CardProps {
     link: Link;
@@ -601,20 +602,33 @@ function Card({
                         })}
                     </div>
 
-                    {/* Your own note — shown in YOUR voice (accent, italic, quote
-                        bar) so it reads as distinct from the machine summary above.
-                        Clamped to 2 lines with dir="auto" so it stays RTL-safe and
-                        never bloats the card. Note-cards ARE the note, so skip them. */}
-                    {link.userNote && link.sourceType !== 'note' && (
-                        <div
-                            dir="auto"
-                            title={link.userNote}
-                            className="flex items-start gap-1.5 border-s-2 border-accent/30 ps-2 text-[12px] leading-snug text-accent/90"
-                        >
-                            <StickyNote className="w-3 h-3 shrink-0 mt-[3px] opacity-70" />
-                            <span className="line-clamp-2 italic">{link.userNote}</span>
-                        </div>
-                    )}
+                    {/* Your own note(s) — the StickyNote glyph leads the snippet
+                        inline (no vertical accent bar), muted + italic so it reads
+                        as YOUR voice, distinct from the machine summary above.
+                        Newest note first; a "+N" tallies the rest. Clamped to 2
+                        lines with dir="auto" so it stays RTL-safe (icon mirrors to
+                        the start) and never bloats the card. Note-cards ARE the
+                        note, so skip them. */}
+                    {link.sourceType !== 'note' && (() => {
+                        const notes = getNotes(link);
+                        if (notes.length === 0) return null;
+                        const [first, ...rest] = notes;
+                        return (
+                            <div
+                                dir="auto"
+                                title={first.text}
+                                className="flex items-start gap-1.5 text-[12px] leading-snug text-text-muted/90 italic"
+                            >
+                                <StickyNote className="w-3 h-3 shrink-0 mt-[3px] opacity-60" />
+                                <span className="line-clamp-2">{first.text}</span>
+                                {rest.length > 0 && (
+                                    <span className="shrink-0 mt-[2px] not-italic text-[10px] font-bold text-text-muted/60">
+                                        +{rest.length}
+                                    </span>
+                                )}
+                            </div>
+                        );
+                    })()}
 
                     {/* Metadata Buttons Row */}
                     <div className="flex items-center justify-between mt-auto">

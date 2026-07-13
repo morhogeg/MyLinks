@@ -16,7 +16,7 @@ from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
 from google import genai
 
 from db import get_db
-from ai_service import embedding_needs_repair
+from ai_service import embedding_needs_repair, collect_notes_text
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +29,10 @@ logger = logging.getLogger(__name__)
 # library. v1 = title + short summary + tags only (the old, too-thin recipe that
 # left detail invisible to Ask). v2 = the richer recipe below. v3 folds in the
 # user's OWN note (userNote) so a card is findable by what the user thought about
-# it, not only by the machine-written summary.
-EMBED_TEXT_VERSION = 3
+# it, not only by the machine-written summary. v4 folds in ALL of the user's
+# notes — the legacy `userNote` string PLUS the newer multi-note `userNotes`
+# array (see ai_service.collect_notes_text) — so every note contributes.
+EMBED_TEXT_VERSION = 4
 
 # gemini-embedding-001 accepts ~2048 input tokens. We cap the assembled text at
 # a conservative character budget (roughly that many tokens) so a long
@@ -61,8 +63,9 @@ def build_embedding_text(data: dict) -> str:
     title = (data.get("title") or "").strip()
     summary = (data.get("summary") or "").strip()
     detailed = (data.get("detailedSummary") or "").strip()
-    # The user's own annotation — high-signal, their words, not the model's.
-    note = (data.get("userNote") or "").strip()
+    # The user's own annotations — high-signal, their words, not the model's.
+    # Merges the legacy `userNote` string + the multi-note `userNotes` array.
+    note = collect_notes_text(data).strip()
     tags = ", ".join(t for t in (data.get("tags") or []) if t)
     concepts = ", ".join(c for c in (data.get("concepts") or []) if c)
     meta = data.get("metadata") or {}
@@ -116,9 +119,10 @@ def _card_haystack(data: dict) -> str:
         data.get("title", ""), data.get("summary", ""),
         " ".join(data.get("tags", []) or []),
         data.get("sourceName", ""), data.get("category", ""),
-        # The user's own note is searchable too — a literal word they wrote
-        # should surface the card in keyword fallback and rerank.
-        data.get("userNote", ""),
+        # The user's own notes are searchable too — a literal word they wrote
+        # should surface the card in keyword fallback and rerank. Covers both the
+        # legacy string and the multi-note array.
+        collect_notes_text(data),
     ]).lower()
 
 

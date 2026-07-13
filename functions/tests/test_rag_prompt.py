@@ -64,6 +64,30 @@ def test_card_block_uses_defaults_for_sparse_card():
     assert "tags: " in block
 
 
+def test_card_block_includes_legacy_user_note():
+    block = _rag_card_block({"id": "x", "title": "T", "userNote": "my own take"})
+    assert "My note: my own take" in block
+
+
+def test_card_block_includes_multi_note_array():
+    # Every note the user wrote is surfaced to the model, not just the first.
+    block = _rag_card_block({
+        "id": "x", "title": "T",
+        "userNotes": [
+            {"id": "a", "text": "first note", "createdAt": 2},
+            {"id": "b", "text": "second note", "createdAt": 1},
+        ],
+    })
+    assert "My note:" in block
+    assert "first note" in block
+    assert "second note" in block
+
+
+def test_card_block_omits_note_line_when_no_notes():
+    block = _rag_card_block({"id": "x", "title": "T", "summary": "S"})
+    assert "My note:" not in block
+
+
 # ── _build_rag_prompt ─────────────────────────────────────────────────────
 
 def _card(i):
