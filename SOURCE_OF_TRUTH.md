@@ -617,7 +617,12 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — Polish round 8b: owner refinements on the revamp.**
+- **2026-07-13 (latest) — Polish round 8c: dedicated sort.** Sort gets its own
+  40px chip beside the funnel (accent while non-default) opening a designated
+  bottom sheet (`feed/MobileSortSheet.tsx`, drag-dismiss); the filter drawer's
+  buried Sort dropdown removed so sort lives in one place. Ships as run
+  #85/build 1085.
+- **2026-07-13 — Polish round 8b: owner refinements on the revamp.**
   Search collapses to an icon chip (tap → full field expands in place; accent
   while a query is active) with the filter funnel as its own matching 40px
   chip; destinations split back into three separate equal pills with gaps
