@@ -91,12 +91,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         () => new Set(collections.filter((c) => c.isPrivate).map((c) => c.id)),
         [collections]
     );
+    // Effectively private = own flag OR inherited from a private collection.
+    const isEffectivelyPrivateCard = useCallback(
+        (l: Link) => !!l.isPrivate || (l.collectionIds ?? []).some((id) => privateCollectionIds.has(id)),
+        [privateCollectionIds]
+    );
     const visibleLinks = useMemo(() => {
         if (!vaultLocked) return links;
-        return links.filter((l) =>
-            !l.isPrivate
-            && !(privateCollectionIds.size > 0 && (l.collectionIds ?? []).some((id) => privateCollectionIds.has(id))));
-    }, [links, vaultLocked, privateCollectionIds]);
+        return links.filter((l) => !isEffectivelyPrivateCard(l));
+    }, [links, vaultLocked, isEffectivelyPrivateCard]);
     const [searchQuery, setSearchQuery] = useState('');
     // Debounced, generation-guarded semantic search (R-3: useSemanticSearch).
     const { debouncedQuery, isSearching, searchResults, searchError } = useSemanticSearch(searchQuery, uid);
@@ -120,7 +123,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         handleToggleSourceKeys,
         matchingSources,
         reminderCount,
-    } = useFeedFilters(visibleLinks, debouncedQuery, searchResults);
+    } = useFeedFilters(visibleLinks, debouncedQuery, searchResults, privateCollectionIds);
     // Card action handlers that depend only on [uid, toast] (R-3: useLinkActions).
     const {
         handleStatusChange,
@@ -473,9 +476,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         }
     }, [uid]);
     // Derived from visibleLinks so a due reminder never leaks a locked private
-    // card's title into the feed strip; card-level private cards are excluded
-    // even while unlocked (they surface only under the Private filter).
-    const dueLinks = useMemo(() => visibleLinks.filter((l) => l.reminderDue === true && !l.isPrivate), [visibleLinks]);
+    // card's title into the feed strip; effectively-private cards (own flag OR
+    // inherited from a private collection) are excluded even while unlocked —
+    // they surface only under the Private filter / inside their collection.
+    const dueLinks = useMemo(
+        () => visibleLinks.filter((l) => l.reminderDue === true && !isEffectivelyPrivateCard(l)),
+        [visibleLinks, isEffectivelyPrivateCard]
+    );
 
     // The proactive feed modules, rendered once and reused in both the grid and
     // list layouts (above pending + real cards). The weekly synthesis recap plus
@@ -733,7 +740,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // Suggested collections — topic clusters detected client-side from the
     // loaded feed (M20-lite). Only surfaced in the Collections view.
     const collectionSuggestions = useMemo(
-        () => (viewMode === 'collections' ? suggestNewCollections(visibleLinks, collections) : []),
+        // Effectively-private cards never seed suggestions — a suggested cluster
+        // must not surface a hidden card's title in the gallery.
+        () => (viewMode === 'collections'
+            ? suggestNewCollections(visibleLinks.filter((l) => !isEffectivelyPrivateCard(l)), collections)
+            : []),
         // suggestionTick re-reads the localStorage dismissal list after a dismiss.
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [viewMode, visibleLinks, collections, suggestionTick]

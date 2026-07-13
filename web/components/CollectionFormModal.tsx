@@ -235,8 +235,9 @@ export default function CollectionFormModal({
                             <div className="flex-1 min-w-0">
                                 <div className="text-sm font-semibold text-text">Private</div>
                                 <p className="mt-0.5 text-[11px] text-text-muted leading-snug">
-                                    Requires your PIN to open. Its cards are hidden from your
-                                    library, search, and suggestions while locked.
+                                    Requires your PIN to open. Its cards become private too —
+                                    hidden from your library, search, and suggestions; they
+                                    live only in here and under Show → Private.
                                     {collection?.isPublic && isPrivate && !collection?.isPrivate
                                         ? ' Saving will also stop sharing its public page.'
                                         : ''}
