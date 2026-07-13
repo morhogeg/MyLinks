@@ -26,6 +26,7 @@ import { isPending, getTimestampNumber } from '@/lib/feedUtils';
 import FeedSkeleton from './feed/FeedSkeleton';
 import PullRefreshSpinner from './feed/PullRefreshSpinner';
 import MobileFiltersSheet from './feed/MobileFiltersSheet';
+import MobileSortSheet from './feed/MobileSortSheet';
 import MobileTagExplorerDrawer from './feed/MobileTagExplorerDrawer';
 import Card from './Card';
 import ListCard from './ListCard';
@@ -165,6 +166,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
     const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+    const [isSortOpen, setIsSortOpen] = useState(false);
     // Mobile: the search bar is collapsed to an icon; tapping it expands a large
     // search field in place, so the card grid gets the vertical space back.
     const [isTagExplorerCollapsed, setIsTagExplorerCollapsed] = useState(false);
@@ -373,7 +375,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // full-screen mode (Ask/Collections) or any overlay/sheet owns the screen so
     // the gesture never fights a modal's own scrolling.
     const anyOverlayOpen =
-        activeLinkId !== null || isTagExplorerOpen || isFiltersOpen ||
+        activeLinkId !== null || isTagExplorerOpen || isFiltersOpen || isSortOpen ||
         reminderModalLink !== null || confirmDeleteId !== null || confirmBulkDelete ||
         addToCollectionLink !== null || collectionFormOpen || confirmDeleteCollection !== null ||
         manageCardsCollection !== null || shareCollection !== null;
@@ -1242,6 +1244,18 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 </span>
                             )}
                         </button>
+                        {/* Sort — its own chip, opening the designated sort sheet. Accent
+                            while the order is non-default so state is visible at a glance. */}
+                        <button
+                            onClick={() => setIsSortOpen(true)}
+                            aria-label="Sort order"
+                            className={`h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-full border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${sortBy !== 'date-desc'
+                                ? 'bg-accent text-white border-accent shadow-sm'
+                                : 'bg-card border-border-subtle text-text-muted hover:text-text hover:bg-card-hover'
+                                }`}
+                        >
+                            <ArrowUpDown className="w-4 h-4" />
+                        </button>
                         <span className="flex-1" />
                         {/* Tools capsule — the three view pills and select in ONE shape,
                             separated by a hairline. */}
@@ -1732,11 +1746,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     onClose={() => setIsFiltersOpen(false)}
                     filter={filter}
                     setFilter={setFilter}
-                    sortBy={sortBy}
-                    setSortBy={setSortBy}
                     statusTriggerIcon={statusTriggerIcon}
                     statusOptions={statusOptions}
-                    sortOptions={sortOptions}
                     sourceFacets={sourceFacets}
                     selectedSources={selectedSources}
                     setSelectedSources={setSelectedSources}
@@ -1752,6 +1763,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     tagCounts={tagCounts}
                     selectedTags={selectedTags}
                     onToggleTag={handleToggleTag}
+                />
+
+                {/* Sort Sheet (Mobile) — the designated home for sort order. */}
+                <MobileSortSheet
+                    isOpen={isSortOpen}
+                    onClose={() => setIsSortOpen(false)}
+                    sortBy={sortBy}
+                    setSortBy={setSortBy}
+                    sortOptions={sortOptions}
                 />
 
                 {/* Tag Explorer Drawer (Mobile) */}
