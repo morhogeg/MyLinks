@@ -617,7 +617,12 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — Polish round 7: tools-row finish pass (designer
+- **2026-07-13 (latest) — Polish round 7b: optical-uniformity pass.** 14px
+  icons everywhere in the tools row (switcher pills had 16px icons in smaller
+  pills); mobile selection-toolbar buttons get the switcher's 2px inset (26px
+  shapes in the 30px pill) instead of sitting flush. Ships as run #82 (build
+  1082), superseding #81/build 1081 which lacks only this pass.
+- **2026-07-13 — Polish round 7: tools-row finish pass (designer
   review).** Filters chip is now a square icon chip matching Categories/Search
   (redundant sort icon dropped — same sheet), active count moved to the same
   overlay badge language as Categories (no more inline-number reflow), and the
