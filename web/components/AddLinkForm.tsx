@@ -458,9 +458,15 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             )}
 
             {/* Expanded Form - Moved outside the FAB container to fix z-index stacking context.
-                Mobile: centered in the space above the keyboard (driven by the visual
+                Mobile: positioned in the space above the keyboard (driven by the visual
                 viewport) so it never jams up under the status bar. Desktop: a popover
-                anchored just above the FAB. */}
+                anchored just above the FAB.
+
+                STEADINESS: the card's TOP is computed by centering a FIXED estimated
+                height — not the live content height — so toggling Link/Image/Note
+                (whose contents differ) never re-centers the frame. Combined with the
+                equal-height tab content area below, the dialog holds one position;
+                only the keyboard sliding in/out moves it (as it must). */}
             {isExpanded && (
                 <div
                     className={`fixed z-[70] ${isMobile ? '' : 'bottom-28 right-4 w-96 max-w-[400px] animate-slide-up'}`}
@@ -468,8 +474,10 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                         ? {
                             left: '1rem',
                             right: '1rem',
-                            top: viewport.offsetTop + viewport.height / 2,
-                            transform: 'translateY(-50%)',
+                            // 460 ≈ the card's height with the fixed content area; the
+                            // constant is what keeps `top` identical across tabs.
+                            top: viewport.offsetTop + Math.max(16, (viewport.height - 460) / 2),
+                            maxHeight: viewport.height - 32,
                         }
                         : undefined}
                 >
@@ -478,7 +486,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                         role="dialog"
                         aria-label="Add link"
                         aria-modal="true"
-                        className="bg-card border border-border-strong rounded-3xl p-6 shadow-2xl relative overflow-hidden animate-fade-in"
+                        className="bg-card border border-border-strong rounded-3xl p-6 shadow-2xl relative max-h-full overflow-y-auto animate-fade-in"
                         noValidate
                     >
                         {/* Close button */}
@@ -536,6 +544,11 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                         </div>
 
                         <div className="space-y-4">
+                            {/* Equal-height swap area: every tab's idle content fills the
+                                same 170px block, so toggling tabs moves NOTHING below it
+                                (the Save button stays put). Loading states may grow past
+                                it — that's a phase change, not a toggle. */}
+                            <div className="min-h-[170px] flex flex-col justify-center">
                             {activeTab === 'link' ? (
                                 isLoading && isVideo ? (
                                     <VideoScanProgress
@@ -581,7 +594,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                         onChange={(e) => setNote(e.target.value)}
                                         placeholder="Write a thought, an idea, a quote — Machina summarizes and files it."
                                         rows={5}
-                                        className="w-full px-4 py-3 bg-background border border-border-subtle rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-base resize-none"
+                                        className="w-full h-[170px] px-4 py-3 bg-background border border-border-subtle rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-base resize-none"
                                         disabled={isLoading}
                                         autoFocus
                                     />
@@ -610,7 +623,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                     />
                                     <label
                                         htmlFor="image-upload"
-                                        className={`w-full aspect-video rounded-xl border-2 border-dashed border-border-strong flex flex-col items-center justify-center cursor-pointer transition-all hover:border-accent/50 hover:bg-fill-subtle ${imagePreview ? 'p-0 border-none overflow-hidden' : 'p-8'
+                                        className={`w-full h-[170px] rounded-xl border-2 border-dashed border-border-strong flex flex-col items-center justify-center cursor-pointer transition-all hover:border-accent/50 hover:bg-fill-subtle ${imagePreview ? 'p-0 border-none overflow-hidden' : 'p-8'
                                             }`}
                                     >
                                         {imagePreview ? (
@@ -635,6 +648,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                     </label>
                                 </div>
                             )}
+                            </div>
 
                             {/* The scan views (link/image/video) show their own
                                 progress, so the button is only needed when idle. */}
