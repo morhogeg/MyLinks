@@ -1390,38 +1390,37 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
                     {/* (Mobile Filters now lives on the category row above, to save a line.) */}
 
-                    {/* Mobile Row 2 — DESTINATIONS as a symmetric three-column toolbar:
-                        Collections leads, Ask sits DEAD CENTER of the screen (grid column,
-                        so sibling widths can't push it off-center), Digest trails — the
-                        iOS toolbar rhythm. The view switcher + select chip moved up to
-                        Row 1, so those live here desktop-only (`hidden sm:contents`). On
-                        desktop every `sm:contents` wrapper dissolves back into the normal
-                        inline cluster. */}
+                    {/* Mobile Row 2 — DESTINATIONS as three EQUAL segments filling the
+                        row: Collections · Ask (dead center) · Digest. Equal widths make
+                        the geometry symmetric — same chip size, same gaps, Ask exactly
+                        centered — instead of unequal chips hugging the edges with lopsided
+                        whitespace. The view switcher + select chip moved up to Row 1, so
+                        those live here desktop-only (`hidden sm:contents`); on desktop
+                        every `sm:contents` wrapper dissolves back into the inline cluster
+                        (`sm:w-auto` on the chips restores their intrinsic width). */}
                     <div className="grid grid-cols-3 items-center w-full gap-2 sm:flex sm:flex-nowrap sm:w-auto">
-                        {/* Leading edge — Collections. */}
-                        <div className="flex justify-start sm:contents">
+                        <div className="flex sm:contents">
                             <button
                                 data-tour="collections"
                                 onClick={() => setViewMode('collections')}
                                 title="Browse collections"
                                 aria-label="Browse collections"
-                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
+                                className={`${ctrlBase} px-1 sm:px-3.5 w-full justify-center sm:w-auto sm:justify-start ${ctrlIdle}`}
                             >
                                 <Layers className="w-4 h-4" />
                                 <span>Collections</span>
                             </button>
                         </div>
 
-                        {/* Dead center — Ask (the hero destination). Plain idle styling;
-                            position, not color, gives it the stage. */}
-                        <div className="flex justify-center sm:contents">
+                        {/* Ask — the hero destination, center segment. */}
+                        <div className="flex sm:contents">
                             {isLibraryView && (
                             <button
                                 data-tour="ask"
                                 onClick={() => setViewMode('ask')}
                                 title="Ask your brain"
                                 aria-label="Ask your brain"
-                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
+                                className={`${ctrlBase} px-1 sm:px-3.5 w-full justify-center sm:w-auto sm:justify-start ${ctrlIdle}`}
                             >
                                 <MessagesSquare className="w-4 h-4" />
                                 <span>Ask</span>
@@ -1429,13 +1428,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             )}
                         </div>
 
-                        {/* Trailing edge — Digest. */}
-                        <div className="flex justify-end sm:contents">
+                        <div className="flex sm:contents">
                             <button
                                 onClick={() => setViewMode('digest')}
                                 title="Your curated digests"
                                 aria-label="Digest"
-                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
+                                className={`${ctrlBase} px-1 sm:px-3.5 w-full justify-center sm:w-auto sm:justify-start ${ctrlIdle}`}
                             >
                                 <Newspaper className="w-4 h-4" />
                                 <span>Digest</span>
