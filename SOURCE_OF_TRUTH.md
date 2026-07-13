@@ -617,7 +617,12 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — Polish round 5 (build 1078 feedback): Ask dead-center.**
+- **2026-07-13 (latest) — Polish round 6 (build 1079 feedback): symmetric
+  destinations.** The centered-chip approach still LOOKED lopsided (unequal
+  Collections/Digest widths → uneven whitespace around Ask). Row 2 is now
+  three EQUAL-width segments filling the row (same size, same gaps, Ask truly
+  centered); `px-1` on mobile so "Collections" fits an equal third at 375pt.
+- **2026-07-13 — Polish round 5 (build 1078 feedback): Ask dead-center.**
   Mobile destinations row is now a symmetric three-column toolbar — Collections
   flush left, **Ask at the exact screen center** (own grid column so sibling
   widths can't shift it), Digest flush right. Owner-directed; desktop unchanged
