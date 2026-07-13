@@ -617,7 +617,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — Polish round 7b: optical-uniformity pass.** 14px
+- **2026-07-13 (latest) — Polish round 8: header REVAMP (owner: "production
+  grade at Apple/Google").** Stopped iterating pills; new composition with two
+  anchored objects per row. Row 1: an always-live SEARCH FIELD owns the row
+  (no expand dance) with the filter funnel inside it as a trailing accessory
+  (one badge; categories/tags/status/sort/sources folded back into ONE
+  MobileFiltersSheet, drag-dismiss kept; MobileCategoriesTagsSheet deleted) +
+  one tools capsule (view pills ‖ select, hairline-divided). Row 2: one
+  continuous destinations bar — single capsule, three equal hairline-divided
+  zones, Collections | Ask (dead center) | Digest. Desktop untouched. Ships as
+  run #83/build 1083.
+- **2026-07-13 — Polish round 7b: optical-uniformity pass.** 14px
   icons everywhere in the tools row (switcher pills had 16px icons in smaller
   pills); mobile selection-toolbar buttons get the switcher's 2px inset (26px
   shapes in the 30px pill) instead of sitting flush. Ships as run #82 (build
