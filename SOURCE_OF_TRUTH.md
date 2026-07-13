@@ -617,7 +617,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — Private collections now make their cards private
+- **2026-07-13 (latest) — Ask polish: origin-aware thinking status + airtight
+  follow-up chips (merge `3e11c48`, feature commit `1668545`).** Owner flagged
+  two Ask quality bugs on device. (1) Thinking micro-copy now matches the
+  ask's origin (`AskOrigin` in AskBrain: free/card/library/followup) — tapping
+  a system-suggested chip about a specific card reads "Opening that card…"
+  instead of the nonsensical "Searching your library…"; library-sweep chips
+  keep the search copy; follow-ups read "Re-reading the sources…". (2)
+  Follow-up chips are now EVIDENCE-GATED (askSuggestions.ts "AIRTIGHT RULE"):
+  every chip must be answerable from data verified client-side on the cited
+  cards — depth/steps chips require `detailedSummary` ≥ 200 chars, ingredient
+  chips require real `recipe.ingredients`, "what else on X" requires the
+  concept to provably recur, compare chips require 2+ citations. Speculative
+  prompts the strictly-grounded backend refused ("What's the counterargument?"
+  → "there's nothing on that", plus bigger-picture / how-solid-evidence /
+  what's-the-catch / worth-watching / can-I-make-this-simpler) are REMOVED,
+  and ungrounded or citation-less answers get no chips at all (no chips beats
+  broken chips). **SHIPPED:** Vercel live; **iOS: TestFlight run #89 → build
+  1089** via temp trigger `claude/ship-tf-trigger-ask2` (runs #87/1087 and
+  #88/1088 both green). Owner cleanup: delete trigger branches `-ask2`,
+  `-inherit`, `-private2`, `-pinvault` + older stale ones.
+- **2026-07-13 — Private collections now make their cards private
   too (merge `523814a`, feature commit `3222b3f`).** Owner call: a private
   collection's members should be private, period. Implemented as INHERITED
   privacy, not stamped flags — `useFeedFilters` takes `privateCollectionIds`
