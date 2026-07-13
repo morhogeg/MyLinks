@@ -709,6 +709,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         'h-9 inline-flex items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold cursor-pointer select-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40';
     const ctrlIdle =
         'bg-card border border-border-subtle text-text-secondary hover:bg-card-hover hover:text-text hover:border-text-muted/40';
+    // Row A (mobile "Categories & Tags / Filters / Search") is secondary chrome —
+    // a quieter, smaller variant of ctrlBase scoped to that row only (never mutate
+    // the shared ctrlBase). Active/accent states reuse the filled style inline.
+    const rowACtrl =
+        'h-[30px] inline-flex items-center justify-center gap-1.5 rounded-full text-[12px] font-semibold cursor-pointer select-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40';
+    const rowAIdle =
+        'bg-card border border-border-subtle text-text-muted hover:bg-card-hover hover:text-text hover:border-text-muted/40';
 
     // Status filter options for the custom dropdown (Reminders has its own toggle).
     const statusOptions = [
@@ -946,7 +953,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 the safe-area inset and spins while the refetch is in flight. */}
             <PullRefreshSpinner pull={pull} refreshing={refreshing} animating={animating} />
             {/* Header Section (Not Sticky) */}
-            <div className={`pt-2 -mx-4 px-4 sm:mx-0 sm:px-0 transition-all duration-300 ${viewMode === 'ask' ? 'space-y-2 pb-0' : 'space-y-3 sm:space-y-4 pb-3'}`}>
+            <div className={`pt-2 -mx-4 px-4 sm:mx-0 sm:px-0 transition-all duration-300 ${viewMode === 'ask' ? 'space-y-2 pb-0' : 'space-y-2 sm:space-y-4 pb-3'}`}>
                 {/* Ask mode drops the search bar entirely (typing there just exits Ask)
                     and shows only a Back button, so the chat gets the full height. */}
                 {viewMode === 'ask' ? (
@@ -1175,20 +1182,20 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             <button
                                 onClick={() => setIsCategoriesOpen(true)}
                                 aria-label="Filter by categories and tags"
-                                className={`${ctrlBase} flex-1 min-w-0 justify-between px-3.5 ${(selectedCategory.size + selectedTags.size) > 0
+                                className={`${rowACtrl} flex-1 min-w-0 justify-between px-3.5 ${(selectedCategory.size + selectedTags.size) > 0
                                     ? 'bg-accent text-white border border-accent shadow-sm'
-                                    : ctrlIdle
+                                    : rowAIdle
                                     }`}
                             >
                                 <span className="inline-flex items-center gap-2 min-w-0">
-                                    <Tags className="w-4 h-4 shrink-0" />
+                                    <Tags className="w-3.5 h-3.5 shrink-0" />
                                     <span className="truncate">
                                         {(selectedCategory.size + selectedTags.size) === 0
                                             ? 'Categories & Tags'
                                             : `${selectedCategory.size + selectedTags.size} selected`}
                                     </span>
                                 </span>
-                                <ChevronDown className="w-4 h-4 opacity-60 shrink-0" />
+                                <ChevronDown className="w-3.5 h-3.5 opacity-60 shrink-0" />
                             </button>
                         )}
                         {/* When scoped to a collection the category button is hidden — keep
@@ -1200,13 +1207,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         <button
                             onClick={() => setIsFiltersOpen(true)}
                             aria-label="Filters and sort"
-                            className={`${ctrlBase} shrink-0 px-3 gap-1.5 ${activeMobileFilters > 0
+                            className={`${rowACtrl} shrink-0 px-3 gap-1.5 ${activeMobileFilters > 0
                                 ? 'bg-accent text-white border border-accent shadow-sm'
-                                : ctrlIdle
+                                : rowAIdle
                                 }`}
                         >
-                            <Filter className="w-4 h-4" />
-                            <ArrowUpDown className="w-4 h-4" />
+                            <Filter className="w-3.5 h-3.5" />
+                            <ArrowUpDown className="w-3.5 h-3.5" />
                             {activeMobileFilters > 0 && (
                                 <span className="text-xs font-bold tabular-nums">{activeMobileFilters}</span>
                             )}
@@ -1217,12 +1224,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             data-tour="search"
                             onClick={() => setMobileSearchOpen(true)}
                             aria-label="Search"
-                            className={`${ctrlBase} shrink-0 w-9 px-0 ${searchQuery
+                            className={`${rowACtrl} shrink-0 w-9 px-0 ${searchQuery
                                 ? 'bg-accent text-white border border-accent shadow-sm'
-                                : ctrlIdle
+                                : rowAIdle
                                 }`}
                         >
-                            <Search className="w-4 h-4" />
+                            <Search className="w-3.5 h-3.5" />
                         </button>
                     </div>
                     )
@@ -1315,7 +1322,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     {/* On mobile this row reads Collections (left) · Ask (centered) · View
                         (right) via three equal columns; on desktop the `sm:contents`
                         wrappers dissolve back into the normal inline cluster. */}
-                    <div className="flex items-center w-full gap-2 sm:w-auto">
+                    <div className="flex flex-wrap items-center w-full gap-2 sm:flex-nowrap sm:w-auto">
                         {/* Left zone — Collections + Connections (the two "browse"
                             surfaces). Connections only appears once there's a real
                             pattern to show, so it never clutters an empty library. */}
@@ -1338,11 +1345,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             >
                                 <Newspaper className="w-4 h-4" />
                                 <span className="hidden sm:inline">Digest</span>
-                                {digests.length > 0 && (
-                                    <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-accent/15 text-accent">
-                                        {digests.length}
-                                    </span>
-                                )}
                             </button>
                         </div>
 
@@ -1354,7 +1356,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 onClick={() => setViewMode('ask')}
                                 title="Ask your brain"
                                 aria-label="Ask your brain"
-                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
+                                className={`${ctrlBase} px-3.5 bg-accent/10 text-accent border border-transparent hover:bg-accent/15 sm:bg-card sm:text-text-secondary sm:border-border-subtle sm:hover:bg-card-hover sm:hover:text-text sm:hover:border-text-muted/40`}
                             >
                                 <MessagesSquare className="w-4 h-4" />
                                 <span>Ask</span>
