@@ -7,6 +7,10 @@ name: iOS → TestFlight
 # main that touch the app. See the one-time secret setup at the bottom.
 
 on:
+  # TEMP push trigger for this ship only (cloud sessions get 403 on API
+  # dispatch) — branch is deleted after the run; main's trigger is unchanged.
+  push:
+    branches: [claude/ship-tf-trigger-addform]
   workflow_dispatch:
     inputs:
       require_auth:
