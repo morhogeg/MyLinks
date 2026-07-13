@@ -1143,11 +1143,47 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
                 </>)}
 
-                {/* Mobile: one tidy line — Categories & Tags · Filters/Sort · Search.
-                    The big search bar is gone (desktop-only above); tapping the search
-                    icon expands a large field right here, so the grid keeps the space. */}
+                {/* Mobile Row 1 — TOOLS: compact icon controls on one line
+                    (Categories & Tags · Filters/Sort · Search · View switcher · Select).
+                    Selection mode and the expanded search field each swap in for this
+                    whole row, mirroring how desktop swaps the selection toolbar. */}
                 {isLibraryView && (
-                    mobileSearchOpen ? (
+                    isSelectionMode ? (
+                        <div className="flex sm:hidden items-center animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div className="flex items-center gap-1 h-9 px-1.5 rounded-full bg-accent/10 border border-accent/20 animate-slide-up">
+                                <span className="text-xs font-bold text-accent px-1.5 tabular-nums">{selectedIds.size}</span>
+                                <button
+                                    onClick={handleBulkArchive}
+                                    disabled={selectedIds.size === 0}
+                                    title="Archive selected"
+                                    aria-label="Archive selected"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
+                                    <Archive className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => setConfirmBulkDelete(true)}
+                                    disabled={selectedIds.size === 0}
+                                    title="Delete selected"
+                                    aria-label="Delete selected"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-red-500 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setIsSelectionMode(false);
+                                        setSelectedIds(new Set());
+                                    }}
+                                    title="Cancel selection"
+                                    aria-label="Cancel selection"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-card-hover hover:text-text transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                    ) : mobileSearchOpen ? (
                         <div className="flex sm:hidden items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
                             <div className="relative flex-1 min-w-0">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
@@ -1180,32 +1216,31 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         </div>
                     ) : (
                     <div className="flex sm:hidden items-center gap-2">
-                        {selectedCollections.size === 0 && (
+                        {/* Categories & Tags — icon-only chip. Accent-filled with a numeric
+                            count badge when categories/tags are selected (the label is gone,
+                            so the badge is the signal). Hidden when scoped to a collection;
+                            a same-width placeholder keeps the row from shifting. */}
+                        {selectedCollections.size === 0 ? (
                             <button
                                 onClick={() => setIsCategoriesOpen(true)}
                                 aria-label="Filter by categories and tags"
-                                className={`${rowACtrl} flex-1 min-w-0 justify-between px-3.5 ${(selectedCategory.size + selectedTags.size) > 0
+                                className={`${rowACtrl} shrink-0 relative w-9 px-0 ${(selectedCategory.size + selectedTags.size) > 0
                                     ? 'bg-accent text-white border border-accent shadow-sm'
                                     : rowAIdle
                                     }`}
                             >
-                                <span className="inline-flex items-center gap-2 min-w-0">
-                                    <Tags className="w-3.5 h-3.5 shrink-0" />
-                                    <span className="truncate">
-                                        {(selectedCategory.size + selectedTags.size) === 0
-                                            ? 'Categories & Tags'
-                                            : `${selectedCategory.size + selectedTags.size} selected`}
+                                <Tags className="w-3.5 h-3.5" />
+                                {(selectedCategory.size + selectedTags.size) > 0 && (
+                                    <span className="absolute -top-1 -end-1 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold tabular-nums bg-white text-accent border border-background shadow-sm">
+                                        {selectedCategory.size + selectedTags.size}
                                     </span>
-                                </span>
-                                <ChevronDown className="w-3.5 h-3.5 opacity-60 shrink-0" />
+                                )}
                             </button>
+                        ) : (
+                            <span className="w-9 shrink-0" aria-hidden="true" />
                         )}
-                        {/* When scoped to a collection the category button is hidden — keep
-                            the remaining controls pinned to the trailing edge. */}
-                        {selectedCollections.size > 0 && <span className="flex-1" />}
                         {/* Filters + sort live in the same sheet, so the button just shows
-                            both icons (no label) — keeping it compact so the category
-                            selector can take the rest of the row. */}
+                            both icons (no label) — keeping the count badge when active. */}
                         <button
                             onClick={() => setIsFiltersOpen(true)}
                             aria-label="Filters and sort"
@@ -1232,6 +1267,40 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 }`}
                         >
                             <Search className="w-3.5 h-3.5" />
+                        </button>
+                        {/* Spacer — pins the view switcher + select chip to the trailing edge. */}
+                        <span className="flex-1" />
+                        {/* View switcher — compact (30px) pills, icon-only, matched to the
+                            other Row 1 chips. */}
+                        <div data-tour="views" className="inline-flex items-center gap-0.5 p-0.5 rounded-full bg-card border border-border-subtle shrink-0">
+                            {viewModes.map(vm => {
+                                const active = viewMode === vm.key;
+                                return (
+                                    <button
+                                        key={vm.key}
+                                        onClick={() => setViewMode(vm.key)}
+                                        title={vm.hint}
+                                        aria-pressed={active}
+                                        aria-label={vm.hint}
+                                        className={`h-[26px] w-[26px] inline-flex items-center justify-center rounded-full cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${active
+                                            ? 'bg-accent text-white shadow-sm'
+                                            : 'text-text-muted hover:text-text hover:bg-card-hover'
+                                            }`}
+                                    >
+                                        {vm.icon}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        {/* Select multiple — enters selection mode (which swaps the whole
+                            row for the accent toolbar above). */}
+                        <button
+                            onClick={() => setIsSelectionMode(true)}
+                            title="Select multiple"
+                            aria-label="Select multiple"
+                            className={`${rowACtrl} shrink-0 w-9 px-0 ${rowAIdle} hover:text-accent hover:border-accent/40`}
+                        >
+                            <CheckSquare className="w-3.5 h-3.5" />
                         </button>
                     </div>
                     )
@@ -1321,14 +1390,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
                     {/* (Mobile Filters now lives on the category row above, to save a line.) */}
 
-                    {/* On mobile this row reads Collections (left) · Ask (centered) · View
-                        (right) via three equal columns; on desktop the `sm:contents`
-                        wrappers dissolve back into the normal inline cluster. */}
+                    {/* Mobile Row 2 — DESTINATIONS: Collections · Digest · Ask as labeled
+                        chips, left-aligned. The view switcher + select chip moved up to
+                        Row 1, so those live here desktop-only (`hidden sm:contents`). On
+                        desktop every `sm:contents` wrapper dissolves back into the normal
+                        inline cluster and the layout is unchanged. */}
                     <div className="flex flex-wrap items-center w-full gap-2 sm:flex-nowrap sm:w-auto">
-                        {/* Left zone — Collections + Connections (the two "browse"
-                            surfaces). Connections only appears once there's a real
-                            pattern to show, so it never clutters an empty library. */}
-                        <div className="flex-1 flex justify-start items-center gap-2 sm:contents">
+                        {/* Left zone — Collections + Digest (the two "browse" surfaces). */}
+                        <div className="flex items-center gap-2 sm:contents">
                             <button
                                 data-tour="collections"
                                 onClick={() => setViewMode('collections')}
@@ -1337,7 +1406,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
                             >
                                 <Layers className="w-4 h-4" />
-                                <span className="hidden sm:inline">Collections</span>
+                                <span>Collections</span>
                             </button>
                             <button
                                 onClick={() => setViewMode('digest')}
@@ -1346,19 +1415,20 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
                             >
                                 <Newspaper className="w-4 h-4" />
-                                <span className="hidden sm:inline">Digest</span>
+                                <span>Digest</span>
                             </button>
                         </div>
 
-                        {/* Center zone — Ask (a distinct AI mode). */}
-                        <div className="flex-1 flex justify-center sm:contents">
+                        {/* Center zone — Ask (a distinct AI mode). Plain idle styling like
+                            its siblings; no constant accent fill. */}
+                        <div className="flex items-center sm:contents">
                             {isLibraryView && (
                             <button
                                 data-tour="ask"
                                 onClick={() => setViewMode('ask')}
                                 title="Ask your brain"
                                 aria-label="Ask your brain"
-                                className={`${ctrlBase} px-3.5 bg-accent/10 text-accent border border-transparent hover:bg-accent/15 sm:bg-card sm:text-text-secondary sm:border-border-subtle sm:hover:bg-card-hover sm:hover:text-text sm:hover:border-text-muted/40`}
+                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
                             >
                                 <MessagesSquare className="w-4 h-4" />
                                 <span>Ask</span>
@@ -1366,8 +1436,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             )}
                         </div>
 
-                        {/* Right zone — view switcher (icon-only on mobile) + desktop-only tools. */}
-                        <div className="flex-1 flex justify-end items-center gap-2 sm:contents">
+                        {/* Right zone — view switcher + select chip. Desktop-only here (the
+                            mobile copies live in Row 1); `hidden sm:contents` keeps them out
+                            of the mobile row while dissolving into the desktop cluster. */}
+                        <div className="hidden sm:contents">
                         {isLibraryView && (
                         <div data-tour="views" className="inline-flex items-center gap-0.5 p-1 rounded-full bg-card border border-border-subtle">
                             {viewModes.map(vm => {
@@ -1393,9 +1465,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         </div>
                         )}
 
-                        {/* Select multiple — an icon chip living right beside the view
-                            switcher (visible on mobile too). Hidden while already in
-                            selection mode (the accent toolbar below takes its place). */}
+                        {/* Select multiple — an icon chip beside the view switcher. Hidden
+                            while already in selection mode (the accent toolbar takes its
+                            place). */}
                         {isLibraryView && !isSelectionMode && (
                             <button
                                 onClick={() => setIsSelectionMode(true)}
