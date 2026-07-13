@@ -3,7 +3,7 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Youtube, ExternalLink, Layers, Share2, X, Loader2, RotateCcw, AlertTriangle, StickyNote } from 'lucide-react';
+import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Youtube, ExternalLink, Layers, Share2, X, Loader2, RotateCcw, AlertTriangle, StickyNote, Lock } from 'lucide-react';
 import { useState, memo } from 'react';
 import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle } from '@/lib/platform';
 import { useNow } from '@/lib/useNow';
@@ -34,6 +34,8 @@ interface CardProps {
     onAddToCollection?: (link: Link) => void;
     /** Share this card as a public Machina page. */
     onShare?: (link: Link) => void;
+    /** Toggle the card's Private flag (parent owns PIN setup — lib/privacyLock). */
+    onTogglePrivate?: (link: Link) => void;
     /** Collections this card belongs to — rendered as subtle chips. */
     cardCollections?: { id: string; name: string }[];
     /** When the feed is scoped to one collection, its id — enables a quick "remove" action. */
@@ -63,6 +65,7 @@ function Card({
     onTagClick,
     onAddToCollection,
     onShare,
+    onTogglePrivate,
     cardCollections,
     activeCollectionId,
     onRemoveFromCollection,
@@ -428,6 +431,16 @@ function Card({
                         branded byline style right here in place of the muted chip;
                         every other source keeps the muted uppercase chip. */}
                     <div className="flex items-center gap-1.5 min-w-0 z-10 ms-auto transition-opacity duration-200 group-hover:opacity-0">
+                        {/* Private marker — icon only, matching the collection tiles. */}
+                        {link.isPrivate && (
+                            <span
+                                aria-label="Private"
+                                title="Private"
+                                className="flex items-center justify-center w-6 h-6 rounded-full bg-fill-subtle border border-border-strong text-text-muted shrink-0"
+                            >
+                                <Lock className="w-3 h-3" />
+                            </span>
+                        )}
                         {isYouTube && youtubeChannel && (
                             <span
                                 dir="ltr"
@@ -654,6 +667,7 @@ function Card({
             onDelete={onDelete}
             onAddToCollection={onAddToCollection}
             onShare={onShare}
+            onTogglePrivate={onTogglePrivate}
             removeFromCollection={
                 activeCollectionId && onRemoveFromCollection
                     ? {

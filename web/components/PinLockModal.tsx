@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Lock, X } from 'lucide-react';
 import { setPin, attemptUnlock, verifyPin, disablePin, tryBiometricUnlock } from '@/lib/privacyLock';
 import { useScrollLock } from '@/lib/useScrollLock';
+import { useVisualViewport } from '@/lib/useVisualViewport';
 
 const PIN_LENGTH = 4;
 
@@ -52,6 +53,14 @@ export default function PinLockModal({
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
+    // The just-typed digit stays visible for a beat before masking into a dot
+    // (the standard PIN-pad affordance).
+    const [peek, setPeek] = useState<{ index: number; digit: string } | null>(null);
+    const peekTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => () => { if (peekTimer.current) clearTimeout(peekTimer.current); }, []);
+    // Track the visible viewport so the dialog centers in the space ABOVE the
+    // iOS keyboard instead of the full window (where the keyboard covers it).
+    const vp = useVisualViewport();
 
     // Reset the flow whenever the modal (re)opens or the mode changes.
     const [resetKey, setResetKey] = useState({ isOpen, mode });
@@ -63,6 +72,7 @@ export default function PinLockModal({
             setFirstPin('');
             setError(null);
             setBusy(false);
+            setPeek(null);
         }
     }
 
@@ -141,6 +151,14 @@ export default function PinLockModal({
 
     const handleChange = (raw: string) => {
         const digits = raw.replace(/\D/g, '').slice(0, PIN_LENGTH);
+        // Show the newly typed digit briefly before it masks into a dot.
+        if (digits.length > value.length) {
+            setPeek({ index: digits.length - 1, digit: digits[digits.length - 1] });
+            if (peekTimer.current) clearTimeout(peekTimer.current);
+            peekTimer.current = setTimeout(() => setPeek(null), 700);
+        } else {
+            setPeek(null);
+        }
         setValue(digits);
         if (error) setError(null);
         if (digits.length === PIN_LENGTH) void handleComplete(digits);
@@ -154,8 +172,13 @@ export default function PinLockModal({
         : 'This collection is private.';
 
     return (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 animate-fade-in">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+        <div
+            className="fixed inset-x-0 z-[120] flex items-center justify-center p-4 animate-fade-in"
+            // Center within the VISIBLE viewport (the area above the iOS
+            // keyboard), not the full window the keyboard is covering.
+            style={{ top: vp.offsetTop || 0, height: vp.height || '100%' }}
+        >
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
             <div
                 role="dialog"
@@ -180,16 +203,22 @@ export default function PinLockModal({
                     <h3 className="text-base font-bold text-text">{STEP_TITLE[step]}</h3>
                     <p className="mt-1 text-[13px] text-text-muted leading-snug">{subtitle}</p>
 
-                    {/* The dots — a visual mirror of the hidden input's value. */}
+                    {/* The dots — a visual mirror of the hidden input's value. The
+                        just-typed digit shows for a beat before masking. */}
                     <div className="relative mt-5 mb-1">
                         <div className="flex items-center gap-3" aria-hidden="true">
                             {Array.from({ length: PIN_LENGTH }, (_, i) => (
-                                <span
-                                    key={i}
-                                    className={`w-3.5 h-3.5 rounded-full border transition-colors ${
-                                        i < value.length ? 'bg-accent border-accent' : 'bg-transparent border-border-strong'
-                                    }`}
-                                />
+                                <span key={i} className="w-5 h-6 flex items-center justify-center">
+                                    {peek?.index === i && i < value.length ? (
+                                        <span className="text-lg font-bold text-text tabular-nums leading-none">{peek.digit}</span>
+                                    ) : (
+                                        <span
+                                            className={`w-3.5 h-3.5 rounded-full border transition-colors ${
+                                                i < value.length ? 'bg-accent border-accent' : 'bg-transparent border-border-strong'
+                                            }`}
+                                        />
+                                    )}
+                                </span>
                             ))}
                         </div>
                         <input

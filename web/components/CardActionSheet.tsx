@@ -1,7 +1,7 @@
 'use client';
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink, Layers, Share2, FolderMinus } from 'lucide-react';
+import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink, Layers, Share2, FolderMinus, Lock } from 'lucide-react';
 import { useEffect } from 'react';
 import { IconButton } from './ui/Button';
 import { useScrollLock } from '@/lib/useScrollLock';
@@ -17,6 +17,8 @@ interface CardActionSheetProps {
     onDelete: (id: string) => void;
     onAddToCollection?: (link: Link) => void;
     onShare?: (link: Link) => void;
+    /** Toggle the card's Private flag (parent owns PIN setup — lib/privacyLock). */
+    onTogglePrivate?: (link: Link) => void;
     /** When viewing inside a collection, a one-tap remove from it. */
     removeFromCollection?: { name: string; onRemove: () => void };
 }
@@ -41,6 +43,7 @@ export default function CardActionSheet({
     onDelete,
     onAddToCollection,
     onShare,
+    onTogglePrivate,
     removeFromCollection,
 }: CardActionSheetProps) {
     useEffect(() => {
@@ -121,6 +124,13 @@ export default function CardActionSheet({
             label: 'Share',
             icon: <Share2 className="w-5 h-5" />,
             onClick: () => onShare(link),
+        }] : []),
+        ...(onTogglePrivate ? [{
+            key: 'private',
+            label: link.isPrivate ? 'Remove from Private' : 'Make private',
+            icon: <Lock className={`w-5 h-5 ${link.isPrivate ? 'text-accent' : ''}`} />,
+            active: !!link.isPrivate,
+            onClick: () => onTogglePrivate(link),
         }] : []),
         ...(removeFromCollection ? [{
             key: 'remove-collection',
