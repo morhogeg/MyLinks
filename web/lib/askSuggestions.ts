@@ -192,10 +192,19 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
 // These must be about what was ACTUALLY discussed — the card(s) the answer was
 // grounded in — not a generic rotating pool. "Give me an action item" is wrong
 // on a tweet about political corruption; "What ingredients do I need?" is wrong
-// on anything but a recipe. So we classify the cited card(s) into a content
-// ANGLE and draw the chips from that angle's template set, mixing in
-// conversation state (what was already asked, how deep we are) and a
-// knowledge-graph nudge when the topic recurs across the library.
+// on anything but a recipe.
+//
+// AIRTIGHT RULE (the whole point of this section): the backend is strictly
+// grounded — it answers only from retrieved card content and refuses when the
+// material isn't there. So every chip we offer must be answerable from data we
+// can VERIFY client-side on the cited cards (their stored summary /
+// detailedSummary / recipe fields), or from library facts we've already
+// counted (a concept that provably recurs, 2+ cited cards to compare).
+// Speculative asks — "What's the counterargument?", "How solid is the
+// evidence?", "Was it worth watching?" — are banned: they demand material the
+// card usually doesn't contain, and the grounded backend answers "there's
+// nothing on that", which reads as a broken product. A chip we can't
+// guarantee is a chip we don't show; fewer, reliable chips beat clever ones.
 
 /** The content "angle" of the card(s) an answer was grounded in. Topical angles
  *  win over the medium — a political *video* is `news` (→ "What's the
@@ -213,6 +222,9 @@ export interface ClassifiableCard {
     tags?: string[];
     concepts?: string[];
     summary?: string;
+    /** Long-form stored analysis — its presence is what licenses depth chips
+     *  ("Give me more detail", "Summarize the steps"). */
+    detailedSummary?: string;
     sourceType?: string;
     recipe?: { ingredients?: string[] } | null;
     metadata?: { videoId?: string } | null;
@@ -302,52 +314,87 @@ function findRelatedConcept(cards: ClassifiableCard[], allLinks: Link[]): string
     return bestCount > 0 ? best : null;
 }
 
-/** The template chips for an angle (before conversation-state adjustments). */
-function angleChips(angle: ContentAngle): string[] {
+/** What the cited cards can PROVABLY support — read straight off their stored
+ *  fields, so every gated chip is answerable by the grounded backend. */
+interface Evidence {
+    /** Structured recipe data with actual ingredients. */
+    hasIngredients: boolean;
+    /** A substantial stored long-form analysis (not just the short summary). */
+    hasDetail: boolean;
+}
+
+function gatherEvidence(cards: ClassifiableCard[]): Evidence {
+    return {
+        hasIngredients: cards.some(c => !!c.recipe?.ingredients?.length),
+        hasDetail: cards.some(c => (c.detailedSummary?.trim().length ?? 0) >= 200),
+    };
+}
+
+/** The template chips for an angle, each gated on evidence the cited cards
+ *  actually carry. Everything here restates or reframes STORED content —
+ *  nothing asks for material that might not exist. */
+function angleChips(angle: ContentAngle, ev: Evidence): string[] {
     switch (angle) {
         case 'recipe':
-            return ['What ingredients do I need?', 'Walk me through the steps', 'Can I make this simpler?'];
+            return [
+                ...(ev.hasIngredients ? ['What ingredients do I need?'] : []),
+                ...(ev.hasIngredients || ev.hasDetail ? ['Walk me through the steps'] : []),
+                'Give me the key points',
+            ];
         case 'news':
-            // News / opinion / politics: reflect, contextualize — never "action item".
-            return ["What's the counterargument?", "What's the bigger picture?", 'Why does this matter?'];
+            // News / opinion / politics: restate and interpret the saved piece —
+            // never debate prompts ("counterargument") the card can't answer.
+            return ["What's the main argument?", 'Why does this matter?'];
         case 'howto':
-            return ['Summarize the steps', 'What do I need to try this?', "What's the catch?"];
+            return [
+                ...(ev.hasDetail ? ['Summarize the steps'] : []),
+                'Give me the key points',
+                'Explain it more simply',
+            ];
         case 'research':
-            return ['What are the key findings?', 'How solid is the evidence?', 'Why does this matter?'];
+            return ['What are the key findings?', 'Why does this matter?'];
         case 'video':
-            return ['What are the key takeaways?', 'Give me the highlights', 'Was it worth watching?'];
+            return ['What are the key takeaways?', 'Give me the highlights'];
         default:
-            return ['Give me the key points', 'How does this fit my other saves?', 'Explain it more simply'];
+            return ['Give me the key points', 'Explain it more simply'];
     }
 }
 
 // Chips that deepen/branch the thread (vs. restart it) — floated to the front
 // once the conversation has a couple of exchanges behind it.
-const DEEPENING_RE = /counter|bigger picture|common thread|compare|what else|fit my|why does this matter|how solid|catch|other side/i;
+const DEEPENING_RE = /common thread|compare|what else|why does this matter|more detail/i;
 
-// Neutral deepening chips used only to top up when the angle set is exhausted.
-const GENERIC_DEEPENING = [
-    'How does this fit my other saves?',
+// Always-answerable top-ups (pure restatements of stored content) used only
+// when the gated angle set comes up short.
+const SAFE_FALLBACKS = [
+    'Give me the key points',
+    'Explain it more simply',
     'Why does this matter?',
-    'What should I look into next?',
 ];
 
 /**
  * Up to 3 content-aware follow-up chips derived from what the answer actually
- * discussed. Pure and deterministic (no salt) — the variety comes from the
- * content and the conversation, not a shuffle. Short, sentence-case, natural.
+ * discussed, every one gated on evidence the cited cards verifiably carry
+ * (see the AIRTIGHT RULE above). Pure and deterministic (no salt) — the
+ * variety comes from the content and the conversation, not a shuffle.
+ * Returns [] when the answer cited nothing — with no grounding there is no
+ * follow-up we can guarantee, and no chips beats broken chips.
  */
 export function buildFollowUps(ctx: FollowUpContext): string[] {
     const { citedCards, allLinks, askedTexts, exchangeCount } = ctx;
+    if (citedCards.length === 0) return [];
     const angle = dominantAngle(citedCards);
     const related = findRelatedConcept(citedCards, allLinks);
     const multiCard = new Set(citedCards.map(c => c.id)).size >= 2;
+    const ev = gatherEvidence(citedCards);
 
     const candidates: string[] = [];
-    // Multiple cited cards → let the user pull them together first.
+    // Multiple cited cards → pulling them together is grounded by definition.
     if (multiCard) candidates.push('Compare these', "What's the common thread?");
-    candidates.push(...angleChips(angle));
-    // A recurring topic in the library → offer the knowledge-graph jump.
+    candidates.push(...angleChips(angle, ev));
+    // A stored long-form analysis exists → depth is a guaranteed win.
+    if (ev.hasDetail) candidates.push('Give me more detail');
+    // A concept that PROVABLY recurs on other cards → the knowledge-graph jump.
     if (related) candidates.push(`What else did I save on ${related}?`);
 
     // Dedupe (case-insensitive) and drop anything already asked/tapped this session.
@@ -367,7 +414,7 @@ export function buildFollowUps(ctx: FollowUpContext): string[] {
 
     // Top up toward 3 without repeating anything used or already shown.
     if (chips.length < 3) {
-        for (const f of GENERIC_DEEPENING) {
+        for (const f of SAFE_FALLBACKS) {
             if (chips.length >= 3) break;
             const k = f.toLowerCase();
             if (!seen.has(k) && !asked.has(k)) { chips.push(f); seen.add(k); }

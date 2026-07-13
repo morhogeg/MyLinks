@@ -123,17 +123,29 @@ function CopyButton({ text, sources }: { text: string; sources?: ChatSource[] })
     );
 }
 
+/** How the current ask was initiated — drives the thinking micro-copy so the
+ *  status matches what's actually happening from the user's point of view.
+ *  Tapping a chip the SYSTEM suggested about a specific card must not read
+ *  "Searching your library…" (we suggested it; there's nothing to find). */
+export type AskOrigin =
+    | 'free'      // typed question → genuine library search
+    | 'card'      // a chip about one specific card we suggested
+    | 'library'   // a chip that genuinely sweeps the library (week/topic/recap)
+    | 'followup'; // continuing the thread about already-cited sources
+
+const THINKING_STAGES: Record<AskOrigin, string[]> = {
+    // Count-free phrasing on purpose: these must always be true.
+    free: ['Searching your library…', 'Reviewing relevant cards…', 'Writing your answer…'],
+    card: ['Opening that card…', 'Reading it closely…', 'Writing your answer…'],
+    library: ['Searching your library…', 'Reviewing relevant cards…', 'Writing your answer…'],
+    followup: ['Re-reading the sources…', 'Thinking it through…', 'Writing your answer…'],
+};
+
 /** Staged "what Machina is doing" status shown while waiting for the answer —
- *  honest theater (search → read → write mirrors the real pipeline) that makes
- *  the wait legible instead of three anonymous dots. Remounts per ask. */
-function ThinkingIndicator() {
-    // Count-free phrasing on purpose: a question about a single card makes
-    // "searching your N saves" read wrong, and these are always true.
-    const stages = [
-        'Searching your library…',
-        'Reviewing relevant cards…',
-        'Writing your answer…',
-    ];
+ *  honest theater (mirrors the real pipeline) that makes the wait legible
+ *  instead of three anonymous dots. Remounts per ask. */
+function ThinkingIndicator({ origin }: { origin: AskOrigin }) {
+    const stages = THINKING_STAGES[origin];
     const [stage, setStage] = useState(0);
     useEffect(() => {
         const t1 = setTimeout(() => setStage(1), 1600);
@@ -177,6 +189,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
+    // How the in-flight ask was initiated — picks the thinking micro-copy.
+    const [askOrigin, setAskOrigin] = useState<AskOrigin>('free');
     // True while an SSE answer is still writing (isThinking covers only the
     // pre-first-token wait). Together they gate the Stop affordance.
     const [isStreaming, setIsStreaming] = useState(false);
@@ -232,6 +246,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
         if (messages.length === 0) return [];
         const last = messages[messages.length - 1];
         if (last.role !== 'assistant' || last.error || !last.content) return [];
+        // No grounding, no chips: an ungrounded (or citation-less) answer has
+        // nothing a follow-up can be guaranteed against — offering "give me the
+        // key points" of an answer the backend already flagged reads as slop.
+        if (last.ungrounded || !last.sources || last.sources.length === 0) return [];
         const byId = new Map(links.map(l => [l.id, l]));
         const citedCards: ClassifiableCard[] = (last.sources ?? []).map(s =>
             byId.get(s.id) ?? { id: s.id, title: s.title, category: s.category ?? undefined }
@@ -536,10 +554,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
     }, [isMobile]);
 
     /** Ask a question. `base` overrides the conversation the turn builds on —
-     *  used by retry to drop a failed exchange before re-sending. */
-    const send = async (text: string, base?: ChatMessage[]) => {
+     *  used by retry to drop a failed exchange before re-sending. `origin`
+     *  records how the ask started, which picks the thinking micro-copy. */
+    const send = async (text: string, base?: ChatMessage[], origin: AskOrigin = 'free') => {
         const question = text.trim();
         if (!question || isThinking || !uid) return;
+        setAskOrigin(origin);
 
         // Start a fresh stream generation — aborts any prior in-flight stream and
         // gives us a token every downstream update re-checks before touching state.
@@ -821,7 +841,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                     // re-animates its chip in — just with no special dress-up.
                                     key={s.key}
                                     dir="auto"
-                                    onClick={() => { trackAskSuggestionUsed(s.kind); send(s.text); }}
+                                    // latest/rediscover chips are about ONE card we
+                                    // suggested; the rest genuinely sweep the library.
+                                    onClick={() => {
+                                        trackAskSuggestionUsed(s.kind);
+                                        send(s.text, undefined, s.kind === 'latest' || s.kind === 'rediscover' ? 'card' : 'library');
+                                    }}
                                     className="animate-fade-in px-3.5 py-2 rounded-full bg-card border border-border-subtle text-text-secondary text-sm font-medium hover:border-accent/40 hover:text-text transition-colors cursor-pointer"
                                 >
                                     {s.text}
@@ -938,7 +963,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                             </div>
                         ))}
 
-                        {isThinking && <ThinkingIndicator />}
+                        {isThinking && <ThinkingIndicator origin={askOrigin} />}
 
                         {/* Content-aware one-tap follow-ups once the latest answer has
                             settled (empty when the turn can't produce a tailored set). */}
@@ -948,7 +973,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                     <button
                                         key={f}
                                         dir="auto"
-                                        onClick={() => { trackAskFollowupUsed(); send(f); }}
+                                        onClick={() => { trackAskFollowupUsed(); send(f, undefined, 'followup'); }}
                                         className="px-3 py-1.5 rounded-full border border-border-subtle text-text-muted text-[13px] hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
                                     >
                                         {f}
@@ -984,7 +1009,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                             dir="auto"
                             onClick={() => {
                                 trackAskSuggestionUsed('fresh');
-                                send(`What's the gist of "${freshCard.title}"?`);
+                                send(`What's the gist of "${freshCard.title}"?`, undefined, 'card');
                                 setFreshCard(null);
                             }}
                             className="flex-1 min-w-0 text-start text-[13px] text-text truncate cursor-pointer hover:underline underline-offset-2"
