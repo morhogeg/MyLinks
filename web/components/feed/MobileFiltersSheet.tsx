@@ -1,14 +1,14 @@
 'use client';
 
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
-import { X, ArrowUpDown, Tag as TagIcon, Shapes } from 'lucide-react';
+import { X, Tag as TagIcon, Shapes } from 'lucide-react';
 import Dropdown, { type DropdownOption } from '../Dropdown';
 import SourceFacetList from '../SourceFacetList';
 import TagExplorer from '../TagExplorer';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { useSheetDrag } from '@/lib/useSheetDrag';
 import type { SourceFacet } from '@/lib/source';
-import type { FilterType, SortType } from '@/lib/useFeedFilters';
+import type { FilterType } from '@/lib/useFeedFilters';
 
 /**
  * Filters Sheet (Mobile) — the single "Filter" affordance behind the home
@@ -21,11 +21,8 @@ export default function MobileFiltersSheet({
     onClose,
     filter,
     setFilter,
-    sortBy,
-    setSortBy,
     statusTriggerIcon,
     statusOptions,
-    sortOptions,
     sourceFacets,
     selectedSources,
     setSelectedSources,
@@ -46,11 +43,8 @@ export default function MobileFiltersSheet({
     onClose: () => void;
     filter: FilterType;
     setFilter: Dispatch<SetStateAction<FilterType>>;
-    sortBy: SortType;
-    setSortBy: Dispatch<SetStateAction<SortType>>;
     statusTriggerIcon: ReactNode;
     statusOptions: DropdownOption[];
-    sortOptions: DropdownOption[];
     sourceFacets: SourceFacet[];
     selectedSources: Set<string>;
     setSelectedSources: Dispatch<SetStateAction<Set<string>>>;
@@ -185,28 +179,16 @@ export default function MobileFiltersSheet({
                         </div>
                     )}
 
-                    {/* Status + Sort */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">Show</label>
-                            <Dropdown
-                                ariaLabel="Filter by status"
-                                value={filter}
-                                onChange={(v) => setFilter(v as FilterType)}
-                                leadingIcon={statusTriggerIcon}
-                                options={statusOptions}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">Sort</label>
-                            <Dropdown
-                                ariaLabel="Sort order"
-                                value={sortBy}
-                                onChange={(v) => setSortBy(v as SortType)}
-                                leadingIcon={<ArrowUpDown className="w-4 h-4 text-text-secondary" />}
-                                options={sortOptions}
-                            />
-                        </div>
+                    {/* Status (sort has its own sheet, opened from the sort chip) */}
+                    <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">Show</label>
+                        <Dropdown
+                            ariaLabel="Filter by status"
+                            value={filter}
+                            onChange={(v) => setFilter(v as FilterType)}
+                            leadingIcon={statusTriggerIcon}
+                            options={statusOptions}
+                        />
                     </div>
 
                     {/* Sources — the grouped source list (platform → account).
