@@ -55,6 +55,10 @@ export default function AnalyzingBanner({ state }: { state: AnalyzingState | nul
     const [done, setDone] = useState(false);
     const [shown, setShown] = useState<AnalyzingState | null>(null);
     const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Monotonic guard on the DISPLAYED %: whichever source is feeding the banner
+    // (optimistic bridge → real processing card), the number must never step
+    // backwards mid-capture. Reset when the banner leaves the screen.
+    const maxPct = useRef(0);
 
     useEffect(() => {
         if (state?.active) {
@@ -80,9 +84,19 @@ export default function AnalyzingBanner({ state }: { state: AnalyzingState | nul
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [state?.active, state?.progress, state?.kind]);
 
-    if (!visible || !shown) return null;
+    if (!visible || !shown) {
+        maxPct.current = 0;
+        return null;
+    }
 
-    const pct = Math.round(Math.min(100, Math.max(0, done ? 100 : shown.progress)));
+    // Non-decreasing: clamp up to the highest % shown so far this capture, so a
+    // hand-off between banner sources can't flash a lower number. The finish
+    // frame (done) always completes to 100%.
+    let pct = Math.round(Math.min(100, Math.max(0, done ? 100 : shown.progress)));
+    // eslint-disable-next-line react-hooks/refs
+    pct = done ? 100 : Math.max(pct, maxPct.current);
+    // eslint-disable-next-line react-hooks/refs
+    maxPct.current = pct;
 
     return (
         <div
@@ -104,7 +118,7 @@ export default function AnalyzingBanner({ state }: { state: AnalyzingState | nul
                         {pct}%
                     </span>
                 </div>
-                <div className="mt-2 h-1 w-full rounded-full bg-white/10 overflow-hidden">
+                <div className="mt-2 h-1 w-full rounded-full bg-fill-strong overflow-hidden">
                     <div
                         className={`h-full rounded-full transition-[width] duration-300 ease-out ${done ? 'bg-green-500' : 'bg-accent'}`}
                         style={{ width: `${pct}%` }}

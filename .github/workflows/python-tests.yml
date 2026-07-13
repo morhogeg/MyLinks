@@ -1,0 +1,35 @@
+name: Python tests
+
+# Backend unit tests for the Cloud Functions (functions/tests). These run
+# offline — no Firestore, no network, no GEMINI key — so they need only the
+# installed dependencies and plain pytest.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "functions/**"
+      - ".github/workflows/python-tests.yml"
+  pull_request:
+    paths:
+      - "functions/**"
+      - ".github/workflows/python-tests.yml"
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r functions/requirements.txt -r functions/requirements-dev.txt
+
+      - name: Run tests
+        run: pytest functions/tests -q

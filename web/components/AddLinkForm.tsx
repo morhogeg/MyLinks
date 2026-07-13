@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef, FormEvent } from 'react';
-import { Link, Plus, X, Upload } from 'lucide-react';
-import { saveLink, getUserTags } from '@/lib/storage';
+import { useRouter, usePathname } from 'next/navigation';
+import { Link, Plus, X, Upload, Loader2 } from 'lucide-react';
+import { saveLink, getUserTags, findLinkIdByUrl, createProcessingPlaceholder, markLinkFailed, createNoteCard, enrichNoteCard } from '@/lib/storage';
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
-import { apiUrl } from '@/lib/api';
+import { apiUrl, fetchWithTimeout as apiFetch } from '@/lib/api';
+import { trackSaveSucceeded, trackFirstSave, trackSaveFailed } from '@/lib/analytics';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useAuth } from '@/components/AuthProvider';
@@ -48,6 +50,14 @@ const youTubeId = (input: string): string | null => {
 // message instead of an indefinite spinner.
 const ANALYZE_TIMEOUT_MS = 60_000;
 
+// A save can fail for a few distinct reasons; we surface an honest message to
+// the user AND record a short, fixed failure category for analytics (never the
+// raw error text). `category` rides on the Error so the catch block can read it.
+type SaveFailReason = 'timeout' | 'network' | 'analyze_failed' | 'save_failed';
+
+const saveError = (message: string, category: SaveFailReason): Error =>
+    Object.assign(new Error(message), { category });
+
 const fetchWithTimeout = async (input: string, init: RequestInit) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
@@ -55,7 +65,10 @@ const fetchWithTimeout = async (input: string, init: RequestInit) => {
         return await fetch(input, { ...init, signal: controller.signal });
     } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') {
-            throw new Error('Analysis is taking longer than expected. It may still finish in the background — check your feed in a moment.');
+            // HONEST copy: the synchronous save did NOT complete — nothing was
+            // persisted and nothing will appear in the feed. Tell the truth and
+            // invite a retry (the URL stays in the field, so retry is one tap).
+            throw saveError('That took too long, so nothing was saved. Your link is still here — tap Save to try again.', 'timeout');
         }
         throw err;
     } finally {
@@ -65,13 +78,15 @@ const fetchWithTimeout = async (input: string, init: RequestInit) => {
 
 /**
  * Form for manually adding URLs
- * This replaces WhatsApp ingestion for local testing
  */
 export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingChange }: AddLinkFormProps) {
     const { uid } = useAuth();
     const toast = useToast();
+    const router = useRouter();
+    const pathname = usePathname();
     const [url, setUrl] = useState('');
-    const [activeTab, setActiveTab] = useState<'link' | 'image'>('link');
+    const [note, setNote] = useState('');
+    const [activeTab, setActiveTab] = useState<'link' | 'image' | 'note'>('link');
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -98,6 +113,16 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
     // Swipe in from the left edge to dismiss the open sheet (iOS back gesture).
     useEdgeSwipeBack(() => setIsExpanded(false), isMobile && isExpanded);
 
+    // Escape collapses the open sheet, mirroring the close button / backdrop tap.
+    useEffect(() => {
+        if (!isExpanded) return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setIsExpanded(false);
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [isExpanded]);
+
     // A YouTube link gets the "watching the video" progress treatment, since
     // native video analysis takes ~1 minute vs. a few seconds for a page.
     const videoId = activeTab === 'link' ? youTubeId(formatUrl(url)) : null;
@@ -110,9 +135,11 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
     // success snaps it to 100%.
     // A normal web link/article also gets the phased scan treatment now.
     const isPlainLink = activeTab === 'link' && !isVideo;
+    // A URL-less note is analyzed like a plain page (a few seconds, no scraping).
+    const isNote = activeTab === 'note';
 
     useEffect(() => {
-        const animated = isLoading && (activeTab === 'image' || isVideo || isPlainLink);
+        const animated = isLoading && (activeTab === 'image' || isVideo || isPlainLink || isNote);
         if (animated) {
             setProgress((p) => (p < 8 ? 8 : p));
             // Smaller factor = slower climb. Tuned so video reaches ~97% over a
@@ -132,7 +159,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 progressTimer.current = null;
             }
         };
-    }, [isLoading, activeTab, isVideo, isPlainLink]);
+    }, [isLoading, activeTab, isVideo, isPlainLink, isNote]);
 
     // Publish the in-flight state up to the page so it can render a persistent
     // "Analyzing… N%" banner that survives this form collapsing/closing.
@@ -154,10 +181,10 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
         try {
             data = JSON.parse(responseText);
         } catch {
-            throw new Error('The analysis service returned an unexpected response. Please try again.');
+            throw saveError('The analysis service returned an unexpected response. Please try again.', 'analyze_failed');
         }
         if (!response.ok || !data.success) {
-            throw new Error(data?.error || 'Failed to analyze. Please try again.');
+            throw saveError(data?.error || 'Failed to analyze. Please try again.', 'analyze_failed');
         }
         return data;
     };
@@ -167,12 +194,154 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
 
         const formattedUrl = formatUrl(url);
 
-        if ((activeTab === 'link' && !formattedUrl) || (activeTab === 'image' && !imageFile) || isLoading) {
+        if ((activeTab === 'link' && !formattedUrl) || (activeTab === 'image' && !imageFile) || (activeTab === 'note' && !note.trim()) || isLoading) {
             return;
         }
 
         if (!uid) {
             setError('User not ready yet. Please wait a moment and try again.');
+            return;
+        }
+
+        // Web-path dedup (link mode only — an image gets its URL post-analysis).
+        // Mirror the iOS share path: exact match on the stored `url` field. Do it
+        // BEFORE the expensive analysis so a repeat paste is caught instantly and
+        // no work is wasted. The check is best-effort: any failure (offline, query
+        // error) falls through to a normal save — a save is NEVER blocked on it.
+        if (activeTab === 'link') {
+            try {
+                const existingId = await findLinkIdByUrl(uid, formattedUrl);
+                if (existingId) {
+                    trackSaveFailed('duplicate');
+                    toast.info("You already saved this — opening it now.");
+                    setUrl('');
+                    setError(null);
+                    setIsExpanded(false);
+                    // Deep-link to the existing card; Feed consumes ?linkId and
+                    // opens it (see Feed.tsx's searchParams effect).
+                    router.push(`${pathname}?linkId=${existingId}`);
+                    return;
+                }
+            } catch {
+                // Dedup probe failed — proceed to save rather than block capture.
+            }
+
+            // DURABLE WEB LINK CAPTURE (Weakness #5). A link no longer blocks on
+            // an up-to-60s synchronous /api/analyze call that a slow scrape could
+            // time out and lose. Instead: write a `processing` placeholder card
+            // (instant feed feedback) and enqueue the URL into the SAME background
+            // pipeline the iOS share sheet uses. Analysis finishes asynchronously
+            // and flips this very card to ready/failed — the capture is durable
+            // the moment the placeholder is written. (Note & Image stay
+            // synchronous below — see the report: images upload inline bytes the
+            // trigger path doesn't handle, and a note is near-instant.)
+            setIsLoading(true);
+            setError(null);
+            setProgress(0);
+
+            let cardId: string;
+            try {
+                cardId = await createProcessingPlaceholder(uid, formattedUrl);
+            } catch (writeErr) {
+                // The placeholder write IS the capture — if it fails, nothing was
+                // saved. Keep the URL in the field so retry is one tap.
+                trackSaveFailed('save_failed');
+                const message = `Could not save to Machina: ${writeErr instanceof Error ? writeErr.message : String(writeErr)}`;
+                setError(message);
+                toast.error(message);
+                setIsLoading(false);
+                return;
+            }
+
+            try {
+                // Enqueue for background analysis. This request is FAST — it only
+                // writes the queue doc; no scraping/AI runs in it — so the 60s
+                // Hosting cap that hurt slow YouTube links no longer applies.
+                const response = await apiFetch(apiUrl('/api/share'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
+                    // uid kept for the pre-cutover soft-auth fallback; ignored once REQUIRE_AUTH is on.
+                    body: JSON.stringify({ url: formattedUrl, cardId, uid }),
+                }, 30_000);
+                const text = await response.text();
+                let resData: { success?: boolean; error?: string };
+                try { resData = JSON.parse(text); } catch { resData = {}; }
+                if (!response.ok || !resData.success) {
+                    throw new Error(resData?.error || 'Could not start analysis. Please try again.');
+                }
+            } catch (enqueueErr) {
+                // Couldn't hand the capture to the pipeline. The placeholder card
+                // exists, so flip it to a retryable `failed` card (never a stuck
+                // spinner) rather than lose it — the feed's Retry re-runs analysis.
+                try {
+                    await markLinkFailed(uid, cardId, enqueueErr instanceof Error ? enqueueErr.message : String(enqueueErr));
+                } catch {
+                    // Best-effort; the 15-min processing janitor ages it out otherwise.
+                }
+                trackSaveFailed('network');
+                toast.error("Saved your link, but analysis couldn't start — tap the card to retry.");
+                setUrl('');
+                setIsExpanded(false);
+                setIsLoading(false);
+                onLinkAdded();
+                return;
+            }
+
+            // Durably captured AND queued. Record the save now: even if analysis
+            // later fails, the card survives as a retryable card, so this is the
+            // honest success moment. The feed is live via onSnapshot — the
+            // processing card streams in and useProcessingBanner drives the
+            // app-level "Analyzing…" banner, exactly as an iOS-shared capture does.
+            trackSaveSucceeded('web_form');
+            trackFirstSave();
+            setProgress(100);
+            hapticSuccess();
+            toast.success('Saved to Machina');
+            setUrl('');
+            setIsExpanded(false);
+            setIsLoading(false);
+            onLinkAdded();
+            return;
+        }
+
+        // DURABLE NOTE CAPTURE. A note is the user's own words — saving it must
+        // never hinge on a slow (or undeployed) AI call the way the old path did
+        // (it POSTed to /api/analyze and errored "URL is required" whenever the
+        // note branch wasn't live). Write the card instantly client-side, then
+        // enrich it (AI title/tags/category) in the background, best-effort.
+        if (activeTab === 'note') {
+            setIsLoading(true);
+            setError(null);
+            setProgress(0);
+
+            const text = note.trim();
+            let cardId: string;
+            try {
+                cardId = await createNoteCard(uid, text);
+            } catch (writeErr) {
+                trackSaveFailed('save_failed');
+                const message = `Couldn't save your note: ${writeErr instanceof Error ? writeErr.message : String(writeErr)}`;
+                setError(message);
+                toast.error(message);
+                setIsLoading(false);
+                return;
+            }
+
+            // Saved durably. Record and close immediately — the feed streams the
+            // note card in via onSnapshot, exactly like any other capture.
+            trackSaveSucceeded('note');
+            trackFirstSave();
+            setProgress(100);
+            hapticSuccess();
+            toast.success('Note saved');
+            setNote('');
+            setIsExpanded(false);
+            setIsLoading(false);
+            onLinkAdded();
+
+            // Background AI enrichment (title/tags/category). Fire-and-forget: the
+            // note already stands on its own with the user's text if this never lands.
+            void enrichNoteCard(uid, cardId, text);
             return;
         }
 
@@ -191,23 +360,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
 
             let data;
 
-            if (activeTab === 'link') {
-                // LINK MODE — analysis happens in the canonical Python backend.
-                let response;
-                try {
-                    response = await fetchWithTimeout(apiUrl('/api/analyze'), {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', ...(await appCheckHeaders()), ...(await authHeaders()) },
-                        // uid kept for the pre-cutover soft-auth fallback; ignored once REQUIRE_AUTH is on.
-                        body: JSON.stringify({ url: formattedUrl, existingTags, uid }),
-                    });
-                } catch (netErr) {
-                    throw new Error(netErr instanceof Error ? netErr.message : `Network error: ${String(netErr)}`);
-                }
-                data = await parseResponse(response);
-                // Real milestone: analysis came back — jump ahead to "saving".
-                setProgress((p) => Math.max(p, 90));
-            } else {
+            {
                 // IMAGE MODE — compress client-side, then send the inline bytes to
                 // the backend, which both analyzes AND stores the image (via the
                 // admin SDK, bypassing storage.rules that block client writes).
@@ -229,7 +382,10 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                         }),
                     });
                 } catch (netErr) {
-                    throw new Error(netErr instanceof Error ? netErr.message : `Network error: ${String(netErr)}`);
+                    // Preserve a categorized error (e.g. the timeout) as-is; only a
+                    // genuine transport failure gets wrapped as 'network'.
+                    if (netErr instanceof Error && 'category' in netErr) throw netErr;
+                    throw saveError(netErr instanceof Error ? netErr.message : `Network error: ${String(netErr)}`, 'network');
                 }
                 data = await parseResponse(response);
                 // The backend returns the stored image's public URL as link.url.
@@ -250,21 +406,26 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                         estimatedReadTime: data.link.metadata.estimatedReadTime,
                         actionableTakeaway: data.link.metadata.actionableTakeaway,
                     },
-                    sourceType: activeTab === 'image' ? 'image' : (data.link.sourceType || 'web'),
+                    sourceType: 'image',
                     sourceName: data.link.sourceName,
-                    embedding_vector: data.link.embedding_vector,
                     concepts: data.link.concepts,
                     relatedLinks: data.link.relatedLinks,
                 });
             } catch (saveErr) {
-                throw new Error(`Could not save to Machina: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
+                throw saveError(`Could not save to Machina: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`, 'save_failed');
             }
+
+            // The capture landed and is persisted — record it (image tab only;
+            // link and note captures returned durably above).
+            trackSaveSucceeded('web_form');
+            trackFirstSave();
 
             // Let the scan progress (link, image, or video) land on "Done!" first.
             setProgress(100);
             await new Promise((r) => setTimeout(r, 550));
 
             setUrl('');
+            setNote('');
             setImageFile(null);
             setImagePreview(null);
             setIsExpanded(false);
@@ -273,6 +434,12 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             onLinkAdded();
         } catch (err) {
             const message = err instanceof Error ? err.message : `Unknown error: ${String(err)}`;
+            // Record a SHORT, FIXED failure category (never raw error text). An
+            // uncategorized error is an unexpected code path → 'analyze_failed'.
+            const category = (err instanceof Error && 'category' in err
+                ? (err as { category?: SaveFailReason }).category
+                : undefined) ?? 'analyze_failed';
+            trackSaveFailed(category);
             setError(message);
             toast.error(message);
         } finally {
@@ -291,9 +458,15 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             )}
 
             {/* Expanded Form - Moved outside the FAB container to fix z-index stacking context.
-                Mobile: centered in the space above the keyboard (driven by the visual
+                Mobile: positioned in the space above the keyboard (driven by the visual
                 viewport) so it never jams up under the status bar. Desktop: a popover
-                anchored just above the FAB. */}
+                anchored just above the FAB.
+
+                STEADINESS: the card's TOP is computed by centering a FIXED estimated
+                height — not the live content height — so toggling Link/Image/Note
+                (whose contents differ) never re-centers the frame. Combined with the
+                equal-height tab content area below, the dialog holds one position;
+                only the keyboard sliding in/out moves it (as it must). */}
             {isExpanded && (
                 <div
                     className={`fixed z-[70] ${isMobile ? '' : 'bottom-28 right-4 w-96 max-w-[400px] animate-slide-up'}`}
@@ -301,21 +474,26 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                         ? {
                             left: '1rem',
                             right: '1rem',
-                            top: viewport.offsetTop + viewport.height / 2,
-                            transform: 'translateY(-50%)',
+                            // 460 ≈ the card's height with the fixed content area; the
+                            // constant is what keeps `top` identical across tabs.
+                            top: viewport.offsetTop + Math.max(16, (viewport.height - 460) / 2),
+                            maxHeight: viewport.height - 32,
                         }
                         : undefined}
                 >
                     <form
                         onSubmit={handleSubmit}
-                        className="bg-card border border-white/10 rounded-3xl p-6 shadow-2xl relative overflow-hidden animate-fade-in"
+                        role="dialog"
+                        aria-label="Add link"
+                        aria-modal="true"
+                        className="bg-card border border-border-strong rounded-3xl p-6 shadow-2xl relative max-h-full overflow-y-auto animate-fade-in"
                         noValidate
                     >
                         {/* Close button */}
                         <button
                             type="button"
                             onClick={() => setIsExpanded(false)}
-                            className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 text-text-muted transition-colors z-10"
+                            className="absolute top-4 right-4 p-2 rounded-full hover:bg-fill-strong text-text-muted transition-colors z-10"
                             aria-label="Close"
                         >
                             <X className="w-5 h-5" />
@@ -327,12 +505,12 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                 Add to Machina
                             </h3>
                             <p className="text-sm text-text-secondary">
-                                Capture a link or image — Machina reads, summarizes, and files it.
+                                Capture a link, image, or your own note — Machina reads, summarizes, and files it.
                             </p>
                         </div>
 
                         {/* Tabs */}
-                        <div className="flex bg-white/5 p-1 rounded-xl mb-6 border border-white/5">
+                        <div className="flex bg-fill-subtle p-1 rounded-xl mb-6 border border-border-subtle">
                             <button
                                 type="button"
                                 onClick={() => setActiveTab('link')}
@@ -353,9 +531,24 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                             >
                                 Image
                             </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('note')}
+                                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'note'
+                                    ? 'bg-accent/10 text-accent shadow-sm border border-accent/20'
+                                    : 'text-text-muted hover:text-text'
+                                    }`}
+                            >
+                                Note
+                            </button>
                         </div>
 
                         <div className="space-y-4">
+                            {/* Equal-height swap area: every tab's idle content fills the
+                                same 170px block, so toggling tabs moves NOTHING below it
+                                (the Save button stays put). Loading states may grow past
+                                it — that's a phase change, not a toggle. */}
+                            <div className="min-h-[170px] flex flex-col justify-center">
                             {activeTab === 'link' ? (
                                 isLoading && isVideo ? (
                                     <VideoScanProgress
@@ -376,11 +569,35 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                             value={url || ''}
                                             onChange={(e) => setUrl(e.target.value)}
                                             placeholder="example.com or https://..."
-                                            className="w-full px-4 py-4 bg-background border border-white/5 rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-base"
+                                            className="w-full px-4 py-4 bg-background border border-border-subtle rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-base"
                                             disabled={isLoading}
                                             autoFocus
                                         />
                                     </div>
+                                )
+                            ) : activeTab === 'note' ? (
+                                isLoading ? (
+                                    <div className="rounded-xl border border-border-subtle bg-background px-4 py-8 flex flex-col items-center justify-center gap-3 text-center">
+                                        <Loader2 className="w-6 h-6 text-accent animate-spin" />
+                                        <p className="text-sm font-semibold text-text">Reading your note…</p>
+                                        <div className="w-full h-1.5 rounded-full bg-fill-subtle overflow-hidden">
+                                            <div
+                                                className="h-full bg-accent transition-all duration-200"
+                                                style={{ width: `${Math.round(progress)}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <textarea
+                                        id="note"
+                                        value={note}
+                                        onChange={(e) => setNote(e.target.value)}
+                                        placeholder="Write a thought, an idea, a quote — Machina summarizes and files it."
+                                        rows={5}
+                                        className="w-full h-[170px] px-4 py-3 bg-background border border-border-subtle rounded-xl text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 text-base resize-none"
+                                        disabled={isLoading}
+                                        autoFocus
+                                    />
                                 )
                             ) : isLoading && imagePreview ? (
                                 <ImageScanProgress imageSrc={imagePreview} progress={progress} />
@@ -406,7 +623,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                     />
                                     <label
                                         htmlFor="image-upload"
-                                        className={`w-full aspect-video rounded-xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center cursor-pointer transition-all hover:border-accent/50 hover:bg-white/5 ${imagePreview ? 'p-0 border-none overflow-hidden' : 'p-8'
+                                        className={`w-full h-[170px] rounded-xl border-2 border-dashed border-border-strong flex flex-col items-center justify-center cursor-pointer transition-all hover:border-accent/50 hover:bg-fill-subtle ${imagePreview ? 'p-0 border-none overflow-hidden' : 'p-8'
                                             }`}
                                     >
                                         {imagePreview ? (
@@ -422,7 +639,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                             </div>
                                         ) : (
                                             <>
-                                                <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3">
+                                                <div className="w-12 h-12 rounded-full bg-fill-subtle flex items-center justify-center mb-3">
                                                     <Upload className="w-6 h-6 text-accent" />
                                                 </div>
                                                 <p className="text-text font-medium text-sm">Tap to add an image</p>
@@ -431,14 +648,15 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                     </label>
                                 </div>
                             )}
+                            </div>
 
                             {/* The scan views (link/image/video) show their own
                                 progress, so the button is only needed when idle. */}
                             {!isLoading && (
                                 <button
                                     type="submit"
-                                    disabled={activeTab === 'link' ? !url.trim() : !imageFile}
-                                    className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-100 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg"
+                                    disabled={activeTab === 'link' ? !url.trim() : activeTab === 'note' ? !note.trim() : !imageFile}
+                                    className="w-full py-4 bg-accent text-white font-bold rounded-xl hover:bg-accent-hover active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-accent/20"
                                 >
                                     Save
                                 </button>
@@ -462,9 +680,10 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 {/* FAB Button */}
                 <button
                     data-tour="add"
+                    aria-label="Add to Machina"
                     onClick={() => setIsExpanded(!isExpanded)}
                     className={`w-14 h-14 min-h-[44px] min-w-[44px] rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${isExpanded
-                        ? 'bg-card border border-white/10 rotate-45 scale-90 opacity-0 pointer-events-none'
+                        ? 'bg-card border border-border-strong rotate-45 scale-90 opacity-0 pointer-events-none'
                         : 'bg-accent hover:scale-105 active:scale-95'
                         }`}
                 >

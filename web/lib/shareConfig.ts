@@ -11,7 +11,7 @@ import { apiUrl } from './api';
  */
 interface ShareConfigPlugin {
     save(options: { endpoint: string; token: string }): Promise<void>;
-    consumePendingShare(): Promise<{ pending: boolean; kind?: string; ageMs?: number; progress?: number }>;
+    consumePendingShare(): Promise<{ pending: boolean; kind?: string; ageMs?: number; progress?: number; startedAt?: number }>;
 }
 
 const ShareConfigNative = registerPlugin<ShareConfigPlugin>('ShareConfig');
@@ -27,6 +27,10 @@ export interface PendingShare {
     /** The % (0–100) the Share Extension HUD showed at hand-off, if known — lets
         the in-app banner resume from the same value. Undefined on older builds. */
     progress?: number;
+    /** Absolute capture-start wall clock (epoch ms) the Share Extension anchored
+        its progress ramp to — the shared clock the in-app loaders ramp from, so
+        progress carries across continuously. Undefined on older builds. */
+    startedAt?: number;
 }
 
 /**
@@ -43,11 +47,39 @@ export async function consumePendingShare(): Promise<PendingShare> {
         const kind: PendingShareKind =
             res.kind === 'image' ? 'image' : res.kind === 'video' ? 'video' : 'link';
         const progress = typeof res.progress === 'number' && res.progress > 0 ? res.progress : undefined;
-        return { pending: true, kind, ageMs: Math.max(0, res.ageMs ?? 0), progress };
+        const startedAt = typeof res.startedAt === 'number' && res.startedAt > 0 ? res.startedAt : undefined;
+        const now = Date.now();
+        // Remember the hand-off for the rest of the surfaces: the flag itself is
+        // one-shot (native clears it on read), but the REAL processing banner
+        // takes over later and must still anchor/floor to what the extension
+        // showed — see lastShareHandoff().
+        lastHandoff = {
+            startMs: startedAt ?? now - Math.max(0, res.ageMs ?? 0),
+            pct: progress,
+            consumedAt: now,
+        };
+        return { pending: true, kind, ageMs: Math.max(0, res.ageMs ?? 0), progress, startedAt };
     } catch {
         // Older builds without the native method, or no App Group — treat as none.
         return { pending: false, kind: 'link', ageMs: 0 };
     }
+}
+
+export interface ShareHandoff {
+    /** Capture-start wall clock (epoch ms) the extension anchored to. */
+    startMs: number;
+    /** The % the extension HUD showed at hand-off, if known. */
+    pct?: number;
+    /** When the app consumed the hint (epoch ms). */
+    consumedAt: number;
+}
+
+let lastHandoff: ShareHandoff | null = null;
+
+/** The most recent Share-Extension hand-off consumed this session, or null.
+    Callers should ignore stale entries (compare consumedAt to their own clock). */
+export function lastShareHandoff(): ShareHandoff | null {
+    return lastHandoff;
 }
 
 export type ShareBridgeState = 'ok' | 'error' | 'pending' | 'n/a';
@@ -99,9 +131,31 @@ export function onShareBridgeStatus(fn: (s: ShareBridgeStatus) => void): () => v
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Fetch this workspace's share-ingest endpoint + personal ingest token from the
+ * `get_share_config` callable — the single server-side source of truth, which
+ * mints a token on first use. Used both by the native bridge's token-less
+ * fallback below and by the web Settings "Browser extension" screen (so the
+ * browser extension can be configured). No new backend endpoint.
+ * Throws if the callable fails or returns nothing usable.
+ */
+export async function fetchShareConfig(uid: string): Promise<{ endpoint: string; token: string }> {
+    const { httpsCallable } = await import('firebase/functions');
+    const { functions } = await import('./firebase');
+    const getShareConfig = httpsCallable<
+        { uid: string },
+        { endpoint: string; token: string }
+    >(functions, 'get_share_config');
+    const res = await getShareConfig({ uid });
+    const endpoint = res.data?.endpoint;
+    const token = res.data?.token;
+    if (!endpoint || !token) throw new Error('No ingest token available');
+    return { endpoint, token };
+}
+
 async function attemptOnce(uid: string, docToken?: string): Promise<void> {
-    let endpoint: string | undefined;
-    let token: string | undefined;
+    let endpoint: string;
+    let token: string;
 
     // Preferred source: the ingest token straight off the already-loaded user
     // doc, with the endpoint built from the app's own API base. No callable,
@@ -113,18 +167,9 @@ async function attemptOnce(uid: string, docToken?: string): Promise<void> {
     } else {
         // Fallback (first-ever launch before a token exists on the doc): the
         // get_share_config callable mints one server-side.
-        const { httpsCallable } = await import('firebase/functions');
-        const { functions } = await import('./firebase');
-        const getShareConfig = httpsCallable<
-            { uid: string },
-            { endpoint: string; token: string }
-        >(functions, 'get_share_config');
-        const res = await getShareConfig({ uid });
-        endpoint = res.data?.endpoint;
-        token = res.data?.token;
+        ({ endpoint, token } = await fetchShareConfig(uid));
     }
 
-    if (!endpoint || !token) throw new Error('No ingest token available');
     await ShareConfigNative.save({ endpoint, token });
 }
 

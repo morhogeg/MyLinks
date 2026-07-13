@@ -5,8 +5,8 @@ import { useAuth } from '@/components/AuthProvider';
 import Feed from "@/components/Feed";
 import AddLinkForm from "@/components/AddLinkForm";
 import AnalyzingBanner, { AnalyzingState } from "@/components/AnalyzingBanner";
-import InstallPWA from "@/components/InstallPWA";
 import SettingsModal from "@/components/SettingsModal";
+import ScrollToTop from "@/components/ScrollToTop";
 import OnboardingTour, { ONBOARDING_STORAGE_KEY } from "@/components/OnboardingTour";
 import { Settings } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -35,7 +35,7 @@ export default function Home() {
   const [hideAddButton, setHideAddButton] = useState(false);
   // In-flight capture analysis for the one "Analyzing… N%" banner. Two sources:
   // `analyzing` = the in-app add flow (real progress); `processing` = captures
-  // shared from other apps / WhatsApp (server-side, ramped). Prefer the in-app
+  // shared from other apps (server-side, ramped). Prefer the in-app
   // one when it's active (it has true milestones); otherwise show the share one.
   const [analyzing, setAnalyzing] = useState<AnalyzingState | null>(null);
   const [processing, setProcessing] = useState<AnalyzingState | null>(null);
@@ -45,6 +45,10 @@ export default function Home() {
   const sharedSignal = useSharedCaptureBanner(!!processing?.active);
   const bannerState = pickBanner(analyzing, processing, sharedSignal);
   const [isTourOpen, setIsTourOpen] = useState(false);
+  // Gate the first-run tour to a non-empty library: it spotlights real cards,
+  // so over an empty feed it must wait (the welcome screen + example seed run
+  // first; the tour fires after the first card — seeded or real — arrives).
+  const [hasCards, setHasCards] = useState(false);
   // Scroll-scrubbed top bar: opacity rides the scroll itself (down = away,
   // up = back), settling to shown/hidden when the finger rests.
   const headerRef = useHeaderFade<HTMLElement>();
@@ -54,7 +58,7 @@ export default function Home() {
   // toolbar anchors (Ask, Collections, view switcher…) mount so they can be
   // spotlighted. Ask/Collections views hide those anchors, so wait for the grid.
   useEffect(() => {
-    if (loading || !uid || isAskMode || hideAddButton) return;
+    if (loading || !uid || isAskMode || hideAddButton || !hasCards) return;
     let seen = true;
     try {
       seen = !!localStorage.getItem(ONBOARDING_STORAGE_KEY);
@@ -64,7 +68,7 @@ export default function Home() {
     if (seen) return;
     const timer = setTimeout(() => setIsTourOpen(true), 600);
     return () => clearTimeout(timer);
-  }, [loading, uid, isAskMode, hideAddButton]);
+  }, [loading, uid, isAskMode, hideAddButton, hasCards]);
 
   const replayTour = () => {
     setIsSettingsOpen(false);
@@ -78,7 +82,6 @@ export default function Home() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg shadow-purple-500/20 animate-pulse ring-1 ring-white/15">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
           </div>
           <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
@@ -117,7 +120,6 @@ export default function Home() {
           <div className="flex items-center gap-2.5 sm:gap-3">
             <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl overflow-hidden shadow-lg shadow-black/10 ring-1 ring-black/5 dark:ring-white/10">
               {/* The exact app icon, so the in-app mark matches the home-screen icon. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
             </div>
             <div className="leading-none">
@@ -157,7 +159,7 @@ export default function Home() {
         {/* The feed is already live via onSnapshot, so a new save streams in on
             its own — no remount needed. (Previously keyed on refreshKey, which
             tore down listeners and wiped view/filter/search on every add.) */}
-        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} />
+        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onHasCardsChange={setHasCards} />
       </main>
 
       {/* Add Link FAB — hidden in Ask & Collections (neither view captures links). */}
@@ -165,6 +167,7 @@ export default function Home() {
           onSnapshot, so nothing extra is needed here on a successful save. */}
       <AddLinkForm onLinkAdded={() => {}} hidden={hideAddButton} onAnalyzingChange={setAnalyzing} />
       <AnalyzingBanner state={bannerState} />
+      <ScrollToTop />
 
       {/* Settings Modal */}
       {uid && (
@@ -179,9 +182,6 @@ export default function Home() {
 
       {/* First-run guided tour */}
       <OnboardingTour open={isTourOpen} onClose={() => setIsTourOpen(false)} />
-
-      {/* iOS Install Banner */}
-      <InstallPWA />
     </div>
   );
 }

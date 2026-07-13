@@ -3,7 +3,7 @@
 
 export type LinkStatus = 'unread' | 'archived' | 'favorite';
 
-// Async-capture lifecycle (M3). Items saved via the share sheet / WhatsApp are
+// Async-capture lifecycle (M3). Items saved via the share sheet are
 // written as `processing` the instant they're queued, then flip to a normal
 // LinkStatus (ready) or `failed` (retryable) — so a capture is never invisible
 // and never silently dropped. A card's `status` field holds one of these while
@@ -32,7 +32,9 @@ export interface AIAnalysis {
   category: string;
   tags: string[];
   concepts?: string[];
-  actionableTakeaway: string;
+  // Optional: only present when the content genuinely supports a concrete action
+  // (the backend omits it for non-actionable content rather than inventing filler).
+  actionableTakeaway?: string;
   sourceType?: string;
   sourceName?: string;
   // Backend writes a float score here; some legacy docs stored a string label.
@@ -47,6 +49,18 @@ export interface AIAnalysis {
   };
 }
 
+/**
+ * One personal note the user wrote on a card. A card can carry several. Stored
+ * in `Link.userNotes`; a legacy single `userNote` string is treated as one of
+ * these at read time (see lib/notes.ts).
+ */
+export interface UserNote {
+  id: string;
+  text: string;
+  createdAt: number;   // Unix ms — when the note was first added
+  updatedAt?: number;  // Unix ms — when its text was last edited
+}
+
 export interface Link {
   id: string;
   url: string;
@@ -56,13 +70,26 @@ export interface Link {
   tags: string[];
   category: string;
   status: CaptureState;
+  // Private card (protected by the app-level privacy PIN — lib/privacyLock.ts).
+  // Modeled on Photos' Hidden album: lives ONLY under the "Private" show-filter
+  // (never in the main feed/search/facets, even while the vault is unlocked);
+  // entering that filter requires the PIN.
+  isPrivate?: boolean;
   createdAt: number | string; // Handle both Unix timestamp and ISO string
+  // When the current processing attempt began (epoch ms). Stamped on the
+  // placeholder card by the backend (share path) and createProcessingPlaceholder
+  // (web path); a retry re-stamps it while preserving createdAt. It's the shared
+  // wall clock the capture-progress loaders ramp from (see lib/shareProgress.ts),
+  // so the in-app ramp resumes where the Share Extension left off instead of
+  // restarting at 0.
+  processingStartedAt?: number;
   // Async-capture (M3): populated on a `failed` card so the UI can explain what
   // went wrong and offer a retry that re-runs analysis for `url`.
   error?: string;
   failedAt?: number;
   metadata: LinkMetadata;
-  // AI Analysis metadata
+  // AI Analysis metadata. sourceType is 'web' | 'youtube' | 'image' | 'note'
+  // (a 'note' is a URL-less thought captured directly — it has no `url`).
   sourceType?: string;
   sourceName?: string;
   // Backend writes a float score here; some legacy docs stored a string label.
@@ -82,9 +109,29 @@ export interface Link {
   nextReminderAt?: number; // Unix timestamp (ms)
   reminderCount?: number;
   reminderProfile?: string;
+  // In-app fallback: the reminder sweep flips this true when a reminder fires
+  // so the feed surfaces it even when the user has no push. Cleared when the
+  // user acts on it (opens/dismisses) or re-sets the reminder.
+  reminderDue?: boolean;
+  reminderDueAt?: number; // Unix timestamp (ms) the reminder came due
   lastViewedAt?: number; // Unix timestamp (ms)
   language?: string;
   isRead?: boolean;
+
+  // Personal notes the user attaches to ANY card (link, image, or note-card) —
+  // their own annotations, kept distinct from the AI-generated summary. Editable
+  // from the detail view.
+  //
+  // Two shapes coexist for backward compatibility (see lib/notes.ts):
+  //   - Legacy: a single `userNote` string (every card saved before multi-note).
+  //   - Current: a `userNotes` array of discrete notes.
+  // `getNotes(link)` merges both into one newest-first list, so every reader
+  // (cards, search, editor) treats a legacy note as one note. New writes go to
+  // `userNotes`; editing a legacy-only card migrates `userNote` into the array
+  // and clears the legacy field, so data converges over time.
+  userNote?: string;
+  userNoteUpdatedAt?: number; // Unix timestamp (ms) the legacy note was last edited
+  userNotes?: UserNote[];
 
   // Contextual Linking
   concepts?: string[];
@@ -112,6 +159,14 @@ export interface Collection {
   updatedAt: number;
   shareId?: string;      // set when published; key into shared_collections/{shareId}
   isPublic?: boolean;
+  // Private collections (protected by the app-level privacy PIN — lib/privacyLock.ts).
+  // While the vault is locked, member cards are hidden from the library, search,
+  // related cards, and suggestions, and opening the collection requires the PIN.
+  isPrivate?: boolean;
+  publishedAt?: number;  // when the public snapshot was last written
+  // Signature of (name, description, member ids) at publish time — comparing it
+  // against the live signature tells the UI the public page is out of date.
+  publishedSignature?: string;
 }
 
 /** A frozen, denormalized copy of a card for a public share page. */
@@ -154,14 +209,17 @@ export interface RelatedLink {
 }
 
 export type DigestFrequency = 'daily' | 'weekly';
-export type DigestChannel = 'push' | 'email' | 'whatsapp';
-export type ReminderChannel = 'push' | 'whatsapp';
-export type DigestMode = 'smart' | 'random' | 'topic' | 'unread' | 'favorites' | 'rediscover' | 'synthesis';
+export type DigestChannel = 'push';
+export type ReminderChannel = 'push';
+// Three curation modes survive; 'synthesis' is the separate weekly-recap path.
+// Retired modes (random/unread/favorites) map to 'smart' at load time — see
+// normalizeDigestMode in useUserSettings.ts.
+export type DigestMode = 'smart' | 'topic' | 'rediscover' | 'synthesis';
 
 // ── Weekly "What you learned" synthesis (M12) ────────────────────────────────
 // A narrative recap of the week's saves, generated server-side (digest_service)
 // and stored at users/{uid}/syntheses/{weekId}. Surfaced in-app as a special
-// feed card and also delivered over email/WhatsApp.
+// feed card, and pushed as a notification when the push channel is on.
 export interface SynthesisTheme {
   title: string;
   insight: string;
@@ -191,8 +249,8 @@ export interface WeeklySynthesis {
 
 // ── Curated digest (in-app Digest section) ───────────────────────────────────
 // Every curated digest is persisted server-side (digest_service) to
-// users/{uid}/digests/{digestId} — the always-on surface; push/WhatsApp/email
-// are additional opt-in delivery channels.
+// users/{uid}/digests/{digestId} — the always-on surface; push is an
+// additional opt-in delivery channel.
 
 /** A card denormalized into the digest doc, so it renders even if the source
  *  link is later deleted (the app still deep-links by id when it exists). */
@@ -261,6 +319,10 @@ export interface ChatMessage {
   content: string;
   sources?: ChatSource[];
   error?: boolean;
+  // True when the backend could not tie this answer to any saved card (no valid
+  // citation, even after a stricter re-ask). The UI drops the "grounded" promise
+  // and shows a downgrade notice in place of the source chips.
+  ungrounded?: boolean;
 }
 
 /** A saved conversation in the Ask history sidebar (users/{uid}/chats/{id}). */

@@ -2,8 +2,7 @@
 
 Share **any link, text, or image** from any app's share sheet straight into
 Machina. The item is sent to the backend, AI-analyzed, and shows up as a card —
-no Shortcut required. (The old [Shortcut](SHORTCUT_SETUP.md) still works; this
-replaces it with a first-class share target.)
+a first-class, native share target.
 
 ## How it works
 

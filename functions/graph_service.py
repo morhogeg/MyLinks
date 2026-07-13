@@ -3,7 +3,6 @@ import json
 from typing import List, Dict, Optional
 from firebase_admin import firestore
 from google.cloud.firestore_v1.vector import Vector
-from models import LinkDocument, RelatedLink
 from ai_service import GeminiService, GEMINI_ANALYSIS_MODEL, embedding_needs_repair
 
 logger = logging.getLogger(__name__)
@@ -80,7 +79,7 @@ class GraphService:
                 target_id = rel.get("id")
                 if target_id in valid_candidates_map:
                     target_data = valid_candidates_map[target_id]
-                    # Create RelatedLink object structure
+                    # Build the related-link dict written to the card's relatedLinks.
                     results.append({
                         "id": target_id,
                         "title": target_data.get("title"),

@@ -33,9 +33,8 @@ export default function VideoScanProgress({ thumbnailSrc, progress }: VideoScanP
 
     return (
         <div className="space-y-3">
-            <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-white/10 bg-black">
+            <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-border-strong bg-black">
                 {thumbnailSrc ? (
-                    // eslint-disable-next-line @next/next/no-img-element
                     <img src={thumbnailSrc} alt="Analyzing video" className="w-full h-full object-cover" />
                 ) : (
                     <div className="w-full h-full bg-[image:var(--accent-gradient)] opacity-30" />
@@ -73,7 +72,7 @@ export default function VideoScanProgress({ thumbnailSrc, progress }: VideoScanP
 
             {/* Determinate progress bar, driven by the same value as the %. */}
             <div
-                className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden"
+                className="h-1.5 w-full rounded-full bg-fill-strong overflow-hidden"
                 role="progressbar"
                 aria-label="Video analysis progress"
                 aria-valuenow={Math.round(clamped)}

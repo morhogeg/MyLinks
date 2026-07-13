@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import re
 import time
 from typing import List, Optional
 from google import genai
@@ -42,6 +43,12 @@ def embedding_needs_repair(raw) -> bool:
 # Single source of truth for the analysis/generation model. Flows to text
 # analysis, image vision, and graph_service. Change here to swap tiers everywhere.
 GEMINI_ANALYSIS_MODEL = "gemini-3.1-flash-lite"
+# The ASK (RAG) answer model — one tier above flash-lite. Used ONLY by the two
+# grounded-answer paths (answer_from_context / answer_from_context_stream), where
+# reasoning quality over the retrieved context matters most and volume is low
+# (a handful of asks per user per day), so the tier bump is affordable. Analysis,
+# vision, and synthesis deliberately stay on GEMINI_ANALYSIS_MODEL.
+GEMINI_ASK_MODEL = "gemini-3.1-flash"
 EMBEDDING_MODEL = "models/gemini-embedding-001"
 EMBEDDING_DIMENSIONS = 768
 
@@ -106,9 +113,10 @@ Requirements for the analysis:
    - PREFER REUSING EXISTING TAGS provided in the "Existing Tags" list if they are applicable.
    - Only create a new tag if no existing tags fit the content.
 
-8. actionableTakeaway: One concrete, specific action or learning the reader can apply.
+8. actionableTakeaway: One concrete, specific action the reader can apply. This field is OPTIONAL.
    - **LANGUAGE**: Write the takeaway in the SAME language as the input content.
-   - **DO NOT INVENT ADVICE**: Only give a takeaway the content actually supports. If the content is not actionable (e.g. a news event, an anecdote, a personal update), state the single most useful thing the reader now knows instead of manufacturing advice. Never pad this with generic filler.
+   - **INCLUDE ONLY WHEN GENUINE**: Provide a takeaway ONLY if the content genuinely supports one concrete, specific action. If the content is not actionable (e.g. a news event, an anecdote, a personal note or update), OMIT this field entirely — leave it out of the JSON rather than manufacturing advice.
+   - **DO NOT INVENT ADVICE**: Never pad this with generic filler ("stay informed", "consider the implications"). An omitted takeaway is always better than a fabricated one.
 
 CRITICAL RULES:
 - Be a neutral reporter, not a reviewer. Report WHAT is said, not HOW WELL it is said.
@@ -142,9 +150,176 @@ IMPORTANT: You are analyzing an **actual YouTube video that you can watch** (its
 - "detailedSummary": markdown. This section structure OVERRIDES the "start with Key Points" rule above — for a video, use these sections in this order instead. Translate each heading into the content's language (see HEADING LANGUAGE rule above):
   - `## Core Thesis` — the central argument or purpose of the video.
   - `## Key Points` — bullets of the main ideas, instructions, or frameworks actually presented.
-  - `## Who It's For` — the intended audience, only if the video makes this clear.
 - "summary": focus on the takeaway — what a viewer will know or be able to do after watching, stated factually.
 """
+
+
+def collect_notes_text(data: dict) -> str:
+    """All of the user's personal notes on a card, joined into one string.
+
+    Reconciles the two note shapes so both feed embedding, lexical search, and
+    RAG grounding through ONE recipe (mirrors the client's lib/notes.getNotes):
+      - Legacy: a single ``userNote`` string (cards saved before multi-note).
+      - Current: a ``userNotes`` array of ``{id, text, createdAt}`` notes.
+    Cards normally carry EITHER shape (a client edit migrates the string into
+    the array and clears it), but merging both is harmless if they ever coexist.
+
+    Lives here (not in search.py) because search.py imports ai_service, so this
+    is the shared, non-circular home both sides can import.
+    """
+    data = data or {}
+    parts = []
+    legacy = (data.get("userNote") or "").strip()
+    if legacy:
+        parts.append(legacy)
+    for n in (data.get("userNotes") or []):
+        if isinstance(n, dict):
+            t = (n.get("text") or "").strip()
+            if t:
+                parts.append(t)
+    return "\n".join(parts)
+
+
+def _rag_source_label(c: dict) -> str:
+    """Publisher name for the card — explicit sourceName, else the URL's
+    host. Lets the model answer questions that name the source (e.g.
+    'the CNN fact-check'), which the title/summary alone don't contain."""
+    name = (c.get("sourceName") or "").strip()
+    if name and name.lower() not in ("none", "screenshot", "unknown"):
+        return name
+    url = c.get("url") or ""
+    try:
+        from urllib.parse import urlparse
+        host = urlparse(url).hostname or ""
+        return host[4:] if host.startswith("www.") else host
+    except Exception:
+        return ""
+
+
+def _rag_card_block(c: dict) -> str:
+    src = _rag_source_label(c)
+    meta = [f"source: {src}"] if src else []
+    meta.append(f"category: {c.get('category', 'General')}")
+    meta.append(f"tags: {', '.join(c.get('tags', []) or [])}")
+    block = (
+        f"[{c.get('id')}] {c.get('title', 'Untitled')} "
+        f"({'; '.join(meta)})\n{c.get('summary', '')}"
+    )
+    # The user's OWN notes on the card — their words, distinct from the machine
+    # summary. Surfaced to the model so it can answer "what did I think about…".
+    # Merges the legacy string + the multi-note array via the shared reader.
+    note = collect_notes_text(c).strip()
+    if note:
+        block += f"\nMy note: {note}"
+    return block
+
+
+def _build_rag_prompt(question: str, cards: list, history: list = None) -> str:
+    """Shared grounding prompt for both RAG answer paths (streaming and
+    non-streaming).
+
+    Returns the prompt through the `User question:` line; each caller appends
+    its own output-format instruction (a JSON object vs. the streamable
+    `[[CITED: ...]]` marker), which is the ONLY part that legitimately differs
+    between the two paths. Centralising this means a wording change to the
+    grounding rules happens once and both paths stay byte-identical.
+    """
+    sources_text = "\n\n".join(_rag_card_block(c) for c in cards)
+
+    history_text = ""
+    if history:
+        turns = []
+        for h in history[-6:]:  # keep the prompt bounded
+            role = "User" if h.get("role") == "user" else "Assistant"
+            turns.append(f"{role}: {h.get('content', '')}")
+        history_text = "\n\nEarlier in this conversation:\n" + "\n".join(turns)
+
+    return f"""You are Machina AI, the user's personal knowledge assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved.
+
+Rules:
+- Ground every claim in the provided sources. Do NOT use outside knowledge or invent facts.
+- If the sources don't contain the answer, say so plainly and suggest what they could save.
+- Be concise and direct (2-5 sentences, or a short list when that's clearer).
+- Don't announce a count of items (e.g. "three sources") — just give the list. If you do state a number, it MUST exactly match the number of items you list.
+- CRITICAL — match the user's language: write your ENTIRE answer in the same language as the User question, NOT the language of the sources. If the question is in English, answer in English even when every source is in Hebrew; if the question is in Hebrew, answer in Hebrew. The sources' language must not influence your answer's language.
+- Only cite sources you actually used.
+
+Saved sources:
+{sources_text}
+{history_text}
+
+User question: {question}
+
+"""
+
+
+# The whole point of a Machina answer is trust: the answer must demonstrably
+# derive from the user's saved cards, which is why every answer carries the ids
+# it relied on. When those citations come back empty/garbled AND we did supply
+# context cards, the answer is "ungrounded" — we can no longer prove it came
+# from the library. The two RAG paths handle that differently: the buffered JSON
+# path re-asks once with a stricter prompt, the streaming path can only flag it
+# after the fact because the prose has already been sent. Both reuse these pure
+# helpers so the "what counts as a valid citation" rule lives in exactly one
+# place and can be unit-tested without a live model.
+
+# Output-format instruction appended to the buffered JSON RAG prompt.
+_CITED_JSON_SUFFIX = (
+    'Return ONLY a JSON object: {"answer": string, "citedIds": string[]} '
+    "where citedIds are the ids (without brackets) of the sources you relied on."
+)
+
+# Stricter variant used for the single re-ask when the first answer came back
+# with no valid citations. It hammers on the invariant without licensing the
+# model to fabricate a citation for an answer the sources don't actually support.
+_CITED_JSON_STRICT_SUFFIX = (
+    "IMPORTANT: your previous answer did not cite any of the saved sources, which "
+    "is not allowed. Answer again and you MUST populate citedIds with the exact "
+    "ids (shown in square brackets above, without the brackets) of the saved "
+    "sources your answer actually relies on. If — and only if — the saved sources "
+    "genuinely contain nothing that answers the question, say that plainly in the "
+    "answer text and return an empty citedIds. Never invent an id. "
+    'Return ONLY a JSON object: {"answer": string, "citedIds": string[]}.'
+)
+
+
+def _valid_cited_ids(cited, cards: list) -> list:
+    """Filter model-supplied citation ids down to ids we actually provided.
+
+    Pure and defensive: `cited` may be None, a non-list, or contain hallucinated
+    or non-string ids. Returns the subset that appears in `cards`, preserving the
+    model's order and dropping duplicates. This is the single definition of a
+    "valid citation" shared by both RAG paths.
+    """
+    if not isinstance(cited, (list, tuple)):
+        return []
+    valid = {c.get("id") for c in cards if isinstance(c, dict)}
+    seen = set()
+    out = []
+    for cid in cited:
+        if cid in valid and cid not in seen:
+            seen.add(cid)
+            out.append(cid)
+    return out
+
+
+def _parse_cited_marker(full_text: str) -> list:
+    """Extract the raw id list from a `[[CITED: id1, id2]]` marker in `full_text`.
+
+    Returns the trimmed, comma-split ids exactly as the model wrote them (no
+    validation against the supplied cards — callers pass the result through
+    `_valid_cited_ids` for that). Missing or unparseable marker → empty list.
+    Pure, so the streaming path's marker handling is unit-testable offline.
+    """
+    if not full_text:
+        return []
+    try:
+        m = re.search(r"\[\[CITED:(.*?)\]\]", full_text, re.DOTALL)
+    except Exception:
+        return []
+    if not m:
+        return []
+    return [t.strip() for t in m.group(1).split(",") if t.strip()]
 
 
 class GeminiService:
@@ -161,13 +336,17 @@ class GeminiService:
         self.client = genai.Client(api_key=self.api_key) if self.api_key else None
         self.model = GEMINI_ANALYSIS_MODEL
 
-    def _generate_json(self, contents: list, what: str, config_extra: dict = None) -> dict:
+    def _generate_json(self, contents: list, what: str, config_extra: dict = None,
+                       model: str = None) -> dict:
         """Call Gemini with a structured-output (response_schema) config and
         return a parsed dict. Retries once on transient failures, then raises
         AnalysisError so the caller can surface a real error.
 
         config_extra lets callers add generation options (e.g. media_resolution
-        for video) without changing the base structured-output config.
+        for video) without changing the base structured-output config. `model`
+        overrides the model for this call only (the RAG answer paths pass the
+        higher-tier GEMINI_ASK_MODEL); it defaults to self.model
+        (GEMINI_ANALYSIS_MODEL) for every analysis/vision/synthesis call.
         """
         if not self.client:
             raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
@@ -189,7 +368,7 @@ class GeminiService:
         for attempt in range(2):
             try:
                 response = self.client.models.generate_content(
-                    model=self.model,
+                    model=model or self.model,
                     contents=contents,
                     config=config,
                 )
@@ -288,13 +467,21 @@ If the image is an article, extract the headline and body."""
         """Answer a user question grounded ONLY in their saved cards (RAG).
 
         `cards` is a list of dicts with id/title/summary/category/tags. Returns
-        {"answer": str, "citedIds": [str]}. Raises AnalysisError on failure.
+        {"answer": str, "citedIds": [str], "ungrounded": bool}. Raises
+        AnalysisError on failure.
 
         The whole point of a Machina AI answer is trust: the model must
         speak only from what the user actually saved, and cite it. Generation is
         schema-constrained (BrainAnswer) so the model returns valid, fully
         escaped JSON even when the answer contains quotes or newlines — a plain
         response_mime_type call breaks on such content (notably Hebrew).
+
+        Citations are a hard invariant here (buffered path): if the first answer
+        cites nothing valid, we re-ask ONCE with a stricter prompt. If the retry
+        still cites nothing, we do NOT fail the request — we return the answer
+        with ``ungrounded=True`` and empty citedIds so the client can downgrade
+        honestly instead of presenting an unverifiable answer as grounded. The
+        empty-library case is NOT ungrounded (there was nothing to cite).
         """
         if not self.client:
             raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
@@ -304,92 +491,73 @@ If the image is an article, extract the headline and body."""
                 "answer": "I couldn't find anything in your library about that yet. "
                           "Try saving a few links on the topic, then ask me again.",
                 "citedIds": [],
+                "ungrounded": False,
             }
 
-        def _source_label(c: dict) -> str:
-            """Publisher name for the card — explicit sourceName, else the URL's
-            host. Lets the model answer questions that name the source (e.g.
-            'the CNN fact-check'), which the title/summary alone don't contain."""
-            name = (c.get("sourceName") or "").strip()
-            if name and name.lower() not in ("none", "screenshot", "unknown"):
-                return name
-            url = c.get("url") or ""
-            try:
-                from urllib.parse import urlparse
-                host = urlparse(url).hostname or ""
-                return host[4:] if host.startswith("www.") else host
-            except Exception:
-                return ""
-
-        def _card_block(c: dict) -> str:
-            src = _source_label(c)
-            meta = [f"source: {src}"] if src else []
-            meta.append(f"category: {c.get('category', 'General')}")
-            meta.append(f"tags: {', '.join(c.get('tags', []) or [])}")
-            return (
-                f"[{c.get('id')}] {c.get('title', 'Untitled')} "
-                f"({'; '.join(meta)})\n{c.get('summary', '')}"
-            )
-
-        sources_text = "\n\n".join(_card_block(c) for c in cards)
-
-        history_text = ""
-        if history:
-            turns = []
-            for h in history[-6:]:  # keep the prompt bounded
-                role = "User" if h.get("role") == "user" else "Assistant"
-                turns.append(f"{role}: {h.get('content', '')}")
-            history_text = "\n\nEarlier in this conversation:\n" + "\n".join(turns)
-
-        prompt = f"""You are Machina AI, the user's personal knowledge assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved.
-
-Rules:
-- Ground every claim in the provided sources. Do NOT use outside knowledge or invent facts.
-- If the sources don't contain the answer, say so plainly and suggest what they could save.
-- Be concise and direct (2-5 sentences, or a short list when that's clearer).
-- Don't announce a count of items (e.g. "three sources") — just give the list. If you do state a number, it MUST exactly match the number of items you list.
-- CRITICAL — match the user's language: write your ENTIRE answer in the same language as the User question, NOT the language of the sources. If the question is in English, answer in English even when every source is in Hebrew; if the question is in Hebrew, answer in Hebrew. The sources' language must not influence your answer's language.
-- Only cite sources you actually used.
-
-Saved sources:
-{sources_text}
-{history_text}
-
-User question: {question}
-
-Return ONLY a JSON object: {{"answer": string, "citedIds": string[]}} where citedIds are the ids (without brackets) of the sources you relied on."""
-
-        data = self._generate_json([prompt], "answer", config_extra={"response_schema": BrainAnswer})
-
+        prompt = _build_rag_prompt(question, cards, history) + _CITED_JSON_SUFFIX
+        data = self._generate_json([prompt], "answer",
+                                   config_extra={"response_schema": BrainAnswer},
+                                   model=GEMINI_ASK_MODEL)
         answer = data.get("answer") or ""
-        cited = data.get("citedIds") or []
-        # Guard against hallucinated ids — keep only ones we actually supplied.
-        valid_ids = {c.get("id") for c in cards}
-        cited = [cid for cid in cited if cid in valid_ids]
-        return {"answer": answer, "citedIds": cited}
+        cited = _valid_cited_ids(data.get("citedIds"), cards)
+        if cited:
+            return {"answer": answer, "citedIds": cited, "ungrounded": False}
+
+        # No valid citation on the first pass. Re-ask ONCE with a stricter prompt
+        # that demands the model name the ids it relied on. A transient failure
+        # here must not sink the request — fall through to the ungrounded return.
+        retry_prompt = _build_rag_prompt(question, cards, history) + _CITED_JSON_STRICT_SUFFIX
+        try:
+            retry = self._generate_json(
+                [retry_prompt], "answer (citation retry)",
+                config_extra={"response_schema": BrainAnswer},
+                model=GEMINI_ASK_MODEL,
+            )
+            retry_answer = retry.get("answer") or ""
+            retry_cited = _valid_cited_ids(retry.get("citedIds"), cards)
+            if retry_cited:
+                return {"answer": retry_answer, "citedIds": retry_cited, "ungrounded": False}
+        except AnalysisError as e:
+            logger.warning(f"ask citation retry failed: {e}")
+
+        # Still uncited after the retry: keep the (best) answer but flag it so the
+        # UI drops the "grounded" promise rather than shipping a confident,
+        # unverifiable answer with no source chips.
+        logger.warning("ask answer returned no valid citations after retry — flagging ungrounded")
+        return {"answer": answer, "citedIds": [], "ungrounded": True}
 
     def answer_from_context_stream(self, question: str, cards: list, history: list = None):
         """Streaming variant of `answer_from_context` (RAG over saved cards).
 
         Yields ("token", text) tuples as the answer streams in, then a final
-        ("citedIds", [str]) tuple with the ids the model used. Reuses the same
-        grounding/system instructions as `answer_from_context` so answer quality
-        and Hebrew handling are preserved.
+        ("citedIds", [str]) tuple with the ids the model used, and — when the
+        answer ended up with NO valid citation — a trailing ("ungrounded", True)
+        tuple. Reuses the same grounding/system instructions as
+        `answer_from_context` so answer quality and Hebrew handling are preserved.
 
         Because schema-constrained JSON cannot be streamed token-by-token, the
         model instead writes a plain-text answer and ends with a machine-readable
         marker line `[[CITED: id1, id2]]`. We buffer the tail of the stream so the
         marker is never surfaced to the user, and parse it at the end to derive
-        citations. If the marker is missing/unparseable we fall back to citing all
-        supplied card ids (so sources are never empty when cards exist).
+        citations. If the marker is missing/unparseable we cite NOTHING (empty
+        list) — mirroring the non-streaming path — rather than over-crediting the
+        answer to every retrieved card.
+
+        Citations are the same hard invariant as the buffered path, but the
+        streaming path CANNOT re-ask: the prose has already been streamed to the
+        client token-by-token, so a full re-ask mid-stream is not possible.
+        Instead we flag it after the fact — a final ("ungrounded", True) event —
+        and let the UI downgrade the already-rendered answer. (A retry would mean
+        buffering the whole answer and defeating streaming; the flag is the
+        smallest correct design here. The buffered/native path does the re-ask.)
+        The empty-library case is NOT flagged ungrounded — there was nothing to
+        cite — matching `answer_from_context`.
 
         On mid-stream failure this raises AnalysisError; callers should wrap the
         consumption in a try/except and emit a sanitized error to the client.
         """
         if not self.client:
             raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
-
-        valid_ids = [c.get("id") for c in cards if c.get("id")]
 
         if not cards:
             yield ("token",
@@ -398,59 +566,13 @@ Return ONLY a JSON object: {{"answer": string, "citedIds": string[]}} where cite
             yield ("citedIds", [])
             return
 
-        # Reuse the exact source/history framing from answer_from_context so the
-        # grounded answer is identical in quality to the non-streaming path.
-        def _source_label(c: dict) -> str:
-            name = (c.get("sourceName") or "").strip()
-            if name and name.lower() not in ("none", "screenshot", "unknown"):
-                return name
-            url = c.get("url") or ""
-            try:
-                from urllib.parse import urlparse
-                host = urlparse(url).hostname or ""
-                return host[4:] if host.startswith("www.") else host
-            except Exception:
-                return ""
-
-        def _card_block(c: dict) -> str:
-            src = _source_label(c)
-            meta = [f"source: {src}"] if src else []
-            meta.append(f"category: {c.get('category', 'General')}")
-            meta.append(f"tags: {', '.join(c.get('tags', []) or [])}")
-            return (
-                f"[{c.get('id')}] {c.get('title', 'Untitled')} "
-                f"({'; '.join(meta)})\n{c.get('summary', '')}"
-            )
-
-        sources_text = "\n\n".join(_card_block(c) for c in cards)
-
-        history_text = ""
-        if history:
-            turns = []
-            for h in history[-6:]:  # keep the prompt bounded
-                role = "User" if h.get("role") == "user" else "Assistant"
-                turns.append(f"{role}: {h.get('content', '')}")
-            history_text = "\n\nEarlier in this conversation:\n" + "\n".join(turns)
-
-        prompt = f"""You are Machina AI, the user's personal knowledge assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved.
-
-Rules:
-- Ground every claim in the provided sources. Do NOT use outside knowledge or invent facts.
-- If the sources don't contain the answer, say so plainly and suggest what they could save.
-- Be concise and direct (2-5 sentences, or a short list when that's clearer).
-- Don't announce a count of items (e.g. "three sources") — just give the list. If you do state a number, it MUST exactly match the number of items you list.
-- CRITICAL — match the user's language: write your ENTIRE answer in the same language as the User question, NOT the language of the sources. If the question is in English, answer in English even when every source is in Hebrew; if the question is in Hebrew, answer in Hebrew. The sources' language must not influence your answer's language.
-- Only cite sources you actually used.
-
-Saved sources:
-{sources_text}
-{history_text}
-
-User question: {question}
-
-Write the answer as plain text (no JSON). Then, on a NEW LINE after the answer, output a citation marker listing the ids (without brackets) of the sources you relied on, in exactly this format:
-[[CITED: id1, id2]]
-Output the marker exactly once, as the very last line, and nothing after it."""
+        prompt = _build_rag_prompt(question, cards, history) + (
+            "Write the answer as plain text (no JSON). Then, on a NEW LINE after "
+            "the answer, output a citation marker listing the ids (without "
+            "brackets) of the sources you relied on, in exactly this format:\n"
+            "[[CITED: id1, id2]]\n"
+            "Output the marker exactly once, as the very last line, and nothing after it."
+        )
 
         # Tail buffer: hold back the trailing characters that could be the start
         # of the "[[CITED: ...]]" marker so it is never streamed as visible text.
@@ -476,7 +598,9 @@ Output the marker exactly once, as the very last line, and nothing after it."""
 
         try:
             stream = self.client.models.generate_content_stream(
-                model=self.model,
+                # Higher-tier ASK model (see GEMINI_ASK_MODEL), matching the
+                # non-streaming answer path — RAG answers, not analysis.
+                model=GEMINI_ASK_MODEL,
                 contents=[prompt],
                 # Match the non-streaming answer path: this is a grounded,
                 # factual answer, so keep temperature low for stability. Without
@@ -512,23 +636,21 @@ Output the marker exactly once, as the very last line, and nothing after it."""
             logger.error(f"Gemini answer stream failed: {e}")
             raise AnalysisError(f"AI answer failed: {e}")
 
-        # Parse the citation marker out of the accumulated full text.
-        cited = []
-        try:
-            import re as _re
-            m = _re.search(r"\[\[CITED:(.*?)\]\]", full_text, _re.DOTALL)
-            if m:
-                raw = m.group(1)
-                cited = [t.strip() for t in raw.split(",") if t.strip()]
-        except Exception:
-            cited = []
-
-        valid_set = set(valid_ids)
-        cited = [cid for cid in cited if cid in valid_set]
-        # Never leave sources empty when we did have cards to ground on.
-        if not cited:
-            cited = list(valid_ids)
+        # Parse the citation marker out of the accumulated full text, then keep
+        # only ids the model actually named that we in fact supplied. If the
+        # [[CITED:]] marker is missing, unparseable, or names nothing valid, cite
+        # NOTHING (empty list) — the old fallback re-cited EVERY supplied id,
+        # attributing the answer to cards the model may never have used.
+        cited = _valid_cited_ids(_parse_cited_marker(full_text), cards)
         yield ("citedIds", cited)
+
+        # No valid citation → the answer can't be proven grounded in the saves.
+        # We can't re-ask (tokens already streamed), so flag it for the UI. cards
+        # is non-empty here (the empty-library case returned early above), so an
+        # empty `cited` unambiguously means "uncited", not "nothing to cite".
+        if not cited:
+            logger.warning("ask stream produced no valid citations — flagging ungrounded")
+            yield ("ungrounded", True)
 
     def synthesize_week(self, cards: list) -> dict:
         """Write a narrative "What you learned this week" synthesis over `cards`.
@@ -641,7 +763,3 @@ Return ONLY a JSON object matching the schema (title, narrative, themes[title,in
         except Exception as e:
             logger.error(f"Embedding generation failed: {str(e)}")
             return None
-
-
-# Backward compatibility alias
-ClaudeService = GeminiService

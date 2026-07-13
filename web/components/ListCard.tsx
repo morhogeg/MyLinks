@@ -1,12 +1,13 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { memo, useRef, useState } from 'react';
 import { Link, LinkStatus } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformColor, PLATFORM_LABELS, xHandle, prettyHost } from '@/lib/platform';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
-import { Star, Check, Trash2 } from 'lucide-react';
+import { Star, Check, Trash2, StickyNote, Lock } from 'lucide-react';
+import { getNotes } from '@/lib/notes';
 
 interface ListCardProps {
     link: Link;
@@ -31,10 +32,11 @@ const TRIGGER = 64;
  * stack of headlines. The headline (up to three lines) gets the full row width;
  * the metadata line below carries the source's brand icon, source label and a
  * compact category chip (the 6px colour bar on the row edge stays the primary
- * category cue, M-P3). On touch, swipe right to delete or left to favourite;
- * tapping opens the link.
+ * category cue, M-P3). On touch, swipe right to favourite or left to delete
+ * (one swipe grammar app-wide — right is always the positive, non-destructive
+ * action, matching the review deck); tapping opens the link.
  */
-export default function ListCard({
+function ListCard({
     link,
     onOpenDetails,
     onStatusChange,
@@ -100,11 +102,11 @@ export default function ListCard({
         const o = offsetRef.current;
         if (axis.current === 'h' && Math.abs(o) >= TRIGGER) {
             if (o > 0) {
-                hapticMedium(); // swipe-to-delete: a firmer tap acknowledges the destructive intent
-                onDelete?.(link.id);
-            } else {
-                hapticLight(); // swipe-to-favorite: a crisp light tap
+                hapticLight(); // swipe-right-to-favorite: positive, non-destructive — a crisp light tap
                 onStatusChange(link.id, isFavorite ? 'unread' : 'favorite');
+            } else {
+                hapticMedium(); // swipe-left-to-delete: a firmer tap acknowledges the destructive intent (parent confirms)
+                onDelete?.(link.id);
             }
         }
         setOff(0);
@@ -125,18 +127,19 @@ export default function ListCard({
             style={{ ['--enter-delay' as string]: enterDelay }}
             className={`group animate-card-enter surface-card rounded-xl border shadow-[var(--shadow-card)] overflow-hidden relative transition-[transform,box-shadow,border-color] duration-200 [@media(hover:hover)]:hover:-translate-y-px [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] ${isSelected
                 ? 'border-accent ring-1 ring-accent'
-                : 'border-white/5 hover:border-accent/30'
+                : 'border-border-subtle hover:border-accent/30'
                 } ${link.isRead ? 'opacity-60' : ''}`}
         >
-            {/* Swipe action revealed behind the row: delete (right) / favourite (left). */}
+            {/* Swipe action revealed behind the row: favourite (right) / delete (left).
+                Right is the positive, non-destructive action everywhere (M-swipe). */}
             {offset > 0 && (
-                <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-start ps-5 bg-red-500 text-white">
-                    <Trash2 className={`w-5 h-5 transition-transform ${armed ? 'scale-125' : 'scale-100'}`} />
+                <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-start ps-5 bg-yellow-500 text-white">
+                    <Star className={`w-5 h-5 fill-current transition-transform ${armed ? 'scale-125' : 'scale-100'}`} />
                 </div>
             )}
             {offset < 0 && (
-                <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-end pe-5 bg-yellow-500 text-white">
-                    <Star className={`w-5 h-5 fill-current transition-transform ${armed ? 'scale-125' : 'scale-100'}`} />
+                <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-end pe-5 bg-red-500 text-white">
+                    <Trash2 className={`w-5 h-5 transition-transform ${armed ? 'scale-125' : 'scale-100'}`} />
                 </div>
             )}
 
@@ -187,6 +190,12 @@ export default function ListCard({
                         handle/host + category name) but hugs the title's edge
                         on RTL cards. Order: icon · source · chip. */}
                     <div className={`mt-1 flex items-center gap-1.5 min-w-0 text-[11px] text-text-muted ${isRtl ? 'justify-end' : ''}`} dir="ltr">
+                        {/* Private marker — icon only, matching the grid cards. */}
+                        {link.isPrivate && (
+                            <span className="shrink-0 inline-flex items-center" title="Private" aria-label="Private">
+                                <Lock className="w-3 h-3" />
+                            </span>
+                        )}
                         {platform && (
                             <span className="shrink-0 inline-flex items-center" style={{ color: platformColor(platform) }} title={PLATFORM_LABELS[platform]}>
                                 {platformIcon(platform, 'w-3.5 h-3.5')}
@@ -203,6 +212,31 @@ export default function ListCard({
                             {link.category}
                         </span>
                     </div>
+                    {/* Your own note(s) in YOUR voice — the StickyNote glyph leads
+                        the snippet inline (no vertical accent bar), muted + italic
+                        so it's distinct from the machine byline above. Newest note
+                        first, "+N" for the rest; truncated to keep the row compact;
+                        dir="auto" keeps it RTL-safe (icon mirrors to the start). */}
+                    {link.sourceType !== 'note' && (() => {
+                        const notes = getNotes(link);
+                        if (notes.length === 0) return null;
+                        const [first, ...rest] = notes;
+                        return (
+                            <p
+                                dir="auto"
+                                title={first.text}
+                                className="mt-1 flex items-center gap-1 min-w-0 text-[11px] italic text-text-muted/90"
+                            >
+                                <StickyNote className="w-3 h-3 shrink-0 opacity-60" />
+                                <span className="truncate">{first.text}</span>
+                                {rest.length > 0 && (
+                                    <span className="shrink-0 not-italic text-[10px] font-bold text-text-muted/60">
+                                        +{rest.length}
+                                    </span>
+                                )}
+                            </p>
+                        );
+                    })()}
                 </div>
 
                 {/* Favourite toggle — stays put as you scan. Keeps its 44px hit
@@ -224,3 +258,7 @@ export default function ListCard({
         </div>
     );
 }
+
+// Memoized: with stable handler props from Feed, an unchanged row skips
+// re-rendering during unrelated feed updates.
+export default memo(ListCard);

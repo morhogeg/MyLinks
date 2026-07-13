@@ -70,7 +70,7 @@ export default function CategoryInput({
             <input
                 ref={inputRef}
                 type="text"
-                className={`uppercase font-black tracking-widest px-2 py-0.5 rounded-lg outline-none focus:ring-1 focus:ring-accent/50 bg-white/10 ${className}`}
+                className={`uppercase font-black tracking-widest px-2 py-0.5 rounded-lg outline-none focus:ring-1 focus:ring-accent/50 bg-fill-strong ${className}`}
                 style={{
                     color: colorStyle.color,
                     minWidth: '80px'
@@ -98,14 +98,14 @@ export default function CategoryInput({
 
             {isOpen && (value.trim() !== '' || filteredCategories.length > 0) && (
                 <div
-                    className="absolute top-full start-0 mt-1 w-48 bg-card border border-white/10 rounded-lg shadow-xl z-50 overflow-hidden flex flex-col py-1 animate-in fade-in zoom-in-95 duration-200 max-h-60 overflow-y-auto"
+                    className="absolute top-full start-0 mt-1 w-48 bg-card border border-border-strong rounded-lg shadow-xl z-50 overflow-hidden flex flex-col py-1 animate-in fade-in zoom-in-95 duration-200 max-h-60 overflow-y-auto"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {filteredCategories.map(category => (
                         <button
                             key={category}
                             onClick={() => onUpdate(category)}
-                            className="flex items-center justify-between px-3 py-2 text-xs hover:bg-white/5 text-start w-full transition-colors group"
+                            className="flex items-center justify-between px-3 py-2 text-xs hover:bg-fill-subtle text-start w-full transition-colors group"
                         >
                             <span
                                 className="font-bold uppercase tracking-wider"
@@ -120,7 +120,7 @@ export default function CategoryInput({
                     {isNew && (
                         <button
                             onClick={() => onUpdate(value.trim())}
-                            className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-accent/10 text-start w-full transition-colors border-t border-white/5 text-accent font-bold"
+                            className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-accent/10 text-start w-full transition-colors border-t border-border-subtle text-accent font-bold"
                         >
                             <Plus className="w-3 h-3" />
                             Create &quot;{value.trim()}&quot;

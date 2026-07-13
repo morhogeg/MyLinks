@@ -77,12 +77,28 @@ export default function SourceFacetList({ facets, selected, onToggleKey, onToggl
     return (
         <div className="flex flex-col">
             {groups.map((g) => {
-                // A one-facet group is just that source — render it as a leaf.
+                // A one-facet group is just that source — render it as a leaf, but
+                // keep the same structure + a chevron-width spacer so it lines up with
+                // the expandable rows instead of floating wider.
                 if (g.facets.length === 1) {
                     const f = g.facets[0];
                     const active = selected.has(f.key);
                     return (
-                        <SourceRow key={g.id} icon={facetIcon(f)} label={f.label} count={f.count} active={active} onClick={() => onToggleKey(f.key)} />
+                        <div key={g.id} className="flex items-center gap-1">
+                            <button
+                                onClick={() => onToggleKey(f.key)}
+                                aria-pressed={active}
+                                className={`flex-1 min-w-0 flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-[13px] text-start transition-colors cursor-pointer ${active ? 'bg-accent/10 text-text' : 'text-text-secondary hover:bg-card-hover hover:text-text'}`}
+                            >
+                                <span className="shrink-0">{facetIcon(f)}</span>
+                                <span className="flex-1 min-w-0 truncate font-medium">{f.label}</span>
+                                <span className={`shrink-0 text-[12px] tabular-nums ${active ? 'text-accent font-semibold' : 'text-text-muted'}`}>{f.count}</span>
+                                {active
+                                    ? <Check className="w-[18px] h-[18px] shrink-0 text-accent" strokeWidth={2.6} />
+                                    : <span className="w-[18px] h-[18px] shrink-0" />}
+                            </button>
+                            <span className="shrink-0 w-8" aria-hidden />
+                        </div>
                     );
                 }
                 const keys = g.facets.map((f) => f.key);
@@ -91,24 +107,28 @@ export default function SourceFacetList({ facets, selected, onToggleKey, onToggl
                 const isOpen = expanded.has(g.id);
                 return (
                     <div key={g.id}>
-                        <div className="flex items-center">
+                        <div className="flex items-center gap-1">
                             <button
                                 onClick={() => onToggleKeys(keys)}
                                 aria-pressed={allOn}
-                                className={`flex-1 min-w-0 flex items-center gap-2.5 px-2 py-2 rounded-xl text-[13px] text-start transition-colors ${selectedHere > 0 ? 'bg-accent/12 text-text' : 'text-text-secondary hover:bg-card-hover hover:text-text'}`}
+                                className={`flex-1 min-w-0 flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-[13px] text-start transition-colors cursor-pointer ${selectedHere > 0 ? 'bg-accent/10 text-text' : 'text-text-secondary hover:bg-card-hover hover:text-text'}`}
                             >
                                 <span className="shrink-0">{g.icon}</span>
                                 <span className="flex-1 min-w-0 truncate font-medium">{g.label}</span>
-                                <span className="shrink-0 tabular-nums text-text-muted">{selectedHere > 0 ? `${selectedHere}/${g.facets.length}` : g.count}</span>
-                                <span className={`w-4 h-4 rounded-full shrink-0 flex items-center justify-center border ${allOn ? 'bg-accent border-accent' : selectedHere > 0 ? 'border-accent' : 'border-border-subtle'}`}>
-                                    {allOn ? <Check className="w-3 h-3 text-white" strokeWidth={3} /> : selectedHere > 0 ? <span className="w-1.5 h-0.5 bg-accent rounded-full" /> : null}
+                                <span className={`shrink-0 text-[12px] tabular-nums ${selectedHere > 0 ? 'text-accent font-semibold' : 'text-text-muted'}`}>
+                                    {selectedHere > 0 ? `${selectedHere}/${g.facets.length}` : g.count}
                                 </span>
+                                {/* A single clean check when the whole group is on; the
+                                    accent count above already signals a partial selection. */}
+                                {allOn
+                                    ? <Check className="w-[18px] h-[18px] shrink-0 text-accent" strokeWidth={2.6} />
+                                    : <span className="w-[18px] h-[18px] shrink-0" />}
                             </button>
                             <button
                                 onClick={() => toggleExpand(g.id)}
                                 aria-label={isOpen ? `Collapse ${g.label}` : `Expand ${g.label}`}
                                 aria-expanded={isOpen}
-                                className="px-2 py-2 text-text-muted hover:text-text transition-colors shrink-0"
+                                className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
                             >
                                 <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                             </button>

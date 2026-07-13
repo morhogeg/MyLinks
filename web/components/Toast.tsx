@@ -77,7 +77,7 @@ function Toast({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) 
     const { icon: Icon, accent } = VARIANTS[item.variant];
 
     return (
-        <div className="pointer-events-auto w-full flex items-start gap-3 bg-card border border-white/10 rounded-xl px-4 py-3 shadow-2xl backdrop-blur-lg animate-slide-up">
+        <div className="pointer-events-auto w-full flex items-start gap-3 bg-card border border-border-strong rounded-xl px-4 py-3 shadow-2xl backdrop-blur-lg animate-slide-up">
             <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${accent}`} />
             <p className="flex-1 text-sm text-text leading-snug">{item.message}</p>
             <button

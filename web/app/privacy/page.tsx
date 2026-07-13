@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Privacy Policy — Machina AI",
@@ -13,9 +14,9 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <main className="mx-auto max-w-2xl px-6 py-16">
-      <a href="/" className="text-sm text-text-secondary hover:text-text transition-colors">
+      <Link href="/" className="text-sm text-text-secondary hover:text-text transition-colors">
         &larr; Machina AI
-      </a>
+      </Link>
 
       <h1 className="mt-6 text-3xl font-semibold tracking-tight text-text">
         Privacy Policy
@@ -47,20 +48,23 @@ export default function PrivacyPage() {
           questions and the resulting chat history, so you can revisit past conversations.
         </li>
         <li>
-          <span className="text-text">Phone number — only if you use WhatsApp capture.</span> Saving
-          via WhatsApp is optional. If you use it, we see the phone number the message came from (to
-          route the save to your workspace) and the content of messages you send to Machina&rsquo;s
-          number. If you never use WhatsApp capture, we never receive your phone number.
-        </li>
-        <li>
           <span className="text-text">Preferences.</span> Your in-app settings, including your
           device timezone, which is used to schedule reminders and digests at sensible local times.
         </li>
+        <li>
+          <span className="text-text">Product usage and diagnostics.</span> To understand which
+          features are used and to catch crashes, Machina records a small number of first-party,
+          content-free events — for example that the app was opened, that a save, ask, or export
+          happened, or that an error occurred (with the error message and stack trace). These are
+          stored in your own workspace in our own database. They never include the content of your
+          saves, your titles, URLs, questions, tags, or email, and there is no third-party analytics
+          service involved.
+        </li>
       </ul>
       <p className="mt-4 leading-relaxed text-text-secondary">
-        What we do <span className="text-text">not</span> collect: no analytics or tracking SDKs, no
-        advertising identifiers, no location, no contacts, and no browsing history beyond the pages
-        you explicitly save.
+        What we do <span className="text-text">not</span> collect: no third-party analytics or
+        tracking SDKs, no advertising identifiers, no location, no contacts, and no browsing history
+        beyond the pages you explicitly save.
       </p>
 
       <h2 className="mt-10 text-xl font-semibold text-text">How we use your data</h2>
@@ -90,11 +94,6 @@ export default function PrivacyPage() {
         <li>
           <span className="text-text">Google Firebase / Google Cloud.</span> Storage, authentication,
           and backend hosting, as described above.
-        </li>
-        <li>
-          <span className="text-text">Twilio (WhatsApp capture, optional).</span> If you save via
-          WhatsApp, your messages and phone number pass through Twilio&rsquo;s WhatsApp messaging
-          service to reach Machina.
         </li>
         <li>
           <span className="text-text">Vercel.</span> Serves the web application and receives
@@ -157,7 +156,7 @@ export default function PrivacyPage() {
       <footer className="mt-14 border-t border-border-subtle pt-6 text-sm text-text-muted">
         <a href="/terms" className="hover:text-text transition-colors">Terms of Service</a>
         <span className="mx-2">&middot;</span>
-        <a href="/" className="hover:text-text transition-colors">Machina AI</a>
+        <Link href="/" className="hover:text-text transition-colors">Machina AI</Link>
       </footer>
     </main>
   );

@@ -22,7 +22,6 @@ export default function ProfileAvatar({
 
     if (photoURL) {
         return (
-            // eslint-disable-next-line @next/next/no-img-element
             <img
                 src={photoURL}
                 alt={name || email || 'Profile'}
@@ -30,7 +29,7 @@ export default function ProfileAvatar({
                 height={size}
                 // Google avatar URLs 403 when a referrer is sent.
                 referrerPolicy="no-referrer"
-                className={`rounded-full object-cover ring-1 ring-black/5 dark:ring-white/10 ${className}`}
+                className={`rounded-full object-cover ring-1 ring-border-strong ${className}`}
                 style={dimension}
             />
         );

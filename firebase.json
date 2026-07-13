@@ -46,6 +46,10 @@
         "function": "ask_brain"
       },
       {
+        "source": "/api/search",
+        "function": "search_links_http"
+      },
+      {
         "source": "/api/article",
         "function": "get_article"
       },

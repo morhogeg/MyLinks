@@ -3,14 +3,16 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Clock, Tag, Trash2, Bell, CheckCircle2, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Play, Youtube, ExternalLink, Layers, Share2, X, Loader2, RotateCcw, AlertTriangle } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
+import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Youtube, ExternalLink, Layers, Share2, X, Loader2, RotateCcw, AlertTriangle, StickyNote, Lock } from 'lucide-react';
+import { useState, memo } from 'react';
+import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle } from '@/lib/platform';
+import { useNow } from '@/lib/useNow';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import CardActionSheet from './CardActionSheet';
 import { hasHebrew } from '@/lib/rtl';
+import { getNotes } from '@/lib/notes';
 
 interface CardProps {
     link: Link;
@@ -32,6 +34,8 @@ interface CardProps {
     onAddToCollection?: (link: Link) => void;
     /** Share this card as a public Machina page. */
     onShare?: (link: Link) => void;
+    /** Toggle the card's Private flag (parent owns PIN setup — lib/privacyLock). */
+    onTogglePrivate?: (link: Link) => void;
     /** Collections this card belongs to — rendered as subtle chips. */
     cardCollections?: { id: string; name: string }[];
     /** When the feed is scoped to one collection, its id — enables a quick "remove" action. */
@@ -45,7 +49,7 @@ interface CardProps {
 /**
  * Card component for displaying a saved link
  */
-export default function Card({
+function Card({
     link,
     onOpenDetails,
     onStatusChange,
@@ -61,6 +65,7 @@ export default function Card({
     onTagClick,
     onAddToCollection,
     onShare,
+    onTogglePrivate,
     cardCollections,
     activeCollectionId,
     onRemoveFromCollection,
@@ -69,7 +74,10 @@ export default function Card({
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
-    const [now, setNow] = useState<number>(0);
+    // One shared app-wide minute clock (see lib/useNow) instead of a per-card
+    // 60s interval — relative times still update once a minute, without dozens
+    // of independent timers each triggering their own re-render.
+    const now = useNow();
 
     // Cap the stagger so long feeds still finish assembling quickly (M-P4: tighter
     // per-card delay for a snappier entrance).
@@ -97,23 +105,21 @@ export default function Card({
     const fbAuthor = isFacebook && link.sourceName
         && !['facebook', 'screenshot', 'none'].includes(link.sourceName.trim().toLowerCase())
         ? link.sourceName : null;
-
-    useEffect(() => {
-        const initialTimer = setTimeout(() => setNow(Date.now()), 0);
-        const timer = setInterval(() => setNow(Date.now()), 60000);
-        return () => {
-            clearTimeout(initialTimer);
-            clearInterval(timer);
-        };
-    }, []);
+    // Instagram: credit the author @handle (extracted by the scraper and stored
+    // in sourceName as "@handle") in the same branded byline style as X. Falls
+    // back to the plain "Instagram" chip when no handle was captured.
+    const igAuthor = platform === 'instagram' ? instagramHandle(link.sourceName) : null;
 
     // Format relative time (e.g., "2h ago")
-    const getTimeAgo = (timestamp: any, now: number): string => {
+    const getTimeAgo = (timestamp: number | string, now: number): string => {
         if (!timestamp || !now) return '...';
 
         // Handle ISO string or number
-        const time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
-        if (isNaN(time)) return isRtl ? 'לאחרונה' : 'recently';
+        let time = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
+        if (isNaN(time) || time <= 0) return isRtl ? 'לאחרונה' : 'recently';
+        // Some ingest paths (Facebook, screenshots) store Unix *seconds*, not ms —
+        // anything below year-2001-in-ms is really a seconds value, so scale it up.
+        if (time < 1e12) time *= 1000;
 
         const seconds = Math.floor((now - time) / 1000);
         if (seconds < 60) return isRtl ? 'זה עתה' : 'just now';
@@ -125,8 +131,8 @@ export default function Card({
         return isRtl ? `לפני ${days} ימים` : `${days}d ago`;
     };
 
-    // M3 — async-capture lifecycle. A card queued via the share sheet / WhatsApp
-    // is written as `processing` and flips to `failed` if analysis errors. Render
+    // M3 — async-capture lifecycle. A card queued via the share sheet is written
+    // as `processing` and flips to `failed` if analysis errors. Render
     // a skeleton (processing) or a retryable "couldn't analyze" card (failed) so a
     // capture is never invisible and never silently dropped. These are terminal
     // presentational states — the normal card body/actions don't apply.
@@ -138,7 +144,7 @@ export default function Card({
         })();
         return (
             <article
-                className={`surface-card animate-card-enter bg-card rounded-2xl border shadow-[var(--shadow-card)] relative flex flex-col h-full overflow-hidden ${failed ? 'border-red-500/30' : 'border-white/5'
+                className={`surface-card animate-card-enter bg-card rounded-2xl border shadow-[var(--shadow-card)] relative flex flex-col h-full overflow-hidden ${failed ? 'border-red-500/30' : 'border-border-subtle'
                     }`}
                 aria-busy={!failed}
             >
@@ -164,13 +170,13 @@ export default function Card({
                         </p>
                     ) : (
                         <div className="space-y-2 flex-grow">
-                            <div className="h-3 w-full bg-white/5 rounded animate-pulse" />
-                            <div className="h-3 w-5/6 bg-white/5 rounded animate-pulse" />
-                            <div className="h-3 w-2/3 bg-white/5 rounded animate-pulse" />
+                            <div className="h-3 w-full bg-fill-subtle rounded animate-pulse" />
+                            <div className="h-3 w-5/6 bg-fill-subtle rounded animate-pulse" />
+                            <div className="h-3 w-2/3 bg-fill-subtle rounded animate-pulse" />
                         </div>
                     )}
 
-                    <div className="flex items-center gap-2 pt-2 mt-auto border-t border-white/5">
+                    <div className="flex items-center gap-2 pt-2 mt-auto border-t border-border-subtle">
                         <a
                             href={link.url}
                             target="_blank"
@@ -212,7 +218,7 @@ export default function Card({
             style={{ ['--enter-delay' as string]: enterDelay }}
             className={`group surface-card animate-card-enter bg-card rounded-2xl border shadow-[var(--shadow-card)] transition-all duration-300 ease-[var(--ease-spring)] cursor-pointer relative flex flex-col items-stretch h-full [@media(hover:hover)]:hover:-translate-y-1 [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] ${isSelected
                 ? 'border-accent bg-accent/5 ring-1 ring-accent'
-                : 'border-white/5 hover:border-accent/30'
+                : 'border-border-subtle hover:border-accent/30'
                 } ${link.isRead ? 'opacity-60 grayscale-[0.3]' : ''} ${isEditingCategory ? 'overflow-visible z-50' : 'overflow-hidden'}`}
             onClick={() => {
                 if (isSelectionMode && onToggleSelection) {
@@ -222,9 +228,10 @@ export default function Card({
                 }
             }}
         >
-            {/* Video thumbnail header — gives YouTube cards a real video shape. */}
+            {/* Video thumbnail header — a short banner (matches the shorter thumb in
+                the open card) rather than a full 16:9 block. */}
             {link.sourceType === 'youtube' && link.metadata?.thumbnailUrl && (
-                <div className="relative w-full aspect-video bg-black/40 overflow-hidden">
+                <div className="relative w-full h-28 sm:h-32 bg-black/40 overflow-hidden">
                     <img
                         src={link.metadata.thumbnailUrl}
                         alt=""
@@ -232,11 +239,6 @@ export default function Card({
                         className="w-full h-full object-cover transition-transform duration-300 [@media(hover:hover)]:group-hover:scale-[1.03]"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-12 h-12 rounded-full bg-black/55 backdrop-blur-sm flex items-center justify-center transition-transform duration-200 [@media(hover:hover)]:group-hover:scale-110">
-                            <Play className="w-5 h-5 text-white fill-white ms-0.5" />
-                        </div>
-                    </div>
                     {link.metadata.durationDisplay && (
                         <span className="absolute bottom-2 end-2 text-[10px] font-bold text-white bg-black/75 px-1.5 py-0.5 rounded-md tracking-wide">
                             {link.metadata.durationDisplay}
@@ -293,7 +295,7 @@ export default function Card({
                                                     e.stopPropagation();
                                                     setIsEditingCategory(true);
                                                 }}
-                                                className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ms-1 hover:bg-white/5 rounded-md flex-shrink-0"
+                                                className="opacity-0 group-hover/cat:opacity-100 transition-opacity p-1 -ms-1 hover:bg-fill-subtle rounded-md flex-shrink-0"
                                             >
                                                 <Pencil className="w-3 h-3 text-text-muted/40 hover:text-text-muted" />
                                             </button>
@@ -310,7 +312,7 @@ export default function Card({
                         mirrors the row and the icons land in a different order
                         per language. */}
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none group-hover:pointer-events-auto">
-                        <div dir="ltr" className="flex items-center gap-1 bg-card/90 backdrop-blur-md border border-white/10 p-1 rounded-full shadow-xl">
+                        <div dir="ltr" className="flex items-center gap-1 bg-card/90 backdrop-blur-md border border-border-strong p-1 rounded-full shadow-xl">
                             {/* Only render as a link for real http(s) URLs — never make a
                                 stored javascript:/data: value clickable. */}
                             {!!link.url && /^https?:\/\//i.test(link.url) && (
@@ -331,7 +333,7 @@ export default function Card({
                                     onReadStatusChange(link.id, !link.isRead);
                                 }}
                                 title={link.isRead ? 'Mark as unread' : 'Mark as read'}
-                                className={`p-1.5 rounded-full transition-all flex items-center justify-center ${link.isRead ? 'text-text bg-white/10' : 'text-text-muted/40 hover:text-text'
+                                className={`p-1.5 rounded-full transition-all flex items-center justify-center ${link.isRead ? 'text-text bg-fill-strong' : 'text-text-muted/40 hover:text-text'
                                     }`}
                             >
                                 {link.isRead ? (
@@ -429,6 +431,16 @@ export default function Card({
                         branded byline style right here in place of the muted chip;
                         every other source keeps the muted uppercase chip. */}
                     <div className="flex items-center gap-1.5 min-w-0 z-10 ms-auto transition-opacity duration-200 group-hover:opacity-0">
+                        {/* Private marker — icon only, matching the collection tiles. */}
+                        {link.isPrivate && (
+                            <span
+                                aria-label="Private"
+                                title="Private"
+                                className="flex items-center justify-center w-6 h-6 rounded-full bg-fill-subtle border border-border-strong text-text-muted shrink-0"
+                            >
+                                <Lock className="w-3 h-3" />
+                            </span>
+                        )}
                         {isYouTube && youtubeChannel && (
                             <span
                                 dir="ltr"
@@ -476,7 +488,19 @@ export default function Card({
                                 {fbAuthor && <span className="truncate">{fbAuthor}</span>}
                             </span>
                         )}
-                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && link.sourceType === 'image' && (
+                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && igAuthor && (
+                            <span
+                                dir="ltr"
+                                className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-text-secondary whitespace-nowrap max-w-[220px]"
+                                title={`@${igAuthor}`}
+                            >
+                                <span className="shrink-0 inline-flex" style={{ color: platformColor('instagram') }}>
+                                    {platformIcon('instagram', 'w-3.5 h-3.5')}
+                                </span>
+                                <span className="truncate">@{igAuthor}</span>
+                            </span>
+                        )}
+                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && !igAuthor && link.sourceType === 'image' && (
                             <span
                                 className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-accent whitespace-nowrap"
                                 title="Screenshot"
@@ -485,9 +509,18 @@ export default function Card({
                                 <span>Screenshot</span>
                             </span>
                         )}
-                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && link.sourceType !== 'image' && link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None' && (
+                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && !igAuthor && link.sourceType === 'note' && (
                             <span
-                                className="flex items-center gap-1 text-[9px] font-bold text-text-muted/60 bg-black/5 border border-black/10 px-2 py-1 rounded-lg dark:bg-white/5 dark:border dark:border-white/10 uppercase tracking-widest whitespace-nowrap transition-all max-w-[220px]"
+                                className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-accent whitespace-nowrap"
+                                title="Note"
+                            >
+                                <StickyNote className="w-3.5 h-3.5 shrink-0" />
+                                <span>Note</span>
+                            </span>
+                        )}
+                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && !igAuthor && link.sourceType !== 'image' && link.sourceType !== 'note' && link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None' && (
+                            <span
+                                className="flex items-center gap-1 text-[9px] font-bold text-text-muted/60 bg-fill-subtle border border-border-strong px-2 py-1 rounded-lg uppercase tracking-widest whitespace-nowrap transition-all max-w-[220px]"
                                 title={link.sourceName}
                             >
                                 {sourceIcon}
@@ -504,7 +537,7 @@ export default function Card({
                             setIsSheetOpen(true);
                         }}
                         aria-label="Actions"
-                        className="hidden [@media(hover:none)]:flex items-center justify-center p-1.5 -me-1 ms-1 rounded-full text-text-muted hover:text-text active:bg-white/10 z-20 flex-shrink-0"
+                        className="hidden [@media(hover:none)]:flex items-center justify-center p-1.5 -me-1 ms-1 rounded-full text-text-muted hover:text-text active:bg-fill-strong z-20 flex-shrink-0"
                     >
                         <MoreHorizontal className="w-4 h-4" />
                     </button>
@@ -527,7 +560,7 @@ export default function Card({
                 />
 
                 {/* Footer Section */}
-                <div className="pt-3 sm:pt-4 border-t border-white/5 flex flex-col space-y-2 sm:space-y-3">
+                <div className="pt-3 sm:pt-4 border-t border-border-subtle flex flex-col space-y-2 sm:space-y-3">
                     {/* Collection memberships — subtle chips. When viewing inside a
                         collection, that chip becomes a one-tap "remove from collection". */}
                     {cardCollections && cardCollections.length > 0 && (
@@ -573,7 +606,7 @@ export default function Card({
                                         e.stopPropagation();
                                         onTagClick?.(tag);
                                     }}
-                                    className="inline-flex items-center text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-white/5 text-text-muted/60 group-hover:text-accent group-hover:bg-accent/10 hover:!bg-accent/20 hover:!text-accent active:scale-95 transition-all border border-transparent group-hover:border-accent/10 cursor-pointer"
+                                    className="inline-flex items-center text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-fill-subtle text-text-muted/60 group-hover:text-accent group-hover:bg-accent/10 hover:!bg-accent/20 hover:!text-accent active:scale-95 transition-all border border-transparent group-hover:border-accent/10 cursor-pointer"
                                 >
                                     {parents && <span className="opacity-40 font-normal mr-0.5">{parents}/</span>}
                                     {leaf}
@@ -581,6 +614,34 @@ export default function Card({
                             );
                         })}
                     </div>
+
+                    {/* Your own note(s) — the StickyNote glyph leads the snippet
+                        inline (no vertical accent bar), muted + italic so it reads
+                        as YOUR voice, distinct from the machine summary above.
+                        Newest note first; a "+N" tallies the rest. Clamped to 2
+                        lines with dir="auto" so it stays RTL-safe (icon mirrors to
+                        the start) and never bloats the card. Note-cards ARE the
+                        note, so skip them. */}
+                    {link.sourceType !== 'note' && (() => {
+                        const notes = getNotes(link);
+                        if (notes.length === 0) return null;
+                        const [first, ...rest] = notes;
+                        return (
+                            <div
+                                dir="auto"
+                                title={first.text}
+                                className="flex items-start gap-1.5 text-[12px] leading-snug text-text-muted/90 italic"
+                            >
+                                <StickyNote className="w-3 h-3 shrink-0 mt-[3px] opacity-60" />
+                                <span className="line-clamp-2">{first.text}</span>
+                                {rest.length > 0 && (
+                                    <span className="shrink-0 mt-[2px] not-italic text-[10px] font-bold text-text-muted/60">
+                                        +{rest.length}
+                                    </span>
+                                )}
+                            </div>
+                        );
+                    })()}
 
                     {/* Metadata Buttons Row */}
                     <div className="flex items-center justify-between mt-auto">
@@ -606,6 +667,7 @@ export default function Card({
             onDelete={onDelete}
             onAddToCollection={onAddToCollection}
             onShare={onShare}
+            onTogglePrivate={onTogglePrivate}
             removeFromCollection={
                 activeCollectionId && onRemoveFromCollection
                     ? {
@@ -618,3 +680,7 @@ export default function Card({
         </>
     );
 }
+
+// Memoized: with stable handler/array props from Feed, an unchanged card skips
+// re-rendering during unrelated feed updates (banner ticks, search typing, etc.).
+export default memo(Card);

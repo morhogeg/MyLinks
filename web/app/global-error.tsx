@@ -11,8 +11,11 @@ import { useEffect } from 'react';
  */
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
     useEffect(() => {
-        // eslint-disable-next-line no-console
         console.error('Root error boundary caught:', error);
+        // Best-effort report; a no-op if no workspace uid is resolvable here.
+        // Imported dynamically (client-only) so Firebase is never pulled into
+        // this root page's static-export prerender graph.
+        import('@/lib/errorReporter').then((m) => m.reportError(error, 'react')).catch(() => {});
     }, [error]);
 
     return (

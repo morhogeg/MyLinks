@@ -14,8 +14,10 @@
 >
 > Remaining *reference* docs (how-to guides, not task trackers — they stay):
 > `AUTH_SPEC.md` (auth design), `NATIVE_AUTH_SETUP.md` (auth cutover console/Xcode
-> steps), `SHARE_EXTENSION.md`, `SHORTCUT_SETUP.md`, `docs/IOS_CICD.md` (TestFlight
+> steps), `SHARE_EXTENSION.md`, `docs/IOS_CICD.md` (TestFlight
 > CI secrets/setup), `web/VERCEL.md`, `extension/README.md`, `README.md` (public-facing).
+> `AUDIT.md` (repo root) is the **2026-07-09 audit + remediation tracker** —
+> full-tree findings with file:line and the remaining manual/owner items (its §9).
 >
 > **Last full review:** 2026-07-03 — every task below was verified against the
 > actual code on `main`, not just against what old docs claimed.
@@ -25,7 +27,7 @@
 ## 1. What Machina is
 
 **Machina AI** (`com.morhogeg.machina`) — an AI-powered personal knowledge base.
-Capture a link/image from anywhere (iOS share sheet, WhatsApp, web UI, browser
+Capture a link/image from anywhere (iOS share sheet, web UI, browser
 extension) → Python Cloud Function scrapes + Gemini analyzes → a structured card
 (summary, category, tags, concepts, embedding, related links) lands in a real-time
 feed with semantic search, RAG chat ("Ask Machina"), spaced-repetition reminders,
@@ -55,9 +57,9 @@ surface in the category and a knowledge graph computed on every save. The path t
 - **Backend:** Python 3.13 Firebase Cloud Functions in `functions/` (project
   **`secondbrain-app-94da2`**, us-central1). Gemini `gemini-3.1-flash-lite`
   (analysis/vision, centralized in `GEMINI_ANALYSIS_MODEL`), `gemini-embedding-001`
-  (search). Twilio (WhatsApp). SendGrid/SMTP (email digests — not yet configured).
+  (search). SendGrid/SMTP (email digests — not yet configured).
 - **Data:** Firestore `users/{uid}/…` where **uid = phone number** (e.g.
-  `+1646…`); Google/Apple accounts link via `authUids[]` on the user doc (no data
+  `+1555…`); Google/Apple accounts link via `authUids[]` on the user doc (no data
   migration — see `AUTH_SPEC.md`). Subcollections: `links`, `chats`, `collections`,
   `syntheses`. Public snapshots: `shared_cards`, `shared_collections`.
 - **Deploy surfaces:**
@@ -77,8 +79,8 @@ surface in the category and a knowledge graph computed on every save. The path t
 
 ### Operational gotchas (hard-won — don't re-learn these)
 
-- `GEMINI_API_KEY` and `TWILIO_*` are **plain env vars in `functions/.env`**
-  (gitignored) — NOT Secret Manager secrets; binding them as secrets breaks deploy.
+- `GEMINI_API_KEY` is a **plain env var in `functions/.env`**
+  (gitignored) — NOT a Secret Manager secret; binding it as a secret breaks deploy.
   Functions deploy needs a local venv (`cd functions && python3.13 -m venv venv &&
   venv/bin/pip install -r requirements.txt`) so firebase-tools can import the source.
 - `deploy-functions.sh` pins `--project secondbrain-app-94da2` (a `firebase use`
@@ -235,8 +237,13 @@ The multi-user auth work is **fully written but not live**:
      it can't time out). The admin all-users `backfill_related_links` HTTP fn
      still exists as a fallback (`curl -H "X-Admin-Token: $ADMIN_TOKEN" …`).
    - Confirm `backfill_youtube_channels` was run (channel-name repair).
-   - `/api/analyze` 60s timeout on slow YouTube videos — route around Hosting's
-     60s cap like `/api/chat` did (touches all link-saving; test carefully).
+   - `/api/analyze` 60s timeout on slow YouTube videos — **largely moot as of
+     2026-07-11 (weaknesses sprint):** web link saves no longer ride the
+     synchronous `/api/analyze` request; they write a `processing` placeholder
+     and enqueue via `/api/share` into `process_link_background` (300s budget).
+     `/api/analyze` remains in use only for the card **Retry** flow, image
+     analysis, and the Note tab (all short) — the slow-YouTube exposure there is
+     retry-only and tolerable.
 5. **[ ] Security config + key hygiene (30 min, do with #2):** set `ADMIN_TOKEN`,
    `APPCHECK_ENFORCE=true`, `OWNER_EMAIL` in functions env. **Rotate the Gemini
    key** (was pasted in chat 2026-06-23) and the **App Store Connect API `.p8`**
@@ -282,7 +289,7 @@ The multi-user auth work is **fully written but not live**:
 8. **[x] Privacy policy + Terms URLs, App Privacy "nutrition label", App Store
    metadata** *(doc/code side done 2026-07-03).* Hosted pages live:
    `web/app/privacy/page.tsx` + `web/app/terms/page.tsx` (static, prose,
-   theme-tokened; content verified against the code — Gemini/Twilio/Firebase
+   theme-tokened; content verified against the code — Gemini/Firebase
    processors, share-page caveat, `delete_account` scope). They are **public**:
    `web/lib/publicRoutes.tsx` (used by `app/layout.tsx`) skips the
    AuthProvider gate on `/privacy` + `/terms` so App Review can read them
@@ -293,15 +300,13 @@ The multi-user auth work is **fully written but not live**:
    Connect, take the screenshots (`docs/APP_STORE.md` §4), name a concrete
    governing-law jurisdiction in `/terms` §10 before public launch.
 9. **[ ] Reviewer readiness.** Demo account credentials for App Review (auth will
-   be ON), review notes explaining WhatsApp capture (reviewer can't test Twilio),
-   and either iPad screenshots or set `TARGETED_DEVICE_FAMILY = 1`. *Device
-   family half done 2026-07-03: `TARGETED_DEVICE_FAMILY = 1` set in all four
-   build configs (App + ShareExt, Debug + Release) — iPhone-only, no iPad
-   screenshots needed. Doc side done 2026-07-03: review-notes template (demo-
-   account placeholder + fresh-sign-in-auto-creates-workspace explanation,
-   WhatsApp-is-optional/test-share-sheet-instead, AI-consent-on-first-run,
-   Sign in with Apple) and the 6-screenshot shot-list are in
-   `docs/APP_STORE.md` §3–§4. **Remaining:** create + seed the demo account
+   be ON) and review notes. `TARGETED_DEVICE_FAMILY = 1` (iPhone-only) is already
+   set in all four build configs (App + ShareExt, Debug + Release), so no iPad
+   screenshots are needed. Doc side done 2026-07-03 (WhatsApp line dropped
+   2026-07-09): review-notes template (demo-account placeholder + fresh-sign-in-
+   auto-creates-workspace explanation, test-capture-via-share-sheet,
+   AI-consent-on-first-run, Sign in with Apple) and the 6-screenshot shot-list are
+   in `docs/APP_STORE.md` §3–§4. **Remaining:** create + seed the demo account
    post-cutover, fill its credentials into the notes, take the screenshots.*
 10. **[x] CI SDK check** *(done 2026-07-03, folded into task 1: the workflow now
     runs on `macos-26` with `Xcode_26*`, satisfying Apple's current-SDK
@@ -317,29 +322,38 @@ The multi-user auth work is **fully written but not live**:
 
 12. **[ ] Ingest token hardening (audit H-1).** Move from App Group UserDefaults
     to Keychain; server copy to a functions-only collection; add rotation.
-13. **[ ] Remaining audit mediums:** per-uid rate limits post-auth + fail-closed
-    on paid buckets (M-3), cap `ask_brain` history (M-5), mask remaining phone
-    logs in `link_service.py`/`whatsapp_handler.py` (H-4 residue).
-14. **[ ] README ↔ reality (M-P5/T12) — still false.** Verified 2026-07-03: README
-    claims Graph *Visualization*, Insights Dashboard, "Works Offline", Table view —
-    none exist. Rewrite to describe the real product (recall engine, capture
-    surface, synthesis). Also remove the PWA badge/positioning.
-15. **[ ] Retire the iPhone-PWA surface deliberately.** The native app replaced
-    it: remove `InstallPWA.tsx` (or gate to Android only), stop advertising
-    install-to-home-screen, and stop routine `./deploy-hosting.sh` runs (already
-    removed from the ship skill). Keep Hosting alive solely for `/api/*` rewrites +
-    share pages.
+13. **[x] Remaining audit mediums — landed 2026-07-09 (AUDIT.md S-2/S-3).**
+    Per-uid+IP rate limits on the paid endpoints and `ask_brain` history/input
+    caps shipped. Phone-log masking (H-4 residue) is **moot**: `link_service.py`'s
+    phone lookup and `whatsapp_handler.py` were deleted with the WhatsApp removal
+    (AUDIT.md ch. 4). Residual: fail-closed-on-Firestore-outage stays an accepted
+    availability trade-off (AUDIT.md S-6).
+14. **[x] README ↔ reality (M-P5/T12) — rewritten 2026-07-09 (AUDIT.md D-17).**
+    Dropped the false Graph *Visualization* / Insights Dashboard / "Works Offline" /
+    Table-view / PWA claims; README now describes the real product (recall engine,
+    capture surface, synthesis).
+15. **[x] Retire the iPhone-PWA surface — done 2026-07-09 (AUDIT.md F-1).**
+    `InstallPWA.tsx` deleted (+ its `app/page.tsx` refs); routine
+    `./deploy-hosting.sh` runs already removed from the ship skill. Hosting stays
+    alive solely for the `/api/*` rewrites + `/s`,`/c` share pages.
 16. **[ ] Offline decision (M15).** No service worker exists. Either build
     read-cache offline for opened articles or (cheaper) drop every offline claim
     (fold into 14).
-17. **[ ] Light theme decision (M-P1).** Give light mode the dark theme's material
-    care, or ship dark-only intentionally. Decide, don't leave half-done.
-18. **[ ] Test harness (T3).** Only `functions/test_yt_scrape.py` exists. Add
-    scraper fixtures, `ai_service` schema-contract tests, `search.py` tests,
-    WhatsApp payload smoke test; wire into CI/SessionStart.
+17. **[x] Light theme decision (M-P1) — RESOLVED 2026-07-10: keep BOTH, light
+    brought to parity.** Four theme-aware material tokens added in `globals.css`
+    (`--fill-subtle`, `--fill-strong`, `--surface-inset`, `--border-strong`;
+    identical dark values, dark-alpha light values) and ~26 components swapped
+    off raw `white/black` alphas. Deliberately kept: modal scrims, media
+    overlays, `text-white` on solid accent surfaces. On-device light-mode visual
+    QA list in the §9 entry.
+18. **[ ] Test harness (T3).** Add scraper fixtures, `ai_service` schema-contract
+    tests, `search.py` tests; wire into CI/SessionStart (AUDIT.md N-2a tracks this).
 19. **[ ] Cost guardrails.** Budget alerts on the Firebase/GCP project; per-user
-    monthly quotas (see §7); email digest provider decision (SendGrid key or cut
-    the email channel).
+    monthly quotas (see §7). ~~Email digest provider decision~~ **DECIDED
+    2026-07-10: the email channel was CUT** (SendGrid was never configured; push
+    + the always-on in-app digest supersede it). Stored `email` channel values
+    are dropped at read time (`_normalize_channels` / `normalizeChannels`) and
+    never written back.
 19a. **[ ] Deferred audit remediations (from the 2026-07-07 sweep — full detail +
     file:line in `AUDIT_FINDINGS.md`).** The high-value fixes shipped that session;
     these remain, roughly high→low: **(data integrity) — ✅ DONE + LIVE
@@ -351,42 +365,56 @@ The multi-user auth work is **fully written but not live**:
     detect drift/poison). **(reliability) — ✅ DONE + LIVE 2026-07-07:** scheduled
     janitor `sweep_stuck_processing` (every 5 min) flips `processing` cards older than
     15 min to retryable `FAILED` (`processingStartedAt` stamped on placeholder +
-    retry; admin `force_sweep_stuck_processing` twin). **Still open:**
-    **(perf)** Feed re-render storm — throttle `useProcessingBanner`'s 200ms
-    tick, memoize the `filteredLinks`/facet-count chain, `React.memo` Card/ListCard,
-    move drag-scroll to refs, one shared "now" tick (currently 5 Hz full-tree
-    re-renders during any capture + per-card `setInterval`s); **(security
-    hardening)** SSRF scraper-branch dispatch (platform fetchers bypass `safe_get`;
-    substring routing); **(correctness)** semantic-search stale-response guard,
-    `/api/chat` `maxDuration`; **(a11y)** modal focus-trap/Escape + FAB `aria-label`;
-    **(polish)** light-theme solid `text-white`/`bg-white` in ConfirmDialog +
-    AddLinkForm Save; **(debt)** decompose `Feed.tsx` (2109 L) + `SettingsModal.tsx`
-    (1117 L) + extract `share_service.py` from `main.py` (2333 L), dedup the verbatim
-    RAG prompt across `answer_from_context`/`_stream` (+ fix the stream path citing
-    *all* cards when the `[[CITED:]]` marker is missing), fix/delete the dead-stale
-    `models.py` `LinkDocument`/`RelatedLink`, consolidate the two markdown stacks;
-    **(hygiene)** scrub owner PII from `models.py`/docs, add extension token-copy UI
-    + rename the stale "MyLinks" manifest, run the `firestore-rules-test` suite in
-    CI, `altool`→`-exportArchive`, filter the Xcode beta glob, lockstep the
-    App/ShareExt build numbers, ShareExt background-upload pending-record
-    reconciliation.
+    retry; admin `force_sweep_stuck_processing` twin). **✅ Fixed in the 2026-07-09
+    remediation (AUDIT.md):** Feed re-render storm — throttled banner ticks, memoized
+    `filteredLinks`/facet chain, `React.memo` Card/ListCard, one shared "now" tick —
+    plus the semantic-search stale-response guard and `/api/chat` `maxDuration`
+    (P-1/P-2/P-6); SSRF scraper-branch dispatch routed through `safe_get` with
+    hostname-anchored dispatch (S-1); the `[[CITED:]]` stream path citing *all* cards +
+    RAG-prompt dedup (C-1); modal Escape + FAB/desktop-search `aria-label` (A-11);
+    light-theme `text-white`/`bg-white` in ConfirmDialog + AddLinkForm Save (F-1);
+    dead-stale `models.py` `LinkDocument`/`RelatedLink` deleted (D-19); owner PII
+    scrubbed from `models.py`/docs (D-18); the stale "MyLinks" extension manifest
+    rebranded to Machina AI (I-3); `altool`→`-exportArchive`, Xcode beta-glob filter,
+    and App/ShareExt build-number lockstep in CI (I-1/I-2). **Still open:** decompose
+    `Feed.tsx` + `SettingsModal.tsx` (R-3/R-4) and extract `share_service.py` from
+    `main.py` (R-1); consolidate the two markdown stacks (A-7, needs on-device visual
+    QA); run the `firestore-rules-test` suite in CI (N-2a); ShareExt
+    background-upload pending-record reconciliation (P-7, device work).
+    ~~Extension token-copy UI in Settings (F-2)~~ — **WON'T DO, owner call
+    2026-07-12:** the Settings browser-extension section was removed entirely
+    (the `/extension` page and the extension itself remain).
 
 ### 🟢 P3 — product roadmap (post-launch)
 
-20. **[ ] M17 Voice capture + voice ask** (mic in AskBrain; WKWebView speech quirks).
-21. **[ ] M18 Proactive brain** (contradiction/reinforcement observations). Push
+20. **[ ] M19 Shareable cited answers — FIRST POST-LAUNCH ITEM (re-ranked to the
+    top of P3, 2026-07-10 product review).** Ask Machina is the hero; a shareable
+    cited answer is its growth surface and every share is a public OG page
+    linking back to the app (`share_page` backend exists). Do this before any
+    other P3 work.
+21. **[ ] M17 Voice capture + voice ask** (mic in AskBrain; WKWebView speech quirks).
+22. **[ ] M18 Proactive brain** (contradiction/reinforcement observations). Push
     notifications now EXIST (shipped 2026-07-06: reminder + digest push over
     FCM/APNs, see §9) — M18 only needs the observation engine on top.
-22. **[ ] M19 Shareable cited answers** (growth surface; `share_page` backend exists).
-23. **[ ] M20 Auto-collections** (cluster `concepts`/embeddings into suggested collections).
+23. **[~] M20 Auto-collections** (cluster `concepts`/embeddings into suggested
+    collections). **Client-side half shipped 2026-07-11** (collections-elevation
+    branch): tag/concept clustering over the loaded feed proposes up to 3
+    one-tap collections in the gallery (`web/lib/collectionSuggest.ts`), and the
+    Add-to-collection sheet ranks suggested targets per card. Still open:
+    embedding-based clustering server-side for deeper/semantic groupings.
 24. **[ ] T10 export** (MD/PDF/HTML from ReadingView), **T11 highlights**, T5/T6
     connector framework + YouTube liked-videos sync (pull connectors; IG/FB saved
     have no legitimate API — won't do), Chrome Web Store listing for the extension.
-25. **[ ] QA backlog leftovers** (from the F-series, still open): F-16 ref-counted
-    scroll locks, F-20 ReminderModal past-times/date-rollover, F-21 offline signal
-    for optimistic writes, F-24/25/26 SimpleMarkdown + RTL unification, F-29
-    SwipeDeck undo doesn't cancel reminders, F-31 Reader "Listen" reliability,
-    F-32 SwipeDeck stale snapshot, L-5 unbounded `deleteCollection` batch.
+25. **[ ] QA backlog leftovers** (from the F-series, still open): F-21 offline
+    signal for optimistic writes, F-24/25/26 SimpleMarkdown + RTL unification,
+    F-31 Reader "Listen" reliability. **✅ Fixed 2026-07-12 (polish sprint):**
+    F-16 (ref-counted body scroll lock — `web/lib/useScrollLock.ts`, all 10
+    overlay lock sites swapped), L-5 (`deleteCollection`/`addLinksToCollection`
+    chunked under Firestore's 500-op batch cap). **✅ Fixed 2026-07-10:** F-20 (ReminderModal
+    past-times/date-rollover — local-time parsing, picker guards, save-time
+    invariant), F-29 (up-swipe remind is now outcome-aware: cancel returns the
+    card, Undo clears the created reminder), F-32 (deck order snapshotted as ids,
+    live card data, deleted/externally-acted cards skip).
 
 ### ✅ Done — verified against code (do not redo)
 
@@ -411,12 +439,14 @@ The multi-user auth work is **fully written but not live**:
 - **Audit Batch 1:** SSRF redirect guard, PII log scrubbing (main.py), Twilio
   fail-closed, fetch timeouts, admin-token-gated debug endpoints, noopener,
   URL-scheme guards, sanitized errors, privacy manifest files created.
-- **Capture surface:** Share Extension (links/text/images + scan HUD), WhatsApp
-  (EN/HE + digest commands), web add/image, browser extension (`/extension`,
-  Chrome/Edge/Brave + Safari converter), iOS Shortcut (legacy, still works).
+- **Capture surface:** Share Extension (links/text/images + scan HUD), web
+  add/image, browser extension (`/extension`, Chrome/Edge/Brave + Safari
+  converter).
 - **Recall:** Ask Machina (hybrid RAG, streaming on web, chat history), semantic
-  search, reminders, curated digest (6 modes), weekly synthesis, collections +
-  public share pages (server-rendered OG), reading view + TTS.
+  search, reminders, curated digest (3 modes: smart / rediscover / by-topic,
+  collapsed from 6 on 2026-07-10), weekly synthesis, Review mode (curated
+  bounded swipe sessions), collections + public share pages (server-rendered
+  OG), reading view + TTS.
 - **CI:** iOS → TestFlight workflow green (UI-only build 1006, 2026-07-02);
   secrets configured; cloud-managed signing works.
 - **T15 polish pass, T2 pipeline consolidation** (Python canonical; TS routes are
@@ -463,12 +493,11 @@ naming Gemini is now table stakes. Second, the **SDK floor**: since April 2026
 submissions must be built against the current-generation SDK, and the CI pins
 `Xcode_16*` on `macos-14` — bump the runner before the store submission even
 though TestFlight accepted the July 2 build. Third, review logistics: a **demo
-account** in App Review notes, an explanation that WhatsApp capture requires an
-external Twilio number (so the reviewer doesn't fail it as broken), a hosted
-**privacy policy + support URL**, the App Privacy nutrition label matching
-Firebase + Google Sign-In data collection, and either iPad screenshots or flipping
-`TARGETED_DEVICE_FAMILY` from `"1,2"` to iPhone-only (recommended — the UI is
-phone-first). None of these are engineering-heavy; they are a focused week once
+account** in App Review notes, a hosted **privacy policy + support URL**, the App
+Privacy nutrition label matching Firebase + Google Sign-In data collection, and —
+already handled — `TARGETED_DEVICE_FAMILY = 1` (iPhone-only, set in every build
+config), so no iPad screenshots are needed. None of these are engineering-heavy;
+they are a focused week once
 the auth build is green. Realistic sequence: CI plugin fix → cutover → consent
 screen + policy URLs → device pass (§4 task 11) → submit.
 
@@ -559,7 +588,7 @@ paid spend.
 > This is the screenshot I keep sending friends: [screenshot: weekly synthesis]
 
 *Post 4 (CTA):*
-> Free on the App Store. Save from the share sheet, WhatsApp, or your browser.
+> Free on the App Store. Save from the share sheet or your browser.
 > Ask it anything you've saved.
 >
 > [App Store link] — reply with what you'd ask your bookmarks 👇
@@ -587,8 +616,712 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-07-13 (latest) — Search "not working" diagnosed: NOT a code bug —
+  the pending owner backend deploy.** Owner screenshot: "Muffins" → no
+  results + "meaning search is unavailable right now" on device. Root cause
+  chain: on-device semantic search (polish round 3's `search_links_http` +
+  firebase.json `/api/search` rewrite) has NEVER been deployed — every ship
+  since 2026-07-10 says "Backend NOT deployed — owner step" (cloud sessions
+  have no Firebase creds; egress to the project is proxy-blocked, re-verified
+  today). So native's POST /api/search 404s at Hosting → the hook degrades to
+  keyword-only → a Hebrew-titled (or private-collection) muffins card can't
+  keyword-match an English query. Code verified ready: `search_links_http`
+  compiles, rewrite committed, `py_compile` clean. **OWNER FIX (one-time, from
+  `main` on the Mac):**
+  1. `./deploy-functions.sh functions:analyze_image,functions:analyze_link,functions:ask_brain,functions:backfill_embeddings,functions:backfill_related_links,functions:backfill_youtube_channels,functions:check_reminders,functions:claim_workspace,functions:claim_workspace_http,functions:debug_status,functions:delete_account,functions:delete_account_http,functions:force_check_reminders,functions:force_send_digests,functions:force_sweep_stuck_processing,functions:get_article,functions:get_share_config,functions:ping,functions:process_link_background,functions:publish_share_http,functions:rebuild_connections,functions:register_device_token_http,functions:search_links,functions:search_links_http,functions:send_digest_now,functions:send_digests,functions:share_ingest,functions:share_page,functions:sweep_stuck_processing,functions:sync_link_embedding,functions:unpublish_share_http,functions:unregister_device_token_http`
+     (ALL functions — weeks of backend work are pending, incl. the search
+     twin, embedding sync, share/service/digest/reminder changes.)
+  2. `./deploy-hosting.sh` (REQUIRED once — publishes the `/api/search`
+     rewrite so the native app can reach the search twin).
+  3. Hit `backfill_embeddings` once with `$ADMIN_TOKEN` so pre-existing cards
+     get embeddings (new saves embed via `sync_link_embedding` post-deploy).
+  Until these run, device search stays keyword-only by graceful degradation.
+- **2026-07-13 — Ask follow-ups made SELF-CONTAINED (merge `64eb72a`,
+  commit `fba0b1e`).** Build 1089's evidence gating was NOT sufficient — owner
+  repro'd "Give me more detail" → "sources do not contain…" on a cited card.
+  Root cause: the backend retrieves by the question text alone (no query
+  rewriting from history), so a context-free follow-up retrieves nothing and
+  the grounded prompt refuses. Fix: `buildFollowUps` now returns
+  `{label, question}` pairs — the chip shows the short label, the SENT
+  question is anchored with the cited card's title ("Give me more detail on
+  'X'"), compare chips carry both titles, and no chips are shown if no cited
+  card has a usable title. LESSON for future Ask work: any client-initiated
+  ask must contain its own retrieval anchor in the question text; history
+  does not help retrieval. Proper server-side fix (query rewriting or pinning
+  retrieval to prior citation ids in ask_brain) is the backlog follow-up.
+  **SHIPPED:** Vercel live. **iOS: run #91 FAILED on a transient** (macOS
+  runner lost the network downloading Google's grpc.zip binary during SPM
+  resolve — not a code failure); re-fired as **run #92 → build 1092** via an
+  empty commit on `claude/ship-tf-trigger-followups`. Build 1092 = today's
+  full stack (identical code to the failed 1091 attempt); owner should
+  install it and delete all `claude/ship-tf-trigger-*` branches.
+- **2026-07-13 — Steady Add-to-Machina dialog (merge `0c0e89b`,
+  commit `b062064`).** Owner screenshot: the capture dialog jumped up/down
+  when toggling Link/Image/Note — it was vertically centered on its LIVE
+  content height, so each tab re-centered the frame. Fix: the mobile top is
+  now computed by centering a FIXED estimated height (460px constant across
+  tabs), and the three tabs share an equal-height 170px content area (note
+  textarea + image drop zone pinned to it, link input centered within), so
+  the frame, tabs, and Save button all hold one position; the form scrolls
+  internally (`max-h-full overflow-y-auto`) when the visible viewport is
+  shorter than the card. **SHIPPED:** Vercel live; **iOS: TestFlight run #90
+  → build 1090** via temp trigger `claude/ship-tf-trigger-addform` (queued
+  behind run #89 — the ios-testflight concurrency group serializes runs).
+- **2026-07-13 — Ask polish: origin-aware thinking status + airtight
+  follow-up chips (merge `3e11c48`, feature commit `1668545`).** Owner flagged
+  two Ask quality bugs on device. (1) Thinking micro-copy now matches the
+  ask's origin (`AskOrigin` in AskBrain: free/card/library/followup) — tapping
+  a system-suggested chip about a specific card reads "Opening that card…"
+  instead of the nonsensical "Searching your library…"; library-sweep chips
+  keep the search copy; follow-ups read "Re-reading the sources…". (2)
+  Follow-up chips are now EVIDENCE-GATED (askSuggestions.ts "AIRTIGHT RULE"):
+  every chip must be answerable from data verified client-side on the cited
+  cards — depth/steps chips require `detailedSummary` ≥ 200 chars, ingredient
+  chips require real `recipe.ingredients`, "what else on X" requires the
+  concept to provably recur, compare chips require 2+ citations. Speculative
+  prompts the strictly-grounded backend refused ("What's the counterargument?"
+  → "there's nothing on that", plus bigger-picture / how-solid-evidence /
+  what's-the-catch / worth-watching / can-I-make-this-simpler) are REMOVED,
+  and ungrounded or citation-less answers get no chips at all (no chips beats
+  broken chips). **SHIPPED:** Vercel live; **iOS: TestFlight run #89 → build
+  1089** via temp trigger `claude/ship-tf-trigger-ask2` (runs #87/1087 and
+  #88/1088 both green). Owner cleanup: delete trigger branches `-ask2`,
+  `-inherit`, `-private2`, `-pinvault` + older stale ones.
+- **2026-07-13 — Private collections now make their cards private
+  too (merge `523814a`, feature commit `3222b3f`).** Owner call: a private
+  collection's members should be private, period. Implemented as INHERITED
+  privacy, not stamped flags — `useFeedFilters` takes `privateCollectionIds`
+  and treats a card as effectively private when `isPrivate` OR it belongs to a
+  private collection, computed live (cards added later hide automatically;
+  removing a card / un-privating the collection restores instantly, no
+  migration sweep, no flag drift). Effectively-private cards are excluded from
+  the main feed, search, facets, suggested collections, and the due-reminders
+  strip EVEN WHILE UNLOCKED; they surface only inside their PIN-opened private
+  collection (via a selectedCollections+private exception in contentLinks) and
+  under Show → Private (which now lists inherited members too). Privacy
+  inherited from one collection follows the card into its other non-private
+  collections. **SHIPPED:** Vercel live; **iOS: TestFlight run #88 → build
+  1088** via temp trigger branch `claude/ship-tf-trigger-inherit` (run #87 /
+  build 1087 = the per-card-private build, green). Owner cleanup: delete
+  trigger branches `-inherit`, `-private2`, `-pinvault` + older stale ones.
+- **2026-07-13 — Private CARDS + privacy polish round (merge
+  `85d8b90`, feature commit `668c138`).** Owner feedback on build 1086, all
+  shipped same-day: (1) **Per-card private** — every card's ⋯ action sheet
+  gets "Make private" (Photos-Hidden model, deliberately different from
+  collections: a private card lives ONLY under the new PIN-gated **Show →
+  Private** status filter and never appears in the main feed, search, facets,
+  Ask client context, due-reminder strip, or suggestions, even while the vault
+  is unlocked; `Link.isPrivate` + `privateCards` split in `useFeedFilters`,
+  gate in Feed's `handleFilterSelect`). First-time use runs inline PIN setup;
+  the Private option only appears in Show once a PIN or a private card exists.
+  (2) Collections get **Make private / Remove private** in the tile 3-dot menu
+  (auto-unpublishes a shared collection; removing protection is PIN-gated).
+  (3) **Aggressive relock**: backing out of a private collection or leaving
+  the Private filter relocks the vault immediately (no waiting for app
+  background). (4) PIN dialog centers in the visible viewport above the iOS
+  keyboard (`useVisualViewport`, was hidden behind it — owner screenshot).
+  (5) PIN pad shows each typed digit for ~0.7s before masking (standard
+  affordance). (6) Privacy badges are icon-only lock glyphs (no "PRIVATE"
+  wording) on collection tiles, grid cards, and list rows. **SHIPPED:** Vercel
+  live off `main`; **iOS: TestFlight run #87 → build 1087** via temp-push-
+  trigger branch `claude/ship-tf-trigger-private2` (run #86/build 1086 = the
+  previous PIN-vault build, confirmed green + on device). KNOWN LIMITS carried
+  from the vault: server-side Ask/RAG + semantic search + digests/reminder
+  pushes still index/mention private cards (backend `isPrivate` exclusion is
+  the natural follow-up); Face ID still stubbed. Owner cleanup: delete
+  `claude/ship-tf-trigger-private2`, `-pinvault`, and older stale trigger
+  branches once green.
+- **2026-07-13 — Private collections (PIN vault), branch
+  `claude/private-collection-connections-akvphm`.** Any collection can be
+  marked **Private** in the create/edit sheet, protected by ONE app-level
+  4-digit PIN (the iOS-Notes model, not a PIN per collection). PIN is
+  PBKDF2-SHA256-hashed (per-user salt, 100k rounds) into a top-level
+  `privacyLock` field on the user doc (`web/lib/privacyLock.ts` — module store
+  + `usePrivacyLock`, auto-relock on app background via visibilitychange); pad
+  UI in `PinLockModal.tsx` (setup/unlock/change/disable flows, hidden numeric
+  input so iOS shows the number pad). While locked: member cards are filtered
+  out of the library/search/related/Ask-context/suggestions/due-reminders via
+  `visibleLinks` in Feed, gallery tiles are masked (color-only cover, lock
+  glyph, "Locked", no description/count), and every action (open/edit/share/
+  delete/manage) gates through the PIN; unlock is session-wide until the app
+  backgrounds, and an open private collection/card bounces closed on relock.
+  Private collections can't be shared (menu entry hidden; going private
+  auto-unpublishes an existing public page). Settings gains a "Private
+  collections" section (Change PIN / Turn off PIN) once a PIN exists; first
+  setup happens inline when a collection is first toggled Private. KNOWN
+  LIMITS (a client-side privacy screen, not encryption): server-side Ask/RAG +
+  semantic search still index private cards (an answer can cite one — the card
+  just won't open while locked); Face ID is stubbed (`tryBiometricUnlock`)
+  pending a Capacitor biometric plugin + native build. `npx tsc --noEmit`
+  clean; needs on-device QA (PIN pad keyboard, relock on background).
+  **SHIPPED:** merged to `main` (merge `74b7b2e`, feature commit `824ff8a`) →
+  Vercel desktop live. **iOS: TestFlight run #86 → build 1086**, fired via the
+  temp-push-trigger pattern (API dispatch still 403 from cloud sessions; temp
+  branch `claude/ship-tf-trigger-pinvault`, trigger commit `924f45f`). Owner
+  cleanup: delete that branch after the run is green, plus the older stale
+  `claude/ship-tf-trigger-*` branches (remote deletes are no-ops from cloud
+  sessions).
+- **2026-07-13 — Polish round 8c: dedicated sort.** Sort gets its own
+  40px chip beside the funnel (accent while non-default) opening a designated
+  bottom sheet (`feed/MobileSortSheet.tsx`, drag-dismiss); the filter drawer's
+  buried Sort dropdown removed so sort lives in one place. Ships as run
+  #85/build 1085.
+- **2026-07-13 — Polish round 8b: owner refinements on the revamp.**
+  Search collapses to an icon chip (tap → full field expands in place; accent
+  while a query is active) with the filter funnel as its own matching 40px
+  chip; destinations split back into three separate equal pills with gaps
+  (airier), Ask still centered. Ships as run #84/build 1084.
+- **2026-07-13 — Polish round 8: header REVAMP (owner: "production
+  grade at Apple/Google").** Stopped iterating pills; new composition with two
+  anchored objects per row. Row 1: an always-live SEARCH FIELD owns the row
+  (no expand dance) with the filter funnel inside it as a trailing accessory
+  (one badge; categories/tags/status/sort/sources folded back into ONE
+  MobileFiltersSheet, drag-dismiss kept; MobileCategoriesTagsSheet deleted) +
+  one tools capsule (view pills ‖ select, hairline-divided). Row 2: one
+  continuous destinations bar — single capsule, three equal hairline-divided
+  zones, Collections | Ask (dead center) | Digest. Desktop untouched. Ships as
+  run #83/build 1083.
+- **2026-07-13 — Polish round 7b: optical-uniformity pass.** 14px
+  icons everywhere in the tools row (switcher pills had 16px icons in smaller
+  pills); mobile selection-toolbar buttons get the switcher's 2px inset (26px
+  shapes in the 30px pill) instead of sitting flush. Ships as run #82 (build
+  1082), superseding #81/build 1081 which lacks only this pass.
+- **2026-07-13 — Polish round 7: tools-row finish pass (designer
+  review).** Filters chip is now a square icon chip matching Categories/Search
+  (redundant sort icon dropped — same sheet), active count moved to the same
+  overlay badge language as Categories (no more inline-number reflow), and the
+  selection toolbar matches the 30px row height it swaps into (no 6px hop).
+- **2026-07-13 — Polish round 6 (build 1079 feedback): symmetric
+  destinations.** The centered-chip approach still LOOKED lopsided (unequal
+  Collections/Digest widths → uneven whitespace around Ask). Row 2 is now
+  three EQUAL-width segments filling the row (same size, same gaps, Ask truly
+  centered); `px-1` on mobile so "Collections" fits an equal third at 375pt.
+- **2026-07-13 — Polish round 5 (build 1078 feedback): Ask dead-center.**
+  Mobile destinations row is now a symmetric three-column toolbar — Collections
+  flush left, **Ask at the exact screen center** (own grid column so sibling
+  widths can't shift it), Digest flush right. Owner-directed; desktop unchanged
+  apart from chip order (Collections·Ask·Digest).
+- **2026-07-13 — Polish round 4: owner feedback on build 1077.**
+  (1) **Header restructured (owner-directed):** mobile Row 1 = compact 30px
+  TOOLS (icon-only Categories&Tags chip with count badge, Filters, Search,
+  shrunk view switcher, multi-select; selection toolbar/search field swap in
+  for the whole row), Row 2 = labeled DESTINATIONS (Collections · Digest ·
+  Ask); the constant purple Ask fill REMOVED (owner disliked it); desktop
+  unchanged; width arithmetic in commit `7d101a7`. (2) **Instagram handle
+  extraction hardened for reels** — the actual miss: IG reel descriptions use
+  date-style bylines ("- username on July 12, 2026:") and the old regex only
+  matched "username on Instagram"; also added embedded-JSON `"username"`/
+  `"owner"` and og:url profile-path signals, all crash-proof (try/except →
+  None); tests 174→183. STILL requires the owner functions deploy to go live.
+  (3) **Multi-word keyword search fixed client-side** — "A collection of
+  articles" now tokenizes (stopwords dropped, plural-aware, Hebrew tokens
+  always kept, AND semantics over title/summary/tags/concepts/notes haystack)
+  in `feedUtils.ts`/`useFeedFilters.ts`; works pre-deploy, independent of the
+  semantic half. Owner deploy steps UNCHANGED from round 3 (functions incl.
+  `search_links_http`, `./deploy-hosting.sh` for `/api/search`,
+  `backfill_embeddings` once).
+- **2026-07-13 — Polish round 3: meaning search + header refinement.**
+  (1) **Home search finds by MEANING on device now** — root cause: semantic
+  search ran only through the `search_links` **callable**, which fails the
+  `capacitor://localhost` CORS preflight (the documented claim_workspace bug
+  class) and the hook swallowed the error, silently degrading iPhone search to
+  keyword-only. Fix mirrors the proven twin pattern: new `search_links_http`
+  (bearer/App Check/rate-limited, reuses `perform_search_logic`), firebase.json
+  + vercel.json `/api/search` rewrites, native branch in `useSemanticSearch`
+  (`authHeaders`+`appCheckHeaders`+`fetchWithTimeout`), `searchError` surfaced
+  with graceful keyword-only degradation, "Searching by meaning…" in-flight
+  line above the grid, distinct empty-state copy, `dir="auto"` on search
+  inputs; +4 backend tests (174 total). (2) **Header refinement (owner-approved
+  mockup variant B):** Row A (Categories & Tags / Filters / Search) shrunk to
+  30px/12px muted with active states unchanged, mobile row gap tightened, Ask
+  chip soft accent fill (mobile only). (3) **Clip bug fixed:** Row B could
+  exceed the 358px content width (owner screenshot) — `flex-wrap` added so the
+  selection-mode toolbar (incl. its X) drops to its own fully-visible line;
+  arithmetic in commit `44ea20c`. (4) Digest count badge removed. **OWNER
+  DEPLOY STEPS (grew this round):** functions deploy (same list + NEW
+  `search_links_http`), **`./deploy-hosting.sh`** (firebase.json `/api/search`
+  rewrite — REQUIRED for native meaning-search), `backfill_embeddings` once.
+  Until then device search stays keyword-only (graceful).
+- **2026-07-13 — Polish round 2: owner feedback on build 1075 (branch
+  `claude/app-polish-multi-agent-0gqmaf`, multi-agent session).** (1) **Home
+  header REVERTED** to the pre-redesign layout (owner: "the top chips design
+  is terrible") — `MobileCategoriesTagsSheet` restored, `MobileFiltersSheet`
+  un-folded; the collections/digest *navigation* from round 1 (detail places,
+  back button + edge swipe to gallery/list) is KEPT. A mockup of modest size
+  tweaks (smaller filter row, soft-accent Ask chip) awaits owner approval
+  before building (claude.ai artifact "header-mockup"). (2) **Multiple notes
+  per card** (`Link.userNotes[]`; legacy `userNote` merged via
+  `web/lib/notes.ts` and migrated on first edit; editor is a newest-first
+  list; closed cards show newest snippet + "+N"; ALL notes searchable
+  client-side; backend `collect_notes_text` feeds embeddings —
+  **`EMBED_TEXT_VERSION` 3→4** — lexical search and RAG blocks; 170 pytest).
+  (3) Closed-card note restyle: vertical accent bar removed, StickyNote glyph
+  leads the snippet inline. (4) Collection header: count inline with title
+  ("Name · 12 cards"), standalone count line removed. (5) Share wording
+  calmed: "Publish public page"→"Create share link", "Update page"→"Update
+  link". (6) **Drag-to-dismiss on all bottom sheets** (`web/lib/useSheetDrag.ts`;
+  7 sheets wired: filters, card actions, add-to-collection, share, manage
+  cards, collection form, tag input; drag routes through the same onClose as
+  the X so dirty-guards hold). (7) Ask: chips are now ALL count-free (client
+  counts never match RAG retrieval — the "13 vs 8" bug class is eliminated),
+  copy tightened. (8) **Edge-swipe layering fixed**: only the top-most surface
+  handles the swipe (a cited card opened over Ask closes back to the chat,
+  not home; AskBrain gates on Feed's `anyOverlayOpen`). (9) **Share hotfixes
+  from owner device testing:** re-sharing an already-saved URL is deduped
+  server-side (200 + `duplicate:true`, NO new card) but the extension showed
+  a plain "Saved ✓" and the app floated a phantom ~20% loader — the extension
+  now says "Already in your library" and clears the App-Group hint (that was
+  the "Instagram won't save" report: the card was already in the library; to
+  re-test the handle, delete the card first — and the handle only appears
+  after the backend deploy). Also killed the structural 100→20% dip: the
+  extension no longer snaps to 100 on queue-ack (green check + "Saved —
+  Machina is reading it…" over the shared-curve %), and `useProcessingBanner`
+  anchors at the earlier of the extension clock vs `processingStartedAt`,
+  floored at the handed-off % (`lastShareHandoff()` in `shareConfig.ts`).
+  Verified: tsc clean, eslint 0 errors/5 warnings, 170/170 pytest. **Backend
+  owner deploy still pending and now also carries the notes/EMBED-v4 changes
+  — same command as the 2026-07-12 entry, then `backfill_embeddings` once.**
+- **2026-07-12 — App-polish sprint, 10 owner fixes + extras (branch
+  `claude/app-polish-multi-agent-0gqmaf`; multi-agent session, every slice
+  reviewed + re-verified after merge).** (1) **Share→app loader continuity:**
+  progress is now a deterministic curve over elapsed time since capture start
+  (`web/lib/shareProgress.ts` ⇄ Swift `ShareProgressCurve` twin, constants
+  lock-stepped); the extension writes `pendingShareStartedAt` to the App Group,
+  the app ramps from it / the placeholder's `processingStartedAt` — switching
+  to the app never restarts the loader, no flash when already done. (2)
+  **Instagram @handle** in the source tag (scraper extracts from og-title/
+  byline/profile URL into `source_name`; Card/LinkDetailModal render IG logo +
+  @handle like X; new `test_instagram_handle.py`, 12 tests). (3) **Ask
+  follow-up chips are content-aware** (`askSuggestions.ts` classifier:
+  recipe/news/howto/research/video angles from the cited cards; news/politics
+  never gets action-item chips; multi-card → compare; used chips never
+  re-offered). (4+5) **Collections are a place** (new `viewMode 'collection'`
+  detail screen with header/actions, back button + edge-swipe to the GALLERY,
+  never home) and **Digest tab opens a list** of all stored digests
+  (`digestDetail` opens one, back to list). (6+7) Settings: browser-extension
+  section removed (ExtensionView deleted); the one `Toggle` primitive
+  hardened (structural flex geometry, `shrink-0`, RTL-safe knob travel). (8)
+  **Tour rebuilt**: 5-step story (share-sheet capture → structured card → cited
+  Ask → resurfacing → CTA) with theme-token mock visuals, Skip everywhere,
+  swipe/keyboard/haptics; same persistence + Settings replay. (9) **Home
+  command surface**: Ask hero bar + unified Feed·Collections·Digest nav in one
+  container, single Filter affordance (categories/tags folded into
+  MobileFiltersSheet; MobileCategoriesTagsSheet deleted). (10) **Notes revamp**:
+  keyboard never covers the composer (visual-viewport + scroll-into-view),
+  auto-grow, save-on-blur that can't lose text, Save/Cancel/Delete + shortcuts,
+  note shown on Card/ListCard in the user's voice (quote bar, accent, italic,
+  `dir="auto"`), notes searchable client-side AND folded into embeddings
+  (`EMBED_TEXT_VERSION` → 3, note writes flip `needsEmbedding`) + Ask RAG
+  context. **Extras found & fixed:** L-5 batch-cap chunking, F-16 ref-counted
+  scroll lock (`useScrollLock.ts`, 10 sites), ReminderModal conditional-hook
+  violation, capture-bridge render purity — eslint back to 0 errors. Verified:
+  `tsc --noEmit` clean, eslint 0 errors/5 warnings, functions 160/160 pytest,
+  `py_compile` clean. **SHIPPED (same session):** merged to `main` as `e65c62b`
+  → **desktop web live via Vercel**. **iOS: TestFlight run #75 → build 1075**
+  (fired via temp branch `claude/ship-tf-trigger-polish` — API dispatch still
+  403 from cloud sessions; owner should delete that branch after green, remote
+  deletes are no-ops from cloud). **Backend NOT deployed — owner step** (no
+  firebase credentials in the cloud sandbox): from `main` run
+  `./deploy-functions.sh functions:analyze_link,functions:analyze_image,functions:share_ingest,functions:process_link_background,functions:ask_brain,functions:sync_link_embedding,functions:search_links,functions:backfill_embeddings`
+  then hit `backfill_embeddings` once with `$ADMIN_TOKEN` so existing cards get
+  the v3 note-aware embeddings. Until that deploy, Instagram handles and
+  note-aware search/Ask are dark server-side (frontend degrades gracefully).
+  On-device QA for build 1075: share→app loader hand-off, collection/digest
+  back-swipe, note editor keyboard, new 5-step tour, toggle alignment in
+  Settings.
+- **2026-07-12 — Ask elevation, device-feedback round (`1e433b6`,
+  merge `e3a96db` to `main`).** Owner QA'd build 1072 and sent five fixes,
+  all landed: (1) latest-save suggestion chip de-spotlighted (no purple/
+  sparkle; live re-animation kept); (2) thinking status now count-free
+  ("Searching your library… / Reviewing relevant cards… / Writing your
+  answer…") — "your N saves" read wrong on single-card questions; (3)
+  **answer-first scrolling**: a new answer pins the QUESTION to the top of
+  the view (send + first-token/buffered arrival; old chats open on their
+  last exchange) instead of dumping the user at the bottom; keyboard focus
+  no longer force-scrolls; (4) literal glyph bullets from the model ("a • b
+  • c" inline, line-start "•", "1)" numbering) are normalized into real
+  Markdown lists before render (`normalizeListMarkers`); (5) RTL: `dir="auto"`
+  on message bubbles (old `getDirection` flipped mixed-language questions
+  fully RTL), citation-chip titles/bylines, fresh-pill title, history rows;
+  also fixed the "N thingsyou've saved" missing space. Plus three additions:
+  **Copy carries citations** (Sources list with titles+URLs), **chat history
+  search** (≥6 chats, matches titles AND message text), **light haptic on
+  answer arrival** (native, M11 grammar). tsc+eslint clean; bullet
+  normalizer unit-tested ad hoc. **Desktop web: live via Vercel** (merge
+  `e3a96db`). **iOS: TestFlight run #74 → build 1074** (owner approved with
+  "Ship it"; fired via temp branch `claude/ship-tf-trigger-ask` — delete
+  after green, along with the other stale `claude/ship-tf-trigger-*`
+  branches; cloud sessions can't delete remote branches). Build 1074 is cut
+  from `605ed5d`, so it carries BOTH the Ask fixes and the Collections
+  elevation. On-device QA: question-pinned scroll on the buffered path,
+  bullet lists, Hebrew citation chips, history search.
+- **2026-07-11 — SHIPPED: Collections elevation (branch
+  `claude/collection-feature-elevation-xw9z9o`, merged to `main` as
+  `bcc3698`).** **Desktop web:** live via Vercel auto-deploy. **iOS:
+  TestFlight run #73 → build 1073**, fired via the temp-push-trigger pattern
+  (API dispatch still 403 from cloud sessions; temp branch
+  `claude/ship-tf-trigger-xw9z9o` — owner should delete after green, plus the
+  parallel Ask session's `claude/ship-tf-trigger-ask`; remote branch deletes
+  are no-ops from cloud). The parallel Ask-elevation run #72 (build 1072) was
+  in progress when #73 queued — 1073 was cut from the merged main so it
+  contains BOTH elevations; 1072 has only Ask. **Backend: NOT deployed —
+  owner step:** from `main` run `./deploy-functions.sh functions:share_page`
+  to make the redesigned public collection page live (publish/unpublish logic
+  unchanged; existing share links keep working with the old rendering until
+  then). **On-device QA for build 1073 (collections bits):** share sheet flow
+  (publish → copy/share/view → stop), stale-share amber "Update" after adding
+  a card to a published collection, suggested-collection tiles in the gallery
+  (needs ≥4 cards sharing a tag/concept), "Suggested" section in the
+  add-to-collection sheet, mosaic tile covers, empty state. Feature summary: (1) **Sharing
+  is now a deliberate flow**: new `ShareCollectionSheet` (preview of what goes
+  public → explicit Publish → copy link / native share / View page / Stop
+  sharing, plus the one-line privacy promise) replaces the old blind
+  tap-Share-→-instant-publish-→-OS-sheet; the feed banner routes to it and its
+  separate Stop-sharing button was folded in. (2) **Stale-share detection**:
+  `publishCollection` now stamps `publishedAt` + `publishedSignature` (djb2 of
+  name+description+sorted member ids, `web/lib/collections.ts`); when the live
+  collection drifts, the sheet shows an amber "Update" prompt and gallery tiles
+  flip their badge to "Update page" (legacy signature-less shares are treated
+  as fresh, never nagged). (3) **Elevated public `/c` page**
+  (`functions/share_service.py`): thumbnail-mosaic hero (1–4 tiles), per-card
+  rows with thumbnail + source kicker + title linked to the original
+  (image-type cards never link their stored file), card count + updated date,
+  >50-card overflow note, better OG description — covered by new
+  `tests/test_share_page.py` (incl. XSS + `javascript:`-URL guards; suite now
+  143 passed). (4) **M20-lite suggested collections** (`web/lib/
+  collectionSuggest.ts`, client-only): clusters ready cards by shared
+  tags/concepts (≥4 cards, dedup vs existing collections + near-identical
+  clusters, localStorage dismissals), rendered as dashed Sparkles tiles in the
+  gallery with one-tap Create (batched `addLinksToCollection`); the
+  Add-to-collection sheet now floats affinity-ranked "Suggested" targets above
+  the A–Z list. (5) Gallery polish: mosaic covers (explicit cover first), a
+  real empty state with create CTA. Analytics: `collection_shared`,
+  `collection_share_updated`, `collection_suggestion_accepted`. Verified: `tsc
+  --noEmit` clean, 143/143 pytest, share page visually verified via headless
+  Chromium (full `next build` fails only at Firebase init in the cloud sandbox
+  — no env keys — pre-existing).
+- **2026-07-11 — SHIPPED: Ask Machina elevation (`581d71b`, merge
+  `4fcd01d` to `main`).** Product polish pass on the hero feature, all
+  frontend (zero backend-deploy dependency). **Desktop web:** live via Vercel
+  auto-deploy. **iOS:** TestFlight **run #72 → build 1072**, fired via the
+  temp-push-trigger pattern (API dispatch still 403 from cloud sessions; temp
+  branch `claude/ship-tf-trigger-ask`). Build 1072 was cut from `4fcd01d`, so
+  it carries Ask but NOT the parallel Collections merge (`bcc3698`) — the next
+  TestFlight build picks that up. ⚠️ Owner cleanup: remote branch
+  deletes are no-ops from cloud sessions — delete the stale trigger branches
+  (`claude/ship-tf-trigger-bvwize`, `-1yngsi`, `-notes`, and `-ask` once run
+  #72 is done) plus the merged `claude/ask-feature-elevation-3aoz26`.
+  Details of what shipped: (1) **Living suggestions:** new `web/lib/askSuggestions.ts`
+  builds the empty-state chips from the LIVE library instead of static
+  category names — a spotlighted "latest save" chip (re-animates the moment a
+  new card lands; keyed by card id), this-week catch-up (count-aware),
+  recurring-concept "connect the dots", top-category takeaways, and a dusty
+  never-opened card to rediscover — plus a "More ideas" shuffle;
+  Feed now passes `links` into AskBrain (replaces the `categories` prop).
+  (2) **"Just saved — ask about it" pill** above the composer when a card
+  lands mid-conversation (guarded against delete-reshuffles via createdAt).
+  (3) **One-tap follow-up chips** under each completed answer (rotating pool).
+  (4) **Stop generation** (send button flips to a stop square while
+  thinking/streaming; partial answer kept) and **one-tap "Try again"** on the
+  last error bubble (drops the failed user+error pair so history stays clean).
+  (5) **Staged thinking status** — "Searching your N saves… → Reading the best
+  matches… → Writing your answer…" mirrors the real RAG pipeline. (6)
+  **Reading-aware autoscroll** (streaming no longer forces you to the bottom
+  once you scroll up; a jump-to-latest pill appears), **composer auto-grow**,
+  and desktop **"/" focuses the composer**. New content-free analytics:
+  `ask_suggestion_used` (kind label only), `ask_followup_used`, `ask_stopped`.
+  tsc + eslint clean; `next build` compiles (prerender fails only on missing
+  Firebase env in the cloud sandbox). On-device QA for build 1072: chip
+  re-animation on a fresh save (empty state + mid-chat pill), stop mid-answer
+  on iOS (buffered path just cancels the wait — no partial text, by design),
+  follow-up chips vs. keyboard, "/" is desktop-only. `firebase.json` and
+  `functions/` unchanged — no hosting or functions deploy.
+- **2026-07-11 — SHIPPED: notes fix + personal notes on every card
+  (`a150ce2`, merged to `main`).** Owner reported the **Note tab errored "URL
+  is required"** on device — root cause: the Note tab POSTed to `/api/analyze`,
+  whose note branch is in the undeployed backend, so it hit the URL-required
+  guard. Fixed by making note capture **durable client-side**: `createNoteCard`
+  (web/lib/storage.ts) writes the note card instantly (needsEmbedding →
+  searchable), `enrichNoteCard` folds in tags/category/concepts in the
+  background best-effort and NEVER rewrites the user's title/body (their words
+  stay verbatim; a short one-liner becomes a clean headline card). Works
+  regardless of backend deploy state — the "URL is required" failure is gone.
+  Also added **personal notes on every card**: new `userNote` field +
+  `updateLinkNote` (deleteField on empty), a polished "My note" section in
+  LinkDetailModal on ALL cards (one-tap add, warm accent panel, tap-to-edit,
+  ⌘/Ctrl+Enter save, delete), and a quiet StickyNote cue on grid + list cards
+  that carry a note. **Desktop web:** live via Vercel. **iOS: TestFlight build
+  1071 (run #71); the older claude/ship-tf-trigger-* branches remain owner-cleanup** (temp-push-trigger `claude/ship-tf-trigger-notes`;
+  delete after). tsc + full `next build` green. **No backend deploy needed for
+  notes to work** (durable client-side); when the pending `./deploy-functions.sh`
+  runs, new note cards additionally get AI tags/category. `firestore.rules`
+  unchanged (userNote is a client write to the already-writable `links` doc).
+- **2026-07-11 (latest) — Review mode simplified per owner device feedback +
+  first-render collapse fixed (`af08fe1`, merges `522035b`/`3c7960d`;
+  TestFlight run #69 → build 1069, fired after cross-merging the parallel
+  weaknesses-sprint main).** Owner's build-1067 report: first tap into Review
+  rendered a collapsed deck (squashed card strips, dead space), and the
+  Forgotten/Recent/Tidy chips + the "Saved X ago · never opened" lines should
+  go. (1) Collapse root cause: the deck can mount on an empty pool — the empty
+  state has no measuring rootRef — then get dealt by the self-heal effect with
+  `pos` unchanged, so the height measure (keyed on pos) never re-ran and maxH
+  stayed 0; the measure is now also keyed on the current card id. (2) Queue
+  chips REMOVED: `reviewQueue.ts` now builds ONE smart order — dustiest
+  forgotten first, then newest unread, then remaining open cards (the deck
+  never dead-ends); no user-facing queue selection; dead per-queue exports
+  deleted. (3) Why-lines removed from card faces (owner: uncomfortable).
+  Review is now: cards + keep/archive/remind/undo + bounded 12-card sessions
+  with the summary screen. Web live via Vercel; combined tree verified (tsc
+  clean, 137/137 pytest). **Follow-up same session (`a9a1fad`, merge
+  `182679c`; next TestFlight run → build 1070):** owner clarified "roasts"
+  meant the TOASTS — stacked per-swipe "Added to favorites" toasts were
+  covering the deck's buttons. handleStatusChange gained a `silent` option;
+  the deck's swipe handlers use it (fling animation + tallies are the
+  confirmation; error toasts unchanged). The removed why-lines stay removed
+  unless the owner asks for them back.
+- **2026-07-11 — SHIPPED: the weaknesses-sprint remediation below
+  (merge `e163147` to `main`).** **Desktop web:** live via Vercel auto-deploy
+  (includes durable web capture UI, Note tab, editable title/summary, export,
+  onboarding redesign, swipe grammar, analytics/error reporting client side).
+  **iOS: TestFlight run #68 → build 1068**, fired via the temp-push-trigger
+  pattern (API dispatch still 403 from cloud sessions; temp branch
+  `claude/ship-tf-trigger-1yngsi`). ⚠️ Remote branch deletes are ALSO no-ops
+  from cloud sessions ("Everything up-to-date" but the ref survives) — owner
+  should delete BOTH stale trigger branches (`claude/ship-tf-trigger-bvwize`,
+  `claude/ship-tf-trigger-1yngsi`) once run #68 is done. **Backend: NOT
+  deployed — owner step** (no Firebase creds in cloud): from `main` run
+  `./deploy-functions.sh functions:analyze_link,functions:analyze_image,functions:ask_brain,functions:share_ingest,functions:process_link_background,functions:sync_link_embedding,functions:backfill_embeddings,functions:check_reminders,functions:force_check_reminders,functions:get_article,functions:claim_workspace,functions:claim_workspace_http`
+  — until then the durable web capture ENQUEUE fails honestly (placeholder
+  flips to a retryable failed card, Retry uses the old sync path — degraded but
+  never lossy), and citations re-ask/ungrounded, retrieval v2, reminder in-app
+  fallback and the note share-path stay dark; the web UI changes are live and
+  read-compatible. **Then:** (1) run `backfill_embeddings` once (`curl -X POST
+  .../backfill_embeddings -H "Authorization: Bearer $ADMIN_TOKEN"`); (2) add
+  permissive `analytics_events` + `client_errors` matches inside `match
+  /users/{uid}` in LIVE firestore.rules (shapes staged in
+  `firestore.rules.locked`) or analytics writes are silently denied; (3) `cd
+  firestore-rules-test && npm test`; (4) on-device QA for build 1068: swipe
+  directions in List view (right=favourite, left=delete+confirm, incl. RTL),
+  push nudge after setting a reminder, "Reminders due" strip, iOS welcome +
+  example-card seed, web link save placeholder→ready flip (after functions
+  deploy), Note tab, title/summary edit. `firebase.json` unchanged — no
+  hosting deploy.
+- **2026-07-11 — Weaknesses-sprint remediation (branch
+  `claude/machina-remediation-orchestrator-1yngsi` — merged to `main` this
+  ship; see the ship entry prepended above).** Orchestrated 7 Opus agents over
+  4 waves against `APP_WEAKNESSES.md` (the 2026-07-10 8-item product critique;
+  that file is the detailed tracker with per-item commits + owner steps). All 8
+  items landed: **#3** citations are a hard invariant (re-ask once, else
+  visible `ungrounded` downgrade — never confident-and-uncited); **#4**
+  reminder one-shots fixed (`once` profile), in-app "Reminders due" strip for
+  pushless users, push asked at first intent, digest default ON (new users);
+  **#8** self-hosted content-free analytics (`users/{uid}/analytics_events`),
+  client error reporting, Settings → Export (JSON+MD); **#2** rich v2
+  embeddings + `backfill_embeddings` endpoint, top-30→rerank→10 retrieval, Ask
+  on `gemini-3.1-flash`; **#5** honest timeout copy, web dedup, PDF/JS-shell
+  honest degradation, and durable web capture (placeholder + `/api/share`
+  enqueue — the 60s loss window is gone); **#1** platform-aware onboarding +
+  1-tap example card + tour cut to 3 steps and gated to a non-empty feed;
+  **#6** URL-less notes (share + web Note tab), editable title/summary,
+  optional `actionableTakeaway`; **#7** unified swipe grammar (right never
+  destructive; taxonomy merge written up as a design proposal, not built).
+  Tests 70→137, tsc clean throughout. **Owner steps:** `./deploy-functions.sh`;
+  run `backfill_embeddings` once (`$ADMIN_TOKEN`); add permissive
+  `analytics_events`/`client_errors` matches to LIVE firestore.rules
+  (pre-cutover) or events are silently denied; run `firestore-rules-test` on
+  the owner machine; device-verify swipes, push nudge, onboarding, and the
+  durable-capture placeholder→ready flip.
+- **2026-07-11 (later) — Review-mode device feedback fixed + reshipped (merge
+  `60c5d23`; TestFlight run #66 → build 1066).** Owner tested build 1065:
+  Review mode didn't read as a Tinder deck — the deck overflowed the viewport
+  (action buttons clipped, page scroll fighting vertical swipes), queue chips
+  wrapped to two rows, giant card. Fix (`fc46556`, SwipeDeck.tsx only): deck
+  height now derives from `visualViewport` (WKWebView innerHeight overstates
+  usable height) with no overflow-forcing floor, re-measures on viewport
+  changes; queue chips compact single-row ("Needs tidying"→"Tidy"); the
+  swipe-instructions caption removed; titles clamp to 2 lines; and a fling
+  wedge-hardening — `finishExit` runs from transitionend OR a 420ms
+  seq-guarded fallback timer, so a dropped transitionend (WKWebView
+  backgrounding) can no longer leave the deck stuck ignoring input. Web live
+  via Vercel. **Owner confirmed build 1066 "much better."** Follow-up
+  (`6549705`, merge `f54c620`; TestFlight run #67 → build 1067): the add-link
+  FAB is now hidden in Review mode — it overlapped the deck's Keep button, and
+  Review doesn't capture links (joins the Ask/Collections/Digest hide list).
+- **2026-07-11 — SHIPPED: the product-review execution below (merge `b71657a`
+  to `main`).** **Desktop web:** live via Vercel auto-deploy. **iOS:
+  TestFlight run #65 → build 1065**, fired via the established
+  temp-push-trigger pattern (API dispatch is still 403 from cloud sessions;
+  temp branch `claude/ship-tf-trigger-bvwize`, trigger commit `5ca16e1` —
+  delete the remote branch once the run finishes if the session didn't get to
+  it). **Backend: NOT deployed — owner step** (this cloud session has no
+  Firebase creds and egress to firebase.googleapis.com is blocked): run from
+  `main` — `./deploy-functions.sh functions:analyze_link,functions:analyze_image,functions:ask_brain,functions:process_link_background,functions:send_digests,functions:send_digest_now,functions:force_send_digests`
+  (the digest email-cut + mode-collapse and the ai_service "Who It's For"
+  prompt fix are dark until then; the web changes are live immediately and
+  read-compatible with the old backend — worst case a legacy-mode digest still
+  curates via its old branch until the deploy). Remember the 2026-07-10
+  gotcha: `git pull` before deploying. `firebase.json` unchanged — no hosting
+  deploy. On-device QA list for build 1065 is in the entry below.
+- **2026-07-10 — Product-review execution: subtraction + Review-mode upgrade
+  (branch `claude/machina-review-execution-bvwize`, 9 commits; merged + shipped
+  2026-07-11 — see the entry above).** Orchestrated 7 work packages (one Opus agent
+  each) + an 8-angle code review. Shipped on the branch: **(A) Review mode
+  upgraded** into the digest's interactive twin — three curated queues
+  (Forgotten default / Recent / Needs tidying, pure logic in
+  `web/lib/reviewQueue.ts`), sessions bounded at 12 cards with a kept/archived/
+  reminders summary + "Review 12 more", a "why this card" line per face,
+  arrow-key bindings, and fixes for **F-29** (up-swipe holds the card until the
+  reminder modal resolves; cancel returns it; Undo clears the reminder) and
+  **F-32** (order-stable id snapshot over live card data; deleted/externally-
+  acted cards skip). **(B) Email digest channel CUT** (never configured):
+  formatters/senders/SendGrid-SMTP config and the Delivery settings screen
+  deleted; stored `email` channels dropped at read time mirroring the
+  whatsapp→push migration (email-only legacy users fall back to the always-on
+  in-app digest — deliberate, no silent push opt-in); closes task 19's provider
+  decision. **(C) Digest modes 6→3** (smart/rediscover/topic; synthesis pathway
+  untouched): retired random/unread/favorites map to smart at read time via
+  mirrored normalizers (`normalize_mode` / `normalizeDigestMode`), never
+  written back. **(D) F-20 fixed** (ReminderModal local-time date handling,
+  past-slot guards, never-in-the-past save invariant, month-overflow clamp).
+  **(E)** "Who It's For" removed from the video prompt at the source
+  (`ai_service.py`) + the frontend strip band-aid deleted — legacy video cards
+  show the stored section until re-saved (accepted). **(F) Task 17 resolved:
+  BOTH themes kept, light brought to material parity** via four new tokens in
+  `globals.css` (dark values identical — dark mode pixel-unchanged). **(G) iOS
+  Shortcut path retired** (`SHORTCUT_SETUP.md` deleted, refs scrubbed; no
+  Shortcut-only endpoint existed — `share_ingest`/`get_share_config` are shared
+  with the Share Extension + browser extension, nothing removed). **M19
+  re-ranked to top of P3** (first post-launch item). Code review (8 finder
+  angles, verified) fixed: unix-seconds timestamps in `getTimestampNumber`
+  (day-old FB/screenshot cards were landing in "Forgotten"), reminder-modal
+  save/cancel signal ordering, empty-session self-heal + default-queue
+  fallback, mid-session skip of externally-acted cards, `CardFace` memoization
+  (markdown no longer re-parses per drag frame), dead email-era helpers
+  deleted. Verified: `tsc --noEmit` clean, `py_compile` clean, 70/70 pytest.
+  **⚠️ On-device QA before ship:** Review-mode gesture feel + the up-swipe
+  cancel/return animation; light-mode visual pass (ReminderModal inset pickers,
+  scan-progress skeletons, card elevation/hairlines, drag handles, HintBadge +
+  category-chip contrast, Toast); `layout.tsx` `themeColor` is still static
+  dark — decide if it should follow the theme.
+  25 tasks, 26 commits — see `AUDIT.md`).** Vercel auto-deploy is live (desktop
+  web). **iOS: SHIPPED — TestFlight run #64 → build 1064, GREEN** (fired via the
+  temp-push-trigger pattern on the audit branch, commit `4c845eb`, trigger
+  reverted in `69a68e1`; API dispatch remains 403 from cloud sessions). The run
+  also VALIDATED the new CI hardening end-to-end: aps-environment=production
+  asserted in the exported IPA (the distribution profile DOES rewrite the
+  source `development` value — audit risk closed), SIWA hard-check passed,
+  no-beta Xcode filter worked, and the upload ran via
+  `-exportArchive destination=upload` (altool fully retired). AUDIT.md M15 is
+  done. **Backend: DEPLOYED 2026-07-10** — owner ran `./deploy-functions.sh`
+  with all 30 targets on `main@7d3f61e` (second attempt; the first deployed a
+  stale pre-ship checkout — **gotcha: always `git pull` before deploying**, and
+  don't paste a `#`-comment on the command line: interactive zsh passes it as
+  an argument and the script deploys a function literally named `#`). The
+  removed **`whatsapp_webhook` was deleted from prod** (`firebase
+  functions:delete whatsapp_webhook --force` — successful); `TWILIO_*` removed
+  from `functions/.env`. **New CI: `python-tests` run #1 failed CI-only** (4
+  rate-limit tests — the real `@firestore.transactional` rejects the FakeTxn
+  and the limiter fails open); fixed in `5f6efeb` (identity-decorator patch in
+  the test setup, verified 73/73 against BOTH the conftest fakes and the real
+  firestore driver). `rules-tests` only fires on rules/rules-test changes —
+  not yet exercised. Historical ship reference below (original owner steps):
+  `./deploy-functions.sh` with ALL targets (every module changed — WhatsApp
+  removal + per-uid rate limits + share_service extraction touch main.py and
+  all shared modules), e.g. functions:analyze_link,functions:analyze_image,
+  functions:ask_brain,functions:share_ingest,functions:get_article,
+  functions:claim_workspace,functions:claim_workspace_http,
+  functions:delete_account,functions:delete_account_http,
+  functions:register_device_token_http,functions:unregister_device_token_http,
+  functions:publish_share_http,functions:unpublish_share_http,
+  functions:share_page,functions:get_share_config,functions:rebuild_connections,
+  functions:send_digest_now,functions:search_links,
+  functions:process_link_background,functions:sync_link_embedding,
+  functions:check_reminders,functions:sweep_stuck_processing,
+  functions:send_digests — then **delete the removed webhook**:
+  `firebase functions:delete whatsapp_webhook --project secondbrain-app-94da2 --force`,
+  and remove `TWILIO_*` from `functions/.env`. The new `python-tests` /
+  `rules-tests` workflows will run on the next functions/rules PR — confirm
+  green once. Remaining owner work is consolidated in `AUDIT.md` §9 (auth
+  cutover M1, key rotation M2, APNs console M7, Twilio decommission M6,
+  App Store Connect M3-M4).
+
 > PR descriptions — this is the orientation trail, not a changelog.
 
+- **2026-07-09 — Orchestrated full-tree audit + remediation (`AUDIT.md` created at
+  repo root — the grounded findings + manual-item tracker).** WhatsApp/Twilio
+  removed end-to-end (backend, frontend, legal pages, docs) with a
+  `whatsapp → push` channel migration at read/send time so no reminder/digest
+  silently drops; SSRF platform-fetcher fix (all scraper branches through
+  `safe_get` + hostname-anchored dispatch); streaming-citation trust fix (missing
+  `[[CITED:]]` marker no longer attributes the answer to all retrieved cards);
+  semantic-search availability fix (`has_any_embeddings`); per-uid+IP rate limits +
+  input caps on paid endpoints; CI hardening (assert `aps-environment=production`
+  in the exported IPA, filter the Xcode beta glob, `altool`→`-exportArchive`
+  upload, Sign-in-with-Apple entitlement hard-fail); ShareExt cleanup + App/ShareExt
+  build-number lockstep (build 21); browser/Safari extension rebranded to
+  Machina AI; README rewritten to the real product; dead-code purge
+  (`InstallPWA.tsx`, template SVGs, dead `models.py`/`ai_service.py` symbols);
+  a11y + light-theme token fixes; Feed capture-time perf overhaul; owner PII
+  scrubbed from docs. Remaining manual/owner items (auth cutover, key rotation,
+  Twilio decommission, APNs steps, App Store Connect data entry, etc.) live in
+  `AUDIT.md` §9.
+- **2026-07-08 — Closed-state (feed) YouTube card thumbnail shortened + play icon
+  removed (`eb332e4`; build 1063; Vercel live).** Follow-up: `Card.tsx` still used
+  full `aspect-video` + a play overlay on the feed card while the open card was
+  already `h-28 sm:h-32` and play-free — matched them (short banner, dropped the
+  play circle, kept the duration badge; trimmed the unused `Play` import).
+- **2026-07-08 — Removed the share "Open Machina" button; YouTube thumb + scroll-
+  top tweaks (`1c034fb`; TestFlight run #62 → build 1062; Vercel live).** (1) The
+  YouTube open-card thumbnail shortened again to `h-28 sm:h-32`. (2) `ScrollToTop`
+  moved to the **right, just above the + FAB** (`bottom-24 right-…`), smaller
+  (`w-9`) and more muted. (3) **Removed the "Open Machina" button from the Share
+  Extension** (`ShareViewController.swift`) — iOS forbids extensions from
+  launching the host app, so both the URL-scheme (build 1051/1053) and the
+  local-notification (build 1055) routes were dead ends and the button did
+  nothing. Deleted the button + its `configureOpenAppButton`/`openAppTapped`/
+  `openMainApp` methods, re-pinned the scan card's bottom to the hint label, and
+  reworded the sign-in message. The App-Group progress hand-off is still written
+  continuously during the scan (`beginScanAnimation` + `syncProgressHint`), so
+  opening Machina from the Home Screen still resumes the in-app banner at the same
+  %. **`import UserNotifications` is now unused** in that file (harmless). Web tsc
+  clean; Swift builds on CI.
+- **2026-07-08 — 6-fix batch: source filter polish, digest facelift+delete,
+  YouTube thumb, scroll-to-top, card fonts (`e66c0f4`; TestFlight run #61 → build
+  1061; Vercel live).** (1) `SourceFacetList`: single-source leaf rows now share
+  the expandable rows' structure + a chevron-width spacer so they align instead of
+  floating wider. (2) **Digest facelift + per-digest actions**: `DigestCard` shows
+  topics as chips (eyebrow is now `date · mode`, not a long comma string); when
+  open, a footer offers **"Digest settings"** (→ Settings digest screen) and a
+  two-tap **Delete** — new `deleteDigest(uid,id)` in `lib/digest.ts` (`deleteDoc`
+  on `users/{uid}/digests/{id}`; onSnapshot drops it live; backend still auto-
+  prunes to 30). Threaded Feed→DigestView→DigestCard. (3) Source filter chips: a
+  fully-selected platform collapses to ONE chip (e.g. "Facebook") via a
+  `sourceChips` memo in Feed, instead of one chip per account. (4) YouTube cards:
+  removed the play-button overlay, shortened the thumbnail (`h-36 sm:h-44`).
+  (5) New `ScrollToTop.tsx` — subtle bottom-left "back to top" that fades in past
+  700px of window scroll; mounted in `page.tsx`. (6) Open-card body font unified:
+  lead summary `text-lg → text-base` to match the section bodies; subheadings
+  unchanged. Frontend-only; tsc + build clean.
+- **2026-07-08 — 7-fix batch: settings footer, YouTube cards, date bug, source
+  chips/layout (`c27f9f8`; TestFlight run #60 → build 1060; Vercel live).**
+  Investigated via 3 parallel Explore agents, then fixed. (1) `SettingsModal`
+  Done footer: tighter (`px-[18px] py-2.5`, smaller safe-area pad), aligned to the
+  content column. (2) `LinkDetailModal`: **removed the Speakers section** on video
+  cards. (3) The inline YouTube embed trips **YouTube error 153** in the WebView —
+  replaced it with the **thumbnail** (`metadata.thumbnailUrl`, `i.ytimg` fallback)
+  that opens the video externally; **Key moments kept**, now deep-link to the
+  timestamp on YouTube (`watch?v=…&t=Ns`) via `openExternal` (dropped the iframe
+  seek). (4) Strip the AI's **"Who It's For"** section from video summaries
+  (`stripMarkdownSection`, frontend-only — note `functions/ai_service.py:145` still
+  generates that heading; optional backend cleanup later). (5) **"19,000 days ago"
+  bug**: some ingest paths (Facebook, screenshots) store Unix **seconds** not ms —
+  `getTimeAgo` (Card.tsx + LinkDetailModal.tsx) now scales sub-`1e12` values ×1000
+  and guards `<=0`. (6) Selected **sources now show removable chips** above the
+  grid (Feed.tsx, matches tag/collection chips). (7) `SourceFacetList` group row
+  de-cluttered — accent-tinted `n/total` count for partial + a single accent check
+  when fully on (dropped the bordered circle/dot); expand chevron is now a distinct
+  square button. Frontend-only; tsc + build clean.
 - **2026-07-08 — Digest markdown fix + scalable desktop reader (`830588a`;
   TestFlight run #59 → build 1059; Vercel live).** (1) Digest card summaries
   rendered raw `**bold**` as literal asterisks — now routed through
@@ -1306,7 +2039,7 @@ exact-match, capped.
   1033** uploaded). On device: the Apple/Google login screen shows, **both**
   Continue-with-Apple and Continue-with-Google sign in successfully and load the
   feed, and Settings shows the account + Delete account. Firebase Auth has ONE
-  user for morhogeg@gmail.com (`jX2yUZpZtybHuKrAfkCQR0NEzj72`) with BOTH apple.com
+  user for the owner (`<owner-auth-uid>`) with BOTH apple.com
   and google.com providers linked (auto-linked by verified email) — so one uid
   covers both methods. **Deployed** `claim_workspace` + `delete_account` (they
   were never on prod — the live backend predated the auth work; deployed from the
@@ -1316,8 +2049,8 @@ exact-match, capped.
   reaches it (no execution logs; same class of WebView-callable failure that
   already forced share-config off its callable) — so the owner-claim never wrote,
   and the sign-in dead-ended on the restricted screen. **Workaround applied:**
-  manually wrote `authUids:[jX2yUZpZtybHuKrAfkCQR0NEzj72]` + `email` onto
-  `users/+16462440305` via the Admin SDK (exactly what the owner-claim does),
+  manually wrote `authUids:[<owner-auth-uid>]` + `email` onto
+  `users/<owner-phone-uid>` via the Admin SDK (exactly what the owner-claim does),
   which unblocked device sign-in. A proper fix (route claim through an HTTP
   endpoint with the `capacitor://localhost` CORS allowlist + bearer verify, like
   `/api/chat`) shipped the same session — **see the entry above.**

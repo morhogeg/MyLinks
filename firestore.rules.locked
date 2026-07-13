@@ -83,6 +83,19 @@ service cloud.firestore {
         allow read: if owns(uid);
         allow write: if false;
       }
+
+      // Self-hosted product analytics (lib/analytics.ts). The client appends
+      // minimal, content-free event docs; only the owner (and the Admin SDK)
+      // can touch them. Mirrors the links/chats/collections owner check.
+      match /analytics_events/{eventId} {
+        allow read, write: if owns(uid);
+      }
+
+      // Self-hosted client error reports (lib/errorReporter.ts). Same
+      // owner-only access as analytics — append-only in practice.
+      match /client_errors/{errorId} {
+        allow read, write: if owns(uid);
+      }
     }
 
     // Shared collections & cards: public, read-only snapshots for share links so

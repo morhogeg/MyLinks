@@ -1,8 +1,30 @@
 import UIKit
-import Social
-import MobileCoreServices
 import ImageIO
-import UserNotifications
+
+/// The ONE progress curve, shared by convention with the web app. Progress is a
+/// deterministic function of elapsed wall-clock time since the capture started,
+/// so the Share Extension HUD and the in-app loaders (which anchor to the same
+/// start timestamp — see `writePendingShareHint` / the placeholder's
+/// `processingStartedAt`) compute the identical percentage at the same moment.
+/// Switching from the share sheet to the app never restarts the loader.
+///
+///     progress(t) = ceiling − (ceiling − start) · e^(−t / tau)
+///
+/// TWIN: keep these constants + formula identical to web/lib/shareProgress.ts
+/// (START_PCT, CEILING, TAU_MS). Change one, change the other, or the two
+/// screens drift.
+enum ShareProgressCurve {
+    static let start: Double = 6      // START_PCT
+    static let ceiling: Double = 92   // CEILING
+    static let tauMs: Double = 10_000 // TAU_MS
+
+    /// Progress (percent, start…ceiling) for `elapsedMs` since capture start.
+    static func progress(forElapsedMs elapsedMs: Double) -> Double {
+        let t = max(0, elapsedMs)
+        let p = ceiling - (ceiling - start) * exp(-t / tauMs)
+        return min(ceiling, max(start, p))
+    }
+}
 
 /// Share Extension entry point. Pulls the shared item (link, text, or image)
 /// out of the share sheet, reads the user's ingest endpoint + token from the
@@ -44,17 +66,15 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     // MARK: Close (✕) button on the scan card
     private let scanCloseButton = UIButton(type: .system)
 
-    // MARK: "Open Machina" button — dismisses the share sheet, opens the app, and
-    // hands off to the in-app "Analyzing… N%" banner (the same one shown when the
-    // in-app add dialog is closed). The upload keeps running on the background
-    // session, so opening the app doesn't cancel the save.
-    private let openAppButton = UIButton(type: .system)
-
     // MARK: Background upload session (survives the extension being dismissed)
     // A foreground URLSession is cancelled when the extension UI goes away, so we
     // hand the upload to a *background* session that the system finishes for us.
     private var backgroundSession: URLSession?
     private var responseData = Data()
+    // The temp JSON body handed to the background upload task. Kept so we can
+    // delete it once the transfer completes (didCompleteWithError); the file must
+    // survive until then because the background daemon reads it after we dismiss.
+    private var uploadTempURL: URL?
 
     // MARK: Image scan HUD
     private let scanContainer = UIView()          // rounded card holding the preview + bar
@@ -82,7 +102,12 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
 
     private var displayLink: CADisplayLink?
     private var progress: CGFloat = 0             // 0…100, what's shown on screen
-    private var ceiling: CGFloat = 90             // animation eases toward this while uploading
+    private var ceiling: CGFloat = CGFloat(ShareProgressCurve.ceiling) // eases toward this while uploading
+    // Capture-start wall clock — the shared anchor the whole progress ramp is a
+    // pure function of, and the value handed to the app so its in-app loader
+    // resumes from the same point instead of restarting. Set when the scan HUD
+    // first appears (beginScanAnimation).
+    private var captureStartedAt: Date?
     private var isImageFlow = false
     private var isLinkFlow = false
     private var finished = false
@@ -91,9 +116,34 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = UIColor.black.withAlphaComponent(0.25)
+        sweepStaleShareTempFiles()
         setupGenericUI()
         setupScanUI()
         handleShare()
+    }
+
+    /// Best-effort sweep of orphaned upload bodies. Each share writes a
+    /// `machina-share-<UUID>.json` temp file that's normally deleted once the
+    /// background upload completes (didCompleteWithError); if the extension was
+    /// killed before that, the file lingers. Delete any older than ~1 day so they
+    /// don't accumulate. Non-fatal — any failure is ignored.
+    private func sweepStaleShareTempFiles() {
+        let fm = FileManager.default
+        let tmpDir = fm.temporaryDirectory
+        let cutoff = Date().addingTimeInterval(-24 * 60 * 60)
+        guard let entries = try? fm.contentsOfDirectory(
+            at: tmpDir,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        ) else { return }
+        for url in entries where url.lastPathComponent.hasPrefix("machina-share-")
+            && url.pathExtension == "json" {
+            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate
+            if let modified = modified, modified < cutoff {
+                try? fm.removeItem(at: url)
+            }
+        }
     }
 
     override func viewDidLayoutSubviews() {
@@ -174,44 +224,9 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         finish()
     }
 
-    /// Styling for the accent-filled "Open Machina" pill.
-    private func configureOpenAppButton() {
-        openAppButton.translatesAutoresizingMaskIntoConstraints = false
-        openAppButton.accessibilityLabel = "Open Machina"
-        if #available(iOS 15.0, *) {
-            var cfg = UIButton.Configuration.filled()
-            cfg.baseBackgroundColor = Self.accent
-            cfg.baseForegroundColor = .white
-            cfg.cornerStyle = .medium
-            cfg.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20)
-            cfg.attributedTitle = AttributedString("Open Machina", attributes: AttributeContainer([
-                .font: UIFont.systemFont(ofSize: 14, weight: .semibold)
-            ]))
-            openAppButton.configuration = cfg
-        } else {
-            openAppButton.setTitle("Open Machina", for: .normal)
-            openAppButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
-            openAppButton.setTitleColor(.white, for: .normal)
-            openAppButton.backgroundColor = Self.accent
-            openAppButton.layer.cornerRadius = 10
-            openAppButton.clipsToBounds = true
-        }
-        openAppButton.addTarget(self, action: #selector(openAppTapped), for: .touchUpInside)
-    }
-
-    /// "Open Machina": record a pending-share hint in the App Group (so the app
-    /// can flash the in-app "Analyzing…" banner the instant it opens, before the
-    /// server's `processing` card streams in), open the app via its URL scheme,
-    /// then dismiss the share sheet. The upload is on a background session, so it
-    /// keeps going regardless.
-    @objc private func openAppTapped() {
-        writePendingShareHint()
-        openMainApp()
-    }
-
     /// Throttled: keep the App-Group hand-off flag in step with the HUD so that
-    /// whenever the user next opens Machina — whether they tap "Open Machina" or
-    /// just launch it themselves — the in-app banner resumes at this exact %.
+    /// whenever the user next opens Machina from the Home Screen, the in-app banner
+    /// resumes at this exact %.
     private var lastHintPct = -1
     private func syncProgressHint() {
         let pct = Int(progress.rounded())
@@ -227,40 +242,27 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         guard let defaults = UserDefaults(suiteName: Self.appGroup) else { return }
         defaults.set(Date().timeIntervalSince1970, forKey: "pendingShareAt")
         defaults.set(isImageFlow ? "image" : "link", forKey: "pendingShareKind")
-        // Hand off the EXACT percentage the HUD is showing right now, so the
-        // in-app banner picks up from the same value instead of restarting near
-        // zero — the user sees one continuous progress across the two screens.
+        // Hand off the EXACT percentage the HUD is showing right now, so an older
+        // app build that can't read the start time still resumes near this value.
         defaults.set(Double(progress), forKey: "pendingShareProgress")
+        // The continuity anchor: the absolute capture-start wall clock (epoch ms).
+        // The in-app loader ramps `progressFor(now - startedAt)` off this exact
+        // value using the SAME curve (ShareProgressCurve / lib/shareProgress.ts),
+        // so the two screens show one continuous progress — never a restart.
+        if let start = captureStartedAt {
+            defaults.set(start.timeIntervalSince1970 * 1000.0, forKey: "pendingShareStartedAt")
+        }
     }
 
-    /// Bring the user into Machina from the share sheet.
-    ///
-    /// iOS deliberately forbids app extensions from launching their host app: the
-    /// `UIApplication.openURL:` responder-chain hack hard-fails on iOS 17+ ("BUG IN
-    /// CLIENT OF UIKIT … Force returning false"), and `NSExtensionContext.open` is
-    /// Today-widget-only. Apple's sanctioned route is a **local notification** the
-    /// user taps to foreground the app — where the in-app banner resumes this exact
-    /// progress (via the App-Group hand-off flag). If notifications aren't
-    /// authorized we simply dismiss; the flag is already written, so opening
-    /// Machina from the Home Screen still resumes the save.
-    private func openMainApp() {
-        let center = UNUserNotificationCenter.current()
-        center.getNotificationSettings { [weak self] settings in
-            let authorized = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
-            guard authorized else {
-                DispatchQueue.main.async { self?.finish() }
-                return
-            }
-            let content = UNMutableNotificationContent()
-            content.title = "Machina"
-            content.body = "Your save is on its way — tap to open and track it."
-            let req = UNNotificationRequest(
-                identifier: "machina-share-open-\(UUID().uuidString)",
-                content: content,
-                trigger: nil, // deliver immediately
-            )
-            center.add(req) { _ in DispatchQueue.main.async { self?.finish() } }
-        }
+    /// Remove the hand-off flag entirely — used when NO card will follow (the
+    /// server deduped this URL against an existing card), so the app never
+    /// floats a progress banner for a card that will never arrive.
+    private func clearPendingShareHint() {
+        guard let defaults = UserDefaults(suiteName: Self.appGroup) else { return }
+        defaults.removeObject(forKey: "pendingShareAt")
+        defaults.removeObject(forKey: "pendingShareKind")
+        defaults.removeObject(forKey: "pendingShareProgress")
+        defaults.removeObject(forKey: "pendingShareStartedAt")
     }
 
     // MARK: - Scan UI (images)
@@ -350,11 +352,6 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         hintLabel.translatesAutoresizingMaskIntoConstraints = false
         scanContainer.addSubview(hintLabel)
 
-        // "Open Machina" call-to-action, below the hint. Opens the app so the user
-        // can watch the rest of the analysis on the in-app banner.
-        configureOpenAppButton()
-        scanContainer.addSubview(openAppButton)
-
         // Close (✕) button, top-trailing corner of the scan card. Added last so it
         // sits above the preview / progress views.
         configureCloseButton(scanCloseButton)
@@ -409,13 +406,9 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             hintLabel.topAnchor.constraint(equalTo: barTrack.bottomAnchor, constant: 12),
             hintLabel.leadingAnchor.constraint(equalTo: scanContainer.leadingAnchor, constant: 16),
             hintLabel.trailingAnchor.constraint(equalTo: scanContainer.trailingAnchor, constant: -16),
-
-            openAppButton.topAnchor.constraint(equalTo: hintLabel.bottomAnchor, constant: 12),
-            openAppButton.centerXAnchor.constraint(equalTo: scanContainer.centerXAnchor),
-            openAppButton.leadingAnchor.constraint(greaterThanOrEqualTo: scanContainer.leadingAnchor, constant: 16),
-            openAppButton.trailingAnchor.constraint(lessThanOrEqualTo: scanContainer.trailingAnchor, constant: -16),
-            openAppButton.bottomAnchor.constraint(equalTo: scanContainer.bottomAnchor, constant: -16),
-            openAppButton.heightAnchor.constraint(equalToConstant: 38),
+            // The hint is now the bottom-most element (the "Open Machina" button was
+            // removed — iOS won't let an extension launch the app), so it pins the card.
+            hintLabel.bottomAnchor.constraint(equalTo: scanContainer.bottomAnchor, constant: -16),
 
             scanCloseButton.topAnchor.constraint(equalTo: scanContainer.topAnchor, constant: 8),
             scanCloseButton.trailingAnchor.constraint(equalTo: scanContainer.trailingAnchor, constant: -8),
@@ -576,18 +569,24 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     private func beginScanAnimation() {
         card.isHidden = true
         scanContainer.isHidden = false
-        // Seed the hand-off flag immediately so opening Machina even a beat later
-        // resumes from the start rather than a blank banner.
+        // Anchor the shared clock the ramp is a pure function of, THEN seed the
+        // hand-off flag immediately so opening Machina even a beat later resumes
+        // from the same point rather than a blank banner.
+        if captureStartedAt == nil { captureStartedAt = Date() }
         writePendingShareHint()
         displayLink = CADisplayLink(target: self, selector: #selector(tick))
         displayLink?.add(to: .main, forMode: .common)
     }
 
     @objc private func tick() {
-        guard progress < ceiling else { return }
-        // Ease toward the ceiling: fast early, slowing as it approaches.
-        let step = max((ceiling - progress) * 0.018, 0.05)
-        progress = min(progress + step, ceiling)
+        guard let start = captureStartedAt else { return }
+        // Progress is a deterministic function of elapsed wall-clock time via the
+        // shared curve — the SAME value the in-app loader computes for the same
+        // moment. Monotonic by construction (the curve only rises), and we never
+        // render below what we've already shown as a belt-and-braces guard.
+        let elapsedMs = Date().timeIntervalSince(start) * 1000.0
+        let next = CGFloat(ShareProgressCurve.progress(forElapsedMs: elapsedMs))
+        if next > progress { progress = next }
         renderProgress(progress, done: false)
         syncProgressHint()
     }
@@ -608,15 +607,55 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         UIView.animate(withDuration: 0.2) { self.barTrack.layoutIfNeeded() }
     }
 
-    /// Drive the counter to 100% + green check, then dismiss.
+    /// Mark the save as acknowledged — green check — while the bar KEEPS the
+    /// shared-curve value. The server has only queued the item; analysis runs
+    /// 15–20s more, and the in-app banner resumes from this same number. The old
+    /// snap-to-100 here made the app's honest % look like a restart (owner bug:
+    /// "extension showed done, app was at 20%").
     private func completeScanSuccess(then: @escaping () -> Void) {
         DispatchQueue.main.async {
             self.displayLink?.invalidate()
             self.displayLink = nil
-            self.ceiling = 100
-            self.progress = 100
-            self.renderProgress(100, done: true)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { then() }
+            self.sweepView.isHidden = true
+            self.linkGlyph.alpha = 0
+            self.percentLabel.alpha = 0
+            self.checkLabel.alpha = 1
+            self.barFill.backgroundColor = Self.successGreen
+            self.phaseLabel.text = "Saved — Machina is reading it…"
+            // Hand the app EXACTLY this % (the hint carries progress + start
+            // clock) so its loader continues the ramp instead of restarting.
+            self.writePendingShareHint()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) { then() }
+        }
+    }
+
+    /// 2xx but the server deduped: this URL is already a card in the library and
+    /// no new card will appear. Say so honestly — a plain "Saved ✓" promises a
+    /// new card — and clear the hand-off hint so the app shows no phantom loader.
+    private func showDuplicateResult() {
+        DispatchQueue.main.async {
+            guard !self.resultShown else { return }
+            self.resultShown = true
+            self.displayLink?.invalidate()
+            self.displayLink = nil
+            self.clearPendingShareHint()
+            if self.isImageFlow || self.isLinkFlow {
+                self.sweepView.isHidden = true
+                self.linkGlyph.alpha = 0
+                self.percentLabel.alpha = 0
+                self.checkLabel.alpha = 1
+                self.barFill.backgroundColor = Self.successGreen
+                self.barFillWidth.constant = self.barTrack.bounds.width
+                self.phaseLabel.text = "Already in your library"
+                self.hintLabel.text = "This one is saved in Machina — no new card was added."
+                UIView.animate(withDuration: 0.2) { self.barTrack.layoutIfNeeded() }
+            } else {
+                self.card.isHidden = false
+                self.label.text = "Already in your library"
+                self.spinner.stopAnimating()
+                self.spinner.isHidden = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { self.finish() }
         }
     }
 
@@ -656,12 +695,9 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                     if neutral {
                         // Neutral terminal state: the save may still be finishing on
                         // the background session. Keep the card up with the ✕ close
-                        // affordance (and the Open Machina button) instead of
-                        // auto-dismissing, and never a check.
+                        // affordance instead of auto-dismissing, and never a check.
                         self.hintLabel.text = "The save is still finishing — you can close this."
                     } else {
-                        // Hard failure — opening the app would show nothing to track.
-                        self.openAppButton.isHidden = true
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { self.finish() }
                     }
                 }
@@ -915,7 +951,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         let endpoint = defaults?.string(forKey: "shareEndpoint") ?? Self.defaultEndpoint
 
         guard let token = token, !token.isEmpty else {
-            showResult("Open Machina and sign in first", success: false)
+            showResult("Open the Machina app and sign in first", success: false)
             return
         }
         guard let url = URL(string: endpoint) else {
@@ -951,6 +987,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             showResult("Couldn't prepare upload", success: false)
             return
         }
+        uploadTempURL = tmpURL
 
         // Background session — append a UUID to the identifier so re-invocations of
         // the extension never collide on an already-in-use identifier. The shared
@@ -998,12 +1035,26 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         } else {
             let code = (task.response as? HTTPURLResponse)?.statusCode ?? 0
             if (200...299).contains(code) {
-                showResult("Saved to Machina ✓", success: true)
+                // The server acks duplicates with 200 + {"duplicate": true} and
+                // creates NO new card — that must not read as a fresh save.
+                let body = (try? JSONSerialization.jsonObject(with: responseData)) as? [String: Any]
+                if (body?["duplicate"] as? Bool) == true {
+                    showDuplicateResult()
+                } else {
+                    showResult("Saved to Machina ✓", success: true)
+                }
             } else if code == 403 || code == 401 {
                 showResult("Auth failed — reopen Machina", success: false)
             } else {
                 showResult("Couldn't save (\(code))", success: false)
             }
+        }
+        // The background daemon has read the body file by the time didComplete
+        // fires, so it's safe to delete now (best-effort — a leftover is swept at
+        // the next launch anyway).
+        if let tmp = uploadTempURL {
+            try? FileManager.default.removeItem(at: tmp)
+            uploadTempURL = nil
         }
         // Let the system tear the session down once it's done with it.
         session.finishTasksAndInvalidate()
