@@ -1390,14 +1390,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
                     {/* (Mobile Filters now lives on the category row above, to save a line.) */}
 
-                    {/* Mobile Row 2 — DESTINATIONS: Collections · Digest · Ask as labeled
-                        chips, left-aligned. The view switcher + select chip moved up to
+                    {/* Mobile Row 2 — DESTINATIONS as a symmetric three-column toolbar:
+                        Collections leads, Ask sits DEAD CENTER of the screen (grid column,
+                        so sibling widths can't push it off-center), Digest trails — the
+                        iOS toolbar rhythm. The view switcher + select chip moved up to
                         Row 1, so those live here desktop-only (`hidden sm:contents`). On
                         desktop every `sm:contents` wrapper dissolves back into the normal
-                        inline cluster and the layout is unchanged. */}
-                    <div className="flex flex-wrap items-center w-full gap-2 sm:flex-nowrap sm:w-auto">
-                        {/* Left zone — Collections + Digest (the two "browse" surfaces). */}
-                        <div className="flex items-center gap-2 sm:contents">
+                        inline cluster. */}
+                    <div className="grid grid-cols-3 items-center w-full gap-2 sm:flex sm:flex-nowrap sm:w-auto">
+                        {/* Leading edge — Collections. */}
+                        <div className="flex justify-start sm:contents">
                             <button
                                 data-tour="collections"
                                 onClick={() => setViewMode('collections')}
@@ -1408,20 +1410,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 <Layers className="w-4 h-4" />
                                 <span>Collections</span>
                             </button>
-                            <button
-                                onClick={() => setViewMode('digest')}
-                                title="Your curated digests"
-                                aria-label="Digest"
-                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
-                            >
-                                <Newspaper className="w-4 h-4" />
-                                <span>Digest</span>
-                            </button>
                         </div>
 
-                        {/* Center zone — Ask (a distinct AI mode). Plain idle styling like
-                            its siblings; no constant accent fill. */}
-                        <div className="flex items-center sm:contents">
+                        {/* Dead center — Ask (the hero destination). Plain idle styling;
+                            position, not color, gives it the stage. */}
+                        <div className="flex justify-center sm:contents">
                             {isLibraryView && (
                             <button
                                 data-tour="ask"
@@ -1434,6 +1427,19 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 <span>Ask</span>
                             </button>
                             )}
+                        </div>
+
+                        {/* Trailing edge — Digest. */}
+                        <div className="flex justify-end sm:contents">
+                            <button
+                                onClick={() => setViewMode('digest')}
+                                title="Your curated digests"
+                                aria-label="Digest"
+                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
+                            >
+                                <Newspaper className="w-4 h-4" />
+                                <span>Digest</span>
+                            </button>
                         </div>
 
                         {/* Right zone — view switcher + select chip. Desktop-only here (the

@@ -617,7 +617,12 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — Polish round 4: owner feedback on build 1077.**
+- **2026-07-13 (latest) — Polish round 5 (build 1078 feedback): Ask dead-center.**
+  Mobile destinations row is now a symmetric three-column toolbar — Collections
+  flush left, **Ask at the exact screen center** (own grid column so sibling
+  widths can't shift it), Digest flush right. Owner-directed; desktop unchanged
+  apart from chip order (Collections·Ask·Digest).
+- **2026-07-13 — Polish round 4: owner feedback on build 1077.**
   (1) **Header restructured (owner-directed):** mobile Row 1 = compact 30px
   TOOLS (icon-only Categories&Tags chip with count badge, Filters, Search,
   shrunk view switcher, multi-select; selection toolbar/search field swap in
