@@ -22,6 +22,8 @@ interface CollectionsGalleryProps {
     onShare: (collection: Collection) => void;
     onDelete: (collection: Collection) => void;
     onManageCards: (collection: Collection) => void;
+    /** Toggle the collection's Private flag (the parent owns PIN setup/gating). */
+    onTogglePrivate: (collection: Collection) => void;
     onCreate?: () => void;
     onCreateSuggestion?: (s: CollectionSuggestion) => void;
     onDismissSuggestion?: (s: CollectionSuggestion) => void;
@@ -47,6 +49,7 @@ export default function CollectionsGallery({
     onShare,
     onDelete,
     onManageCards,
+    onTogglePrivate,
     onCreate,
     onCreateSuggestion,
     onDismissSuggestion,
@@ -122,11 +125,16 @@ export default function CollectionsGallery({
                                 </div>
                             )}
                             <div className="absolute inset-0 bg-gradient-to-t from-card/90 to-transparent" />
-                            {/* Private badge — always shown on private collections so the
-                                lock state is visible even when the vault is open. */}
+                            {/* Private badge — icon only (no wording), always shown on
+                                private collections so the lock state is visible even
+                                when the vault is open. */}
                             {c.isPrivate && (
-                                <span className="absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full backdrop-blur-sm bg-black/55 text-[9px] font-bold uppercase tracking-wide text-white">
-                                    <Lock className="w-2.5 h-2.5" /> Private
+                                <span
+                                    aria-label="Private"
+                                    title="Private"
+                                    className="absolute top-2 start-2 flex items-center justify-center w-6 h-6 rounded-full backdrop-blur-sm bg-black/55 text-white"
+                                >
+                                    <Lock className="w-3 h-3" />
                                 </span>
                             )}
                             {/* Public badge — amber when the page is behind the live collection. */}
@@ -248,6 +256,7 @@ export default function CollectionsGallery({
                     onManageCards={() => { onManageCards(menu.collection); setMenu(null); }}
                     onShare={() => { onShare(menu.collection); setMenu(null); }}
                     onEdit={() => { onEdit(menu.collection); setMenu(null); }}
+                    onTogglePrivate={() => { onTogglePrivate(menu.collection); setMenu(null); }}
                     onDelete={() => { onDelete(menu.collection); setMenu(null); }}
                 />
             )}
@@ -258,7 +267,7 @@ export default function CollectionsGallery({
 /** A portal dropdown anchored to a trigger's screen rect. Rendered at the document
  *  root with fixed positioning so no ancestor `overflow`/stacking can clip it. */
 function CollectionMenu({
-    anchor, isPublic, isPrivate, onClose, onManageCards, onShare, onEdit, onDelete,
+    anchor, isPublic, isPrivate, onClose, onManageCards, onShare, onEdit, onTogglePrivate, onDelete,
 }: {
     anchor: DOMRect;
     isPublic?: boolean;
@@ -267,10 +276,11 @@ function CollectionMenu({
     onManageCards: () => void;
     onShare: () => void;
     onEdit: () => void;
+    onTogglePrivate: () => void;
     onDelete: () => void;
 }) {
     const WIDTH = 184;
-    const EST_H = 196; // ~4 rows — only used to decide whether to flip upward.
+    const EST_H = 244; // ~5 rows — only used to decide whether to flip upward.
 
     // Position is derived from the trigger's rect alone (computed once on the
     // client — this component never renders during SSR). Clamp horizontally; when
@@ -311,6 +321,7 @@ function CollectionMenu({
                     <MenuRow icon={<Share2 className="w-4 h-4" />} label={isPublic ? 'Share / manage' : 'Share'} onClick={onShare} />
                 )}
                 <MenuRow icon={<Pencil className="w-4 h-4" />} label="Edit" onClick={onEdit} />
+                <MenuRow icon={<Lock className="w-4 h-4" />} label={isPrivate ? 'Remove private' : 'Make private'} onClick={onTogglePrivate} />
                 <MenuRow icon={<Trash2 className="w-4 h-4" />} label="Delete" danger onClick={onDelete} />
             </div>
         </>,

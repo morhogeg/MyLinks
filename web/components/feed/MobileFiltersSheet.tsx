@@ -42,7 +42,8 @@ export default function MobileFiltersSheet({
     isOpen: boolean;
     onClose: () => void;
     filter: FilterType;
-    setFilter: Dispatch<SetStateAction<FilterType>>;
+    /** Routed through Feed's handleFilterSelect so 'private' stays PIN-gated. */
+    setFilter: (filter: FilterType) => void;
     statusTriggerIcon: ReactNode;
     statusOptions: DropdownOption[];
     sourceFacets: SourceFacet[];

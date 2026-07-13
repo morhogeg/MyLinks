@@ -42,7 +42,7 @@ import CollectionsGallery from './CollectionsGallery';
 import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, Share2, Globe, Plus, Pencil, Newspaper, Sparkles } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, Share2, Globe, Plus, Pencil, Newspaper, Sparkles, Lock } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
@@ -50,11 +50,11 @@ import { subscribeDigests, deleteDigest } from '@/lib/digest';
 import { PUSH_INTENT_EVENT, PUSH_FOREGROUND_EVENT, consumePendingPushIntent, readLocalPushPrompt, type PushIntent } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
 import PushNudge from './PushNudge';
-import { deleteCollection, createCollection, addLinksToCollection, isShareStale } from '@/lib/collections';
+import { deleteCollection, createCollection, addLinksToCollection, isShareStale, updateCollection, unpublishCollection } from '@/lib/collections';
 import { suggestNewCollections, dismissSuggestion, type CollectionSuggestion } from '@/lib/collectionSuggest';
 import ShareCollectionSheet from './ShareCollectionSheet';
 import PinLockModal from './PinLockModal';
-import { usePrivacyLock } from '@/lib/privacyLock';
+import { usePrivacyLock, relock } from '@/lib/privacyLock';
 import { openExternal } from '@/lib/share';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import TagExplorer from './TagExplorer';
@@ -86,14 +86,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // Privacy vault: one app-level PIN protects every collection marked
     // Private. While locked, member cards vanish from the library, search,
     // related cards, Ask context, and suggestions.
-    const { locked: vaultLocked } = usePrivacyLock(uid);
+    const { hasPin, locked: vaultLocked } = usePrivacyLock(uid);
     const privateCollectionIds = useMemo(
         () => new Set(collections.filter((c) => c.isPrivate).map((c) => c.id)),
         [collections]
     );
     const visibleLinks = useMemo(() => {
-        if (!vaultLocked || privateCollectionIds.size === 0) return links;
-        return links.filter((l) => !(l.collectionIds ?? []).some((id) => privateCollectionIds.has(id)));
+        if (!vaultLocked) return links;
+        return links.filter((l) =>
+            !l.isPrivate
+            && !(privateCollectionIds.size > 0 && (l.collectionIds ?? []).some((id) => privateCollectionIds.has(id))));
     }, [links, vaultLocked, privateCollectionIds]);
     const [searchQuery, setSearchQuery] = useState('');
     // Debounced, generation-guarded semantic search (R-3: useSemanticSearch).
@@ -202,6 +204,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
     // PIN prompt for a gated private-collection action (see withPrivacyGate).
     const [unlockPrompt, setUnlockPrompt] = useState<(() => void) | null>(null);
+    // First-time PIN setup triggered by "Make private"; holds the pending action.
+    const [pinSetupAction, setPinSetupAction] = useState<(() => void) | null>(null);
 
     // One-tap "Try it with an example" on a brand-new empty feed: seed a real,
     // hand-crafted card so Ask / search / Collections have something to work
@@ -399,7 +403,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         activeLinkId !== null || isTagExplorerOpen || isFiltersOpen || isSortOpen ||
         reminderModalLink !== null || confirmDeleteId !== null || confirmBulkDelete ||
         addToCollectionLink !== null || collectionFormOpen || confirmDeleteCollection !== null ||
-        manageCardsCollection !== null || shareCollection !== null || unlockPrompt !== null;
+        manageCardsCollection !== null || shareCollection !== null || unlockPrompt !== null ||
+        pinSetupAction !== null;
     const { pull, refreshing, animating } = usePullToRefresh({
         onRefresh: handlePullRefresh,
         enabled: (viewMode === 'grid' || viewMode === 'list') && !anyOverlayOpen,
@@ -468,8 +473,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         }
     }, [uid]);
     // Derived from visibleLinks so a due reminder never leaks a locked private
-    // card's title into the feed strip.
-    const dueLinks = useMemo(() => visibleLinks.filter((l) => l.reminderDue === true), [visibleLinks]);
+    // card's title into the feed strip; card-level private cards are excluded
+    // even while unlocked (they surface only under the Private filter).
+    const dueLinks = useMemo(() => visibleLinks.filter((l) => l.reminderDue === true && !l.isPrivate), [visibleLinks]);
 
     // The proactive feed modules, rendered once and reused in both the grid and
     // list layouts (above pending + real cards). The weekly synthesis recap plus
@@ -622,8 +628,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         setViewMode('collection');
     };
     // Leave a collection: always back to the gallery it was opened from — never
-    // dumped to the home library (the old clear-filter behaviour).
+    // dumped to the home library (the old clear-filter behaviour). Backing out
+    // of a PRIVATE collection relocks the vault right away — no waiting for the
+    // app to background — so the tile behind you is masked again.
     const closeCollectionToGallery = () => {
+        const col = openCollectionId ? collections.find((c) => c.id === openCollectionId) : null;
+        if (col?.isPrivate) relock();
         setSelectedCollections(new Set());
         setOpenCollectionId(null);
         setViewMode('collections');
@@ -657,6 +667,68 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const gatedShareCollection = (col: Collection) => withPrivacyGate(col, () => handleShareCollection(col));
     const gatedDeleteCollection = (col: Collection) => withPrivacyGate(col, () => setConfirmDeleteCollection(col));
     const gatedManageCollection = (col: Collection) => withPrivacyGate(col, () => setManageCardsCollection(col));
+
+    // ── Make private / remove private (collections + individual cards) ──────
+    // Making something private with no PIN yet routes through first-time PIN
+    // setup, then runs the pending action (pinSetupAction, declared with the
+    // overlay states above, drives that modal).
+    const makeCollectionPrivate = async (col: Collection) => {
+        if (!uid) return;
+        try {
+            // A collection can't be private AND have a public page.
+            if (col.isPublic) await unpublishCollection(uid, col);
+            await updateCollection(uid, col.id, { isPrivate: true });
+            toast.success(`“${col.name}” is now private`);
+        } catch {
+            toast.error("Couldn't make the collection private. Please try again.");
+        }
+    };
+    const handleToggleCollectionPrivate = (col: Collection) => {
+        if (!uid) return;
+        if (col.isPrivate) {
+            // Removing protection is itself a protected action.
+            withPrivacyGate(col, () => {
+                updateCollection(uid, col.id, { isPrivate: false })
+                    .then(() => toast.success(`“${col.name}” is no longer private`))
+                    .catch(() => toast.error("Couldn't update the collection. Please try again."));
+            });
+        } else if (hasPin === true) {
+            void makeCollectionPrivate(col);
+        } else {
+            setPinSetupAction(() => () => void makeCollectionPrivate(col));
+        }
+    };
+
+    const setCardPrivate = useCallback(async (link: Link, isPrivate: boolean) => {
+        if (!uid) return;
+        try {
+            await updateDoc(doc(db, 'users', uid, 'links', link.id), { isPrivate });
+            toast.success(isPrivate
+                ? 'Moved to Private — find it under Show → Private'
+                : 'Removed from Private');
+        } catch {
+            toast.error("Couldn't update the card. Please try again.");
+        }
+    }, [uid, toast]);
+    const handleToggleCardPrivate = useCallback((link: Link) => {
+        // "Remove from Private" is only reachable inside the unlocked Private
+        // view, so no extra gate; hiding a card never needs the vault open.
+        if (link.isPrivate) void setCardPrivate(link, false);
+        else if (hasPin === true) void setCardPrivate(link, true);
+        else setPinSetupAction(() => () => void setCardPrivate(link, true));
+    }, [hasPin, setCardPrivate]);
+
+    // Status-filter selection, PIN-gated for 'private': entering the Private
+    // view demands the PIN while the vault is locked, and LEAVING it relocks
+    // the vault immediately (mirrors backing out of a private collection).
+    const handleFilterSelect = useCallback((next: FilterType) => {
+        if (next === 'private' && vaultLocked) {
+            setUnlockPrompt(() => () => setFilter('private'));
+            return;
+        }
+        if (filter === 'private' && next !== 'private') relock();
+        setFilter(next);
+    }, [vaultLocked, filter, setFilter]);
 
     // Suggested collections — topic clusters detected client-side from the
     // loaded feed (M20-lite). Only surfaced in the Collections view.
@@ -747,6 +819,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         { key: 'favorite', label: 'Favorites', icon: <Star className="w-4 h-4" /> },
         { key: 'reminders', label: 'Reminders', icon: <Bell className="w-4 h-4" /> },
         { key: 'archived', label: 'Archived', icon: <Archive className="w-4 h-4" /> },
+        { key: 'private', label: 'Private', icon: <Lock className="w-4 h-4" /> },
     ];
 
     // Shared styling so every toolbar control is the same height, weight, and
@@ -768,6 +841,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         // Reminders lives here as a Show option (was a separate toolbar button).
         { value: 'reminders', label: reminderCount > 0 ? `Reminders (${reminderCount})` : 'Reminders', icon: <Bell className="w-4 h-4 text-blue-500" /> },
         { value: 'archived', label: 'Archived', icon: <Archive className="w-4 h-4 text-text-secondary" /> },
+        // Private cards (Photos-Hidden model) — only offered once the privacy
+        // vault exists or something is already in it; entering is PIN-gated.
+        ...(hasPin === true || links.some((l) => l.isPrivate)
+            ? [{ value: 'private', label: 'Private', icon: <Lock className="w-4 h-4 text-text-secondary" /> }]
+            : []),
     ];
     const statusTriggerIcon = (statusOptions.find(o => o.value === filter) ?? statusOptions[0]).icon;
 
@@ -828,6 +906,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [viewMode, openCollectionId, collections, vaultLocked, privateCollectionIds]);
+
+    // Same bounce for the Private cards view: if the vault relocks while it's
+    // showing (app backgrounded), fall back to All so nothing stays exposed.
+    useEffect(() => {
+        if (vaultLocked && filter === 'private') setFilter('all');
+    }, [vaultLocked, filter, setFilter]);
     // True for the card-browsing layouts (everything except the full-screen
     // Ask chat and the Collections gallery), which share the search/filter chrome.
     const isLibraryView = viewMode === 'grid' || viewMode === 'list' || viewMode === 'review';
@@ -970,6 +1054,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 onTagClick={handleToggleTag}
                                 onAddToCollection={handleAddToCollection}
                                 onShare={handleShareCard}
+                                onTogglePrivate={handleToggleCardPrivate}
                                 cardCollections={cardCollectionsByLink.get(link.id)}
                                 activeCollectionId={openCol.id}
                                 onRemoveFromCollection={handleRemoveFromCollection}
@@ -1363,7 +1448,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         <Dropdown
                             ariaLabel="Filter by status"
                             value={filter}
-                            onChange={(v) => setFilter(v as FilterType)}
+                            onChange={(v) => handleFilterSelect(v as FilterType)}
                             leadingIcon={statusTriggerIcon}
                             options={statusOptions}
                         />
@@ -1636,7 +1721,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             <span>{active.label}</span>
                             <button
                                 type="button"
-                                onClick={() => setFilter('all')}
+                                onClick={() => handleFilterSelect('all')}
                                 aria-label={`Clear ${active.label} filter`}
                                 title="Clear filter"
                                 className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
@@ -1802,7 +1887,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     isOpen={isFiltersOpen}
                     onClose={() => setIsFiltersOpen(false)}
                     filter={filter}
-                    setFilter={setFilter}
+                    setFilter={handleFilterSelect}
                     statusTriggerIcon={statusTriggerIcon}
                     statusOptions={statusOptions}
                     sourceFacets={sourceFacets}
@@ -1934,6 +2019,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 onShare={gatedShareCollection}
                                 onDelete={gatedDeleteCollection}
                                 onManageCards={gatedManageCollection}
+                                onTogglePrivate={handleToggleCollectionPrivate}
                                 onCreate={openNewCollectionForm}
                                 onCreateSuggestion={handleCreateSuggestion}
                                 onDismissSuggestion={handleDismissSuggestion}
@@ -1960,12 +2046,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     <Archive className="w-8 h-8 text-white" />
                                 ) : filter === 'reminders' ? (
                                     <Bell className="w-8 h-8 text-white" />
+                                ) : filter === 'private' ? (
+                                    <Lock className="w-8 h-8 text-white" />
                                 ) : (
                                     <Inbox className="w-8 h-8 text-white" />
                                 )}
                             </div>
                             <h3 className="text-lg font-medium text-text mb-2">
                                 {searchQuery ? 'No results found' :
+                                    filter === 'private' ? 'No private cards yet' :
                                     filter === 'favorite' ? 'No favorites yet' :
                                         filter === 'archived' ? 'No archived links' :
                                             filter === 'unread' ? 'No unread links' :
@@ -1984,6 +2073,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 {searchQuery ? (isSearching ? 'No keyword matches yet — searching by meaning…'
                                     : searchError ? 'No keyword matches, and meaning search is unavailable right now.'
                                     : 'Try a different search term') :
+                                    filter === 'private' ? 'Use a card’s ⋯ menu → Make private to hide it here' :
                                     filter === 'favorite' ? 'Star links to add them to your favorites' :
                                         filter === 'archived' ? 'Archive links to see them here' :
                                             filter === 'unread' ? 'All caught up! No unread links' :
@@ -2082,6 +2172,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     onTagClick={handleToggleTag}
                                     onAddToCollection={handleAddToCollection}
                                     onShare={handleShareCard}
+                                    onTogglePrivate={handleToggleCardPrivate}
                                     cardCollections={cardCollectionsByLink.get(link.id)}
                                     activeCollectionId={activeCollectionId}
                                     onRemoveFromCollection={handleRemoveFromCollection}
@@ -2126,6 +2217,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             onShare={gatedShareCollection}
                             onDelete={gatedDeleteCollection}
                             onManageCards={gatedManageCollection}
+                            onTogglePrivate={handleToggleCollectionPrivate}
                             onCreate={openNewCollectionForm}
                             onCreateSuggestion={handleCreateSuggestion}
                             onDismissSuggestion={handleDismissSuggestion}
@@ -2262,6 +2354,22 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     onSuccess={() => {
                         const run = unlockPrompt;
                         setUnlockPrompt(null);
+                        run();
+                    }}
+                />
+            )}
+
+            {/* First-time PIN setup on "Make private" (card or collection);
+                runs the pending make-private action after the PIN is saved. */}
+            {pinSetupAction && uid && (
+                <PinLockModal
+                    uid={uid}
+                    mode="setup"
+                    isOpen
+                    onClose={() => setPinSetupAction(null)}
+                    onSuccess={() => {
+                        const run = pinSetupAction;
+                        setPinSetupAction(null);
                         run();
                     }}
                 />

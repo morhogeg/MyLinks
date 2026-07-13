@@ -4,7 +4,7 @@ import { getSourceInfo, buildSourceFacets, sourceMatchesQuery } from '@/lib/sour
 import { PLATFORM_LABELS, prettyHost, type PlatformKey } from '@/lib/platform';
 import { isPending, getTimestampNumber, tokenizeQuery, buildSearchHaystack, matchesAllTokens } from '@/lib/feedUtils';
 
-export type FilterType = 'all' | 'unread' | 'read' | 'archived' | 'favorite' | 'reminders';
+export type FilterType = 'all' | 'unread' | 'read' | 'archived' | 'favorite' | 'reminders' | 'private';
 export type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
 
 /**
@@ -28,7 +28,12 @@ export function useFeedFilters(links: Link[], debouncedQuery: string, searchResu
     // normal filtered feed and from every facet derivation below (so a still-empty
     // card never spawns a phantom "Processing" category/tag), then surfaced
     // separately, pinned at the top of the library, so a capture is always visible.
-    const contentLinks = useMemo(() => links.filter((l) => !isPending(l)), [links]);
+    // Private cards are excluded too (Photos-Hidden model): they exist ONLY under
+    // the 'private' show-filter, never in the main feed or its facets — even while
+    // the privacy vault is unlocked. (While the vault is LOCKED they don't reach
+    // this hook at all — Feed's visibleLinks strips them.)
+    const contentLinks = useMemo(() => links.filter((l) => !isPending(l) && !l.isPrivate), [links]);
+    const privateCards = useMemo(() => links.filter((l) => !isPending(l) && !!l.isPrivate), [links]);
 
     // Keyword-search tokens for the current query, prepped ONCE per query (not per
     // card): lowercased, punctuation-stripped, stopwords dropped. Every token must
@@ -38,9 +43,10 @@ export function useFeedFilters(links: Link[], debouncedQuery: string, searchResu
     // 4. Hybrid Search Logic — memoized so a banner tick or any unrelated state
     // change (search typing, overlay toggles) doesn't re-run the 6-stage filter +
     // sort. Recomputes only when an input it actually reads changes.
-    const filteredLinks = useMemo(() => contentLinks
+    const filteredLinks = useMemo(() => (filter === 'private' ? privateCards : contentLinks)
         .filter((link) => {
-            // Apply status filters
+            // Apply status filters ('private' already picked its base list above)
+            if (filter === 'private') return true;
             if (filter === 'reminders') return link.reminderStatus === 'pending';
             if (filter === 'unread') return !link.isRead;
             if (filter === 'read') return !!link.isRead;

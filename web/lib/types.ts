@@ -70,6 +70,11 @@ export interface Link {
   tags: string[];
   category: string;
   status: CaptureState;
+  // Private card (protected by the app-level privacy PIN — lib/privacyLock.ts).
+  // Modeled on Photos' Hidden album: lives ONLY under the "Private" show-filter
+  // (never in the main feed/search/facets, even while the vault is unlocked);
+  // entering that filter requires the PIN.
+  isPrivate?: boolean;
   createdAt: number | string; // Handle both Unix timestamp and ISO string
   // When the current processing attempt began (epoch ms). Stamped on the
   // placeholder card by the backend (share path) and createProcessingPlaceholder
