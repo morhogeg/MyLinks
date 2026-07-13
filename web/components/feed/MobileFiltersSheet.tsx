@@ -1,7 +1,10 @@
+'use client';
+
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { X, ArrowUpDown } from 'lucide-react';
 import Dropdown, { type DropdownOption } from '../Dropdown';
 import SourceFacetList from '../SourceFacetList';
+import { useSheetDrag } from '@/lib/useSheetDrag';
 import type { SourceFacet } from '@/lib/source';
 import type { FilterType, SortType } from '@/lib/useFeedFilters';
 
@@ -45,24 +48,32 @@ export default function MobileFiltersSheet({
     activeMobileFilters: number;
     setSelectedTags: Dispatch<SetStateAction<Set<string>>>;
 }) {
+    // Bottom sheet at every width it renders (mobile only), so drag is always on.
+    const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose });
     if (!isOpen) return null;
     return (
         <div className="sm:hidden fixed inset-0 z-50 flex flex-col justify-end isolate">
             <div
+                ref={scrimRef}
                 className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
                 onClick={onClose}
             />
-            <div className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
-                <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-text-muted/30" />
-                <div className="flex items-center justify-between mb-5">
-                    <h3 className="text-base font-bold text-text">Filters</h3>
-                    <button
-                        onClick={onClose}
-                        aria-label="Close filters"
-                        className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
+            <div
+                ref={sheetRef}
+                className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300"
+            >
+                <div {...handleProps}>
+                    <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-text-muted/30" />
+                    <div className="flex items-center justify-between mb-5">
+                        <h3 className="text-base font-bold text-text">Filters</h3>
+                        <button
+                            onClick={onClose}
+                            aria-label="Close filters"
+                            className="p-1.5 rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="space-y-5">
