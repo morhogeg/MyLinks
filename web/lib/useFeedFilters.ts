@@ -13,7 +13,13 @@ export type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
  * tags/collections/sources/sort selection; consumes the live links plus the
  * debounced query + semantic results to produce `filteredLinks` and every facet.
  */
-export function useFeedFilters(links: Link[], debouncedQuery: string, searchResults: Link[]) {
+export function useFeedFilters(
+    links: Link[],
+    debouncedQuery: string,
+    searchResults: Link[],
+    /** Ids of collections marked Private — their members INHERIT privacy (see below). */
+    privateCollectionIds: Set<string>,
+) {
     const [filter, setFilter] = useState<FilterType>('all');
     const [selectedCategory, setSelectedCategory] = useState<Set<string>>(new Set());
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
@@ -28,12 +34,35 @@ export function useFeedFilters(links: Link[], debouncedQuery: string, searchResu
     // normal filtered feed and from every facet derivation below (so a still-empty
     // card never spawns a phantom "Processing" category/tag), then surfaced
     // separately, pinned at the top of the library, so a capture is always visible.
-    // Private cards are excluded too (Photos-Hidden model): they exist ONLY under
-    // the 'private' show-filter, never in the main feed or its facets — even while
-    // the privacy vault is unlocked. (While the vault is LOCKED they don't reach
-    // this hook at all — Feed's visibleLinks strips them.)
-    const contentLinks = useMemo(() => links.filter((l) => !isPending(l) && !l.isPrivate), [links]);
-    const privateCards = useMemo(() => links.filter((l) => !isPending(l) && !!l.isPrivate), [links]);
+    //
+    // Privacy (Photos-Hidden model): a card is EFFECTIVELY private when it carries
+    // its own isPrivate flag OR belongs to a private collection — membership is
+    // inherited live, never stamped onto member docs, so cards added later hide
+    // automatically and removing one (or un-privating the collection) restores it
+    // with no sweep. Effectively-private cards exist only under the 'private'
+    // show-filter and inside their own explicitly opened (PIN-gated) private
+    // collection — never in the main feed or its facets, even while the vault is
+    // unlocked. (While the vault is LOCKED they don't reach this hook at all —
+    // Feed's visibleLinks strips them.)
+    const isEffectivelyPrivate = useCallback(
+        (l: Link) => !!l.isPrivate || (l.collectionIds ?? []).some((id) => privateCollectionIds.has(id)),
+        [privateCollectionIds]
+    );
+    const contentLinks = useMemo(() => links.filter((l) => {
+        if (isPending(l)) return false;
+        if (!isEffectivelyPrivate(l)) return true;
+        // The one place an effectively-private card surfaces outside the Private
+        // filter: the feed scoped to a private collection the user opened
+        // through the PIN gate (selectedCollections only ever holds an opened
+        // collection). Membership in a selected NON-private collection doesn't
+        // count — privacy inherited from one collection follows the card into
+        // its other collections.
+        return (l.collectionIds ?? []).some((id) => selectedCollections.has(id) && privateCollectionIds.has(id));
+    }), [links, isEffectivelyPrivate, selectedCollections, privateCollectionIds]);
+    const privateCards = useMemo(
+        () => links.filter((l) => !isPending(l) && isEffectivelyPrivate(l)),
+        [links, isEffectivelyPrivate]
+    );
 
     // Keyword-search tokens for the current query, prepped ONCE per query (not per
     // card): lowercased, punctuation-stripped, stopwords dropped. Every token must
