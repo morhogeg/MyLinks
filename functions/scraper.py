@@ -674,14 +674,42 @@ def _valid_ig_handle(candidate: Optional[str]) -> Optional[str]:
     return h
 
 
-def _extract_instagram_handle(url: str, *texts: str) -> Optional[str]:
+# Month names for the modern IG byline ("- handle on July 12, 2026: …"), which
+# carries a date instead of the literal word "Instagram".
+_IG_MONTHS = (
+    "January|February|March|April|May|June|July|August|September|October|"
+    "November|December"
+)
+
+
+def _url_segment_handle(url: str) -> Optional[str]:
+    """A handle from a URL's first path segment, but only when that segment is a
+    profile (not a short-code route like /p/, /reel/, /tv/, /stories/)."""
+    try:
+        segs = [s for s in (urlparse(url).path or "").split("/") if s]
+    except Exception:
+        return None
+    if segs and segs[0].lower() not in _IG_RESERVED_SEGMENTS:
+        return _valid_ig_handle(segs[0])
+    return None
+
+
+def _extract_instagram_handle(
+    url: str, *texts: str, html: Optional[str] = None, og_url: Optional[str] = None
+) -> Optional[str]:
     """Best-effort extraction of the Instagram author's @handle.
 
-    Order (first hit wins): (1) an explicit ``(@handle)`` in the
-    og:title/description, (2) a ``<handle> on Instagram`` byline — a single
-    username token anchored to the start or a separator so a multi-word display
-    name never yields a stray word, (3) the URL's first path segment when it's a
-    profile — never for short-code routes like /p/, /reel/, /tv/, /stories/.
+    Priority (first hit wins):
+      1. an explicit ``(@handle)`` in the og:title/description;
+      2. a ``<handle> on Instagram`` / ``<handle> on <Month> <day>, <year>``
+         byline — a single username token anchored to the start or a separator so
+         a multi-word display name never yields a stray word (reels increasingly
+         use the date form instead of the literal "Instagram");
+      3. an embedded ``"username": "…"`` in the raw page JSON;
+      4. an embedded ``"owner": { … "username": "…" }`` in the raw page JSON;
+      5. a profile-scoped ``og:url`` / canonical path (og:url sometimes carries
+         ``instagram.com/<handle>/reel/…`` even when the visited URL does not);
+      6. the visited URL's first path segment when it's a profile.
 
     Returns the bare handle (no @) or None.
     """
@@ -693,29 +721,59 @@ def _extract_instagram_handle(url: str, *texts: str) -> Optional[str]:
         h = _valid_ig_handle(m.group(1)) if m else None
         if h:
             return h
-        # 2. "cristiano on Instagram: …" / "… - cristiano on Instagram"
-        m = re.search(r"(?:^|[-–—|:•·])\s*@?([A-Za-z0-9._]{1,30})\s+on\s+Instagram\b",
-                      text, flags=re.I)
+        # 2. "cristiano on Instagram: …" / "… - cristiano on July 12, 2026: …"
+        #    Single token anchored to a separator; the tail is the literal word
+        #    "Instagram" or a month name (a real date), never an arbitrary word,
+        #    so a multi-word display name still can't leak a stray token.
+        m = re.search(
+            r"(?:^|[-–—|:•·])\s*@?([A-Za-z0-9._]{1,30})\s+on\s+"
+            r"(?:Instagram\b|(?:" + _IG_MONTHS + r")\b)",
+            text,
+            flags=re.I,
+        )
         h = _valid_ig_handle(m.group(1)) if m else None
         if h:
             return h
 
-    # 3. URL first path segment (profile-scoped URLs only).
-    try:
-        segs = [s for s in (urlparse(url).path or "").split("/") if s]
-    except Exception:
-        segs = []
-    if segs and segs[0].lower() not in _IG_RESERVED_SEGMENTS:
-        return _valid_ig_handle(segs[0])
-    return None
+    if html:
+        # 3. Embedded JSON: "username": "veryshortphilosophy"
+        m = re.search(r'"username"\s*:\s*"([A-Za-z0-9._]{1,30})"', html)
+        h = _valid_ig_handle(m.group(1)) if m else None
+        if h:
+            return h
+        # 4. Embedded JSON: "owner": { … "username": "…" }
+        m = re.search(
+            r'"owner"\s*:\s*\{[^}]*?"username"\s*:\s*"([A-Za-z0-9._]{1,30})"', html
+        )
+        h = _valid_ig_handle(m.group(1)) if m else None
+        if h:
+            return h
+
+    # 5. Profile-scoped og:url / canonical path (reuse the URL-segment logic).
+    if og_url:
+        h = _url_segment_handle(og_url)
+        if h:
+            return h
+
+    # 6. Visited URL first path segment (profile-scoped URLs only).
+    return _url_segment_handle(url)
 
 
-def _instagram_source_name(url: str, *texts: str) -> Optional[str]:
+def _instagram_source_name(
+    url: str, *texts: str, html: Optional[str] = None, og_url: Optional[str] = None
+) -> Optional[str]:
     """The card ``source_name`` for an Instagram card: ``@handle`` when an author
     handle can be extracted, else None (so the AI's sourceName / plain
-    "Instagram" label is used as the fallback)."""
-    handle = _extract_instagram_handle(url, *texts)
-    return f"@{handle}" if handle else None
+    "Instagram" label is used as the fallback).
+
+    Crash-proof: any failure inside handle extraction degrades to None rather
+    than breaking the enclosing IG save."""
+    try:
+        handle = _extract_instagram_handle(url, *texts, html=html, og_url=og_url)
+        return f"@{handle}" if handle else None
+    except Exception as e:  # pragma: no cover - defensive; runs on every IG save
+        logger.warning(f"Instagram handle extraction failed: {e}")
+        return None
 
 
 def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
@@ -728,6 +786,8 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
     metadata_lines = []
     best_title = "Instagram Post"
     best_desc = ""
+    raw_html = ""   # kept for embedded-author signals (JSON "username"/"owner")
+    og_url = ""     # og:url/canonical often carries a profile-scoped path
     generic_titles = ["Instagram Post", "Instagram", "Open in App", "Login • Instagram", "Instagram Video", "Instagram Reel"]
 
     MOBILE_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
@@ -743,7 +803,12 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
         response = safe_get(url, headers=headers, timeout=10)
         if response.ok:
             from bs4 import BeautifulSoup
+            raw_html = response.text or ""
             soup = BeautifulSoup(response.text, 'html.parser')
+
+            og_tag = soup.find('meta', property='og:url') or soup.find('meta', attrs={'name': 'og:url'})
+            if og_tag and og_tag.get('content'):
+                og_url = og_tag['content']
 
             meta_sources = {
                 'title': ['og:title', 'twitter:title', 'title'],
@@ -827,7 +892,7 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
 
     if not metadata_lines and not best_desc:
         return {"html": "", "title": "Instagram Link", "text": "Instagram content (metadata extraction failed)",
-                "source_name": _instagram_source_name(url, best_title)}
+                "source_name": _instagram_source_name(url, best_title, best_desc, html=raw_html, og_url=og_url)}
 
     # Final Title fallback
     if best_title in generic_titles and best_desc:
@@ -846,7 +911,7 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
         "html": final_text,
         "title": best_title,
         "text": final_text,
-        "source_name": _instagram_source_name(url, best_title, best_desc),
+        "source_name": _instagram_source_name(url, best_title, best_desc, html=raw_html, og_url=og_url),
     }
 
 

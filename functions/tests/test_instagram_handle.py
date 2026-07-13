@@ -110,6 +110,60 @@ def test_source_name_prefixes_at_sign_or_none():
     assert scraper._instagram_source_name("https://instagram.com/p/ABC/") is None
 
 
+# ── _extract_instagram_handle: reel-shaped signals ──────────────────────────
+
+def test_extract_date_style_byline():
+    # Modern reel byline carries a date, not the literal word "Instagram".
+    desc = '2,600 likes, 141 comments - veryshortphilosophy on July 12, 2026: "2600 Years of Philosophy in Two Minutes"'
+    assert scraper._extract_instagram_handle("https://instagram.com/reel/ABC/", desc) == "veryshortphilosophy"
+
+
+def test_date_style_byline_ignores_multiword_display_name():
+    # "… - Very Short Philosophy on July 12, 2026" must NOT yield "Philosophy":
+    # the token is not anchored to a separator.
+    desc = "2,600 likes, 141 comments from Very Short Philosophy on July 12, 2026"
+    assert scraper._extract_instagram_handle("https://instagram.com/reel/ABC/", desc) is None
+
+
+def test_extract_from_embedded_json_username():
+    html = '<html><body><script>{"foo":1,"username":"veryshortphilosophy","bar":2}</script></body></html>'
+    assert scraper._extract_instagram_handle("https://instagram.com/reel/ABC/", html=html) == "veryshortphilosophy"
+
+
+def test_extract_from_embedded_json_owner():
+    # A stray "username" for the viewer precedes the owner block; the direct
+    # "username" key wins first here, but the owner pattern must also resolve.
+    html = '<script>{"owner":{"id":"42","username":"natgeo"},"caption":"x"}</script>'
+    assert scraper._extract_instagram_handle("https://instagram.com/reel/ABC/", html=html) == "natgeo"
+
+
+def test_extract_from_og_url_profile_path():
+    # og:url carries the profile-scoped path even though the reel URL doesn't.
+    assert scraper._extract_instagram_handle(
+        "https://instagram.com/reel/ABC/",
+        og_url="https://www.instagram.com/veryshortphilosophy/reel/ABC/",
+    ) == "veryshortphilosophy"
+
+
+def test_og_url_shortcode_path_is_not_a_handle():
+    assert scraper._extract_instagram_handle(
+        "https://instagram.com/reel/ABC/",
+        og_url="https://www.instagram.com/reel/ABC/",
+    ) is None
+
+
+def test_reel_with_no_author_signal_returns_none():
+    # Title only, no handle anywhere, short-code URL → no bogus handle.
+    title = "2600 Years of Philosophy in Two Minutes"
+    assert scraper._extract_instagram_handle("https://instagram.com/reel/ABC/", title) is None
+    assert scraper._instagram_source_name("https://instagram.com/reel/ABC/", title) is None
+
+
+def test_source_name_never_raises():
+    # Extraction is wrapped: even a non-string text degrades to None.
+    assert scraper._instagram_source_name("https://instagram.com/reel/ABC/", 12345) is None
+
+
 # ── scrape_url integration (needs bs4) ───────────────────────────────────────
 
 def test_scrape_url_sets_instagram_source_name(monkeypatch):
@@ -123,3 +177,21 @@ def test_scrape_url_sets_instagram_source_name(monkeypatch):
     monkeypatch.setattr(scraper, "safe_get", lambda *a, **k: _FakeResponse(text=html))
     result = scraper.scrape_url("https://www.instagram.com/p/ABC123/")
     assert result["source_name"] == "@cristiano"
+
+
+def test_scrape_reel_source_name_from_description_byline(monkeypatch):
+    # Reel: og:title is just the caption (no handle); the author only appears in
+    # the og:description byline. The scrape result must still tag the @handle,
+    # proving the description is passed to source-name extraction.
+    pytest.importorskip("bs4")
+    desc = ('2,600 likes, 141 comments - veryshortphilosophy on July 12, 2026: '
+            '"2600 Years of Philosophy in Two Minutes. ' + ("More text. " * 8) + '"')
+    html = (
+        "<html><head>"
+        "<meta property='og:title' content='2600 Years of Philosophy in Two Minutes'>"
+        "<meta property='og:description' content='" + desc + "'>"
+        "</head><body></body></html>"
+    )
+    monkeypatch.setattr(scraper, "safe_get", lambda *a, **k: _FakeResponse(text=html))
+    result = scraper.scrape_url("https://www.instagram.com/reel/ABC123/")
+    assert result["source_name"] == "@veryshortphilosophy"

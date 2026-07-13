@@ -617,7 +617,26 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — Polish round 3: meaning search + header refinement.**
+- **2026-07-13 (latest) — Polish round 4: owner feedback on build 1077.**
+  (1) **Header restructured (owner-directed):** mobile Row 1 = compact 30px
+  TOOLS (icon-only Categories&Tags chip with count badge, Filters, Search,
+  shrunk view switcher, multi-select; selection toolbar/search field swap in
+  for the whole row), Row 2 = labeled DESTINATIONS (Collections · Digest ·
+  Ask); the constant purple Ask fill REMOVED (owner disliked it); desktop
+  unchanged; width arithmetic in commit `7d101a7`. (2) **Instagram handle
+  extraction hardened for reels** — the actual miss: IG reel descriptions use
+  date-style bylines ("- username on July 12, 2026:") and the old regex only
+  matched "username on Instagram"; also added embedded-JSON `"username"`/
+  `"owner"` and og:url profile-path signals, all crash-proof (try/except →
+  None); tests 174→183. STILL requires the owner functions deploy to go live.
+  (3) **Multi-word keyword search fixed client-side** — "A collection of
+  articles" now tokenizes (stopwords dropped, plural-aware, Hebrew tokens
+  always kept, AND semantics over title/summary/tags/concepts/notes haystack)
+  in `feedUtils.ts`/`useFeedFilters.ts`; works pre-deploy, independent of the
+  semantic half. Owner deploy steps UNCHANGED from round 3 (functions incl.
+  `search_links_http`, `./deploy-hosting.sh` for `/api/search`,
+  `backfill_embeddings` once).
+- **2026-07-13 — Polish round 3: meaning search + header refinement.**
   (1) **Home search finds by MEANING on device now** — root cause: semantic
   search ran only through the `search_links` **callable**, which fails the
   `capacitor://localhost` CORS preflight (the documented claim_workspace bug
