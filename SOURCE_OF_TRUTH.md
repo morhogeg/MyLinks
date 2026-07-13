@@ -617,7 +617,12 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — Polish round 6 (build 1079 feedback): symmetric
+- **2026-07-13 (latest) — Polish round 7: tools-row finish pass (designer
+  review).** Filters chip is now a square icon chip matching Categories/Search
+  (redundant sort icon dropped — same sheet), active count moved to the same
+  overlay badge language as Categories (no more inline-number reflow), and the
+  selection toolbar matches the 30px row height it swaps into (no 6px hop).
+- **2026-07-13 — Polish round 6 (build 1079 feedback): symmetric
   destinations.** The centered-chip approach still LOOKED lopsided (unequal
   Collections/Digest widths → uneven whitespace around Ask). Row 2 is now
   three EQUAL-width segments filling the row (same size, same gaps, Ask truly
