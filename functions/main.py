@@ -238,6 +238,12 @@ _RATE_LIMITS = {
     "article": (120, 3600),
     "share": (120, 3600),
     "device_token": (30, 3600),
+    # Home search bar (native HTTP twin). Debounced client-side, but a user can
+    # still fire many queries in a session, so keep the ceilings generous. Mirror
+    # the IP + uid double-bucket the paid endpoints use (an embedding call per
+    # query has a small cost).
+    "search": (120, 3600),
+    "search-uid": (120, 3600),
 }
 
 # Input caps for client-supplied fields that flow into the Gemini prompt, so a
@@ -1176,6 +1182,74 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
 
     except Exception as e:
         return _server_error(headers, e)
+
+
+@https_fn.on_request()
+def search_links_http(req: https_fn.Request) -> https_fn.Response:
+    """HTTP twin of the `search_links` callable, for the native iOS shell.
+
+    The Firebase callable transport issues a CORS preflight that the managed
+    callable endpoint rejects from `capacitor://localhost`, so
+    httpsCallable('search_links') silently fails inside the WKWebView — the exact
+    failure that moved claim_workspace / ask_brain off the callable/Hosting paths.
+    On the iPhone that meant the home search bar's semantic half never ran and it
+    degraded to keyword-only. This endpoint sets CORS from the same
+    `_allowed_origins()` allowlist (which includes `capacitor://localhost`),
+    verifies the caller exactly like the other /api/* twins (bearer ID token,
+    flag-aware fallback to the client-supplied uid pre-cutover via `_authed_uid`),
+    enforces App Check + rate limits like its peers, and runs the identical
+    `perform_search_logic` so results match the web callable exactly. Web keeps
+    the callable.
+
+    Body: { query: str, limit?: int, uid?: str }. Returns { links: [...] }.
+    """
+    if req.method == 'OPTIONS':
+        return _cors_preflight(req)
+
+    headers = _cors_headers(req)
+
+    rl = _rate_limited("search", client_ip(req), headers)
+    if rl:
+        return rl
+
+    if not _require_app_check(req, headers):
+        return _error_response("App Check verification failed", 401, headers)
+
+    try:
+        data = req.get_json(silent=True) or {}
+
+        # Identity: prefer the verified ID token; falls back to the body uid only
+        # while REQUIRE_AUTH is off (see _authed_uid) — same as the peer twins.
+        uid, auth_err = _authed_uid(req, headers, data.get('uid'))
+        if auth_err:
+            return auth_err
+
+        # Second rate-limit bucket, keyed per workspace uid (the IP bucket above
+        # can't stop a single account rotating IPs). Only when a uid resolves.
+        if uid:
+            rl = _rate_limited("search-uid", uid, headers)
+            if rl:
+                return rl
+
+        query_text = (data.get('query') or '').strip()
+        if not query_text:
+            return _error_response("query is required", 400, headers)
+        if len(query_text) > MAX_QUESTION_LENGTH:
+            return _error_response("query is too long", 400, headers)
+
+        try:
+            limit = int(data.get('limit', 10))
+        except (TypeError, ValueError):
+            limit = 10
+        limit = max(1, min(limit, 50))
+
+        links = perform_search_logic(uid, query_text, limit)
+        return https_fn.Response(
+            json.dumps({"links": links}),
+            status=200, headers=headers, mimetype='application/json',
+        )
+    except Exception as e:
+        return _server_error(headers, e, "Search failed")
 
 
 @https_fn.on_request()

@@ -80,7 +80,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const { links, isLoading, handlePullRefresh } = useLinks(uid, toast);
     const [searchQuery, setSearchQuery] = useState('');
     // Debounced, generation-guarded semantic search (R-3: useSemanticSearch).
-    const { debouncedQuery, isSearching, searchResults } = useSemanticSearch(searchQuery);
+    const { debouncedQuery, isSearching, searchResults, searchError } = useSemanticSearch(searchQuery, uid);
     // Selection state + filter/sort pipeline + facet counts (R-3: useFeedFilters).
     const {
         filter, setFilter,
@@ -1032,6 +1032,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                         <input
                             type="text"
+                            dir="auto"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Search Machina…"
@@ -1153,6 +1154,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 <input
                                     type="text"
                                     autoFocus
+                                    dir="auto"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     onKeyDown={(e) => { if (e.key === 'Escape') setMobileSearchOpen(false); }}
@@ -1737,6 +1739,24 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             )}
                         </div>
                     )}
+                    {/* Meaning-search status. Keyword matches render immediately
+                        (the hybrid filter runs client-side), so while the semantic
+                        half is still in flight — or if it failed — show a subtle
+                        line above the grid instead of blocking the results. The
+                        empty state owns the no-results case (spinner there). */}
+                    {(viewMode === 'grid' || viewMode === 'list') && debouncedQuery.trim()
+                        && filteredLinks.length > 0 && (isSearching || searchError) && (
+                        <div className="flex items-center gap-2 mb-4 text-xs" aria-live="polite">
+                            {isSearching ? (
+                                <>
+                                    <div className="w-3.5 h-3.5 border-2 border-accent/20 border-t-accent rounded-full animate-spin shrink-0" />
+                                    <span className="text-text-muted font-medium">Searching by meaning…</span>
+                                </>
+                            ) : (
+                                <span className="text-text-muted">Showing keyword matches — meaning search is unavailable right now.</span>
+                            )}
+                        </div>
+                    )}
                     {viewMode === 'collection' ? (
                         // Desktop/tablet: the collection detail place, inline beneath
                         // its subheader. Mobile renders the full-screen overlay below.
@@ -1810,11 +1830,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             {debouncedQuery && isSearching && (
                                 <div className="flex items-center justify-center gap-2 text-accent mt-2">
                                     <div className="w-4 h-4 border-2 border-accent/20 border-t-accent rounded-full animate-spin" />
-                                    <span className="text-sm font-medium">Searching meanings...</span>
+                                    <span className="text-sm font-medium">Searching by meaning…</span>
                                 </div>
                             )}
                             <p className="text-text-secondary text-sm">
-                                {searchQuery ? (isSearching ? 'Thinking...' : 'Try a different search term') :
+                                {searchQuery ? (isSearching ? 'No keyword matches yet — searching by meaning…'
+                                    : searchError ? 'No keyword matches, and meaning search is unavailable right now.'
+                                    : 'Try a different search term') :
                                     filter === 'favorite' ? 'Star links to add them to your favorites' :
                                         filter === 'archived' ? 'Archive links to see them here' :
                                             filter === 'unread' ? 'All caught up! No unread links' :
