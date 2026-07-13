@@ -617,7 +617,30 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — Polish round 8c: dedicated sort.** Sort gets its own
+- **2026-07-13 (latest) — Private collections (PIN vault), branch
+  `claude/private-collection-connections-akvphm`.** Any collection can be
+  marked **Private** in the create/edit sheet, protected by ONE app-level
+  4-digit PIN (the iOS-Notes model, not a PIN per collection). PIN is
+  PBKDF2-SHA256-hashed (per-user salt, 100k rounds) into a top-level
+  `privacyLock` field on the user doc (`web/lib/privacyLock.ts` — module store
+  + `usePrivacyLock`, auto-relock on app background via visibilitychange); pad
+  UI in `PinLockModal.tsx` (setup/unlock/change/disable flows, hidden numeric
+  input so iOS shows the number pad). While locked: member cards are filtered
+  out of the library/search/related/Ask-context/suggestions/due-reminders via
+  `visibleLinks` in Feed, gallery tiles are masked (color-only cover, lock
+  glyph, "Locked", no description/count), and every action (open/edit/share/
+  delete/manage) gates through the PIN; unlock is session-wide until the app
+  backgrounds, and an open private collection/card bounces closed on relock.
+  Private collections can't be shared (menu entry hidden; going private
+  auto-unpublishes an existing public page). Settings gains a "Private
+  collections" section (Change PIN / Turn off PIN) once a PIN exists; first
+  setup happens inline when a collection is first toggled Private. KNOWN
+  LIMITS (a client-side privacy screen, not encryption): server-side Ask/RAG +
+  semantic search still index private cards (an answer can cite one — the card
+  just won't open while locked); Face ID is stubbed (`tryBiometricUnlock`)
+  pending a Capacitor biometric plugin + native build. `npx tsc --noEmit`
+  clean; needs on-device QA (PIN pad keyboard, relock on background).
+- **2026-07-13 — Polish round 8c: dedicated sort.** Sort gets its own
   40px chip beside the funnel (accent while non-default) opening a designated
   bottom sheet (`feed/MobileSortSheet.tsx`, drag-dismiss); the filter drawer's
   buried Sort dropdown removed so sort lives in one place. Ships as run

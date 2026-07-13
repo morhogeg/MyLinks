@@ -154,6 +154,10 @@ export interface Collection {
   updatedAt: number;
   shareId?: string;      // set when published; key into shared_collections/{shareId}
   isPublic?: boolean;
+  // Private collections (protected by the app-level privacy PIN — lib/privacyLock.ts).
+  // While the vault is locked, member cards are hidden from the library, search,
+  // related cards, and suggestions, and opening the collection requires the PIN.
+  isPrivate?: boolean;
   publishedAt?: number;  // when the public snapshot was last written
   // Signature of (name, description, member ids) at publish time — comparing it
   // against the live signature tells the UI the public page is out of date.

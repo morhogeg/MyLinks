@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Collection, Link } from '@/lib/types';
-import { MoreHorizontal, Pencil, Share2, Trash2, Globe, LayoutGrid, Sparkles, Plus, X, Layers } from 'lucide-react';
+import { MoreHorizontal, Pencil, Share2, Trash2, Globe, LayoutGrid, Sparkles, Plus, X, Layers, Lock } from 'lucide-react';
 import { getColorStyleByKey } from '@/lib/colors';
 import { isShareStale } from '@/lib/collections';
 import { CollectionSuggestion } from '@/lib/collectionSuggest';
@@ -13,6 +13,10 @@ interface CollectionsGalleryProps {
     links: Link[];
     /** Auto-detected topic clusters the user can turn into collections in one tap. */
     suggestions?: CollectionSuggestion[];
+    /** Private collections whose vault is currently locked — tiles are masked
+     *  (no covers, description, or count) and the parent gates every action
+     *  behind the PIN. Omit/empty when the vault is unlocked. */
+    lockedIds?: Set<string>;
     onOpen: (collectionId: string) => void;
     onEdit: (collection: Collection) => void;
     onShare: (collection: Collection) => void;
@@ -37,6 +41,7 @@ export default function CollectionsGallery({
     collections,
     links,
     suggestions = [],
+    lockedIds,
     onOpen,
     onEdit,
     onShare,
@@ -85,11 +90,13 @@ export default function CollectionsGallery({
             {sorted.map((c) => {
                 const style = getColorStyleByKey(c.color || c.name);
                 const count = meta.counts[c.id] || 0;
+                const locked = lockedIds?.has(c.id) ?? false;
                 // Explicit cover first, then mosaic fill from member thumbnails.
+                // Locked tiles show nothing of their contents — just the color.
                 const explicitCover = c.coverLinkId
                     ? links.find((l) => l.id === c.coverLinkId)?.metadata?.thumbnailUrl
                     : undefined;
-                const thumbs = explicitCover
+                const thumbs = locked ? [] : explicitCover
                     ? [explicitCover, ...(meta.covers[c.id] ?? []).filter((t) => t !== explicitCover)].slice(0, 4)
                     : meta.covers[c.id] ?? [];
                 const stale = isShareStale(c, meta.members[c.id] ?? []);
@@ -102,6 +109,11 @@ export default function CollectionsGallery({
                     >
                         {/* Cover — a mosaic of member thumbnails over the collection color. */}
                         <div className="relative h-24 w-full overflow-hidden rounded-t-2xl" style={{ backgroundColor: style.backgroundColor }}>
+                            {locked && (
+                                <span className="absolute inset-0 flex items-center justify-center">
+                                    <Lock className="w-7 h-7 text-white/80" />
+                                </span>
+                            )}
                             {thumbs.length > 0 && (
                                 <div className={`absolute inset-0 grid gap-px ${thumbs.length >= 4 ? 'grid-cols-2 grid-rows-2' : thumbs.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                                     {thumbs.map((t, i) => (
@@ -110,8 +122,15 @@ export default function CollectionsGallery({
                                 </div>
                             )}
                             <div className="absolute inset-0 bg-gradient-to-t from-card/90 to-transparent" />
+                            {/* Private badge — always shown on private collections so the
+                                lock state is visible even when the vault is open. */}
+                            {c.isPrivate && (
+                                <span className="absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full backdrop-blur-sm bg-black/55 text-[9px] font-bold uppercase tracking-wide text-white">
+                                    <Lock className="w-2.5 h-2.5" /> Private
+                                </span>
+                            )}
                             {/* Public badge — amber when the page is behind the live collection. */}
-                            {c.isPublic && (
+                            {c.isPublic && !c.isPrivate && (
                                 <span className={`absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full backdrop-blur-sm text-[9px] font-bold uppercase tracking-wide text-white ${stale ? 'bg-amber-600/80' : 'bg-black/55'}`}>
                                     <Globe className="w-2.5 h-2.5" /> {stale ? 'Update link' : 'Shared'}
                                 </span>
@@ -140,11 +159,11 @@ export default function CollectionsGallery({
                                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: style.color }} />
                                 <h3 className="flex-1 font-bold text-text text-[15px] leading-tight truncate" title={c.name}>{c.name}</h3>
                             </div>
-                            {c.description && (
+                            {c.description && !locked && (
                                 <p className="mt-1 text-xs text-text-muted line-clamp-2">{c.description}</p>
                             )}
                             <p className="mt-2 text-[11px] font-semibold text-text-muted/70">
-                                {count} {count === 1 ? 'card' : 'cards'}
+                                {locked ? 'Locked' : `${count} ${count === 1 ? 'card' : 'cards'}`}
                             </p>
                         </div>
                     </div>
@@ -224,6 +243,7 @@ export default function CollectionsGallery({
                 <CollectionMenu
                     anchor={menu.rect}
                     isPublic={menu.collection.isPublic}
+                    isPrivate={menu.collection.isPrivate}
                     onClose={() => setMenu(null)}
                     onManageCards={() => { onManageCards(menu.collection); setMenu(null); }}
                     onShare={() => { onShare(menu.collection); setMenu(null); }}
@@ -238,10 +258,11 @@ export default function CollectionsGallery({
 /** A portal dropdown anchored to a trigger's screen rect. Rendered at the document
  *  root with fixed positioning so no ancestor `overflow`/stacking can clip it. */
 function CollectionMenu({
-    anchor, isPublic, onClose, onManageCards, onShare, onEdit, onDelete,
+    anchor, isPublic, isPrivate, onClose, onManageCards, onShare, onEdit, onDelete,
 }: {
     anchor: DOMRect;
     isPublic?: boolean;
+    isPrivate?: boolean;
     onClose: () => void;
     onManageCards: () => void;
     onShare: () => void;
@@ -285,7 +306,10 @@ function CollectionMenu({
                 onClick={(e) => e.stopPropagation()}
             >
                 <MenuRow icon={<LayoutGrid className="w-4 h-4" />} label="Manage cards" onClick={onManageCards} />
-                <MenuRow icon={<Share2 className="w-4 h-4" />} label={isPublic ? 'Share / manage' : 'Share'} onClick={onShare} />
+                {/* A private collection can't have a public page — no Share entry. */}
+                {!isPrivate && (
+                    <MenuRow icon={<Share2 className="w-4 h-4" />} label={isPublic ? 'Share / manage' : 'Share'} onClick={onShare} />
+                )}
                 <MenuRow icon={<Pencil className="w-4 h-4" />} label="Edit" onClick={onEdit} />
                 <MenuRow icon={<Trash2 className="w-4 h-4" />} label="Delete" danger onClick={onDelete} />
             </div>

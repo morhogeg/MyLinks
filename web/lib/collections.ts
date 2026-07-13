@@ -57,7 +57,7 @@ function clean<T extends Record<string, unknown>>(obj: T): Record<string, unknow
 /** Create a new collection; returns the new doc id. */
 export async function createCollection(
     uid: string,
-    data: { name: string; description?: string; color?: string; coverLinkId?: string }
+    data: { name: string; description?: string; color?: string; coverLinkId?: string; isPrivate?: boolean }
 ): Promise<string> {
     const now = Date.now();
     const ref = await addDoc(collectionsRef(uid), clean({
@@ -65,17 +65,18 @@ export async function createCollection(
         description: data.description?.trim() || undefined,
         color: data.color,
         coverLinkId: data.coverLinkId,
+        isPrivate: data.isPrivate || undefined,
         createdAt: now,
         updatedAt: now,
     }));
     return ref.id;
 }
 
-/** Update a collection's metadata (name/description/color/cover). */
+/** Update a collection's metadata (name/description/color/cover/privacy). */
 export async function updateCollection(
     uid: string,
     id: string,
-    patch: Partial<Pick<Collection, 'name' | 'description' | 'color' | 'coverLinkId'>>
+    patch: Partial<Pick<Collection, 'name' | 'description' | 'color' | 'coverLinkId' | 'isPrivate'>>
 ): Promise<void> {
     const ref = doc(db, 'users', uid, 'collections', id);
     await updateDoc(ref, clean({ ...patch, updatedAt: Date.now() }));

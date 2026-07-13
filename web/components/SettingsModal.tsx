@@ -20,6 +20,8 @@ import {
     ResurfacingView, StyleView, ScheduleView, PickerView,
 } from './settings/DigestSettings';
 import { useScrollLock } from '@/lib/useScrollLock';
+import { usePrivacyLock } from '@/lib/privacyLock';
+import PinLockModal from './PinLockModal';
 
 interface SettingsModalProps {
     uid: string;
@@ -112,6 +114,11 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
 
     // AI-consent timestamp for the "Privacy & AI" section.
     const [aiConsentAt, setAiConsentAt] = useState<number | null>(null);
+
+    // Private-collections PIN management (change / turn off). The PIN is first
+    // created from the collection edit sheet; here it can only be maintained.
+    const { hasPin } = usePrivacyLock(uid);
+    const [pinModal, setPinModal] = useState<null | 'change' | 'disable'>(null);
     useEffect(() => {
         if (isOpen) setAiConsentAt(readLocalAiConsent());
     }, [isOpen]);
@@ -277,6 +284,9 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                                 togglePush={togglePush}
                                 pushNote={pushNote}
                                 aiConsentAt={aiConsentAt}
+                                privacyLockOn={hasPin}
+                                onChangePin={() => setPinModal('change')}
+                                onDisablePin={() => setPinModal('disable')}
                                 rebuilding={rebuilding}
                                 rebuildLabel={rebuildLabel}
                                 handleRebuild={handleRebuild}
@@ -389,6 +399,16 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                 cancelLabel="Cancel"
                 variant="danger"
             />
+
+            {/* Change / turn off the private-collections PIN (verifies first). */}
+            {pinModal && (
+                <PinLockModal
+                    uid={uid}
+                    mode={pinModal}
+                    isOpen
+                    onClose={() => setPinModal(null)}
+                />
+            )}
         </div>
     );
 }
