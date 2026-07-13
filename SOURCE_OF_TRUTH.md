@@ -641,10 +641,12 @@ exact-match, capped.
   pending a Capacitor biometric plugin + native build. `npx tsc --noEmit`
   clean; needs on-device QA (PIN pad keyboard, relock on background).
   **SHIPPED:** merged to `main` (merge `74b7b2e`, feature commit `824ff8a`) →
-  Vercel desktop live. **OWNER STEP — TestFlight:** the cloud session's GitHub
-  App can't dispatch workflows (403 on workflow_dispatch), so run Actions →
-  "iOS → TestFlight" → Run workflow on `main` by hand (same `require_auth`
-  choice as the last build) to put the PIN vault on device.
+  Vercel desktop live. **iOS: TestFlight run #86 → build 1086**, fired via the
+  temp-push-trigger pattern (API dispatch still 403 from cloud sessions; temp
+  branch `claude/ship-tf-trigger-pinvault`, trigger commit `924f45f`). Owner
+  cleanup: delete that branch after the run is green, plus the older stale
+  `claude/ship-tf-trigger-*` branches (remote deletes are no-ops from cloud
+  sessions).
 - **2026-07-13 — Polish round 8c: dedicated sort.** Sort gets its own
   40px chip beside the funnel (accent while non-default) opening a designated
   bottom sheet (`feed/MobileSortSheet.tsx`, drag-dismiss); the filter drawer's
