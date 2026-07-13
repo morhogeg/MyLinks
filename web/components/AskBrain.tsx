@@ -971,12 +971,15 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                             <div className="flex flex-wrap gap-2 ps-1 animate-fade-in">
                                 {followUps.map(f => (
                                     <button
-                                        key={f}
+                                        key={f.label}
                                         dir="auto"
-                                        onClick={() => { trackAskFollowupUsed(); send(f, undefined, 'followup'); }}
+                                        // The chip shows the short label; what's SENT is the
+                                        // self-contained question carrying the cited card's
+                                        // title, so backend retrieval can actually find it.
+                                        onClick={() => { trackAskFollowupUsed(); send(f.question, undefined, 'followup'); }}
                                         className="px-3 py-1.5 rounded-full border border-border-subtle text-text-muted text-[13px] hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
                                     >
-                                        {f}
+                                        {f.label}
                                     </button>
                                 ))}
                             </div>

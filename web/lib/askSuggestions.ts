@@ -330,94 +330,146 @@ function gatherEvidence(cards: ClassifiableCard[]): Evidence {
     };
 }
 
+/** A follow-up chip: `label` is the short text on the chip; `question` is what
+ *  is ACTUALLY sent. They differ on purpose — see SELF-CONTAINED RULE below. */
+export interface FollowUpChip {
+    label: string;
+    question: string;
+}
+
+// SELF-CONTAINED RULE (the second half of airtight): the backend retrieves by
+// the QUESTION TEXT alone — it does not resolve "this"/"it" from chat history
+// into a retrieval query. A bare "Give me more detail" contains nothing to
+// search with, retrieval comes back empty, and the grounded backend refuses —
+// even though the card is right there in the thread. So every follow-up's
+// sent question must carry the cited card's TITLE (the same reason the
+// title-bearing home chips always work). The chip shows the short label; the
+// sent bubble shows the full anchored question, which also reads clearer in
+// the transcript.
+
 /** The template chips for an angle, each gated on evidence the cited cards
- *  actually carry. Everything here restates or reframes STORED content —
- *  nothing asks for material that might not exist. */
-function angleChips(angle: ContentAngle, ev: Evidence): string[] {
+ *  actually carry and anchored to the cited title `t`. Everything here
+ *  restates or reframes STORED content — nothing asks for material that
+ *  might not exist. */
+function angleChips(angle: ContentAngle, ev: Evidence, t: string): FollowUpChip[] {
+    const keyPoints = { label: 'Give me the key points', question: `Give me the key points of "${t}"` };
+    const simpler = { label: 'Explain it more simply', question: `Explain "${t}" more simply` };
+    const whyMatters = { label: 'Why does this matter?', question: `Why does "${t}" matter?` };
     switch (angle) {
         case 'recipe':
             return [
-                ...(ev.hasIngredients ? ['What ingredients do I need?'] : []),
-                ...(ev.hasIngredients || ev.hasDetail ? ['Walk me through the steps'] : []),
-                'Give me the key points',
+                ...(ev.hasIngredients ? [{ label: 'What ingredients do I need?', question: `What ingredients do I need for "${t}"?` }] : []),
+                ...(ev.hasIngredients || ev.hasDetail ? [{ label: 'Walk me through the steps', question: `Walk me through the steps in "${t}"` }] : []),
+                keyPoints,
             ];
         case 'news':
             // News / opinion / politics: restate and interpret the saved piece —
             // never debate prompts ("counterargument") the card can't answer.
-            return ["What's the main argument?", 'Why does this matter?'];
+            return [{ label: "What's the main argument?", question: `What's the main argument in "${t}"?` }, whyMatters];
         case 'howto':
             return [
-                ...(ev.hasDetail ? ['Summarize the steps'] : []),
-                'Give me the key points',
-                'Explain it more simply',
+                ...(ev.hasDetail ? [{ label: 'Summarize the steps', question: `Summarize the steps in "${t}"` }] : []),
+                keyPoints,
+                simpler,
             ];
         case 'research':
-            return ['What are the key findings?', 'Why does this matter?'];
+            return [{ label: 'What are the key findings?', question: `What are the key findings in "${t}"?` }, whyMatters];
         case 'video':
-            return ['What are the key takeaways?', 'Give me the highlights'];
+            return [
+                { label: 'What are the key takeaways?', question: `What are the key takeaways from "${t}"?` },
+                { label: 'Give me the highlights', question: `Give me the highlights of "${t}"` },
+            ];
         default:
-            return ['Give me the key points', 'Explain it more simply'];
+            return [keyPoints, simpler];
     }
 }
 
-// Chips that deepen/branch the thread (vs. restart it) — floated to the front
-// once the conversation has a couple of exchanges behind it.
+// Chips (by label) that deepen/branch the thread (vs. restart it) — floated to
+// the front once the conversation has a couple of exchanges behind it.
 const DEEPENING_RE = /common thread|compare|what else|why does this matter|more detail/i;
 
-// Always-answerable top-ups (pure restatements of stored content) used only
-// when the gated angle set comes up short.
-const SAFE_FALLBACKS = [
-    'Give me the key points',
-    'Explain it more simply',
-    'Why does this matter?',
-];
+// Always-answerable top-ups (pure restatements of stored content, anchored to
+// the cited title) used only when the gated angle set comes up short.
+function safeFallbacks(t: string): FollowUpChip[] {
+    return [
+        { label: 'Give me the key points', question: `Give me the key points of "${t}"` },
+        { label: 'Explain it more simply', question: `Explain "${t}" more simply` },
+        { label: 'Why does this matter?', question: `Why does "${t}" matter?` },
+    ];
+}
 
 /**
  * Up to 3 content-aware follow-up chips derived from what the answer actually
- * discussed, every one gated on evidence the cited cards verifiably carry
- * (see the AIRTIGHT RULE above). Pure and deterministic (no salt) — the
- * variety comes from the content and the conversation, not a shuffle.
- * Returns [] when the answer cited nothing — with no grounding there is no
- * follow-up we can guarantee, and no chips beats broken chips.
+ * discussed. Every chip is (a) gated on evidence the cited cards verifiably
+ * carry (AIRTIGHT RULE) and (b) sent as a question anchored to the cited
+ * card's title so retrieval can find it (SELF-CONTAINED RULE). Pure and
+ * deterministic (no salt). Returns [] when the answer cited nothing, or when
+ * no cited card has a usable title to anchor to — a chip whose retrieval we
+ * can't guarantee is a chip we don't show.
  */
-export function buildFollowUps(ctx: FollowUpContext): string[] {
+export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
     const { citedCards, allLinks, askedTexts, exchangeCount } = ctx;
     if (citedCards.length === 0) return [];
+    // The anchor: the first cited card with a usable title (60 chars keeps the
+    // sent bubble reasonable while giving retrieval plenty to match on).
+    const titles = citedCards
+        .map(c => chipTitle(c.title, 60))
+        .filter((x): x is string => !!x);
+    if (titles.length === 0) return [];
+    const t = titles[0];
+
     const angle = dominantAngle(citedCards);
     const related = findRelatedConcept(citedCards, allLinks);
     const multiCard = new Set(citedCards.map(c => c.id)).size >= 2;
     const ev = gatherEvidence(citedCards);
 
-    const candidates: string[] = [];
-    // Multiple cited cards → pulling them together is grounded by definition.
-    if (multiCard) candidates.push('Compare these', "What's the common thread?");
-    candidates.push(...angleChips(angle, ev));
+    const candidates: FollowUpChip[] = [];
+    // Multiple cited cards → pulling them together is grounded by definition;
+    // both titles ride along so retrieval can find both cards.
+    if (multiCard && titles.length >= 2) {
+        candidates.push(
+            { label: 'Compare these', question: `Compare "${titles[0]}" with "${titles[1]}"` },
+            { label: "What's the common thread?", question: `What's the common thread between "${titles[0]}" and "${titles[1]}"?` },
+        );
+    }
+    candidates.push(...angleChips(angle, ev, t));
     // A stored long-form analysis exists → depth is a guaranteed win.
-    if (ev.hasDetail) candidates.push('Give me more detail');
-    // A concept that PROVABLY recurs on other cards → the knowledge-graph jump.
-    if (related) candidates.push(`What else did I save on ${related}?`);
+    if (ev.hasDetail) candidates.push({ label: 'Give me more detail', question: `Give me more detail on "${t}"` });
+    // A concept that PROVABLY recurs on other cards → the knowledge-graph jump
+    // (already self-contained — the concept is the retrieval anchor).
+    if (related) {
+        candidates.push({ label: `What else did I save on ${related}?`, question: `What else did I save on ${related}?` });
+    }
 
-    // Dedupe (case-insensitive) and drop anything already asked/tapped this session.
-    const asked = new Set(askedTexts.map(t => t.trim().toLowerCase()));
+    // Dedupe (by label AND sent question, case-insensitive) and drop anything
+    // whose question was already asked/tapped this session.
+    const asked = new Set(askedTexts.map(x => x.trim().toLowerCase()));
     const seen = new Set<string>();
     let chips = candidates.filter(c => {
-        const k = c.toLowerCase();
-        if (seen.has(k) || asked.has(k)) return false;
-        seen.add(k);
+        const lk = c.label.toLowerCase();
+        const qk = c.question.toLowerCase();
+        if (seen.has(lk) || seen.has(qk) || asked.has(qk)) return false;
+        seen.add(lk);
+        seen.add(qk);
         return true;
     });
 
     // Deeper into the thread, prefer deepening/branching over restart-y chips.
     if (exchangeCount >= 2) {
-        chips = [...chips.filter(c => DEEPENING_RE.test(c)), ...chips.filter(c => !DEEPENING_RE.test(c))];
+        chips = [...chips.filter(c => DEEPENING_RE.test(c.label)), ...chips.filter(c => !DEEPENING_RE.test(c.label))];
     }
 
     // Top up toward 3 without repeating anything used or already shown.
     if (chips.length < 3) {
-        for (const f of SAFE_FALLBACKS) {
+        for (const f of safeFallbacks(t)) {
             if (chips.length >= 3) break;
-            const k = f.toLowerCase();
-            if (!seen.has(k) && !asked.has(k)) { chips.push(f); seen.add(k); }
+            const lk = f.label.toLowerCase();
+            const qk = f.question.toLowerCase();
+            if (!seen.has(lk) && !seen.has(qk) && !asked.has(qk)) {
+                chips.push(f);
+                seen.add(lk);
+                seen.add(qk);
+            }
         }
     }
     return chips.slice(0, 3);
