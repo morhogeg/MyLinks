@@ -392,12 +392,17 @@ class GeminiService:
         self.model = GEMINI_ANALYSIS_MODEL
 
     def _generate_json(self, contents: list, what: str, config_extra: dict = None,
-                       model: str = None) -> dict:
+                       model: str = None, attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
         """Call Gemini with a structured-output (response_schema) config and
         return a parsed dict. Retries transient failures (429/5xx/timeout) with
-        exponential backoff + jitter, up to _MAX_GENERATE_ATTEMPTS, then raises
+        exponential backoff + jitter, up to `attempts` tries, then raises
         AnalysisError so the caller can surface a real error. Non-retryable
         errors (schema/safety/empty response) fail fast — see _is_retryable_error.
+
+        `attempts` defaults to _MAX_GENERATE_ATTEMPTS (3) for the BACKGROUND
+        pipeline; the SYNCHRONOUS HTTP callers (analyze_link/analyze_image/
+        ask_brain) pass attempts=2 so a slow retry can't blow the 60s function
+        budget mid-retry (report 3.6). Clamped to >= 1.
 
         config_extra lets callers add generation options (e.g. media_resolution
         for video) without changing the base structured-output config. `model`
@@ -405,6 +410,7 @@ class GeminiService:
         higher-tier GEMINI_ASK_MODEL); it defaults to self.model
         (GEMINI_ANALYSIS_MODEL) for every analysis/vision/synthesis call.
         """
+        attempts = max(1, attempts)
         if not self.client:
             raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
 
@@ -422,7 +428,7 @@ class GeminiService:
             config.update(config_extra)
 
         last_error = None
-        for attempt in range(_MAX_GENERATE_ATTEMPTS):
+        for attempt in range(attempts):
             try:
                 response = self.client.models.generate_content(
                     model=model or self.model,
@@ -450,7 +456,7 @@ class GeminiService:
                 logger.warning(f"Gemini {what} attempt {attempt + 1} failed: {e}")
                 # Retry ONLY transient errors, and only while attempts remain.
                 # Non-retryable errors (schema/safety/empty/bad-shape) fail fast.
-                if attempt < _MAX_GENERATE_ATTEMPTS - 1 and _is_retryable_error(e):
+                if attempt < attempts - 1 and _is_retryable_error(e):
                     time.sleep(_retry_delay(attempt))
                     continue
                 break
@@ -458,12 +464,14 @@ class GeminiService:
         logger.error(f"Gemini {what} failed after retries: {last_error}")
         raise AnalysisError(f"AI {what} failed: {last_error}")
 
-    def analyze_text(self, text: str, existing_tags: list = None, content_type: str = None) -> dict:
+    def analyze_text(self, text: str, existing_tags: list = None, content_type: str = None,
+                     attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
         """Analyze text content using Gemini. Raises AnalysisError on failure.
 
         content_type is accepted for caller compatibility; video content is
         handled by analyze_youtube (native video ingestion), so no special
-        text addendum is applied here.
+        text addendum is applied here. `attempts` is threaded to _generate_json
+        (synchronous callers pass 2 to stay under the 60s budget).
         """
         clean_text = text[:30000]
         tags_context = (
@@ -472,9 +480,10 @@ class GeminiService:
         )
 
         prompt = f"{SYSTEM_PROMPT}{tags_context}\n\nContent to analyze:\n{clean_text}"
-        return self._generate_json([prompt], "text analysis")
+        return self._generate_json([prompt], "text analysis", attempts=attempts)
 
-    def analyze_youtube(self, watch_url: str, existing_tags: list = None) -> dict:
+    def analyze_youtube(self, watch_url: str, existing_tags: list = None,
+                        attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
         """Analyze an actual YouTube video via Gemini's native video ingestion.
 
         Google fetches and watches the video on its own infrastructure, so this
@@ -501,10 +510,14 @@ class GeminiService:
             contents,
             "youtube video analysis",
             config_extra={"media_resolution": "MEDIA_RESOLUTION_LOW"},
+            attempts=attempts,
         )
 
-    def analyze_image(self, image_bytes: bytes, mime_type: str, existing_tags: list = None) -> dict:
-        """Analyze image content using Gemini vision. Raises AnalysisError on failure."""
+    def analyze_image(self, image_bytes: bytes, mime_type: str, existing_tags: list = None,
+                      attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
+        """Analyze image content using Gemini vision. Raises AnalysisError on failure.
+
+        `attempts` is threaded to _generate_json (synchronous callers pass 2)."""
         tags_context = (
             f"\n\nExisting Tags in Brain (Reuse these if possible):\n{', '.join(existing_tags)}"
             if existing_tags else ""
@@ -522,9 +535,10 @@ If the image is an article, extract the headline and body."""
             types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
             prompt,
         ]
-        return self._generate_json(contents, "image analysis")
+        return self._generate_json(contents, "image analysis", attempts=attempts)
 
-    def answer_from_context(self, question: str, cards: list, history: list = None) -> dict:
+    def answer_from_context(self, question: str, cards: list, history: list = None,
+                            attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
         """Answer a user question grounded ONLY in their saved cards (RAG).
 
         `cards` is a list of dicts with id/title/summary/category/tags. Returns
@@ -558,7 +572,7 @@ If the image is an article, extract the headline and body."""
         prompt = _build_rag_prompt(question, cards, history) + _CITED_JSON_SUFFIX
         data = self._generate_json([prompt], "answer",
                                    config_extra={"response_schema": BrainAnswer},
-                                   model=GEMINI_ASK_MODEL)
+                                   model=GEMINI_ASK_MODEL, attempts=attempts)
         answer = data.get("answer") or ""
         cited = _valid_cited_ids(data.get("citedIds"), cards)
         if cited:
@@ -572,7 +586,7 @@ If the image is an article, extract the headline and body."""
             retry = self._generate_json(
                 [retry_prompt], "answer (citation retry)",
                 config_extra={"response_schema": BrainAnswer},
-                model=GEMINI_ASK_MODEL,
+                model=GEMINI_ASK_MODEL, attempts=attempts,
             )
             retry_answer = retry.get("answer") or ""
             retry_cited = _valid_cited_ids(retry.get("citedIds"), cards)

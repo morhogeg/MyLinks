@@ -31,7 +31,25 @@ _COLLECTION = "usage_quotas"
 # pruned at write time so the doc can't grow without bound.
 _KEEP_MONTHS = 2
 
-_KINDS = ("saves", "asks")
+# Single source of truth for every metered quota kind: the env var that overrides
+# its monthly limit, that limit's default, and the user-facing 429 message. Both
+# _limit_for (here) and main.py's _quota_blocked read from this table (via
+# quota_message), so adding a future kind can't half-work — there's no parallel
+# message dict to forget and trip a KeyError on.
+_QUOTA_KINDS = {
+    "saves": {
+        "env": "MONTHLY_SAVE_QUOTA",
+        "default": 150,
+        "message": "Monthly save limit reached — resets on the 1st.",
+    },
+    "asks": {
+        "env": "MONTHLY_ASK_QUOTA",
+        "default": 100,
+        "message": "Monthly question limit reached — resets on the 1st.",
+    },
+}
+
+_KINDS = tuple(_QUOTA_KINDS)
 
 # Sentinel "remaining" when the check is disabled or fails open. Callers gate on
 # `ok` only; a large number reads correctly as "plenty left".
@@ -41,14 +59,23 @@ _UNLIMITED = 1_000_000
 def _limit_for(kind: str) -> int:
     """Monthly limit for `kind` from env. 0 (or negative / unparseable) disables
     the check entirely (always allow)."""
-    if kind == "saves":
-        raw = os.environ.get("MONTHLY_SAVE_QUOTA", "150")
-    else:  # "asks"
-        raw = os.environ.get("MONTHLY_ASK_QUOTA", "100")
+    cfg = _QUOTA_KINDS.get(kind)
+    if cfg is None:
+        return 0
+    raw = os.environ.get(cfg["env"], str(cfg["default"]))
     try:
         return int(raw)
     except (TypeError, ValueError):
         return 0
+
+
+def quota_message(kind: str) -> str:
+    """User-facing 429 copy for `kind` (single source of truth — see _QUOTA_KINDS).
+
+    Falls back to a generic message for an unknown kind rather than raising, so a
+    caller can never trip a KeyError on the message lookup."""
+    cfg = _QUOTA_KINDS.get(kind)
+    return cfg["message"] if cfg else "Monthly limit reached."
 
 
 def _current_month(now: datetime = None) -> str:
@@ -124,3 +151,43 @@ def check_and_increment_quota(uid: str, kind: str, amount: int = 1):
     except Exception as e:
         logger.warning("Quota check failed (failing open) for kind=%s: %s", kind, e)
         return True, _UNLIMITED
+
+
+def refund_quota(uid: str, kind: str, amount: int = 1) -> None:
+    """Refund `amount` units to `uid`'s current-month `kind` counter (floor 0).
+
+    Called when metered work FAILS server-side (5xx) so a failed save/ask doesn't
+    permanently consume a unit the user never got value for. Best-effort and
+    transactional: swallows+logs every error (a refund is a courtesy, never worth
+    failing the response over) and never logs the uid (PII). No-op when metering
+    is disabled (limit <= 0 → nothing was charged) or the counter is already 0."""
+    if kind not in _KINDS or not uid:
+        return
+    if _limit_for(kind) <= 0:
+        # Metering disabled → the request never charged, so there's nothing to
+        # refund (and no counter doc to touch).
+        return
+
+    try:
+        db = get_db()
+        doc_ref = db.collection(_COLLECTION).document(uid)
+        month = _current_month()
+
+        @firestore.transactional
+        def _txn(txn):
+            snap = doc_ref.get(transaction=txn)
+            if not snap.exists:
+                return
+            data = snap.to_dict() or {}
+            month_map = dict(data.get(month) or {})
+            current = int(month_map.get(kind, 0) or 0)
+            if current <= 0:
+                return
+            month_map[kind] = max(0, current - amount)
+            data[month] = month_map
+            txn.set(doc_ref, data)
+
+        _txn(db.transaction())
+    except Exception as e:
+        # A failed refund must never turn into a failed request — log and move on.
+        logger.warning("Quota refund failed (ignored) for kind=%s: %s", kind, e)

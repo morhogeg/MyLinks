@@ -104,8 +104,10 @@ retryable errors (429/5xx/timeouts); embed gets 2 attempts. No model fallback
 
 **3.7 `task_logs` grows forever — ✅ IMPLEMENTED (code) + ⛔ OWNER (optional TTL)**
 *Spec:* the 5-min janitor now also prunes `task_logs` older than 14 days in
-bounded batches. Optionally also set a Firestore TTL policy on the collection
-(gcloud, §4 step 6) and the janitor becomes belt-and-suspenders.
+bounded batched deletes, and new log docs carry an `expireAt` **Timestamp**
+field. Optionally set a Firestore TTL policy on `expireAt` (NOT the string
+`timestamp` field — TTL only acts on Timestamp types) and the janitor becomes
+belt-and-suspenders.
 
 ### Backend — scale
 
@@ -209,11 +211,33 @@ Post-launch item; bandwidth cost is real but not a launch blocker.
   with friendly messaging — no purchase path, so no IAP/paywall review risk at
   launch. When Machina Pro ships later it must use Apple IAP (already the plan).
 
-### Explicitly deferred (post-launch backlog, unchanged)
+### Post-implementation review round (2026-07-14, same session)
+
+An 8-angle adversarial review of the implementation diff found and FIXED before
+ship: windowed-feed completeness regressions (semantic-search results, deep
+links, the in-app due-reminder strip, and collection member lists/publish
+snapshots now resolve beyond the loaded window — collection publish reads the
+full member set server-side); reminder-scheduler defects in the new
+collection-group path (disabled-user due docs snoozed so they can't starve the
+batch, per-user per-tick delivery cap restored, loud error if the composite
+index is missing); quota fairness (charge after validation, refund on failed
+analyses, no double-charge on retries); Gemini retry budget trimmed on the
+synchronous paths + 120 s timeouts; `task_logs` prune made TTL-compatible and
+batched; rate-limit fail policy moved into the bucket declaration table; deploy
+workflow hardened (env-var secret handling, whole-codebase `--only functions`
+deploy instead of a drift-prone hardcoded list, indexes deployed with it).
+
+### Explicitly deferred (post-launch backlog)
 
 Ingest-token Keychain hardening (task 12), offline read-cache decision (16),
 Feed/Settings decomposition + `share_service` extraction (19a), image
 optimization (3.18), server-side keyword search, Sentry adoption, M19+ roadmap.
+Newly deferred from the review round (accepted trade-offs, revisit at real
+scale): cursor-based pagination instead of the growing-window subscription
+(deep scrolls re-read the window — O(pages²) reads for very large libraries),
+window-scoped facet counts/keyword search/archive view (semantic search and
+the new completeness fixes cover recall), merging the per-uid rate-limit and
+quota transactions into one, and a shared paid-endpoint guard helper.
 
 ## 4. ⛔ OWNER LAUNCH RUNBOOK — ordered, everything that needs you
 
@@ -237,8 +261,13 @@ optimization (3.18), server-side keyword search, Sentry adoption, M19+ roadmap.
    sign-in creates a fresh workspace.
 5. **Backups:** enable Firestore PITR + daily scheduled backups (3.12).
 6. **Monitoring:** GCP budget alerts, uptime check on `ping`, one error-rate
-   alert (3.13). Optional: Firestore TTL policy on `task_logs`;
-   Sentry DSN if you want real client crash reporting.
+   alert (3.13). Optional: Firestore TTL policy on `task_logs.expireAt`
+   (Timestamp field added this session); Sentry DSN if you want real client
+   crash reporting.
+6a. **One-time data repair:** after deploying, hit `force_check_reminders`
+   with `?coerce=1` (admin token) once — it rewrites any legacy
+   Timestamp/string `nextReminderAt` values to integer-ms so old pending
+   reminders keep firing under the new scheduler query.
 7. **App Store Connect:** create + seed the demo reviewer account; fill
    credentials into `docs/APP_STORE.md` §3 notes; click in nutrition label +
    metadata; take the 6 screenshots; set governing law in `/terms` §10.

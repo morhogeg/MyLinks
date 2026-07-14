@@ -93,3 +93,53 @@ def test_retry_delay_bounds():
         d1 = ai_service._retry_delay(1)
         assert 1.0 <= d0 <= 2.0
         assert 2.0 <= d1 <= 4.0
+
+
+# ── _generate_json honors the `attempts` budget (report 3.6) ─────────────────
+
+def _svc_with_failing_client(exc):
+    """A GeminiService whose model call always raises `exc`, counting calls."""
+    from ai_service import GeminiService
+    svc = GeminiService.__new__(GeminiService)
+    calls = {"n": 0}
+
+    class _Models:
+        def generate_content(self, model, contents, config):
+            calls["n"] += 1
+            raise exc
+
+    svc.client = type("_Client", (), {"models": _Models()})()
+    svc.model = "test-model"
+    return svc, calls
+
+
+def test_generate_json_attempts_caps_retries(monkeypatch):
+    # No real backoff sleeps in the test.
+    monkeypatch.setattr(ai_service.time, "sleep", lambda *a, **k: None)
+
+    # Synchronous callers pass attempts=2 → exactly 2 tries on a retryable error.
+    svc, calls = _svc_with_failing_client(FakeAPIError(code=503))
+    try:
+        svc._generate_json(["x"], "test", attempts=2)
+    except ai_service.AnalysisError:
+        pass
+    assert calls["n"] == 2
+
+    # Background default (3) → 3 tries.
+    svc, calls = _svc_with_failing_client(FakeAPIError(code=503))
+    try:
+        svc._generate_json(["x"], "test", attempts=3)
+    except ai_service.AnalysisError:
+        pass
+    assert calls["n"] == 3
+
+
+def test_generate_json_non_retryable_fails_fast_regardless_of_attempts(monkeypatch):
+    monkeypatch.setattr(ai_service.time, "sleep", lambda *a, **k: None)
+    # A 400 is not retryable → only ONE try even with attempts=3.
+    svc, calls = _svc_with_failing_client(FakeAPIError(code=400))
+    try:
+        svc._generate_json(["x"], "test", attempts=3)
+    except ai_service.AnalysisError:
+        pass
+    assert calls["n"] == 1

@@ -113,20 +113,23 @@ jobs:
           APPCHECK_ENFORCE: ${{ secrets.APPCHECK_ENFORCE }}
           REQUIRE_AUTH: ${{ secrets.REQUIRE_AUTH }}
         run: |
+          # Read secrets ONLY from the exported env vars above — never interpolate
+          # ${{ secrets.X }} into the script body, or a secret containing shell
+          # metacharacters would be parsed as syntax (injection). $VAR is inert.
           env_file=functions/.env
           {
             echo "GEMINI_API_KEY=${GEMINI_API_KEY}"
           } > "$env_file"
-          if [ -n "${{ secrets.ADMIN_TOKEN }}" ]; then
+          if [ -n "$ADMIN_TOKEN" ]; then
             echo "ADMIN_TOKEN=${ADMIN_TOKEN}" >> "$env_file"
           fi
-          if [ -n "${{ secrets.OWNER_EMAIL }}" ]; then
+          if [ -n "$OWNER_EMAIL" ]; then
             echo "OWNER_EMAIL=${OWNER_EMAIL}" >> "$env_file"
           fi
-          if [ -n "${{ secrets.APPCHECK_ENFORCE }}" ]; then
+          if [ -n "$APPCHECK_ENFORCE" ]; then
             echo "APPCHECK_ENFORCE=${APPCHECK_ENFORCE}" >> "$env_file"
           fi
-          if [ -n "${{ secrets.REQUIRE_AUTH }}" ]; then
+          if [ -n "$REQUIRE_AUTH" ]; then
             echo "REQUIRE_AUTH=${REQUIRE_AUTH}" >> "$env_file"
           fi
 
@@ -138,34 +141,40 @@ jobs:
           venv/bin/pip install --upgrade pip
           venv/bin/pip install -r requirements.txt
 
-      # Build the --only target list. For "all" we use the canonical full
-      # function list (SOURCE_OF_TRUTH §9, 2026-07-13 entry). Bare names are
-      # auto-prefixed with "functions:" — a list like "functions:a,b,c" silently
-      # deploys ONLY "a" otherwise (b/c read as unknown target types), matching
-      # deploy-functions.sh behavior.
+      # Ship Firestore indexes BEFORE functions so a function that needs a new
+      # composite index (e.g. the reminders collection-group index the reminder
+      # sweep queries) never deploys ahead of the index it depends on.
+      - name: Deploy Firestore indexes
+        run: |
+          set -euo pipefail
+          firebase deploy --only firestore:indexes --project "$FIREBASE_PROJECT" --non-interactive --force
+
+      # For "all" we do a WHOLE-CODEBASE deploy (`--only functions`): firebase
+      # derives the function list from source and prunes functions deleted from
+      # code — no hardcoded 32-name list to drift out of sync. Selective deploys
+      # (explicit targets) keep the per-name path; bare names are auto-prefixed
+      # with "functions:" — a list like "functions:a,b,c" silently deploys ONLY
+      # "a" otherwise (b/c read as unknown target types).
       - name: Deploy functions
         env:
           FIREBASE_TARGETS_INPUT: ${{ inputs.targets }}
         run: |
           set -euo pipefail
 
-          # Canonical full function list (keep in sync with SOURCE_OF_TRUTH §9).
-          ALL="analyze_image,analyze_link,ask_brain,backfill_embeddings,backfill_related_links,backfill_youtube_channels,check_reminders,claim_workspace,claim_workspace_http,debug_status,delete_account,delete_account_http,force_check_reminders,force_send_digests,force_sweep_stuck_processing,get_article,get_share_config,ping,process_link_background,publish_share_http,rebuild_connections,register_device_token_http,search_links,search_links_http,send_digest_now,send_digests,share_ingest,share_page,sweep_stuck_processing,sync_link_embedding,unpublish_share_http,unregister_device_token_http"
-
           RAW="${FIREBASE_TARGETS_INPUT:-all}"
           if [ "$RAW" = "all" ]; then
-            RAW="$ALL"
+            ONLY="functions"
+          else
+            # Normalize: prefix every bare name with "functions:".
+            ONLY=$(printf '%s' "$RAW" | awk -F, 'BEGIN{OFS=","}{for(i=1;i<=NF;i++){gsub(/^[ \t]+|[ \t]+$/,"",$i); if($i!~/^functions:/)$i="functions:"$i}; $1=$1; print}')
           fi
 
-          # Normalize: prefix every bare name with "functions:".
-          TARGETS=$(printf '%s' "$RAW" | awk -F, 'BEGIN{OFS=","}{for(i=1;i<=NF;i++){gsub(/^[ \t]+|[ \t]+$/,"",$i); if($i!~/^functions:/)$i="functions:"$i}; $1=$1; print}')
-
-          echo "Deploying [$TARGETS] to project: $FIREBASE_PROJECT"
+          echo "Deploying [$ONLY] to project: $FIREBASE_PROJECT"
 
           # process_link_background occasionally 409s (conflict) mid-deploy —
           # retry the whole deploy once after 60s before failing the job.
-          if ! firebase deploy --only "$TARGETS" --project "$FIREBASE_PROJECT" --non-interactive --force; then
+          if ! firebase deploy --only "$ONLY" --project "$FIREBASE_PROJECT" --non-interactive --force; then
             echo "First deploy attempt failed (process_link_background sometimes 409s). Retrying in 60s…"
             sleep 60
-            firebase deploy --only "$TARGETS" --project "$FIREBASE_PROJECT" --non-interactive --force
+            firebase deploy --only "$ONLY" --project "$FIREBASE_PROJECT" --non-interactive --force
           fi

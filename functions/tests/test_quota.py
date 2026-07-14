@@ -20,6 +20,32 @@ class FakeSnap:
         return dict(self._data) if self._data is not None else None
 
 
+def _install_fake_db_for_refund(monkeypatch, store):
+    """Same as _install_fake_db but where FakeSnap.exists tracks the store, so a
+    refund against a never-charged (absent) doc is a genuine no-op."""
+    class _RefundDocRef:
+        def __init__(self, s):
+            self._store = s
+
+        def get(self, transaction=None):
+            return FakeSnap(self._store.get("value"))
+
+    class _RefundDB:
+        def __init__(self, s):
+            self._store = s
+            self._doc_ref = _RefundDocRef(s)
+
+        def collection(self, _name):
+            return FakeCollection(self._doc_ref)
+
+        def transaction(self):
+            return FakeTxn(self._store)
+
+    monkeypatch.setattr(quota, "get_db", lambda: _RefundDB(store))
+    monkeypatch.setattr(quota.firestore, "transactional", lambda fn: fn)
+    return store
+
+
 class FakeDocRef:
     def __init__(self, store):
         self._store = store
@@ -197,3 +223,80 @@ def test_limit_for_defaults(monkeypatch):
 def test_limit_for_unparseable_disables(monkeypatch):
     monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "not-a-number")
     assert quota._limit_for("saves") == 0
+
+
+def test_limit_for_unknown_kind_is_zero(monkeypatch):
+    # An unknown kind isn't in the config table → disabled (0), not a KeyError.
+    assert quota._limit_for("bogus") == 0
+
+
+# ── consolidated kind table / messages (report 3.2d) ─────────────────────────
+
+def test_quota_message_per_kind():
+    assert "save" in quota.quota_message("saves").lower()
+    assert "question" in quota.quota_message("asks").lower()
+
+
+def test_quota_message_unknown_kind_falls_back():
+    # Must not KeyError for an unknown kind — a generic message is returned.
+    assert quota.quota_message("bogus") == "Monthly limit reached."
+
+
+def test_kinds_derived_from_table():
+    # _KINDS is derived from the single config table, so the message lookup and
+    # the metering path can't drift apart.
+    assert set(quota._KINDS) == set(quota._QUOTA_KINDS)
+
+
+# ── refund_quota (report 3.2b) ───────────────────────────────────────────────
+
+def test_refund_decrements_current_month(monkeypatch):
+    store = {"value": {"2026-07": {"saves": 3}}}
+    _install_fake_db_for_refund(monkeypatch, store)
+    _pin_month(monkeypatch)
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "150")
+
+    quota.refund_quota("u1", "saves")
+    assert store["value"]["2026-07"]["saves"] == 2
+
+
+def test_refund_floors_at_zero(monkeypatch):
+    store = {"value": {"2026-07": {"saves": 0}}}
+    _install_fake_db_for_refund(monkeypatch, store)
+    _pin_month(monkeypatch)
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "150")
+
+    quota.refund_quota("u1", "saves")
+    # Never goes negative, and (counter already 0) the doc is left as-is.
+    assert store["value"]["2026-07"]["saves"] == 0
+
+
+def test_refund_noop_when_metering_disabled(monkeypatch):
+    store = {"value": {"2026-07": {"saves": 3}}}
+    _install_fake_db_for_refund(monkeypatch, store)
+    _pin_month(monkeypatch)
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "0")  # disabled → nothing was charged
+
+    quota.refund_quota("u1", "saves")
+    assert store["value"]["2026-07"]["saves"] == 3  # untouched
+
+
+def test_refund_noop_for_none_uid_and_unknown_kind(monkeypatch):
+    store = {"value": {"2026-07": {"saves": 3}}}
+    _install_fake_db_for_refund(monkeypatch, store)
+    _pin_month(monkeypatch)
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "150")
+
+    quota.refund_quota(None, "saves")
+    quota.refund_quota("u1", "bogus")
+    assert store["value"]["2026-07"]["saves"] == 3
+
+
+def test_refund_swallows_backend_error(monkeypatch):
+    def boom():
+        raise RuntimeError("firestore down")
+
+    monkeypatch.setattr(quota, "get_db", boom)
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "150")
+    # Must not raise — a failed refund is best-effort.
+    quota.refund_quota("u1", "saves")

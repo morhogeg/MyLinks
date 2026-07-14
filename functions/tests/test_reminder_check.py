@@ -130,6 +130,20 @@ class FakeDB:
                 docs.append(FakeDocSnapshot(link_id, ref, ldata))
         return FakeQuery(docs)
 
+    def get_all(self, refs):
+        # Batched user-doc fetch (mirrors Firestore db.get_all): each ref is a
+        # users/{uid} FakeDocRef; return its snapshot (exists=False when missing).
+        out = []
+        for ref in refs:
+            data = self._store["users"].get(ref._uid)
+            snap = FakeDocSnapshot(
+                ref.id, ref,
+                None if data is None else {k: v for k, v in data.items() if k != "links"},
+            )
+            snap.exists = data is not None
+            out.append(snap)
+        return out
+
 
 class _FakeUsersCollection:
     def __init__(self, store, users_col):
@@ -223,7 +237,7 @@ def test_groups_due_links_by_uid_and_fetches_each_user_once(monkeypatch, past_ms
     assert store["users"]["bob"]["links"]["l3"]["reminderDue"] is True
 
 
-def test_disabled_user_left_pending(monkeypatch, past_ms, push_calls):
+def test_disabled_user_due_docs_are_snoozed_not_delivered(monkeypatch, past_ms, push_calls):
     store = {
         "users": {
             "carol": {
@@ -244,9 +258,38 @@ def test_disabled_user_left_pending(monkeypatch, past_ms, push_calls):
     assert report["users_with_reminders_enabled"] == 0
     assert report["reminders_found"] == 0
     assert push_calls == []
-    # Untouched — still pending for when they re-enable.
-    assert store["users"]["carol"]["links"]["l1"]["reminderStatus"] == "pending"
-    assert "reminderDue" not in store["users"]["carol"]["links"]["l1"]
+    link = store["users"]["carol"]["links"]["l1"]
+    # Nothing delivered — still pending, not flagged due.
+    assert link["reminderStatus"] == "pending"
+    assert "reminderDue" not in link
+    # But SNOOZED off the batch head: nextReminderAt pushed ~1h into the future so
+    # it stops being re-fetched every tick and starving deliverable users.
+    assert isinstance(link["nextReminderAt"], int)
+    assert link["nextReminderAt"] > past_ms
+
+
+def test_per_user_cap_limits_deliveries(monkeypatch, past_ms, push_calls):
+    # A user with more than REMINDER_PER_USER_LIMIT due docs delivers only the cap
+    # this tick; the rest stay pending (untouched) for subsequent ticks.
+    n = rs.REMINDER_PER_USER_LIMIT + 5
+    links = {
+        f"l{i}": {"reminderStatus": "pending", "nextReminderAt": past_ms,
+                  "title": f"due {i}", "reminderProfile": "smart", "reminderCount": 0}
+        for i in range(n)
+    }
+    store = {"users": {"hank": {"settings": {}, "fcmTokens": ["tok-h"], "links": links}}}
+    _install_db(monkeypatch, store)
+
+    rs.run_reminder_check()
+
+    # Exactly REMINDER_PER_USER_LIMIT were delivered (smart → rescheduled, count 1).
+    delivered = [l for l in store["users"]["hank"]["links"].values()
+                 if l.get("reminderCount") == 1]
+    assert len(delivered) == rs.REMINDER_PER_USER_LIMIT
+    # The leftovers are untouched (still count 0, still due in the past).
+    untouched = [l for l in store["users"]["hank"]["links"].values()
+                 if l.get("reminderCount") == 0]
+    assert len(untouched) == 5
 
 
 def test_smart_profile_recurs_not_completed(monkeypatch, past_ms, push_calls):
@@ -323,3 +366,94 @@ def test_uid_derivation_from_reference():
     db = FakeDB(store)
     snap = db.collection_group("links").get()[0]
     assert rs._uid_from_link_ref(snap.reference) == "u1"
+
+
+def test_missing_index_error_detection():
+    # By class name (google.api_core.exceptions.FailedPrecondition).
+    err = type("FailedPrecondition", (Exception,), {})("boom")
+    assert rs._is_missing_index_error(err) is True
+    # By gRPC status text in the message.
+    assert rs._is_missing_index_error(
+        Exception("400 The query requires an index. Create it here: ...")) is True
+    assert rs._is_missing_index_error(
+        Exception("9 FAILED_PRECONDITION: needs index")) is True
+    # An unrelated error is NOT treated as a missing index.
+    assert rs._is_missing_index_error(Exception("connection reset")) is False
+
+
+# ── _coerce_reminder_ms (pure legacy-value normalization) ─────────────────────
+
+def test_coerce_int_is_left_alone():
+    assert rs._coerce_reminder_ms(1_700_000_000_000) == (None, "ok")
+
+
+def test_coerce_float_converts_to_int():
+    new, status = rs._coerce_reminder_ms(1_700_000_000_000.0)
+    assert status == "converted"
+    assert new == 1_700_000_000_000
+    assert isinstance(new, int)
+
+
+def test_coerce_numeric_string():
+    assert rs._coerce_reminder_ms("1700000000000") == (1_700_000_000_000, "converted")
+
+
+def test_coerce_iso_string():
+    new, status = rs._coerce_reminder_ms("2021-01-01T00:00:00Z")
+    assert status == "converted"
+    # 2021-01-01T00:00:00Z == 1609459200 s == 1609459200000 ms.
+    assert new == 1_609_459_200_000
+
+
+def test_coerce_timestamp_like_object():
+    class FakeTimestamp:
+        def timestamp(self):
+            return 1_609_459_200.0  # epoch seconds
+    new, status = rs._coerce_reminder_ms(FakeTimestamp())
+    assert status == "converted"
+    assert new == 1_609_459_200_000
+
+
+def test_coerce_unparseable_string_left():
+    assert rs._coerce_reminder_ms("not a date") == (None, "unparseable")
+
+
+def test_coerce_bool_is_unparseable():
+    # bool is an int subclass but never a valid ms value.
+    assert rs._coerce_reminder_ms(True) == (None, "unparseable")
+
+
+def test_coerce_none_is_unparseable():
+    assert rs._coerce_reminder_ms(None) == (None, "unparseable")
+
+
+def test_coerce_pending_reminder_times_rewrites_legacy(monkeypatch):
+    class FakeTimestamp:
+        def timestamp(self):
+            return 1_609_459_200.0
+    store = {
+        "users": {
+            "u1": {
+                "links": {
+                    "int_ok": {"reminderStatus": "pending", "nextReminderAt": 123},
+                    "ts": {"reminderStatus": "pending", "nextReminderAt": FakeTimestamp()},
+                    "str": {"reminderStatus": "pending", "nextReminderAt": "2021-01-01T00:00:00Z"},
+                    "bad": {"reminderStatus": "pending", "nextReminderAt": "garbage"},
+                    "done": {"reminderStatus": "completed", "nextReminderAt": "2021-01-01T00:00:00Z"},
+                },
+            }
+        }
+    }
+    _install_db(monkeypatch, store)
+
+    report = rs.coerce_pending_reminder_times()
+
+    assert report["scanned"] == 4  # only pending docs (not the completed one)
+    assert report["already_int"] == 1
+    assert report["converted"] == 2
+    assert report["unparseable"] == 1
+    links = store["users"]["u1"]["links"]
+    assert links["ts"]["nextReminderAt"] == 1_609_459_200_000
+    assert links["str"]["nextReminderAt"] == 1_609_459_200_000
+    assert links["bad"]["nextReminderAt"] == "garbage"  # left in place
+    assert links["done"]["nextReminderAt"] == "2021-01-01T00:00:00Z"  # untouched

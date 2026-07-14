@@ -63,7 +63,7 @@ from search import (
 )
 from rate_limit import check_rate_limit, client_ip
 # Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
-from quota import check_and_increment_quota
+from quota import check_and_increment_quota, refund_quota, quota_message
 # Public share-page subsystem (renderers + publish/unpublish logic). The three
 # HTTP endpoints (publish_share_http, unpublish_share_http, share_page) stay in
 # this file — Firebase discovers deployables by scanning main.py — and call into
@@ -235,36 +235,44 @@ MAX_QUESTION_LENGTH = 2000
 MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
-# Per-bucket rate limits: (max_requests, window_seconds). The analyze / image /
-# chat buckets are deliberately tight because each call spends money on Gemini.
-# The `*-uid` twins mirror their IP buckets so paid endpoints are limited BOTH
-# per source IP (catches anonymous/rotating-IP abuse and shared NAT) AND per
+# Per-bucket rate limits: (max_requests, window_seconds, fail_open). The analyze
+# / image / chat buckets are deliberately tight because each call spends money on
+# Gemini. The `*-uid` twins mirror their IP buckets so paid endpoints are limited
+# BOTH per source IP (catches anonymous/rotating-IP abuse and shared NAT) AND per
 # resolved workspace uid (a single account can't just rotate IPs to bypass the
 # limit). See _rate_limited call sites in analyze_link / analyze_image / ask_brain.
+#
+# `fail_open` is the bucket's Firestore-outage policy and lives HERE, on the same
+# row as the limit, so a newly added bucket can't silently default to fail-open by
+# being forgotten from a parallel set (report 3.5). Paid buckets (every call
+# spends money on Gemini, or writes attacker-influenceable data) fail CLOSED:
+# reject on a limiter backend error rather than strip the last cost ceiling.
+# Cheap / IP-only buckets (article scrape, device-token writes) fail OPEN so a
+# Firestore hiccup doesn't take those harmless paths down.
 _RATE_LIMITS = {
-    "analyze": (30, 3600),
-    "analyze-uid": (30, 3600),
-    "image": (30, 3600),
-    "image-uid": (30, 3600),
-    "chat": (60, 3600),
-    "chat-uid": (60, 3600),
-    "article": (120, 3600),
-    "share": (120, 3600),
+    "analyze": (30, 3600, False),
+    "analyze-uid": (30, 3600, False),
+    "image": (30, 3600, False),
+    "image-uid": (30, 3600, False),
+    "chat": (60, 3600, False),
+    "chat-uid": (60, 3600, False),
+    "article": (120, 3600, True),
+    "share": (120, 3600, False),
     # Per-uid ceiling on the share-extension token path (report 3.3): the IP
     # `share` bucket alone can't stop a leaked ingest token from spamming the
     # paid pipeline from rotating IPs. 60/hr comfortably covers real share usage.
-    "share-uid": (60, 3600),
+    "share-uid": (60, 3600, False),
     # Per-uid ceiling on public-share publishing (report 3.4): each publish
     # writes a client-built snapshot, so bound how fast one account can create/
     # overwrite them (on top of the serialized-size cap in publish_share_http).
-    "publish": (30, 3600),
-    "device_token": (30, 3600),
+    "publish": (30, 3600, False),
+    "device_token": (30, 3600, True),
     # Home search bar (native HTTP twin). Debounced client-side, but a user can
     # still fire many queries in a session, so keep the ceilings generous. Mirror
     # the IP + uid double-bucket the paid endpoints use (an embedding call per
     # query has a small cost).
-    "search": (120, 3600),
-    "search-uid": (120, 3600),
+    "search": (120, 3600, False),
+    "search-uid": (120, 3600, False),
 }
 
 # Input caps for client-supplied fields that flow into the Gemini prompt, so a
@@ -319,23 +327,13 @@ def _sanitize_tags(tags) -> list:
     return cleaned
 
 
-# Paid buckets — every call behind one spends money on Gemini (analyze/image/
-# chat/search) or writes attacker-influenceable data (share/publish). These fail
-# CLOSED (report 3.5): if the rate-limiter's Firestore backend errors, the call
-# is rejected (429) rather than allowed unlimited, which is exactly the moment a
-# fail-open limiter would remove the last cost ceiling. Cheap/IP-only buckets
-# (article scrape, device-token writes) keep failing OPEN so a Firestore hiccup
-# doesn't take those harmless paths down.
-_FAIL_CLOSED_BUCKETS = {
-    "analyze", "analyze-uid", "image", "image-uid", "chat", "chat-uid",
-    "search", "search-uid", "share", "share-uid", "publish",
-}
-
-
 def _rate_limited(bucket: str, identity: str, headers: dict = None):
-    """Return a 429 Response if `identity` exceeds the bucket's limit, else None."""
-    limit, window = _RATE_LIMITS[bucket]
-    fail_open = bucket not in _FAIL_CLOSED_BUCKETS
+    """Return a 429 Response if `identity` exceeds the bucket's limit, else None.
+
+    The bucket's limit, window, AND fail-open policy all come from the single
+    _RATE_LIMITS row — no parallel fail-closed set to keep in sync (report 3.5).
+    """
+    limit, window, fail_open = _RATE_LIMITS[bucket]
     if not check_rate_limit(f"{bucket}:{identity}", limit, window, fail_open=fail_open):
         # Log the bucket only — the identity is an IP or workspace uid (PII).
         logger.warning("Rate limit exceeded: %s", bucket)
@@ -347,13 +345,6 @@ def _rate_limited(bucket: str, identity: str, headers: dict = None):
 # a single card or a small curated collection; 200 KB is generous headroom while
 # blocking large-doc spam / storage abuse. Over-cap → 413.
 MAX_PUBLISH_BYTES = 200 * 1024
-
-# Friendly, envelope-matching messages for the monthly quota 429s (report 3.2).
-_QUOTA_MESSAGES = {
-    "saves": "Monthly save limit reached — resets on the 1st.",
-    "asks": "Monthly question limit reached — resets on the 1st.",
-}
-
 
 def _quota_blocked(uid: str, kind: str, headers: dict = None):
     """Meter one `kind` unit against `uid`'s monthly quota; 429 Response if over.
@@ -370,7 +361,7 @@ def _quota_blocked(uid: str, kind: str, headers: dict = None):
     ok, _ = check_and_increment_quota(uid, kind)
     if not ok:
         logger.warning("Monthly quota exceeded (kind=%s)", kind)
-        return _error_response(_QUOTA_MESSAGES[kind], 429, headers)
+        return _error_response(quota_message(kind), 429, headers)
     return None
 
 
@@ -443,26 +434,33 @@ def _append_capture_note(detailed: str, language: str) -> str:
     return f"{detailed}\n\n{note}" if detailed else note
 
 
-def _analyze_scraped(ai, scraped: dict, existing_tags: list):
+def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = None):
     """Run the right analysis for scraped content.
 
     For YouTube, use Gemini native video ingestion; if that fails (private /
     unlisted / over-quota / region-blocked), fall back to an honest
     metadata-only text analysis rather than fabricating a summary.
+
+    `attempts` threads the Gemini retry budget: the SYNCHRONOUS analyze_link path
+    passes 2 (stay under the 60s function timeout), while the background pipeline
+    leaves it None so ai_service's default (3) applies.
     """
+    # None → let ai_service use its default retry count (3, the background value).
+    kw = {} if attempts is None else {"attempts": attempts}
     content_type = scraped.get("content_type")
     if content_type == "youtube":
         watch_url = scraped.get("youtube_metadata", {}).get("watch_url")
         if watch_url:
             try:
-                return ai.analyze_youtube(watch_url, existing_tags=existing_tags)
+                return ai.analyze_youtube(watch_url, existing_tags=existing_tags, **kw)
             except AnalysisError as e:
                 logger.warning(f"Native YouTube analysis failed, using metadata-only fallback: {e}")
         # Fallback: analyze the lightweight oEmbed metadata text honestly.
-        return ai.analyze_text(scraped.get("text") or scraped.get("html", ""), existing_tags=existing_tags)
+        return ai.analyze_text(scraped.get("text") or scraped.get("html", ""),
+                               existing_tags=existing_tags, **kw)
 
     analysis = ai.analyze_text(scraped.get("text") or scraped.get("html", ""),
-                               existing_tags=existing_tags, content_type=content_type)
+                               existing_tags=existing_tags, content_type=content_type, **kw)
     # When the scraper could only get a truncated preview (Facebook text posts),
     # tell the user plainly rather than presenting a thin summary as complete.
     if isinstance(analysis, dict) and scraped.get("truncated"):
@@ -858,7 +856,7 @@ def debug_status(req: https_fn.Request) -> https_fn.Response:
         return _server_error(exc=e, message="Debug failed")
 
 
-@https_fn.on_request(max_instances=10)
+@https_fn.on_request(max_instances=10, timeout_sec=120)
 def analyze_link(req: https_fn.Request) -> https_fn.Response:
     """
     HTTP endpoint for analyzing URLs immediately (Synchronous).
@@ -875,6 +873,11 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
 
     if not _require_app_check(req, headers):
         return _error_response("App Check verification failed", 401, headers)
+
+    # (refund_uid, kind) of a quota unit charged by THIS request, so the 5xx
+    # handler can refund it — a failed save must not permanently consume a unit.
+    # Stays None on the 4xx/rate-limit paths that never charged.
+    charged = None
 
     try:
         data = req.get_json()
@@ -903,11 +906,14 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
                 q = _quota_blocked(note_uid, "saves", headers)
                 if q:
                     return q
+                charged = (note_uid, "saves")
 
             note_text = text.strip()[:MAX_NOTE_LENGTH]
             logger.info("Analyzing note text synchronously (%d chars)", len(note_text))
             ai = GeminiService()
-            analysis = ai.analyze_text(note_text, existing_tags=existing_tags)
+            # Synchronous path: cap Gemini at 2 attempts to stay under the 60s
+            # function budget (report 3.6).
+            analysis = ai.analyze_text(note_text, existing_tags=existing_tags, attempts=2)
 
             related_links = []
             if note_uid:
@@ -946,9 +952,20 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             if rl:
                 return rl
             # Monthly save quota — meter before scraping + paid Gemini analysis.
+            #
+            # NOTE (report 3.2c retry double-charge): a Retry of a failed card
+            # (web/lib/storage.ts retryFailedLink) POSTs the SAME body shape as a
+            # fresh add — { url, existingTags, uid } — with NO distinguishing field
+            # (no linkId / retry flag). The backend therefore cannot tell a retry
+            # from a new save, so it charges again. Left as-is deliberately: the
+            # only clean fixes are client-side (send a retry marker) or accepting
+            # the rare double-charge; the failed original now REFUNDS its unit (see
+            # the 5xx handler below), so most retries follow a refund and net to one
+            # charge anyway.
             q = _quota_blocked(uid, "saves", headers)
             if q:
                 return q
+            charged = (uid, "saves")
 
         logger.info(f"Analyzing URL synchronously: {url}")
 
@@ -961,7 +978,8 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         # 2. Analyze with AI (YouTube → native video ingestion w/ fallback)
         ai = GeminiService()
         content_type = scraped.get("content_type")
-        analysis = _analyze_scraped(ai, scraped, existing_tags)
+        # Synchronous path: 2 Gemini attempts (stay under the 60s budget, report 3.6).
+        analysis = _analyze_scraped(ai, scraped, existing_tags, attempts=2)
 
         # 3. Generate Embedding & Find Connections
         # Rich v2 recipe (see _embedding_text_from_analysis). Used here only as
@@ -1023,6 +1041,10 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         )
 
     except Exception as e:
+        # Server-side failure (AnalysisError / unexpected) → refund the save unit
+        # this request charged so a failed analysis doesn't burn quota.
+        if charged:
+            refund_quota(*charged)
         return _server_error(headers, e)
 
 
@@ -1076,7 +1098,7 @@ def _keyword_fallback_cards(uid: str, question: str, exclude_ids: set, limit: in
     return [d for _, d in scored[:limit]]
 
 
-@https_fn.on_request(max_instances=10)
+@https_fn.on_request(max_instances=10, timeout_sec=120)
 def ask_brain(req: https_fn.Request) -> https_fn.Response:
     """HTTP endpoint: conversational RAG over the user's saved links.
 
@@ -1233,7 +1255,8 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                 mimetype="text/event-stream",
             )
 
-        result = ai.answer_from_context(question, slim, history)
+        # Synchronous path: 2 Gemini attempts (stay under the 60s budget, report 3.6).
+        result = ai.answer_from_context(question, slim, history, attempts=2)
 
         # 4. Return only the cited sources for the UI (clickable chips).
         cited_ids = result.get("citedIds", [])
@@ -1378,7 +1401,7 @@ def get_article(req: https_fn.Request) -> https_fn.Response:
         return _server_error(headers, e)
 
 
-@https_fn.on_request(max_instances=10)
+@https_fn.on_request(max_instances=10, timeout_sec=120)
 def analyze_image(req: https_fn.Request) -> https_fn.Response:
     """HTTP endpoint for analyzing Images immediately (Synchronous)."""
     if req.method == 'OPTIONS':
@@ -1392,6 +1415,10 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
 
     if not _require_app_check(req, headers):
         return _error_response("App Check verification failed", 401, headers)
+
+    # (refund_uid, kind) of a quota unit charged by THIS request, so the 5xx
+    # handler can refund it — a failed image save must not consume a unit.
+    charged = None
 
     try:
         data = req.get_json()
@@ -1407,20 +1434,23 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
         if auth_err:
             return auth_err
 
+        # Validate the request has an image BEFORE charging quota — an imageless
+        # (400) request must never burn a save unit.
+        if not image_url and not image_b64:
+            return _error_response("imageBytes or imageUrl is required", 400, headers)
+
         # Second rate-limit bucket, keyed per workspace uid (the IP bucket above
         # can't stop a single account rotating IPs). Only when a uid resolves.
         if uid:
             rl = _rate_limited("image-uid", uid, headers)
             if rl:
                 return rl
-            # Monthly save quota (an image is a save) — meter before the paid
-            # Gemini vision call.
+            # Monthly save quota (an image is a save) — metered only after input
+            # validation passes, so a rejected request doesn't consume a unit.
             q = _quota_blocked(uid, "saves", headers)
             if q:
                 return q
-
-        if not image_url and not image_b64:
-            return _error_response("imageBytes or imageUrl is required", 400, headers)
+            charged = (uid, "saves")
 
         # 1. Obtain image bytes.
         # Preferred path: the client sends the (already compressed) bytes inline,
@@ -1459,7 +1489,8 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
 
         # 2. Analyze with AI
         ai = GeminiService()
-        analysis = ai.analyze_image(image_bytes, mime_type, existing_tags=existing_tags)
+        # Synchronous path: 2 Gemini attempts (stay under the 60s budget, report 3.6).
+        analysis = ai.analyze_image(image_bytes, mime_type, existing_tags=existing_tags, attempts=2)
 
         # 2b. Persist the image via the admin SDK (bypasses storage.rules, which
         # denies client writes). This is how screenshots are stored elsewhere
@@ -1496,6 +1527,10 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
         )
 
     except Exception as e:
+        # Server-side failure → refund the save unit this request charged so a
+        # failed image analysis doesn't burn quota.
+        if charged:
+            refund_quota(*charged)
         return _server_error(headers, e, "Image analysis failed")
 
 
@@ -2206,11 +2241,17 @@ def log_to_firestore(task_id: str, message: str, level: str = "INFO", data: dict
     """Log a heartbeat to Firestore for visibility."""
     try:
         db = get_db()
+        now = datetime.now(timezone.utc)
         log_entry = {
             "taskId": task_id,
             "message": message,
             "level": level,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": now.isoformat(),
+            # A real datetime → stored as a Firestore Timestamp, so a Firestore TTL
+            # policy on this field can auto-expire the doc (TTL only works on
+            # Timestamp fields, not the ISO `timestamp` string). The janitor prune
+            # also matches on it (expireAt <= now) — see run_processing_janitor.
+            "expireAt": now + timedelta(days=14),
             "data": data or {}
         }
         db.collection('task_logs').add(log_entry)
@@ -2565,27 +2606,57 @@ def run_processing_janitor() -> dict:
             report["errors"].append(f"{doc.id}: {e}")
 
     # Bounded task_logs pruning (report 3.7). task_logs is a TOP-LEVEL collection
-    # of heartbeat docs, each stamped with an ISO-8601 UTC `timestamp` string by
-    # log_to_firestore. It grows forever otherwise, so age out docs older than 14
-    # days, up to 200 per run (belt-and-suspenders to an optional Firestore TTL
-    # policy). ISO-8601 UTC sorts lexicographically, so the string range query is
-    # correct and served by the default single-field index. Docs missing the
-    # field simply don't match and are skipped — safe.
+    # of heartbeat docs written by log_to_firestore. New docs carry a Timestamp
+    # `expireAt` (TTL-policy compatible); pre-existing docs only have the ISO-8601
+    # `timestamp` string. Age out docs older than 14 days from BOTH sources so the
+    # existing backlog still drains while new docs prune (and/or TTL-expire) on the
+    # Timestamp field. Each query is bounded; deletes go through a single batch
+    # commit (<= 200 ops) instead of a round trip per doc.
     report["logs_pruned"] = 0
+    now_dt = datetime.now(timezone.utc)
+    cutoff_dt = now_dt - timedelta(days=14)
+    stale_refs = []
+    seen_ids = set()
+
+    # Primary: Timestamp `expireAt` <= now (what a TTL policy keys on too).
     try:
-        cutoff_iso = (datetime.now(timezone.utc) - timedelta(days=14)).isoformat()
-        old_logs = db.collection("task_logs").where(
-            "timestamp", "<", cutoff_iso
-        ).limit(200).stream()
-        for doc in old_logs:
-            try:
-                doc.reference.delete()
-                report["logs_pruned"] += 1
-            except Exception as e:
-                logger.error(f"Janitor failed to delete task_log {doc.id}: {e}")
+        for doc in db.collection("task_logs").where(
+            "expireAt", "<=", now_dt
+        ).limit(200).stream():
+            if doc.id not in seen_ids:
+                seen_ids.add(doc.id)
+                stale_refs.append(doc.reference)
     except Exception as e:
-        logger.error(f"task_logs prune query failed: {e}")
-        report["errors"].append(f"task_logs: {e}")
+        logger.error(f"task_logs expireAt prune query failed: {e}")
+        report["errors"].append(f"task_logs expireAt: {e}")
+
+    # Fallback: legacy docs with no expireAt — match on the ISO `timestamp` string
+    # (ISO-8601 UTC sorts lexicographically, so a string range query is correct).
+    # Bounded to whatever batch headroom remains (<= 200 total ops per commit).
+    remaining = max(0, 200 - len(stale_refs))
+    if remaining:
+        try:
+            cutoff_iso = cutoff_dt.isoformat()
+            for doc in db.collection("task_logs").where(
+                "timestamp", "<", cutoff_iso
+            ).limit(remaining).stream():
+                if doc.id not in seen_ids:
+                    seen_ids.add(doc.id)
+                    stale_refs.append(doc.reference)
+        except Exception as e:
+            logger.error(f"task_logs timestamp prune query failed: {e}")
+            report["errors"].append(f"task_logs timestamp: {e}")
+
+    if stale_refs:
+        try:
+            batch = db.batch()
+            for ref in stale_refs:
+                batch.delete(ref)
+            batch.commit()
+            report["logs_pruned"] = len(stale_refs)
+        except Exception as e:
+            logger.error(f"task_logs batch delete failed: {e}")
+            report["errors"].append(f"task_logs delete: {e}")
 
     if report["failed_out"] or report["logs_pruned"]:
         logger.info(f"Processing janitor: {report}")
@@ -2615,13 +2686,24 @@ def force_sweep_stuck_processing(req: https_fn.Request) -> https_fn.Response:
 
 @https_fn.on_request(max_instances=1)
 def force_check_reminders(req: https_fn.Request) -> https_fn.Response:
-    """Manual trigger for reminder check to debug without waiting for schedule."""
+    """Manual trigger for reminder check to debug without waiting for schedule.
+
+    Optional ?coerce=1 runs a bounded one-time repair pass FIRST that rewrites
+    legacy non-int nextReminderAt values (Firestore Timestamp / string) to int ms
+    so they stop being stranded by the '<=' int filter — see
+    reminder_service.coerce_pending_reminder_times. Its counts are returned under
+    the "coercion" key alongside the normal run report."""
     guard = _require_admin(req)
     if guard:
         return guard
     try:
-        report = run_reminder_check()
-        return https_fn.Response(json.dumps(report, indent=2), status=200, mimetype="application/json")
+        result = {}
+        coerce = (req.args.get("coerce") or "").lower() in ("1", "true", "yes")
+        if coerce:
+            from reminder_service import coerce_pending_reminder_times
+            result["coercion"] = coerce_pending_reminder_times()
+        result["check"] = run_reminder_check()
+        return https_fn.Response(json.dumps(result, indent=2), status=200, mimetype="application/json")
     except Exception as e:
         logger.error(f"Manual trigger failed: {e}")
         return https_fn.Response(f"Error: {e}", status=500)

@@ -48,7 +48,10 @@ export function useFeedFilters(
         (l: Link) => !!l.isPrivate || (l.collectionIds ?? []).some((id) => privateCollectionIds.has(id)),
         [privateCollectionIds]
     );
-    const contentLinks = useMemo(() => links.filter((l) => {
+    // Membership predicate for the main (non-private) feed. Factored out so the
+    // semantic-search union below can gate out-of-window server matches through
+    // the exact same pending/privacy rules the window is filtered by.
+    const isContentCard = useCallback((l: Link) => {
         if (isPending(l)) return false;
         if (!isEffectivelyPrivate(l)) return true;
         // The one place an effectively-private card surfaces outside the Private
@@ -58,21 +61,39 @@ export function useFeedFilters(
         // count — privacy inherited from one collection follows the card into
         // its other collections.
         return (l.collectionIds ?? []).some((id) => selectedCollections.has(id) && privateCollectionIds.has(id));
-    }), [links, isEffectivelyPrivate, selectedCollections, privateCollectionIds]);
-    const privateCards = useMemo(
-        () => links.filter((l) => !isPending(l) && isEffectivelyPrivate(l)),
-        [links, isEffectivelyPrivate]
+    }, [isEffectivelyPrivate, selectedCollections, privateCollectionIds]);
+    const isPrivateCard = useCallback(
+        (l: Link) => !isPending(l) && isEffectivelyPrivate(l),
+        [isEffectivelyPrivate]
     );
+    const contentLinks = useMemo(() => links.filter(isContentCard), [links, isContentCard]);
+    const privateCards = useMemo(() => links.filter(isPrivateCard), [links, isPrivateCard]);
 
     // Keyword-search tokens for the current query, prepped ONCE per query (not per
     // card): lowercased, punctuation-stripped, stopwords dropped. Every token must
     // then appear in a card's text for a keyword match (see the search filter below).
     const queryTokens = useMemo(() => tokenizeQuery(debouncedQuery), [debouncedQuery]);
 
+    // Base set for the filter pipeline. When a semantic search is active, UNION
+    // the server's results (full Link objects) into the loaded window so a match
+    // OLDER than the window still renders — that old-item recall is the whole
+    // point of semantic search, and a pure window membership test hides it. The
+    // unioned docs are deduped by id (window docs win) and run through the SAME
+    // pending/privacy predicate as the window, then flow through every facet/
+    // status filter below, so e.g. archived filtering stays consistent.
+    const searchBase = useMemo(() => {
+        const base = filter === 'private' ? privateCards : contentLinks;
+        if (!debouncedQuery.trim() || searchResults.length === 0) return base;
+        const gate = filter === 'private' ? isPrivateCard : isContentCard;
+        const seen = new Set(base.map((l) => l.id));
+        const extra = searchResults.filter((r) => !seen.has(r.id) && gate(r));
+        return extra.length ? base.concat(extra) : base;
+    }, [filter, privateCards, contentLinks, debouncedQuery, searchResults, isPrivateCard, isContentCard]);
+
     // 4. Hybrid Search Logic — memoized so a banner tick or any unrelated state
     // change (search typing, overlay toggles) doesn't re-run the 6-stage filter +
     // sort. Recomputes only when an input it actually reads changes.
-    const filteredLinks = useMemo(() => (filter === 'private' ? privateCards : contentLinks)
+    const filteredLinks = useMemo(() => searchBase
         .filter((link) => {
             // Apply status filters ('private' already picked its base list above)
             if (filter === 'private') return true;
@@ -168,7 +189,7 @@ export function useFeedFilters(
                     return 0;
             }
         }),
-        [contentLinks, filter, selectedCategory, selectedTags, selectedCollections, selectedSources, debouncedQuery, queryTokens, searchResults, sortBy]);
+        [searchBase, filter, selectedCategory, selectedTags, selectedCollections, selectedSources, debouncedQuery, queryTokens, searchResults, sortBy]);
 
     // Faceted counts — the numbers update live as you tap. Each facet's counts are
     // computed against the OTHER facet's current selection (but never its own), so
