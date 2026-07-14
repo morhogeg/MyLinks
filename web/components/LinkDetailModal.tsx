@@ -55,8 +55,8 @@ interface LinkDetailModalProps {
     onReadStatusChange: (id: string, isRead: boolean) => void;
     onUpdateTags: (id: string, tags: string[]) => void;
     onUpdateCategory: (id: string, category: string) => void;
-    onUpdateTitle?: (id: string, title: string) => void;
-    onUpdateSummary?: (id: string, summary: string) => void;
+    onUpdateTitle?: (id: string, title: string, reembed?: boolean) => void;
+    onUpdateSummary?: (id: string, summary: string, reembed?: boolean) => void;
     onUpdateNotes?: (id: string, notes: UserNote[], removed?: boolean) => void;
     onDelete: (id: string) => void;
     onUpdateReminder: (link: Link) => void;
@@ -121,15 +121,21 @@ export default function LinkDetailModal({
         setEditingNoteId(null);
     }
 
+    // A note card IS the user's own words (no source article to preserve): its
+    // title and body are meant to be edited freely — not just "corrected" like AI
+    // output — and each edit must re-embed the card (reembed=true) to keep
+    // search/Ask current. A regular link's title/summary are metadata over an
+    // unchanged article, so its vector is left alone.
+    const isNote = link.sourceType === 'note';
     const saveTitle = () => {
         const t = titleDraft.trim();
         setIsEditingTitle(false);
-        if (t && t !== link.title) onUpdateTitle?.(link.id, t);
+        if (t && t !== link.title) onUpdateTitle?.(link.id, t, isNote);
     };
     const saveSummary = () => {
         const s = summaryDraft.trim();
         setIsEditingSummary(false);
-        if (s !== (link.summary || '')) onUpdateSummary?.(link.id, s);
+        if (s !== (link.summary || '')) onUpdateSummary?.(link.id, s, isNote);
     };
     // The note composer: refs + a pointer-down intent flag so save-on-blur can
     // never fight an explicit Save/Cancel/Delete tap. On iOS a button tap often
@@ -808,11 +814,11 @@ export default function LinkDetailModal({
                             {onUpdateTitle && (
                                 <button
                                     onClick={() => { setTitleDraft(link.title); setIsEditingTitle(true); }}
-                                    aria-label="Edit title"
-                                    title="Edit title"
-                                    className="shrink-0 mt-1 opacity-0 group-hover/title:opacity-100 focus:opacity-100 transition-opacity p-1.5 hover:bg-fill-subtle rounded-md"
+                                    aria-label={isNote ? 'Edit note' : 'Edit title'}
+                                    title={isNote ? 'Edit note' : 'Edit title'}
+                                    className={`shrink-0 mt-1 focus:opacity-100 transition-opacity p-1.5 hover:bg-fill-subtle rounded-md ${isNote ? 'opacity-100' : 'opacity-0 group-hover/title:opacity-100'}`}
                                 >
-                                    <Pencil className="w-4 h-4 text-text-muted/50 hover:text-text-muted" />
+                                    <Pencil className={`w-4 h-4 ${isNote ? 'text-accent' : 'text-text-muted/50 hover:text-text-muted'}`} />
                                 </button>
                             )}
                         </div>
@@ -881,11 +887,11 @@ export default function LinkDetailModal({
                                                         {onUpdateSummary && (
                                                             <button
                                                                 onClick={startEditSummary}
-                                                                aria-label="Edit summary"
-                                                                title="Edit summary"
-                                                                className={`absolute top-0 opacity-0 group-hover/summary:opacity-100 focus:opacity-100 transition-opacity p-1.5 hover:bg-fill-subtle rounded-md ${isRtl ? 'left-0' : 'right-0'}`}
+                                                                aria-label={isNote ? 'Edit note' : 'Edit summary'}
+                                                                title={isNote ? 'Edit note' : 'Edit summary'}
+                                                                className={`absolute top-0 focus:opacity-100 transition-opacity p-1.5 hover:bg-fill-subtle rounded-md ${isNote ? 'opacity-100' : 'opacity-0 group-hover/summary:opacity-100'} ${isRtl ? 'left-0' : 'right-0'}`}
                                                             >
-                                                                <Pencil className="w-4 h-4 text-text-muted/50 hover:text-text-muted" />
+                                                                <Pencil className={`w-4 h-4 ${isNote ? 'text-accent' : 'text-text-muted/50 hover:text-text-muted'}`} />
                                                             </button>
                                                         )}
                                                     </div>
@@ -897,7 +903,7 @@ export default function LinkDetailModal({
                                                         onClick={startEditSummary}
                                                         className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/60 hover:text-accent transition-colors"
                                                     >
-                                                        <Pencil className="w-3.5 h-3.5" /> Edit summary
+                                                        <Pencil className="w-3.5 h-3.5" /> {isNote ? 'Add a body' : 'Edit summary'}
                                                     </button>
                                                 )}
                                             </>

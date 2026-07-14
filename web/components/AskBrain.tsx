@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { MessageCircleQuestion, ArrowUp, FileText, Plus, MessagesSquare, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X } from 'lucide-react';
+import { ArrowUp, FileText, Plus, MessagesSquare, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X, PanelLeftOpen } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -771,8 +771,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
     if (totalLinks === 0) {
         return (
             <div className="text-center py-20 px-6 animate-fade-in">
-                <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-accent/10 flex items-center justify-center">
-                    <MessageCircleQuestion className="w-7 h-7 text-accent" strokeWidth={1.75} />
+                <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-fill-subtle border border-border-subtle flex items-center justify-center">
+                    <MessagesSquare className="w-7 h-7 text-text-secondary" strokeWidth={1.75} />
                 </div>
                 <h3 className="text-base font-bold text-text">Nothing to ask about yet</h3>
                 <p className="mt-1.5 max-w-xs mx-auto text-sm text-text-muted leading-relaxed">
@@ -797,12 +797,20 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                     onBack={() => onExit?.()}
                     title="Ask Machina"
                     leading={
+                        // A labeled pill (not a bare icon) so it's obvious a history
+                        // panel lives behind it — the panel-open glyph mirrors the
+                        // desktop sidebar toggle, and the count hints there's something
+                        // to open. Falls back to just "History" when the list is empty.
                         <button
                             onClick={() => setHistoryOpen(true)}
-                            aria-label="Chat history"
-                            className="p-2 rounded-full text-text-secondary hover:text-text active:bg-card-hover transition-colors cursor-pointer"
+                            aria-label="Open chat history"
+                            className="inline-flex items-center gap-1.5 ps-2 pe-2.5 py-1.5 rounded-full text-text-secondary bg-card border border-border-subtle hover:text-text hover:border-text-muted/40 active:bg-card-hover transition-colors cursor-pointer"
                         >
-                            <MessagesSquare className="w-5 h-5" />
+                            <PanelLeftOpen className="w-4 h-4 shrink-0" />
+                            <span className="text-xs font-semibold">History</span>
+                            {chats.length > 0 && (
+                                <span className="min-w-[1.1rem] text-center text-[11px] font-bold tabular-nums text-text-muted">{chats.length}</span>
+                            )}
                         </button>
                     }
                 >
@@ -828,8 +836,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
             >
                 {isEmpty ? (
                     <div className="h-full flex flex-col items-center justify-center text-center px-4">
-                        <div className="w-14 h-14 mb-4 rounded-2xl bg-accent/10 flex items-center justify-center">
-                            <MessageCircleQuestion className="w-7 h-7 text-accent" strokeWidth={1.75} />
+                        <div className="w-14 h-14 mb-4 rounded-2xl bg-fill-subtle border border-border-subtle flex items-center justify-center">
+                            <MessagesSquare className="w-7 h-7 text-text-secondary" strokeWidth={1.75} />
                         </div>
                         <h2 className="text-xl font-semibold text-text mb-1.5">What do you want to recall?</h2>
                         <p className="text-text-muted text-sm max-w-xs mb-6 leading-relaxed">

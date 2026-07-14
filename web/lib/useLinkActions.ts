@@ -62,19 +62,19 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
 
     // Editable AI output — the summary/title the model produced is a draft, not a
     // verdict. Optimistic via onSnapshot latency compensation (same as the others).
-    const handleUpdateTitle = useCallback(async (id: string, title: string) => {
+    const handleUpdateTitle = useCallback(async (id: string, title: string, reembed = false) => {
         if (!uid) return;
         try {
-            await updateLinkTitle(uid, id, title);
+            await updateLinkTitle(uid, id, title, reembed);
         } catch {
             toast.error("Couldn't save the title. Please try again.");
         }
     }, [uid, toast]);
 
-    const handleUpdateSummary = useCallback(async (id: string, summary: string) => {
+    const handleUpdateSummary = useCallback(async (id: string, summary: string, reembed = false) => {
         if (!uid) return;
         try {
-            await updateLinkSummary(uid, id, summary);
+            await updateLinkSummary(uid, id, summary, reembed);
         } catch {
             toast.error("Couldn't save the summary. Please try again.");
         }

@@ -383,18 +383,24 @@ export async function updateLinkCategory(uid: string, id: string, category: stri
  * background process rewrites `title` on a ready card (the embedding trigger only
  * touches `embedding_vector`), so a user edit sticks.
  */
-export async function updateLinkTitle(uid: string, id: string, title: string): Promise<void> {
+export async function updateLinkTitle(uid: string, id: string, title: string, reembed = false): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', id);
-    await updateDoc(linkRef, { title });
+    // For a NOTE card the title IS (part of) the user's own words — the embedding
+    // is built from that text — so a title edit must re-flag `needsEmbedding` to
+    // keep search/Ask honest. For a regular link the title is just metadata (the
+    // embedding comes from the article), so we leave the vector untouched.
+    await updateDoc(linkRef, reembed ? { title, needsEmbedding: true } : { title });
 }
 
 /**
  * Update a link's AI-generated summary. Same rationale as updateLinkTitle — the
  * summary is editable and the edit is durable (nothing rewrites it in place).
+ * `reembed` re-vectorizes note cards (whose body IS the user's words) so an edit
+ * flows through to search/Ask.
  */
-export async function updateLinkSummary(uid: string, id: string, summary: string): Promise<void> {
+export async function updateLinkSummary(uid: string, id: string, summary: string, reembed = false): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', id);
-    await updateDoc(linkRef, { summary });
+    await updateDoc(linkRef, reembed ? { summary, needsEmbedding: true } : { summary });
 }
 
 /**
