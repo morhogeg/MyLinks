@@ -38,6 +38,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 // (/privacy, /terms), which App Store review must reach without sign-in.
 import { AuthGate } from "@/lib/publicRoutes";
 import { ToastProvider } from "@/components/Toast";
+import OfflineBanner from "@/components/OfflineBanner";
 
 export default function RootLayout({
   children,
@@ -67,6 +68,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-text transition-colors duration-200`}
       >
         <ThemeProvider>
+          {/* Global offline banner — mounted above the auth gate so it shows on
+              every route (incl. the public legal pages) and both platforms. */}
+          <OfflineBanner />
           <AuthGate>
             <ToastProvider>
               {children}

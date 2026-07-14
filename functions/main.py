@@ -20,13 +20,24 @@ import html as _html
 import logging
 import requests
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # Firebase Functions framework
 from firebase_functions import https_fn, scheduler_fn, firestore_fn, options
 from firebase_admin import storage, auth as admin_auth
 from google.cloud import firestore as gc_firestore
 from google.cloud.firestore_v1.vector import Vector
+
+# Cost ceiling (report 3.1): a hard cap on total concurrent instances across
+# EVERY function in this codebase, so a traffic spike or abuse can never fan out
+# into unbounded paid Gemini calls. Set BEFORE the internal-module imports below
+# on purpose: firebase_functions computes each function's deploy spec at
+# DECORATION time, so functions decorated while those modules import (notably
+# search.py's search_links / sync_link_embedding) only inherit this global
+# default if it's already set. Per-function decorators tighten it further on the
+# paid/admin surfaces; a function still overrides any field it sets explicitly
+# (e.g. process_link_background keeps its own memory/timeout).
+options.set_global_options(max_instances=20)
 
 # Internal modules
 from db import get_db
@@ -51,6 +62,8 @@ from search import (
     keyword_match_score, EmbeddingService, EMBED_TEXT_VERSION,
 )
 from rate_limit import check_rate_limit, client_ip
+# Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
+from quota import check_and_increment_quota
 # Public share-page subsystem (renderers + publish/unpublish logic). The three
 # HTTP endpoints (publish_share_http, unpublish_share_http, share_page) stay in
 # this file — Firebase discovers deployables by scanning main.py — and call into
@@ -237,6 +250,14 @@ _RATE_LIMITS = {
     "chat-uid": (60, 3600),
     "article": (120, 3600),
     "share": (120, 3600),
+    # Per-uid ceiling on the share-extension token path (report 3.3): the IP
+    # `share` bucket alone can't stop a leaked ingest token from spamming the
+    # paid pipeline from rotating IPs. 60/hr comfortably covers real share usage.
+    "share-uid": (60, 3600),
+    # Per-uid ceiling on public-share publishing (report 3.4): each publish
+    # writes a client-built snapshot, so bound how fast one account can create/
+    # overwrite them (on top of the serialized-size cap in publish_share_http).
+    "publish": (30, 3600),
     "device_token": (30, 3600),
     # Home search bar (native HTTP twin). Debounced client-side, but a user can
     # still fire many queries in a session, so keep the ceilings generous. Mirror
@@ -298,12 +319,58 @@ def _sanitize_tags(tags) -> list:
     return cleaned
 
 
+# Paid buckets — every call behind one spends money on Gemini (analyze/image/
+# chat/search) or writes attacker-influenceable data (share/publish). These fail
+# CLOSED (report 3.5): if the rate-limiter's Firestore backend errors, the call
+# is rejected (429) rather than allowed unlimited, which is exactly the moment a
+# fail-open limiter would remove the last cost ceiling. Cheap/IP-only buckets
+# (article scrape, device-token writes) keep failing OPEN so a Firestore hiccup
+# doesn't take those harmless paths down.
+_FAIL_CLOSED_BUCKETS = {
+    "analyze", "analyze-uid", "image", "image-uid", "chat", "chat-uid",
+    "search", "search-uid", "share", "share-uid", "publish",
+}
+
+
 def _rate_limited(bucket: str, identity: str, headers: dict = None):
     """Return a 429 Response if `identity` exceeds the bucket's limit, else None."""
     limit, window = _RATE_LIMITS[bucket]
-    if not check_rate_limit(f"{bucket}:{identity}", limit, window):
-        logger.warning("Rate limit exceeded: %s:%s", bucket, identity)
+    fail_open = bucket not in _FAIL_CLOSED_BUCKETS
+    if not check_rate_limit(f"{bucket}:{identity}", limit, window, fail_open=fail_open):
+        # Log the bucket only — the identity is an IP or workspace uid (PII).
+        logger.warning("Rate limit exceeded: %s", bucket)
         return _error_response("Too many requests. Please slow down.", 429, headers)
+    return None
+
+
+# Serialized-payload cap for publish_share_http (report 3.4). A share snapshot is
+# a single card or a small curated collection; 200 KB is generous headroom while
+# blocking large-doc spam / storage abuse. Over-cap → 413.
+MAX_PUBLISH_BYTES = 200 * 1024
+
+# Friendly, envelope-matching messages for the monthly quota 429s (report 3.2).
+_QUOTA_MESSAGES = {
+    "saves": "Monthly save limit reached — resets on the 1st.",
+    "asks": "Monthly question limit reached — resets on the 1st.",
+}
+
+
+def _quota_blocked(uid: str, kind: str, headers: dict = None):
+    """Meter one `kind` unit against `uid`'s monthly quota; 429 Response if over.
+
+    Soft cap (report 3.2): a None uid (pre-cutover soft auth, nothing to meter)
+    or any Firestore error fails OPEN inside check_and_increment_quota, so this
+    only ever blocks a real, over-limit workspace — the rate limiter (fail-closed)
+    and max_instances are the hard backstops. Increments the counter as a side
+    effect when the call is allowed, so callers invoke it exactly once, before
+    the paid work / enqueue.
+    """
+    if not uid:
+        return None
+    ok, _ = check_and_increment_quota(uid, kind)
+    if not ok:
+        logger.warning("Monthly quota exceeded (kind=%s)", kind)
+        return _error_response(_QUOTA_MESSAGES[kind], 429, headers)
     return None
 
 
@@ -572,7 +639,7 @@ def _card_source_name(c: dict):
     return meta.get("youtubeChannel") or c.get("sourceName")
 
 
-@https_fn.on_request()
+@https_fn.on_request(max_instances=1)
 def backfill_youtube_channels(req: https_fn.Request) -> https_fn.Response:
     """One-off repair: set metadata.youtubeChannel (and sourceName) from YouTube
     oEmbed for existing YouTube cards that are missing a real channel — older
@@ -624,7 +691,7 @@ def backfill_youtube_channels(req: https_fn.Request) -> https_fn.Response:
         return _server_error(headers, e, "Backfill failed")
 
 
-@https_fn.on_request()
+@https_fn.on_request(max_instances=1)
 def backfill_related_links(req: https_fn.Request) -> https_fn.Response:
     """One-off repair: compute link.relatedLinks (the "See also" graph, M9) for
     existing cards that predate graph_service, and backfill any missing
@@ -658,7 +725,7 @@ def backfill_related_links(req: https_fn.Request) -> https_fn.Response:
         return _server_error(headers, e, "Backfill related links failed")
 
 
-@https_fn.on_request()
+@https_fn.on_request(max_instances=1)
 def backfill_embeddings(req: https_fn.Request) -> https_fn.Response:
     """One-off migration: re-embed existing cards with the RICH v2 recipe.
 
@@ -743,7 +810,7 @@ def ping(req: https_fn.Request) -> https_fn.Response:
     return https_fn.Response("pong")
 
 
-@https_fn.on_request()
+@https_fn.on_request(max_instances=1)
 def debug_status(req: https_fn.Request) -> https_fn.Response:
     """Debug endpoint to inspect system state."""
     guard = _require_admin(req)
@@ -791,7 +858,7 @@ def debug_status(req: https_fn.Request) -> https_fn.Response:
         return _server_error(exc=e, message="Debug failed")
 
 
-@https_fn.on_request()
+@https_fn.on_request(max_instances=10)
 def analyze_link(req: https_fn.Request) -> https_fn.Response:
     """
     HTTP endpoint for analyzing URLs immediately (Synchronous).
@@ -831,6 +898,11 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
                 rl = _rate_limited("analyze-uid", note_uid, headers)
                 if rl:
                     return rl
+                # Monthly save quota (a note is a save) — meter before the paid
+                # Gemini analysis below.
+                q = _quota_blocked(note_uid, "saves", headers)
+                if q:
+                    return q
 
             note_text = text.strip()[:MAX_NOTE_LENGTH]
             logger.info("Analyzing note text synchronously (%d chars)", len(note_text))
@@ -873,6 +945,10 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             rl = _rate_limited("analyze-uid", uid, headers)
             if rl:
                 return rl
+            # Monthly save quota — meter before scraping + paid Gemini analysis.
+            q = _quota_blocked(uid, "saves", headers)
+            if q:
+                return q
 
         logger.info(f"Analyzing URL synchronously: {url}")
 
@@ -1000,7 +1076,7 @@ def _keyword_fallback_cards(uid: str, question: str, exclude_ids: set, limit: in
     return [d for _, d in scored[:limit]]
 
 
-@https_fn.on_request()
+@https_fn.on_request(max_instances=10)
 def ask_brain(req: https_fn.Request) -> https_fn.Response:
     """HTTP endpoint: conversational RAG over the user's saved links.
 
@@ -1055,6 +1131,11 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             return _error_response("question is required", 400, headers)
         if len(question) > MAX_QUESTION_LENGTH:
             return _error_response("question is too long", 400, headers)
+
+        # Monthly ask quota — meter before the retrieval + paid Gemini answer.
+        q = _quota_blocked(uid, "asks", headers)
+        if q:
+            return q
 
         # 1. Retrieve the most relevant saved cards (reuses the vector search
         #    that already powers the search bar). Degrade gracefully: if
@@ -1184,7 +1265,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         return _server_error(headers, e)
 
 
-@https_fn.on_request()
+@https_fn.on_request(max_instances=10)
 def search_links_http(req: https_fn.Request) -> https_fn.Response:
     """HTTP twin of the `search_links` callable, for the native iOS shell.
 
@@ -1252,7 +1333,7 @@ def search_links_http(req: https_fn.Request) -> https_fn.Response:
         return _server_error(headers, e, "Search failed")
 
 
-@https_fn.on_request()
+@https_fn.on_request(max_instances=10)
 def get_article(req: https_fn.Request) -> https_fn.Response:
     """HTTP endpoint: extract a clean, readable version of an article for the
     in-app reading mode. Body: { url }. Returns { success, title, paragraphs }.
@@ -1297,7 +1378,7 @@ def get_article(req: https_fn.Request) -> https_fn.Response:
         return _server_error(headers, e)
 
 
-@https_fn.on_request()
+@https_fn.on_request(max_instances=10)
 def analyze_image(req: https_fn.Request) -> https_fn.Response:
     """HTTP endpoint for analyzing Images immediately (Synchronous)."""
     if req.method == 'OPTIONS':
@@ -1332,6 +1413,11 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
             rl = _rate_limited("image-uid", uid, headers)
             if rl:
                 return rl
+            # Monthly save quota (an image is a save) — meter before the paid
+            # Gemini vision call.
+            q = _quota_blocked(uid, "saves", headers)
+            if q:
+                return q
 
         if not image_url and not image_b64:
             return _error_response("imageBytes or imageUrl is required", 400, headers)
@@ -1453,7 +1539,7 @@ def _pending_url_doc(uid: str, url: str, *, card_id: Optional[str] = None,
     return doc
 
 
-@https_fn.on_request()
+@https_fn.on_request(max_instances=10)
 def share_ingest(req: https_fn.Request) -> https_fn.Response:
     """
     HTTP endpoint for the iOS Share Extension (and any share-sheet client).
@@ -1480,6 +1566,11 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             uid = find_user_by_ingest_token(token)
             if not uid:
                 return _error_response("Invalid ingest token", 403, headers)
+            # Per-uid ceiling on the token path (report 3.3): the IP `share`
+            # bucket above can't stop a leaked token spamming from rotating IPs.
+            rl = _rate_limited("share-uid", uid, headers)
+            if rl:
+                return rl
         else:
             # Web / in-app client path (durable web capture — no share-extension
             # token). Authenticate like the other first-party endpoints: App Check
@@ -1511,6 +1602,12 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 return _error_response("Empty image data", 400, headers)
             if len(image_bytes) > MAX_IMAGE_BYTES:
                 return _error_response("Image is too large", 413, headers)
+
+            # Monthly save quota — a shared image becomes a save; meter before we
+            # store it and enqueue the paid background job.
+            q = _quota_blocked(uid, "saves", headers)
+            if q:
+                return q
 
             mime_type = data.get('mimeType', 'image/jpeg')
             ext = 'png' if 'png' in mime_type else 'jpg'
@@ -1551,6 +1648,11 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             note_text = (data.get('text') or data.get('shared') or data.get('note') or '').strip()
             if not note_text:
                 return _error_response("No URL or text found in shared content", 400, headers)
+            # Monthly save quota (a note is a save) — meter before the paid
+            # Gemini analysis + write below.
+            q = _quota_blocked(uid, "saves", headers)
+            if q:
+                return q
             note_text = note_text[:MAX_NOTE_LENGTH]
             try:
                 ai = GeminiService()
@@ -1585,6 +1687,13 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 json.dumps({"success": True, "duplicate": True, "url": url}),
                 status=200, headers=headers, mimetype='application/json'
             )
+
+        # Monthly save quota — a genuinely new (non-duplicate) URL becomes a save;
+        # meter before enqueuing the paid background job. Duplicates returned
+        # above are NOT counted.
+        q = _quota_blocked(uid, "saves", headers)
+        if q:
+            return q
 
         db = get_db()
         process_ref = db.collection('pending_processing').document()
@@ -1995,6 +2104,11 @@ def publish_share_http(req: https_fn.Request) -> https_fn.Response:
     if req.method == 'OPTIONS':
         return _cors_preflight(req)
     headers = _cors_headers(req)
+    # Serialized-payload cap (report 3.4): reject an oversized client snapshot
+    # before parsing/storing it. 413 with a plain message.
+    raw = req.get_data(cache=True) or b""
+    if len(raw) > MAX_PUBLISH_BYTES:
+        return _error_response("Share payload too large", 413, headers)
     try:
         data = req.get_json(silent=True) or {}
     except Exception:
@@ -2002,6 +2116,12 @@ def publish_share_http(req: https_fn.Request) -> https_fn.Response:
     uid, auth_err = _authed_uid(req, headers, data.get("uid"))
     if auth_err:
         return auth_err
+    # Per-uid publish rate bucket (report 3.4) — bound how fast one account can
+    # create/overwrite public snapshots.
+    if uid:
+        rl = _rate_limited("publish", uid, headers)
+        if rl:
+            return rl
     try:
         result = _publish_share_logic(
             uid, data.get("type"), data.get("shareId"), data.get("payload"),
@@ -2114,7 +2234,8 @@ def _capture_placeholder_title(url: str, is_image: bool) -> str:
 @firestore_fn.on_document_created(
     document="pending_processing/{doc_id}",
     memory=1024,
-    timeout_sec=300
+    timeout_sec=300,
+    max_instances=10,
 )
 def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnapshot]) -> None:
     """
@@ -2370,7 +2491,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
 # Scheduled Functions
 # ─────────────────────────────────────────────
 
-@scheduler_fn.on_schedule(schedule="every 2 minutes")
+@scheduler_fn.on_schedule(schedule="every 2 minutes", max_instances=1)
 def check_reminders(event: scheduler_fn.ScheduledEvent) -> None:
     """Scheduled function that runs every 2 minutes to check for pending reminders."""
     run_reminder_check()
@@ -2443,18 +2564,41 @@ def run_processing_janitor() -> dict:
             logger.error(f"Janitor failed to update {doc.id}: {e}")
             report["errors"].append(f"{doc.id}: {e}")
 
-    if report["failed_out"]:
+    # Bounded task_logs pruning (report 3.7). task_logs is a TOP-LEVEL collection
+    # of heartbeat docs, each stamped with an ISO-8601 UTC `timestamp` string by
+    # log_to_firestore. It grows forever otherwise, so age out docs older than 14
+    # days, up to 200 per run (belt-and-suspenders to an optional Firestore TTL
+    # policy). ISO-8601 UTC sorts lexicographically, so the string range query is
+    # correct and served by the default single-field index. Docs missing the
+    # field simply don't match and are skipped — safe.
+    report["logs_pruned"] = 0
+    try:
+        cutoff_iso = (datetime.now(timezone.utc) - timedelta(days=14)).isoformat()
+        old_logs = db.collection("task_logs").where(
+            "timestamp", "<", cutoff_iso
+        ).limit(200).stream()
+        for doc in old_logs:
+            try:
+                doc.reference.delete()
+                report["logs_pruned"] += 1
+            except Exception as e:
+                logger.error(f"Janitor failed to delete task_log {doc.id}: {e}")
+    except Exception as e:
+        logger.error(f"task_logs prune query failed: {e}")
+        report["errors"].append(f"task_logs: {e}")
+
+    if report["failed_out"] or report["logs_pruned"]:
         logger.info(f"Processing janitor: {report}")
     return report
 
 
-@scheduler_fn.on_schedule(schedule="every 5 minutes")
+@scheduler_fn.on_schedule(schedule="every 5 minutes", max_instances=1)
 def sweep_stuck_processing(event: scheduler_fn.ScheduledEvent) -> None:
     """Every 5 min: age out captures stuck in `processing` (see run_processing_janitor)."""
     run_processing_janitor()
 
 
-@https_fn.on_request()
+@https_fn.on_request(max_instances=1)
 def force_sweep_stuck_processing(req: https_fn.Request) -> https_fn.Response:
     """Manual trigger for the processing janitor (admin-gated) — verify without
     waiting for the schedule."""
@@ -2469,7 +2613,7 @@ def force_sweep_stuck_processing(req: https_fn.Request) -> https_fn.Response:
         return https_fn.Response(f"Error: {e}", status=500)
 
 
-@https_fn.on_request()
+@https_fn.on_request(max_instances=1)
 def force_check_reminders(req: https_fn.Request) -> https_fn.Response:
     """Manual trigger for reminder check to debug without waiting for schedule."""
     guard = _require_admin(req)
@@ -2489,16 +2633,18 @@ def force_check_reminders(req: https_fn.Request) -> https_fn.Response:
 
 # Cadence MUST match DIGEST_CADENCE_MINUTES in digest_service.py — is_due() uses
 # it as the match window, so a mismatch means missed or double-checked sends.
-# Every 5 min honors minute-precise delivery times (digest_hour:digest_minute)
-# to within one tick; the daily 20h / weekly 6d dup-guard prevents double-sends.
-@scheduler_fn.on_schedule(schedule="every 5 minutes")
+# Every 15 min keeps the user-doc scan cost at 1/3 of the old 5-min cadence
+# (it grows linearly with user count); delivery lands within one tick of the
+# chosen digest_hour:digest_minute, and the daily 20h / weekly 6d dup-guard
+# prevents double-sends.
+@scheduler_fn.on_schedule(schedule="every 15 minutes", max_instances=1)
 def send_digests(event: scheduler_fn.ScheduledEvent) -> None:
-    """Every 5 min: deliver curated digests to users whose schedule is due now."""
+    """Every 15 min: deliver curated digests to users whose schedule is due now."""
     from digest_service import run_digest_check
     run_digest_check()
 
 
-@https_fn.on_request()
+@https_fn.on_request(max_instances=1)
 def force_send_digests(req: https_fn.Request) -> https_fn.Response:
     """Manual trigger for the digest sweep (debug, ignores nothing-due skips)."""
     from digest_service import run_digest_check

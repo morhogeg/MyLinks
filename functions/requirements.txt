@@ -1,9 +1,19 @@
-# TODO: replace these ranges with exact pins from a known-good deploy (==X.Y.Z).
-# Upper bounds below just cap at the next major so a deploy can't pull a breaking release.
-firebase-functions>=0.4.0,<1.0
-firebase-admin>=6.4.0,<7.0
-google-genai>=1.0.0,<2.0
-beautifulsoup4>=4.12.0,<5.0
-requests>=2.31.0,<3.0
-pydantic>=2.0.0,<3.0
-flask>=3.0.0,<4.0
+# Pinned to exact versions resolved from a clean Python 3.13 venv
+# (report §3.11). The original range for each dep is kept as a comment above
+# its pin. To re-pin: install the ranges in a fresh venv, `pip freeze`, and
+# update the ==X.Y.Z below. Top-level requirements only (no transitive deps).
+
+# firebase-functions>=0.4.0,<1.0
+firebase-functions==0.6.0
+# firebase-admin>=6.4.0,<7.0
+firebase-admin==6.9.0
+# google-genai>=1.0.0,<2.0
+google-genai==1.75.0
+# beautifulsoup4>=4.12.0,<5.0
+beautifulsoup4==4.15.0
+# requests>=2.31.0,<3.0
+requests==2.34.2
+# pydantic>=2.0.0,<3.0
+pydantic==2.13.4
+# flask>=3.0.0,<4.0
+flask==3.1.3

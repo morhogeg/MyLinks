@@ -1,0 +1,171 @@
+# Deploy Cloud Functions to Firebase (project: secondbrain-app-94da2).
+#
+# Why this exists (report §3.10): functions previously deployed ONLY from the
+# owner's Mac, which is why prod drifted weeks behind `main`. This manual
+# workflow removes that class of drift — once the two secrets below exist,
+# nobody needs the Mac to deploy again.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# ⛔ OWNER SETUP (one-time) — required before this workflow can run:
+#
+#   1. Create a Google Cloud service account on project `secondbrain-app-94da2`
+#      with these roles:
+#        - Cloud Functions Admin
+#        - Firebase Admin
+#        - Service Account User
+#   2. Create a JSON key for that service account and add it as the repo secret
+#      FIREBASE_SERVICE_ACCOUNT (paste the whole JSON).
+#   3. Add the repo secret GEMINI_API_KEY (the Gemini API key the functions use).
+#   4. (Optional) Add ADMIN_TOKEN, OWNER_EMAIL, APPCHECK_ENFORCE, REQUIRE_AUTH
+#      as repo secrets — if present they are written into functions/.env at
+#      deploy time. This project deliberately uses a plain functions/.env for
+#      config (NOT Secret Manager) — see SOURCE_OF_TRUTH §2.
+#
+# Until the two required secrets exist the workflow fails fast with instructions
+# (see the "Check required secrets" step) — safe to land.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Deploy Cloud Functions
+
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: 'Comma-separated function names to deploy, or "all"'
+        required: false
+        default: "all"
+        type: string
+
+# Never let two deploys run at once — concurrent `firebase deploy` to the same
+# project fights over the same function resources.
+concurrency:
+  group: deploy-functions
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      FIREBASE_PROJECT: secondbrain-app-94da2
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fail fast with actionable instructions if the owner hasn't added the
+      # required secrets yet (see the OWNER SETUP block at the top of this file).
+      - name: Check required secrets
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          missing=0
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::Missing repo secret FIREBASE_SERVICE_ACCOUNT."
+            missing=1
+          fi
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error::Missing repo secret GEMINI_API_KEY."
+            missing=1
+          fi
+          if [ "$missing" -eq 1 ]; then
+            echo ""
+            echo "To fix: create a service account on project secondbrain-app-94da2"
+            echo "with roles: Cloud Functions Admin, Firebase Admin, Service Account User."
+            echo "Add its JSON key as the FIREBASE_SERVICE_ACCOUNT repo secret, and add"
+            echo "the Gemini API key as the GEMINI_API_KEY repo secret. Then re-run."
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install firebase-tools
+        run: npm i -g firebase-tools
+
+      # Write the service-account JSON to a temp file and point
+      # GOOGLE_APPLICATION_CREDENTIALS at it so firebase-tools authenticates
+      # non-interactively as the service account.
+      - name: Write service account credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          creds="$RUNNER_TEMP/firebase-sa.json"
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$creds"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$creds" >> "$GITHUB_ENV"
+
+      # This project deliberately uses a plain functions/.env (NOT Secret
+      # Manager) — see SOURCE_OF_TRUTH §2. Write the runtime config here.
+      # Optional secrets are only written when set (secrets.X != '').
+      - name: Write functions/.env
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}
+          APPCHECK_ENFORCE: ${{ secrets.APPCHECK_ENFORCE }}
+          REQUIRE_AUTH: ${{ secrets.REQUIRE_AUTH }}
+        run: |
+          env_file=functions/.env
+          {
+            echo "GEMINI_API_KEY=${GEMINI_API_KEY}"
+          } > "$env_file"
+          if [ -n "${{ secrets.ADMIN_TOKEN }}" ]; then
+            echo "ADMIN_TOKEN=${ADMIN_TOKEN}" >> "$env_file"
+          fi
+          if [ -n "${{ secrets.OWNER_EMAIL }}" ]; then
+            echo "OWNER_EMAIL=${OWNER_EMAIL}" >> "$env_file"
+          fi
+          if [ -n "${{ secrets.APPCHECK_ENFORCE }}" ]; then
+            echo "APPCHECK_ENFORCE=${APPCHECK_ENFORCE}" >> "$env_file"
+          fi
+          if [ -n "${{ secrets.REQUIRE_AUTH }}" ]; then
+            echo "REQUIRE_AUTH=${REQUIRE_AUTH}" >> "$env_file"
+          fi
+
+      # firebase-tools runs the Python functions codebase inside functions/venv.
+      - name: Create functions venv
+        run: |
+          cd functions
+          python3.13 -m venv venv
+          venv/bin/pip install --upgrade pip
+          venv/bin/pip install -r requirements.txt
+
+      # Build the --only target list. For "all" we use the canonical full
+      # function list (SOURCE_OF_TRUTH §9, 2026-07-13 entry). Bare names are
+      # auto-prefixed with "functions:" — a list like "functions:a,b,c" silently
+      # deploys ONLY "a" otherwise (b/c read as unknown target types), matching
+      # deploy-functions.sh behavior.
+      - name: Deploy functions
+        env:
+          FIREBASE_TARGETS_INPUT: ${{ inputs.targets }}
+        run: |
+          set -euo pipefail
+
+          # Canonical full function list (keep in sync with SOURCE_OF_TRUTH §9).
+          ALL="analyze_image,analyze_link,ask_brain,backfill_embeddings,backfill_related_links,backfill_youtube_channels,check_reminders,claim_workspace,claim_workspace_http,debug_status,delete_account,delete_account_http,force_check_reminders,force_send_digests,force_sweep_stuck_processing,get_article,get_share_config,ping,process_link_background,publish_share_http,rebuild_connections,register_device_token_http,search_links,search_links_http,send_digest_now,send_digests,share_ingest,share_page,sweep_stuck_processing,sync_link_embedding,unpublish_share_http,unregister_device_token_http"
+
+          RAW="${FIREBASE_TARGETS_INPUT:-all}"
+          if [ "$RAW" = "all" ]; then
+            RAW="$ALL"
+          fi
+
+          # Normalize: prefix every bare name with "functions:".
+          TARGETS=$(printf '%s' "$RAW" | awk -F, 'BEGIN{OFS=","}{for(i=1;i<=NF;i++){gsub(/^[ \t]+|[ \t]+$/,"",$i); if($i!~/^functions:/)$i="functions:"$i}; $1=$1; print}')
+
+          echo "Deploying [$TARGETS] to project: $FIREBASE_PROJECT"
+
+          # process_link_background occasionally 409s (conflict) mid-deploy —
+          # retry the whole deploy once after 60s before failing the job.
+          if ! firebase deploy --only "$TARGETS" --project "$FIREBASE_PROJECT" --non-interactive --force; then
+            echo "First deploy attempt failed (process_link_background sometimes 409s). Retrying in 60s…"
+            sleep 60
+            firebase deploy --only "$TARGETS" --project "$FIREBASE_PROJECT" --non-interactive --force
+          fi

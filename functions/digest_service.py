@@ -49,7 +49,7 @@ CANDIDATE_LIMIT = 500
 # also the worst-case delivery latency and the width of the is_due match window.
 # MUST stay in sync with the cron in send_digests. Smaller = tighter to the
 # chosen minute but proportionally more scheduler invocations (cost).
-DIGEST_CADENCE_MINUTES = 5
+DIGEST_CADENCE_MINUTES = 15
 
 VALID_MODES = {"smart", "topic", "rediscover", "synthesis"}
 
@@ -592,7 +592,16 @@ def run_digest_check() -> dict:
         "errors": [],
     }
 
-    for user_doc in db.collection("users").get():
+    # Slim scan: stream() (don't buffer every user doc in memory) and a field
+    # mask so each scanned doc carries only what the is_due gate AND the send
+    # path (build_and_send_digest / _synthesis) actually read — settings,
+    # timezone, lastDigestSentAt, fcmTokens — never the rest of the user doc.
+    # Because these fields cover the full send path, no per-DUE-user re-fetch is
+    # needed.
+    scan = db.collection("users").select(
+        ["settings", "timezone", "lastDigestSentAt", "fcmTokens"]
+    ).stream()
+    for user_doc in scan:
         report["users_checked"] += 1
         uid = user_doc.id
         user_data = user_doc.to_dict() or {}

@@ -1,0 +1,199 @@
+"""Offline unit tests for quota.check_and_increment_quota and its helpers.
+
+Firestore is mocked at the ``db.get_db`` boundary (same approach as
+test_rate_limit.py): a fake db returns a snapshot we control and records the
+``txn.set`` write, and the module's ``@firestore.transactional`` is patched to an
+identity decorator so the txn body runs directly. No network, no emulator.
+"""
+
+import quota
+
+
+# ── Fakes (mirror test_rate_limit.py) ────────────────────────────────────────
+
+class FakeSnap:
+    def __init__(self, data):
+        self._data = data
+        self.exists = data is not None
+
+    def to_dict(self):
+        return dict(self._data) if self._data is not None else None
+
+
+class FakeDocRef:
+    def __init__(self, store):
+        self._store = store
+
+    def get(self, transaction=None):
+        return FakeSnap(self._store.get("value"))
+
+
+class FakeTxn:
+    def __init__(self, store):
+        self._store = store
+
+    def set(self, doc_ref, data):
+        self._store["value"] = dict(data)
+
+
+class FakeCollection:
+    def __init__(self, doc_ref):
+        self._doc_ref = doc_ref
+
+    def document(self, _id):
+        return self._doc_ref
+
+
+class FakeDB:
+    def __init__(self, store):
+        self._store = store
+        self._doc_ref = FakeDocRef(store)
+
+    def collection(self, _name):
+        return FakeCollection(self._doc_ref)
+
+    def transaction(self):
+        return FakeTxn(self._store)
+
+
+def _install_fake_db(monkeypatch, store):
+    monkeypatch.setattr(quota, "get_db", lambda: FakeDB(store))
+    # Bypass @firestore.transactional (see test_rate_limit for the rationale):
+    # run the txn body directly against FakeTxn in both sandbox and CI.
+    monkeypatch.setattr(quota.firestore, "transactional", lambda fn: fn)
+    return store
+
+
+def _pin_month(monkeypatch, month="2026-07"):
+    monkeypatch.setattr(quota, "_current_month", lambda now=None: month)
+
+
+# ── check_and_increment_quota ────────────────────────────────────────────────
+
+def test_first_save_allowed_and_persists(monkeypatch):
+    store = {}
+    _install_fake_db(monkeypatch, store)
+    _pin_month(monkeypatch)
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "3")
+
+    ok, remaining = quota.check_and_increment_quota("u1", "saves")
+    assert ok is True
+    assert remaining == 2
+    assert store["value"]["2026-07"]["saves"] == 1
+
+
+def test_counts_up_to_limit_then_blocks(monkeypatch):
+    store = {}
+    _install_fake_db(monkeypatch, store)
+    _pin_month(monkeypatch)
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "3")
+
+    results = [quota.check_and_increment_quota("u1", "saves") for _ in range(4)]
+    oks = [r[0] for r in results]
+    assert oks == [True, True, True, False]
+    # The blocked 4th call must NOT have incremented past the limit.
+    assert store["value"]["2026-07"]["saves"] == 3
+
+
+def test_saves_and_asks_are_independent(monkeypatch):
+    store = {}
+    _install_fake_db(monkeypatch, store)
+    _pin_month(monkeypatch)
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "1")
+    monkeypatch.setenv("MONTHLY_ASK_QUOTA", "1")
+
+    assert quota.check_and_increment_quota("u1", "saves")[0] is True
+    # asks has its own counter — a maxed-out saves counter must not block it.
+    assert quota.check_and_increment_quota("u1", "asks")[0] is True
+    assert store["value"]["2026-07"] == {"saves": 1, "asks": 1}
+
+
+def test_zero_limit_disables_check(monkeypatch):
+    store = {}
+    _install_fake_db(monkeypatch, store)
+    _pin_month(monkeypatch)
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "0")
+
+    for _ in range(10):
+        ok, _rem = quota.check_and_increment_quota("u1", "saves")
+        assert ok is True
+    # Disabled → no counter doc is ever written.
+    assert store == {}
+
+
+def test_amount_greater_than_one(monkeypatch):
+    store = {}
+    _install_fake_db(monkeypatch, store)
+    _pin_month(monkeypatch)
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "5")
+
+    ok, remaining = quota.check_and_increment_quota("u1", "saves", amount=5)
+    assert ok is True and remaining == 0
+    # A further single increment now exceeds the cap.
+    assert quota.check_and_increment_quota("u1", "saves")[0] is False
+
+
+def test_prunes_months_older_than_two(monkeypatch):
+    store = {"value": {
+        "2026-07": {"saves": 1},
+        "2026-06": {"saves": 9},   # kept (within 2 most recent)
+        "2026-01": {"saves": 99},  # pruned
+        "2025-12": {"saves": 99},  # pruned
+    }}
+    _install_fake_db(monkeypatch, store)
+    _pin_month(monkeypatch, "2026-07")
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "150")
+
+    quota.check_and_increment_quota("u1", "saves")
+    kept = set(store["value"].keys())
+    assert kept == {"2026-07", "2026-06"}
+    assert store["value"]["2026-07"]["saves"] == 2
+
+
+def test_none_uid_allows_and_writes_nothing(monkeypatch):
+    store = {}
+    _install_fake_db(monkeypatch, store)
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "1")
+    ok, remaining = quota.check_and_increment_quota(None, "saves")
+    assert ok is True
+    assert store == {}
+
+
+def test_unknown_kind_raises(monkeypatch):
+    _install_fake_db(monkeypatch, {})
+    try:
+        quota.check_and_increment_quota("u1", "bogus")
+    except ValueError:
+        return
+    raise AssertionError("expected ValueError for unknown kind")
+
+
+def test_fails_open_on_backend_error(monkeypatch):
+    def boom():
+        raise RuntimeError("firestore down")
+
+    monkeypatch.setattr(quota, "get_db", boom)
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "1")
+    ok, remaining = quota.check_and_increment_quota("u1", "saves")
+    # A backend outage must degrade to "allowed" (soft cap).
+    assert ok is True
+    assert remaining == quota._UNLIMITED
+
+
+# ── pure helpers ─────────────────────────────────────────────────────────────
+
+def test_recent_months_wraps_year_boundary():
+    assert quota._recent_months("2026-01") == {"2026-01", "2025-12"}
+    assert quota._recent_months("2026-07") == {"2026-07", "2026-06"}
+
+
+def test_limit_for_defaults(monkeypatch):
+    monkeypatch.delenv("MONTHLY_SAVE_QUOTA", raising=False)
+    monkeypatch.delenv("MONTHLY_ASK_QUOTA", raising=False)
+    assert quota._limit_for("saves") == 150
+    assert quota._limit_for("asks") == 100
+
+
+def test_limit_for_unparseable_disables(monkeypatch):
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "not-a-number")
+    assert quota._limit_for("saves") == 0

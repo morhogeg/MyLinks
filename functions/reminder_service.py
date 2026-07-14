@@ -142,6 +142,36 @@ def should_complete_reminder(profile: str, new_reminder_count: int) -> bool:
     return profile == "once" or new_reminder_count >= 3
 
 
+# Max due reminders processed per scheduler tick. One bounded collection-group
+# query replaces the old per-user scan; anything beyond this rolls to the next
+# tick. Kept well above realistic per-tick due volume so it's effectively a
+# safety ceiling, not a throttle.
+REMINDER_BATCH_LIMIT = 500
+
+
+def _uid_from_link_ref(reference) -> Optional[str]:
+    """Derive the owner uid from a link doc reference (users/{uid}/links/{id}).
+
+    Uses the reference's parent chain (parent = the 'links' collection,
+    parent.parent = the 'users/{uid}' document); falls back to parsing the path
+    string. Returns None if the shape is unexpected (defensive — such a doc is
+    skipped rather than crashing the whole tick)."""
+    try:
+        owner = reference.parent.parent
+        if owner is not None and owner.id:
+            return owner.id
+    except Exception:
+        pass
+    try:
+        parts = [p for p in str(reference.path).split('/') if p]
+        # users/{uid}/links/{id}
+        if len(parts) >= 2 and parts[0] == 'users':
+            return parts[1]
+    except Exception:
+        pass
+    return None
+
+
 def run_reminder_check() -> dict:
     """
     Main logic for checking pending reminders and delivering them.
@@ -151,6 +181,21 @@ def run_reminder_check() -> dict:
     must always produce something the user can see in-app. Push is delivered on
     top when the user has it enabled with a live token. The schedule (advance/
     complete) runs identically whether or not push was sent.
+
+    Scale: one bounded collection-group query finds every due reminder across
+    all users in a single read (reminderStatus == 'pending' AND
+    nextReminderAt <= now, limit REMINDER_BATCH_LIMIT), instead of loading all
+    user docs and running a per-user scan. Due docs are grouped by owner uid
+    (derived from the doc path) and each affected user's doc is fetched exactly
+    once — only for users that actually have due reminders — for the settings /
+    push-token data the send path needs.
+
+    Legacy nextReminderAt coercion is gone: every writer (set_reminder and this
+    function) stores nextReminderAt as an integer-ms value, and the '<=' filter
+    against an integer only matches integer-typed fields, so any stale
+    Timestamp/string value simply isn't returned (it can't be "due" until a
+    writer rewrites it as ms). Read-time coercion (_due_ms) defends the send
+    path anyway.
     Returns a summary dict.
     """
     # Import here to avoid circular dependency
@@ -158,9 +203,6 @@ def run_reminder_check() -> dict:
 
     db = get_db()
     logger.info("Starting reminder logic execution...")
-
-    users_ref = db.collection('users')
-    users = users_ref.get()
 
     report = {
         "users_checked": 0,
@@ -171,15 +213,53 @@ def run_reminder_check() -> dict:
         "errors": []
     }
 
-    for user_doc in users:
-        uid = user_doc.id
-        user_data = user_doc.to_dict()
-        report["users_checked"] += 1
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
 
-        settings = user_data.get('settings', {})
+    # One bounded query across every user's links subcollection (needs the
+    # COLLECTION_GROUP composite index in firestore.indexes.json).
+    try:
+        due_links = list(
+            db.collection_group('links')
+            .where('reminderStatus', '==', 'pending')
+            .where('nextReminderAt', '<=', now_ms)
+            .limit(REMINDER_BATCH_LIMIT)
+            .get()
+        )
+    except Exception as e:
+        err_msg = f"Failed to query due reminders: {e}"
+        logger.error(err_msg)
+        report["errors"].append(err_msg)
+        return report
+
+    # Group due docs by owner uid (users/{uid}/links/{id}).
+    by_uid: dict = {}
+    for link_doc in due_links:
+        uid = _uid_from_link_ref(link_doc.reference)
+        if not uid:
+            logger.warning(f"Skipping due reminder with unexpected path: {getattr(link_doc.reference, 'path', '?')}")
+            continue
+        by_uid.setdefault(uid, []).append(link_doc)
+
+    report["users_checked"] = len(by_uid)
+
+    for uid, user_links in by_uid.items():
+        # Fetch the affected user's doc once (settings + push tokens).
+        try:
+            user_snap = db.collection('users').document(uid).get()
+            user_data = user_snap.to_dict() or {}
+        except Exception as e:
+            err_msg = f"Failed to load user {uid} for reminders: {e}"
+            logger.error(err_msg)
+            report["errors"].append(err_msg)
+            continue
+
+        settings = user_data.get('settings', {}) or {}
         enabled = settings.get('reminders_enabled', settings.get('remindersEnabled', True))
 
         if not enabled:
+            # User has due reminders but reminders are off — leave them pending
+            # (unchanged behavior: the old per-user path skipped before touching
+            # these docs).
             continue
 
         report["users_with_reminders_enabled"] += 1
@@ -204,36 +284,18 @@ def run_reminder_check() -> dict:
         # NOTE: we no longer skip users without push. Reminders are surfaced
         # in-app for everyone (see below); push is an extra channel on top.
 
-        links_ref = db.collection('users').document(uid).collection('links')
-        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        report["reminders_found"] += len(user_links)
+        logger.info(f"Found {len(user_links)} reminders for user {uid}")
 
-        # Data Cleanup: Ensure nextReminderAt is always an integer
-        all_links_to_clean = links_ref.where('reminderStatus', '==', 'pending').get()
-        for l in all_links_to_clean:
-            d = l.to_dict()
-            nra = d.get('nextReminderAt')
-            if hasattr(nra, 'timestamp'):
-                new_ms = int(nra.timestamp() * 1000)
-                l.reference.update({'nextReminderAt': new_ms})
-                logger.info(f"Cleaned up nextReminderAt for link {l.id} (converted Timestamp to {new_ms})")
-
-        query = links_ref.where('reminderStatus', '==', 'pending').where('nextReminderAt', '<=', now_ms).limit(10)
-
-        try:
-            due_links = query.get()
-        except Exception as e:
-            err_msg = f"Failed to query reminders for user {uid}: {e}"
-            logger.error(err_msg)
-            report["errors"].append(err_msg)
-            continue
-
-        if due_links:
-            logger.info(f"Found {len(due_links)} reminders for user {uid}")
-            report["reminders_found"] += len(due_links)
-
-        for link_doc in due_links:
+        for link_doc in user_links:
             link_id = link_doc.id
-            link_data = link_doc.to_dict()
+            link_data = link_doc.to_dict() or {}
+
+            # Defensive: skip any doc whose nextReminderAt isn't a usable number
+            # (should never happen — the '<=' int filter excludes non-numeric
+            # values — but never fire on a value we can't reason about).
+            if not isinstance(link_data.get('nextReminderAt'), (int, float)):
+                continue
 
             title = link_data.get('title', 'Untitled')
             category = link_data.get('category', 'General')

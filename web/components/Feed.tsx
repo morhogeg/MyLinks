@@ -11,10 +11,10 @@ import SourceFacetList from './SourceFacetList';
 import DigestView from './DigestView';
 import DigestCard from './DigestCard';
 import Dropdown from './Dropdown';
-import { updateLinkStatus, deleteLink, updateLinkReminder, saveLink } from '@/lib/storage';
+import { deleteLink, updateLinkReminder, saveLink } from '@/lib/storage';
 import { EXAMPLE_CARD } from '@/lib/exampleCard';
 import { track } from '@/lib/analytics';
-import { collection, onSnapshot, doc, updateDoc, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, writeBatch, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
@@ -42,6 +42,7 @@ import CollectionsGallery from './CollectionsGallery';
 import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
+import LoadMoreSentinel from './feed/LoadMoreSentinel';
 import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, Share2, Globe, Plus, Pencil, Newspaper, Sparkles, Lock, BookOpenCheck } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
@@ -49,6 +50,7 @@ import { subscribeLatestSynthesis } from '@/lib/synthesis';
 import { subscribeDigests, deleteDigest } from '@/lib/digest';
 import { PUSH_INTENT_EVENT, PUSH_FOREGROUND_EVENT, consumePendingPushIntent, readLocalPushPrompt, type PushIntent } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
+import { reportError } from '@/lib/errorReporter';
 import PushNudge from './PushNudge';
 import { deleteCollection, createCollection, addLinksToCollection, isShareStale, updateCollection, unpublishCollection } from '@/lib/collections';
 import { suggestNewCollections, dismissSuggestion, type CollectionSuggestion } from '@/lib/collectionSuggest';
@@ -78,8 +80,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
-    // Links subscription + pull-refresh (R-3: useLinks).
-    const { links, isLoading, handlePullRefresh } = useLinks(uid, toast);
+    // Links subscription + pull-refresh (R-3: useLinks). Windowed (report 3.15):
+    // loadMore grows the subscription window; hasMore gates the scroll sentinel.
+    const { links, isLoading, handlePullRefresh, loadMore, hasMore } = useLinks(uid, toast);
     // Collections — declared before the filter pipeline so private-collection
     // membership can hide cards from it while the privacy vault is locked.
     const [collections, setCollections] = useState<Collection[]>([]);
@@ -365,7 +368,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 ...d.data()
             } as Collection)));
         }, (error: Error) => {
-            console.error("Collections sync error:", error);
+            reportError(error, 'feed-collections-snapshot');
         });
         return () => unsubscribe();
     }, [uid]);
@@ -471,8 +474,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         if (!uid) return;
         try {
             await updateDoc(doc(db, 'users', uid, 'links', id), { reminderDue: false, reminderDueAt: null });
-        } catch {
-            /* best-effort dismiss; the live snapshot keeps the source of truth */
+        } catch (e) {
+            // Best-effort dismiss; the live snapshot keeps the source of truth.
+            reportError(e, 'feed-clear-reminder-due');
         }
     }, [uid]);
     // Derived from visibleLinks so a due reminder never leaks a locked private
@@ -563,11 +567,32 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         }
     };
 
+    // Apply the same mutation to many link docs via chunked writeBatch (report
+    // 3.17): ≤450 ops per batch (under Firestore's 500-op limit) instead of N
+    // parallel single-doc writes. deleteLink's client path is a plain deleteDoc
+    // (screenshot cleanup is a server-side concern), and archive is a field
+    // update, so both batch cleanly with no per-doc side effects to preserve.
+    const commitLinksInChunks = async (
+        ids: string[],
+        mutate: (batch: ReturnType<typeof writeBatch>, ref: ReturnType<typeof doc>) => void,
+    ) => {
+        if (!uid) return;
+        const CHUNK = 450;
+        for (let i = 0; i < ids.length; i += CHUNK) {
+            const batch = writeBatch(db);
+            for (const id of ids.slice(i, i + CHUNK)) {
+                mutate(batch, doc(db, 'users', uid, 'links', id));
+            }
+            await batch.commit();
+        }
+    };
+
     const handleBulkArchive = async () => {
         if (!uid) return;
+        const ids = Array.from(selectedIds);
         try {
-            await Promise.all(Array.from(selectedIds).map(id => updateLinkStatus(uid, id, 'archived')));
-            toast.success(`Archived ${selectedIds.size} link${selectedIds.size === 1 ? '' : 's'}`);
+            await commitLinksInChunks(ids, (batch, ref) => batch.update(ref, { status: 'archived' }));
+            toast.success(`Archived ${ids.length} link${ids.length === 1 ? '' : 's'}`);
         } catch {
             toast.error("Couldn't archive some links. Please try again.");
         }
@@ -577,9 +602,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
     const performBulkDelete = async () => {
         if (!uid) return;
+        const ids = Array.from(selectedIds);
         try {
-            await Promise.all(Array.from(selectedIds).map(id => deleteLink(uid, id)));
-            toast.success(`Deleted ${selectedIds.size} link${selectedIds.size === 1 ? '' : 's'}`);
+            await commitLinksInChunks(ids, (batch, ref) => batch.delete(ref));
+            toast.success(`Deleted ${ids.length} link${ids.length === 1 ? '' : 's'}`);
         } catch {
             toast.error("Couldn't delete some links. Please try again.");
         }
@@ -2175,18 +2201,21 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             {feedModules}
                             {pendingCards.map(renderPendingCard)}
                             {filteredLinks.map((link, idx) => (
-                                <ListCard
-                                    key={link.id}
-                                    index={idx}
-                                    link={link}
-                                    onOpenDetails={openLinkDetails}
-                                    onStatusChange={handleStatusChange}
-                                    onDelete={handleDelete}
-                                    isSelectionMode={isSelectionMode}
-                                    isSelected={selectedIds.has(link.id)}
-                                    onToggleSelection={toggleSelection}
-                                />
+                                // cv-card: off-screen rows skip layout/paint (3.15).
+                                <div key={link.id} className="cv-card">
+                                    <ListCard
+                                        index={idx}
+                                        link={link}
+                                        onOpenDetails={openLinkDetails}
+                                        onStatusChange={handleStatusChange}
+                                        onDelete={handleDelete}
+                                        isSelectionMode={isSelectionMode}
+                                        isSelected={selectedIds.has(link.id)}
+                                        onToggleSelection={toggleSelection}
+                                    />
+                                </div>
                             ))}
+                            <LoadMoreSentinel hasMore={hasMore} onLoadMore={loadMore} />
                         </div>
                     ) : (
                         <>
@@ -2218,6 +2247,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 />
                             ))}
                         </Masonry>
+                        <LoadMoreSentinel hasMore={hasMore} onLoadMore={loadMore} />
                         </>
                     )}
                 </div>

@@ -3,6 +3,7 @@ import json
 import logging
 import re
 import time
+import random
 from typing import List, Optional
 from google import genai
 from google.cloud.firestore_v1.vector import Vector
@@ -56,6 +57,60 @@ EMBEDDING_DIMENSIONS = 768
 class AnalysisError(Exception):
     """Raised when AI analysis genuinely fails so callers can surface a real
     error instead of silently saving a junk 'Analysis Failed' card."""
+
+
+# How many times _generate_json attempts a Gemini call before giving up.
+_MAX_GENERATE_ATTEMPTS = 3
+# Attempts for embed_text (embeddings are non-critical — see embed_text).
+_MAX_EMBED_ATTEMPTS = 2
+
+
+def _is_retryable_error(exc: Exception) -> bool:
+    """True when a Gemini call error is transient and worth retrying (report 3.6).
+
+    Retries ONLY: HTTP 429 / RESOURCE_EXHAUSTED, 5xx server errors, and
+    network-level timeout/connection failures. Deliberately does NOT retry
+    permanent client errors (400 / invalid-argument / safety / schema) or our own
+    AnalysisError (empty or wrong-shape response) — retrying those just burns
+    quota and latency on a call that will fail identically.
+
+    Duck-typed rather than importing google.genai.errors, so it stays importable
+    and unit-testable offline (the test harness fakes google.genai). The
+    google-genai APIError carries an int HTTP `code` (ClientError=4xx,
+    ServerError=5xx) and a string `status` (e.g. "RESOURCE_EXHAUSTED").
+    """
+    code = getattr(exc, "code", None)
+    if isinstance(code, int):
+        if code == 429 or code >= 500:
+            return True
+        if 400 <= code < 500:
+            # Any other explicit client error is permanent — do not retry.
+            return False
+    status = getattr(exc, "status", None)
+    if isinstance(status, str) and status.strip().upper() in (
+        "RESOURCE_EXHAUSTED", "UNAVAILABLE", "INTERNAL",
+        "DEADLINE_EXCEEDED", "ABORTED",
+    ):
+        return True
+    # Network-level failures from the underlying http stack (httpx / requests /
+    # stdlib) are transient. Match by base class first, then by name so we don't
+    # need to import optional http libraries here.
+    if isinstance(exc, (TimeoutError, ConnectionError)):
+        return True
+    name = type(exc).__name__.lower()
+    if "timeout" in name or "connection" in name:
+        return True
+    return False
+
+
+def _retry_delay(attempt: int) -> float:
+    """Exponential backoff with jitter for retry `attempt` (0-based).
+
+    attempt 0 → ~1-2s, attempt 1 → ~2-4s. The jitter spreads retries so many
+    instances failing at once don't stampede the API in lockstep.
+    """
+    base = 2 ** attempt
+    return base + random.uniform(0, base)
 
 # Professional system prompt
 SYSTEM_PROMPT = """You are a professional knowledge extraction assistant for Machina AI, a personal knowledge capture and recall system.
@@ -339,8 +394,10 @@ class GeminiService:
     def _generate_json(self, contents: list, what: str, config_extra: dict = None,
                        model: str = None) -> dict:
         """Call Gemini with a structured-output (response_schema) config and
-        return a parsed dict. Retries once on transient failures, then raises
-        AnalysisError so the caller can surface a real error.
+        return a parsed dict. Retries transient failures (429/5xx/timeout) with
+        exponential backoff + jitter, up to _MAX_GENERATE_ATTEMPTS, then raises
+        AnalysisError so the caller can surface a real error. Non-retryable
+        errors (schema/safety/empty response) fail fast — see _is_retryable_error.
 
         config_extra lets callers add generation options (e.g. media_resolution
         for video) without changing the base structured-output config. `model`
@@ -365,7 +422,7 @@ class GeminiService:
             config.update(config_extra)
 
         last_error = None
-        for attempt in range(2):
+        for attempt in range(_MAX_GENERATE_ATTEMPTS):
             try:
                 response = self.client.models.generate_content(
                     model=model or self.model,
@@ -391,8 +448,12 @@ class GeminiService:
             except Exception as e:
                 last_error = e
                 logger.warning(f"Gemini {what} attempt {attempt + 1} failed: {e}")
-                if attempt == 0:
-                    time.sleep(0.75)  # brief backoff before the single retry
+                # Retry ONLY transient errors, and only while attempts remain.
+                # Non-retryable errors (schema/safety/empty/bad-shape) fail fast.
+                if attempt < _MAX_GENERATE_ATTEMPTS - 1 and _is_retryable_error(e):
+                    time.sleep(_retry_delay(attempt))
+                    continue
+                break
 
         logger.error(f"Gemini {what} failed after retries: {last_error}")
         raise AnalysisError(f"AI {what} failed: {last_error}")
@@ -753,13 +814,20 @@ Return ONLY a JSON object matching the schema (title, narrative, themes[title,in
             logger.warning("Gemini client not initialized — skipping embedding")
             return None
 
-        try:
-            result = self.client.models.embed_content(
-                model=EMBEDDING_MODEL,
-                contents=text[:9000],
-                config={"output_dimensionality": EMBEDDING_DIMENSIONS}
-            )
-            return result.embeddings[0].values
-        except Exception as e:
-            logger.error(f"Embedding generation failed: {str(e)}")
-            return None
+        for attempt in range(_MAX_EMBED_ATTEMPTS):
+            try:
+                result = self.client.models.embed_content(
+                    model=EMBEDDING_MODEL,
+                    contents=text[:9000],
+                    config={"output_dimensionality": EMBEDDING_DIMENSIONS}
+                )
+                return result.embeddings[0].values
+            except Exception as e:
+                logger.error(f"Embedding generation failed (attempt {attempt + 1}): {e}")
+                # Short backoff, and only for transient errors while attempts
+                # remain. Preserve the None-on-failure contract callers depend on.
+                if attempt < _MAX_EMBED_ATTEMPTS - 1 and _is_retryable_error(e):
+                    time.sleep(0.5 + random.uniform(0, 0.5))
+                    continue
+                return None
+        return None
