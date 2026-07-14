@@ -1,6 +1,6 @@
 'use client';
 
-import { Children, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Children, isValidElement, useEffect, useRef, useState, type ReactNode } from 'react';
 
 interface MasonryProps {
     children: ReactNode;
@@ -50,7 +50,15 @@ export default function Masonry({ children, columnWidth = 340, gap = 16 }: Mason
         <div ref={ref} className="flex items-start" style={{ gap }}>
             {columns.map((col, i) => (
                 <div key={i} className="flex flex-col flex-1 min-w-0" style={{ gap }}>
-                    {col}
+                    {/* Each card sits in a `cv-card` wrapper so off-screen cards
+                        skip layout/paint (virtualization-lite, report 3.15). The
+                        wrapper reuses the child's own key so reconciliation and the
+                        card entrance animation are unaffected. */}
+                    {col.map((child, j) => (
+                        <div key={(isValidElement(child) && child.key != null) ? child.key : j} className="cv-card">
+                            {child}
+                        </div>
+                    ))}
                 </div>
             ))}
         </div>

@@ -3,6 +3,7 @@ import json
 import logging
 import re
 import time
+import random
 from typing import List, Optional
 from google import genai
 from google.cloud.firestore_v1.vector import Vector
@@ -56,6 +57,60 @@ EMBEDDING_DIMENSIONS = 768
 class AnalysisError(Exception):
     """Raised when AI analysis genuinely fails so callers can surface a real
     error instead of silently saving a junk 'Analysis Failed' card."""
+
+
+# How many times _generate_json attempts a Gemini call before giving up.
+_MAX_GENERATE_ATTEMPTS = 3
+# Attempts for embed_text (embeddings are non-critical — see embed_text).
+_MAX_EMBED_ATTEMPTS = 2
+
+
+def _is_retryable_error(exc: Exception) -> bool:
+    """True when a Gemini call error is transient and worth retrying (report 3.6).
+
+    Retries ONLY: HTTP 429 / RESOURCE_EXHAUSTED, 5xx server errors, and
+    network-level timeout/connection failures. Deliberately does NOT retry
+    permanent client errors (400 / invalid-argument / safety / schema) or our own
+    AnalysisError (empty or wrong-shape response) — retrying those just burns
+    quota and latency on a call that will fail identically.
+
+    Duck-typed rather than importing google.genai.errors, so it stays importable
+    and unit-testable offline (the test harness fakes google.genai). The
+    google-genai APIError carries an int HTTP `code` (ClientError=4xx,
+    ServerError=5xx) and a string `status` (e.g. "RESOURCE_EXHAUSTED").
+    """
+    code = getattr(exc, "code", None)
+    if isinstance(code, int):
+        if code == 429 or code >= 500:
+            return True
+        if 400 <= code < 500:
+            # Any other explicit client error is permanent — do not retry.
+            return False
+    status = getattr(exc, "status", None)
+    if isinstance(status, str) and status.strip().upper() in (
+        "RESOURCE_EXHAUSTED", "UNAVAILABLE", "INTERNAL",
+        "DEADLINE_EXCEEDED", "ABORTED",
+    ):
+        return True
+    # Network-level failures from the underlying http stack (httpx / requests /
+    # stdlib) are transient. Match by base class first, then by name so we don't
+    # need to import optional http libraries here.
+    if isinstance(exc, (TimeoutError, ConnectionError)):
+        return True
+    name = type(exc).__name__.lower()
+    if "timeout" in name or "connection" in name:
+        return True
+    return False
+
+
+def _retry_delay(attempt: int) -> float:
+    """Exponential backoff with jitter for retry `attempt` (0-based).
+
+    attempt 0 → ~1-2s, attempt 1 → ~2-4s. The jitter spreads retries so many
+    instances failing at once don't stampede the API in lockstep.
+    """
+    base = 2 ** attempt
+    return base + random.uniform(0, base)
 
 # Professional system prompt
 SYSTEM_PROMPT = """You are a professional knowledge extraction assistant for Machina AI, a personal knowledge capture and recall system.
@@ -337,10 +392,17 @@ class GeminiService:
         self.model = GEMINI_ANALYSIS_MODEL
 
     def _generate_json(self, contents: list, what: str, config_extra: dict = None,
-                       model: str = None) -> dict:
+                       model: str = None, attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
         """Call Gemini with a structured-output (response_schema) config and
-        return a parsed dict. Retries once on transient failures, then raises
-        AnalysisError so the caller can surface a real error.
+        return a parsed dict. Retries transient failures (429/5xx/timeout) with
+        exponential backoff + jitter, up to `attempts` tries, then raises
+        AnalysisError so the caller can surface a real error. Non-retryable
+        errors (schema/safety/empty response) fail fast — see _is_retryable_error.
+
+        `attempts` defaults to _MAX_GENERATE_ATTEMPTS (3) for the BACKGROUND
+        pipeline; the SYNCHRONOUS HTTP callers (analyze_link/analyze_image/
+        ask_brain) pass attempts=2 so a slow retry can't blow the 60s function
+        budget mid-retry (report 3.6). Clamped to >= 1.
 
         config_extra lets callers add generation options (e.g. media_resolution
         for video) without changing the base structured-output config. `model`
@@ -348,6 +410,7 @@ class GeminiService:
         higher-tier GEMINI_ASK_MODEL); it defaults to self.model
         (GEMINI_ANALYSIS_MODEL) for every analysis/vision/synthesis call.
         """
+        attempts = max(1, attempts)
         if not self.client:
             raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
 
@@ -365,7 +428,7 @@ class GeminiService:
             config.update(config_extra)
 
         last_error = None
-        for attempt in range(2):
+        for attempt in range(attempts):
             try:
                 response = self.client.models.generate_content(
                     model=model or self.model,
@@ -391,18 +454,24 @@ class GeminiService:
             except Exception as e:
                 last_error = e
                 logger.warning(f"Gemini {what} attempt {attempt + 1} failed: {e}")
-                if attempt == 0:
-                    time.sleep(0.75)  # brief backoff before the single retry
+                # Retry ONLY transient errors, and only while attempts remain.
+                # Non-retryable errors (schema/safety/empty/bad-shape) fail fast.
+                if attempt < attempts - 1 and _is_retryable_error(e):
+                    time.sleep(_retry_delay(attempt))
+                    continue
+                break
 
         logger.error(f"Gemini {what} failed after retries: {last_error}")
         raise AnalysisError(f"AI {what} failed: {last_error}")
 
-    def analyze_text(self, text: str, existing_tags: list = None, content_type: str = None) -> dict:
+    def analyze_text(self, text: str, existing_tags: list = None, content_type: str = None,
+                     attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
         """Analyze text content using Gemini. Raises AnalysisError on failure.
 
         content_type is accepted for caller compatibility; video content is
         handled by analyze_youtube (native video ingestion), so no special
-        text addendum is applied here.
+        text addendum is applied here. `attempts` is threaded to _generate_json
+        (synchronous callers pass 2 to stay under the 60s budget).
         """
         clean_text = text[:30000]
         tags_context = (
@@ -411,9 +480,10 @@ class GeminiService:
         )
 
         prompt = f"{SYSTEM_PROMPT}{tags_context}\n\nContent to analyze:\n{clean_text}"
-        return self._generate_json([prompt], "text analysis")
+        return self._generate_json([prompt], "text analysis", attempts=attempts)
 
-    def analyze_youtube(self, watch_url: str, existing_tags: list = None) -> dict:
+    def analyze_youtube(self, watch_url: str, existing_tags: list = None,
+                        attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
         """Analyze an actual YouTube video via Gemini's native video ingestion.
 
         Google fetches and watches the video on its own infrastructure, so this
@@ -440,10 +510,14 @@ class GeminiService:
             contents,
             "youtube video analysis",
             config_extra={"media_resolution": "MEDIA_RESOLUTION_LOW"},
+            attempts=attempts,
         )
 
-    def analyze_image(self, image_bytes: bytes, mime_type: str, existing_tags: list = None) -> dict:
-        """Analyze image content using Gemini vision. Raises AnalysisError on failure."""
+    def analyze_image(self, image_bytes: bytes, mime_type: str, existing_tags: list = None,
+                      attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
+        """Analyze image content using Gemini vision. Raises AnalysisError on failure.
+
+        `attempts` is threaded to _generate_json (synchronous callers pass 2)."""
         tags_context = (
             f"\n\nExisting Tags in Brain (Reuse these if possible):\n{', '.join(existing_tags)}"
             if existing_tags else ""
@@ -461,9 +535,10 @@ If the image is an article, extract the headline and body."""
             types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
             prompt,
         ]
-        return self._generate_json(contents, "image analysis")
+        return self._generate_json(contents, "image analysis", attempts=attempts)
 
-    def answer_from_context(self, question: str, cards: list, history: list = None) -> dict:
+    def answer_from_context(self, question: str, cards: list, history: list = None,
+                            attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
         """Answer a user question grounded ONLY in their saved cards (RAG).
 
         `cards` is a list of dicts with id/title/summary/category/tags. Returns
@@ -497,7 +572,7 @@ If the image is an article, extract the headline and body."""
         prompt = _build_rag_prompt(question, cards, history) + _CITED_JSON_SUFFIX
         data = self._generate_json([prompt], "answer",
                                    config_extra={"response_schema": BrainAnswer},
-                                   model=GEMINI_ASK_MODEL)
+                                   model=GEMINI_ASK_MODEL, attempts=attempts)
         answer = data.get("answer") or ""
         cited = _valid_cited_ids(data.get("citedIds"), cards)
         if cited:
@@ -511,7 +586,7 @@ If the image is an article, extract the headline and body."""
             retry = self._generate_json(
                 [retry_prompt], "answer (citation retry)",
                 config_extra={"response_schema": BrainAnswer},
-                model=GEMINI_ASK_MODEL,
+                model=GEMINI_ASK_MODEL, attempts=attempts,
             )
             retry_answer = retry.get("answer") or ""
             retry_cited = _valid_cited_ids(retry.get("citedIds"), cards)
@@ -753,13 +828,20 @@ Return ONLY a JSON object matching the schema (title, narrative, themes[title,in
             logger.warning("Gemini client not initialized — skipping embedding")
             return None
 
-        try:
-            result = self.client.models.embed_content(
-                model=EMBEDDING_MODEL,
-                contents=text[:9000],
-                config={"output_dimensionality": EMBEDDING_DIMENSIONS}
-            )
-            return result.embeddings[0].values
-        except Exception as e:
-            logger.error(f"Embedding generation failed: {str(e)}")
-            return None
+        for attempt in range(_MAX_EMBED_ATTEMPTS):
+            try:
+                result = self.client.models.embed_content(
+                    model=EMBEDDING_MODEL,
+                    contents=text[:9000],
+                    config={"output_dimensionality": EMBEDDING_DIMENSIONS}
+                )
+                return result.embeddings[0].values
+            except Exception as e:
+                logger.error(f"Embedding generation failed (attempt {attempt + 1}): {e}")
+                # Short backoff, and only for transient errors while attempts
+                # remain. Preserve the None-on-failure contract callers depend on.
+                if attempt < _MAX_EMBED_ATTEMPTS - 1 and _is_retryable_error(e):
+                    time.sleep(0.5 + random.uniform(0, 0.5))
+                    continue
+                return None
+        return None

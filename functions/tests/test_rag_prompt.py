@@ -190,9 +190,11 @@ def _svc_with_json_responses(responses):
     svc.client = object()  # truthy → passes the "configured" guard
     calls = {"n": 0}
 
-    def fake_generate_json(contents, what, config_extra=None, model=None):
-        # `model` accepts the RAG paths' GEMINI_ASK_MODEL override.
+    def fake_generate_json(contents, what, config_extra=None, model=None, attempts=None):
+        # `model` accepts the RAG paths' GEMINI_ASK_MODEL override; `attempts`
+        # accepts the synchronous callers' reduced retry budget.
         calls.setdefault("models", []).append(model)
+        calls.setdefault("attempts", []).append(attempts)
         i = calls["n"]
         calls["n"] += 1
         resp = responses[i]

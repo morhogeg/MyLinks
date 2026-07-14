@@ -11,10 +11,10 @@ import SourceFacetList from './SourceFacetList';
 import DigestView from './DigestView';
 import DigestCard from './DigestCard';
 import Dropdown from './Dropdown';
-import { updateLinkStatus, deleteLink, updateLinkReminder, saveLink } from '@/lib/storage';
+import { deleteLink, updateLinkReminder, saveLink, toLink } from '@/lib/storage';
 import { EXAMPLE_CARD } from '@/lib/exampleCard';
 import { track } from '@/lib/analytics';
-import { collection, onSnapshot, doc, updateDoc, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc, getDoc, updateDoc, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
@@ -42,6 +42,7 @@ import CollectionsGallery from './CollectionsGallery';
 import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
+import LoadMoreSentinel from './feed/LoadMoreSentinel';
 import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, Share2, Globe, Plus, Pencil, Newspaper, Sparkles, Lock, BookOpenCheck } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
@@ -49,8 +50,10 @@ import { subscribeLatestSynthesis } from '@/lib/synthesis';
 import { subscribeDigests, deleteDigest } from '@/lib/digest';
 import { PUSH_INTENT_EVENT, PUSH_FOREGROUND_EVENT, consumePendingPushIntent, readLocalPushPrompt, type PushIntent } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
+import { reportError } from '@/lib/errorReporter';
 import PushNudge from './PushNudge';
-import { deleteCollection, createCollection, addLinksToCollection, isShareStale, updateCollection, unpublishCollection } from '@/lib/collections';
+import { deleteCollection, createCollection, addLinksToCollection, isShareStale, updateCollection, unpublishCollection, batchedUpdate } from '@/lib/collections';
+import { useCollectionLinks } from '@/lib/useCollectionLinks';
 import { suggestNewCollections, dismissSuggestion, type CollectionSuggestion } from '@/lib/collectionSuggest';
 import ShareCollectionSheet from './ShareCollectionSheet';
 import PinLockModal from './PinLockModal';
@@ -78,8 +81,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
-    // Links subscription + pull-refresh (R-3: useLinks).
-    const { links, isLoading, handlePullRefresh } = useLinks(uid, toast);
+    // Links subscription + pull-refresh (R-3: useLinks). Windowed (report 3.15):
+    // loadMore grows the subscription window; hasMore gates the scroll sentinel.
+    const { links, isLoading, handlePullRefresh, loadMore, hasMore } = useLinks(uid, toast);
     // Collections — declared before the filter pipeline so private-collection
     // membership can hide cards from it while the privacy vault is locked.
     const [collections, setCollections] = useState<Collection[]>([]);
@@ -138,6 +142,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         handleShareCard,
     } = useLinkActions(uid, toast);
     const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
+    // Cards fetched directly by id for a deep-link (?linkId) that targets a card
+    // older than the loaded window — reminder push taps and dup-save redirects
+    // point at arbitrary-age links. Keyed by id; consulted by activeLink below.
+    const [fetchedCards, setFetchedCards] = useState<Record<string, Link>>({});
     // Back-stack for related-card navigation: opening a card *from* another card
     // pushes the current one, so closing returns there instead of dismissing all.
     const [linkStack, setLinkStack] = useState<string[]>([]);
@@ -148,7 +156,18 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const [scrollLeft, setScrollLeft] = useState(0);
     // Resolved against visibleLinks so a locked private card can never be opened
     // (deep link, push tap) — and an open one closes itself when the vault relocks.
-    const activeLink = visibleLinks.find(l => l.id === activeLinkId) || null;
+    // A directly-fetched deep-link card (outside the window) is the fallback, and
+    // it goes through the SAME vault gate: while locked it stays hidden if it's
+    // effectively private, so the fetch can never bypass the PIN.
+    const activeLink = useMemo(() => {
+        if (!activeLinkId) return null;
+        const inWindow = visibleLinks.find(l => l.id === activeLinkId);
+        if (inWindow) return inWindow;
+        const fetched = fetchedCards[activeLinkId];
+        if (!fetched) return null;
+        if (vaultLocked && isEffectivelyPrivateCard(fetched)) return null;
+        return fetched;
+    }, [activeLinkId, visibleLinks, fetchedCards, vaultLocked, isEffectivelyPrivateCard]);
 
     // Open a card reached from another card's "Related" list — remember where we
     // came from so the back-stack can return there.
@@ -365,7 +384,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 ...d.data()
             } as Collection)));
         }, (error: Error) => {
-            console.error("Collections sync error:", error);
+            reportError(error, 'feed-collections-snapshot');
         });
         return () => unsubscribe();
     }, [uid]);
@@ -380,24 +399,54 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const consumedDeepLinkRef = useRef<string | null>(null);
     useEffect(() => {
         const linkId = searchParams.get('linkId');
-        if (!linkId || links.length === 0) return;
+        if (!linkId) return;
         if (consumedDeepLinkRef.current === linkId) return;
 
-        const link = links.find(l => l.id === linkId);
-        if (!link) return;
+        const inList = links.find(l => l.id === linkId);
+        // Still doing the first window load — wait before deciding whether the
+        // card is genuinely outside the window and needs a direct fetch.
+        if (!inList && isLoading) return;
 
+        // Consume once (both the in-window and fetched paths): onSnapshot mutates
+        // `links` constantly, and without this the effect would re-open a modal
+        // the user just closed, or re-fetch on every background change.
         consumedDeepLinkRef.current = linkId;
-        setActiveLinkId(link.id);
 
         // Drop ?linkId from the URL so closing the modal is final and a manual
         // refresh won't re-open it. history.replaceState avoids a Next navigation
         // (and the scroll reset that comes with it).
-        if (typeof window !== 'undefined') {
+        const stripLinkIdFromUrl = () => {
+            if (typeof window === 'undefined') return;
             const url = new URL(window.location.href);
             url.searchParams.delete('linkId');
             window.history.replaceState(window.history.state, '', url.toString());
+        };
+
+        if (inList) {
+            setActiveLinkId(inList.id);
+            stripLinkIdFromUrl();
+            return;
         }
-    }, [searchParams, links]);
+
+        // Outside the loaded window — fetch the doc directly and open it. Reuses
+        // useLinks' toLink mapping so the fetched card is normalized identically.
+        if (!uid) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const snap = await getDoc(doc(db, 'users', uid, 'links', linkId));
+                if (cancelled) return;
+                if (!snap.exists()) return; // deleted/unknown id — no crash, just no-op
+                const card = toLink(snap as QueryDocumentSnapshot<DocumentData>);
+                setFetchedCards(prev => ({ ...prev, [linkId]: card }));
+                setActiveLinkId(linkId);
+                stripLinkIdFromUrl();
+            } catch (e) {
+                reportError(e, 'feed-deeplink-fetch');
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [searchParams, links, isLoading, uid]);
 
     // Only the scrollable card layouts drive pull-to-refresh; disable it while a
     // full-screen mode (Ask/Collections) or any overlay/sheet owns the screen so
@@ -471,8 +520,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         if (!uid) return;
         try {
             await updateDoc(doc(db, 'users', uid, 'links', id), { reminderDue: false, reminderDueAt: null });
-        } catch {
-            /* best-effort dismiss; the live snapshot keeps the source of truth */
+        } catch (e) {
+            // Best-effort dismiss; the live snapshot keeps the source of truth.
+            reportError(e, 'feed-clear-reminder-due');
         }
     }, [uid]);
     // Derived from visibleLinks so a due reminder never leaks a locked private
@@ -563,11 +613,20 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         }
     };
 
+    // Apply the same mutation to many link docs via chunked writeBatch (report
+    // 3.17): ≤450 ops per batch (under Firestore's 500-op limit) instead of N
+    // parallel single-doc writes. Shares lib/collections.ts's batchedUpdate —
+    // deleteLink's client path is a plain deleteDoc (screenshot cleanup is a
+    // server-side concern) and archive is a field update, so both batch cleanly
+    // with no per-doc side effects to preserve.
+    const linkRefs = (ids: string[]) => ids.map((id) => doc(db, 'users', uid!, 'links', id));
+
     const handleBulkArchive = async () => {
         if (!uid) return;
+        const ids = Array.from(selectedIds);
         try {
-            await Promise.all(Array.from(selectedIds).map(id => updateLinkStatus(uid, id, 'archived')));
-            toast.success(`Archived ${selectedIds.size} link${selectedIds.size === 1 ? '' : 's'}`);
+            await batchedUpdate(linkRefs(ids), (batch, ref) => batch.update(ref, { status: 'archived' }));
+            toast.success(`Archived ${ids.length} link${ids.length === 1 ? '' : 's'}`);
         } catch {
             toast.error("Couldn't archive some links. Please try again.");
         }
@@ -577,9 +636,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
     const performBulkDelete = async () => {
         if (!uid) return;
+        const ids = Array.from(selectedIds);
         try {
-            await Promise.all(Array.from(selectedIds).map(id => deleteLink(uid, id)));
-            toast.success(`Deleted ${selectedIds.size} link${selectedIds.size === 1 ? '' : 's'}`);
+            await batchedUpdate(linkRefs(ids), (batch, ref) => batch.delete(ref));
+            toast.success(`Deleted ${ids.length} link${ids.length === 1 ? '' : 's'}`);
         } catch {
             toast.error("Couldn't delete some links. Please try again.");
         }
@@ -971,13 +1031,25 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         <div className="text-center py-16 text-text-secondary text-sm">That digest is no longer available.</div>
     );
 
+    // Complete member sets, direct-subscribed per collection so neither the
+    // detail view's list/count nor a published snapshot is ever truncated by the
+    // windowed feed (report 3.15 follow-up). One for the open collection, one for
+    // whichever collection the Share sheet targets (they can differ — Share is
+    // reachable from the gallery without opening the detail).
+    const openCollectionMembers = useCollectionLinks(uid, openCollectionId);
+    const shareCollectionMembers = useCollectionLinks(uid, shareCollection?.id ?? null);
+
     // One collection opened as its own place (Task A): a real header (name,
     // description, count, share status + actions) over the normal card grid.
     const openCol = openCollectionId ? collections.find((c) => c.id === openCollectionId) ?? null : null;
     const collectionDetailContent = openCol ? (() => {
-        // visibleLinks so a card that's ALSO in a locked private collection
-        // doesn't surface here through a non-private one.
-        const members = visibleLinks.filter((l) => (l.collectionIds ?? []).includes(openCol.id));
+        // The COMPLETE member set (not the windowed feed), so the count and the
+        // grid can't silently drop old members. Pending cards are excluded (as in
+        // the main feed) and — mirroring visibleLinks — a card that's ALSO in a
+        // locked private collection stays hidden here while the vault is locked.
+        const members = openCollectionMembers
+            .filter((l) => !isPending(l) && (!vaultLocked || !isEffectivelyPrivateCard(l)))
+            .sort((a, b) => getTimestampNumber(b.createdAt) - getTimestampNumber(a.createdAt));
         const count = members.length;
         const stale = isShareStale(openCol, members.map((m) => ({ id: m.id })));
         const colStyle = getColorStyleByKey(openCol.color || openCol.name);
@@ -1033,8 +1105,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     </div>
                 </div>
 
-                {/* Cards — the normal card grid, scoped to this collection. */}
-                {filteredLinks.length === 0 ? (
+                {/* Cards — the complete member set for this collection. */}
+                {members.length === 0 ? (
                     <div className="text-center py-16">
                         <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-accent/10 flex items-center justify-center">
                             <Layers className="w-7 h-7 text-accent" />
@@ -1050,7 +1122,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     </div>
                 ) : (
                     <Masonry columnWidth={340} gap={16}>
-                        {filteredLinks.map((link, idx) => (
+                        {members.map((link, idx) => (
                             <Card
                                 key={link.id}
                                 index={idx}
@@ -2175,18 +2247,21 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             {feedModules}
                             {pendingCards.map(renderPendingCard)}
                             {filteredLinks.map((link, idx) => (
-                                <ListCard
-                                    key={link.id}
-                                    index={idx}
-                                    link={link}
-                                    onOpenDetails={openLinkDetails}
-                                    onStatusChange={handleStatusChange}
-                                    onDelete={handleDelete}
-                                    isSelectionMode={isSelectionMode}
-                                    isSelected={selectedIds.has(link.id)}
-                                    onToggleSelection={toggleSelection}
-                                />
+                                // cv-card: off-screen rows skip layout/paint (3.15).
+                                <div key={link.id} className="cv-card">
+                                    <ListCard
+                                        index={idx}
+                                        link={link}
+                                        onOpenDetails={openLinkDetails}
+                                        onStatusChange={handleStatusChange}
+                                        onDelete={handleDelete}
+                                        isSelectionMode={isSelectionMode}
+                                        isSelected={selectedIds.has(link.id)}
+                                        onToggleSelection={toggleSelection}
+                                    />
+                                </div>
                             ))}
+                            <LoadMoreSentinel hasMore={hasMore} onLoadMore={loadMore} />
                         </div>
                     ) : (
                         <>
@@ -2218,6 +2293,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 />
                             ))}
                         </Masonry>
+                        <LoadMoreSentinel hasMore={hasMore} onLoadMore={loadMore} />
                         </>
                     )}
                 </div>
@@ -2356,7 +2432,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 <ShareCollectionSheet
                     uid={uid}
                     collection={collections.find(c => c.id === shareCollection.id) ?? shareCollection}
-                    memberLinks={links.filter(l => (l.collectionIds ?? []).includes(shareCollection.id))}
+                    memberLinks={shareCollectionMembers}
                     isOpen={!!shareCollection}
                     onClose={() => setShareCollection(null)}
                 />

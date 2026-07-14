@@ -14,7 +14,8 @@
  *
  * Design constraints, mirroring the analytics module:
  *   - Fire-and-forget: reporting never throws and never blocks.
- *   - No-op when signed out (no uid ⇒ nothing to key the write to).
+ *   - Signed out (no uid ⇒ nothing to key the write to): the report is buffered
+ *     in memory (capped) and flushed once a workspace uid resolves.
  *   - Rate-limited: at most MAX_REPORTS_PER_SESSION writes per page session,
  *     and identical messages are de-duplicated, so a render loop can't spam
  *     Firestore.
@@ -32,13 +33,18 @@ import { db } from './firebase';
 import { isNativeApp } from './api';
 import { getAnalyticsUid } from './analytics';
 
-const MAX_REPORTS_PER_SESSION = 8;
+const MAX_REPORTS_PER_SESSION = 20;
 const MAX_MESSAGE_LEN = 500;
 const MAX_STACK_LEN = 2000;
+// Reports that arrive while signed out (no uid) are held here and flushed once
+// a workspace resolves (AuthProvider calls flushBufferedReports). Capped so a
+// pre-auth render loop can't grow this without bound.
+const MAX_BUFFERED_REPORTS = 20;
 
 let reportCount = 0;
 let installed = false;
 const seenMessages = new Set<string>();
+const buffered: { error: unknown; source: string }[] = [];
 
 function platform(): 'web' | 'ios' {
     return isNativeApp() ? 'ios' : 'web';
@@ -51,14 +57,41 @@ function truncate(s: string, max: number): string {
 /**
  * Persist one error record. Swallows everything — including a denied/failed
  * write — so it can never itself surface an error or start a loop.
+ *
+ * `source` is a short context label. The global handlers use the fixed
+ * 'window.onerror' / 'unhandledrejection' / 'react' tags; explicit call sites
+ * (previously-silent `.catch`es) pass their own free-form context string.
+ *
+ * When signed out (no uid to key the write to) the report is buffered in memory
+ * and flushed by flushBufferedReports() once a workspace resolves — the exact
+ * window (sign-in) where launch failures otherwise vanish.
  */
-export function reportError(
-    error: unknown,
-    source: 'window.onerror' | 'unhandledrejection' | 'react',
-): void {
+export function reportError(error: unknown, source: string): void {
     try {
         const uid = getAnalyticsUid();
-        if (!uid) return;
+        if (!uid) {
+            if (buffered.length < MAX_BUFFERED_REPORTS) buffered.push({ error, source });
+            return;
+        }
+        writeReport(uid, error, source);
+    } catch {
+        // Reporting must never throw.
+    }
+}
+
+/**
+ * Flush any reports that were buffered while signed out. Called by AuthProvider
+ * the moment a workspace uid resolves. No-op when still signed out or empty.
+ */
+export function flushBufferedReports(): void {
+    if (!getAnalyticsUid() || buffered.length === 0) return;
+    const pending = buffered.splice(0, buffered.length);
+    for (const r of pending) reportError(r.error, r.source);
+}
+
+/** Actually write one record for a known uid. Swallows every failure. */
+function writeReport(uid: string, error: unknown, source: string): void {
+    try {
         if (reportCount >= MAX_REPORTS_PER_SESSION) return;
 
         const err = error as { message?: unknown; stack?: unknown } | undefined;

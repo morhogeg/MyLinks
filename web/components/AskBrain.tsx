@@ -11,6 +11,7 @@ import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl, isNativeApp, fetchWithTimeout } from '@/lib/api';
 import { trackFirstAsk, trackAskNoCitations, trackAskSuggestionUsed, trackAskFollowupUsed, trackAskStopped } from '@/lib/analytics';
+import { reportError } from '@/lib/errorReporter';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { ChatMessage, ChatSource, ChatSession, Link } from '@/lib/types';
 import { buildAskSuggestions, buildFollowUps, newestReadyLink, ClassifiableCard } from '@/lib/askSuggestions';
@@ -419,7 +420,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                 setActiveChatId(id);
             }
             lastSavedRef.current = sig;
-        } catch { /* transient write error; snapshot keeps the list consistent */ }
+        } catch (e) {
+            // Transient write error; the live snapshot keeps the list consistent.
+            reportError(e, 'ask-persist-conversation');
+        }
     }, [uid]);
 
     // Debounced auto-save as the conversation grows.
@@ -467,13 +471,14 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
         if (!uid) return;
         const chat = chats.find(c => c.id === id);
         // Preserve list ordering — a rename shouldn't resurface the chat.
-        updateChat(uid, id, { title, updatedAt: chat?.updatedAt }).catch(() => {});
+        updateChat(uid, id, { title, updatedAt: chat?.updatedAt })
+            .catch((e) => reportError(e, 'ask-rename-chat'));
     };
 
     const confirmDeleteChat = () => {
         if (!uid || !chatToDelete) return;
         const id = chatToDelete;
-        deleteChat(uid, id).catch(() => {});
+        deleteChat(uid, id).catch((e) => reportError(e, 'ask-delete-chat'));
         if (id === activeChatId) newChat();
         setChatToDelete(null);
     };

@@ -49,11 +49,16 @@ export async function getLinksFromFirestore(uid: string): Promise<Link[]> {
 }
 
 /**
- * Get all unique tags for a user from Firestore
+ * Get the user's unique tags from their most recent links.
+ *
+ * Bounded to the 300 newest links (report 3.9): reading the ENTIRE links
+ * collection on every note/save/retry doesn't scale, and tag vocabulary comes
+ * from recent activity anyway. Mirrors the backend `get_user_tags` cap.
  */
 export async function getUserTags(uid: string): Promise<string[]> {
     const linksRef = collection(db, 'users', uid, 'links');
-    const snapshot = await getDocs(linksRef);
+    const q = query(linksRef, orderBy('createdAt', 'desc'), limit(300));
+    const snapshot = await getDocs(q);
 
     const tags = new Set<string>();
     snapshot.docs.forEach(doc => {

@@ -35,7 +35,7 @@ const collectionsRef = (uid: string) => collection(db, 'users', uid, 'collection
 const BATCH_LIMIT = 450;
 
 /** Apply `op` to every ref, committing in ≤BATCH_LIMIT-op batches sequentially. */
-async function batchedUpdate(
+export async function batchedUpdate(
     refs: ReturnType<typeof doc>[],
     op: (batch: ReturnType<typeof writeBatch>, ref: ReturnType<typeof doc>) => void,
 ): Promise<void> {

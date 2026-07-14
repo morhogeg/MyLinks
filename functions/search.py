@@ -368,7 +368,7 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
     return links
 
 
-@https_fn.on_call()
+@https_fn.on_call(max_instances=10)
 def search_links(req: https_fn.CallableRequest) -> Any:
     """
     Callable Function: Perform semantic search.

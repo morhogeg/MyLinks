@@ -134,5 +134,12 @@ service cloud.firestore {
     match /rate_limits/{docId} {
       allow read, write: if false;
     }
+
+    // usage_quotas: only Cloud Functions (admin SDK) — per-uid monthly counters
+    // (see quota.py). Never client-readable or client-writable, so a client can't
+    // inspect or reset its own spend ceiling.
+    match /usage_quotas/{docId} {
+      allow read, write: if false;
+    }
   }
 }
