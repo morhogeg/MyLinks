@@ -617,7 +617,30 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — SHIPPED: Empty-state revamp across Feed / Ask /
+- **2026-07-14 (latest) — SHIPPED: Ask empty-state icon + discoverable
+  history affordance + editable note cards (merge `8f52c67`, commit
+  `ba75039`).** Owner follow-ups on the empty-state ship: (1) the Ask
+  empty-chat / empty-library hero icon was still an accent-purple glyph — now
+  a neutral tile (`bg-fill-subtle` + `border-border-subtle`, `text-secondary`
+  icon) with the ask-chat icon (`MessagesSquare`) instead of the
+  question-mark bubble; (2) the mobile Ask chat-history drawer was a bare icon
+  with no signal a panel existed — replaced with a labeled "History" pill
+  (`PanelLeftOpen` glyph + live chat count) in the mobile subheader; (3) note
+  cards are now freely editable on touch: `LinkDetailModal`'s title/body edit
+  pencils were `opacity-0 group-hover` (unreachable without a mouse) — for
+  `sourceType === 'note'` they're now always-visible and accent-tinted, the
+  empty-body affordance reads "Add a body", and each edit threads a new
+  `reembed` flag through `handleUpdateTitle`/`handleUpdateSummary` →
+  `updateLinkTitle`/`updateLinkSummary` so note edits set `needsEmbedding:
+  true` (a note's text IS its embedding source; regular links unchanged).
+  Verified `tsc --noEmit` clean. **SHIPPED:** Vercel live via `main`; **iOS:
+  TestFlight run #94 → build 1094** via temp trigger
+  `claude/ship-tf-trigger-emptystates2`. ⚠️ Note re-embedding only takes
+  effect once the backend embedding pipeline is deployed (still an owner step
+  — see the search-diagnosis entry below); until then the edit still saves and
+  displays, just doesn't re-vectorize. Owner cleanup: delete all
+  `claude/ship-tf-trigger-*` branches after the run.
+- **2026-07-13 — SHIPPED: Empty-state revamp across Feed / Ask /
   Digest / Review (merge `0503e04`, commit `7596854`).** Owner screenshots
   showed two problems: (1) BUG — the Reminders filter's empty view fell
   through to "Your Machina is empty / Add your first link…" because
