@@ -348,8 +348,17 @@ The multi-user auth work is **fully written but not live**:
     QA list in the §9 entry.
 18. **[ ] Test harness (T3).** Add scraper fixtures, `ai_service` schema-contract
     tests, `search.py` tests; wire into CI/SessionStart (AUDIT.md N-2a tracks this).
-19. **[ ] Cost guardrails.** Budget alerts on the Firebase/GCP project; per-user
-    monthly quotas (see §7). ~~Email digest provider decision~~ **DECIDED
+19. **[~] Cost guardrails — CODE HALF SHIPPED 2026-07-14 (production-readiness
+    sprint, see `docs/PRODUCTION_READINESS_2026-07-14.md`).** Per-user monthly
+    quotas live in code (`functions/quota.py`: 150 saves / 100 asks per month,
+    env-tunable `MONTHLY_SAVE_QUOTA`/`MONTHLY_ASK_QUOTA`, friendly 429s, refund
+    on failed analyses), plus `max_instances` caps on every function, paid rate
+    buckets fail closed, scheduler scans reworked (reminders via a bounded
+    collection-group query + new composite index; digests 15-min cadence,
+    field-masked scan), `task_logs` pruning + TTL-ready `expireAt`. **Remaining
+    ⛔ OWNER:** GCP budget alerts, Firestore PITR/backups, uptime check — the
+    ordered runbook is `docs/PRODUCTION_READINESS_2026-07-14.md` §4.
+    ~~Email digest provider decision~~ **DECIDED
     2026-07-10: the email channel was CUT** (SendGrid was never configured; push
     + the always-on in-app digest supersede it). Stored `email` channel values
     are dropped at read time (`_normalize_channels` / `normalizeChannels`) and
@@ -617,7 +626,41 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-13 (latest) — SHIPPED: Empty-state revamp across Feed / Ask /
+- **2026-07-14 (latest) — SHIPPED: Production-readiness sprint (multi-user
+  hardening) — report + implementation + 8-angle review, commits `e5c4bfd` /
+  `799d690` / `643ce05`.** New `docs/PRODUCTION_READINESS_2026-07-14.md`
+  (user-requested report; its §4 is the ORDERED OWNER LAUNCH RUNBOOK — read it
+  before the cutover). Backend: `set_global_options(max_instances=20)` + per-fn
+  caps (paid endpoints 10, admin/schedulers 1); NEW `functions/quota.py`
+  monthly per-user quotas (150 saves / 100 asks, env-tunable, refund-on-5xx,
+  `usage_quotas` denied in locked rules + rules test); `share_ingest` per-uid
+  bucket; `publish_share_http` 200KB cap + uid bucket; paid rate buckets fail
+  CLOSED (policy lives in the `_RATE_LIMITS` table); Gemini retry w/ backoff
+  (sync paths 2 attempts, `timeout_sec=120` on analyze/ask); reminders scan is
+  now ONE bounded collection-group query (needs the NEW composite index in
+  `firestore.indexes.json` — deploy `firestore:indexes` BEFORE/WITH functions
+  or reminders stop; disabled-user due docs snoozed +1h; ≤10 sends/user/tick;
+  `force_check_reminders?coerce=1` one-time legacy-timestamp repair); digests
+  every 15 min (`DIGEST_CADENCE_MINUTES=15`) with field-masked scan;
+  `task_logs` docs stamp Timestamp `expireAt` (TTL-ready) + batched 14-day
+  janitor prune; `get_user_tags` capped at 300. Frontend: feed subscription is
+  a growing WINDOW (150 + load-more sentinel) with completeness fixes from the
+  review — semantic results union past the window, `?linkId` falls back to
+  getDoc, due-reminder strip has its own `reminderDue` subscription, collection
+  detail/share/publish read the FULL member set via `useCollectionLinks`
+  (published snapshots can't lose members); pull-refresh capped at one page;
+  bulk ops via exported `batchedUpdate`; errorReporter buffers signed-out
+  reports (cap 20) + previously-silent catches now report; `OfflineBanner`.
+  Infra: NEW `.github/workflows/deploy-functions.yml` (manual dispatch; needs
+  ⛔ OWNER secrets `FIREBASE_SERVICE_ACCOUNT` + `GEMINI_API_KEY`; deploys
+  indexes then whole-codebase functions — ends the main-vs-prod drift);
+  `requirements.txt` pinned exact (venv-resolved). Tests 214→236, all green;
+  tsc + full Next build green. **SHIPPED:** merged to `main` (Vercel auto);
+  TestFlight triggered (see run/build in the ship report). **Backend still NOT
+  deployed — owner:** runbook §4 of the report (functions + hosting + indexes +
+  `backfill_embeddings` + `coerce=1`). Deferred (accepted): cursor pagination,
+  window-scoped facet counts/keyword search, Sentry, image optimization.
+- **2026-07-13 — SHIPPED: Empty-state revamp across Feed / Ask /
   Digest / Review (merge `0503e04`, commit `7596854`).** Owner screenshots
   showed two problems: (1) BUG — the Reminders filter's empty view fell
   through to "Your Machina is empty / Add your first link…" because
