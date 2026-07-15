@@ -804,24 +804,25 @@ export default function LinkDetailModal({
                             </div>
                         </div>
                     ) : (
-                        <div className={`group/title relative flex items-start gap-2 mb-4 ${isRtl ? 'flex-row-reverse' : ''}`}>
-                            <h2
-                                dir="auto"
-                                className={`font-bold text-2xl text-text leading-tight flex-1 min-w-0 ${isRtl ? 'text-right' : ''}`}
-                            >
-                                {link.title}
-                            </h2>
+                        // The edit pencil flows INLINE right after the title text
+                        // (not a flex sibling), so it never reserves a right-hand
+                        // column that squeezes the title into early wrapping.
+                        <h2
+                            dir="auto"
+                            className={`group/title font-bold text-2xl text-text leading-tight mb-4 ${isRtl ? 'text-right' : ''}`}
+                        >
+                            {link.title}
                             {onUpdateTitle && (
                                 <button
                                     onClick={() => { setTitleDraft(link.title); setIsEditingTitle(true); }}
                                     aria-label={isNote ? 'Edit note' : 'Edit title'}
                                     title={isNote ? 'Edit note' : 'Edit title'}
-                                    className={`shrink-0 mt-0.5 inline-flex items-center justify-center w-8 h-8 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle focus:opacity-100 transition-colors ${isNote ? 'opacity-100' : 'opacity-0 group-hover/title:opacity-100 transition-opacity'}`}
+                                    className={`inline-flex items-center justify-center align-middle ms-2 w-7 h-7 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle focus:opacity-100 transition-colors ${isNote ? '' : 'opacity-0 group-hover/title:opacity-100 transition-opacity'}`}
                                 >
-                                    <Pencil className="w-4 h-4" />
+                                    <Pencil className="w-[18px] h-[18px]" />
                                 </button>
                             )}
-                        </div>
+                        </h2>
                     )}
 
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -890,9 +891,11 @@ export default function LinkDetailModal({
                                                         {onUpdateSummary && isNote ? (
                                                             <button
                                                                 onClick={startEditSummary}
-                                                                className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-text-muted hover:text-accent transition-colors"
+                                                                aria-label="Edit note"
+                                                                title="Edit note"
+                                                                className="mt-2 inline-flex items-center justify-center w-8 h-8 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
                                                             >
-                                                                <Pencil className="w-3.5 h-3.5" /> Edit note
+                                                                <Pencil className="w-[18px] h-[18px]" />
                                                             </button>
                                                         ) : onUpdateSummary ? (
                                                             <button
@@ -909,12 +912,23 @@ export default function LinkDetailModal({
                                                 {/* Legacy prose-only cards hide the lead to avoid a
                                                     duplicate — still let the user correct the summary. */}
                                                 {!showLead && onUpdateSummary && (
+                                                    isNote ? (
+                                                        <button
+                                                            onClick={startEditSummary}
+                                                            aria-label="Add a body"
+                                                            title="Add a body"
+                                                            className="mb-4 inline-flex items-center justify-center w-8 h-8 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
+                                                        >
+                                                            <Pencil className="w-[18px] h-[18px]" />
+                                                        </button>
+                                                    ) : (
                                                     <button
                                                         onClick={startEditSummary}
                                                         className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/60 hover:text-accent transition-colors"
                                                     >
-                                                        <Pencil className="w-3.5 h-3.5" /> {isNote ? 'Add a body' : 'Edit summary'}
+                                                        <Pencil className="w-3.5 h-3.5" /> Edit summary
                                                     </button>
+                                                    )
                                                 )}
                                             </>
                                         )}
