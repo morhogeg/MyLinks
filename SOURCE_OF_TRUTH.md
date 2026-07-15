@@ -626,7 +626,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-15 (latest) — SHIPPED: Card action-sheet portal fix + note-edit
+- **2026-07-15 (latest) — SHIPPED: Filter drawer order (merge `c90ec06`,
+  commit `63d219c`, run #99 / build 1099, trigger
+  `claude/ship-tf-trigger-filter-order`).** Owner design review of the mobile
+  filter drawer. Decisions: (1) **Show (status) now leads the drawer** — it's
+  the primary lens (unread/favorites/archived/…), was buried below
+  Categories+Tags; new order is Show → Categories → Tags → Sources (Sources
+  stays last as the long power-user list). (2) Category chips already sorted
+  alphabetically (`useFeedFilters.ts`); made the sort **case-insensitive**
+  (`localeCompare` sensitivity:base) so capitalization can't scramble the A–Z.
+  (3) Kept everything consolidated in the ONE Filter drawer — no new toolbar
+  buttons (owner chose to keep the toolbar clean). `MobileFiltersSheet.tsx` +
+  `useFeedFilters.ts`; `tsc`/eslint clean.
+- **2026-07-15 — SHIPPED: Card action-sheet portal fix + note-edit
   polish + Ask history button (merge `077a95e`, feature commit `e07c04f`).**
   Three owner-reported bugs from a device screenshot: (1) tapping a card's ⋯
   opened the action menu **stranded mid-page with no full-screen scrim** — the
