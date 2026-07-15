@@ -658,6 +658,18 @@ exact-match, capped.
     icon buttons (no words), and the title pencil flows **inline after the
     title text** (inside the `<h2>`, `align-middle`) so it reserves no column
     and the headline uses full width.
+  - **Follow-up (build 1098, commit `14754d0`, run #98, trigger
+    `claude/ship-tf-trigger-note-editor`):** owner still found the two-pencil
+    model wrong — the body pencil floated detached in dead space below the text.
+    Root cause: the note detail edited `title` and `summary` as independent AI
+    fields, but a note is ONE piece of writing. Rebuilt as a **single-field note
+    editor** (Apple-style): one pencil (inline on the title) opens the entire
+    note in one textarea; on save, title + body are re-derived via a shared
+    `splitNoteText` (same split as capture) in a new atomic `updateNoteText`
+    storage fn (+ `handleUpdateNote` handler, `onUpdateNote` prop), and the card
+    re-embeds. The read-only body is hidden while editing so nothing shows twice;
+    the separate note body pencils are gone. `splitNoteText` is now the single
+    source of the note title/body split (refactored `createNoteCard` onto it).
 - **2026-07-14 — SHIPPED: Production-readiness sprint (multi-user
   hardening) — report + implementation + 8-angle review, commits `e5c4bfd` /
   `799d690` / `643ce05`.** New `docs/PRODUCTION_READINESS_2026-07-14.md`
