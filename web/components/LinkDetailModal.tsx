@@ -57,6 +57,8 @@ interface LinkDetailModalProps {
     onUpdateCategory: (id: string, category: string) => void;
     onUpdateTitle?: (id: string, title: string, reembed?: boolean) => void;
     onUpdateSummary?: (id: string, summary: string, reembed?: boolean) => void;
+    /** Edit a note card as one field — re-derives title/body from the text. */
+    onUpdateNote?: (id: string, text: string) => void;
     onUpdateNotes?: (id: string, notes: UserNote[], removed?: boolean) => void;
     onDelete: (id: string) => void;
     onUpdateReminder: (link: Link) => void;
@@ -81,6 +83,7 @@ export default function LinkDetailModal({
     onUpdateCategory,
     onUpdateTitle,
     onUpdateSummary,
+    onUpdateNote,
     onUpdateNotes,
     onDelete,
     onUpdateReminder,
@@ -99,6 +102,10 @@ export default function LinkDetailModal({
     const [isEditingSummary, setIsEditingSummary] = useState(false);
     const [titleDraft, setTitleDraft] = useState('');
     const [summaryDraft, setSummaryDraft] = useState('');
+    // A note card is edited as ONE field — the whole note text at once (title +
+    // body are re-derived on save). Held separately from the title/summary drafts.
+    const [isEditingNote, setIsEditingNote] = useState(false);
+    const [noteTextDraft, setNoteTextDraft] = useState('');
     // The user's personal notes on this card — a list, newest first. One note is
     // open in the composer at a time: `editingNoteId` holds its id (or NEW_NOTE_ID
     // when adding a fresh note, or null when the list is just being read). The
@@ -118,15 +125,22 @@ export default function LinkDetailModal({
         // never leaks onto the wrong card.
         setIsEditingTitle(false);
         setIsEditingSummary(false);
+        setIsEditingNote(false);
         setEditingNoteId(null);
     }
 
-    // A note card IS the user's own words (no source article to preserve): its
-    // title and body are meant to be edited freely — not just "corrected" like AI
-    // output — and each edit must re-embed the card (reembed=true) to keep
-    // search/Ask current. A regular link's title/summary are metadata over an
-    // unchanged article, so its vector is left alone.
+    // A note card IS the user's own words — a single piece of writing, edited as
+    // ONE field (see `onUpdateNote`), not a separate title + body. The full note
+    // text lives in `summary` for anything longer than a one-liner; a short note
+    // is entirely its own title. Editing re-derives both and re-embeds.
     const isNote = link.sourceType === 'note';
+    const noteFullText = (link.summary && link.summary.trim()) ? link.summary : link.title;
+    const startEditNoteCard = () => { setNoteTextDraft(noteFullText); setIsEditingNote(true); };
+    const saveNoteCard = () => {
+        const t = noteTextDraft.trim();
+        setIsEditingNote(false);
+        if (t && t !== noteFullText.trim()) onUpdateNote?.(link.id, t);
+    };
     const saveTitle = () => {
         const t = titleDraft.trim();
         setIsEditingTitle(false);
@@ -288,6 +302,7 @@ export default function LinkDetailModal({
             if (e.key !== 'Escape') return;
             e.preventDefault();
             if (isReading) setIsReading(false);
+            else if (isEditingNote) setIsEditingNote(false);
             else if (isEditingTitle) setIsEditingTitle(false);
             else if (isEditingSummary) setIsEditingSummary(false);
             else if (editingNoteId) setEditingNoteId(null);
@@ -297,7 +312,7 @@ export default function LinkDetailModal({
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [isOpen, isReading, isEditingTitle, isEditingSummary, editingNoteId, isEditingCategory, isAddingTag, onClose]);
+    }, [isOpen, isReading, isEditingNote, isEditingTitle, isEditingSummary, editingNoteId, isEditingCategory, isAddingTag, onClose]);
 
     if (!isOpen) return null;
 
@@ -773,7 +788,40 @@ export default function LinkDetailModal({
                         })()}
                     </div>
 
-                    {isEditingTitle ? (
+                    {isNote && isEditingNote ? (
+                        // A note is ONE piece of writing — edited in a single field
+                        // (title + body are re-derived on save), not a title box and a
+                        // detached body pencil. This replaces the whole title+body area.
+                        <div className="mb-6">
+                            <textarea
+                                value={noteTextDraft}
+                                onChange={(e) => setNoteTextDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                    // ⌘/Ctrl+Enter saves; plain Enter is a newline (notes are multiline).
+                                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveNoteCard(); }
+                                }}
+                                rows={8}
+                                autoFocus
+                                dir="auto"
+                                aria-label="Edit note"
+                                className={`w-full text-base text-text leading-relaxed bg-background border border-accent/40 rounded-xl px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50 resize-y min-h-[8rem] ${isRtl ? 'text-right' : ''}`}
+                            />
+                            <div className="flex gap-2 mt-3">
+                                <button
+                                    onClick={saveNoteCard}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-white text-sm font-bold hover:bg-accent-hover active:scale-95 transition-all"
+                                >
+                                    <Check className="w-4 h-4" /> Save
+                                </button>
+                                <button
+                                    onClick={() => setIsEditingNote(false)}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-fill-subtle text-text-muted text-sm font-bold hover:text-text hover:bg-fill-strong transition-all"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    ) : isEditingTitle ? (
                         <div className="mb-4">
                             <textarea
                                 value={titleDraft}
@@ -806,15 +854,17 @@ export default function LinkDetailModal({
                     ) : (
                         // The edit pencil flows INLINE right after the title text
                         // (not a flex sibling), so it never reserves a right-hand
-                        // column that squeezes the title into early wrapping.
+                        // column that squeezes the title into early wrapping. For a
+                        // note it opens the single-field note editor (title + body as
+                        // one); for a link it edits just the title.
                         <h2
                             dir="auto"
                             className={`group/title font-bold text-2xl text-text leading-tight mb-4 ${isRtl ? 'text-right' : ''}`}
                         >
                             {link.title}
-                            {onUpdateTitle && (
+                            {(isNote ? onUpdateNote : onUpdateTitle) && (
                                 <button
-                                    onClick={() => { setTitleDraft(link.title); setIsEditingTitle(true); }}
+                                    onClick={() => { if (isNote) startEditNoteCard(); else { setTitleDraft(link.title); setIsEditingTitle(true); } }}
                                     aria-label={isNote ? 'Edit note' : 'Edit title'}
                                     title={isNote ? 'Edit note' : 'Edit title'}
                                     className={`inline-flex items-center justify-center align-middle ms-2 w-7 h-7 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle focus:opacity-100 transition-colors ${isNote ? '' : 'opacity-0 group-hover/title:opacity-100 transition-opacity'}`}
@@ -834,7 +884,10 @@ export default function LinkDetailModal({
                             leading overview paragraph — drop everything before the
                             first "## " so the open view never shows two overviews.
                             Prose-only legacy detailedSummary (no headings) has no gist
-                            to strip, so we show it alone to avoid duplicating it. */}
+                            to strip, so we show it alone to avoid duplicating it.
+                            While a note's single-field editor is open, its read-only
+                            body is hidden so the text isn't shown twice. */}
+                        {!(isNote && isEditingNote) && (
                         <div className="mb-6">
                             {(() => {
                                 const detailed = link.detailedSummary || '';
@@ -885,19 +938,10 @@ export default function LinkDetailModal({
                                                             isRtl={isRtl}
                                                             className="text-base"
                                                         />
-                                                        {/* Note body edits get a clean inline button beneath the
-                                                            text (never an icon floating over the user's words);
-                                                            AI summaries keep the quiet hover pencil. */}
-                                                        {onUpdateSummary && isNote ? (
-                                                            <button
-                                                                onClick={startEditSummary}
-                                                                aria-label="Edit note"
-                                                                title="Edit note"
-                                                                className="mt-2 inline-flex items-center justify-center w-8 h-8 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
-                                                            >
-                                                                <Pencil className="w-[18px] h-[18px]" />
-                                                            </button>
-                                                        ) : onUpdateSummary ? (
+                                                        {/* Non-note summaries keep a quiet hover pencil to correct
+                                                            AI output. Notes are edited via the single pencil on the
+                                                            title (the whole note is one field), so no body control. */}
+                                                        {!isNote && onUpdateSummary && (
                                                             <button
                                                                 onClick={startEditSummary}
                                                                 aria-label="Edit summary"
@@ -906,29 +950,18 @@ export default function LinkDetailModal({
                                                             >
                                                                 <Pencil className="w-4 h-4" />
                                                             </button>
-                                                        ) : null}
+                                                        )}
                                                     </div>
                                                 )}
                                                 {/* Legacy prose-only cards hide the lead to avoid a
                                                     duplicate — still let the user correct the summary. */}
-                                                {!showLead && onUpdateSummary && (
-                                                    isNote ? (
-                                                        <button
-                                                            onClick={startEditSummary}
-                                                            aria-label="Add a body"
-                                                            title="Add a body"
-                                                            className="mb-4 inline-flex items-center justify-center w-8 h-8 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
-                                                        >
-                                                            <Pencil className="w-[18px] h-[18px]" />
-                                                        </button>
-                                                    ) : (
+                                                {!showLead && !isNote && onUpdateSummary && (
                                                     <button
                                                         onClick={startEditSummary}
                                                         className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/60 hover:text-accent transition-colors"
                                                     >
                                                         <Pencil className="w-3.5 h-3.5" /> Edit summary
                                                     </button>
-                                                    )
                                                 )}
                                             </>
                                         )}
@@ -943,6 +976,7 @@ export default function LinkDetailModal({
                                 );
                             })()}
                         </div>
+                        )}
 
 
                         <div className="flex flex-wrap items-center gap-4 text-sm text-text-muted mb-8">

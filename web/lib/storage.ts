@@ -190,17 +190,27 @@ export async function saveLink(uid: string, linkData: Partial<Link>): Promise<vo
  * in the background — best-effort, so the note stands on its own if that never
  * lands.
  */
-export async function createNoteCard(uid: string, text: string): Promise<string> {
+/**
+ * Split raw note text into the card's `{ title, summary }`.
+ *
+ * A short one-liner IS its own title, so the body stays empty to avoid a card
+ * that prints the same sentence twice. A longer/multi-line note gets a truncated
+ * first-line title with the full text as the body. Shared by `createNoteCard`
+ * and `updateNoteText` so a note reads identically whether it was just captured
+ * or later edited.
+ */
+export function splitNoteText(text: string): { title: string; summary: string; firstLine: string; words: number } {
     const trimmed = text.trim();
     const firstLine = (trimmed.split('\n').map(l => l.trim()).find(Boolean) || 'Note');
-    // A short one-liner IS its own title, so we leave the body empty to avoid a
-    // card that prints the same sentence twice. A longer/multi-line note gets a
-    // truncated first-line title with the full text as the body. (AI enrichment
-    // later refines the title either way.)
     const isShortSingleLine = !trimmed.includes('\n') && firstLine.length <= 90;
     const title = firstLine.length > 90 ? `${firstLine.slice(0, 90).trimEnd()}…` : firstLine;
     const summary = isShortSingleLine ? '' : trimmed;
     const words = trimmed ? trimmed.split(/\s+/).length : 0;
+    return { title, summary, firstLine, words };
+}
+
+export async function createNoteCard(uid: string, text: string): Promise<string> {
+    const { title, summary, firstLine, words } = splitNoteText(text);
     const ref = await addDoc(collection(db, 'users', uid, 'links'), {
         url: '',
         title,
@@ -217,6 +227,27 @@ export async function createNoteCard(uid: string, text: string): Promise<string>
         metadata: { originalTitle: firstLine, estimatedReadTime: Math.max(1, Math.round(words / 200)) },
     });
     return ref.id;
+}
+
+/**
+ * Edit a note card's text as ONE thing.
+ *
+ * A note IS a single piece of the user's writing, so the detail view edits it in
+ * a single field — not a separate "title" and "body". We re-derive title/summary
+ * with the SAME split `createNoteCard` uses (so the card reads identically to a
+ * fresh capture), refresh the read-time estimate, and flip `needsEmbedding` so
+ * search/Ask pick up the new words. One atomic write.
+ */
+export async function updateNoteText(uid: string, id: string, text: string): Promise<void> {
+    const { title, summary, firstLine, words } = splitNoteText(text);
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    await updateDoc(linkRef, {
+        title,
+        summary,
+        needsEmbedding: true,
+        'metadata.originalTitle': firstLine,
+        'metadata.estimatedReadTime': Math.max(1, Math.round(words / 200)),
+    });
 }
 
 /**
