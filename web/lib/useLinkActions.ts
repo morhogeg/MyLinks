@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { Link, LinkStatus, UserNote } from '@/lib/types';
-import { updateLinkStatus, updateLinkTags, updateLinkCategory, updateLinkTitle, updateLinkSummary, updateLinkNotes, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
+import { updateLinkStatus, updateLinkTags, updateLinkCategory, updateLinkTitle, updateLinkSummary, updateNoteText, updateLinkNotes, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
 import { publishCard, removeLinkFromCollection } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
 import { useToast } from '@/components/Toast';
@@ -80,6 +80,17 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
         }
     }, [uid, toast]);
 
+    // A note card is edited as ONE field (see updateNoteText) — re-derives
+    // title/body from the single text and re-embeds.
+    const handleUpdateNote = useCallback(async (id: string, text: string) => {
+        if (!uid) return;
+        try {
+            await updateNoteText(uid, id, text);
+        } catch {
+            toast.error("Couldn't save your note. Please try again.");
+        }
+    }, [uid, toast]);
+
     // The user's personal notes on a card — their own annotations, distinct from
     // the AI summary. Takes the full desired note list (the editor computes it);
     // `removed` picks the right confirmation. Optimistic via onSnapshot latency
@@ -142,6 +153,7 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
         handleUpdateCategory,
         handleUpdateTitle,
         handleUpdateSummary,
+        handleUpdateNote,
         handleUpdateNotes,
         handleRetryProcessing,
         handleRemoveFromCollection,
