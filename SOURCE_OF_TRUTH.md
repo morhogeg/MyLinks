@@ -649,6 +649,15 @@ exact-match, capped.
   overlay (`position: fixed`) rendered inside the feed/card tree MUST portal to
   `body` — an ancestor `transform`/`filter`/`will-change` silently turns
   `fixed` into `absolute`.
+  - **Follow-up (build 1097, commit `415d087`, run #97, trigger
+    `claude/ship-tf-trigger-menu-fixes2`):** owner screenshot of a note detail
+    flagged the note-edit affordances still weren't right — the body edit had
+    "Edit note" wording while the title was a bare pencil, and the title pencil
+    (a flex sibling with `flex-1` on the `<h2>`) reserved a right-hand column
+    that forced the headline to wrap early. Now BOTH note edits are bare pencil
+    icon buttons (no words), and the title pencil flows **inline after the
+    title text** (inside the `<h2>`, `align-middle`) so it reserves no column
+    and the headline uses full width.
 - **2026-07-14 — SHIPPED: Production-readiness sprint (multi-user
   hardening) — report + implementation + 8-angle review, commits `e5c4bfd` /
   `799d690` / `643ce05`.** New `docs/PRODUCTION_READINESS_2026-07-14.md`
