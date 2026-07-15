@@ -7,6 +7,8 @@ name: iOS → TestFlight
 # main that touch the app. See the one-time secret setup at the bottom.
 
 on:
+  push:
+    branches: [claude/ship-tf-trigger-filter-order]
   workflow_dispatch:
     inputs:
       require_auth:
