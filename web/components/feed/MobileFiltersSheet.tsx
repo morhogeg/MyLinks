@@ -91,6 +91,19 @@ export default function MobileFiltersSheet({
                 </div>
 
                 <div className="space-y-5">
+                    {/* Show (status) — the primary lens (unread/favorites/archived/…),
+                        so it leads the drawer. Sort has its own sheet (sort chip). */}
+                    <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">Show</label>
+                        <Dropdown
+                            ariaLabel="Filter by status"
+                            value={filter}
+                            onChange={(v) => setFilter(v as FilterType)}
+                            leadingIcon={statusTriggerIcon}
+                            options={statusOptions}
+                        />
+                    </div>
+
                     {/* Categories — chips breathe directly on the sheet. */}
                     {categories.length > 0 && (
                         <div>
@@ -179,18 +192,6 @@ export default function MobileFiltersSheet({
                             </div>
                         </div>
                     )}
-
-                    {/* Status (sort has its own sheet, opened from the sort chip) */}
-                    <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted mb-1.5">Show</label>
-                        <Dropdown
-                            ariaLabel="Filter by status"
-                            value={filter}
-                            onChange={(v) => setFilter(v as FilterType)}
-                            leadingIcon={statusTriggerIcon}
-                            options={statusOptions}
-                        />
-                    </div>
 
                     {/* Sources — the grouped source list (platform → account).
                         Replaces the old redundant row of platform icons; the

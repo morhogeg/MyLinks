@@ -210,7 +210,10 @@ export function useFeedFilters(
     // Category chips stay derived from the whole library so they never vanish —
     // they just read 0 when nothing matches the current tag selection.
     const categories = useMemo(
-        () => Array.from(new Set(contentLinks.map(l => l.category).filter(Boolean))).sort(),
+        () => Array.from(new Set(contentLinks.map(l => l.category).filter(Boolean)))
+            // Case-insensitive A–Z so chips read in a predictable order regardless
+            // of how a category happens to be capitalized.
+            .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
         [contentLinks]
     );
 
