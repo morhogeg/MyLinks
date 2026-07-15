@@ -802,19 +802,19 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                     onBack={() => onExit?.()}
                     title="Ask Machina"
                     leading={
-                        // A labeled pill (not a bare icon) so it's obvious a history
-                        // panel lives behind it — the panel-open glyph mirrors the
-                        // desktop sidebar toggle, and the count hints there's something
-                        // to open. Falls back to just "History" when the list is empty.
+                        // A quiet icon button, same footprint as the back chevron and
+                        // "New" action. The panel-open glyph signals it opens a side
+                        // panel; a small dot badges an existing history without adding
+                        // width. (Was a full "History" pill — too heavy in the bar.)
                         <button
                             onClick={() => setHistoryOpen(true)}
                             aria-label="Open chat history"
-                            className="inline-flex items-center gap-1.5 ps-2 pe-2.5 py-1.5 rounded-full text-text-secondary bg-card border border-border-subtle hover:text-text hover:border-text-muted/40 active:bg-card-hover transition-colors cursor-pointer"
+                            title="Chat history"
+                            className="relative p-2 rounded-full text-text-secondary hover:text-text active:bg-card-hover transition-colors cursor-pointer"
                         >
-                            <PanelLeftOpen className="w-4 h-4 shrink-0" />
-                            <span className="text-xs font-semibold">History</span>
+                            <PanelLeftOpen className="w-5 h-5" />
                             {chats.length > 0 && (
-                                <span className="min-w-[1.1rem] text-center text-[11px] font-bold tabular-nums text-text-muted">{chats.length}</span>
+                                <span className="absolute top-1 end-1 w-1.5 h-1.5 rounded-full bg-accent" />
                             )}
                         </button>
                     }

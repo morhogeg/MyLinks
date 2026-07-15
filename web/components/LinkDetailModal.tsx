@@ -816,9 +816,9 @@ export default function LinkDetailModal({
                                     onClick={() => { setTitleDraft(link.title); setIsEditingTitle(true); }}
                                     aria-label={isNote ? 'Edit note' : 'Edit title'}
                                     title={isNote ? 'Edit note' : 'Edit title'}
-                                    className={`shrink-0 mt-1 focus:opacity-100 transition-opacity p-1.5 hover:bg-fill-subtle rounded-md ${isNote ? 'opacity-100' : 'opacity-0 group-hover/title:opacity-100'}`}
+                                    className={`shrink-0 mt-0.5 inline-flex items-center justify-center w-8 h-8 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle focus:opacity-100 transition-colors ${isNote ? 'opacity-100' : 'opacity-0 group-hover/title:opacity-100 transition-opacity'}`}
                                 >
-                                    <Pencil className={`w-4 h-4 ${isNote ? 'text-accent' : 'text-text-muted/50 hover:text-text-muted'}`} />
+                                    <Pencil className="w-4 h-4" />
                                 </button>
                             )}
                         </div>
@@ -884,16 +884,26 @@ export default function LinkDetailModal({
                                                             isRtl={isRtl}
                                                             className="text-base"
                                                         />
-                                                        {onUpdateSummary && (
+                                                        {/* Note body edits get a clean inline button beneath the
+                                                            text (never an icon floating over the user's words);
+                                                            AI summaries keep the quiet hover pencil. */}
+                                                        {onUpdateSummary && isNote ? (
                                                             <button
                                                                 onClick={startEditSummary}
-                                                                aria-label={isNote ? 'Edit note' : 'Edit summary'}
-                                                                title={isNote ? 'Edit note' : 'Edit summary'}
-                                                                className={`absolute top-0 focus:opacity-100 transition-opacity p-1.5 hover:bg-fill-subtle rounded-md ${isNote ? 'opacity-100' : 'opacity-0 group-hover/summary:opacity-100'} ${isRtl ? 'left-0' : 'right-0'}`}
+                                                                className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-text-muted hover:text-accent transition-colors"
                                                             >
-                                                                <Pencil className={`w-4 h-4 ${isNote ? 'text-accent' : 'text-text-muted/50 hover:text-text-muted'}`} />
+                                                                <Pencil className="w-3.5 h-3.5" /> Edit note
                                                             </button>
-                                                        )}
+                                                        ) : onUpdateSummary ? (
+                                                            <button
+                                                                onClick={startEditSummary}
+                                                                aria-label="Edit summary"
+                                                                title="Edit summary"
+                                                                className={`absolute top-0 inline-flex items-center justify-center w-8 h-8 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle opacity-0 group-hover/summary:opacity-100 focus:opacity-100 transition-opacity ${isRtl ? 'left-0' : 'right-0'}`}
+                                                            >
+                                                                <Pencil className="w-4 h-4" />
+                                                            </button>
+                                                        ) : null}
                                                     </div>
                                                 )}
                                                 {/* Legacy prose-only cards hide the lead to avoid a
