@@ -626,7 +626,30 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-14 (latest) — SHIPPED: Production-readiness sprint (multi-user
+- **2026-07-15 (latest) — SHIPPED: Card action-sheet portal fix + note-edit
+  polish + Ask history button (merge `077a95e`, feature commit `e07c04f`).**
+  Three owner-reported bugs from a device screenshot: (1) tapping a card's ⋯
+  opened the action menu **stranded mid-page with no full-screen scrim** — the
+  `fixed inset-0` overlay in `CardActionSheet` was being trapped by an
+  ancestor's containing block (a transformed/filtered feed ancestor). Fix:
+  render the sheet through `createPortal(…, document.body)` so it's always
+  viewport-anchored, and cap it to `max-h-[85vh]` with `flex flex-col` + an
+  internal `overflow-y-auto` rows region (header `shrink-0`) so a long action
+  list scrolls instead of overflowing off a short screen. (2) The note
+  title/body edit pencils (added build 1094) looked sloppy — loud accent icons,
+  and the body pencil floated over the user's RTL text. Now quiet, well-aligned
+  `w-8 h-8` icon buttons; the note **body** edit is a clean inline "Edit note"
+  button *beneath* the text (never an icon over it). (3) The Ask mobile
+  chat-history control was a full "History" pill (too heavy in the bar) — back
+  to a compact icon button (`PanelLeftOpen`) with a small accent dot when
+  history exists. Verified `tsc --noEmit` + eslint clean. **SHIPPED:** Vercel
+  live via `main`; **iOS: TestFlight run #96 → build 1096** via temp trigger
+  `claude/ship-tf-trigger-menu-fixes`. Owner cleanup: delete the
+  `claude/ship-tf-trigger-*` branches after the run. LESSON: any full-screen
+  overlay (`position: fixed`) rendered inside the feed/card tree MUST portal to
+  `body` — an ancestor `transform`/`filter`/`will-change` silently turns
+  `fixed` into `absolute`.
+- **2026-07-14 — SHIPPED: Production-readiness sprint (multi-user
   hardening) — report + implementation + 8-angle review, commits `e5c4bfd` /
   `799d690` / `643ce05`.** New `docs/PRODUCTION_READINESS_2026-07-14.md`
   (user-requested report; its §4 is the ORDERED OWNER LAUNCH RUNBOOK — read it
