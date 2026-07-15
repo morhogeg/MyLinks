@@ -3,6 +3,7 @@
 import { Link, LinkStatus } from '@/lib/types';
 import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink, Layers, Share2, FolderMinus, Lock } from 'lucide-react';
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { IconButton } from './ui/Button';
 import { useScrollLock } from '@/lib/useScrollLock';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
@@ -65,7 +66,12 @@ export default function CardActionSheet({
     const isMobile = useIsMobile();
     const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose, enabled: isMobile });
 
-    if (!isOpen) return null;
+    // Portal to <body> so the fixed overlay is anchored to the viewport, never
+    // trapped inside a transformed/filtered feed ancestor (which would strand the
+    // sheet mid-page with no full-screen scrim). `isOpen` only flips true on a
+    // client tap, so the portal never runs during SSR; the `document` guard is
+    // belt-and-suspenders for that.
+    if (!isOpen || typeof document === 'undefined') return null;
 
     const isFavorite = link.status === 'favorite';
     const isArchived = link.status === 'archived';
@@ -147,7 +153,7 @@ export default function CardActionSheet({
         },
     ];
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center animate-fade-in">
             {/* Backdrop */}
             <div
@@ -156,15 +162,16 @@ export default function CardActionSheet({
                 onClick={onClose}
             />
 
-            {/* Sheet */}
+            {/* Sheet — capped to the viewport so a long action list scrolls
+                internally instead of overflowing off the top of a short screen. */}
             <div
                 ref={sheetRef}
                 role="menu"
                 aria-label="Card actions"
-                className="relative w-full sm:max-w-sm bg-card border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up overflow-hidden safe-pb"
+                className="relative w-full sm:max-w-sm max-h-[85vh] flex flex-col bg-card border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up overflow-hidden safe-pb"
             >
                 {/* Grab handle + header: the drag-to-dismiss zone on mobile. */}
-                <div {...handleProps}>
+                <div {...handleProps} className="shrink-0">
                     <div className="sm:hidden flex justify-center pt-3 pb-1">
                         <div className="h-1.5 w-10 rounded-full bg-fill-strong" />
                     </div>
@@ -186,8 +193,8 @@ export default function CardActionSheet({
                     </div>
                 </div>
 
-                {/* Action rows */}
-                <div className="py-1">
+                {/* Action rows — scroll within the capped sheet if they don't fit. */}
+                <div className="flex-1 min-h-0 py-1 overflow-y-auto overscroll-contain scrollbar-soft">
                     {rows.map((row) => (
                         <button
                             key={row.key}
@@ -212,6 +219,7 @@ export default function CardActionSheet({
                     ))}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body,
     );
 }
