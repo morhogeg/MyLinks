@@ -626,7 +626,16 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-15 (latest) — SHIPPED: Filter drawer order (merge `c90ec06`,
+- **2026-07-15 (latest) — DOC: iOS launch runbook (`docs/IOS_LAUNCH_GUIDE.md`).**
+  Owner-requested single step-by-step guide to take Machina from "all code done,
+  single-user" to "live on the App Store." Consolidates the open launch items
+  from §4 + `docs/PRODUCTION_READINESS_2026-07-14.md` §4 +
+  `NATIVE_AUTH_SETUP.md` + `docs/APP_STORE.md` into one ordered runbook (auth
+  cutover → backend deploy → key rotation → backups → monitoring → App Store
+  Connect → on-device sweep → submit), with exact console paths and commands for
+  each step. No code change — reference how-to guide only; the underlying tasks
+  (§4 tasks 2/4/5/8/9/11) are unchanged and still owner-gated.
+- **2026-07-15 — SHIPPED: Filter drawer order (merge `c90ec06`,
   commit `63d219c`, run #99 / build 1099, trigger
   `claude/ship-tf-trigger-filter-order`).** Owner design review of the mobile
   filter drawer. Decisions: (1) **Show (status) now leads the drawer** — it's
