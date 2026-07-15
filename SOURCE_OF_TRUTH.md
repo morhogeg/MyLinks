@@ -655,8 +655,11 @@ exact-match, capped.
   ⛔ OWNER secrets `FIREBASE_SERVICE_ACCOUNT` + `GEMINI_API_KEY`; deploys
   indexes then whole-codebase functions — ends the main-vs-prod drift);
   `requirements.txt` pinned exact (venv-resolved). Tests 214→236, all green;
-  tsc + full Next build green. **SHIPPED:** merged to `main` (Vercel auto);
-  TestFlight triggered (see run/build in the ship report). **Backend still NOT
+  tsc + full Next build green. **SHIPPED:** merged to `main` (merge `fe53031`,
+  Vercel auto); **iOS: TestFlight run #95 → build 1095, upload SUCCESS** via
+  temp trigger `claude/ship-tf-trigger-prodready` (API dispatch still 403 from
+  cloud sessions; owner: delete `claude/ship-tf-trigger-*` branches after
+  installing). **Backend still NOT
   deployed — owner:** runbook §4 of the report (functions + hosting + indexes +
   `backfill_embeddings` + `coerce=1`). Deferred (accepted): cursor pagination,
   window-scoped facet counts/keyword search, Sentry, image optimization.
