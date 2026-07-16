@@ -681,6 +681,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                         } else if (evt.type === 'error') {
                             setIsThinking(false);
                             patchAt({ content: evt.error || 'Something went wrong reaching Machina. Please try again.', error: true });
+                            // Surface the failure in client_errors — the backend
+                            // message is sanitized, so record what the user saw
+                            // plus where it came from for production triage.
+                            reportError(new Error(`ask stream error: ${evt.error || 'unknown'}`), 'ask-send-stream');
                             done = true;
                         } else if (evt.type === 'done') {
                             done = true;
@@ -715,8 +719,11 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                     content: data.error || 'Something went wrong reaching Machina. Please try again.',
                     error: true,
                 }]);
+                // Record what failed (status + sanitized backend message) so
+                // production ask failures leave a trail in client_errors.
+                reportError(new Error(`ask failed (HTTP ${res.status}): ${data.error || 'unknown'}`), 'ask-send');
             }
-        } catch {
+        } catch (e) {
             // A deliberate abort (New/switch/re-send) is not a user-facing error.
             if (isStale()) return;
             setMessages(prev => [...prev, {
@@ -724,6 +731,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                 content: 'Couldn’t reach Machina. Check your connection and try again.',
                 error: true,
             }]);
+            reportError(e, 'ask-send-network');
         } finally {
             // Only the current generation owns these — a superseded run must not
             // clear the newer stream's thinking state or abort controller.

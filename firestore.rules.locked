@@ -141,5 +141,12 @@ service cloud.firestore {
     match /usage_quotas/{docId} {
       allow read, write: if false;
     }
+
+    // server_errors: only Cloud Functions (admin SDK) — durable 5xx records
+    // (see main.py _record_server_error). They can carry a workspace uid, so
+    // never client-readable; surfaced only via the admin debug_status endpoint.
+    match /server_errors/{docId} {
+      allow read, write: if false;
+    }
   }
 }

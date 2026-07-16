@@ -626,7 +626,45 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-15 (latest) — SHIPPED (desktop web only): Search-icon collapse +
+- **2026-07-16 (latest) — Ask "Internal server error" fixed + production error
+  visibility (branch `claude/ask-messaging-server-error-5n1lxt`).** Owner
+  report: every Ask message returns "internal server error". Diagnosis from
+  code (cloud sessions can't reach prod — egress re-verified blocked): the
+  string is `ask_brain`'s sanitized catch-all, and the only unguarded per-ask
+  step is the Gemini answer call, so Ask's generation is failing on every
+  message. Prime suspect: the Ask paths are the ONLY consumers of
+  `GEMINI_ASK_MODEL="gemini-3.1-flash"` (added 2026-07-11, commit `8e90537`) —
+  a model id that has NEVER run in production (last deployed backend is
+  `main@7d3f61e`, 2026-07-10, which predates it; every other Gemini surface
+  runs the proven `gemini-3.1-flash-lite`). A bad/keyless model id fails
+  non-retryably → `AnalysisError` → blind 500 on every ask while saves keep
+  working. Fixes (defensive under EVERY root cause): (1) both RAG paths now
+  **fall back to `GEMINI_ANALYSIS_MODEL`** when the ask-tier call fails
+  (`_answer_json`; the stream falls back only while no token has been emitted,
+  so prose can't duplicate); (2) ask failures return a **distinguishable but
+  still sanitized** message ("Machina couldn't generate an answer right now…",
+  502) instead of "Internal server error"; (3) NEW durable error trail: 5xx
+  records land in the admin-only **`server_errors`** collection
+  (`_record_server_error`; uid + type + bounded message + TTL `expireAt`),
+  surfaced via `debug_status` → `recent_server_errors`, pruned by the janitor
+  on the task_logs 14-day policy, denied to clients in
+  `firestore.rules.locked` + rules test; (4) failed asks now **refund the
+  monthly ask quota unit** (parity with analyze_*); (5) client-side: AskBrain
+  `send()` now reports every failure shape to `client_errors` via
+  `reportError` (`ask-send`, `ask-send-stream`, `ask-send-network`) — before
+  this, ask errors left NO trace anywhere the owner could see. Tests 230→237
+  (fallback both paths, no-fallback-after-emit, server_errors shape +
+  never-raises); `tsc` clean. **⛔ OWNER — the fix is dark until the pending
+  backend deploy runs:** the whole-codebase deploy from the 07-14 runbook
+  (`docs/PRODUCTION_READINESS_2026-07-14.md` §4) now also carries this fix;
+  after deploying, re-test Ask, and if it still fails check
+  `debug_status?…recent_server_errors` (admin token) — the recorded `type`/
+  `error` names the real cause. **How to know about such bugs in production
+  (owner question #3):** (a) server side — `server_errors` via `debug_status`;
+  (b) client side — `users/{uid}/client_errors` (now includes ask failures);
+  (c) still recommended (runbook): GCP budget alerts + a Cloud Monitoring
+  log-based alert on Cloud Functions severity>=ERROR for push/email notice.
+- **2026-07-15 — SHIPPED (desktop web only): Search-icon collapse +
   slim filter scrollbar (merge `6034ade`, commit `cbf70d7`).** Two desktop
   polish fixes: (1) the filters modal had a fat native scrollbar — added
   `scrollbar-soft` (slim rounded ~4px thumb) + `overscroll-contain`. (2)

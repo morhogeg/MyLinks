@@ -537,6 +537,28 @@ If the image is an article, extract the headline and body."""
         ]
         return self._generate_json(contents, "image analysis", attempts=attempts)
 
+    def _answer_json(self, prompt: str, what: str, attempts: int) -> dict:
+        """One grounded-answer generation call, with a model fallback.
+
+        Tries the higher-tier GEMINI_ASK_MODEL first; if that call fails
+        outright (after _generate_json's own transient retries), re-runs the
+        SAME prompt on GEMINI_ANALYSIS_MODEL — the tier every save/analysis
+        call already exercises in production. The ask tier is the ONLY place
+        the higher model id is used, so a bad/unavailable model there must
+        degrade Ask to the proven tier, not hard-fail every question with an
+        opaque 500. Raises AnalysisError only when BOTH models fail.
+        """
+        try:
+            return self._generate_json([prompt], what,
+                                       config_extra={"response_schema": BrainAnswer},
+                                       model=GEMINI_ASK_MODEL, attempts=attempts)
+        except AnalysisError as e:
+            logger.error("Ask model %s failed for %s — falling back to %s: %s",
+                         GEMINI_ASK_MODEL, what, GEMINI_ANALYSIS_MODEL, e)
+            return self._generate_json([prompt], f"{what} (fallback model)",
+                                       config_extra={"response_schema": BrainAnswer},
+                                       model=GEMINI_ANALYSIS_MODEL, attempts=attempts)
+
     def answer_from_context(self, question: str, cards: list, history: list = None,
                             attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
         """Answer a user question grounded ONLY in their saved cards (RAG).
@@ -570,9 +592,7 @@ If the image is an article, extract the headline and body."""
             }
 
         prompt = _build_rag_prompt(question, cards, history) + _CITED_JSON_SUFFIX
-        data = self._generate_json([prompt], "answer",
-                                   config_extra={"response_schema": BrainAnswer},
-                                   model=GEMINI_ASK_MODEL, attempts=attempts)
+        data = self._answer_json(prompt, "answer", attempts)
         answer = data.get("answer") or ""
         cited = _valid_cited_ids(data.get("citedIds"), cards)
         if cited:
@@ -583,11 +603,7 @@ If the image is an article, extract the headline and body."""
         # here must not sink the request — fall through to the ungrounded return.
         retry_prompt = _build_rag_prompt(question, cards, history) + _CITED_JSON_STRICT_SUFFIX
         try:
-            retry = self._generate_json(
-                [retry_prompt], "answer (citation retry)",
-                config_extra={"response_schema": BrainAnswer},
-                model=GEMINI_ASK_MODEL, attempts=attempts,
-            )
+            retry = self._answer_json(retry_prompt, "answer (citation retry)", attempts)
             retry_answer = retry.get("answer") or ""
             retry_cited = _valid_cited_ids(retry.get("citedIds"), cards)
             if retry_cited:
@@ -653,10 +669,6 @@ If the image is an article, extract the headline and body."""
         # of the "[[CITED: ...]]" marker so it is never streamed as visible text.
         # We keep at least the marker's full prefix length buffered at all times.
         MARKER = "[[CITED:"
-        # Once we see the marker open we stop emitting and accumulate the rest.
-        buffer = ""
-        full_text = ""
-        marker_seen = False
 
         def _safe_emit_point(buf: str) -> int:
             """Return how many leading chars of `buf` are safe to emit now —
@@ -671,45 +683,66 @@ If the image is an article, extract the headline and body."""
                     return len(buf) - keep
             return len(buf)
 
-        try:
-            stream = self.client.models.generate_content_stream(
-                # Higher-tier ASK model (see GEMINI_ASK_MODEL), matching the
-                # non-streaming answer path — RAG answers, not analysis.
-                model=GEMINI_ASK_MODEL,
-                contents=[prompt],
-                # Match the non-streaming answer path: this is a grounded,
-                # factual answer, so keep temperature low for stability. Without
-                # this the stream would silently run at the ~1.0 default.
-                config={"temperature": 0.2},
-            )
-            for chunk in stream:
-                piece = getattr(chunk, "text", None)
-                if not piece:
-                    continue
-                full_text += piece
-                if marker_seen:
-                    # Past the marker — accumulate into full_text only, emit nothing.
-                    continue
-                buffer += piece
-                marker_idx = buffer.find(MARKER)
-                if marker_idx != -1:
-                    # Emit everything before the marker, then stop emitting.
-                    head = buffer[:marker_idx]
-                    if head:
-                        yield ("token", head)
-                    marker_seen = True
-                    buffer = ""
-                    continue
-                emit_to = _safe_emit_point(buffer)
-                if emit_to > 0:
-                    yield ("token", buffer[:emit_to])
-                    buffer = buffer[emit_to:]
-            # Flush any remaining buffered text that turned out not to be a marker.
-            if not marker_seen and buffer:
-                yield ("token", buffer)
-        except Exception as e:
-            logger.error(f"Gemini answer stream failed: {e}")
-            raise AnalysisError(f"AI answer failed: {e}")
+        # Model fallback, mirroring _answer_json: the ask tier is the ONLY user
+        # of GEMINI_ASK_MODEL, so if it fails we retry the whole stream on the
+        # production-proven analysis model — but only while NOTHING has been
+        # yielded to the consumer yet (text held in the tail buffer is fine; it
+        # was never surfaced). After the first emitted token a restart would
+        # duplicate prose, so mid-stream failures still raise.
+        full_text = ""
+        for fallback_model in (None, GEMINI_ANALYSIS_MODEL):
+            # Per-attempt state: a failed first attempt must not leak partial
+            # accumulation into the fallback run.
+            buffer = ""
+            full_text = ""
+            marker_seen = False
+            emitted = False
+            try:
+                stream = self.client.models.generate_content_stream(
+                    # Higher-tier ASK model (see GEMINI_ASK_MODEL) first,
+                    # matching the non-streaming answer path.
+                    model=fallback_model or GEMINI_ASK_MODEL,
+                    contents=[prompt],
+                    # Match the non-streaming answer path: this is a grounded,
+                    # factual answer, so keep temperature low for stability. Without
+                    # this the stream would silently run at the ~1.0 default.
+                    config={"temperature": 0.2},
+                )
+                for chunk in stream:
+                    piece = getattr(chunk, "text", None)
+                    if not piece:
+                        continue
+                    full_text += piece
+                    if marker_seen:
+                        # Past the marker — accumulate into full_text only, emit nothing.
+                        continue
+                    buffer += piece
+                    marker_idx = buffer.find(MARKER)
+                    if marker_idx != -1:
+                        # Emit everything before the marker, then stop emitting.
+                        head = buffer[:marker_idx]
+                        if head:
+                            emitted = True
+                            yield ("token", head)
+                        marker_seen = True
+                        buffer = ""
+                        continue
+                    emit_to = _safe_emit_point(buffer)
+                    if emit_to > 0:
+                        emitted = True
+                        yield ("token", buffer[:emit_to])
+                        buffer = buffer[emit_to:]
+                # Flush any remaining buffered text that turned out not to be a marker.
+                if not marker_seen and buffer:
+                    yield ("token", buffer)
+                break  # this model completed — don't try the fallback
+            except Exception as e:
+                if emitted or fallback_model is not None:
+                    logger.error(f"Gemini answer stream failed: {e}")
+                    raise AnalysisError(f"AI answer failed: {e}")
+                logger.error("Ask model %s stream failed before any output — "
+                             "falling back to %s: %s",
+                             GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL, e)
 
         # Parse the citation marker out of the accumulated full text, then keep
         # only ids the model actually named that we in fact supplied. If the

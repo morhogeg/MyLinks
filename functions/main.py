@@ -167,6 +167,40 @@ def _server_error(headers: dict = None, exc: Exception = None,
     return _error_response(message, status, headers)
 
 
+# How long a server_errors record lives before the janitor (or a Firestore TTL
+# policy on `expireAt`) removes it. Matches the task_logs retention.
+_SERVER_ERROR_TTL_DAYS = 14
+
+
+def _record_server_error(fn: str, exc: Exception, uid: str = None) -> None:
+    """Best-effort durable record of a server-side failure (`server_errors`).
+
+    Cloud Logging keeps the stack trace, but nobody is watching Cloud Logging —
+    a production 5xx surfaces to the user as a sanitized message and then
+    vanishes. This writes a small, bounded record to the top-level
+    ``server_errors`` collection so failures are visible from the app side:
+    `debug_status` returns the recent ones, and the janitor prunes them on the
+    same 14-day policy as ``task_logs`` (docs carry a TTL-compatible
+    ``expireAt``). Admin-SDK-only, like ``rate_limits``/``usage_quotas`` — the
+    locked ruleset denies all client access. Never raises.
+    """
+    try:
+        now = datetime.now(timezone.utc)
+        get_db().collection("server_errors").add({
+            "fn": fn,
+            "type": type(exc).__name__,
+            "error": str(exc)[:500],
+            # Admin-only collection, so the workspace uid is safe to store here
+            # (needed to correlate a user's report with the failure).
+            "uid": uid,
+            "timestamp": now.isoformat(),
+            "expireAt": now + timedelta(days=_SERVER_ERROR_TTL_DAYS),
+        })
+    except Exception as log_exc:
+        # Observability must never take the request down with it.
+        logger.warning("server_errors write failed (ignored): %s", log_exc)
+
+
 def _verify_bearer(req):
     """Verify the Firebase ID token from the Authorization: Bearer header.
 
@@ -823,6 +857,12 @@ def debug_status(req: https_fn.Request) -> https_fn.Response:
         logs = db.collection('task_logs').order_by('timestamp', direction='DESCENDING').limit(10).get()
         logs_data = [d.to_dict() for d in logs]
 
+        # Recent production 5xx records (see _record_server_error) — the
+        # queryable trail for "a user reported an error" without Cloud Logging.
+        errs = db.collection('server_errors').order_by(
+            'timestamp', direction='DESCENDING').limit(20).get()
+        errors_data = [d.to_dict() for d in errs]
+
         status = {
             "status": "online",
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -834,6 +874,7 @@ def debug_status(req: https_fn.Request) -> https_fn.Response:
                 "pending_tasks_count": len(pending_data),
             },
             "recent_pending_tasks": pending_data,
+            "recent_server_errors": errors_data,
             "recent_logs": logs_data
         }
 
@@ -1121,6 +1162,11 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
     if not _require_app_check(req, headers):
         return _error_response("App Check verification failed", 401, headers)
 
+    # (uid, kind) of a quota unit charged by THIS request, so the failure paths
+    # can refund it — a failed ask must not consume a unit (mirrors analyze_*).
+    charged = None
+    uid = None
+
     try:
         data = req.get_json()
         if not data:
@@ -1158,6 +1204,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         q = _quota_blocked(uid, "asks", headers)
         if q:
             return q
+        charged = (uid, "asks")
 
         # 1. Retrieve the most relevant saved cards (reuses the vector search
         #    that already powers the search bar). Degrade gracefully: if
@@ -1240,10 +1287,21 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                             ) + "\n\n"
                     yield "data: " + json.dumps({"type": "done"}) + "\n\n"
                 except Exception as stream_exc:
-                    # Mirror _server_error: log full detail, emit a sanitized message.
+                    # Mirror _server_error: log full detail, emit a sanitized
+                    # message — but a DISTINGUISHABLE one (an AI-generation
+                    # failure is not the same bug as anything else), record it
+                    # durably, and refund the ask unit this request charged.
                     logger.error("ask_brain stream error: %s", stream_exc, exc_info=True)
+                    _record_server_error("ask_brain (stream)", stream_exc, uid=uid)
+                    if charged:
+                        refund_quota(*charged)
+                    msg = (
+                        "Machina couldn't generate an answer right now. Please try again in a minute."
+                        if isinstance(stream_exc, AnalysisError)
+                        else "Internal server error"
+                    )
                     yield "data: " + json.dumps(
-                        {"type": "error", "error": "Internal server error"}
+                        {"type": "error", "error": msg}
                     ) + "\n\n"
 
             stream_headers = dict(headers)
@@ -1284,7 +1342,23 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             status=200, headers=headers, mimetype='application/json'
         )
 
+    except AnalysisError as e:
+        # The Gemini answer call failed even after the in-service model
+        # fallback. Refund the metered unit, record the failure durably, and
+        # return a message that names the failing subsystem (still sanitized —
+        # no exception detail crosses to the client).
+        if charged:
+            refund_quota(*charged)
+        _record_server_error("ask_brain", e, uid=uid)
+        return _server_error(
+            headers, e,
+            "Machina couldn't generate an answer right now. Please try again in a minute.",
+            502,
+        )
     except Exception as e:
+        if charged:
+            refund_quota(*charged)
+        _record_server_error("ask_brain", e, uid=uid)
         return _server_error(headers, e)
 
 
@@ -2658,7 +2732,27 @@ def run_processing_janitor() -> dict:
             logger.error(f"task_logs batch delete failed: {e}")
             report["errors"].append(f"task_logs delete: {e}")
 
-    if report["failed_out"] or report["logs_pruned"]:
+    # server_errors pruning — same 14-day policy. Every doc carries a Timestamp
+    # `expireAt` from birth (no legacy fallback needed). Bounded + one batch.
+    report["server_errors_pruned"] = 0
+    try:
+        err_refs = [
+            doc.reference
+            for doc in db.collection("server_errors").where(
+                "expireAt", "<=", now_dt
+            ).limit(200).stream()
+        ]
+        if err_refs:
+            batch = db.batch()
+            for ref in err_refs:
+                batch.delete(ref)
+            batch.commit()
+            report["server_errors_pruned"] = len(err_refs)
+    except Exception as e:
+        logger.error(f"server_errors prune failed: {e}")
+        report["errors"].append(f"server_errors: {e}")
+
+    if report["failed_out"] or report["logs_pruned"] or report["server_errors_pruned"]:
         logger.info(f"Processing janitor: {report}")
     return report
 
