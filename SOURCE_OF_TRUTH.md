@@ -626,7 +626,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-16 (latest) — HOTFIX SHIPPED: search-revamp outage — rerank
+- **2026-07-16 (latest) — PRECISION FIX SHIPPED: search results now cut at
+  the per-query distance CLIFF.** Post-hotfix owner repro on iOS (build
+  1100): "muffins" correctly ranked the Hebrew muffins card #1 (crash fixed,
+  hybrid live) BUT a long tail of unrelated cards followed — the absolute
+  distance gate (best+0.22 / 0.68 ceiling) is structurally too loose:
+  real-match distances vary per query/language, so no fixed number separates
+  "the 2 muffin cards" from "18 nearest-neighbour cards behind them". NEW
+  `search.cut_at_distance_cliff` (pure): results arrive nearest-first; cut at
+  the FIRST consecutive-distance jump ≥ 0.05 (scale-free elbow detection),
+  never inside the top-2, never keeping >10, fail-open when distances are
+  missing. Applied in `perform_hybrid_search` after the absolute gate (gate
+  bounds worst-case junk; cliff removes the wall). Tests 253→260. **Server-
+  side only — build 1100 gets it with no new TestFlight. ⛔ OWNER:**
+  `./deploy-functions.sh functions:search_links,functions:search_links_http`.
+- **2026-07-16 — HOTFIX SHIPPED: search-revamp outage — rerank
   crashed on legacy timestamps; recall floor added to the distance gate.**
   Owner repro post-deploy: "muffins" (English) → 2 Hebrew muffin cards NOT
   found, UI showed "meaning search is unavailable" (the callable threw).
