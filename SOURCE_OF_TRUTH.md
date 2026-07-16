@@ -647,8 +647,11 @@ exact-match, capped.
   stream generation) stops a backgrounded answer from clobbering a chat the
   user has since re-asked in; conversation identity is an object swapped per
   chat switch (`convoRef`) so a late create can't attach its id to the wrong
-  conversation. Web-only — no backend/functions change; ships via Vercel on
-  merge + needs a TestFlight build for native (bundled web assets).
+  conversation. Web-only — no backend/functions change; merged to `main`
+  (`753107c`), desktop live via Vercel. **⛔ OWNER:** trigger **Actions → "iOS →
+  TestFlight" → Run workflow** on `main` so the native app (bundled web assets)
+  picks this up — the cloud session's GitHub integration can't dispatch
+  workflows (403 on `workflow_dispatch`).
 - **2026-07-16 — Ask follow-up chips: no repeats in a conversation.**
   Owner repro (iOS): after tapping "What's the common thread?", the same chip
   was offered again under the next answer. Root cause: dedup in
