@@ -1,6 +1,6 @@
 ---
 name: onboard
-description: Prime a fresh session on Machina AI (repo MyLinks) before doing work. Reads SOURCE_OF_TRUTH.md and the other core docs, builds a mental model of the product/architecture/backlog/current state, confirms how to verify and ship, then proceeds to the user's actual request. Use at the START of a new session, or when the user says onboard, prime, "get up to speed", "review the docs", "understand the project", "read the source of truth", or opens with a feature/bug request and no prior context.
+description: Prime a fresh session on Machina AI (repo MyLinks) before doing work. Reads SOURCE_OF_TRUTH.md and the other core docs, builds a mental model of the product/architecture/backlog/current state, then returns a concise (≤3-sentence) verdict on the user's idea ending in Yes / No / "Yes, but <refinements>" and WAITS for approval before implementing and shipping. Use at the START of a new session, or when the user says onboard, prime, "get up to speed", "review the docs", "understand the project", "read the source of truth", or opens with a feature/bug request and no prior context.
 ---
 
 # Onboard on Machina AI
@@ -42,16 +42,27 @@ the old ones were consolidated into `SOURCE_OF_TRUTH.md` and deleted.
    `functions/`, browser `extension/`. Don't deep-read code yet — locate the area
    the request touches.
 
-3. **Report a short briefing** (3–6 lines) so the user can course-correct before
-   you build:
-   - What Machina is, in one line.
-   - Current state that matters for this request (e.g. auth cutover status, any
-     in-flight work or blocker from §4 / §9).
-   - Which surface(s) the request touches and your intended approach.
-   Then continue — don't wait for approval unless the request is ambiguous or the
-   backlog shows it conflicts with in-flight work; in that case ask.
+3. **Give your verdict on the idea, then STOP for approval.** This is a hard gate
+   — do not write any code until the user approves. After reading the docs, react
+   to the request itself with genuine judgment (informed by §4 backlog priorities,
+   §3 auth state, and the architecture) — not a summary of what you'll do.
+   - **≤ 3 sentences.** Concise enough that the user can usually just reply `go`.
+   - Lead with the substance: does this fit the product/architecture, does it
+     conflict with in-flight work, is there a simpler or safer path, is anything
+     risky.
+   - **Always end with an explicit verdict line**, one of:
+     - **`Yes`** — sound as-is, ready to build.
+     - **`No`** — and the one reason why (conflicts with X, breaks Y, better handled by Z).
+     - **`Yes, but` <x, y, z>** — approve with specific refinements you'd fold in.
+   - Then **wait.** Only proceed once the user approves (`go`, "yes", "do it", or
+     approves your refinements). If they approve the `Yes, but`, build the refined
+     version. Don't ask a second round of questions unless they push back.
 
-4. **Do the request.** Implement on the current `claude/*` branch. While working,
+   Keep it tight — the point is a real opinion the user can green-light in one
+   word, not a back-and-forth. Skip the product tour; they know their own app.
+
+4. **Do the request** (only after step-3 approval). Implement on the current
+   `claude/*` branch. While working,
    respect the house rules from `CLAUDE.md`:
    - **Theme:** use Tailwind tokens (`text-text`, `bg-card`, `--accent-gradient`,
      `--ease-modal`) — never hardcoded white/black/hex.
@@ -70,8 +81,12 @@ the old ones were consolidated into `SOURCE_OF_TRUTH.md` and deleted.
 
 ## Notes
 - If the user opened with a concrete feature/bug ("add X", "fix Y"), treat that as
-  the request for steps 4–6; this skill is the wrapper that gets you ready for it.
-- If they only said "onboard" / "get up to speed" with no task, stop after the
-  step-3 briefing and ask what they want to work on.
+  the request: read the docs, then give your step-3 verdict and wait for approval
+  before building.
+- If they only said "onboard" / "get up to speed" with no task, there's nothing to
+  give a verdict on — briefly report the state (§3/§4/newest §9) and ask what they
+  want to work on.
+- The step-3 gate is mandatory even when the idea is obviously fine — a one-word
+  `go` from the user is the green light. Never skip straight to building.
 - Don't over-read: §4 (top) + newest §9 entries + the one reference doc that
   matches the task is usually enough. Pull more only when the task needs it.
