@@ -6,15 +6,17 @@ import Dropdown, { type DropdownOption } from '../Dropdown';
 import SourceFacetList from '../SourceFacetList';
 import TagExplorer from '../TagExplorer';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { useSheetDrag } from '@/lib/useSheetDrag';
+import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 import type { SourceFacet } from '@/lib/source';
 import type { FilterType } from '@/lib/useFeedFilters';
 
 /**
- * Filters Sheet (Mobile) — the single "Filter" affordance behind the home
- * toolbar. Holds everything that narrows the library: categories, tags, status,
- * sort, and sources — so the home screen shows one well-labelled control instead
- * of a scatter of filter buttons. Desktop is untouched. Renders nothing when closed.
+ * Filters Sheet — the single "Filter" affordance behind the home toolbar. Holds
+ * everything that narrows the library: status (Show), categories, tags, and
+ * sources, so the toolbar shows ONE well-labelled control instead of a scatter
+ * of filter buttons. Responsive: a drag-to-dismiss bottom sheet on phones, a
+ * centered modal on desktop. The Tags section hides at `lg` where the desktop
+ * Tag Explorer sidebar already covers it. Renders nothing when closed.
  */
 export default function MobileFiltersSheet({
     isOpen,
@@ -62,11 +64,12 @@ export default function MobileFiltersSheet({
     selectedTags: Set<string>;
     onToggleTag: (tag: string) => void;
 }) {
-    // Bottom sheet at every width it renders (mobile only), so drag is always on.
-    const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose });
+    // Bottom sheet on phones (drag-to-dismiss), centered modal on desktop (no drag).
+    const isMobile = useIsMobile();
+    const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose, enabled: isMobile });
     if (!isOpen) return null;
     return (
-        <div className="sm:hidden fixed inset-0 z-50 flex flex-col justify-end isolate">
+        <div className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center sm:p-4 isolate">
             <div
                 ref={scrimRef}
                 className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
@@ -74,10 +77,10 @@ export default function MobileFiltersSheet({
             />
             <div
                 ref={sheetRef}
-                className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300"
+                className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300 sm:rounded-3xl sm:border sm:max-w-lg sm:w-full sm:max-h-[80vh] sm:pb-6"
             >
                 <div {...handleProps}>
-                <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-text-muted/30" />
+                <div className="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-text-muted/30" />
                 <div className="flex items-center justify-between mb-5">
                     <h3 className="text-base font-bold text-text">Filters</h3>
                     <button
@@ -160,9 +163,10 @@ export default function MobileFiltersSheet({
                         </div>
                     )}
 
-                    {/* Tags — the same explorer used on desktop, flowing freely. */}
+                    {/* Tags — the same explorer used on desktop, flowing freely. Hidden
+                        at lg, where the desktop Tag Explorer sidebar already owns tags. */}
                     {allTags.length > 0 && (
-                        <div>
+                        <div className="lg:hidden">
                             <div className="flex items-center justify-between mb-2.5">
                                 <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">
                                     <TagIcon className="w-3.5 h-3.5 text-accent/70" /> Tags
