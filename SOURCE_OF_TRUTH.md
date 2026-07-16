@@ -626,7 +626,26 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-16 (latest) — SHIPPED: Ask chats persist to the sidebar the moment
+- **2026-07-16 (latest) — YouTube summaries tightened: `## Core Thesis` section
+  removed (branch `claude/starred-chat-sidebar-persist-d35ztb`, follow-up).**
+  Owner repro (iOS, MrBeast card screenshot): a YouTube card read the same fact
+  three times — summary paragraphs, then a "Core Thesis" section restating
+  them, then Key Points. Root cause: `VIDEO_ANALYSIS_PROMPT`
+  (`functions/ai_service.py`) explicitly OVERRODE the base "start with
+  ## Key Points / no intro" rule for videos and demanded a `## Core Thesis`
+  section — but the card UI renders `summary` directly above
+  `detailedSummary`, so the thesis was always a repeat. Fix (prompt-only, all
+  extraction fields — highlights/timestamps/speakers/duration — untouched):
+  video `detailedSummary` now starts directly at `## Key Points` with a "no
+  thesis/overview/intro section" rule, and the video `summary` instruction
+  gained tightening rules (every sentence adds NEW info; never restate the
+  title or repeat a fact in different words). Tests 266/266 pass. Existing
+  cards keep their old text — only new saves get the tighter format.
+  **⛔ OWNER:** deploy the analysis path:
+  `./deploy-functions.sh functions:analyze_link,functions:process_link_background`
+  (cloud session can't deploy functions or dispatch the CI deploy workflow —
+  `workflow_dispatch` 403).
+- **2026-07-16 — SHIPPED: Ask chats persist to the sidebar the moment
   the question is sent (branch `claude/starred-chat-sidebar-persist-d35ztb`).**
   Owner repro: start an Ask chat, open the history sidebar before the answer
   lands, view another chat, come back — the new chat wasn't in the sidebar at

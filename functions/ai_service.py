@@ -202,10 +202,8 @@ IMPORTANT: You are analyzing an **actual YouTube video that you can watch** (its
 - "videoDurationMinutes": the video's total length in whole minutes (round up; minimum 1).
 - "videoHighlights": 3–6 genuinely key moments, each prefixed with its timestamp in "M:SS — description" form (e.g. "2:15 — Explains the 2-minute rule"). Use real timestamps from the video. Order them chronologically.
 - "speakers": the people who actually speak or are clearly featured (host first, then guests). If it cannot be determined, return an empty list — do not guess names.
-- "detailedSummary": markdown. This section structure OVERRIDES the "start with Key Points" rule above — for a video, use these sections in this order instead. Translate each heading into the content's language (see HEADING LANGUAGE rule above):
-  - `## Core Thesis` — the central argument or purpose of the video.
-  - `## Key Points` — bullets of the main ideas, instructions, or frameworks actually presented.
-- "summary": focus on the takeaway — what a viewer will know or be able to do after watching, stated factually.
+- "detailedSummary": markdown, following the standard structure above — start DIRECTLY with `## Key Points` (heading translated into the content's language), bullets of the main ideas, instructions, or frameworks actually presented. Do NOT add a `## Core Thesis` (or any thesis/overview/intro) section: the `summary` is displayed right above this text, so a thesis section just restates it word-for-word to the reader.
+- "summary": focus on the takeaway — what a viewer will know or be able to do after watching, stated factually. Keep it TIGHT: every sentence must add NEW information. Never restate the title, and never say the same thing twice in different words.
 """
 
 
