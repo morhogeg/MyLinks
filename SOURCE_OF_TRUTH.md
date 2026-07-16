@@ -626,8 +626,15 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-16 (latest) — Ask "Internal server error" fixed + production error
-  visibility (branch `claude/ask-messaging-server-error-5n1lxt`).** Owner
+- **2026-07-16 (latest) — SHIPPED (web live; backend fix ⛔ awaits owner
+  deploy): Ask "Internal server error" fixed + production error visibility
+  (merge `07d9042`, commit `290ae66`, branch
+  `claude/ask-messaging-server-error-5n1lxt`).** Vercel deployed the client
+  half on the `main` push; the "Deploy Cloud Functions" workflow dispatch was
+  attempted and is still 403 from cloud sessions, so the backend half ships
+  with the owner's pending whole-codebase deploy (see ⛔ below). NO TestFlight
+  build (client change is error-reporting only; the next build picks it up).
+  Owner
   report: every Ask message returns "internal server error". Diagnosis from
   code (cloud sessions can't reach prod — egress re-verified blocked): the
   string is `ask_brain`'s sanitized catch-all, and the only unguarded per-ask
