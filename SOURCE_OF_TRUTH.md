@@ -626,7 +626,34 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-16 (latest) — SHIPPED: Search revamp — scored instant keyword
+- **2026-07-16 (latest) — HOTFIX SHIPPED: search-revamp outage — rerank
+  crashed on legacy timestamps; recall floor added to the distance gate.**
+  Owner repro post-deploy: "muffins" (English) → 2 Hebrew muffin cards NOT
+  found, UI showed "meaning search is unavailable" (the callable threw).
+  Root cause (reproduced offline): `rerank_candidates`' recency math did
+  `min()/max()` over raw `createdAt` values — this library stores datetimes,
+  ISO STRINGS, unix-seconds AND ms numbers (the web's `getTimestampNumber`
+  defends against exactly this zoo) — one string-timestamp card in the
+  candidates → `TypeError: '<' not supported between 'str' and 'int'` →
+  whole search request 500s. The pre-revamp callable never ran rerank, hence
+  "worked before". Fixes: NEW `search._to_unix_ms` coerces every stored
+  shape (datetime/ISO string/seconds/ms/None) to ms-int; used by
+  `normalize_card_for_search` AND defensively inside `rerank_candidates`.
+  Plus a RECALL FLOOR in `apply_distance_threshold`: top-3 results survive
+  under a looser hard ceiling (`SEARCH_DISTANCE_HARD_CEILING`, default
+  0.80) regardless of the 0.68 ceiling — cross-language matches (the
+  muffins case: English query → Hebrew card) land at larger cosine
+  distances and must never be thresholded into "No matches"; the
+  20-junk-results wall stays dead (tail still cut). Observability closed:
+  the `search_links` callable now records failures to `server_errors`
+  (lazy-imported `_record_server_error`, uid attached) and the web client
+  reports search failures to `client_errors` (`semantic-search` tag) — this
+  outage left no trail anywhere, never again. Tests 248→253 (timestamp-zoo
+  regression tests incl. end-to-end hybrid; floor semantics). **⛔ OWNER:**
+  redeploy the search path:
+  `./deploy-functions.sh functions:search_links,functions:search_links_http,functions:ask_brain`
+  (ask_brain shares rerank). Web half auto-deploys via Vercel.
+- **2026-07-16 — SHIPPED: Search revamp — scored instant keyword
   ranking + quality-gated server hybrid, fused (branch
   `claude/ask-messaging-server-error-5n1lxt`).** Owner: "search is simply
   bad — complete revamp." Root causes found in code: (1) find_nearest's

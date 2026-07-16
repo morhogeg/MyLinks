@@ -6,6 +6,7 @@ import { httpsCallable } from 'firebase/functions';
 import { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { isNativeApp, apiUrl, fetchWithTimeout } from '@/lib/api';
 import { authHeaders } from '@/lib/auth';
+import { reportError } from '@/lib/errorReporter';
 
 /**
  * Debounced, generation-guarded semantic search (P-2). Extracted verbatim from
@@ -102,6 +103,9 @@ export function useSemanticSearch(searchQuery: string, uid?: string | null) {
             } catch (err: unknown) {
                 if (isStale()) return;
                 console.error("Search failed:", err);
+                // Leave a trail in client_errors — a production search failure
+                // must be visible to the owner, not just this console.
+                reportError(err, 'semantic-search');
                 // Extract a user-facing message. The web callable surfaces the
                 // backend's tagged errors in err.message; the native twin throws
                 // a plain HTTP error. Either way keyword filtering still works, so
