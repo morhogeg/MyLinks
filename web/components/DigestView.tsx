@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { Newspaper, Sparkles } from 'lucide-react';
+import { Newspaper, Sparkles, ChevronRight } from 'lucide-react';
 import type { CuratedDigest, WeeklySynthesis, DigestCardRef } from '@/lib/types';
 import { track } from '@/lib/analytics';
 import DigestCard from './DigestCard';
@@ -37,6 +37,11 @@ interface Props {
     onDismissSynthesis: () => void;
     onOpenDigestSettings?: () => void;
     onDeleteDigest?: (id: string) => void;
+    /** Phone/tablet: open a single digest as its own screen. Passed the digest
+     *  id, or the sentinel 'synthesis' for the weekly-synthesis entry. When set,
+     *  the compact layout renders a tappable LIST instead of expanding the
+     *  latest digest inline. */
+    onOpenDigest?: (id: string) => void;
 }
 
 /**
@@ -47,7 +52,7 @@ interface Props {
  * scroll of collapsed headers.
  */
 export default function DigestView({
-    digests, synthesis, onOpenCard, onOpenSynthesisCard, onDismissSynthesis, onOpenDigestSettings, onDeleteDigest,
+    digests, synthesis, onOpenCard, onOpenSynthesisCard, onDismissSynthesis, onOpenDigestSettings, onDeleteDigest, onOpenDigest,
 }: Props) {
     // The Digest section mounts only when the user opens it (Feed swaps it in),
     // so a mount is a genuine "digest opened" view. Fired once per mount.
@@ -65,21 +70,22 @@ export default function DigestView({
     if (isEmpty) {
         return (
             <div className="max-w-3xl mx-auto">
-                <div className="text-center py-16 animate-fade-in">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-lg shadow-accent/20">
-                        <Newspaper className="w-8 h-8 text-white" />
+                <div className="text-center py-16 px-6 animate-fade-in">
+                    <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-accent/10 flex items-center justify-center">
+                        <Newspaper className="w-7 h-7 text-accent" strokeWidth={1.75} />
                     </div>
-                    <h3 className="text-lg font-medium text-text mb-2">No digests yet</h3>
-                    <p className="text-text-secondary text-sm">
-                        Your hand-picked batches will collect here once the curated digest is on.
-                        {onOpenDigestSettings && (
-                            <> {' '}
-                                <button onClick={onOpenDigestSettings} className="text-accent font-medium hover:underline cursor-pointer">
-                                    Set up your digest
-                                </button>
-                            </>
-                        )}
+                    <h3 className="text-base font-bold text-text">No digests yet</h3>
+                    <p className="mt-1.5 max-w-xs mx-auto text-sm text-text-muted leading-relaxed">
+                        On your schedule, Machina picks a few saves worth revisiting and delivers them here.
                     </p>
+                    {onOpenDigestSettings && (
+                        <button
+                            onClick={onOpenDigestSettings}
+                            className="mt-5 inline-flex items-center gap-2 px-4 h-10 rounded-full bg-accent text-white text-sm font-bold hover:bg-accent-hover active:scale-95 transition-all cursor-pointer"
+                        >
+                            Set up your digest
+                        </button>
+                    )}
                 </div>
             </div>
         );
@@ -98,13 +104,39 @@ export default function DigestView({
 
     return (
         <>
-            {/* Phone / tablet — the elegant single column (unchanged). */}
-            <div className="lg:hidden max-w-3xl mx-auto flex flex-col gap-3">
+            {/* Phone / tablet — a scannable LIST of every digest, newest first.
+                Tapping one opens it as its own screen (Feed owns that view + the
+                back navigation). The old behaviour expanded the latest digest
+                inline, which hid the rest of the history behind a scroll. */}
+            <div className="lg:hidden max-w-3xl mx-auto flex flex-col gap-4">
                 {synthesis && (
-                    <SynthesisCard synthesis={synthesis} onOpenCard={onOpenSynthesisCard} onDismiss={onDismissSynthesis} />
+                    <div className="flex flex-col gap-1.5">
+                        <div className="px-1 text-[11px] font-bold uppercase tracking-[0.14em] text-text-muted">Highlights</div>
+                        <SidebarRow
+                            icon={<Sparkles className="w-4 h-4" />}
+                            eyebrow="Weekly synthesis"
+                            title={synthesis.title || 'Your week, connected'}
+                            active={false}
+                            onClick={() => onOpenDigest?.('synthesis')}
+                            trailing={<ChevronRight className="w-4 h-4 text-text-muted shrink-0" />}
+                        />
+                    </div>
                 )}
-                {digests.map((digest, i) => (
-                    <DigestCard key={digest.id} digest={digest} defaultExpanded={i === 0} onOpenCard={onOpenCard} onOpenSettings={onOpenDigestSettings} onDelete={onDeleteDigest} />
+                {groups.map((g) => (
+                    <div key={g.label} className="flex flex-col gap-1.5">
+                        <div className="px-1 text-[11px] font-bold uppercase tracking-[0.14em] text-text-muted">{g.label}</div>
+                        {g.items.map((d) => (
+                            <SidebarRow
+                                key={d.id}
+                                eyebrow={`${shortDate(d.createdAt)} · ${d.topics.length ? d.topics.join(', ') : (MODE_LABEL[d.mode] ?? 'Smart mix')}`}
+                                title={d.title}
+                                meta={`${d.cardCount} ${d.cardCount === 1 ? 'card' : 'cards'}`}
+                                active={false}
+                                onClick={() => onOpenDigest?.(d.id)}
+                                trailing={<ChevronRight className="w-4 h-4 text-text-muted shrink-0" />}
+                            />
+                        ))}
+                    </div>
                 ))}
             </div>
 
@@ -149,23 +181,28 @@ export default function DigestView({
     );
 }
 
-function SidebarRow({ icon, eyebrow, title, meta, active, onClick }: {
+function SidebarRow({ icon, eyebrow, title, meta, active, onClick, trailing }: {
     icon?: ReactNode; eyebrow: string; title: string; meta?: string; active: boolean; onClick: () => void;
+    /** Optional trailing affordance (e.g. a chevron for rows that navigate). */
+    trailing?: ReactNode;
 }) {
     return (
         <button
             onClick={onClick}
             aria-pressed={active}
-            className={`w-full text-left rounded-xl px-3 py-2.5 border transition-colors cursor-pointer ${active
+            className={`w-full flex items-center gap-2 text-left rounded-xl px-3 py-2.5 border transition-colors cursor-pointer ${active
                 ? 'bg-accent/10 border-accent/40'
                 : 'bg-card border-border-subtle hover:bg-card-hover hover:border-text-muted/40'}`}
         >
-            <div className={`flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider ${active ? 'text-accent' : 'text-text-muted'}`}>
-                {icon}
-                <span className="truncate">{eyebrow}</span>
-            </div>
-            <div className="mt-0.5 text-[13.5px] font-semibold text-text truncate">{title}</div>
-            {meta && <div className="mt-0.5 text-[11px] text-text-muted">{meta}</div>}
+            <span className="min-w-0 flex-1">
+                <span className={`flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider ${active ? 'text-accent' : 'text-text-muted'}`}>
+                    {icon}
+                    <span className="truncate">{eyebrow}</span>
+                </span>
+                <span className="mt-0.5 block text-[13.5px] font-semibold text-text truncate">{title}</span>
+                {meta && <span className="mt-0.5 block text-[11px] text-text-muted">{meta}</span>}
+            </span>
+            {trailing}
         </button>
     );
 }

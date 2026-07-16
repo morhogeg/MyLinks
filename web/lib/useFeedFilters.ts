@@ -3,17 +3,26 @@ import { Link } from '@/lib/types';
 import { getSourceInfo, buildSourceFacets, sourceMatchesQuery } from '@/lib/source';
 import { PLATFORM_LABELS, prettyHost, type PlatformKey } from '@/lib/platform';
 import { isPending, getTimestampNumber } from '@/lib/feedUtils';
+import { tokenizeSearch, normalizeSearchText, getCardFields, scoreCard, fuseRankings, ranksFromScores, recencyOf } from '@/lib/searchRank';
 
-export type FilterType = 'all' | 'unread' | 'read' | 'archived' | 'favorite' | 'reminders';
+export type FilterType = 'all' | 'unread' | 'read' | 'archived' | 'favorite' | 'reminders' | 'private';
 export type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
 
 /**
  * Feed selection state + the memoized filter/sort pipeline and facet counts,
- * extracted verbatim from Feed (R-3) — same behavior. Owns filter/category/
- * tags/collections/sources/sort selection; consumes the live links plus the
- * debounced query + semantic results to produce `filteredLinks` and every facet.
+ * extracted verbatim from Feed (R-3). Owns filter/category/tags/collections/
+ * sources/sort selection; consumes the live links plus the LIVE search query
+ * (keyword matching is instant, per keystroke — only the server call debounces)
+ * + the server's hybrid results to produce `filteredLinks` and every facet.
  */
-export function useFeedFilters(links: Link[], debouncedQuery: string, searchResults: Link[]) {
+export function useFeedFilters(
+    links: Link[],
+    /** The LIVE query (not debounced): local scoring must react per keystroke. */
+    searchQuery: string,
+    searchResults: Link[],
+    /** Ids of collections marked Private — their members INHERIT privacy (see below). */
+    privateCollectionIds: Set<string>,
+) {
     const [filter, setFilter] = useState<FilterType>('all');
     const [selectedCategory, setSelectedCategory] = useState<Set<string>>(new Set());
     const [sortBy, setSortBy] = useState<SortType>('date-desc');
@@ -28,14 +37,109 @@ export function useFeedFilters(links: Link[], debouncedQuery: string, searchResu
     // normal filtered feed and from every facet derivation below (so a still-empty
     // card never spawns a phantom "Processing" category/tag), then surfaced
     // separately, pinned at the top of the library, so a capture is always visible.
-    const contentLinks = useMemo(() => links.filter((l) => !isPending(l)), [links]);
+    //
+    // Privacy (Photos-Hidden model): a card is EFFECTIVELY private when it carries
+    // its own isPrivate flag OR belongs to a private collection — membership is
+    // inherited live, never stamped onto member docs, so cards added later hide
+    // automatically and removing one (or un-privating the collection) restores it
+    // with no sweep. Effectively-private cards exist only under the 'private'
+    // show-filter and inside their own explicitly opened (PIN-gated) private
+    // collection — never in the main feed or its facets, even while the vault is
+    // unlocked. (While the vault is LOCKED they don't reach this hook at all —
+    // Feed's visibleLinks strips them.)
+    const isEffectivelyPrivate = useCallback(
+        (l: Link) => !!l.isPrivate || (l.collectionIds ?? []).some((id) => privateCollectionIds.has(id)),
+        [privateCollectionIds]
+    );
+    // Membership predicate for the main (non-private) feed. Factored out so the
+    // semantic-search union below can gate out-of-window server matches through
+    // the exact same pending/privacy rules the window is filtered by.
+    const isContentCard = useCallback((l: Link) => {
+        if (isPending(l)) return false;
+        if (!isEffectivelyPrivate(l)) return true;
+        // The one place an effectively-private card surfaces outside the Private
+        // filter: the feed scoped to a private collection the user opened
+        // through the PIN gate (selectedCollections only ever holds an opened
+        // collection). Membership in a selected NON-private collection doesn't
+        // count — privacy inherited from one collection follows the card into
+        // its other collections.
+        return (l.collectionIds ?? []).some((id) => selectedCollections.has(id) && privateCollectionIds.has(id));
+    }, [isEffectivelyPrivate, selectedCollections, privateCollectionIds]);
+    const isPrivateCard = useCallback(
+        (l: Link) => !isPending(l) && isEffectivelyPrivate(l),
+        [isEffectivelyPrivate]
+    );
+    const contentLinks = useMemo(() => links.filter(isContentCard), [links, isContentCard]);
+    const privateCards = useMemo(() => links.filter(isPrivateCard), [links, isPrivateCard]);
+
+    // Keyword-search tokens + normalized phrase for the LIVE query, prepped ONCE
+    // per keystroke (not per card). Tokens drive the scored AND-match; the phrase
+    // drives the exact-title bonus.
+    const queryTokens = useMemo(() => tokenizeSearch(searchQuery), [searchQuery]);
+    const queryPhrase = useMemo(() => normalizeSearchText(searchQuery.trim()), [searchQuery]);
+
+    // Base set for the filter pipeline. When a server search is active, UNION
+    // its results (full Link objects) into the loaded window so a match OLDER
+    // than the window still renders — old-item recall is the whole point of the
+    // server's hybrid search (vector + newest-1000 lexical scan), and a pure
+    // window membership test hides it. The unioned docs are deduped by id
+    // (window docs win) and run through the SAME pending/privacy predicate as
+    // the window, then flow through every facet/status filter below, so e.g.
+    // archived filtering stays consistent.
+    const searchBase = useMemo(() => {
+        const base = filter === 'private' ? privateCards : contentLinks;
+        if (!searchQuery.trim() || searchResults.length === 0) return base;
+        const gate = filter === 'private' ? isPrivateCard : isContentCard;
+        const seen = new Set(base.map((l) => l.id));
+        const extra = searchResults.filter((r) => !seen.has(r.id) && gate(r));
+        return extra.length ? base.concat(extra) : base;
+    }, [filter, privateCards, contentLinks, searchQuery, searchResults, isPrivateCard, isContentCard]);
+
+    // Server hybrid results as id → rank (server order is already quality-gated
+    // + reranked server-side). Set-membership also gates the search filter.
+    const serverRanks = useMemo(() => {
+        const m = new Map<string, number>();
+        searchResults.forEach((r, i) => m.set(r.id, i));
+        return m;
+    }, [searchResults]);
+
+    // Local relevance scores for the live query — the INSTANT half of hybrid
+    // search, recomputed per keystroke (field caching keeps it cheap). Folds the
+    // precise source/host match in as a modest fixed score so "twitter" still
+    // surfaces every X card even when the word appears nowhere in the text.
+    const kwScores = useMemo(() => {
+        const m = new Map<string, number>();
+        if (!searchQuery.trim()) return m;
+        const rawQuery = searchQuery.toLowerCase();
+        for (const link of searchBase) {
+            let s = queryTokens.length > 0 ? scoreCard(getCardFields(link), queryTokens, queryPhrase) : 0;
+            if (s === 0 && (
+                sourceMatchesQuery(getSourceInfo(link), rawQuery) ||
+                prettyHost(link.url).toLowerCase().includes(rawQuery)
+            )) {
+                s = 3; // ~source-field weight: a real match, below any title hit
+            }
+            if (s > 0) m.set(link.id, s);
+        }
+        return m;
+    }, [searchBase, searchQuery, queryTokens, queryPhrase]);
+
+    // Fused relevance: reciprocal-rank fusion of the local scored ranking and
+    // the server's hybrid ranking. A card both halves agree on rises above a
+    // card only one half found; before the server responds this is simply the
+    // local order, so results never jump from "date order" to "relevance order".
+    const fusedScores = useMemo(() => {
+        if (!searchQuery.trim()) return new Map<string, number>();
+        return fuseRankings(ranksFromScores(Array.from(kwScores.entries())), serverRanks);
+    }, [searchQuery, kwScores, serverRanks]);
 
     // 4. Hybrid Search Logic — memoized so a banner tick or any unrelated state
     // change (search typing, overlay toggles) doesn't re-run the 6-stage filter +
     // sort. Recomputes only when an input it actually reads changes.
-    const filteredLinks = useMemo(() => contentLinks
+    const filteredLinks = useMemo(() => searchBase
         .filter((link) => {
-            // Apply status filters
+            // Apply status filters ('private' already picked its base list above)
+            if (filter === 'private') return true;
             if (filter === 'reminders') return link.reminderStatus === 'pending';
             if (filter === 'unread') return !link.isRead;
             if (filter === 'read') return !!link.isRead;
@@ -68,38 +172,21 @@ export function useFeedFilters(links: Link[], debouncedQuery: string, searchResu
             return selectedSources.has(getSourceInfo(link).key);
         })
         .filter((link) => {
-            // Apply search (Hybrid: keyword OR semantic result)
-            if (!debouncedQuery.trim()) return true;
-
-            const query = debouncedQuery.toLowerCase();
-
-            // If it's in the semantic search results, it's a match
-            const isSemanticMatch = searchResults.some(r => r.id === link.id);
-            if (isSemanticMatch) return true;
-
-            // Otherwise check keyword matching — including the card's source, so
-            // typing a publisher name ("ynet") surfaces its cards even without a
-            // semantic hit.
-            return (
-                link.title.toLowerCase().includes(query) ||
-                link.summary.toLowerCase().includes(query) ||
-                link.tags.some((tag) => tag.toLowerCase().includes(query)) ||
-                link.category.toLowerCase().includes(query) ||
-                // Source label + platform aliases, so "twitter"/"x" finds every X
-                // card (labelled by @handle), not just hosts containing the letter.
-                sourceMatchesQuery(getSourceInfo(link), query) ||
-                prettyHost(link.url).toLowerCase().includes(query)
-            );
+            // Apply search (hybrid): the local scored match (kwScores already
+            // folds in the token AND-match plus the precise source/host tests)
+            // OR membership in the server's quality-gated hybrid results.
+            if (!searchQuery.trim()) return true;
+            return kwScores.has(link.id) || serverRanks.has(link.id);
         })
         .sort((a, b) => {
-            // Prioritize semantic matches at the top if they exist
-            if (debouncedQuery.trim()) {
-                const aIdx = searchResults.findIndex(r => r.id === a.id);
-                const bIdx = searchResults.findIndex(r => r.id === b.id);
-
-                if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
-                if (aIdx !== -1) return -1;
-                if (bIdx !== -1) return 1;
+            // Relevance order while searching (fused local + server ranking,
+            // recency tiebreak) — unless the user explicitly picked a different
+            // sort, which then wins outright.
+            if (searchQuery.trim() && sortBy === 'date-desc') {
+                const fa = fusedScores.get(a.id) ?? 0;
+                const fb = fusedScores.get(b.id) ?? 0;
+                if (fa !== fb) return fb - fa;
+                return recencyOf(b) - recencyOf(a);
             }
 
             if (filter === 'reminders') {
@@ -120,7 +207,7 @@ export function useFeedFilters(links: Link[], debouncedQuery: string, searchResu
                     return 0;
             }
         }),
-        [contentLinks, filter, selectedCategory, selectedTags, selectedCollections, selectedSources, debouncedQuery, searchResults, sortBy]);
+        [searchBase, filter, selectedCategory, selectedTags, selectedCollections, selectedSources, searchQuery, kwScores, serverRanks, fusedScores, sortBy]);
 
     // Faceted counts — the numbers update live as you tap. Each facet's counts are
     // computed against the OTHER facet's current selection (but never its own), so
@@ -141,7 +228,10 @@ export function useFeedFilters(links: Link[], debouncedQuery: string, searchResu
     // Category chips stay derived from the whole library so they never vanish —
     // they just read 0 when nothing matches the current tag selection.
     const categories = useMemo(
-        () => Array.from(new Set(contentLinks.map(l => l.category).filter(Boolean))).sort(),
+        () => Array.from(new Set(contentLinks.map(l => l.category).filter(Boolean)))
+            // Case-insensitive A–Z so chips read in a predictable order regardless
+            // of how a category happens to be capitalized.
+            .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
         [contentLinks]
     );
 
@@ -228,10 +318,10 @@ export function useFeedFilters(links: Link[], debouncedQuery: string, searchResu
     // Search "Sources" suggestions — the sources whose label matches the live
     // query, so a search splits into a Sources row (tap to filter) + the Cards grid.
     const matchingSources = useMemo(
-        () => debouncedQuery.trim()
-            ? sourceFacets.filter(s => sourceMatchesQuery(s, debouncedQuery)).slice(0, 8)
+        () => searchQuery.trim()
+            ? sourceFacets.filter(s => sourceMatchesQuery(s, searchQuery)).slice(0, 8)
             : [],
-        [debouncedQuery, sourceFacets]
+        [searchQuery, sourceFacets]
     );
 
     const reminderCount = useMemo(

@@ -124,6 +124,20 @@ export function xHandle(url?: string): string | null {
 }
 
 /**
+ * The Instagram author @handle for a card. Unlike X (whose handle lives in the
+ * post URL) an Instagram short-code URL — instagram.com/p/<code>, /reel/<code> —
+ * carries no username, so the backend extracts the author while scraping and
+ * stores it in `sourceName` as "@handle". This reads that back: it returns the
+ * bare handle (no @) when sourceName is a stored IG handle, else null (so the
+ * card falls back to the plain "Instagram" label). Validates the IG charset
+ * (`[A-Za-z0-9._]`, ≤30) so a page/publisher name never renders as a handle.
+ */
+export function instagramHandle(sourceName?: string | null): string | null {
+    const m = /^@([A-Za-z0-9._]{1,30})$/.exec((sourceName || '').trim());
+    return m ? m[1] : null;
+}
+
+/**
  * Extract the author/profile name from a LinkedIn URL
  * (linkedin.com/posts/<slug>_…, /in/<slug>, /company/<slug>). LinkedIn stores
  * no author field, but the slug carries it — e.g.

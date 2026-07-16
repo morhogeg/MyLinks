@@ -6,7 +6,8 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformColor, PLATFORM_LABELS, xHandle, prettyHost } from '@/lib/platform';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
-import { Star, Check, Trash2, StickyNote } from 'lucide-react';
+import { Star, Check, Trash2, StickyNote, Lock } from 'lucide-react';
+import { getNotes } from '@/lib/notes';
 
 interface ListCardProps {
     link: Link;
@@ -189,6 +190,12 @@ function ListCard({
                         handle/host + category name) but hugs the title's edge
                         on RTL cards. Order: icon · source · chip. */}
                     <div className={`mt-1 flex items-center gap-1.5 min-w-0 text-[11px] text-text-muted ${isRtl ? 'justify-end' : ''}`} dir="ltr">
+                        {/* Private marker — icon only, matching the grid cards. */}
+                        {link.isPrivate && (
+                            <span className="shrink-0 inline-flex items-center" title="Private" aria-label="Private">
+                                <Lock className="w-3 h-3" />
+                            </span>
+                        )}
                         {platform && (
                             <span className="shrink-0 inline-flex items-center" style={{ color: platformColor(platform) }} title={PLATFORM_LABELS[platform]}>
                                 {platformIcon(platform, 'w-3.5 h-3.5')}
@@ -204,13 +211,32 @@ function ListCard({
                         >
                             {link.category}
                         </span>
-                        {/* Personal-note cue — this card carries your own note. */}
-                        {link.userNote && link.sourceType !== 'note' && (
-                            <span className="shrink-0 inline-flex items-center text-accent/70" title="You added a note">
-                                <StickyNote className="w-3 h-3" />
-                            </span>
-                        )}
                     </div>
+                    {/* Your own note(s) in YOUR voice — the StickyNote glyph leads
+                        the snippet inline (no vertical accent bar), muted + italic
+                        so it's distinct from the machine byline above. Newest note
+                        first, "+N" for the rest; truncated to keep the row compact;
+                        dir="auto" keeps it RTL-safe (icon mirrors to the start). */}
+                    {link.sourceType !== 'note' && (() => {
+                        const notes = getNotes(link);
+                        if (notes.length === 0) return null;
+                        const [first, ...rest] = notes;
+                        return (
+                            <p
+                                dir="auto"
+                                title={first.text}
+                                className="mt-1 flex items-center gap-1 min-w-0 text-[11px] italic text-text-muted/90"
+                            >
+                                <StickyNote className="w-3 h-3 shrink-0 opacity-60" />
+                                <span className="truncate">{first.text}</span>
+                                {rest.length > 0 && (
+                                    <span className="shrink-0 not-italic text-[10px] font-bold text-text-muted/60">
+                                        +{rest.length}
+                                    </span>
+                                )}
+                            </p>
+                        );
+                    })()}
                 </div>
 
                 {/* Favourite toggle — stays put as you scan. Keeps its 44px hit

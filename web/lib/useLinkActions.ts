@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
-import { Link, LinkStatus } from '@/lib/types';
-import { updateLinkStatus, updateLinkTags, updateLinkCategory, updateLinkTitle, updateLinkSummary, updateLinkNote, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
+import { Link, LinkStatus, UserNote } from '@/lib/types';
+import { updateLinkStatus, updateLinkTags, updateLinkCategory, updateLinkTitle, updateLinkSummary, updateNoteText, updateLinkNotes, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
 import { publishCard, removeLinkFromCollection } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
 import { useToast } from '@/components/Toast';
@@ -62,30 +62,45 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
 
     // Editable AI output — the summary/title the model produced is a draft, not a
     // verdict. Optimistic via onSnapshot latency compensation (same as the others).
-    const handleUpdateTitle = useCallback(async (id: string, title: string) => {
+    const handleUpdateTitle = useCallback(async (id: string, title: string, reembed = false) => {
         if (!uid) return;
         try {
-            await updateLinkTitle(uid, id, title);
+            await updateLinkTitle(uid, id, title, reembed);
         } catch {
             toast.error("Couldn't save the title. Please try again.");
         }
     }, [uid, toast]);
 
-    const handleUpdateSummary = useCallback(async (id: string, summary: string) => {
+    const handleUpdateSummary = useCallback(async (id: string, summary: string, reembed = false) => {
         if (!uid) return;
         try {
-            await updateLinkSummary(uid, id, summary);
+            await updateLinkSummary(uid, id, summary, reembed);
         } catch {
             toast.error("Couldn't save the summary. Please try again.");
         }
     }, [uid, toast]);
 
-    // The user's personal note on a card — their own annotation, distinct from
-    // the AI summary. Optimistic via onSnapshot latency compensation.
-    const handleUpdateNote = useCallback(async (id: string, note: string) => {
+    // A note card is edited as ONE field (see updateNoteText) — re-derives
+    // title/body from the single text and re-embeds.
+    const handleUpdateNote = useCallback(async (id: string, text: string) => {
         if (!uid) return;
         try {
-            await updateLinkNote(uid, id, note);
+            await updateNoteText(uid, id, text);
+        } catch {
+            toast.error("Couldn't save your note. Please try again.");
+        }
+    }, [uid, toast]);
+
+    // The user's personal notes on a card — their own annotations, distinct from
+    // the AI summary. Takes the full desired note list (the editor computes it);
+    // `removed` picks the right confirmation. Optimistic via onSnapshot latency
+    // compensation. A note is user content (like a favorite/collection add, which
+    // also confirm), so we acknowledge the save/removal.
+    const handleUpdateNotes = useCallback(async (id: string, notes: UserNote[], removed = false) => {
+        if (!uid) return;
+        try {
+            await updateLinkNotes(uid, id, notes);
+            toast.success(removed ? 'Note removed' : 'Note saved');
         } catch {
             toast.error("Couldn't save your note. Please try again.");
         }
@@ -139,6 +154,7 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
         handleUpdateTitle,
         handleUpdateSummary,
         handleUpdateNote,
+        handleUpdateNotes,
         handleRetryProcessing,
         handleRemoveFromCollection,
         handleShareCard,

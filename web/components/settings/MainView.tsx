@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, Sun, Moon, Monitor, RefreshCw, Clock, Compass, Network, Puzzle } from 'lucide-react';
+import { Bell, Sun, Moon, Monitor, RefreshCw, Clock, Compass, Network, Lock } from 'lucide-react';
 import { policyUrl, openExternal } from '@/lib/share';
 import ProfileAvatar from '../ProfileAvatar';
 import DataExport from './DataExport';
@@ -13,6 +13,7 @@ import {
 export function MainView({
     authUid, accountEmail, displayName, photoURL, providerLabel, settings, theme, setTheme,
     togglePush, pushNote, aiConsentAt,
+    privacyLockOn, onChangePin, onDisablePin,
     rebuilding, rebuildLabel, handleRebuild, onReplayTour, go,
 }: {
     authUid: string | null;
@@ -26,6 +27,10 @@ export function MainView({
     togglePush: () => void;
     pushNote: string | null;
     aiConsentAt: number | null;
+    /** True when the private-collections PIN is set (null while loading). */
+    privacyLockOn: boolean | null;
+    onChangePin: () => void;
+    onDisablePin: () => void;
     rebuilding: boolean;
     rebuildLabel: string | null;
     handleRebuild: () => void;
@@ -59,12 +64,6 @@ export function MainView({
             </List>
             {pushNote && <p className="text-[12px] text-amber-500 leading-snug px-2 pt-1.5">{pushNote}</p>}
 
-            <SectionHeader>Integrations</SectionHeader>
-            <List>
-                <NavRow tile={<Puzzle className="w-[16px] h-[16px]" />} tileClass="bg-violet-500" title="Browser extension" onClick={() => go('extension')} />
-            </List>
-            <Footnote>Save any page into your library from Chrome, Edge, or Brave with one click.</Footnote>
-
             <SectionHeader>Appearance</SectionHeader>
             <List>
                 <RowShell>
@@ -81,6 +80,19 @@ export function MainView({
                     />
                 </RowShell>
             </List>
+
+            {/* Private collections — only once a PIN exists (it's created the
+                first time a collection is marked Private, in the edit sheet). */}
+            {privacyLockOn && (
+                <>
+                    <SectionHeader>Private collections</SectionHeader>
+                    <List>
+                        <NavRow tile={<Lock className="w-[16px] h-[16px]" />} tileClass="bg-slate-600" title="Change PIN" onClick={onChangePin} />
+                        <NavRow tile={<Lock className="w-[16px] h-[16px]" />} tileClass="bg-red-500" title="Turn off PIN" onClick={onDisablePin} />
+                    </List>
+                    <Footnote>One PIN protects every private collection. Turning it off leaves collections marked Private visible to anyone using this device.</Footnote>
+                </>
+            )}
 
             <SectionHeader>Privacy &amp; AI</SectionHeader>
             <List>

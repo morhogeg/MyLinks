@@ -377,6 +377,18 @@ html {
   animation: shimmer 1.6s ease-in-out infinite;
 }
 
+/* Virtualization-lite (report 3.15): let the browser skip rendering off-screen
+   cards. `content-visibility: auto` culls the subtree's layout/paint when it's
+   outside the viewport; `contain-intrinsic-size` gives it a placeholder height
+   (approximating a typical card) so the scrollbar and column heights stay stable
+   before a card has ever rendered. `auto` remembers the real size once measured.
+   Safe with our flexbox Masonry (columns are count-distributed, never JS
+   height-measured) and the list view. */
+.cv-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 360px;
+}
+
 /* Reusable surface treatment: faint top sheen for a sense of material.
    The sheen is a background-image (composited over the card's background-color)
    so it always paints behind content — never dimming text. The elevation shadow

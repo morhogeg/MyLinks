@@ -3,7 +3,7 @@ import { db, appCheckHeaders } from './firebase';
 import { authHeaders } from './auth';
 import { apiUrl, fetchWithTimeout } from './api';
 
-import { AnalyzeResponse, Link, LinkMetadata, LinkStatus, User } from './types';
+import { AnalyzeResponse, Link, LinkMetadata, LinkStatus, User, UserNote } from './types';
 
 /**
  * Normalize a Firestore link doc into a safe `Link`.
@@ -49,11 +49,16 @@ export async function getLinksFromFirestore(uid: string): Promise<Link[]> {
 }
 
 /**
- * Get all unique tags for a user from Firestore
+ * Get the user's unique tags from their most recent links.
+ *
+ * Bounded to the 300 newest links (report 3.9): reading the ENTIRE links
+ * collection on every note/save/retry doesn't scale, and tag vocabulary comes
+ * from recent activity anyway. Mirrors the backend `get_user_tags` cap.
  */
 export async function getUserTags(uid: string): Promise<string[]> {
     const linksRef = collection(db, 'users', uid, 'links');
-    const snapshot = await getDocs(linksRef);
+    const q = query(linksRef, orderBy('createdAt', 'desc'), limit(300));
+    const snapshot = await getDocs(q);
 
     const tags = new Set<string>();
     snapshot.docs.forEach(doc => {
@@ -185,17 +190,27 @@ export async function saveLink(uid: string, linkData: Partial<Link>): Promise<vo
  * in the background — best-effort, so the note stands on its own if that never
  * lands.
  */
-export async function createNoteCard(uid: string, text: string): Promise<string> {
+/**
+ * Split raw note text into the card's `{ title, summary }`.
+ *
+ * A short one-liner IS its own title, so the body stays empty to avoid a card
+ * that prints the same sentence twice. A longer/multi-line note gets a truncated
+ * first-line title with the full text as the body. Shared by `createNoteCard`
+ * and `updateNoteText` so a note reads identically whether it was just captured
+ * or later edited.
+ */
+export function splitNoteText(text: string): { title: string; summary: string; firstLine: string; words: number } {
     const trimmed = text.trim();
     const firstLine = (trimmed.split('\n').map(l => l.trim()).find(Boolean) || 'Note');
-    // A short one-liner IS its own title, so we leave the body empty to avoid a
-    // card that prints the same sentence twice. A longer/multi-line note gets a
-    // truncated first-line title with the full text as the body. (AI enrichment
-    // later refines the title either way.)
     const isShortSingleLine = !trimmed.includes('\n') && firstLine.length <= 90;
     const title = firstLine.length > 90 ? `${firstLine.slice(0, 90).trimEnd()}…` : firstLine;
     const summary = isShortSingleLine ? '' : trimmed;
     const words = trimmed ? trimmed.split(/\s+/).length : 0;
+    return { title, summary, firstLine, words };
+}
+
+export async function createNoteCard(uid: string, text: string): Promise<string> {
+    const { title, summary, firstLine, words } = splitNoteText(text);
     const ref = await addDoc(collection(db, 'users', uid, 'links'), {
         url: '',
         title,
@@ -212,6 +227,27 @@ export async function createNoteCard(uid: string, text: string): Promise<string>
         metadata: { originalTitle: firstLine, estimatedReadTime: Math.max(1, Math.round(words / 200)) },
     });
     return ref.id;
+}
+
+/**
+ * Edit a note card's text as ONE thing.
+ *
+ * A note IS a single piece of the user's writing, so the detail view edits it in
+ * a single field — not a separate "title" and "body". We re-derive title/summary
+ * with the SAME split `createNoteCard` uses (so the card reads identically to a
+ * fresh capture), refresh the read-time estimate, and flip `needsEmbedding` so
+ * search/Ask pick up the new words. One atomic write.
+ */
+export async function updateNoteText(uid: string, id: string, text: string): Promise<void> {
+    const { title, summary, firstLine, words } = splitNoteText(text);
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    await updateDoc(linkRef, {
+        title,
+        summary,
+        needsEmbedding: true,
+        'metadata.originalTitle': firstLine,
+        'metadata.estimatedReadTime': Math.max(1, Math.round(words / 200)),
+    });
 }
 
 /**
@@ -383,33 +419,55 @@ export async function updateLinkCategory(uid: string, id: string, category: stri
  * background process rewrites `title` on a ready card (the embedding trigger only
  * touches `embedding_vector`), so a user edit sticks.
  */
-export async function updateLinkTitle(uid: string, id: string, title: string): Promise<void> {
+export async function updateLinkTitle(uid: string, id: string, title: string, reembed = false): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', id);
-    await updateDoc(linkRef, { title });
+    // For a NOTE card the title IS (part of) the user's own words — the embedding
+    // is built from that text — so a title edit must re-flag `needsEmbedding` to
+    // keep search/Ask honest. For a regular link the title is just metadata (the
+    // embedding comes from the article), so we leave the vector untouched.
+    await updateDoc(linkRef, reembed ? { title, needsEmbedding: true } : { title });
 }
 
 /**
  * Update a link's AI-generated summary. Same rationale as updateLinkTitle — the
  * summary is editable and the edit is durable (nothing rewrites it in place).
+ * `reembed` re-vectorizes note cards (whose body IS the user's words) so an edit
+ * flows through to search/Ask.
  */
-export async function updateLinkSummary(uid: string, id: string, summary: string): Promise<void> {
+export async function updateLinkSummary(uid: string, id: string, summary: string, reembed = false): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', id);
-    await updateDoc(linkRef, { summary });
+    await updateDoc(linkRef, reembed ? { summary, needsEmbedding: true } : { summary });
 }
 
 /**
- * Set (or clear) the user's **personal note** on any card — their own thought
- * about a saved item, distinct from the AI summary. An empty note removes the
- * field entirely (via deleteField) so a card is cleanly "note-less" again rather
- * than carrying an empty string. Nothing else writes `userNote`, so the edit is
- * durable.
+ * Write the user's **personal notes** on a card — their own thoughts, distinct
+ * from the AI summary. Takes the full desired note list (the editor computes it
+ * from getNotes + its edit) and persists it to `userNotes`, always **migrating
+ * away from the legacy `userNote` string**: the legacy field is deleted on every
+ * write, so a card converges to the array shape the first time its notes are
+ * touched. An empty list removes `userNotes` too, so a note-less card carries no
+ * empty array.
+ *
+ * Notes are part of the card's embedded/searchable text (search.py folds every
+ * note into build_embedding_text), so every write flips `needsEmbedding` — the
+ * `sync_link_embedding` trigger only re-embeds when that flag (or a repair
+ * condition) is set, so without it a note edit would never refresh the vector.
  */
-export async function updateLinkNote(uid: string, id: string, note: string): Promise<void> {
+export async function updateLinkNotes(uid: string, id: string, notes: UserNote[]): Promise<void> {
     const linkRef = doc(db, 'users', uid, 'links', id);
-    const trimmed = note.trim();
-    await updateDoc(linkRef, trimmed
-        ? { userNote: trimmed, userNoteUpdatedAt: Date.now() }
-        : { userNote: deleteField(), userNoteUpdatedAt: deleteField() });
+    // Drop empties and strip undefined fields — Firestore rejects `undefined`,
+    // so `updatedAt` is only included when present.
+    const clean = notes
+        .filter(n => n.text && n.text.trim())
+        .map(n => ({
+            id: n.id,
+            text: n.text.trim(),
+            createdAt: n.createdAt,
+            ...(n.updatedAt ? { updatedAt: n.updatedAt } : {}),
+        }));
+    await updateDoc(linkRef, clean.length
+        ? { userNotes: clean, userNote: deleteField(), userNoteUpdatedAt: deleteField(), needsEmbedding: true }
+        : { userNotes: deleteField(), userNote: deleteField(), userNoteUpdatedAt: deleteField(), needsEmbedding: true });
 }
 
 /**

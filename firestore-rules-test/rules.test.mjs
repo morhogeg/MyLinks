@@ -290,7 +290,7 @@ test('shared_owners: denied for owner, stranger, and anon (read and write)', asy
 
 // ── Functions-only collections: always denied ────────────────────────────────
 
-for (const col of ['rate_limits', 'pending_processing', 'task_logs']) {
+for (const col of ['rate_limits', 'pending_processing', 'task_logs', 'usage_quotas', 'server_errors']) {
   test(`${col}: denied for owner, stranger, and anon`, async () => {
     await assertFails(getDoc(doc(ownerDb(), col, 'x')));
     await assertFails(setDoc(doc(ownerDb(), col, 'x'), { a: 1 }));

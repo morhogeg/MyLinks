@@ -6,6 +6,7 @@ import {
     doc,
     query,
     orderBy,
+    limit,
     getDocs,
     onSnapshot,
     QueryDocumentSnapshot,
@@ -60,16 +61,20 @@ function toSession(d: QueryDocumentSnapshot<DocumentData>): ChatSession {
     };
 }
 
-/** One-time fetch of all chats, most-recently-updated first. */
+// Bound both reads to the 100 most-recently-updated conversations (report
+// 3.15) — the sidebar shows recent chats, so an unbounded read doesn't scale.
+const CHATS_LIMIT = 100;
+
+/** One-time fetch of the most-recently-updated chats. */
 export async function listChats(uid: string): Promise<ChatSession[]> {
-    const q = query(chatsCol(uid), orderBy('updatedAt', 'desc'));
+    const q = query(chatsCol(uid), orderBy('updatedAt', 'desc'), limit(CHATS_LIMIT));
     const snap = await getDocs(q);
     return snap.docs.map(toSession);
 }
 
 /** Live subscription so the sidebar updates across devices. Returns unsubscribe. */
 export function subscribeChats(uid: string, cb: (chats: ChatSession[]) => void): () => void {
-    const q = query(chatsCol(uid), orderBy('updatedAt', 'desc'));
+    const q = query(chatsCol(uid), orderBy('updatedAt', 'desc'), limit(CHATS_LIMIT));
     return onSnapshot(q, snap => cb(snap.docs.map(toSession)));
 }
 

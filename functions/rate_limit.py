@@ -27,11 +27,17 @@ def _safe_key(key: str) -> str:
     return key.replace("/", "_")[:1400]
 
 
-def check_rate_limit(key: str, limit: int, window_seconds: int) -> bool:
+def check_rate_limit(key: str, limit: int, window_seconds: int,
+                     fail_open: bool = True) -> bool:
     """Return True if the call is allowed, False if the limit is exceeded.
 
-    Fails OPEN (returns True) on any backend error, so a transient Firestore
-    problem degrades to "no rate limiting" rather than taking the endpoint down.
+    On a backend error the behavior depends on `fail_open`:
+    - `fail_open=True` (default) returns True — a transient Firestore problem
+      degrades to "no rate limiting" rather than taking the endpoint down. Use
+      for cheap / IP-only buckets where an outage is harmless.
+    - `fail_open=False` returns False (rate-limited) — use for PAID buckets
+      (analyze/ask/search/share/publish) so a Firestore outage can't strip the
+      last cost ceiling and let unbounded paid work through (report 3.5).
     """
     try:
         db = get_db()
@@ -60,8 +66,9 @@ def check_rate_limit(key: str, limit: int, window_seconds: int) -> bool:
 
         return _txn(db.transaction())
     except Exception as e:
-        logger.error("Rate limit check failed (failing open): %s", e)
-        return True
+        logger.error("Rate limit check failed (%s): %s",
+                     "failing open" if fail_open else "failing closed", e)
+        return fail_open
 
 
 def client_ip(req) -> str:

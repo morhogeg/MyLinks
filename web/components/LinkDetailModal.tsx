@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Link, LinkStatus } from '@/lib/types';
+import { Link, LinkStatus, UserNote } from '@/lib/types';
 import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2, ChevronLeft, StickyNote } from 'lucide-react';
-import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
+import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import { openExternal } from '@/lib/share';
 import ReadingView from './ReadingView';
@@ -14,6 +14,12 @@ import { hasHebrew } from '@/lib/rtl';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { getRelatedCards } from '@/lib/related';
+import { getNotes, makeNote, touchNote } from '@/lib/notes';
+import { hapticSuccess, hapticMedium } from '@/lib/haptics';
+
+// Sentinel `editingNoteId` for the composer when adding a brand-new note (as
+// opposed to editing an existing one, keyed by its real id).
+const NEW_NOTE_ID = '__new_note__';
 
 /**
  * Split a "M:SS — description" (or "H:MM:SS …") video highlight into its
@@ -49,9 +55,11 @@ interface LinkDetailModalProps {
     onReadStatusChange: (id: string, isRead: boolean) => void;
     onUpdateTags: (id: string, tags: string[]) => void;
     onUpdateCategory: (id: string, category: string) => void;
-    onUpdateTitle?: (id: string, title: string) => void;
-    onUpdateSummary?: (id: string, summary: string) => void;
-    onUpdateNote?: (id: string, note: string) => void;
+    onUpdateTitle?: (id: string, title: string, reembed?: boolean) => void;
+    onUpdateSummary?: (id: string, summary: string, reembed?: boolean) => void;
+    /** Edit a note card as one field — re-derives title/body from the text. */
+    onUpdateNote?: (id: string, text: string) => void;
+    onUpdateNotes?: (id: string, notes: UserNote[], removed?: boolean) => void;
     onDelete: (id: string) => void;
     onUpdateReminder: (link: Link) => void;
     onOpenOtherLink?: (link: Link) => void;
@@ -76,6 +84,7 @@ export default function LinkDetailModal({
     onUpdateTitle,
     onUpdateSummary,
     onUpdateNote,
+    onUpdateNotes,
     onDelete,
     onUpdateReminder,
     onOpenOtherLink,
@@ -93,9 +102,15 @@ export default function LinkDetailModal({
     const [isEditingSummary, setIsEditingSummary] = useState(false);
     const [titleDraft, setTitleDraft] = useState('');
     const [summaryDraft, setSummaryDraft] = useState('');
-    // The user's personal note on this card — their own thought, editable and
-    // held locally while writing, committed on Save.
+    // A note card is edited as ONE field — the whole note text at once (title +
+    // body are re-derived on save). Held separately from the title/summary drafts.
     const [isEditingNote, setIsEditingNote] = useState(false);
+    const [noteTextDraft, setNoteTextDraft] = useState('');
+    // The user's personal notes on this card — a list, newest first. One note is
+    // open in the composer at a time: `editingNoteId` holds its id (or NEW_NOTE_ID
+    // when adding a fresh note, or null when the list is just being read). The
+    // draft text is held locally while writing, committed on Save/blur.
+    const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [noteDraft, setNoteDraft] = useState('');
     const [imgFailed, setImgFailed] = useState(false);
     // Reset the broken-image fallback when navigating to a different card. Done
@@ -111,24 +126,98 @@ export default function LinkDetailModal({
         setIsEditingTitle(false);
         setIsEditingSummary(false);
         setIsEditingNote(false);
+        setEditingNoteId(null);
     }
 
+    // A note card IS the user's own words — a single piece of writing, edited as
+    // ONE field (see `onUpdateNote`), not a separate title + body. The full note
+    // text lives in `summary` for anything longer than a one-liner; a short note
+    // is entirely its own title. Editing re-derives both and re-embeds.
+    const isNote = link.sourceType === 'note';
+    const noteFullText = (link.summary && link.summary.trim()) ? link.summary : link.title;
+    const startEditNoteCard = () => { setNoteTextDraft(noteFullText); setIsEditingNote(true); };
+    const saveNoteCard = () => {
+        const t = noteTextDraft.trim();
+        setIsEditingNote(false);
+        if (t && t !== noteFullText.trim()) onUpdateNote?.(link.id, t);
+    };
     const saveTitle = () => {
         const t = titleDraft.trim();
         setIsEditingTitle(false);
-        if (t && t !== link.title) onUpdateTitle?.(link.id, t);
+        if (t && t !== link.title) onUpdateTitle?.(link.id, t, isNote);
     };
     const saveSummary = () => {
         const s = summaryDraft.trim();
         setIsEditingSummary(false);
-        if (s !== (link.summary || '')) onUpdateSummary?.(link.id, s);
+        if (s !== (link.summary || '')) onUpdateSummary?.(link.id, s, isNote);
     };
-    const saveNote = () => {
-        const n = noteDraft.trim();
-        setIsEditingNote(false);
-        if (n !== (link.userNote || '')) onUpdateNote?.(link.id, n);
+    // The note composer: refs + a pointer-down intent flag so save-on-blur can
+    // never fight an explicit Save/Cancel/Delete tap. On iOS a button tap often
+    // reports a null blur relatedTarget, so we record intent on pointerdown
+    // (which fires before blur) rather than inferring it from focus movement.
+    const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
+    const noteEditorRef = useRef<HTMLDivElement>(null);
+    const noteActionRef = useRef<'save' | 'cancel' | 'delete' | null>(null);
+
+    // Auto-grow the composer to fit its content (capped by CSS max-height, which
+    // then scrolls) so the whole note is visible while writing — no inner
+    // scrollbar until it gets genuinely long.
+    const autoGrowNote = (el: HTMLTextAreaElement | null) => {
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight}px`;
     };
-    const startEditNote = () => { setNoteDraft(link.userNote || ''); setIsEditingNote(true); };
+
+    // The card's notes, newest first — the ONE reader that reconciles the legacy
+    // `userNote` string with the `userNotes` array (lib/notes). Every write goes
+    // back through onUpdateNotes with the full list, so saving ANY note migrates a
+    // legacy-only card to the array shape and clears the legacy field.
+    const notes = getNotes(link);
+    const isNewNote = editingNoteId === NEW_NOTE_ID;
+
+    // Commit the current draft into the note list. Shared by explicit Save and the
+    // save-on-blur guard so writing can never be lost. A new note is prepended
+    // (newest first); an existing note has its text + updatedAt replaced. An empty
+    // draft is a no-op here — emptying an existing note is a Delete, not a Save.
+    const commitNoteDraft = () => {
+        const text = noteDraft.trim();
+        if (!text) return;
+        if (isNewNote) {
+            onUpdateNotes?.(link.id, [makeNote(text), ...notes]);
+            hapticSuccess();
+        } else {
+            const existing = notes.find(n => n.id === editingNoteId);
+            if (!existing || existing.text === text) return; // unchanged — skip the write
+            onUpdateNotes?.(link.id, notes.map(n => n.id === editingNoteId ? touchNote(n, text) : n));
+            hapticSuccess();
+        }
+    };
+    const saveNote = () => { noteActionRef.current = 'save'; setEditingNoteId(null); commitNoteDraft(); };
+    const cancelNote = () => { noteActionRef.current = 'cancel'; setEditingNoteId(null); };
+    // Remove a note — from the composer's Delete button (removes the note being
+    // edited) or a list row's trash (removes that row). A brand-new, unsaved note
+    // just closes the composer. Mirrors the inline tag-delete pattern: instant,
+    // confirmed by a toast, no modal.
+    const deleteNote = (id: string) => {
+        noteActionRef.current = 'delete';
+        setEditingNoteId(null);
+        if (id === NEW_NOTE_ID) { hapticMedium(); return; }
+        if (notes.some(n => n.id === id)) {
+            onUpdateNotes?.(link.id, notes.filter(n => n.id !== id), true);
+            hapticMedium();
+        }
+    };
+    // Save-on-blur guard: if the composer loses focus with NO explicit action
+    // pending (tapped elsewhere, keyboard dismissed), auto-commit a non-empty
+    // draft so writing is never lost. An empty draft is left alone — blur never
+    // silently deletes an existing note (that needs the explicit Delete button).
+    const onNoteBlur = () => {
+        if (noteActionRef.current) { noteActionRef.current = null; return; }
+        setEditingNoteId(null);
+        commitNoteDraft();
+    };
+    const startAddNote = () => { setNoteDraft(''); noteActionRef.current = null; setEditingNoteId(NEW_NOTE_ID); };
+    const startEditNote = (n: UserNote) => { setNoteDraft(n.text); noteActionRef.current = null; setEditingNoteId(n.id); };
     const hasValidImage = !!link.url && /^https?:\/\//.test(link.url);
 
     // Scroll back to the top when the card changes. Opening a related card reuses
@@ -162,6 +251,32 @@ export default function LinkDetailModal({
     // the keys. No-op on desktop (visualViewport spans the full window).
     const vp = useVisualViewport();
 
+    // Note composer focus: when the editor opens, focus it, place the caret at
+    // the END of any existing text (so editing continues where the note left
+    // off, not with the whole thing selected), and size it to its content.
+    useEffect(() => {
+        if (!editingNoteId) return;
+        const el = noteTextareaRef.current;
+        if (!el) return;
+        autoGrowNote(el);
+        el.focus({ preventScroll: true });
+        const end = el.value.length;
+        try { el.setSelectionRange(end, end); } catch { /* older WebViews */ }
+    }, [editingNoteId]);
+
+    // Keep the composer above the on-screen keyboard (M5, visual-viewport). The
+    // modal is already clamped to the visible viewport; here we scroll the
+    // composer into that shrunken area. Re-runs when the keyboard animates in and
+    // changes vp.height, so the input + its Save/Cancel row never sit under the
+    // keys — the core "keyboard covers the note field" fix.
+    useEffect(() => {
+        if (!editingNoteId) return;
+        const t = setTimeout(() => {
+            noteEditorRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }, 100);
+        return () => clearTimeout(t);
+    }, [editingNoteId, vp.height]);
+
     // A11y: move focus into the dialog on open and restore it to the trigger on
     // close. Keyed on isOpen only, so navigating between related cards (which
     // keeps the modal open and only changes link.id) never steals focus.
@@ -187,16 +302,17 @@ export default function LinkDetailModal({
             if (e.key !== 'Escape') return;
             e.preventDefault();
             if (isReading) setIsReading(false);
+            else if (isEditingNote) setIsEditingNote(false);
             else if (isEditingTitle) setIsEditingTitle(false);
             else if (isEditingSummary) setIsEditingSummary(false);
-            else if (isEditingNote) setIsEditingNote(false);
+            else if (editingNoteId) setEditingNoteId(null);
             else if (isEditingCategory) setIsEditingCategory(false);
             else if (isAddingTag) setIsAddingTag(false);
             else onClose();
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [isOpen, isReading, isEditingTitle, isEditingSummary, isEditingNote, isEditingCategory, isAddingTag, onClose]);
+    }, [isOpen, isReading, isEditingNote, isEditingTitle, isEditingSummary, editingNoteId, isEditingCategory, isAddingTag, onClose]);
 
     if (!isOpen) return null;
 
@@ -222,6 +338,9 @@ export default function LinkDetailModal({
     const fbAuthor = isFacebook && link.sourceName
         && !['facebook', 'screenshot', 'none'].includes(link.sourceName.trim().toLowerCase())
         ? link.sourceName : null;
+    // Instagram: the author @handle captured by the scraper (stored in
+    // sourceName as "@handle"), credited in the same byline style as X.
+    const igAuthor = platform === 'instagram' ? instagramHandle(link.sourceName) : null;
 
     const getTimeAgo = (timestamp: number | string, now: number): string => {
         if (!timestamp || !now) return '...';
@@ -250,6 +369,61 @@ export default function LinkDetailModal({
     };
 
     const allTags = Array.from(new Set(allLinks.flatMap(l => l.tags))).sort();
+
+    // The note composer — one instance, rendered either at the top of the list
+    // (adding a new note) or in place of the row being edited. Keeps every good
+    // property of the revamp: keyboard-safe (noteEditorRef is scrolled above the
+    // keyboard), auto-growing, explicit Save/Cancel/Delete, ⌘/Ctrl+Enter to save,
+    // Escape to cancel, save-on-blur (onNoteBlur) so writing is never lost, and
+    // RTL-safe via dir="auto".
+    const renderNoteComposer = () => (
+        <div ref={noteEditorRef} onBlur={onNoteBlur} className="scroll-mt-6">
+            <textarea
+                ref={noteTextareaRef}
+                value={noteDraft}
+                onChange={(e) => { setNoteDraft(e.target.value); autoGrowNote(e.target); }}
+                onKeyDown={(e) => {
+                    // Notes are multi-line, so plain Enter adds a line;
+                    // ⌘/Ctrl+Enter saves (a familiar "commit" chord).
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveNote(); }
+                    // Escape discards the draft (explicit cancel).
+                    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancelNote(); }
+                }}
+                rows={3}
+                dir="auto"
+                placeholder={isRtl ? 'מה דעתך על זה?' : 'Add your take…'}
+                aria-label="Edit your note"
+                className={`w-full min-h-[6.5rem] max-h-[45vh] overflow-y-auto text-base text-text bg-background border border-accent/40 rounded-xl px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none placeholder:text-text-muted/50 leading-relaxed ${isRtl ? 'text-right' : ''}`}
+            />
+            <div className="flex items-center gap-2 mt-2">
+                <button
+                    onPointerDown={() => { noteActionRef.current = 'save'; }}
+                    onClick={saveNote}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
+                >
+                    <Check className="w-3.5 h-3.5" /> {isRtl ? 'שמור הערה' : 'Save note'}
+                </button>
+                <button
+                    onPointerDown={() => { noteActionRef.current = 'cancel'; }}
+                    onClick={cancelNote}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-fill-subtle text-text-muted text-xs font-bold hover:text-text hover:bg-fill-strong transition-all"
+                >
+                    {isRtl ? 'ביטול' : 'Cancel'}
+                </button>
+                {/* Delete only when editing an existing note; a brand-new note is
+                    discarded by Cancel, not deleted. */}
+                {!isNewNote && (
+                    <button
+                        onPointerDown={() => { noteActionRef.current = 'delete'; }}
+                        onClick={() => deleteNote(editingNoteId as string)}
+                        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-text-muted/70 hover:text-red-400 transition-all ${isRtl ? 'mr-auto' : 'ml-auto'}`}
+                    >
+                        <Trash2 className="w-3.5 h-3.5" /> {isRtl ? 'מחק' : 'Delete'}
+                    </button>
+                )}
+            </div>
+        </div>
+    );
 
     return (
         <>
@@ -580,6 +754,17 @@ export default function LinkDetailModal({
                                             </span>
                                             {fbAuthor && <span className="truncate">{fbAuthor}</span>}
                                         </span>
+                                    ) : igAuthor ? (
+                                        <span
+                                            dir="ltr"
+                                            className="flex items-center gap-1.5 min-w-0 text-sm font-semibold text-text-secondary whitespace-nowrap max-w-[240px]"
+                                            title={`@${igAuthor}`}
+                                        >
+                                            <span className="shrink-0 inline-flex" style={{ color: platformColor('instagram') }}>
+                                                {platformIcon('instagram', 'w-4 h-4')}
+                                            </span>
+                                            <span className="truncate">@{igAuthor}</span>
+                                        </span>
                                     ) : link.sourceType === 'image' ? (
                                         <span className="flex items-center gap-1.5 text-sm font-semibold text-accent whitespace-nowrap" title="Screenshot">
                                             <ImageIcon className="w-4 h-4 shrink-0" />
@@ -603,7 +788,40 @@ export default function LinkDetailModal({
                         })()}
                     </div>
 
-                    {isEditingTitle ? (
+                    {isNote && isEditingNote ? (
+                        // A note is ONE piece of writing — edited in a single field
+                        // (title + body are re-derived on save), not a title box and a
+                        // detached body pencil. This replaces the whole title+body area.
+                        <div className="mb-6">
+                            <textarea
+                                value={noteTextDraft}
+                                onChange={(e) => setNoteTextDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                    // ⌘/Ctrl+Enter saves; plain Enter is a newline (notes are multiline).
+                                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveNoteCard(); }
+                                }}
+                                rows={8}
+                                autoFocus
+                                dir="auto"
+                                aria-label="Edit note"
+                                className={`w-full text-base text-text leading-relaxed bg-background border border-accent/40 rounded-xl px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50 resize-y min-h-[8rem] ${isRtl ? 'text-right' : ''}`}
+                            />
+                            <div className="flex gap-2 mt-3">
+                                <button
+                                    onClick={saveNoteCard}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-white text-sm font-bold hover:bg-accent-hover active:scale-95 transition-all"
+                                >
+                                    <Check className="w-4 h-4" /> Save
+                                </button>
+                                <button
+                                    onClick={() => setIsEditingNote(false)}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-fill-subtle text-text-muted text-sm font-bold hover:text-text hover:bg-fill-strong transition-all"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    ) : isEditingTitle ? (
                         <div className="mb-4">
                             <textarea
                                 value={titleDraft}
@@ -634,24 +852,27 @@ export default function LinkDetailModal({
                             </div>
                         </div>
                     ) : (
-                        <div className={`group/title relative flex items-start gap-2 mb-4 ${isRtl ? 'flex-row-reverse' : ''}`}>
-                            <h2
-                                dir="auto"
-                                className={`font-bold text-2xl text-text leading-tight flex-1 min-w-0 ${isRtl ? 'text-right' : ''}`}
-                            >
-                                {link.title}
-                            </h2>
-                            {onUpdateTitle && (
+                        // The edit pencil flows INLINE right after the title text
+                        // (not a flex sibling), so it never reserves a right-hand
+                        // column that squeezes the title into early wrapping. For a
+                        // note it opens the single-field note editor (title + body as
+                        // one); for a link it edits just the title.
+                        <h2
+                            dir="auto"
+                            className={`group/title font-bold text-2xl text-text leading-tight mb-4 ${isRtl ? 'text-right' : ''}`}
+                        >
+                            {link.title}
+                            {(isNote ? onUpdateNote : onUpdateTitle) && (
                                 <button
-                                    onClick={() => { setTitleDraft(link.title); setIsEditingTitle(true); }}
-                                    aria-label="Edit title"
-                                    title="Edit title"
-                                    className="shrink-0 mt-1 opacity-0 group-hover/title:opacity-100 focus:opacity-100 transition-opacity p-1.5 hover:bg-fill-subtle rounded-md"
+                                    onClick={() => { if (isNote) startEditNoteCard(); else { setTitleDraft(link.title); setIsEditingTitle(true); } }}
+                                    aria-label={isNote ? 'Edit note' : 'Edit title'}
+                                    title={isNote ? 'Edit note' : 'Edit title'}
+                                    className={`inline-flex items-center justify-center align-middle ms-2 w-7 h-7 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle focus:opacity-100 transition-colors ${isNote ? '' : 'opacity-0 group-hover/title:opacity-100 transition-opacity'}`}
                                 >
-                                    <Pencil className="w-4 h-4 text-text-muted/50 hover:text-text-muted" />
+                                    <Pencil className="w-[18px] h-[18px]" />
                                 </button>
                             )}
-                        </div>
+                        </h2>
                     )}
 
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -663,7 +884,10 @@ export default function LinkDetailModal({
                             leading overview paragraph — drop everything before the
                             first "## " so the open view never shows two overviews.
                             Prose-only legacy detailedSummary (no headings) has no gist
-                            to strip, so we show it alone to avoid duplicating it. */}
+                            to strip, so we show it alone to avoid duplicating it.
+                            While a note's single-field editor is open, its read-only
+                            body is hidden so the text isn't shown twice. */}
+                        {!(isNote && isEditingNote) && (
                         <div className="mb-6">
                             {(() => {
                                 const detailed = link.detailedSummary || '';
@@ -714,21 +938,24 @@ export default function LinkDetailModal({
                                                             isRtl={isRtl}
                                                             className="text-base"
                                                         />
-                                                        {onUpdateSummary && (
+                                                        {/* Non-note summaries keep a quiet hover pencil to correct
+                                                            AI output. Notes are edited via the single pencil on the
+                                                            title (the whole note is one field), so no body control. */}
+                                                        {!isNote && onUpdateSummary && (
                                                             <button
                                                                 onClick={startEditSummary}
                                                                 aria-label="Edit summary"
                                                                 title="Edit summary"
-                                                                className={`absolute top-0 opacity-0 group-hover/summary:opacity-100 focus:opacity-100 transition-opacity p-1.5 hover:bg-fill-subtle rounded-md ${isRtl ? 'left-0' : 'right-0'}`}
+                                                                className={`absolute top-0 inline-flex items-center justify-center w-8 h-8 rounded-lg text-text-muted hover:text-text hover:bg-fill-subtle opacity-0 group-hover/summary:opacity-100 focus:opacity-100 transition-opacity ${isRtl ? 'left-0' : 'right-0'}`}
                                                             >
-                                                                <Pencil className="w-4 h-4 text-text-muted/50 hover:text-text-muted" />
+                                                                <Pencil className="w-4 h-4" />
                                                             </button>
                                                         )}
                                                     </div>
                                                 )}
                                                 {/* Legacy prose-only cards hide the lead to avoid a
                                                     duplicate — still let the user correct the summary. */}
-                                                {!showLead && onUpdateSummary && (
+                                                {!showLead && !isNote && onUpdateSummary && (
                                                     <button
                                                         onClick={startEditSummary}
                                                         className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-text-muted/60 hover:text-accent transition-colors"
@@ -749,6 +976,7 @@ export default function LinkDetailModal({
                                 );
                             })()}
                         </div>
+                        )}
 
 
                         <div className="flex flex-wrap items-center gap-4 text-sm text-text-muted mb-8">
@@ -827,81 +1055,75 @@ export default function LinkDetailModal({
                             )}
                         </div>
 
-                        {/* My note — the user's OWN annotation on this card, on
+                        {/* My notes — the user's OWN annotations on this card, on
                             every card regardless of source, kept visually distinct
-                            from the AI summary. Empty state is an inviting one-tap
-                            "Add a note"; a saved note reads back in a warm accent
-                            panel that's tap-anywhere-to-edit. */}
-                        {onUpdateNote && (
+                            from the AI summary. A list, newest first: each note
+                            reads back in a calm accent panel with its relative date,
+                            tap-anywhere-to-edit, and hover edit/delete. "Add a note"
+                            appends another. One composer is open at a time. Kept
+                            calm — a notes list, not a chat. */}
+                        {onUpdateNotes && (
                             <div className="mb-8 border-t border-border-subtle pt-6">
                                 <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider mb-3 flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
                                     <StickyNote className="w-4 h-4 text-accent" />
-                                    {isRtl ? 'ההערה שלי' : 'My note'}
+                                    {isRtl ? (notes.length > 1 ? 'ההערות שלי' : 'ההערה שלי') : (notes.length > 1 ? 'My notes' : 'My note')}
                                 </h3>
-                                {isEditingNote ? (
-                                    <div>
-                                        <textarea
-                                            value={noteDraft}
-                                            onChange={(e) => setNoteDraft(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                // Notes are multi-line, so plain Enter adds a line;
-                                                // ⌘/Ctrl+Enter saves (a familiar "commit" chord).
-                                                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveNote(); }
-                                            }}
-                                            rows={4}
-                                            autoFocus
-                                            dir="auto"
-                                            placeholder={isRtl ? 'מה חשבת על זה?' : 'What were you thinking about this?'}
-                                            aria-label="Edit your note"
-                                            className={`w-full text-base text-text bg-background border border-accent/40 rounded-xl px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none placeholder:text-text-muted/50 leading-relaxed ${isRtl ? 'text-right' : ''}`}
-                                        />
-                                        <div className="flex items-center gap-2 mt-2">
-                                            <button
-                                                onClick={saveNote}
-                                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
+
+                                <div className="space-y-2.5">
+                                    {/* A brand-new note is the newest, so its composer
+                                        opens at the top of the list. */}
+                                    {isNewNote && renderNoteComposer()}
+
+                                    {notes.map((n) => (
+                                        editingNoteId === n.id ? (
+                                            <div key={n.id}>{renderNoteComposer()}</div>
+                                        ) : (
+                                            <div
+                                                key={n.id}
+                                                className="group/note relative rounded-xl bg-accent/[0.06] border border-accent/15 hover:border-accent/30 transition-colors"
                                             >
-                                                <Check className="w-3.5 h-3.5" /> Save note
-                                            </button>
-                                            <button
-                                                onClick={() => setIsEditingNote(false)}
-                                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-fill-subtle text-text-muted text-xs font-bold hover:text-text hover:bg-fill-strong transition-all"
-                                            >
-                                                Cancel
-                                            </button>
-                                            {link.userNote && (
-                                                <button
-                                                    onClick={() => { setIsEditingNote(false); onUpdateNote(link.id, ''); }}
-                                                    className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-text-muted/70 hover:text-red-400 transition-all ${isRtl ? 'mr-auto' : 'ml-auto'}`}
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" /> Delete
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                ) : link.userNote ? (
-                                    <div
-                                        onClick={startEditNote}
-                                        className="group/note relative rounded-xl bg-accent/[0.06] border border-accent/15 px-4 py-3.5 cursor-text hover:border-accent/30 transition-colors"
-                                    >
-                                        <p dir="auto" className={`text-base text-text whitespace-pre-wrap leading-relaxed ${isRtl ? 'text-right' : ''}`}>
-                                            {link.userNote}
-                                        </p>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); startEditNote(); }}
-                                            aria-label="Edit your note"
-                                            title="Edit note"
-                                            className={`absolute top-2 opacity-0 group-hover/note:opacity-100 focus:opacity-100 transition-opacity p-1.5 hover:bg-fill-subtle rounded-md ${isRtl ? 'left-2' : 'right-2'}`}
-                                        >
-                                            <Pencil className="w-4 h-4 text-text-muted/50 hover:text-text-muted" />
-                                        </button>
-                                    </div>
-                                ) : (
+                                                <div onClick={() => startEditNote(n)} className="px-4 py-3.5 cursor-text">
+                                                    <p dir="auto" className={`text-base text-text whitespace-pre-wrap leading-relaxed ${isRtl ? 'text-right' : ''}`}>
+                                                        {n.text}
+                                                    </p>
+                                                    <span className={`mt-2 block text-[11px] font-medium text-text-muted/60 ${isRtl ? 'text-right' : ''}`}>
+                                                        {getTimeAgo(n.updatedAt ?? n.createdAt, now)}
+                                                    </span>
+                                                </div>
+                                                <div className={`absolute top-2 flex items-center gap-0.5 opacity-0 group-hover/note:opacity-100 focus-within:opacity-100 transition-opacity ${isRtl ? 'left-2' : 'right-2'}`}>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); startEditNote(n); }}
+                                                        aria-label="Edit note"
+                                                        title="Edit note"
+                                                        className="p-1.5 hover:bg-fill-subtle rounded-md"
+                                                    >
+                                                        <Pencil className="w-4 h-4 text-text-muted/50 hover:text-text-muted" />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); deleteNote(n.id); }}
+                                                        aria-label="Delete note"
+                                                        title="Delete note"
+                                                        className="p-1.5 hover:bg-fill-subtle rounded-md"
+                                                    >
+                                                        <Trash2 className="w-4 h-4 text-text-muted/50 hover:text-red-400" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )
+                                    ))}
+                                </div>
+
+                                {/* Add another note — hidden while a new-note composer
+                                    is already open (there's nothing to add on top of). */}
+                                {!isNewNote && (
                                     <button
-                                        onClick={() => { setNoteDraft(''); setIsEditingNote(true); }}
-                                        className={`w-full flex items-center gap-2 px-4 py-3 rounded-xl border border-dashed border-border-strong text-text-muted/70 hover:text-accent hover:border-accent/40 hover:bg-accent/[0.04] active:scale-[0.99] transition-all ${isRtl ? 'flex-row-reverse' : ''}`}
+                                        onClick={startAddNote}
+                                        className={`mt-2.5 w-full flex items-center gap-2 px-4 py-3 rounded-xl border border-dashed border-border-strong text-text-muted/70 hover:text-accent hover:border-accent/40 hover:bg-accent/[0.04] active:scale-[0.99] transition-all ${isRtl ? 'flex-row-reverse' : ''}`}
                                     >
                                         <Plus className="w-4 h-4 shrink-0" />
-                                        <span className="text-sm font-semibold">{isRtl ? 'הוסף הערה' : 'Add a note'}</span>
+                                        <span className="text-sm font-semibold">
+                                            {notes.length ? (isRtl ? 'הוסף הערה' : 'Add note') : (isRtl ? 'הוסף הערה' : 'Add a note')}
+                                        </span>
                                     </button>
                                 )}
                             </div>

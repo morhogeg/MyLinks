@@ -11,12 +11,13 @@ from datetime import datetime
 from typing import List, Optional, Any
 from firebase_functions import firestore_fn, https_fn
 from firebase_admin import firestore
+from google.cloud import firestore as gc_firestore
 from google.cloud.firestore_v1.vector import Vector
 from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
 from google import genai
 
 from db import get_db
-from ai_service import embedding_needs_repair
+from ai_service import embedding_needs_repair, collect_notes_text
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +28,17 @@ logger = logging.getLogger(__name__)
 # `backfill_embeddings` admin endpoint re-embeds any card whose stamp is behind
 # this number, so a recipe change can be rolled out to the whole existing
 # library. v1 = title + short summary + tags only (the old, too-thin recipe that
-# left detail invisible to Ask). v2 = the richer recipe below.
-EMBED_TEXT_VERSION = 2
+# left detail invisible to Ask). v2 = the richer recipe below. v3 folds in the
+# user's OWN note (userNote) so a card is findable by what the user thought about
+# it, not only by the machine-written summary. v4 folds in ALL of the user's
+# notes — the legacy `userNote` string PLUS the newer multi-note `userNotes`
+# array (see ai_service.collect_notes_text) — so every note contributes.
+# v5 keeps the v4 text but embeds it with task_type=RETRIEVAL_DOCUMENT (queries
+# use RETRIEVAL_QUERY) — gemini-embedding-001's asymmetric retrieval mode, which
+# measurably improves query→document matching over the untyped default. The
+# vectors change, so the version bump rolls the re-embed out via the standard
+# backfill.
+EMBED_TEXT_VERSION = 5
 
 # gemini-embedding-001 accepts ~2048 input tokens. We cap the assembled text at
 # a conservative character budget (roughly that many tokens) so a long
@@ -59,6 +69,9 @@ def build_embedding_text(data: dict) -> str:
     title = (data.get("title") or "").strip()
     summary = (data.get("summary") or "").strip()
     detailed = (data.get("detailedSummary") or "").strip()
+    # The user's own annotations — high-signal, their words, not the model's.
+    # Merges the legacy `userNote` string + the multi-note `userNotes` array.
+    note = collect_notes_text(data).strip()
     tags = ", ".join(t for t in (data.get("tags") or []) if t)
     concepts = ", ".join(c for c in (data.get("concepts") or []) if c)
     meta = data.get("metadata") or {}
@@ -72,6 +85,8 @@ def build_embedding_text(data: dict) -> str:
         parts.append(f"Summary: {summary}")
     if detailed:
         parts.append(f"Details: {detailed}")
+    if note:
+        parts.append(f"Note: {note}")
     if takeaway:
         parts.append(f"Takeaway: {takeaway}")
     if tags:
@@ -110,6 +125,10 @@ def _card_haystack(data: dict) -> str:
         data.get("title", ""), data.get("summary", ""),
         " ".join(data.get("tags", []) or []),
         data.get("sourceName", ""), data.get("category", ""),
+        # The user's own notes are searchable too — a literal word they wrote
+        # should surface the card in keyword fallback and rerank. Covers both the
+        # legacy string and the multi-note array.
+        collect_notes_text(data),
     ]).lower()
 
 
@@ -126,6 +145,177 @@ def keyword_match_score(data: dict, tokens: set) -> int:
     haystack = _card_haystack(data)
     title_l = str(data.get("title", "")).lower()
     return sum((2 if t in title_l else 0) + (1 if t in haystack else 0) for t in tokens)
+
+
+# ── Vector-distance quality gate (pure, unit-tested) ────────────────────────
+# find_nearest always returns the `limit` nearest neighbours no matter how far
+# away they are — for a query the library has nothing about, that's 20 random
+# cards presented as "results", ranked above every exact keyword hit. These
+# cutoffs turn nearest-neighbour output into actual matches: keep a result only
+# while it's within MARGIN of the best distance AND under an absolute ceiling.
+# Cosine distance for gemini-embedding-001: strong matches typically land well
+# under ~0.55; unrelated text drifts toward ~0.7+. The ceiling is deliberately
+# generous (paraphrase recall — "that video about waking up early" must still
+# find "morning routine") and env-tunable without a code change.
+_DISTANCE_CEILING = float(os.environ.get("SEARCH_DISTANCE_CEILING", "0.68"))
+_DISTANCE_MARGIN = float(os.environ.get("SEARCH_DISTANCE_MARGIN", "0.22"))
+# Looser bound for the top-`min_keep` recall floor (see apply_distance_threshold).
+_DISTANCE_HARD_CEILING = float(os.environ.get("SEARCH_DISTANCE_HARD_CEILING", "0.80"))
+
+
+def _to_unix_ms(val) -> int:
+    """Best-effort unix-ms from every `createdAt` shape that exists in the wild:
+    Firestore datetime, unix ms/seconds number, ISO-8601 string. 0 when absent
+    or unparseable. The web client (feedUtils.getTimestampNumber) and main.py's
+    `_to_ms` defend against the same zoo — server-side ranking must too: one
+    legacy string-timestamp card in a candidate set crashed rerank's min/max
+    with a str-vs-int TypeError, which took the WHOLE search request down."""
+    if val is None:
+        return 0
+    if hasattr(val, "timestamp"):
+        try:
+            return int(val.timestamp() * 1000)
+        except Exception:
+            return 0
+    if isinstance(val, (int, float)):
+        return int(val * 1000) if val < 1e12 else int(val)
+    if isinstance(val, str):
+        try:
+            return int(datetime.fromisoformat(val.replace("Z", "+00:00")).timestamp() * 1000)
+        except Exception:
+            return 0
+    return 0
+
+
+def apply_distance_threshold(results: List[dict],
+                             ceiling: float = None,
+                             margin: float = None,
+                             hard_ceiling: float = None,
+                             min_keep: int = 3) -> List[dict]:
+    """Drop vector results that are too far to be real matches.
+
+    `results` arrive nearest-first, each carrying the `vector_distance` the
+    query stamped (missing/malformed distances are kept — fail open, order
+    already encodes rank). Cutoff = min(best_distance + margin, ceiling): the
+    relative term keeps the cluster around the best hit; the absolute ceiling
+    kills the tail when even the best hit is far.
+
+    RECALL FLOOR: the first `min_keep` results survive the cutoff as long as
+    they're under the (looser) `hard_ceiling`. Cross-language recall — an
+    English "muffins" finding a Hebrew muffin card — legitimately lands at
+    larger distances than a same-language match, and cutting the top handful
+    on an absolute number turns the library's best answer into "No matches".
+    The floor bounds worst-case junk at `min_keep` cards while making the
+    top matches un-droppable; the 20-nearest-neighbour wall stays dead.
+    Pure, unit-testable offline.
+    """
+    if not results:
+        return []
+    ceiling = _DISTANCE_CEILING if ceiling is None else ceiling
+    margin = _DISTANCE_MARGIN if margin is None else margin
+    hard_ceiling = _DISTANCE_HARD_CEILING if hard_ceiling is None else hard_ceiling
+    dists = [r.get("vector_distance") for r in results
+             if isinstance(r.get("vector_distance"), (int, float))]
+    if not dists:
+        return list(results)
+    cutoff = min(min(dists) + margin, ceiling)
+    kept = []
+    for i, r in enumerate(results):
+        d = r.get("vector_distance")
+        if not isinstance(d, (int, float)) or d <= cutoff or (i < min_keep and d <= hard_ceiling):
+            kept.append(r)
+    return kept
+
+
+def cut_at_distance_cliff(results: List[dict], min_keep: int = 2,
+                          max_keep: int = 10, min_gap: float = 0.05) -> List[dict]:
+    """Trim the nearest-neighbour tail at the biggest relevance cliff.
+
+    Absolute distance cutoffs can't separate "the two muffin cards" from "the
+    18 unrelated cards behind them" — real match distances vary per query and
+    per language, so any fixed number is either too tight (drops the Hebrew
+    match) or too loose (a wall of junk, the owner-reported failure). The
+    CLIFF is scale-free: results arrive nearest-first, and when the gap
+    between consecutive distances jumps by >= `min_gap`, everything past the
+    jump is a different (worse) cluster — cut there. Guardrails: never cut
+    inside the top `min_keep`, never keep more than `max_keep`, and fail open
+    (no cut) when distances are missing or no clear cliff exists. Pure.
+    """
+    if len(results) <= min_keep:
+        return list(results)
+    dists = []
+    for r in results:
+        d = r.get("vector_distance")
+        if not isinstance(d, (int, float)):
+            return list(results)[:max_keep]  # no distances → order is all we have
+        dists.append(d)
+    cut = min(len(results), max_keep)
+    for i in range(min_keep, cut):
+        # FIRST cliff wins: the initial big jump is where the relevant cluster
+        # ends; a later, larger jump is just structure inside the junk tail.
+        if dists[i] - dists[i - 1] >= min_gap:
+            cut = i
+            break
+    return list(results)[:cut]
+
+
+def normalize_card_for_search(data: dict, doc_id: str) -> dict:
+    """One search-result card: id stamped, createdAt as unix-ms, vector dropped.
+
+    Both retrieval halves (vector + keyword scan) run their output through this
+    so `rerank_candidates` never sees mixed timestamp types (a raw Firestore
+    datetime minus an int crashes the recency math) and no embedding ever
+    crosses to the client. Pure."""
+    data = dict(data or {})
+    if data.get("createdAt") is not None:
+        # EVERY stored shape (datetime / ISO string / seconds / ms) → ms int,
+        # so ranking math can never hit a mixed-type comparison.
+        data["createdAt"] = _to_unix_ms(data.get("createdAt"))
+    data.pop("embedding_vector", None)
+    data["id"] = doc_id
+    return data
+
+
+# How many recent cards the lexical half scans (matches ask_brain's cap): the
+# newest N by createdAt, deterministic and recency-biased. Cards older than the
+# cap remain reachable via the vector half.
+KEYWORD_SCAN_CAP = 1000
+
+
+def keyword_scan_cards(uid: str, query_text: str, exclude_ids: set = None,
+                       limit: int = 10) -> List[dict]:
+    """Lexical retrieval over the newest KEYWORD_SCAN_CAP cards.
+
+    The client's own keyword filter only sees the loaded feed window (newest
+    ~150), so a literal title match older than the window used to be findable
+    ONLY if vector search happened to rank it top-20. This server-side scan
+    closes that hole for both the search bar (via perform_hybrid_search) and
+    ask_brain's retrieval fallback. Scores via keyword_match_score (title hits
+    weighted double), returns the best `limit` matches not in `exclude_ids`,
+    normalized for rerank/client use.
+    """
+    tokens = keyword_query_tokens(query_text)
+    if not tokens:
+        return []
+    exclude_ids = exclude_ids or set()
+
+    db = get_db()
+    links_ref = db.collection("users").document(uid).collection("links")
+    query = links_ref.order_by(
+        "createdAt", direction=gc_firestore.Query.DESCENDING
+    ).limit(KEYWORD_SCAN_CAP)
+
+    scored = []
+    for doc in query.stream():
+        if doc.id in exclude_ids:
+            continue
+        data = doc.to_dict() or {}
+        score = keyword_match_score(data, tokens)
+        if score > 0:
+            scored.append((score, normalize_card_for_search(data, doc.id)))
+
+    scored.sort(key=lambda s: s[0], reverse=True)
+    return [d for _, d in scored[:limit]]
 
 
 def rerank_candidates(question: str, candidates: List[dict], top_k: int = 10) -> List[dict]:
@@ -149,7 +339,9 @@ def rerank_candidates(question: str, candidates: List[dict], top_k: int = 10) ->
         return []
 
     q_tokens = keyword_query_tokens(question)
-    times = [c.get("createdAt") or 0 for c in candidates]
+    # Coerce every timestamp shape defensively (see _to_unix_ms) — rerank must
+    # never crash on a legacy card, whatever a caller feeds it.
+    times = [_to_unix_ms(c.get("createdAt")) for c in candidates]
     oldest, newest = min(times), max(times)
     span = (newest - oldest) or 1
     n = len(candidates)
@@ -164,7 +356,7 @@ def rerank_candidates(question: str, candidates: List[dict], top_k: int = 10) ->
             title_overlap = len(q_tokens & title_tokens) / len(q_tokens)
         else:
             overlap = title_overlap = 0.0
-        recency = ((c.get("createdAt") or oldest) - oldest) / span
+        recency = (times[rank] - oldest) / span
         # Vector rank leads (weight 1.0), but a strong literal match is a strong
         # relevance signal — a FULL query-token overlap adds up to 0.75, enough
         # to rescue a card the vector score buried ~half the list down (the "you
@@ -191,8 +383,15 @@ class EmbeddingService:
         self.model = "models/gemini-embedding-001"
         logger.info(f"EmbeddingService initialized with model: {self.model}, client initialized: {self.client is not None}")
 
-    def generate_embedding(self, text: str) -> List[float]:
-        """Generate 768-dim embedding for text."""
+    def generate_embedding(self, text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> List[float]:
+        """Generate 768-dim embedding for text.
+
+        `task_type` is gemini-embedding-001's asymmetric-retrieval switch:
+        stored cards embed as RETRIEVAL_DOCUMENT (the default — every doc-side
+        caller inherits it), search queries as RETRIEVAL_QUERY. The pairing is
+        what the model is trained on for query→document matching; the untyped
+        default we used before leaves ranking quality on the table.
+        """
         if not self.client:
             logger.error("Gemini client not initialized - cannot generate embeddings! Set GEMINI_API_KEY environment variable.")
             raise Exception("GEMINI_API_KEY not configured. Please set the GEMINI_API_KEY environment variable in Firebase Cloud Functions.")
@@ -203,7 +402,7 @@ class EmbeddingService:
                 # Guard the model's input limit — the v2 recipe folds in
                 # detailedSummary, so the assembled text can be long.
                 contents=text[:_EMBED_TEXT_MAX_CHARS],
-                config={"output_dimensionality": 768}
+                config={"output_dimensionality": 768, "task_type": task_type}
             )
             return result.embeddings[0].values
         except Exception as e:
@@ -295,7 +494,9 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
         raise Exception("SEMANTIC_SEARCH_NOT_CONFIGURED: GEMINI_API_KEY environment variable not set. Please configure the API key in Firebase Cloud Functions.")
     
     try:
-        query_vector = service.generate_embedding(query_text)
+        # RETRIEVAL_QUERY pairs with the stored cards' RETRIEVAL_DOCUMENT
+        # vectors (asymmetric retrieval — see generate_embedding).
+        query_vector = service.generate_embedding(query_text, task_type="RETRIEVAL_QUERY")
     except Exception as e:
         logger.error(f"Failed to generate query embedding: {e}")
         raise Exception(f"SEMANTIC_SEARCH_ERROR: Failed to generate query embedding - {str(e)}")
@@ -339,28 +540,67 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
         # If the vector index isn't ready, return empty with message
         raise Exception(f"VECTOR_SEARCH_ERROR: {str(e)}. Make sure the vector index is deployed in Firestore.")
 
-    links = []
-    for doc in results:
-        data = doc.to_dict()
-        if "createdAt" in data and hasattr(data["createdAt"], "isoformat"):
-            data["createdAt"] = int(data["createdAt"].timestamp() * 1000)
-
-        if "embedding_vector" in data:
-            del data["embedding_vector"]
-
-        data["id"] = doc.id
-        links.append(data)
+    links = [normalize_card_for_search(doc.to_dict(), doc.id) for doc in results]
 
     logger.info(f"Found {len(links)} results.")
     return links
 
 
-@https_fn.on_call()
+def perform_hybrid_search(uid: str, query_text: str, limit: int = 20) -> List[dict]:
+    """Search-bar retrieval: quality-gated vector search + lexical scan, fused.
+
+    This is what the home search bar (web callable + native HTTP twin) serves:
+
+      1. Vector search DEEP (top-30), then `apply_distance_threshold` so
+         nearest-neighbour padding never masquerades as results.
+      2. `keyword_scan_cards` over the newest 1000 — literal matches the vector
+         rank buried (or that live beyond the client's loaded feed window,
+         which the client's own keyword filter can't see).
+      3. Merge (vector order first, keyword extras deduped after) and
+         `rerank_candidates` — vector rank leads, literal overlap boosts,
+         recency tiebreaks — down to `limit`.
+
+    Degrades instead of failing: if the vector half errors transiently, the
+    lexical half still serves (an outage must not blank the search bar). Only
+    the unambiguous config error (no API key) propagates, so the client can
+    show its "not configured" notice.
+    """
+    vector_results: List[dict] = []
+    try:
+        vector_results = perform_search_logic(uid, query_text, limit=30)
+    except Exception as e:
+        if "SEMANTIC_SEARCH_NOT_CONFIGURED" in str(e):
+            raise
+        logger.error(f"Hybrid search: vector half failed, degrading to keyword-only: {e}")
+
+    vector_results = apply_distance_threshold(vector_results)
+    # Then trim at the per-query relevance cliff — the absolute gate bounds
+    # worst-case junk, the cliff removes the "wall of loosely-related cards"
+    # behind the actual matches (owner-reported precision failure).
+    vector_results = cut_at_distance_cliff(vector_results)
+
+    try:
+        have = {r.get("id") for r in vector_results}
+        keyword_hits = keyword_scan_cards(uid, query_text, exclude_ids=have, limit=10)
+    except Exception as e:
+        logger.error(f"Hybrid search: keyword scan failed: {e}")
+        keyword_hits = []
+
+    merged = vector_results + keyword_hits
+    ranked = rerank_candidates(query_text, merged, top_k=limit)
+    # The distance served its purpose (threshold + rank) — don't leak internals.
+    for r in ranked:
+        r.pop("vector_distance", None)
+    return ranked
+
+
+@https_fn.on_call(max_instances=10)
 def search_links(req: https_fn.CallableRequest) -> Any:
     """
     Callable Function: Perform semantic search.
     Input: { query: string, limit?: number }
     """
+    uid = None
     try:
         # Prefer the verified caller; fall back to the client uid only while
         # REQUIRE_AUTH is off (staged rollout).
@@ -378,12 +618,20 @@ def search_links(req: https_fn.CallableRequest) -> Any:
         if not query_text:
             raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="Query text is required")
 
-        links = perform_search_logic(uid, query_text, limit)
+        links = perform_hybrid_search(uid, query_text, limit)
         return {"links": links}
 
     except https_fn.HttpsError:
         raise
     except Exception as e:
         logger.error(f"Search failed: {e}", exc_info=True)
+        # Durable trail (lazy import — main imports this module at load time).
+        # The web search bar calls THIS callable, so a failure here must land in
+        # server_errors like every other 5xx or it's invisible in production.
+        try:
+            from main import _record_server_error
+            _record_server_error("search_links", e, uid=uid)
+        except Exception:
+            pass
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message="Search failed")
 

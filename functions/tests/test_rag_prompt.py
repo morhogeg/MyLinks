@@ -15,6 +15,8 @@ from ai_service import (
     _valid_cited_ids,
     _parse_cited_marker,
     GeminiService,
+    GEMINI_ASK_MODEL,
+    GEMINI_ANALYSIS_MODEL,
 )
 
 
@@ -62,6 +64,30 @@ def test_card_block_uses_defaults_for_sparse_card():
     assert "Untitled" in block
     assert "category: General" in block
     assert "tags: " in block
+
+
+def test_card_block_includes_legacy_user_note():
+    block = _rag_card_block({"id": "x", "title": "T", "userNote": "my own take"})
+    assert "My note: my own take" in block
+
+
+def test_card_block_includes_multi_note_array():
+    # Every note the user wrote is surfaced to the model, not just the first.
+    block = _rag_card_block({
+        "id": "x", "title": "T",
+        "userNotes": [
+            {"id": "a", "text": "first note", "createdAt": 2},
+            {"id": "b", "text": "second note", "createdAt": 1},
+        ],
+    })
+    assert "My note:" in block
+    assert "first note" in block
+    assert "second note" in block
+
+
+def test_card_block_omits_note_line_when_no_notes():
+    block = _rag_card_block({"id": "x", "title": "T", "summary": "S"})
+    assert "My note:" not in block
 
 
 # ── _build_rag_prompt ─────────────────────────────────────────────────────
@@ -166,9 +192,11 @@ def _svc_with_json_responses(responses):
     svc.client = object()  # truthy → passes the "configured" guard
     calls = {"n": 0}
 
-    def fake_generate_json(contents, what, config_extra=None, model=None):
-        # `model` accepts the RAG paths' GEMINI_ASK_MODEL override.
+    def fake_generate_json(contents, what, config_extra=None, model=None, attempts=None):
+        # `model` accepts the RAG paths' GEMINI_ASK_MODEL override; `attempts`
+        # accepts the synchronous callers' reduced retry budget.
         calls.setdefault("models", []).append(model)
+        calls.setdefault("attempts", []).append(attempts)
         i = calls["n"]
         calls["n"] += 1
         resp = responses[i]
@@ -217,11 +245,40 @@ def test_answer_retry_exception_still_flags_ungrounded():
     from ai_service import AnalysisError
     svc = _svc_with_json_responses([
         {"answer": "Uncited answer.", "citedIds": []},
-        AnalysisError("transient model failure"),
+        # The citation retry fails on BOTH models (_answer_json falls back to
+        # the analysis model before giving up), so it takes two failures for
+        # the retry to be abandoned and the first answer flagged ungrounded.
+        AnalysisError("ask model failure"),
+        AnalysisError("fallback model failure"),
     ])
     out = svc.answer_from_context("q?", _CARDS)
     assert out == {"answer": "Uncited answer.", "citedIds": [], "ungrounded": True}
-    assert svc._calls["n"] == 2
+    assert svc._calls["n"] == 3
+
+
+# ── _answer_json: ask-tier model falls back to the proven analysis tier ────
+
+def test_answer_falls_back_to_analysis_model_when_ask_model_fails():
+    from ai_service import AnalysisError
+    svc = _svc_with_json_responses([
+        AnalysisError("ask model unavailable"),          # GEMINI_ASK_MODEL
+        {"answer": "Recovered.", "citedIds": ["id1"]},   # GEMINI_ANALYSIS_MODEL
+    ])
+    out = svc.answer_from_context("q?", _CARDS)
+    assert out == {"answer": "Recovered.", "citedIds": ["id1"], "ungrounded": False}
+    assert svc._calls["models"] == [GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL]
+
+
+def test_answer_raises_when_both_models_fail():
+    import pytest
+    from ai_service import AnalysisError
+    svc = _svc_with_json_responses([
+        AnalysisError("ask model unavailable"),
+        AnalysisError("fallback also down"),
+    ])
+    with pytest.raises(AnalysisError):
+        svc.answer_from_context("q?", _CARDS)
+    assert svc._calls["models"] == [GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL]
 
 
 def test_answer_empty_library_is_not_ungrounded():
@@ -296,6 +353,81 @@ def test_stream_with_only_invalid_ids_flagged_ungrounded():
     text, cited, ungrounded = _drain(svc.answer_from_context_stream("q?", _CARDS))
     assert cited == []
     assert ungrounded is True
+
+
+# ── answer_from_context_stream: ask-tier model fallback ────────────────────
+
+class _SelectiveFailModels:
+    """generate_content_stream that raises for `bad_models` and streams
+    `pieces` for anything else, recording every model requested."""
+
+    def __init__(self, pieces, bad_models):
+        self._pieces = pieces
+        self._bad = set(bad_models)
+        self.requested = []
+
+    def generate_content_stream(self, model, contents, config=None):
+        self.requested.append(model)
+        if model in self._bad:
+            raise RuntimeError(f"model not found: {model}")
+        return iter(_FakeChunk(p) for p in self._pieces)
+
+
+class _MidStreamFailModels:
+    """Streams one real chunk, then dies — a mid-stream failure AFTER output."""
+
+    def __init__(self):
+        self.requested = []
+
+    def generate_content_stream(self, model, contents, config=None):
+        self.requested.append(model)
+
+        def gen():
+            yield _FakeChunk("Some prose that is safely emitted right away. ")
+            raise RuntimeError("stream died mid-answer")
+        return gen()
+
+
+def _svc_with_models(models_obj):
+    svc = GeminiService.__new__(GeminiService)
+    svc.client = type("C", (), {"models": models_obj})()
+    svc.model = GEMINI_ANALYSIS_MODEL
+    return svc
+
+
+def test_stream_falls_back_when_ask_model_fails_before_output():
+    models = _SelectiveFailModels(
+        ["Answer body.\n", "[[CITED: id1]]"], bad_models={GEMINI_ASK_MODEL})
+    svc = _svc_with_models(models)
+    text, cited, ungrounded = _drain(svc.answer_from_context_stream("q?", _CARDS))
+    assert models.requested == [GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL]
+    assert "Answer body." in text
+    assert "[[CITED:" not in text
+    assert cited == ["id1"]
+    assert ungrounded is False
+
+
+def test_stream_raises_when_both_models_fail():
+    import pytest
+    from ai_service import AnalysisError
+    models = _SelectiveFailModels(
+        [], bad_models={GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL})
+    svc = _svc_with_models(models)
+    with pytest.raises(AnalysisError):
+        _drain(svc.answer_from_context_stream("q?", _CARDS))
+    assert models.requested == [GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL]
+
+
+def test_stream_no_fallback_after_tokens_emitted():
+    """A failure after prose reached the client must NOT restart on the
+    fallback model — that would stream the answer twice."""
+    import pytest
+    from ai_service import AnalysisError
+    models = _MidStreamFailModels()
+    svc = _svc_with_models(models)
+    with pytest.raises(AnalysisError):
+        _drain(svc.answer_from_context_stream("q?", _CARDS))
+    assert models.requested == [GEMINI_ASK_MODEL]  # never retried
 
 
 def test_stream_empty_library_not_flagged():

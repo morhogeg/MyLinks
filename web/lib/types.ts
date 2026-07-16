@@ -49,6 +49,18 @@ export interface AIAnalysis {
   };
 }
 
+/**
+ * One personal note the user wrote on a card. A card can carry several. Stored
+ * in `Link.userNotes`; a legacy single `userNote` string is treated as one of
+ * these at read time (see lib/notes.ts).
+ */
+export interface UserNote {
+  id: string;
+  text: string;
+  createdAt: number;   // Unix ms — when the note was first added
+  updatedAt?: number;  // Unix ms — when its text was last edited
+}
+
 export interface Link {
   id: string;
   url: string;
@@ -58,7 +70,19 @@ export interface Link {
   tags: string[];
   category: string;
   status: CaptureState;
+  // Private card (protected by the app-level privacy PIN — lib/privacyLock.ts).
+  // Modeled on Photos' Hidden album: lives ONLY under the "Private" show-filter
+  // (never in the main feed/search/facets, even while the vault is unlocked);
+  // entering that filter requires the PIN.
+  isPrivate?: boolean;
   createdAt: number | string; // Handle both Unix timestamp and ISO string
+  // When the current processing attempt began (epoch ms). Stamped on the
+  // placeholder card by the backend (share path) and createProcessingPlaceholder
+  // (web path); a retry re-stamps it while preserving createdAt. It's the shared
+  // wall clock the capture-progress loaders ramp from (see lib/shareProgress.ts),
+  // so the in-app ramp resumes where the Share Extension left off instead of
+  // restarting at 0.
+  processingStartedAt?: number;
   // Async-capture (M3): populated on a `failed` card so the UI can explain what
   // went wrong and offer a retry that re-runs analysis for `url`.
   error?: string;
@@ -94,11 +118,20 @@ export interface Link {
   language?: string;
   isRead?: boolean;
 
-  // A personal note the user attaches to ANY card (link, image, or note-card) —
-  // their own annotation, kept distinct from the AI-generated summary. Editable
-  // from the detail view; cleared (field removed) when emptied.
+  // Personal notes the user attaches to ANY card (link, image, or note-card) —
+  // their own annotations, kept distinct from the AI-generated summary. Editable
+  // from the detail view.
+  //
+  // Two shapes coexist for backward compatibility (see lib/notes.ts):
+  //   - Legacy: a single `userNote` string (every card saved before multi-note).
+  //   - Current: a `userNotes` array of discrete notes.
+  // `getNotes(link)` merges both into one newest-first list, so every reader
+  // (cards, search, editor) treats a legacy note as one note. New writes go to
+  // `userNotes`; editing a legacy-only card migrates `userNote` into the array
+  // and clears the legacy field, so data converges over time.
   userNote?: string;
-  userNoteUpdatedAt?: number; // Unix timestamp (ms) the note was last edited
+  userNoteUpdatedAt?: number; // Unix timestamp (ms) the legacy note was last edited
+  userNotes?: UserNote[];
 
   // Contextual Linking
   concepts?: string[];
@@ -126,6 +159,10 @@ export interface Collection {
   updatedAt: number;
   shareId?: string;      // set when published; key into shared_collections/{shareId}
   isPublic?: boolean;
+  // Private collections (protected by the app-level privacy PIN — lib/privacyLock.ts).
+  // While the vault is locked, member cards are hidden from the library, search,
+  // related cards, and suggestions, and opening the collection requires the PIN.
+  isPrivate?: boolean;
   publishedAt?: number;  // when the public snapshot was last written
   // Signature of (name, description, member ids) at publish time — comparing it
   // against the live signature tells the UI the public page is out of date.

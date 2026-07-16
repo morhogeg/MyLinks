@@ -16,6 +16,20 @@
         },
         {
             "collectionGroup": "links",
+            "queryScope": "COLLECTION_GROUP",
+            "fields": [
+                {
+                    "fieldPath": "reminderStatus",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "nextReminderAt",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "links",
             "queryScope": "COLLECTION",
             "fields": [
                 {

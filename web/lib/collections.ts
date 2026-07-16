@@ -30,6 +30,22 @@ import { Collection, Link, SharedCard } from './types';
 
 const collectionsRef = (uid: string) => collection(db, 'users', uid, 'collections');
 
+// Firestore caps a WriteBatch at 500 operations — chunk conservatively so
+// membership sweeps over large collections can't throw mid-delete (L-5).
+const BATCH_LIMIT = 450;
+
+/** Apply `op` to every ref, committing in ≤BATCH_LIMIT-op batches sequentially. */
+export async function batchedUpdate(
+    refs: ReturnType<typeof doc>[],
+    op: (batch: ReturnType<typeof writeBatch>, ref: ReturnType<typeof doc>) => void,
+): Promise<void> {
+    for (let i = 0; i < refs.length; i += BATCH_LIMIT) {
+        const batch = writeBatch(db);
+        refs.slice(i, i + BATCH_LIMIT).forEach((ref) => op(batch, ref));
+        await batch.commit();
+    }
+}
+
 /** Drop undefined keys — Firestore can't store them. */
 function clean<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
     return Object.entries(obj).reduce((acc, [k, v]) => {
@@ -41,7 +57,7 @@ function clean<T extends Record<string, unknown>>(obj: T): Record<string, unknow
 /** Create a new collection; returns the new doc id. */
 export async function createCollection(
     uid: string,
-    data: { name: string; description?: string; color?: string; coverLinkId?: string }
+    data: { name: string; description?: string; color?: string; coverLinkId?: string; isPrivate?: boolean }
 ): Promise<string> {
     const now = Date.now();
     const ref = await addDoc(collectionsRef(uid), clean({
@@ -49,17 +65,18 @@ export async function createCollection(
         description: data.description?.trim() || undefined,
         color: data.color,
         coverLinkId: data.coverLinkId,
+        isPrivate: data.isPrivate || undefined,
         createdAt: now,
         updatedAt: now,
     }));
     return ref.id;
 }
 
-/** Update a collection's metadata (name/description/color/cover). */
+/** Update a collection's metadata (name/description/color/cover/privacy). */
 export async function updateCollection(
     uid: string,
     id: string,
-    patch: Partial<Pick<Collection, 'name' | 'description' | 'color' | 'coverLinkId'>>
+    patch: Partial<Pick<Collection, 'name' | 'description' | 'color' | 'coverLinkId' | 'isPrivate'>>
 ): Promise<void> {
     const ref = doc(db, 'users', uid, 'collections', id);
     await updateDoc(ref, clean({ ...patch, updatedAt: Date.now() }));
@@ -74,9 +91,10 @@ export async function deleteCollection(uid: string, id: string, shareId?: string
     const linksRef = collection(db, 'users', uid, 'links');
     const members = await getDocs(query(linksRef, where('collectionIds', 'array-contains', id)));
     if (!members.empty) {
-        const batch = writeBatch(db);
-        members.docs.forEach((d) => batch.update(d.ref, { collectionIds: arrayRemove(id) }));
-        await batch.commit();
+        await batchedUpdate(
+            members.docs.map((d) => d.ref),
+            (batch, ref) => batch.update(ref, { collectionIds: arrayRemove(id) }),
+        );
     }
     if (shareId) {
         // Public snapshot is Admin-SDK-owned now (locked rules deny client
@@ -107,11 +125,10 @@ export async function setLinkCollections(uid: string, linkId: string, collection
 /** Add many cards to a collection in one batched write (suggested collections). */
 export async function addLinksToCollection(uid: string, linkIds: string[], collectionId: string): Promise<void> {
     if (linkIds.length === 0) return;
-    const batch = writeBatch(db);
-    for (const linkId of linkIds) {
-        batch.update(doc(db, 'users', uid, 'links', linkId), { collectionIds: arrayUnion(collectionId) });
-    }
-    await batch.commit();
+    await batchedUpdate(
+        linkIds.map((linkId) => doc(db, 'users', uid, 'links', linkId)),
+        (batch, ref) => batch.update(ref, { collectionIds: arrayUnion(collectionId) }),
+    );
 }
 
 /**

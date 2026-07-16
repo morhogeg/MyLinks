@@ -75,6 +75,12 @@ be in a git worktree under `~/MyLinks/.claude/worktrees/<name>` on a `claude/*` 
    ```
    Always pass explicit targets — the scheduler/webhook functions are not in the
    script's defaults. `process_link_background` may 409 transiently; retry in ~60s.
+   **CI alternative (works from cloud sessions once the owner adds the
+   `FIREBASE_SERVICE_ACCOUNT` + `GEMINI_API_KEY` repo secrets):** dispatch the
+   **"Deploy Cloud Functions"** workflow (`.github/workflows/deploy-functions.yml`,
+   `targets` input, default `all` = whole codebase + `firestore:indexes`).
+   If `firestore.indexes.json` changed and you deploy from the Mac instead, also
+   run `firebase deploy --only firestore:indexes`.
 
 6. **Deploy to TestFlight** (if frontend or native iOS changed and the user wants
    the app updated — TestFlight builds are heavier than web deploys, so confirm

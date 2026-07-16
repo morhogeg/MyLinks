@@ -13,7 +13,7 @@ import {
 import { syncShareConfigToNative } from '@/lib/shareConfig';
 import { readLocalAiConsent, writeLocalAiConsent } from '@/lib/aiConsent';
 import { setAnalyticsUid, flushSignIn, trackAppOpen, track } from '@/lib/analytics';
-import { installErrorReporter } from '@/lib/errorReporter';
+import { installErrorReporter, reportError, flushBufferedReports } from '@/lib/errorReporter';
 import {
     initPushListeners, refreshPushRegistration, unregisterPush,
     readLocalPushPrompt, writeLocalPushPrompt,
@@ -78,7 +78,8 @@ function attachUserDoc(docId: string, data: Record<string, unknown> | undefined)
     try {
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
         if (tz && data?.timezone !== tz) {
-            updateDoc(doc(db, 'users', docId), { timezone: tz }).catch(() => {});
+            updateDoc(doc(db, 'users', docId), { timezone: tz })
+                .catch((e) => reportError(e, 'auth-timezone-update'));
         }
     } catch {
         // Intl not available — skip.
@@ -132,6 +133,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (uid) {
             flushSignIn();
             trackAppOpen();
+            // A workspace is now resolved — drain any errors captured while
+            // signed out (the sign-in window where failures otherwise vanish).
+            flushBufferedReports();
         }
     }, [uid]);
 
@@ -148,7 +152,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
             const localTs = readLocalAiConsent();
             if (localTs !== null) {
-                updateDoc(doc(db, 'users', docId), { aiConsentAt: localTs }).catch(() => {});
+                updateDoc(doc(db, 'users', docId), { aiConsentAt: localTs })
+                    .catch((e) => reportError(e, 'auth-ai-consent-reconcile'));
             }
         },
         [],
@@ -167,7 +172,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } else {
                 const localTs = readLocalPushPrompt();
                 if (localTs !== null) {
-                    updateDoc(doc(db, 'users', docId), { pushPromptedAt: localTs }).catch(() => {});
+                    updateDoc(doc(db, 'users', docId), { pushPromptedAt: localTs })
+                        .catch((e) => reportError(e, 'auth-push-prompt-reconcile'));
                 }
             }
             if (isNativeApp()) {
@@ -184,7 +190,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         writeLocalAiConsent(now);
         track('consent_accepted');
         if (uid) {
-            updateDoc(doc(db, 'users', uid), { aiConsentAt: now }).catch(() => {});
+            updateDoc(doc(db, 'users', uid), { aiConsentAt: now })
+                .catch((e) => reportError(e, 'auth-ai-consent-accept'));
         }
     }, [uid]);
 
@@ -298,7 +305,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             localStorage.setItem(`${WELCOME_DISMISSED_KEY}:${uid}`, '1');
         } catch { /* private mode — best effort */ }
-        updateDoc(doc(db, 'users', uid), { onboarded: true }).catch(() => {});
+        updateDoc(doc(db, 'users', uid), { onboarded: true })
+            .catch((e) => reportError(e, 'auth-finish-onboarding'));
     }, [uid]);
 
     const value: AuthContextType = { uid, authUid, email, displayName, photoURL, loading, signOut };

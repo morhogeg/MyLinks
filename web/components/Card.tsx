@@ -3,15 +3,16 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Youtube, ExternalLink, Layers, Share2, X, Loader2, RotateCcw, AlertTriangle, StickyNote } from 'lucide-react';
+import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, Image as ImageIcon, MoreHorizontal, Youtube, ExternalLink, Layers, Share2, X, Loader2, RotateCcw, AlertTriangle, StickyNote, Lock } from 'lucide-react';
 import { useState, memo } from 'react';
-import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
+import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle } from '@/lib/platform';
 import { useNow } from '@/lib/useNow';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import CardActionSheet from './CardActionSheet';
 import { hasHebrew } from '@/lib/rtl';
+import { getNotes } from '@/lib/notes';
 
 interface CardProps {
     link: Link;
@@ -33,6 +34,8 @@ interface CardProps {
     onAddToCollection?: (link: Link) => void;
     /** Share this card as a public Machina page. */
     onShare?: (link: Link) => void;
+    /** Toggle the card's Private flag (parent owns PIN setup — lib/privacyLock). */
+    onTogglePrivate?: (link: Link) => void;
     /** Collections this card belongs to — rendered as subtle chips. */
     cardCollections?: { id: string; name: string }[];
     /** When the feed is scoped to one collection, its id — enables a quick "remove" action. */
@@ -62,6 +65,7 @@ function Card({
     onTagClick,
     onAddToCollection,
     onShare,
+    onTogglePrivate,
     cardCollections,
     activeCollectionId,
     onRemoveFromCollection,
@@ -101,6 +105,10 @@ function Card({
     const fbAuthor = isFacebook && link.sourceName
         && !['facebook', 'screenshot', 'none'].includes(link.sourceName.trim().toLowerCase())
         ? link.sourceName : null;
+    // Instagram: credit the author @handle (extracted by the scraper and stored
+    // in sourceName as "@handle") in the same branded byline style as X. Falls
+    // back to the plain "Instagram" chip when no handle was captured.
+    const igAuthor = platform === 'instagram' ? instagramHandle(link.sourceName) : null;
 
     // Format relative time (e.g., "2h ago")
     const getTimeAgo = (timestamp: number | string, now: number): string => {
@@ -423,6 +431,16 @@ function Card({
                         branded byline style right here in place of the muted chip;
                         every other source keeps the muted uppercase chip. */}
                     <div className="flex items-center gap-1.5 min-w-0 z-10 ms-auto transition-opacity duration-200 group-hover:opacity-0">
+                        {/* Private marker — icon only, matching the collection tiles. */}
+                        {link.isPrivate && (
+                            <span
+                                aria-label="Private"
+                                title="Private"
+                                className="flex items-center justify-center w-6 h-6 rounded-full bg-fill-subtle border border-border-strong text-text-muted shrink-0"
+                            >
+                                <Lock className="w-3 h-3" />
+                            </span>
+                        )}
                         {isYouTube && youtubeChannel && (
                             <span
                                 dir="ltr"
@@ -470,7 +488,19 @@ function Card({
                                 {fbAuthor && <span className="truncate">{fbAuthor}</span>}
                             </span>
                         )}
-                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && link.sourceType === 'image' && (
+                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && igAuthor && (
+                            <span
+                                dir="ltr"
+                                className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-text-secondary whitespace-nowrap max-w-[220px]"
+                                title={`@${igAuthor}`}
+                            >
+                                <span className="shrink-0 inline-flex" style={{ color: platformColor('instagram') }}>
+                                    {platformIcon('instagram', 'w-3.5 h-3.5')}
+                                </span>
+                                <span className="truncate">@{igAuthor}</span>
+                            </span>
+                        )}
+                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && !igAuthor && link.sourceType === 'image' && (
                             <span
                                 className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-accent whitespace-nowrap"
                                 title="Screenshot"
@@ -479,7 +509,7 @@ function Card({
                                 <span>Screenshot</span>
                             </span>
                         )}
-                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && link.sourceType === 'note' && (
+                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && !igAuthor && link.sourceType === 'note' && (
                             <span
                                 className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-accent whitespace-nowrap"
                                 title="Note"
@@ -488,7 +518,7 @@ function Card({
                                 <span>Note</span>
                             </span>
                         )}
-                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && link.sourceType !== 'image' && link.sourceType !== 'note' && link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None' && (
+                        {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && !igAuthor && link.sourceType !== 'image' && link.sourceType !== 'note' && link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None' && (
                             <span
                                 className="flex items-center gap-1 text-[9px] font-bold text-text-muted/60 bg-fill-subtle border border-border-strong px-2 py-1 rounded-lg uppercase tracking-widest whitespace-nowrap transition-all max-w-[220px]"
                                 title={link.sourceName}
@@ -585,6 +615,34 @@ function Card({
                         })}
                     </div>
 
+                    {/* Your own note(s) — the StickyNote glyph leads the snippet
+                        inline (no vertical accent bar), muted + italic so it reads
+                        as YOUR voice, distinct from the machine summary above.
+                        Newest note first; a "+N" tallies the rest. Clamped to 2
+                        lines with dir="auto" so it stays RTL-safe (icon mirrors to
+                        the start) and never bloats the card. Note-cards ARE the
+                        note, so skip them. */}
+                    {link.sourceType !== 'note' && (() => {
+                        const notes = getNotes(link);
+                        if (notes.length === 0) return null;
+                        const [first, ...rest] = notes;
+                        return (
+                            <div
+                                dir="auto"
+                                title={first.text}
+                                className="flex items-start gap-1.5 text-[12px] leading-snug text-text-muted/90 italic"
+                            >
+                                <StickyNote className="w-3 h-3 shrink-0 mt-[3px] opacity-60" />
+                                <span className="line-clamp-2">{first.text}</span>
+                                {rest.length > 0 && (
+                                    <span className="shrink-0 mt-[2px] not-italic text-[10px] font-bold text-text-muted/60">
+                                        +{rest.length}
+                                    </span>
+                                )}
+                            </div>
+                        );
+                    })()}
+
                     {/* Metadata Buttons Row */}
                     <div className="flex items-center justify-between mt-auto">
                         <div className="flex items-center gap-3 text-text-muted/60 text-[11px] font-medium">
@@ -593,13 +651,6 @@ function Card({
                                 {link.metadata.estimatedReadTime}{isRtl ? ' דק׳' : 'm'}
                             </span>
                             {now > 0 && <span>{getTimeAgo(link.createdAt, now)}</span>}
-                            {/* You've added a personal note to this card — a quiet
-                                accent cue so your own thoughts are findable at a glance. */}
-                            {link.userNote && link.sourceType !== 'note' && (
-                                <span className="flex items-center text-accent/70" title="You added a note">
-                                    <StickyNote className="w-3 h-3" />
-                                </span>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -616,6 +667,7 @@ function Card({
             onDelete={onDelete}
             onAddToCollection={onAddToCollection}
             onShare={onShare}
+            onTogglePrivate={onTogglePrivate}
             removeFromCollection={
                 activeCollectionId && onRemoveFromCollection
                     ? {

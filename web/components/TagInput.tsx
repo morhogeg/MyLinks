@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Plus, Check, Search } from 'lucide-react';
 import { useVisualViewport } from '@/lib/useVisualViewport';
+import { useSheetDrag } from '@/lib/useSheetDrag';
 
 interface TagInputProps {
     allTags: string[];
@@ -37,6 +38,9 @@ export default function TagInput({
 
     // Visual viewport drives the mobile sheet so it rides above the keyboard.
     const vp = useVisualViewport();
+
+    // Drag-to-dismiss for the mobile sheet — closes via the same onCancel the X uses.
+    const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose: onCancel, enabled: isMobile });
 
     // Focus the right field on open.
     useEffect(() => {
@@ -185,20 +189,23 @@ export default function TagInput({
             className="fixed inset-x-0 z-[100] flex items-end animate-fade-in"
             style={{ top: vp.offsetTop || 0, height: vp.height || '100%', bottom: 'auto' }}
         >
-            <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={onCancel} />
-            <div className="relative w-full max-h-[85%] flex flex-col bg-card border-t border-border-strong rounded-t-3xl shadow-2xl animate-slide-up overflow-hidden">
-                <div className="flex justify-center pt-3 pb-1 shrink-0">
-                    <div className="h-1.5 w-10 rounded-full bg-fill-strong" />
-                </div>
-                <div className="flex items-center gap-3 px-4 pb-3 shrink-0">
-                    <h3 className="flex-1 text-base font-bold text-text">Add a tag</h3>
-                    <button
-                        onClick={onCancel}
-                        aria-label="Close"
-                        className="h-9 w-9 -me-1 inline-flex items-center justify-center rounded-full text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
+            <div ref={scrimRef} className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={onCancel} />
+            <div ref={sheetRef} className="relative w-full max-h-[85%] flex flex-col bg-card border-t border-border-strong rounded-t-3xl shadow-2xl animate-slide-up overflow-hidden">
+                {/* Grab handle + header: the drag-to-dismiss zone. */}
+                <div {...handleProps} className="shrink-0">
+                    <div className="flex justify-center pt-3 pb-1">
+                        <div className="h-1.5 w-10 rounded-full bg-fill-strong" />
+                    </div>
+                    <div className="flex items-center gap-3 px-4 pb-3">
+                        <h3 className="flex-1 text-base font-bold text-text">Add a tag</h3>
+                        <button
+                            onClick={onCancel}
+                            aria-label="Close"
+                            className="h-9 w-9 -me-1 inline-flex items-center justify-center rounded-full text-text-muted hover:text-text hover:bg-fill-subtle transition-colors"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
                 <div className="px-4 pb-3 shrink-0">
                     <div className="flex items-center gap-2 px-3 h-11 rounded-xl bg-background border border-border-subtle focus-within:border-accent/50 transition-colors">

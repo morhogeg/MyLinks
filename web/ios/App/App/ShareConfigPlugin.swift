@@ -62,9 +62,21 @@ public class ShareConfigPlugin: CAPPlugin, CAPBridgedPlugin {
         // The % the share HUD was showing at hand-off (0 if an older extension
         // build didn't write it), so the in-app banner can resume from there.
         let progress = defaults.double(forKey: "pendingShareProgress")
+        // The absolute capture-start wall clock (epoch ms) the extension anchored
+        // its ramp to (0 if an older build didn't write it). The in-app loader
+        // prefers this over its own mount time, so progress carries across
+        // continuously via the shared curve (see web/lib/shareProgress.ts).
+        let startedAt = defaults.double(forKey: "pendingShareStartedAt")
         defaults.removeObject(forKey: "pendingShareAt")
         defaults.removeObject(forKey: "pendingShareKind")
         defaults.removeObject(forKey: "pendingShareProgress")
-        call.resolve(["pending": true, "kind": kind, "ageMs": ageMs, "progress": progress])
+        defaults.removeObject(forKey: "pendingShareStartedAt")
+        call.resolve([
+            "pending": true,
+            "kind": kind,
+            "ageMs": ageMs,
+            "progress": progress,
+            "startedAt": startedAt,
+        ])
     }
 }

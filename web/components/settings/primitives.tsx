@@ -114,17 +114,24 @@ export function TopicPill({ label, active, onClick }: { label: string; active: b
     );
 }
 
+/** The one switch primitive for the whole app. iOS spec: 51×31 track, 27px knob.
+    Geometry is structural, not hand-tuned: the track is an inline-flex row with a
+    uniform 2px pad on every side, and the knob is a normal flex child (no absolute
+    offsets). That makes the resting inset and vertical centring fall out of the
+    layout, so the knob is always fully inside the track with even padding in both
+    states — the ON travel is exactly the leftover free space (51 − 2×2 − 27 = 20px)
+    and can't drift out of sync if the sizes change. `shrink-0` keeps the track from
+    being squeezed by a long label in a settings row, so it never overflows the
+    row's rounded container. */
 export function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
-    // iOS spec: 51×31 track, 27px knob, 2px inset → 20px travel. The knob nearly
-    // fills the track height so there's no visible gap on the sides.
     return (
         <button
             onClick={onChange}
             role="switch"
             aria-checked={on}
-            className={`relative w-[51px] h-[31px] rounded-full transition-colors duration-200 shrink-0 cursor-pointer ${on ? 'bg-accent' : 'bg-text-muted/30'}`}
+            className={`inline-flex items-center shrink-0 w-[51px] h-[31px] p-[2px] rounded-full transition-colors duration-200 cursor-pointer ${on ? 'bg-accent' : 'bg-text-muted/30'}`}
         >
-            <span className={`absolute top-[2px] left-[2px] w-[27px] h-[27px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.2),0_2px_5px_rgba(0,0,0,0.18)] transition-transform duration-200 ease-out ${on ? 'translate-x-[20px]' : 'translate-x-0'}`} />
+            <span className={`block w-[27px] h-[27px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.2),0_2px_5px_rgba(0,0,0,0.18)] transition-transform duration-200 ease-out ${on ? 'translate-x-[20px] rtl:-translate-x-[20px]' : 'translate-x-0'}`} />
         </button>
     );
 }

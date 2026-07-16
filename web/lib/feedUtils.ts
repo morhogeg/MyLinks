@@ -19,3 +19,6 @@ export const getTimestampNumber = (val: unknown): number => {
     }
     return 0;
 };
+
+// Keyword search moved to searchRank.ts (scored, field-weighted, Hebrew-aware
+// hybrid ranking) — the old binary token matcher lived here until 2026-07-16.

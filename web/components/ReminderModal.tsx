@@ -107,6 +107,19 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
         return () => window.removeEventListener('keydown', onKey);
     }, [isOpen, isSaving, onClose]);
 
+    // Materialize the custom default date the moment "Custom" is chosen (the
+    // selects otherwise render a today fallback that was never committed to
+    // state, so Save silently no-ops on an untouched picker). Late at night —
+    // past the last 15-min slot — default to tomorrow so the picker doesn't
+    // open onto a day with every time slot disabled. Lives ABOVE the isOpen
+    // early-return: hooks must run unconditionally on every render.
+    useEffect(() => {
+        if (!isOpen || selectedOption !== 'custom' || customDate) return;
+        const base = new Date();
+        if (base.getHours() * 60 + base.getMinutes() >= 23 * 60 + 45) base.setDate(base.getDate() + 1);
+        setCustomDate(formatLocalDate(base));
+    }, [isOpen, selectedOption, customDate]);
+
     if (!isOpen) return null;
 
     const handleSave = async () => {
@@ -207,18 +220,6 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
     };
 
     const isReminderActive = link.reminderStatus === 'pending';
-
-    // Materialize the custom default date the moment "Custom" is chosen (the
-    // selects otherwise render a today fallback that was never committed to
-    // state, so Save silently no-ops on an untouched picker). Late at night —
-    // past the last 15-min slot — default to tomorrow so the picker doesn't
-    // open onto a day with every time slot disabled.
-    useEffect(() => {
-        if (!isOpen || selectedOption !== 'custom' || customDate) return;
-        const base = new Date();
-        if (base.getHours() * 60 + base.getMinutes() >= 23 * 60 + 45) base.setDate(base.getDate() + 1);
-        setCustomDate(formatLocalDate(base));
-    }, [isOpen, selectedOption, customDate]);
 
     // Selection-time guards for the custom picker so past dates/times can't be
     // chosen in the first place. Recomputed every render (cheap), so the "today"
