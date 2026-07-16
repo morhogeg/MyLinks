@@ -626,7 +626,30 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-16 (latest) — Ask follow-up chips: no repeats in a conversation.**
+- **2026-07-16 (latest) — SHIPPED: Ask chats persist to the sidebar the moment
+  the question is sent (branch `claude/starred-chat-sidebar-persist-d35ztb`).**
+  Owner repro: start an Ask chat, open the history sidebar before the answer
+  lands, view another chat, come back — the new chat wasn't in the sidebar at
+  all. Root cause (`web/components/AskBrain.tsx`): `persistConversation`
+  refused to create the Firestore doc until the first ASSISTANT message, and
+  switching chats aborted the in-flight stream — the question was silently
+  dropped forever. Fixes: (1) **eager persist** — `send()` now saves
+  `[…history, question]` immediately, so the chat appears at the top of the
+  sidebar (Firestore latency compensation makes it instant) while the answer
+  is still streaming; (2) **detached streams** — New chat / selecting another
+  chat no longer aborts the in-flight answer; the stream keeps reading in the
+  background (accumulator mirrors the on-screen bubble) and persists the
+  finished exchange to its own chat doc; if the user is back on that chat when
+  it lands, it's put on screen too. Stop + superseding sends still hard-abort
+  (`cancelledGensRef` distinguishes CANCELLED from DETACHED). All chat writes
+  are serialized through `persistChainRef` (no duplicate-create races between
+  the eager save and the 600ms debounce); `chatOwnerGenRef` (chatId → owning
+  stream generation) stops a backgrounded answer from clobbering a chat the
+  user has since re-asked in; conversation identity is an object swapped per
+  chat switch (`convoRef`) so a late create can't attach its id to the wrong
+  conversation. Web-only — no backend/functions change; ships via Vercel on
+  merge + needs a TestFlight build for native (bundled web assets).
+- **2026-07-16 — Ask follow-up chips: no repeats in a conversation.**
   Owner repro (iOS): after tapping "What's the common thread?", the same chip
   was offered again under the next answer. Root cause: dedup in
   `buildFollowUps` (`web/lib/askSuggestions.ts`) compared EXACT question

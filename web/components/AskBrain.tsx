@@ -206,28 +206,52 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
     const [historyOpen, setHistoryOpen] = useState(false);          // mobile drawer
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // desktop panel
 
-    // Mirrors of state for use inside async/debounced closures without re-subscribing.
-    const activeChatIdRef = useRef<string | null>(null);
+    // Identity of the conversation currently on screen. New chat / selecting a
+    // chat swaps in a fresh object; async work captures THE OBJECT, so a late
+    // write can never attach itself (or its freshly-created Firestore id) to a
+    // conversation the user has since navigated to.
+    const convoRef = useRef<{ id: string | null }>({ id: null });
     const lastSavedRef = useRef<string>('');   // signature of the last persisted messages
     const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Every chats write goes through this chain, so the eager create fired on
+    // send, the debounced auto-save, and a backgrounded completion can never
+    // race each other into duplicate docs or out-of-order content.
+    const persistChainRef = useRef<Promise<unknown>>(Promise.resolve());
+    // chatId → the stream generation that owns its next answer. A newer ask in
+    // the same chat takes ownership, so a detached (backgrounded) stream from an
+    // older ask quietly discards its result instead of clobbering the doc.
+    const chatOwnerGenRef = useRef<Map<string, number>>(new Map());
     // Gate persistence until the initial load/migration has run, so the first
     // (empty) render doesn't create a stray chat.
     const hydratedRef = useRef(false);
 
-    // Stream lifecycle guard. Every send() captures the current generation; any
-    // action that invalidates the in-flight stream (New chat, switching chats, or
-    // starting another send) bumps `streamGenRef` and aborts the live fetch. The
-    // reader loop re-checks its captured generation before each setMessages, so a
-    // stale stream can't patch the wrong conversation or index past its bubble.
+    // Stream lifecycle guard. Every send() captures the current generation; the
+    // reader loop re-checks it before each setMessages, so a stale stream can't
+    // patch the wrong conversation or index past its bubble. A stream leaves the
+    // "live" state one of two ways:
+    //  - CANCELLED (Stop, or a newer send superseding it): the fetch is aborted
+    //    and the generation is marked dead — nothing of it survives.
+    //  - DETACHED (New chat / switching chats): the generation is bumped but the
+    //    fetch keeps running; the answer is persisted straight to its own chat
+    //    doc when it lands — it just may no longer touch this screen's state.
     const streamGenRef = useRef(0);
     const streamAbortRef = useRef<AbortController | null>(null);
+    const cancelledGensRef = useRef<Set<number>>(new Set());
 
-    /** Invalidate any in-flight stream and return the new generation to capture. */
+    /** Hard-cancel any in-flight stream and return the new generation to capture. */
     const bumpStreamGen = () => {
+        cancelledGensRef.current.add(streamGenRef.current);
         streamAbortRef.current?.abort();
         streamAbortRef.current = null;
         streamGenRef.current += 1;
         return streamGenRef.current;
+    };
+
+    /** Background any in-flight stream: it finishes on its own and persists to
+     *  its chat doc, while this screen moves on to another conversation. */
+    const detachStream = () => {
+        streamAbortRef.current = null;
+        streamGenRef.current += 1;
     };
 
     // Living suggested prompts, built from the actual library (newest save,
@@ -404,26 +428,34 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
         })();
     }, [uid, chatsLoaded, chats]);
 
-    // Persist the working conversation: create on the first assistant reply,
-    // then update in place. Skips writes when content is unchanged.
-    const persistConversation = useCallback(async (msgs: ChatMessage[]) => {
-        if (!uid) return;
-        if (!msgs.some(m => m.role === 'assistant')) return; // wait for a real exchange
-        const sig = JSON.stringify(msgs);
-        if (sig === lastSavedRef.current) return;
-        try {
-            if (activeChatIdRef.current) {
-                await updateChat(uid, activeChatIdRef.current, { messages: msgs });
-            } else {
-                const id = await createChat(uid, msgs);
-                activeChatIdRef.current = id;
-                setActiveChatId(id);
+    // Persist a conversation: create the doc on the FIRST user message — not the
+    // first assistant reply — so a just-asked chat already sits at the top of
+    // the sidebar while the answer is still being written; then update in place.
+    // Serialized through persistChainRef. Resolves to the chat's Firestore id
+    // (null when there's nothing to save or the write failed).
+    const persistConversation = useCallback((msgs: ChatMessage[], convo: { id: string | null }): Promise<string | null> => {
+        const task = persistChainRef.current.then(async (): Promise<string | null> => {
+            if (!uid || msgs.length === 0) return null;
+            const sig = JSON.stringify(msgs);
+            const isCurrent = () => convo === convoRef.current;
+            if (isCurrent() && sig === lastSavedRef.current) return convo.id;
+            try {
+                if (convo.id) {
+                    await updateChat(uid, convo.id, { messages: msgs });
+                } else {
+                    convo.id = await createChat(uid, msgs);
+                    if (isCurrent()) setActiveChatId(convo.id);
+                }
+                if (isCurrent()) lastSavedRef.current = sig;
+                return convo.id;
+            } catch (e) {
+                // Transient write error; the live snapshot keeps the list consistent.
+                reportError(e, 'ask-persist-conversation');
+                return null;
             }
-            lastSavedRef.current = sig;
-        } catch (e) {
-            // Transient write error; the live snapshot keeps the list consistent.
-            reportError(e, 'ask-persist-conversation');
-        }
+        });
+        persistChainRef.current = task;
+        return task;
     }, [uid]);
 
     // Debounced auto-save as the conversation grows.
@@ -431,17 +463,18 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
         if (!uid || !hydratedRef.current || messages.length === 0) return;
         if (saveTimer.current) clearTimeout(saveTimer.current);
         const snapshot = messages;
-        saveTimer.current = setTimeout(() => persistConversation(snapshot), 600);
+        const convo = convoRef.current;
+        saveTimer.current = setTimeout(() => persistConversation(snapshot, convo), 600);
         return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
     }, [messages, uid, persistConversation]);
 
     // ── Conversation actions ──────────────────────────────────────────────────
     const newChat = () => {
-        bumpStreamGen();            // abandon any in-flight stream from the old chat
+        detachStream();             // let any in-flight answer land in its own chat doc
         setIsThinking(false);
         setIsStreaming(false);
         setActiveChatId(null);
-        activeChatIdRef.current = null;
+        convoRef.current = { id: null };
         setMessages([]);
         lastSavedRef.current = '';
         setInput('');
@@ -451,11 +484,11 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
     const selectChat = (id: string) => {
         const chat = chats.find(c => c.id === id);
         if (!chat) return;
-        bumpStreamGen();            // abandon any in-flight stream before swapping
+        detachStream();             // background any in-flight answer before swapping
         setIsThinking(false);
         setIsStreaming(false);
         setActiveChatId(id);
-        activeChatIdRef.current = id;
+        convoRef.current = { id };
         setMessages(chat.messages);
         lastSavedRef.current = JSON.stringify(chat.messages);
         setInput('');
@@ -478,6 +511,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
     const confirmDeleteChat = () => {
         if (!uid || !chatToDelete) return;
         const id = chatToDelete;
+        // Orphan any backgrounded answer still headed for this doc.
+        chatOwnerGenRef.current.delete(id);
         deleteChat(uid, id).catch((e) => reportError(e, 'ask-delete-chat'));
         if (id === activeChatId) newChat();
         setChatToDelete(null);
@@ -571,13 +606,69 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
         const gen = bumpStreamGen();
         const controller = new AbortController();
         streamAbortRef.current = controller;
+        // No longer the on-screen stream (Stop, a newer send, or a chat switch).
         const isStale = () => streamGenRef.current !== gen;
+        // Torn down for real — a detached stream is stale but NOT cancelled.
+        const isCancelled = () => cancelledGensRef.current.has(gen);
 
         // History = the conversation so far (before this turn), trimmed server-side.
         const baseMsgs = base ?? messages;
         const history = baseMsgs.map(m => ({ role: m.role, content: m.content }));
+        const withUser: ChatMessage[] = [...baseMsgs, { role: 'user', content: question }];
 
-        setMessages([...baseMsgs, { role: 'user', content: question }]);
+        // Persist the question RIGHT NOW instead of waiting for the answer: if
+        // the user peeks at the sidebar before the reply lands, this chat must
+        // already be there at the top. The resolved id also registers this
+        // generation as the chat's answer owner, so a backgrounded completion
+        // knows whether it may still write.
+        const convo = convoRef.current;
+        const chatIdReady: Promise<string | null> = hydratedRef.current
+            ? persistConversation(withUser, convo)
+            : Promise.resolve(null);
+        chatIdReady.then(id => { if (id) chatOwnerGenRef.current.set(id, gen); });
+
+        // Mirror of the on-screen assistant bubble, so a detached stream can
+        // persist the finished exchange even though it can't touch React state.
+        let accContent = '';
+        let accSources: ChatSource[] = [];
+        let accUngrounded = false;
+        let accError: string | null = null;
+
+        /** Persist a backgrounded exchange to its own chat doc — unless a newer
+         *  ask has taken the chat over. If the user has meanwhile navigated back
+         *  to this conversation, put the landed answer on screen too. */
+        const commitDetached = (finalMsgs: ChatMessage[]) => {
+            const task = persistChainRef.current.then(async () => {
+                const id = convo.id;
+                if (!uid || !id) return;
+                if (chatOwnerGenRef.current.get(id) !== gen) return; // superseded
+                try {
+                    await updateChat(uid, id, { messages: finalMsgs });
+                    // Compare by id, not object: navigating back to this chat
+                    // swaps in a fresh convo object with the same id — and that's
+                    // exactly when the user is staring at the pending question.
+                    if (convoRef.current.id === id) {
+                        lastSavedRef.current = JSON.stringify(finalMsgs);
+                        setMessages(finalMsgs);
+                    }
+                } catch (e) {
+                    reportError(e, 'ask-detached-persist');
+                }
+            });
+            persistChainRef.current = task;
+        };
+        /** The backgrounded exchange as it should be saved: question + whatever
+         *  answer arrived. Null when nothing arrived — the eagerly-saved
+         *  question already stands on its own. */
+        const detachedMsgs = (): ChatMessage[] | null => {
+            if (accError) return [...withUser, { role: 'assistant', content: accError, error: true }];
+            if (!accContent) return null;
+            const answer: ChatMessage = { role: 'assistant', content: accContent, sources: accSources };
+            if (accUngrounded) answer.ungrounded = true;
+            return [...withUser, answer];
+        };
+
+        setMessages(withUser);
         setInput('');
         setIsThinking(true);
         setIsStreaming(false);
@@ -608,18 +699,22 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                 signal: controller.signal,
             }, 30_000);
 
-            if (isStale()) return; // superseded while the request was in flight
+            if (isCancelled()) return; // torn down while the request was in flight
 
             const contentType = res.headers.get('content-type') || '';
             if (contentType.includes('text/event-stream') && res.body) {
                 // Streaming backend: append an empty in-progress bubble and remember
                 // ITS index, so every subsequent patch targets that exact message —
                 // not "the last one", which a concurrent action could have changed.
+                // (Skipped when already detached — the accumulator carries the
+                // answer to Firestore instead.)
                 let assistantIdx = -1;
-                setMessages(prev => {
-                    assistantIdx = prev.length;
-                    return [...prev, { role: 'assistant', content: '', sources: [] }];
-                });
+                if (!isStale()) {
+                    setMessages(prev => {
+                        assistantIdx = prev.length;
+                        return [...prev, { role: 'assistant', content: '', sources: [] }];
+                    });
+                }
                 // Patch the tracked assistant bubble by index; no-op if it's gone
                 // (e.g. the conversation was swapped out from under us).
                 const patchAt = (patch: Partial<ChatMessage>) =>
@@ -643,12 +738,13 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                 let firstToken = true;
                 let done = false;
                 while (!done) {
-                    // Bail the moment this stream is superseded: stop reading and
-                    // release the connection so a stale stream never mutates state.
-                    if (isStale()) { try { await reader.cancel(); } catch { /* ignore */ } return; }
+                    // Bail the moment this stream is torn down: stop reading and
+                    // release the connection. (A DETACHED stream keeps reading —
+                    // its answer still gets persisted below.)
+                    if (isCancelled()) { try { await reader.cancel(); } catch { /* ignore */ } return; }
                     const { value, done: streamDone } = await reader.read();
                     if (streamDone) break;
-                    if (isStale()) { try { await reader.cancel(); } catch { /* ignore */ } return; }
+                    if (isCancelled()) { try { await reader.cancel(); } catch { /* ignore */ } return; }
                     buffer += decoder.decode(value, { stream: true });
                     // Events are separated by a blank line; keep the trailing partial.
                     const chunks = buffer.split('\n\n');
@@ -660,27 +756,35 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                         try {
                             evt = JSON.parse(line.slice(line.indexOf(':') + 1).trim());
                         } catch { continue; }
-                        if (isStale()) { try { await reader.cancel(); } catch { /* ignore */ } return; }
+                        if (isCancelled()) { try { await reader.cancel(); } catch { /* ignore */ } return; }
                         if (evt.type === 'token') {
-                            if (firstToken) {
-                                setIsThinking(false);
-                                setIsStreaming(true);
-                                firstToken = false;
-                                // Re-pin now that content can actually overflow —
-                                // the first pin may have had no scroll room yet.
-                                pinQuestionToTop(questionIdx);
+                            accContent += evt.text || '';
+                            if (!isStale()) {
+                                if (firstToken) {
+                                    setIsThinking(false);
+                                    setIsStreaming(true);
+                                    firstToken = false;
+                                    // Re-pin now that content can actually overflow —
+                                    // the first pin may have had no scroll room yet.
+                                    pinQuestionToTop(questionIdx);
+                                }
+                                appendText(evt.text || '');
                             }
-                            appendText(evt.text || '');
                         } else if (evt.type === 'sources') {
-                            patchAt({ sources: evt.sources || [] });
+                            accSources = evt.sources || [];
+                            if (!isStale()) patchAt({ sources: accSources });
                         } else if (evt.type === 'ungrounded') {
                             // Answer couldn't be tied to any save — downgrade it
                             // (arrives after the prose, in place of source chips).
-                            patchAt({ ungrounded: true });
+                            accUngrounded = true;
+                            if (!isStale()) patchAt({ ungrounded: true });
                             trackAskNoCitations();
                         } else if (evt.type === 'error') {
-                            setIsThinking(false);
-                            patchAt({ content: evt.error || 'Something went wrong reaching Machina. Please try again.', error: true });
+                            accError = evt.error || 'Something went wrong reaching Machina. Please try again.';
+                            if (!isStale()) {
+                                setIsThinking(false);
+                                patchAt({ content: accError, error: true });
+                            }
                             // Surface the failure in client_errors — the backend
                             // message is sanitized, so record what the user saw
                             // plus where it came from for production triage.
@@ -689,49 +793,68 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                         } else if (evt.type === 'done') {
                             done = true;
                             trackFirstAsk();
-                            hapticLight();
+                            if (!isStale()) hapticLight();
                         }
                     }
+                }
+                // Detached mid-answer (the user moved on): persist the finished
+                // exchange to its chat doc so nothing is lost.
+                if (isStale() && !isCancelled()) {
+                    const final = detachedMsgs();
+                    if (final) commitDetached(final);
                 }
                 return;
             }
 
             // Non-streaming backend (current prod): existing JSON behavior unchanged.
             const data = await res.json();
-            if (isStale()) return; // superseded while parsing the response
+            if (isCancelled()) return; // torn down while parsing the response
 
             if (data.success) {
-                setMessages(prev => [...prev, {
+                const answer: ChatMessage = {
                     role: 'assistant',
                     content: data.answer || "I couldn't find an answer for that.",
                     sources: data.sources || [],
                     ungrounded: Boolean(data.ungrounded),
-                }]);
+                };
                 trackFirstAsk();
+                if (data.ungrounded) trackAskNoCitations();
+                if (isStale()) { commitDetached([...withUser, answer]); return; }
+                setMessages(prev => [...prev, answer]);
                 hapticLight();
                 // Buffered path (native): the whole answer just landed at once —
                 // show it from the top, question first.
                 pinQuestionToTop(questionIdx);
-                if (data.ungrounded) trackAskNoCitations();
             } else {
-                setMessages(prev => [...prev, {
+                const errAnswer: ChatMessage = {
                     role: 'assistant',
                     content: data.error || 'Something went wrong reaching Machina. Please try again.',
                     error: true,
-                }]);
+                };
                 // Record what failed (status + sanitized backend message) so
                 // production ask failures leave a trail in client_errors.
                 reportError(new Error(`ask failed (HTTP ${res.status}): ${data.error || 'unknown'}`), 'ask-send');
+                if (isStale()) { commitDetached([...withUser, errAnswer]); return; }
+                setMessages(prev => [...prev, errAnswer]);
             }
         } catch (e) {
-            // A deliberate abort (New/switch/re-send) is not a user-facing error.
-            if (isStale()) return;
-            setMessages(prev => [...prev, {
+            // A deliberate abort (Stop / a newer send) is not a user-facing error.
+            if (isCancelled()) return;
+            reportError(e, 'ask-send-network');
+            const errAnswer: ChatMessage = {
                 role: 'assistant',
                 content: 'Couldn’t reach Machina. Check your connection and try again.',
                 error: true,
-            }]);
-            reportError(e, 'ask-send-network');
+            };
+            if (isStale()) {
+                // Backgrounded: keep any partial answer, then the error, in the doc.
+                const partial: ChatMessage[] = accContent
+                    ? [{ role: 'assistant', content: accContent, sources: accSources }]
+                    : [];
+                commitDetached([...withUser, ...partial, errAnswer]);
+                return;
+            }
+            setMessages(prev => [...prev, errAnswer]);
         } finally {
             // Only the current generation owns these — a superseded run must not
             // clear the newer stream's thinking state or abort controller.
