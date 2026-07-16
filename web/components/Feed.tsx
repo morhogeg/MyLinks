@@ -202,7 +202,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
-    const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+    const [searchOpen, setSearchOpen] = useState(false);
     const [isSortOpen, setIsSortOpen] = useState(false);
     // Mobile: the search bar is collapsed to an icon; tapping it expands a large
     // search field in place, so the card grid gets the vertical space back.
@@ -1240,29 +1240,31 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             title={digestDetailTitle}
                         />
                     </div>
-                ) : (
-                    // Desktop keeps the full search bar; on mobile it collapses to a
-                    // search icon in the toolbar row below (expandable in place).
-                    <div data-tour="search" className="relative hidden sm:block">
+                ) : searchOpen ? (
+                    // Desktop: like iOS, search is an icon in the toolbar that expands
+                    // this input on demand — so the resting layout reclaims the line the
+                    // always-on search bar used to occupy. Esc or the × collapses it.
+                    <div data-tour="search" className="relative hidden sm:block animate-in fade-in slide-in-from-top-1 duration-200">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                         <input
                             type="text"
+                            autoFocus
                             dir="auto"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Escape') { if (searchQuery) setSearchQuery(''); else setSearchOpen(false); } }}
                             placeholder="Search Machina…"
                             className="w-full pl-9 pr-10 py-2 bg-card rounded-xl text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent/30 transition-all"
                         />
-                        {searchQuery && (
-                            <button
-                                onClick={() => setSearchQuery('')}
-                                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-fill-strong rounded-full transition-all"
-                            >
-                                <X className="w-4 h-4 text-text-muted" />
-                            </button>
-                        )}
+                        <button
+                            onClick={() => { setSearchQuery(''); setSearchOpen(false); }}
+                            aria-label="Close search"
+                            className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-fill-strong rounded-full transition-all"
+                        >
+                            <X className="w-4 h-4 text-text-muted" />
+                        </button>
                     </div>
-                )}
+                ) : null}
 
 
                 {/* Mobile Row 1 — the ANCHOR: an always-live search field (tap, type,
@@ -1306,7 +1308,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 </button>
                             </div>
                         </div>
-                    ) : mobileSearchOpen ? (
+                    ) : searchOpen ? (
                         <div className="flex sm:hidden items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
                             <div className="relative flex-1 min-w-0">
                                 <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
@@ -1317,7 +1319,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     dir="auto"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    onKeyDown={(e) => { if (e.key === 'Escape') setMobileSearchOpen(false); }}
+                                    onKeyDown={(e) => { if (e.key === 'Escape') setSearchOpen(false); }}
                                     placeholder="Search Machina…"
                                     className="w-full h-10 ps-9 pe-9 bg-card border border-border-subtle rounded-full text-[15px] text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-transparent transition-shadow"
                                 />
@@ -1332,7 +1334,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 )}
                             </div>
                             <button
-                                onClick={() => setMobileSearchOpen(false)}
+                                onClick={() => setSearchOpen(false)}
                                 className="shrink-0 text-[13px] font-semibold text-accent px-1.5 py-2"
                             >
                                 Done
@@ -1344,7 +1346,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             Accent-filled while a query is active. */}
                         <button
                             data-tour="search"
-                            onClick={() => setMobileSearchOpen(true)}
+                            onClick={() => setSearchOpen(true)}
                             aria-label="Search"
                             className={`h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-full border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${searchQuery
                                 ? 'bg-accent text-white border-accent shadow-sm'
@@ -1427,6 +1429,20 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         Filters sheet. Hidden entirely in Ask mode (no grid to filter). */}
                     <div className="hidden sm:flex items-center gap-2">
                         {isLibraryView && (<>
+                        {/* Search — an icon that expands the input above (iOS-style), so
+                            the resting toolbar keeps the reclaimed line. Accent while a
+                            query is active so it reads as "on" even when collapsed. */}
+                        <button
+                            data-tour="search"
+                            onClick={() => setSearchOpen(o => !o)}
+                            aria-label="Search"
+                            title="Search"
+                            className={`${ctrlBase} w-9 px-0 border ${searchQuery
+                                ? 'bg-accent text-white border-accent shadow-sm'
+                                : ctrlIdle}`}
+                        >
+                            <Search className="w-4 h-4" />
+                        </button>
                         {/* ONE consolidated Filter button (mirrors the iOS drawer): opens
                             the responsive filters modal holding Show (status), Categories,
                             and Sources — replacing the old inline Status dropdown + Sources

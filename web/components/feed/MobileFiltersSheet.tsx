@@ -77,7 +77,7 @@ export default function MobileFiltersSheet({
             />
             <div
                 ref={sheetRef}
-                className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300 sm:rounded-3xl sm:border sm:max-w-lg sm:w-full sm:max-h-[80vh] sm:pb-6"
+                className="relative bg-background rounded-t-3xl border-t border-border-subtle shadow-2xl px-5 pt-3 pb-8 max-h-[85vh] overflow-y-auto overscroll-contain scrollbar-soft animate-in slide-in-from-bottom duration-300 sm:rounded-3xl sm:border sm:max-w-lg sm:w-full sm:max-h-[80vh] sm:pb-6"
             >
                 <div {...handleProps}>
                 <div className="sm:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-text-muted/30" />
