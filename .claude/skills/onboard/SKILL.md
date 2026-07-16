@@ -1,6 +1,6 @@
 ---
 name: onboard
-description: Prime a fresh session on Machina AI (repo MyLinks) before doing work. Reads SOURCE_OF_TRUTH.md and the other core docs, builds a mental model of the product/architecture/backlog/current state, then returns a concise (≤3-sentence) verdict on the user's idea ending in Yes / No / "Yes, but <refinements>" and WAITS for approval before implementing and shipping. Use at the START of a new session, or when the user says onboard, prime, "get up to speed", "review the docs", "understand the project", "read the source of truth", or opens with a feature/bug request and no prior context.
+description: Prime a fresh session on Machina AI (repo MyLinks) before doing work. Silently reads SOURCE_OF_TRUTH.md and the other core docs so the AI understands the product/architecture/backlog/current state (no narration back to the user), then returns a 1-2 sentence verdict on the user's idea ending in Yes / No / "Yes, but <refinements>" and WAITS for approval before implementing and shipping. Use at the START of a new session, or when the user says onboard, prime, "get up to speed", "review the docs", "understand the project", "read the source of truth", or opens with a feature/bug request and no prior context.
 ---
 
 # Onboard on Machina AI
@@ -15,6 +15,11 @@ Everything else is reference. Do NOT create new HANDOFF/TASKS/spec/audit docs �
 the old ones were consolidated into `SOURCE_OF_TRUTH.md` and deleted.
 
 ## Steps
+
+**Reading is internal — don't narrate it.** Steps 1–2 are for *you* to understand
+the codebase; produce no running commentary, no "here's what Machina is" tour, no
+summary of the docs. The only thing the user sees before you build is the short
+step-3 verdict.
 
 1. **Read the core docs, in this order** (they are the map):
    - `CLAUDE.md` — the rules (source of truth, ship path, verify commands, theme
@@ -42,24 +47,18 @@ the old ones were consolidated into `SOURCE_OF_TRUTH.md` and deleted.
    `functions/`, browser `extension/`. Don't deep-read code yet — locate the area
    the request touches.
 
-3. **Give your verdict on the idea, then STOP for approval.** This is a hard gate
-   — do not write any code until the user approves. After reading the docs, react
-   to the request itself with genuine judgment (informed by §4 backlog priorities,
-   §3 auth state, and the architecture) — not a summary of what you'll do.
-   - **≤ 3 sentences.** Concise enough that the user can usually just reply `go`.
-   - Lead with the substance: does this fit the product/architecture, does it
-     conflict with in-flight work, is there a simpler or safer path, is anything
-     risky.
-   - **Always end with an explicit verdict line**, one of:
-     - **`Yes`** — sound as-is, ready to build.
-     - **`No`** — and the one reason why (conflicts with X, breaks Y, better handled by Z).
-     - **`Yes, but` <x, y, z>** — approve with specific refinements you'd fold in.
-   - Then **wait.** Only proceed once the user approves (`go`, "yes", "do it", or
-     approves your refinements). If they approve the `Yes, but`, build the refined
-     version. Don't ask a second round of questions unless they push back.
+3. **Give a one-line verdict, then STOP for approval.** Hard gate — no code until
+   the user approves. **1–2 sentences MAX**, ending in an explicit verdict:
+   - **`Yes`** — sound as-is; or
+   - **`No`** — plus the one reason; or
+   - **`Yes, but` <x, y, z>** — approve with specific refinements.
 
-   Keep it tight — the point is a real opinion the user can green-light in one
-   word, not a back-and-forth. Skip the product tour; they know their own app.
+   Say something only if it's worth the user's tokens. When the idea plainly fits
+   and there's nothing to flag, a bare **`Yes.`** (or one short clause + `Yes`) is
+   the ideal output — not a paragraph. Skip the product tour, skip restating the
+   request, skip listing your plan. Then **wait**; proceed on `go` / "yes" / "do
+   it" (build the refined version if they approve a `Yes, but`). Don't open a
+   second round of questions unless they push back.
 
 4. **Do the request** (only after step-3 approval). Implement on the current
    `claude/*` branch. While working,
