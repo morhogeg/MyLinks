@@ -30,11 +30,13 @@ export function useSemanticSearch(searchQuery: string, uid?: string | null) {
     const [searchError, setSearchError] = useState<string | null>(null);
     const [debouncedQuery, setDebouncedQuery] = useState('');
 
-    // Debounce search query
+    // Debounce the SERVER call only — local keyword ranking reacts to every
+    // keystroke undebounced (see useFeedFilters), so this delay is invisible
+    // except as "the meaning results settle in a beat later".
     useEffect(() => {
         const timer = setTimeout(() => {
             setDebouncedQuery(searchQuery);
-        }, 500);
+        }, 350);
         return () => clearTimeout(timer);
     }, [searchQuery]);
 

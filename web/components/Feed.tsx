@@ -106,6 +106,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const [searchQuery, setSearchQuery] = useState('');
     // Debounced, generation-guarded semantic search (R-3: useSemanticSearch).
     const { debouncedQuery, isSearching, searchResults, searchError } = useSemanticSearch(searchQuery, uid);
+    // True while the server half of the search hasn't answered for what's typed
+    // — either the request is in flight or the debounce hasn't fired yet. Drives
+    // the "Searching by meaning…" hints so a just-typed query never flashes a
+    // premature "No matches".
+    const awaitingServer = isSearching || (!!searchQuery.trim() && searchQuery !== debouncedQuery);
     // Selection state + filter/sort pipeline + facet counts (R-3: useFeedFilters).
     const {
         filter, setFilter,
@@ -126,7 +131,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         handleToggleSourceKeys,
         matchingSources,
         reminderCount,
-    } = useFeedFilters(visibleLinks, debouncedQuery, searchResults, privateCollectionIds);
+    // LIVE query in, so keyword ranking is instant; only the server call debounces.
+    } = useFeedFilters(visibleLinks, searchQuery, searchResults, privateCollectionIds);
     // Card action handlers that depend only on [uid, toast] (R-3: useLinkActions).
     const {
         handleStatusChange,
@@ -482,7 +488,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         && selectedCategory.size === 0
         && selectedTags.size === 0
         && selectedSources.size === 0
-        && !debouncedQuery.trim();
+        && !searchQuery.trim();
 
     const pendingCards = useMemo(
         () => isDefaultLibraryView
@@ -1892,7 +1898,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     {/* Search typeahead — split the live results into a "Sources" row
                         (tap a publisher to jump straight to its cards) above the
                         "Cards" grid below, so searching "ynet" offers both. */}
-                    {(viewMode === 'grid' || viewMode === 'list') && debouncedQuery.trim() && matchingSources.length > 0 && (
+                    {(viewMode === 'grid' || viewMode === 'list') && searchQuery.trim() && matchingSources.length > 0 && (
                         <div className="mb-5 animate-in fade-in slide-in-from-top-1 duration-200">
                             <div className="flex items-center gap-2 mb-2.5">
                                 <Globe className="w-3.5 h-3.5 text-accent/70" />
@@ -1935,10 +1941,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         half is still in flight — or if it failed — show a subtle
                         line above the grid instead of blocking the results. The
                         empty state owns the no-results case (spinner there). */}
-                    {(viewMode === 'grid' || viewMode === 'list') && debouncedQuery.trim()
-                        && filteredLinks.length > 0 && (isSearching || searchError) && (
+                    {(viewMode === 'grid' || viewMode === 'list') && searchQuery.trim()
+                        && filteredLinks.length > 0 && (awaitingServer || searchError) && (
                         <div className="flex items-center gap-2 mb-4 text-xs" aria-live="polite">
-                            {isSearching ? (
+                            {awaitingServer ? (
                                 <>
                                     <div className="w-3.5 h-3.5 border-2 border-accent/20 border-t-accent rounded-full animate-spin shrink-0" />
                                     <span className="text-text-muted font-medium">Searching by meaning…</span>
@@ -2006,7 +2012,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             const empty = searchQuery
                                 ? {
                                     Icon: Search, title: 'No matches',
-                                    body: isSearching ? null
+                                    body: awaitingServer ? null
                                         : searchError ? 'No keyword matches, and meaning search is unavailable right now.'
                                         : 'Try different words — search reads titles, summaries, and meaning.',
                                 }
@@ -2056,7 +2062,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 <empty.Icon className="w-7 h-7 text-accent" strokeWidth={1.75} />
                             </div>
                             <h3 className="text-base font-bold text-text">{empty.title}</h3>
-                            {debouncedQuery && isSearching && (
+                            {searchQuery && awaitingServer && (
                                 <div className="flex items-center justify-center gap-2 text-accent mt-2">
                                     <div className="w-4 h-4 border-2 border-accent/20 border-t-accent rounded-full animate-spin" />
                                     <span className="text-sm font-medium">Searching by meaning…</span>

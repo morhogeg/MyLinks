@@ -243,3 +243,126 @@ def test_rerank_recency_breaks_ties():
     out = rerank_candidates("zzz", cands, top_k=2)
     # 'old' is nearer by vector (rank 0) so it still leads; recency doesn't flip it.
     assert out[0]["id"] == "old"
+
+
+# ── apply_distance_threshold: the vector-quality gate ───────────────────────
+
+import search as search_mod
+from search import apply_distance_threshold, normalize_card_for_search, perform_hybrid_search
+
+
+def _vres(id, dist):
+    return {"id": id, "title": id, "vector_distance": dist}
+
+
+def test_threshold_keeps_the_close_cluster_drops_the_tail():
+    results = [_vres("a", 0.30), _vres("b", 0.42), _vres("c", 0.60)]
+    kept = [r["id"] for r in apply_distance_threshold(results, ceiling=0.68, margin=0.22)]
+    # cutoff = min(0.30 + 0.22, 0.68) = 0.52 → c (0.60) is padding, not a match
+    assert kept == ["a", "b"]
+
+
+def test_threshold_empties_when_even_the_best_is_unrelated():
+    # Nothing in the library relates: best distance is beyond the ceiling, so an
+    # honest empty beats 20 nearest-neighbour placeholders.
+    results = [_vres("a", 0.71), _vres("b", 0.75)]
+    assert apply_distance_threshold(results, ceiling=0.68, margin=0.22) == []
+
+
+def test_threshold_keeps_results_without_distances():
+    # Fail open when the field is missing/malformed — order already ranks them.
+    results = [{"id": "a"}, {"id": "b", "vector_distance": "oops"}]
+    assert len(apply_distance_threshold(results)) == 2
+
+
+def test_threshold_mixed_missing_distance_is_kept():
+    results = [_vres("a", 0.30), {"id": "no-dist"}, _vres("c", 0.70)]
+    kept = [r["id"] for r in apply_distance_threshold(results, ceiling=0.68, margin=0.22)]
+    assert kept == ["a", "no-dist"]
+
+
+def test_threshold_empty_input():
+    assert apply_distance_threshold([]) == []
+
+
+# ── normalize_card_for_search ───────────────────────────────────────────────
+
+class _FakeTs:
+    def timestamp(self):
+        return 1_700_000_000.0
+
+
+def test_normalize_converts_timestamp_strips_vector_stamps_id():
+    out = normalize_card_for_search(
+        {"title": "T", "createdAt": _FakeTs(), "embedding_vector": [0.1] * 3},
+        "doc1",
+    )
+    assert out["id"] == "doc1"
+    assert out["createdAt"] == 1_700_000_000_000  # unix ms — rerank-safe
+    assert "embedding_vector" not in out
+
+
+def test_normalize_leaves_numeric_created_at_alone():
+    out = normalize_card_for_search({"createdAt": 123}, "d")
+    assert out["createdAt"] == 123
+
+
+# ── perform_hybrid_search: fusion + degradation (halves stubbed) ────────────
+
+def test_hybrid_merges_vector_and_keyword_deduped(monkeypatch):
+    monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
+        _vres("v1", 0.30), _vres("v2", 0.35),
+    ])
+    captured = {}
+
+    def fake_scan(uid, q, exclude_ids=None, limit=10):
+        captured["exclude"] = exclude_ids
+        return [{"id": "k1", "title": "improve sleep", "createdAt": 5}]
+
+    monkeypatch.setattr(search_mod, "keyword_scan_cards", fake_scan)
+    out = perform_hybrid_search("u", "improve sleep", limit=10)
+    ids = [c["id"] for c in out]
+    # Vector ids are excluded from the scan; the keyword hit joins the ranking
+    # (and its literal title match lifts it), and no distances leak out.
+    assert captured["exclude"] == {"v1", "v2"}
+    assert set(ids) == {"v1", "v2", "k1"}
+    assert all("vector_distance" not in c for c in out)
+
+
+def test_hybrid_degrades_to_keyword_only_on_vector_failure(monkeypatch):
+    def boom(uid, q, limit):
+        raise Exception("VECTOR_SEARCH_ERROR: index rebuilding")
+    monkeypatch.setattr(search_mod, "perform_search_logic", boom)
+    monkeypatch.setattr(search_mod, "keyword_scan_cards",
+                        lambda uid, q, exclude_ids=None, limit=10: [
+                            {"id": "k1", "title": "muffins", "createdAt": 5}])
+    out = perform_hybrid_search("u", "muffins", limit=10)
+    assert [c["id"] for c in out] == ["k1"]  # search bar never blanks
+
+
+def test_hybrid_propagates_config_error(monkeypatch):
+    import pytest as _pytest
+
+    def boom(uid, q, limit):
+        raise Exception("SEMANTIC_SEARCH_NOT_CONFIGURED: no key")
+    monkeypatch.setattr(search_mod, "perform_search_logic", boom)
+    with _pytest.raises(Exception, match="SEMANTIC_SEARCH_NOT_CONFIGURED"):
+        perform_hybrid_search("u", "q", limit=10)
+
+
+def test_hybrid_thresholds_before_keyword_exclusion(monkeypatch):
+    # A far (junk) vector hit is dropped by the gate, so the keyword scan may
+    # re-find it as a REAL literal match rather than it surviving as noise.
+    monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
+        _vres("close", 0.30), _vres("far", 0.70),
+    ])
+    captured = {}
+
+    def fake_scan(uid, q, exclude_ids=None, limit=10):
+        captured["exclude"] = exclude_ids
+        return []
+
+    monkeypatch.setattr(search_mod, "keyword_scan_cards", fake_scan)
+    out = perform_hybrid_search("u", "q", limit=10)
+    assert captured["exclude"] == {"close"}
+    assert [c["id"] for c in out] == ["close"]
