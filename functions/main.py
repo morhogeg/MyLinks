@@ -57,9 +57,9 @@ from graph_service import GraphService
 # scrape — like the hot image-analysis path in analyze_image — so their cold
 # starts stay lighter.
 from search import (
-    sync_link_embedding, search_links, perform_search_logic,
+    sync_link_embedding, search_links, perform_search_logic, perform_hybrid_search,
     build_embedding_text, rerank_candidates, keyword_query_tokens,
-    keyword_match_score, EmbeddingService, EMBED_TEXT_VERSION,
+    keyword_match_score, keyword_scan_cards, EmbeddingService, EMBED_TEXT_VERSION,
 )
 from rate_limit import check_rate_limit, client_ip
 # Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
@@ -1089,56 +1089,6 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         return _server_error(headers, e)
 
 
-# How many recent cards the lexical fallback scans. The old scan was an
-# UNORDERED links_ref.limit(300) — for a library over 300 cards it was a coin
-# flip whether the right card was even looked at (Firestore returns docs in an
-# arbitrary order without order_by). We now scan the most-recent 1000 by
-# createdAt, so the scan is deterministic and recency-biased (the cards a user
-# is most likely asking about). Tradeoff: cards older than the newest 1000 are
-# not reachable by the LEXICAL path — but they remain reachable via the semantic
-# top-30 vector search, so nothing is fully invisible, and we keep the per-ask
-# read cost bounded instead of scanning an unbounded collection on every ask.
-_KEYWORD_SCAN_CAP = 1000
-
-
-def _keyword_fallback_cards(uid: str, question: str, exclude_ids: set, limit: int = 5) -> list:
-    """Lexical retrieval to back up vector search.
-
-    Vector search can miss a card whose text literally contains the query's
-    keywords (ranking, or a card with no embedding yet). This scans the user's
-    most-recent links for the question's keywords across title/summary/tags/
-    source/category and returns the best matches not already retrieved — so an
-    obvious title hit like "fact check" is never dropped.
-
-    Deterministic scan: ordered by createdAt desc and capped, so the same
-    question always sees the same candidate set (the old unordered scan could
-    skip the right card entirely on a large library).
-    """
-    tokens = keyword_query_tokens(question)
-    if not tokens:
-        return []
-
-    db = get_db()
-    links_ref = db.collection("users").document(uid).collection("links")
-    query = links_ref.order_by(
-        "createdAt", direction=gc_firestore.Query.DESCENDING
-    ).limit(_KEYWORD_SCAN_CAP)
-
-    scored = []
-    for doc in query.stream():
-        if doc.id in exclude_ids:
-            continue
-        data = doc.to_dict() or {}
-        score = keyword_match_score(data, tokens)
-        if score > 0:
-            data.pop("embedding_vector", None)
-            data["id"] = doc.id
-            scored.append((score, data))
-
-    scored.sort(key=lambda s: s[0], reverse=True)
-    return [d for _, d in scored[:limit]]
-
-
 @https_fn.on_request(max_instances=10, timeout_sec=120)
 def ask_brain(req: https_fn.Request) -> https_fn.Response:
     """HTTP endpoint: conversational RAG over the user's saved links.
@@ -1225,10 +1175,11 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         # 1b. Hybrid retrieval: add lexical keyword matches vector search may
         #     have missed (e.g. a word literally in a card's title, or a card
         #     with no embedding yet). Merge, keeping reranked vector results
-        #     first, then keyword hits, deduped.
+        #     first, then keyword hits, deduped. Shared scan lives in search.py
+        #     (same one the search bar's hybrid path uses).
         try:
             have = {c.get("id") for c in cards}
-            cards = cards + _keyword_fallback_cards(uid, question, have, limit=5)
+            cards = cards + keyword_scan_cards(uid, question, exclude_ids=have, limit=5)
         except Exception as e:
             logger.error(f"ask_brain keyword fallback failed: {e}")
 
@@ -1421,7 +1372,7 @@ def search_links_http(req: https_fn.Request) -> https_fn.Response:
             limit = 10
         limit = max(1, min(limit, 50))
 
-        links = perform_search_logic(uid, query_text, limit)
+        links = perform_hybrid_search(uid, query_text, limit)
         return https_fn.Response(
             json.dumps({"links": links}),
             status=200, headers=headers, mimetype='application/json',

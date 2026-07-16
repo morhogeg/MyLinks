@@ -65,8 +65,8 @@ def test_options_returns_cors_preflight_204():
 
 def test_missing_auth_and_uid_is_rejected(monkeypatch):
     # No Authorization header and no client uid → cannot resolve a workspace.
-    # Guard: perform_search_logic must never be reached (it would raise, not 401).
-    monkeypatch.setattr(main, "perform_search_logic",
+    # Guard: the hybrid search must never be reached (it would raise, not 401).
+    monkeypatch.setattr(main, "perform_hybrid_search",
                         lambda *a, **k: pytest.fail("search ran without auth"))
     resp = main.search_links_http(_Req(json_body={"query": "dogs"}))
     assert resp.status == 401
@@ -77,14 +77,14 @@ def test_empty_query_is_rejected():
     assert resp.status == 400
 
 
-def test_happy_path_runs_perform_search_logic(monkeypatch):
+def test_happy_path_runs_hybrid_search(monkeypatch):
     captured = {}
 
     def fake_search(uid, query_text, limit):
         captured["args"] = (uid, query_text, limit)
         return [{"id": "a", "title": "Dogs 101"}, {"id": "b", "title": "Puppies"}]
 
-    monkeypatch.setattr(main, "perform_search_logic", fake_search)
+    monkeypatch.setattr(main, "perform_hybrid_search", fake_search)
 
     resp = main.search_links_http(
         _Req(json_body={"query": "dogs", "uid": "user1", "limit": 5})
@@ -92,7 +92,7 @@ def test_happy_path_runs_perform_search_logic(monkeypatch):
 
     assert resp.status == 200
     # Identity comes from the client uid (soft mode), and the twin reuses the
-    # exact same core the callable does, so behavior is identical.
+    # exact same hybrid core the callable does, so behavior is identical.
     assert captured["args"] == ("user1", "dogs", 5)
     payload = json.loads(resp.body)
     assert [c["id"] for c in payload["links"]] == ["a", "b"]

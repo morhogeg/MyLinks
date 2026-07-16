@@ -848,6 +848,12 @@ Return ONLY a JSON object matching the schema (title, narrative, themes[title,in
     def embed_text(self, text: str) -> Optional[List[float]]:
         """Generate a vector embedding for text using Gemini.
 
+        Always embeds as RETRIEVAL_DOCUMENT: every caller embeds CARD content
+        (the analyze pipelines writing `embedding_vector`, graph_service
+        comparing cards to stored card vectors), so all stored vectors live in
+        one space and search queries pair with them via RETRIEVAL_QUERY — see
+        search.EmbeddingService.generate_embedding / EMBED_TEXT_VERSION v5.
+
         Returns `None` on failure (no client, or the API errored) rather than a
         zero-ish sentinel. Callers MUST treat `None` as "no embedding": omit the
         `embedding_vector` field and set `needsEmbedding=True` so a backfill can
@@ -866,7 +872,8 @@ Return ONLY a JSON object matching the schema (title, narrative, themes[title,in
                 result = self.client.models.embed_content(
                     model=EMBEDDING_MODEL,
                     contents=text[:9000],
-                    config={"output_dimensionality": EMBEDDING_DIMENSIONS}
+                    config={"output_dimensionality": EMBEDDING_DIMENSIONS,
+                            "task_type": "RETRIEVAL_DOCUMENT"}
                 )
                 return result.embeddings[0].values
             except Exception as e:

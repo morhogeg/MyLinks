@@ -626,7 +626,50 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-16 (latest) — SHIPPED (web live; backend fix ⛔ awaits owner
+- **2026-07-16 (latest) — SHIPPED: Search revamp — scored instant keyword
+  ranking + quality-gated server hybrid, fused (branch
+  `claude/ask-messaging-server-error-5n1lxt`).** Owner: "search is simply
+  bad — complete revamp." Root causes found in code: (1) find_nearest's
+  top-20 were trusted blindly — the computed `vector_distance` was NEVER
+  used, so 20 nearest-neighbour cards surfaced for ANY query (junk included)
+  and ALL of them ranked above every keyword hit; (2) keyword matching was a
+  binary filter then date sort — an exact title match had no rank advantage;
+  (3) even local keyword matches waited for the 500ms debounce; (4) keyword
+  search only saw the loaded 150-card feed window — older cards were
+  findable only if the (noisy) vector top-20 caught them; (5) embeddings
+  didn't use gemini-embedding-001's retrieval task types. **Backend
+  (`search.py`):** NEW `apply_distance_threshold` (relative best+0.22 +
+  absolute 0.68 ceiling, env-tunable `SEARCH_DISTANCE_CEILING`/`_MARGIN` —
+  honest empty beats neighbour padding); NEW `keyword_scan_cards` (shared
+  newest-1000 lexical scan — ask_brain's fallback now reuses it, old
+  `_keyword_fallback_cards` deleted); NEW `perform_hybrid_search` = deep
+  vector (30) → threshold → keyword scan (excl. dupes) → `rerank_candidates`
+  → limit, degrading to keyword-only on transient vector failure; BOTH
+  search surfaces (callable `search_links` + native twin `search_links_http`)
+  now serve it. Embeddings: docs embed as RETRIEVAL_DOCUMENT (both services
+  — `search.EmbeddingService` and `ai_service.embed_text`), queries as
+  RETRIEVAL_QUERY; `EMBED_TEXT_VERSION` 4→5 rolls the re-embed via backfill.
+  **Client:** NEW `web/lib/searchRank.ts` — normalized (niqqud stripped,
+  Hebrew final letters folded), Unicode-tokenized, field-weighted scoring
+  (title 5 > tags 3.5 > source/category 3 > concepts 2.5 > summary/notes 2 >
+  detailed 1, word-start bonus, exact-title-phrase bonus +8, English plural +
+  Hebrew prefix-particle tolerance, AND semantics kept), cached per card via
+  WeakMap; `useFeedFilters` now takes the LIVE query — keyword results are
+  instant per keystroke, only the server call debounces (500→350ms) — and
+  orders results by **reciprocal-rank fusion** (K=8) of the local scored rank
+  and the server hybrid rank (a card both halves agree on rises top; an
+  explicit non-default sort still wins); old binary matcher deleted from
+  `feedUtils`. Feed hints: new `awaitingServer` drives "Searching by
+  meaning…" so a fresh query never flashes "No matches" pre-debounce.
+  Tests 237→248 (+13 tsx behavioral checks on searchRank, incl. Hebrew);
+  `tsc`/eslint clean. **⛔ OWNER (backend half is dark until):**
+  (1) `./deploy-functions.sh functions:search_links,functions:search_links_http,functions:ask_brain,functions:sync_link_embedding,functions:backfill_embeddings,functions:analyze_link,functions:analyze_image,functions:process_link_background,functions:share_ingest,functions:rebuild_connections,functions:backfill_related_links`
+  (2) then re-run the embedding backfill ONCE (v5 task-typed vectors):
+  `curl -X POST ".../backfill_embeddings" -H "X-Admin-Token: $ADMIN_TOKEN"`.
+  Until (2), queries (RETRIEVAL_QUERY) run against untyped v4 vectors —
+  search works (same space, thresholds hold) but ranking is best after the
+  re-embed. Web half (instant scored ranking + fusion) is live on Vercel now.
+- **2026-07-16 — SHIPPED (web live; backend fix ⛔ awaits owner
   deploy): Ask "Internal server error" fixed + production error visibility
   (merge `07d9042`, commit `290ae66`, branch
   `claude/ask-messaging-server-error-5n1lxt`).** Vercel deployed the client
