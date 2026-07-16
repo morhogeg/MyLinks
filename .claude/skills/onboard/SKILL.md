@@ -1,6 +1,6 @@
 ---
 name: onboard
-description: Prime a fresh session on Machina AI (repo MyLinks) before doing work. Silently reads SOURCE_OF_TRUTH.md and the other core docs so the AI understands the product/architecture/backlog/current state (no narration back to the user), then returns a 1-2 sentence verdict on the user's idea ending in Yes / No / "Yes, but <refinements>" and WAITS for approval before implementing and shipping. Use at the START of a new session, or when the user says onboard, prime, "get up to speed", "review the docs", "understand the project", "read the source of truth", or opens with a feature/bug request and no prior context.
+description: Prime a fresh session on Machina AI (repo MyLinks) before doing work. Silently reads SOURCE_OF_TRUTH.md and the other core docs so the AI understands the product/architecture/backlog/current state (no doc summary narrated back to the user), then returns its genuine feedback/opinion on the user's idea — up to ~5 sentences as warranted — ending in Yes / No / "Yes, but <refinements>" and WAITS for approval before implementing and shipping. Use at the START of a new session, or when the user says onboard, prime, "get up to speed", "review the docs", "understand the project", "read the source of truth", or opens with a feature/bug request and no prior context.
 ---
 
 # Onboard on Machina AI
@@ -18,8 +18,8 @@ the old ones were consolidated into `SOURCE_OF_TRUTH.md` and deleted.
 
 **Reading is internal — don't narrate it.** Steps 1–2 are for *you* to understand
 the codebase; produce no running commentary, no "here's what Machina is" tour, no
-summary of the docs. The only thing the user sees before you build is the short
-step-3 verdict.
+summary of the docs. The only thing the user sees before you build is the step-3
+feedback — that's where the value goes, not in a recap of what you read.
 
 1. **Read the core docs, in this order** (they are the map):
    - `CLAUDE.md` — the rules (source of truth, ship path, verify commands, theme
@@ -47,18 +47,23 @@ step-3 verdict.
    `functions/`, browser `extension/`. Don't deep-read code yet — locate the area
    the request touches.
 
-3. **Give a one-line verdict, then STOP for approval.** Hard gate — no code until
-   the user approves. **1–2 sentences MAX**, ending in an explicit verdict:
+3. **Give your feedback on the idea, then STOP for approval.** Hard gate — no code
+   until the user approves. This is the part the user wants: genuine feedback,
+   advice, and an opinion — informed by §4 backlog priorities, §3 auth state, and
+   the architecture. **Up to ~5 sentences, only as many as the idea warrants** —
+   flag conflicts with in-flight work, a simpler or safer path, risks, or
+   architectural fit. Don't pad to fill space, but don't suppress a real opinion
+   either; a trivial idea may need one line, a consequential one may need five.
+
+   End with an explicit verdict:
    - **`Yes`** — sound as-is; or
-   - **`No`** — plus the one reason; or
+   - **`No`** — plus the reason; or
    - **`Yes, but` <x, y, z>** — approve with specific refinements.
 
-   Say something only if it's worth the user's tokens. When the idea plainly fits
-   and there's nothing to flag, a bare **`Yes.`** (or one short clause + `Yes`) is
-   the ideal output — not a paragraph. Skip the product tour, skip restating the
-   request, skip listing your plan. Then **wait**; proceed on `go` / "yes" / "do
-   it" (build the refined version if they approve a `Yes, but`). Don't open a
-   second round of questions unless they push back.
+   Skip restating the request and listing your plan step-by-step — the value is
+   the judgment, not a recap. Then **wait**; proceed on `go` / "yes" / "do it"
+   (build the refined version if they approve a `Yes, but`). Don't open a second
+   round of questions unless they push back.
 
 4. **Do the request** (only after step-3 approval). Implement on the current
    `claude/*` branch. While working,
