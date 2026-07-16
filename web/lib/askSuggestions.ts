@@ -388,13 +388,36 @@ function angleChips(angle: ContentAngle, ev: Evidence, t: string): FollowUpChip[
 // the front once the conversation has a couple of exchanges behind it.
 const DEEPENING_RE = /common thread|compare|what else|why does this matter|more detail/i;
 
+// NO-REPEAT RULE: a chip the user has used must never be offered again in the
+// same conversation — even when the regenerated question isn't byte-identical.
+// Anchored questions embed cited-card TITLES, and the anchor comes from the
+// latest answer's citations; citation order routinely flips between turns, so
+// `Common thread between "A" and "B"` comes back as `…"B" and "A"` and exact-
+// string dedup misses it (the chip visibly repeats). Identity is therefore the
+// chip's template FAMILY: the question with its quoted titles removed. Two
+// chips that differ only in which card they're anchored to (or the order of
+// two titles) share a family — same visible label, so re-offering it reads as
+// a repeat regardless of anchor.
+function chipFamily(text: string): string {
+    return text
+        .toLowerCase()
+        .replace(/["“”«»].*?["“”«»]/g, ' ')  // drop quoted titles (any quote style)
+        .replace(/[^\p{L}\p{N}\s]/gu, ' ')   // punctuation-insensitive
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 // Always-answerable top-ups (pure restatements of stored content, anchored to
-// the cited title) used only when the gated angle set comes up short.
+// the cited title) used only when the gated angle set comes up short. Deep in
+// a conversation most families are already consumed, so this pool carries a
+// few extra restatement angles to keep fresh chips flowing.
 function safeFallbacks(t: string): FollowUpChip[] {
     return [
         { label: 'Give me the key points', question: `Give me the key points of "${t}"` },
         { label: 'Explain it more simply', question: `Explain "${t}" more simply` },
         { label: 'Why does this matter?', question: `Why does "${t}" matter?` },
+        { label: 'Sum it up in one line', question: `Sum up "${t}" in one line` },
+        { label: 'What should I remember?', question: `What should I remember from "${t}"?` },
     ];
 }
 
@@ -441,16 +464,17 @@ export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
         candidates.push({ label: `What else did I save on ${related}?`, question: `What else did I save on ${related}?` });
     }
 
-    // Dedupe (by label AND sent question, case-insensitive) and drop anything
-    // whose question was already asked/tapped this session.
-    const asked = new Set(askedTexts.map(x => x.trim().toLowerCase()));
+    // Dedupe by template family (NO-REPEAT RULE above) and drop anything whose
+    // family was already asked/tapped this conversation. Families come from the
+    // persisted user messages, so the rule survives reloads and re-anchoring.
+    const asked = new Set(askedTexts.map(chipFamily));
     const seen = new Set<string>();
     let chips = candidates.filter(c => {
-        const lk = c.label.toLowerCase();
-        const qk = c.question.toLowerCase();
-        if (seen.has(lk) || seen.has(qk) || asked.has(qk)) return false;
-        seen.add(lk);
-        seen.add(qk);
+        const qf = chipFamily(c.question);
+        const lf = chipFamily(c.label);
+        if (seen.has(qf) || seen.has(lf) || asked.has(qf) || asked.has(lf)) return false;
+        seen.add(qf);
+        seen.add(lf);
         return true;
     });
 
@@ -459,16 +483,16 @@ export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
         chips = [...chips.filter(c => DEEPENING_RE.test(c.label)), ...chips.filter(c => !DEEPENING_RE.test(c.label))];
     }
 
-    // Top up toward 3 without repeating anything used or already shown.
+    // Top up toward 3 without repeating any family used or already shown.
     if (chips.length < 3) {
         for (const f of safeFallbacks(t)) {
             if (chips.length >= 3) break;
-            const lk = f.label.toLowerCase();
-            const qk = f.question.toLowerCase();
-            if (!seen.has(lk) && !seen.has(qk) && !asked.has(qk)) {
+            const qf = chipFamily(f.question);
+            const lf = chipFamily(f.label);
+            if (!seen.has(qf) && !seen.has(lf) && !asked.has(qf) && !asked.has(lf)) {
                 chips.push(f);
-                seen.add(lk);
-                seen.add(qk);
+                seen.add(qf);
+                seen.add(lf);
             }
         }
     }
