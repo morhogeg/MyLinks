@@ -649,6 +649,25 @@ exact-match, capped.
   chat switch (`convoRef`) so a late create can't attach its id to the wrong
   conversation. Web-only — no backend/functions change; ships via Vercel on
   merge + needs a TestFlight build for native (bundled web assets).
+- **2026-07-16 — Ask follow-up chips: no repeats in a conversation.**
+  Owner repro (iOS): after tapping "What's the common thread?", the same chip
+  was offered again under the next answer. Root cause: dedup in
+  `buildFollowUps` (`web/lib/askSuggestions.ts`) compared EXACT question
+  strings, but anchored questions embed cited-card titles and the citation
+  ORDER flips between turns — `…between "A" and "B"` regenerates as
+  `…between "B" and "A"` and slips past the string match (same for every
+  anchored chip when its anchor title changes). NEW `chipFamily()`: chip
+  identity = the question template with quoted titles stripped (lowercased,
+  punctuation-insensitive), so a used chip never re-appears in the same chat
+  regardless of anchor/order — and since families derive from the persisted
+  user messages, the rule survives chat reloads. `safeFallbacks` grew two more
+  grounded restatement chips ("Sum it up in one line", "What should I
+  remember?") so later turns keep surfacing FRESH chips as earlier families
+  are consumed — the chip row now visibly adapts turn-over-turn and drains
+  gracefully (fewer chips beat repeated ones). Verified: `tsc --noEmit` +
+  offline repro simulating the flipped-citation screenshots across 7 turns
+  (zero repeats). Frontend-only — ships with the next web deploy / TestFlight
+  build. Branch `claude/ask-chip-deduplication-fzw6aj`.
 - **2026-07-16 — PRECISION FIX SHIPPED: search results now cut at
   the per-query distance CLIFF.** Post-hotfix owner repro on iOS (build
   1100): "muffins" correctly ranked the Hebrew muffins card #1 (crash fixed,
