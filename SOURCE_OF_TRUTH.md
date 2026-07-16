@@ -643,8 +643,17 @@ exact-match, capped.
   are consumed — the chip row now visibly adapts turn-over-turn and drains
   gracefully (fewer chips beat repeated ones). Verified: `tsc --noEmit` +
   offline repro simulating the flipped-citation screenshots across 7 turns
-  (zero repeats). Frontend-only — ships with the next web deploy / TestFlight
-  build. Branch `claude/ask-chip-deduplication-fzw6aj`.
+  (zero repeats). **SHIPPED:** merged to `main` (`8309fc7`, commit `91fbb05`)
+  → Vercel auto-deploy; **iOS: TestFlight run #101 → build 1101**, started by
+  merging current `main` into the existing trigger branch
+  `claude/ship-tf-trigger-xw9z9o` (push `2e428b3`) — its committed push
+  trigger carries over the merge, so no workflow-file change is needed (API
+  workflow dispatch remains 403 from cloud sessions). Two ship notes for next
+  time: (1) prefer reusing that existing trigger branch; (2) cloud clones are
+  SHALLOW — run `git fetch --deepen=200` before merging into an older branch
+  or git reports "refusing to merge unrelated histories". Owner cleanup:
+  stale `claude/ship-tf-trigger-*` branches can be deleted, but KEEP
+  `claude/ship-tf-trigger-xw9z9o` for future ships.
 - **2026-07-16 — PRECISION FIX SHIPPED: search results now cut at
   the per-query distance CLIFF.** Post-hotfix owner repro on iOS (build
   1100): "muffins" correctly ranked the Hebrew muffins card #1 (crash fixed,
