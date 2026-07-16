@@ -626,7 +626,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-15 (latest) — SHIPPED: Filter drawer order (merge `c90ec06`,
+- **2026-07-15 (latest) — SHIPPED (desktop web only): Consolidated desktop
+  filter toolbar (merge `a26f5a0`, commit `e68e730`).** Owner review of the
+  DESKTOP toolbar. Removed the full-width horizontal category chip row (it ate
+  a whole line of vertical space) and folded filtering into a single **"Filter"
+  button** — mirroring the iOS drawer — that opens the filters sheet, now made
+  **responsive**: drag-to-dismiss bottom sheet on phones, centered modal on
+  desktop (`MobileFiltersSheet` lost its `sm:hidden`; drag gated to
+  `useIsMobile`). The desktop modal holds Show (status) + Categories + Sources;
+  the old inline Status dropdown and Sources popover are gone; **Sort stays its
+  own control** (ordering ≠ filtering). Tags hide at `lg` inside the sheet
+  (`lg:hidden`) where the desktop Tag Explorer sidebar already owns them.
+  Removed the dead category drag-scroll state (`categoryScrollRef`,
+  `isDragging`, `startX`, `scrollLeft`, `isDraggingRef`) + unused imports
+  (`getCategoryColorStyle`, `SourceFacetList`, `ChevronDown`, `isSourcesOpen`).
+  **NO TestFlight build:** the change is desktop-width only — the iPhone layout
+  already hid the category bar and is unaffected (mobile filter sheet unchanged
+  on phones; the new `sm:`/`lg:` classes don't apply below `sm`). `tsc`/eslint
+  clean; Vercel desktop web deploying on the `main` push.
+- **2026-07-15 — SHIPPED: Filter drawer order (merge `c90ec06`,
   commit `63d219c`, run #99 / build 1099, trigger
   `claude/ship-tf-trigger-filter-order`).** Owner design review of the mobile
   filter drawer. Decisions: (1) **Show (status) now leads the drawer** — it's
