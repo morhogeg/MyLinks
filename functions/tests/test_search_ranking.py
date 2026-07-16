@@ -427,3 +427,59 @@ def test_hybrid_survives_mixed_timestamps_end_to_end(monkeypatch):
                             {"id": "k1", "title": "muffins", "createdAt": "2026-07-01T10:00:00Z"}])
     out = perform_hybrid_search("u", "muffins", limit=10)
     assert {c["id"] for c in out} == {"v1", "k1"}
+
+
+# ── cut_at_distance_cliff: the per-query precision trim ─────────────────────
+
+from search import cut_at_distance_cliff
+
+
+def test_cliff_cuts_after_relevant_cluster():
+    # Two real matches, then a jump into the junk tail (the muffins case).
+    results = [_vres("m1", 0.45), _vres("m2", 0.48),
+               _vres("junk1", 0.62), _vres("junk2", 0.64), _vres("junk3", 0.66)]
+    kept = [r["id"] for r in cut_at_distance_cliff(results)]
+    assert kept == ["m1", "m2"]
+
+
+def test_cliff_first_gap_wins_over_later_bigger_gap():
+    # A later, larger jump inside the tail must not re-include the junk.
+    results = [_vres("a", 0.45), _vres("b", 0.48),
+               _vres("j1", 0.60), _vres("j2", 0.62), _vres("j3", 0.79)]
+    kept = [r["id"] for r in cut_at_distance_cliff(results)]
+    assert kept == ["a", "b"]
+
+
+def test_cliff_no_gap_keeps_up_to_max():
+    # Smooth distances (a genuinely broad query): no cliff → cap at max_keep.
+    results = [_vres(str(i), 0.40 + i * 0.01) for i in range(15)]
+    kept = cut_at_distance_cliff(results, max_keep=10)
+    assert len(kept) == 10
+
+
+def test_cliff_never_cuts_inside_min_keep():
+    # Even with an immediate jump, the top min_keep results always survive.
+    results = [_vres("a", 0.30), _vres("b", 0.55), _vres("c", 0.56)]
+    kept = [r["id"] for r in cut_at_distance_cliff(results, min_keep=2)]
+    assert kept[:2] == ["a", "b"]
+
+
+def test_cliff_fails_open_without_distances():
+    results = [{"id": "a"}, {"id": "b"}, {"id": "c"}]
+    assert len(cut_at_distance_cliff(results)) == 3
+
+
+def test_cliff_short_list_untouched():
+    results = [_vres("a", 0.30)]
+    assert cut_at_distance_cliff(results) == results
+
+
+def test_hybrid_applies_cliff_to_vector_results(monkeypatch):
+    monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
+        _vres("m1", 0.45), _vres("m2", 0.48),
+        _vres("junk1", 0.62), _vres("junk2", 0.64),
+    ])
+    monkeypatch.setattr(search_mod, "keyword_scan_cards",
+                        lambda uid, q, exclude_ids=None, limit=10: [])
+    out = [c["id"] for c in perform_hybrid_search("u", "muffins", limit=20)]
+    assert out == ["m1", "m2"]  # the junk tail never reaches the client

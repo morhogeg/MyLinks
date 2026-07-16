@@ -227,6 +227,38 @@ def apply_distance_threshold(results: List[dict],
     return kept
 
 
+def cut_at_distance_cliff(results: List[dict], min_keep: int = 2,
+                          max_keep: int = 10, min_gap: float = 0.05) -> List[dict]:
+    """Trim the nearest-neighbour tail at the biggest relevance cliff.
+
+    Absolute distance cutoffs can't separate "the two muffin cards" from "the
+    18 unrelated cards behind them" — real match distances vary per query and
+    per language, so any fixed number is either too tight (drops the Hebrew
+    match) or too loose (a wall of junk, the owner-reported failure). The
+    CLIFF is scale-free: results arrive nearest-first, and when the gap
+    between consecutive distances jumps by >= `min_gap`, everything past the
+    jump is a different (worse) cluster — cut there. Guardrails: never cut
+    inside the top `min_keep`, never keep more than `max_keep`, and fail open
+    (no cut) when distances are missing or no clear cliff exists. Pure.
+    """
+    if len(results) <= min_keep:
+        return list(results)
+    dists = []
+    for r in results:
+        d = r.get("vector_distance")
+        if not isinstance(d, (int, float)):
+            return list(results)[:max_keep]  # no distances → order is all we have
+        dists.append(d)
+    cut = min(len(results), max_keep)
+    for i in range(min_keep, cut):
+        # FIRST cliff wins: the initial big jump is where the relevant cluster
+        # ends; a later, larger jump is just structure inside the junk tail.
+        if dists[i] - dists[i - 1] >= min_gap:
+            cut = i
+            break
+    return list(results)[:cut]
+
+
 def normalize_card_for_search(data: dict, doc_id: str) -> dict:
     """One search-result card: id stamped, createdAt as unix-ms, vector dropped.
 
@@ -542,6 +574,10 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20) -> List[di
         logger.error(f"Hybrid search: vector half failed, degrading to keyword-only: {e}")
 
     vector_results = apply_distance_threshold(vector_results)
+    # Then trim at the per-query relevance cliff — the absolute gate bounds
+    # worst-case junk, the cliff removes the "wall of loosely-related cards"
+    # behind the actual matches (owner-reported precision failure).
+    vector_results = cut_at_distance_cliff(vector_results)
 
     try:
         have = {r.get("id") for r in vector_results}
