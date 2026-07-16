@@ -626,7 +626,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-15 (latest) — SHIPPED (desktop web only): Consolidated desktop
+- **2026-07-15 (latest) — SHIPPED (desktop web only): Search-icon collapse +
+  slim filter scrollbar (merge `6034ade`, commit `cbf70d7`).** Two desktop
+  polish fixes: (1) the filters modal had a fat native scrollbar — added
+  `scrollbar-soft` (slim rounded ~4px thumb) + `overscroll-contain`. (2)
+  Replaced the always-on desktop search bar with a **search icon** in the
+  toolbar (iOS-style): clicking it expands the input above; Esc/× collapse it,
+  so the resting layout reclaims that line too. The icon goes accent while a
+  query is active (reads as "on" even collapsed). Shared the open state across
+  breakpoints (`mobileSearchOpen` → `searchOpen`). Still desktop-width only —
+  the phone already used a search icon; the modal scrollbar is cosmetic under
+  mobile overlay scrollbars. NO TestFlight build. `tsc`/eslint clean; Vercel
+  deploying on the `main` push.
+- **2026-07-15 — SHIPPED (desktop web only): Consolidated desktop
   filter toolbar (merge `a26f5a0`, commit `e68e730`).** Owner review of the
   DESKTOP toolbar. Removed the full-width horizontal category chip row (it ate
   a whole line of vertical space) and folded filtering into a single **"Filter"
