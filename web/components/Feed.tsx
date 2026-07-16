@@ -5,9 +5,8 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback, cloneElement, type ReactElement } from 'react';
 import { Link, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef } from '@/lib/types';
-import { getCategoryColorStyle, getColorStyleByKey } from '@/lib/colors';
+import { getColorStyleByKey } from '@/lib/colors';
 import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
-import SourceFacetList from './SourceFacetList';
 import DigestView from './DigestView';
 import DigestCard from './DigestCard';
 import Dropdown from './Dropdown';
@@ -43,7 +42,7 @@ import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
 import LoadMoreSentinel from './feed/LoadMoreSentinel';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, ChevronDown, Share2, Globe, Plus, Pencil, Newspaper, Sparkles, Lock, BookOpenCheck } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, Sparkles, Lock, BookOpenCheck } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
@@ -150,11 +149,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // Back-stack for related-card navigation: opening a card *from* another card
     // pushes the current one, so closing returns there instead of dismissing all.
     const [linkStack, setLinkStack] = useState<string[]>([]);
-    const categoryScrollRef = useRef<HTMLDivElement>(null);
-    const [isDragging, setIsDragging] = useState(false);
-    const isDraggingRef = useRef(false);
-    const [startX, setStartX] = useState(0);
-    const [scrollLeft, setScrollLeft] = useState(0);
     // Resolved against visibleLinks so a locked private card can never be opened
     // (deep link, push tap) — and an open one closes itself when the vault relocks.
     // A directly-fetched deep-link card (outside the window) is the fallback, and
@@ -206,7 +200,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const [openDigestId, setOpenDigestId] = useState<string | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
-    const [isSourcesOpen, setIsSourcesOpen] = useState(false);
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
     const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
@@ -1271,99 +1264,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     </div>
                 )}
 
-                {/* Row 1: Category Navigator — only relevant when browsing the full grid.
-                    Hidden while scoped to a collection (the collection already narrows the set).
-                    Desktop shows scrollable chips; mobile collapses them into one button. */}
-                {isLibraryView && selectedCollections.size === 0 && (<>
-                <div className="relative hidden sm:block -mx-4 px-4 sm:mx-0 sm:px-0 group/category-nav">
-                    {/* Left/Right Fades for Scrollability Cue */}
-                    <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none opacity-0 group-hover/category-nav:opacity-100 transition-opacity duration-300 sm:left-0 sm:from-background" />
-                    <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none opacity-0 group-hover/category-nav:opacity-100 transition-opacity duration-300 sm:right-0 sm:from-background" />
-
-                    <div
-                        ref={categoryScrollRef}
-                        className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide cursor-grab active:cursor-grabbing select-none"
-                        onWheel={(e) => {
-                            if (categoryScrollRef.current) {
-                                if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-                                    categoryScrollRef.current.scrollLeft += e.deltaY;
-                                }
-                            }
-                        }}
-                        onMouseDown={(e) => {
-                            if (!categoryScrollRef.current) return;
-                            setIsDragging(true);
-                            isDraggingRef.current = false; // Reset on mousedown
-                            setStartX(e.pageX - categoryScrollRef.current.offsetLeft);
-                            setScrollLeft(categoryScrollRef.current.scrollLeft);
-                        }}
-                        onMouseLeave={() => {
-                            setIsDragging(false);
-                            // Keep ref as is for a moment to block pending clicks
-                            setTimeout(() => { isDraggingRef.current = false; }, 100);
-                        }}
-                        onMouseUp={() => {
-                            setIsDragging(false);
-                            // We use a small timeout to let any pending click event fire first (which we'll block)
-                            setTimeout(() => { isDraggingRef.current = false; }, 100);
-                        }}
-                        onMouseMove={(e) => {
-                            if (!isDragging || !categoryScrollRef.current) return;
-                            const x = e.pageX - categoryScrollRef.current.offsetLeft;
-                            const walk = (x - startX) * 2;
-                            if (Math.abs(walk) > 5) {
-                                isDraggingRef.current = true;
-                            }
-                            categoryScrollRef.current.scrollLeft = scrollLeft - walk;
-                        }}
-                    >
-                        <button
-                            onClick={() => {
-                                if (isDraggingRef.current) return;
-                                setSelectedCategory(new Set());
-                            }}
-                            className={`px-3 py-1.5 rounded-full text-[13px] font-bold transition-all border whitespace-nowrap min-h-[34px] flex-shrink-0 ${selectedCategory.size === 0
-                                ? 'bg-accent text-white border-accent shadow-sm'
-                                : 'bg-card border-border-subtle text-text-muted hover:border-text-secondary hover:text-text-secondary'}`}
-                        >
-                            All Categories
-                        </button>
-                        {categories.map(cat => {
-                            const isSelected = selectedCategory.has(cat);
-                            const colorStyle = getCategoryColorStyle(cat);
-                            return (
-                                <button
-                                    key={cat}
-                                    onClick={() => {
-                                        if (isDraggingRef.current) return;
-                                        const newSet = new Set(selectedCategory);
-                                        if (isSelected) {
-                                            newSet.delete(cat);
-                                        } else {
-                                            newSet.add(cat);
-                                        }
-                                        setSelectedCategory(newSet);
-                                    }}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-bold transition-all border whitespace-nowrap min-h-[34px] flex-shrink-0 ${isSelected
-                                        ? ''
-                                        : 'bg-card border-border-subtle text-text-muted hover:border-text-secondary hover:text-text-secondary'
-                                        }`}
-                                    style={isSelected ? {
-                                        backgroundColor: colorStyle.backgroundColor,
-                                        color: colorStyle.color,
-                                        borderColor: colorStyle.backgroundColor,
-                                        boxShadow: `0 4px 10px ${colorStyle.backgroundColor}22`,
-                                    } : undefined}
-                                >
-                                    {cat}
-                                    <span className="opacity-60 font-medium ml-1">({categoryCounts[cat]})</span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                </>)}
 
                 {/* Mobile Row 1 — the ANCHOR: an always-live search field (tap, type,
                     results — no expand dance) with the filter funnel inside it as a
@@ -1527,17 +1427,29 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         Filters sheet. Hidden entirely in Ask mode (no grid to filter). */}
                     <div className="hidden sm:flex items-center gap-2">
                         {isLibraryView && (<>
-                        {/* Status Filter — accent-themed dropdown (Reminders is a Show
-                            option now, not a separate button). */}
-                        <Dropdown
-                            ariaLabel="Filter by status"
-                            value={filter}
-                            onChange={(v) => handleFilterSelect(v as FilterType)}
-                            leadingIcon={statusTriggerIcon}
-                            options={statusOptions}
-                        />
+                        {/* ONE consolidated Filter button (mirrors the iOS drawer): opens
+                            the responsive filters modal holding Show (status), Categories,
+                            and Sources — replacing the old inline Status dropdown + Sources
+                            popover AND the full-width category chip row, which reclaims a
+                            whole line of vertical space for the feed. */}
+                        <button
+                            onClick={() => setIsFiltersOpen(true)}
+                            aria-label="Filters — status, categories, sources"
+                            title="Filters"
+                            className={`${ctrlBase} px-3.5 border relative ${activeMobileFilters > 0
+                                ? 'bg-accent text-white border-accent shadow-sm'
+                                : ctrlIdle}`}
+                        >
+                            <Filter className="w-4 h-4" />
+                            <span>Filter</span>
+                            {activeMobileFilters > 0 && (
+                                <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-white/25 text-white">
+                                    {activeMobileFilters}
+                                </span>
+                            )}
+                        </button>
 
-                        {/* Sort — accent-themed dropdown */}
+                        {/* Sort — ordering is orthogonal to filtering, so it stays its own control. */}
                         <Dropdown
                             ariaLabel="Sort order"
                             value={sortBy}
@@ -1545,63 +1457,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             leadingIcon={<ArrowUpDown className="w-4 h-4 text-text-secondary" />}
                             options={sortOptions}
                         />
-
-                        {/* Sources — the single grouped source filter (platform → account),
-                            opened as one popover. Replaces the old row of redundant
-                            round platform icons. */}
-                        {sourceFacets.length > 0 && (
-                            <div className="relative ps-2 border-s border-border-subtle">
-                                <button
-                                    onClick={() => setIsSourcesOpen(o => !o)}
-                                    aria-haspopup="menu"
-                                    aria-expanded={isSourcesOpen}
-                                    title="Filter by source"
-                                    className={`${ctrlBase} px-3.5 border ${selectedSources.size > 0
-                                        ? 'bg-accent text-white border-accent shadow-sm'
-                                        : ctrlIdle}`}
-                                >
-                                    <Globe className="w-4 h-4" />
-                                    <span>Sources</span>
-                                    {selectedSources.size > 0 && (
-                                        <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-white/25 text-white">
-                                            {selectedSources.size}
-                                        </span>
-                                    )}
-                                    <ChevronDown className={`w-4 h-4 opacity-60 transition-transform ${isSourcesOpen ? 'rotate-180' : ''}`} />
-                                </button>
-                                {isSourcesOpen && (
-                                    <>
-                                        {/* Click-away layer */}
-                                        <div className="fixed inset-0 z-40" onClick={() => setIsSourcesOpen(false)} />
-                                        <div className="absolute z-50 mt-2 end-0 w-72 max-h-[60vh] overflow-y-auto bg-card surface-card rounded-2xl border border-border-subtle shadow-[var(--shadow-card)] p-2 animate-in fade-in slide-in-from-top-1 duration-150">
-                                            <div className="flex items-center justify-between px-2 py-1.5">
-                                                <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">
-                                                    {sourceFacets.length} source{sourceFacets.length === 1 ? '' : 's'}
-                                                </span>
-                                                {selectedSources.size > 0 && (
-                                                    <button
-                                                        onClick={() => setSelectedSources(new Set())}
-                                                        className="text-[11px] font-semibold text-text-muted hover:text-accent transition-colors"
-                                                    >
-                                                        Clear
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <SourceFacetList
-                                                facets={sourceFacets}
-                                                selected={selectedSources}
-                                                onToggleKey={handleToggleSource}
-                                                onToggleKeys={handleToggleSourceKeys}
-                                            />
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        )}
                         </>)}
                     </div>
 
-                    {/* (Mobile Filters now lives on the category row above, to save a line.) */}
+                    {/* (Mobile: the Filter funnel lives in the search row above. Desktop:
+                        the Filter button is in the left cluster of this row.) */}
 
                     {/* Mobile Row 2 — DESTINATIONS as three EQUAL segments filling the
                         row: Collections · Ask (dead center) · Digest. Equal widths make
