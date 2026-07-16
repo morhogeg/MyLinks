@@ -159,34 +159,72 @@ def keyword_match_score(data: dict, tokens: set) -> int:
 # find "morning routine") and env-tunable without a code change.
 _DISTANCE_CEILING = float(os.environ.get("SEARCH_DISTANCE_CEILING", "0.68"))
 _DISTANCE_MARGIN = float(os.environ.get("SEARCH_DISTANCE_MARGIN", "0.22"))
+# Looser bound for the top-`min_keep` recall floor (see apply_distance_threshold).
+_DISTANCE_HARD_CEILING = float(os.environ.get("SEARCH_DISTANCE_HARD_CEILING", "0.80"))
+
+
+def _to_unix_ms(val) -> int:
+    """Best-effort unix-ms from every `createdAt` shape that exists in the wild:
+    Firestore datetime, unix ms/seconds number, ISO-8601 string. 0 when absent
+    or unparseable. The web client (feedUtils.getTimestampNumber) and main.py's
+    `_to_ms` defend against the same zoo — server-side ranking must too: one
+    legacy string-timestamp card in a candidate set crashed rerank's min/max
+    with a str-vs-int TypeError, which took the WHOLE search request down."""
+    if val is None:
+        return 0
+    if hasattr(val, "timestamp"):
+        try:
+            return int(val.timestamp() * 1000)
+        except Exception:
+            return 0
+    if isinstance(val, (int, float)):
+        return int(val * 1000) if val < 1e12 else int(val)
+    if isinstance(val, str):
+        try:
+            return int(datetime.fromisoformat(val.replace("Z", "+00:00")).timestamp() * 1000)
+        except Exception:
+            return 0
+    return 0
 
 
 def apply_distance_threshold(results: List[dict],
                              ceiling: float = None,
-                             margin: float = None) -> List[dict]:
+                             margin: float = None,
+                             hard_ceiling: float = None,
+                             min_keep: int = 3) -> List[dict]:
     """Drop vector results that are too far to be real matches.
 
     `results` arrive nearest-first, each carrying the `vector_distance` the
     query stamped (missing/malformed distances are kept — fail open, order
     already encodes rank). Cutoff = min(best_distance + margin, ceiling): the
     relative term keeps the cluster around the best hit; the absolute ceiling
-    empties the list entirely when even the best hit is unrelated — an honest
-    "no results" instead of 20 random cards. Pure, unit-testable offline.
+    kills the tail when even the best hit is far.
+
+    RECALL FLOOR: the first `min_keep` results survive the cutoff as long as
+    they're under the (looser) `hard_ceiling`. Cross-language recall — an
+    English "muffins" finding a Hebrew muffin card — legitimately lands at
+    larger distances than a same-language match, and cutting the top handful
+    on an absolute number turns the library's best answer into "No matches".
+    The floor bounds worst-case junk at `min_keep` cards while making the
+    top matches un-droppable; the 20-nearest-neighbour wall stays dead.
+    Pure, unit-testable offline.
     """
     if not results:
         return []
     ceiling = _DISTANCE_CEILING if ceiling is None else ceiling
     margin = _DISTANCE_MARGIN if margin is None else margin
+    hard_ceiling = _DISTANCE_HARD_CEILING if hard_ceiling is None else hard_ceiling
     dists = [r.get("vector_distance") for r in results
              if isinstance(r.get("vector_distance"), (int, float))]
     if not dists:
         return list(results)
     cutoff = min(min(dists) + margin, ceiling)
-    return [
-        r for r in results
-        if not isinstance(r.get("vector_distance"), (int, float))
-        or r["vector_distance"] <= cutoff
-    ]
+    kept = []
+    for i, r in enumerate(results):
+        d = r.get("vector_distance")
+        if not isinstance(d, (int, float)) or d <= cutoff or (i < min_keep and d <= hard_ceiling):
+            kept.append(r)
+    return kept
 
 
 def normalize_card_for_search(data: dict, doc_id: str) -> dict:
@@ -197,9 +235,10 @@ def normalize_card_for_search(data: dict, doc_id: str) -> dict:
     datetime minus an int crashes the recency math) and no embedding ever
     crosses to the client. Pure."""
     data = dict(data or {})
-    created = data.get("createdAt")
-    if created is not None and hasattr(created, "timestamp"):
-        data["createdAt"] = int(created.timestamp() * 1000)
+    if data.get("createdAt") is not None:
+        # EVERY stored shape (datetime / ISO string / seconds / ms) → ms int,
+        # so ranking math can never hit a mixed-type comparison.
+        data["createdAt"] = _to_unix_ms(data.get("createdAt"))
     data.pop("embedding_vector", None)
     data["id"] = doc_id
     return data
@@ -268,7 +307,9 @@ def rerank_candidates(question: str, candidates: List[dict], top_k: int = 10) ->
         return []
 
     q_tokens = keyword_query_tokens(question)
-    times = [c.get("createdAt") or 0 for c in candidates]
+    # Coerce every timestamp shape defensively (see _to_unix_ms) — rerank must
+    # never crash on a legacy card, whatever a caller feeds it.
+    times = [_to_unix_ms(c.get("createdAt")) for c in candidates]
     oldest, newest = min(times), max(times)
     span = (newest - oldest) or 1
     n = len(candidates)
@@ -283,7 +324,7 @@ def rerank_candidates(question: str, candidates: List[dict], top_k: int = 10) ->
             title_overlap = len(q_tokens & title_tokens) / len(q_tokens)
         else:
             overlap = title_overlap = 0.0
-        recency = ((c.get("createdAt") or oldest) - oldest) / span
+        recency = (times[rank] - oldest) / span
         # Vector rank leads (weight 1.0), but a strong literal match is a strong
         # relevance signal — a FULL query-token overlap adds up to 0.75, enough
         # to rescue a card the vector score buried ~half the list down (the "you
@@ -523,6 +564,7 @@ def search_links(req: https_fn.CallableRequest) -> Any:
     Callable Function: Perform semantic search.
     Input: { query: string, limit?: number }
     """
+    uid = None
     try:
         # Prefer the verified caller; fall back to the client uid only while
         # REQUIRE_AUTH is off (staged rollout).
@@ -547,5 +589,13 @@ def search_links(req: https_fn.CallableRequest) -> Any:
         raise
     except Exception as e:
         logger.error(f"Search failed: {e}", exc_info=True)
+        # Durable trail (lazy import — main imports this module at load time).
+        # The web search bar calls THIS callable, so a failure here must land in
+        # server_errors like every other 5xx or it's invisible in production.
+        try:
+            from main import _record_server_error
+            _record_server_error("search_links", e, uid=uid)
+        except Exception:
+            pass
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message="Search failed")
 

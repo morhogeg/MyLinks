@@ -256,17 +256,28 @@ def _vres(id, dist):
 
 
 def test_threshold_keeps_the_close_cluster_drops_the_tail():
-    results = [_vres("a", 0.30), _vres("b", 0.42), _vres("c", 0.60)]
+    # Beyond the top-3 recall floor, the relative cutoff kills the padding:
+    # cutoff = min(0.30 + 0.22, 0.68) = 0.52 → d (rank 3, 0.60) is out.
+    results = [_vres("a", 0.30), _vres("b", 0.42), _vres("c", 0.55), _vres("d", 0.60)]
     kept = [r["id"] for r in apply_distance_threshold(results, ceiling=0.68, margin=0.22)]
-    # cutoff = min(0.30 + 0.22, 0.68) = 0.52 → c (0.60) is padding, not a match
-    assert kept == ["a", "b"]
+    assert kept == ["a", "b", "c"]
 
 
-def test_threshold_empties_when_even_the_best_is_unrelated():
-    # Nothing in the library relates: best distance is beyond the ceiling, so an
-    # honest empty beats 20 nearest-neighbour placeholders.
-    results = [_vres("a", 0.71), _vres("b", 0.75)]
-    assert apply_distance_threshold(results, ceiling=0.68, margin=0.22) == []
+def test_threshold_recall_floor_keeps_top3_under_hard_ceiling():
+    # Cross-language case (English query → Hebrew card): distances run larger
+    # than same-language matches, but the top few must never be dropped on an
+    # absolute number — the floor keeps them while the tail still dies.
+    results = [_vres("a", 0.70), _vres("b", 0.72), _vres("c", 0.74), _vres("d", 0.76)]
+    kept = [r["id"] for r in apply_distance_threshold(
+        results, ceiling=0.68, margin=0.02, hard_ceiling=0.80)]
+    assert kept == ["a", "b", "c"]  # top-3 floor; rank-3 tail cut
+
+
+def test_threshold_empties_beyond_hard_ceiling():
+    # Truly unrelated (past even the loose bound): honest empty, no placeholders.
+    results = [_vres("a", 0.85), _vres("b", 0.90)]
+    assert apply_distance_threshold(
+        results, ceiling=0.68, margin=0.22, hard_ceiling=0.80) == []
 
 
 def test_threshold_keeps_results_without_distances():
@@ -276,9 +287,11 @@ def test_threshold_keeps_results_without_distances():
 
 
 def test_threshold_mixed_missing_distance_is_kept():
-    results = [_vres("a", 0.30), {"id": "no-dist"}, _vres("c", 0.70)]
-    kept = [r["id"] for r in apply_distance_threshold(results, ceiling=0.68, margin=0.22)]
-    assert kept == ["a", "no-dist"]
+    results = [_vres("a", 0.30), {"id": "no-dist"}, _vres("c", 0.70), _vres("d", 0.99)]
+    kept = [r["id"] for r in apply_distance_threshold(
+        results, ceiling=0.68, margin=0.22, hard_ceiling=0.80)]
+    # c survives via the top-3 floor (rank 2, under 0.80); d fails everything.
+    assert kept == ["a", "no-dist", "c"]
 
 
 def test_threshold_empty_input():
@@ -302,9 +315,9 @@ def test_normalize_converts_timestamp_strips_vector_stamps_id():
     assert "embedding_vector" not in out
 
 
-def test_normalize_leaves_numeric_created_at_alone():
-    out = normalize_card_for_search({"createdAt": 123}, "d")
-    assert out["createdAt"] == 123
+def test_normalize_leaves_ms_created_at_alone():
+    out = normalize_card_for_search({"createdAt": 1_752_600_000_000}, "d")
+    assert out["createdAt"] == 1_752_600_000_000
 
 
 # ── perform_hybrid_search: fusion + degradation (halves stubbed) ────────────
@@ -351,10 +364,11 @@ def test_hybrid_propagates_config_error(monkeypatch):
 
 
 def test_hybrid_thresholds_before_keyword_exclusion(monkeypatch):
-    # A far (junk) vector hit is dropped by the gate, so the keyword scan may
-    # re-find it as a REAL literal match rather than it surviving as noise.
+    # A truly-unrelated vector hit (beyond even the recall floor's hard
+    # ceiling) is dropped by the gate, so the keyword scan may re-find it as a
+    # REAL literal match rather than it surviving as noise.
     monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
-        _vres("close", 0.30), _vres("far", 0.70),
+        _vres("close", 0.30), _vres("far", 0.85),
     ])
     captured = {}
 
@@ -366,3 +380,50 @@ def test_hybrid_thresholds_before_keyword_exclusion(monkeypatch):
     out = perform_hybrid_search("u", "q", limit=10)
     assert captured["exclude"] == {"close"}
     assert [c["id"] for c in out] == ["close"]
+
+
+# ── Timestamp-shape robustness (the 2026-07-16 search-outage regression) ────
+# One legacy card with a string createdAt in the candidate set crashed
+# rerank's min/max (str vs int TypeError) and took the whole search request
+# down. Every shape in the wild must flow through ranking without crashing.
+
+from search import _to_unix_ms
+
+
+def test_to_unix_ms_handles_every_shape():
+    class _Ts:
+        def timestamp(self):
+            return 1_700_000_000.0
+    assert _to_unix_ms(_Ts()) == 1_700_000_000_000
+    assert _to_unix_ms(1_752_600_000_000) == 1_752_600_000_000     # already ms
+    assert _to_unix_ms(1_752_600_000) == 1_752_600_000_000          # unix seconds
+    assert _to_unix_ms("2026-07-01T10:00:00Z") > 0                  # ISO string
+    assert _to_unix_ms("garbage") == 0
+    assert _to_unix_ms(None) == 0
+
+
+def test_rerank_survives_mixed_timestamp_shapes():
+    cands = [
+        {"id": "a", "title": "muffins recipe", "createdAt": 1_752_600_000_000},
+        {"id": "b", "title": "other", "createdAt": "2026-07-01T10:00:00Z"},
+        {"id": "c", "title": "third"},  # missing entirely
+    ]
+    out = [c["id"] for c in rerank_candidates("muffins", cands, top_k=3)]
+    assert set(out) == {"a", "b", "c"}
+    assert out[0] == "a"  # the literal title match still leads
+
+
+def test_normalize_converts_string_and_seconds_created_at():
+    assert normalize_card_for_search({"createdAt": "2026-07-01T10:00:00Z"}, "d")["createdAt"] > 1e12
+    assert normalize_card_for_search({"createdAt": 1_752_600_000}, "d")["createdAt"] == 1_752_600_000_000
+
+
+def test_hybrid_survives_mixed_timestamps_end_to_end(monkeypatch):
+    monkeypatch.setattr(search_mod, "perform_search_logic", lambda uid, q, limit: [
+        {"id": "v1", "title": "x", "vector_distance": 0.3, "createdAt": 1_752_600_000_000},
+    ])
+    monkeypatch.setattr(search_mod, "keyword_scan_cards",
+                        lambda uid, q, exclude_ids=None, limit=10: [
+                            {"id": "k1", "title": "muffins", "createdAt": "2026-07-01T10:00:00Z"}])
+    out = perform_hybrid_search("u", "muffins", limit=10)
+    assert {c["id"] for c in out} == {"v1", "k1"}
