@@ -88,7 +88,12 @@ export function useSemanticSearch(searchQuery: string, uid?: string | null) {
                     links = data.links || [];
                 } else {
                     const searchFn = httpsCallable(functions, 'search_links');
-                    const result = await searchFn({ query: debouncedQuery, limit: 20 });
+                    // Send the workspace uid like the native twin does: while
+                    // REQUIRE_AUTH is off the backend falls back to it when the
+                    // signed-in account has no authUids link to the workspace —
+                    // without it, web search hard-fails UNAUTHENTICATED for any
+                    // account whose claim never ran, while iOS keeps working.
+                    const result = await searchFn({ query: debouncedQuery, limit: 20, uid });
                     if (isStale()) return; // a newer query superseded this one
                     const data = result.data as { links?: Link[] };
                     links = data.links || [];
