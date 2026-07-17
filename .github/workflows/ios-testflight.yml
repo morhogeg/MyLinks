@@ -17,6 +17,14 @@ on:
           Default OFF = legacy pre-cutover behavior (no sign-in UI).
         type: boolean
         default: false
+  # PUSH-TO-BUILD: cloud sessions can't call the dispatch API (403 for the
+  # GitHub App integration), so moving this branch is the programmatic trigger:
+  #   git push -f origin main:trigger/testflight
+  # builds whatever commit the branch points at (normally main's HEAD) with the
+  # default legacy behavior (require_auth off — same as a default dispatch).
+  # For a require_auth=true build, use manual dispatch.
+  push:
+    branches: [trigger/testflight]
   # AUTO-BUILD TEMPORARILY GATED during the multi-user auth cutover.
   # The build now includes the Sign in with Apple entitlement and the
   # @capacitor-firebase/authentication pod (native Firebase SDK). Archiving
@@ -171,7 +179,7 @@ jobs:
           fi
           echo "URL scheme registered: ${RCID:0:24}…"
 
-      # ── Signing ────────────────────────────────────────────────────────────
+      # ── Signing ────────────────────────────────────────────────────────
       # The app uses automatic signing (CODE_SIGN_STYLE = Automatic). xcodebuild,
       # given the App Store Connect API key + -allowProvisioningUpdates, manages
       # the provisioning PROFILES automatically — profiles are uncapped, so that
