@@ -315,7 +315,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                             />
                         )}
 
-                        {view === 'stats' && <StatsView uid={uid} onOpenFacet={onOpenLibraryFacet} />}
+                        {view === 'stats' && <StatsView uid={uid} onOpenFacet={onOpenLibraryFacet} restoreScroll={initialSection === 'stats'} />}
 
                         {view === 'resurfacing' && (
                             <ResurfacingView
