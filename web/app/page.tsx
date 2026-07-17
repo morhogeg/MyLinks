@@ -8,7 +8,7 @@ import AnalyzingBanner, { AnalyzingState } from "@/components/AnalyzingBanner";
 import SettingsModal from "@/components/SettingsModal";
 import ScrollToTop from "@/components/ScrollToTop";
 import OnboardingTour, { ONBOARDING_STORAGE_KEY } from "@/components/OnboardingTour";
-import { Settings } from "lucide-react";
+import { Settings, Search, Globe, SlidersHorizontal } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { IconButton } from "@/components/ui/Button";
 import { useHeaderFade } from "@/lib/useHeaderFade";
@@ -36,6 +36,15 @@ export default function Home() {
   // A tapped Insights row (category/tag/source): Settings closes and Feed
   // applies this as its active filter, then clears it via the callback.
   const [libraryFacet, setLibraryFacet] = useState<LibraryFacetRequest | null>(null);
+  // Mobile v4 chrome: the header's bare glyphs (search / sources / display)
+  // command the Feed via a nonce channel; the bottom bar's + bumps
+  // captureSignal to pop AddLinkForm open. `feedTab` mirrors Feed's active
+  // bottom tab so the glyphs only show on Home, where they apply.
+  const [headerCommand, setHeaderCommand] = useState<{ action: 'search' | 'sources' | 'display'; nonce: number } | null>(null);
+  const [captureSignal, setCaptureSignal] = useState(0);
+  const [feedTab, setFeedTab] = useState<'home' | 'collections' | 'ask' | 'digest'>('home');
+  const sendHeaderCommand = (action: 'search' | 'sources' | 'display') =>
+    setHeaderCommand((prev) => ({ action, nonce: (prev?.nonce ?? 0) + 1 }));
   const [isAskMode, setIsAskMode] = useState(false);
   const [hideAddButton, setHideAddButton] = useState(false);
   // In-flight capture analysis for the one "Analyzing… N%" banner. Two sources:
@@ -139,6 +148,38 @@ export default function Home() {
 
           {/* Controls — one cohesive cluster */}
           <div className="flex items-center gap-2">
+            {/* Mobile v4: the library's controls are BARE GLYPHS in this one
+                header line (Apple nav-bar grammar) — search, sources, and the
+                ⋯ display menu (view/sort/filter/select). Home tab only; the
+                other tabs bring their own subheaders. Desktop keeps its
+                toolbar, so these stay sm:hidden. */}
+            {feedTab === 'home' && (
+              <div className="flex sm:hidden items-center">
+                <button
+                  data-tour="search"
+                  onClick={() => sendHeaderCommand('search')}
+                  aria-label="Search"
+                  className="h-10 w-10 flex items-center justify-center text-text-secondary hover:text-text active:text-text transition-colors"
+                >
+                  <Search className="w-[19px] h-[19px]" />
+                </button>
+                <button
+                  onClick={() => sendHeaderCommand('sources')}
+                  aria-label="Sources"
+                  className="h-10 w-10 flex items-center justify-center text-text-secondary hover:text-text active:text-text transition-colors"
+                >
+                  <Globe className="w-[19px] h-[19px]" />
+                </button>
+                <button
+                  data-tour="views"
+                  onClick={() => sendHeaderCommand('display')}
+                  aria-label="View, sort, and filter options"
+                  className="h-10 w-10 flex items-center justify-center text-text-secondary hover:text-text active:text-text transition-colors"
+                >
+                  <SlidersHorizontal className="w-[19px] h-[19px]" />
+                </button>
+              </div>
+            )}
             {/* Theme toggle is desktop-only — on mobile/iOS it lives in Settings,
                 so the top bar stays clean. */}
             <div className="hidden sm:block">
@@ -164,13 +205,13 @@ export default function Home() {
         {/* The feed is already live via onSnapshot, so a new save streams in on
             its own — no remount needed. (Previously keyed on refreshKey, which
             tore down listeners and wiped view/filter/search on every add.) */}
-        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onHasCardsChange={setHasCards} libraryFacet={libraryFacet} onLibraryFacetApplied={() => setLibraryFacet(null)} onBackToInsights={() => { setSettingsSection('stats'); setIsSettingsOpen(true); }} />
+        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onHasCardsChange={setHasCards} libraryFacet={libraryFacet} onLibraryFacetApplied={() => setLibraryFacet(null)} onBackToInsights={() => { setSettingsSection('stats'); setIsSettingsOpen(true); }} headerCommand={headerCommand} onCapture={() => setCaptureSignal((n) => n + 1)} onTabChange={setFeedTab} />
       </main>
 
       {/* Add Link FAB — hidden in Ask & Collections (neither view captures links). */}
       {/* onLinkAdded is a no-op: the form resets itself and the feed is live via
           onSnapshot, so nothing extra is needed here on a successful save. */}
-      <AddLinkForm onLinkAdded={() => {}} hidden={hideAddButton} onAnalyzingChange={setAnalyzing} />
+      <AddLinkForm onLinkAdded={() => {}} hidden={hideAddButton} onAnalyzingChange={setAnalyzing} openSignal={captureSignal} />
       <AnalyzingBanner state={bannerState} />
       <ScrollToTop />
 
