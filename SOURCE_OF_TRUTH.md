@@ -78,7 +78,8 @@ surface in the category and a knowledge graph computed on every save. The path t
   - **Functions** → **auto on push to `main` touching `functions/**`** via the
     "Deploy Cloud Functions" workflow (indexes first, then functions; scope with
     a `Deploy-Functions: a,b` line in the merge-commit message, else "all";
-    needs repo secrets `FIREBASE_SERVICE_ACCOUNT` + `GEMINI_API_KEY`). Mac
+    secrets `FIREBASE_SERVICE_ACCOUNT` + `GEMINI_API_KEY` added + VERIFIED
+    2026-07-17 — fully operational, no owner step per deploy). Mac
     fallback: `./deploy-functions.sh functions:<a>,functions:<b>` (always pass
     explicit targets; scheduler/webhook fns aren't in the default set).
 
@@ -233,7 +234,12 @@ The multi-user auth work is **fully written but not live**:
    now remains only for creation failures (with a Retry). Example-card seeding
    was skipped (optional). Ships with the task-2 functions deploy — no separate
    action.
-4. **[ ] Pending deploys/verifications from the last sessions** (owner machine):
+4. **[ ] Pending deploys/verifications from the last sessions** *(2026-07-17:
+   no Mac needed anymore — any session can run these via the push-triggered
+   "Deploy Cloud Functions" CI: push a `functions/**`-touching commit to main
+   with a `Deploy-Functions:` line, or bump `functions/.deploy-ping`; a
+   whole-codebase run (no trailer) executes ALL of the below at once — do it
+   deliberately, it lights up the dark M12 synthesis backend)*:
    - `./deploy-functions.sh` — M12 weekly synthesis backend is written but dark.
    - `firebase deploy --only firestore:rules` — the `syntheses` read rule.
    - M9 backfill (See-also for old cards): **now a one-tap in-app action** —
@@ -648,14 +654,19 @@ exact-match, capped.
   functions run fired on push (run #1) and failed exactly at "Check required
   secrets"; TestFlight run **#102 (build 1102)** started via the trigger
   branch and carries the 2026-07-16 sidebar-persist fix (which build 1101,
-  head `2e428b30c`, did NOT include). **⛔ OWNER (one-time, ~5 min, then
-  deploys are fully autonomous):** add repo secrets `FIREBASE_SERVICE_ACCOUNT`
-  (service-account JSON key on `secondbrain-app-94da2` with Cloud Functions
-  Admin + Firebase Admin + Service Account User) and `GEMINI_API_KEY` — setup
-  block at the top of `deploy-functions.yml` — then re-run the failed
-  "Deploy Cloud Functions" run #1 (its commit already carries
-  `Deploy-Functions: analyze_link,process_link_background`, the still-pending
-  YouTube-prompt deploy).
+  head `2e428b30c`, did NOT include; build 1102 uploaded green 08:52 UTC).
+  **SETUP COMPLETED 2026-07-17:** owner added the repo secrets
+  `FIREBASE_SERVICE_ACCOUNT` (service account `github-deployer` on
+  `secondbrain-app-94da2`: Cloud Functions Admin + Firebase Admin + Service
+  Account User) and `GEMINI_API_KEY`, then re-ran "Deploy Cloud Functions"
+  run #1 — attempt 2 passed the secrets gate, deployed Firestore indexes,
+  and shipped `analyze_link` + `process_link_background` (the YouTube-prompt
+  fix — see the deploy-run outcome noted below/in Actions). **All three
+  deploy surfaces are now zero-owner-step:** web (Vercel on main push),
+  functions (main push touching `functions/**`), iOS (push
+  `main:trigger/testflight`). If a functions deploy ever fails at "Check
+  required secrets", a secret was rotated/deleted — recreate per the setup
+  block in `deploy-functions.yml`.
 - **2026-07-16 — YouTube summaries tightened: `## Core Thesis` section
   removed (branch `claude/starred-chat-sidebar-persist-d35ztb`, follow-up).**
   Owner repro (iOS, MrBeast card screenshot): a YouTube card read the same fact

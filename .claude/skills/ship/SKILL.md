@@ -85,8 +85,10 @@ be in a git worktree under `~/MyLinks/.claude/worktrees/<name>` on a `claude/*` 
      commit carrying the `Deploy-Functions:` line and push to main.
    - Manual fallbacks still work: Actions → Run workflow (owner), or
      `./deploy-functions.sh functions:<a>,functions:<b>` on the Mac.
-   - ⚠️ Requires repo secrets `FIREBASE_SERVICE_ACCOUNT` + `GEMINI_API_KEY`;
-     the run fails fast with instructions if they're missing.
+   - Repo secrets `FIREBASE_SERVICE_ACCOUNT` + `GEMINI_API_KEY` are **set up and
+     verified (2026-07-17)** — this path is fully operational; no owner step.
+     If a deploy ever fails at "Check required secrets", a secret was rotated
+     or deleted — re-add per the setup block at the top of the workflow file.
    - If `git push` to main is blocked in-session (permission classifier), land
      the same content via the GitHub MCP `push_files` tool — the commit message
      still carries the `Deploy-Functions:` line.
@@ -101,7 +103,8 @@ be in a git worktree under `~/MyLinks/.claude/worktrees/<name>` on a `claude/*` 
    This builds main's HEAD with default (legacy, require_auth off) behavior and
    uploads to TestFlight automatically — no Xcode. Watch it via GitHub MCP
    `actions_list` (`list_workflow_runs` for `ios-testflight.yml`); build number
-   = 1000 + run number. For a `require_auth=true` build, the owner must use
+   = 1000 + run number. **Verified end-to-end 2026-07-17:** run #102 / build
+   1102 built and uploaded green from a session-pushed trigger branch. For a `require_auth=true` build, the owner must use
    manual dispatch (Actions → *iOS → TestFlight* → Run workflow). `gh workflow
    run` / MCP `actions_run_trigger` also work where dispatch is permitted.
 
