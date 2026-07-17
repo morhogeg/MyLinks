@@ -647,7 +647,30 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-17 (latest) — ABUSE HARDENING: embed-trigger cost backstop + live
+- **2026-07-17 (latest) — ADVERSARIAL TEST SWEEP: 393 backend tests (was 264),
+  ~30 real bugs fixed (branch `claude/adversarial-unit-tests-3qkcth`).**
+  Full-codebase adversarial pass over `functions/` (edge cases, malformed
+  Firestore/client data, boundaries, NaN/inf, state corruption). Highest-impact
+  fixes: one poison card (non-str tag/note, NaN createdAt) 500'd EVERY
+  search+Ask for its user; a `title:null` link doc permanently killed the whole
+  reminder tick for all users (and `reminderProfile:null` caused push spam
+  every 2 min — push sent before schedule advance); a non-dict `settings`
+  aborted the digest/reminder sweeps; the smart digest's 60/40
+  backlog/rediscovery mix was dead code (quota never applied); `is_due` missed
+  DST spring-forward targets (wall-clock math); Hebrew queries had ZERO lexical
+  search tokens (ASCII-only tokenizer); SSRF guard passed CGNAT 100.64/10;
+  Twitter `author:null` discarded whole tweets and mobile.twitter.com URLs
+  never reached the fx/vx APIs (substring rewrite → dead host); LinkedIn/IG
+  scrape failures fed raw markup / fabricated text to the model instead of the
+  grounding placeholder; share publish wrote the snapshot before ownership
+  (crash window = takeover); `CORS_ORIGIN=","` = total outage; callable
+  `search_links` validation had drifted behind its HTTP twin. Also removed
+  no-signal/duplicate tests and strengthened weak ones (CORS preflight now
+  pins headers, intent tests pin magnitudes). All offline, `pytest
+  functions/tests` green, `tsc --noEmit` green. Owner follow-ups: see the
+  session's final report (frontend has no unit-test harness — decision needed;
+  rules-tests lane unchanged).
+- **2026-07-17 — ABUSE HARDENING: embed-trigger cost backstop + live
   `shared_*` write lockdown (branch `claude/gemini-pricing-analysis-ab575e`).**
   Cost research first (owner asked pre-launch): per-card analysis ≈ $0.002
   (flash-lite $0.25/$1.50 per M, embeddings $0.15/M) → 100 cards ≈ $0.20;
