@@ -98,6 +98,17 @@ def test_ai_analysis_valid_without_actionable_takeaway():
     assert a.actionableTakeaway is None
 
 
+def test_ai_analysis_accepts_exactly_five_tags():
+    # Boundary: max_length=5 must admit exactly 5 (only 6+ is rejected).
+    a = AIAnalysis(
+        title="T",
+        summary="S",
+        category="Tech",
+        tags=["a", "b", "c", "d", "e"],
+    )
+    assert len(a.tags) == 5
+
+
 def test_ai_analysis_rejects_too_many_tags():
     # tags has max_length=5.
     with pytest.raises(ValidationError):

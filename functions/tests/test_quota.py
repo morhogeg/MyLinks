@@ -194,6 +194,31 @@ def test_unknown_kind_raises(monkeypatch):
     raise AssertionError("expected ValueError for unknown kind")
 
 
+def test_corrupted_month_map_fails_open(monkeypatch):
+    # A corrupted doc (month key holds a string, or the counter is not a number)
+    # raises inside the txn body; the soft-cap contract says that must degrade to
+    # "allowed", exactly like a Firestore outage — never a 500 for the user.
+    for bad_value in ("garbage", {"saves": "NaN"}):
+        store = {"value": {"2026-07": bad_value}}
+        _install_fake_db(monkeypatch, store)
+        _pin_month(monkeypatch)
+        monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "3")
+        ok, remaining = quota.check_and_increment_quota("u1", "saves")
+        assert ok is True
+        assert remaining == quota._UNLIMITED
+
+
+def test_negative_limit_disables_check(monkeypatch):
+    # _limit_for: "0 (or negative / unparseable) disables the check entirely."
+    store = {}
+    _install_fake_db(monkeypatch, store)
+    _pin_month(monkeypatch)
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "-5")
+    ok, remaining = quota.check_and_increment_quota("u1", "saves")
+    assert ok is True and remaining == quota._UNLIMITED
+    assert store == {}
+
+
 def test_fails_open_on_backend_error(monkeypatch):
     def boom():
         raise RuntimeError("firestore down")
@@ -290,6 +315,30 @@ def test_refund_noop_for_none_uid_and_unknown_kind(monkeypatch):
     quota.refund_quota(None, "saves")
     quota.refund_quota("u1", "bogus")
     assert store["value"]["2026-07"]["saves"] == 3
+
+
+def test_refund_larger_than_counter_floors_at_zero(monkeypatch):
+    # Refunding more than was charged (e.g. a double refund race) must clamp to
+    # 0, never drive the counter negative and mint free quota.
+    store = {"value": {"2026-07": {"saves": 1}}}
+    _install_fake_db_for_refund(monkeypatch, store)
+    _pin_month(monkeypatch)
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "150")
+
+    quota.refund_quota("u1", "saves", amount=3)
+    assert store["value"]["2026-07"]["saves"] == 0
+
+
+def test_refund_absent_doc_is_a_noop(monkeypatch):
+    # A refund for a user who was never charged (no counter doc) must not
+    # create one.
+    store = {}
+    _install_fake_db_for_refund(monkeypatch, store)
+    _pin_month(monkeypatch)
+    monkeypatch.setenv("MONTHLY_SAVE_QUOTA", "150")
+
+    quota.refund_quota("u1", "saves")
+    assert store == {}
 
 
 def test_refund_swallows_backend_error(monkeypatch):

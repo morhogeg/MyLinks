@@ -124,6 +124,26 @@ def test_fails_open_on_backend_error(monkeypatch):
     assert rate_limit.check_rate_limit("k", 1, 60) is True
 
 
+def test_fails_closed_on_backend_error_for_paid_buckets(monkeypatch):
+    def boom():
+        raise RuntimeError("firestore down")
+
+    monkeypatch.setattr(rate_limit, "get_db", boom)
+    # Paid buckets pass fail_open=False: a Firestore outage must NOT strip the
+    # last cost ceiling — the call is rate-limited instead (report 3.5).
+    assert rate_limit.check_rate_limit("k", 1, 60, fail_open=False) is False
+
+
+def test_corrupted_doc_degrades_per_fail_open_flag(monkeypatch):
+    # A corrupted counter doc (count/window_start not numbers) raises inside the
+    # txn body; that must hit the same fail-open/fail-closed policy as any other
+    # backend error, never propagate to the caller.
+    store = {"value": {"window_start": "not-a-number", "count": "corrupt"}}
+    _install_fake_db(monkeypatch, store)
+    assert rate_limit.check_rate_limit("k", 3, 60) is True
+    assert rate_limit.check_rate_limit("k", 3, 60, fail_open=False) is False
+
+
 # ── client_ip ─────────────────────────────────────────────────────────────
 
 class FakeReq:
@@ -147,6 +167,13 @@ def test_client_ip_falls_back_to_remote_addr():
 def test_client_ip_unknown_when_nothing_available():
     req = FakeReq(headers={})
     assert rate_limit.client_ip(req) == "unknown"
+
+
+def test_client_ip_ignores_whitespace_only_forwarded_header():
+    # A degenerate "X-Forwarded-For: , ," must not yield an empty-string key —
+    # that would funnel every such caller into one shared rate-limit bucket.
+    req = FakeReq(headers={"X-Forwarded-For": " , , "}, remote_addr="9.9.9.9")
+    assert rate_limit.client_ip(req) == "9.9.9.9"
 
 
 def test_safe_key_strips_slashes_and_caps_length():
