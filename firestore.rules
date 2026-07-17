@@ -57,16 +57,17 @@ service cloud.firestore {
 
     // Shared collections & cards: public, read-only snapshots for share links.
     // World-readable so logged-out visitors can open /c?id= and /s?id= pages.
-    // Writes are owner-driven from the client today (single-user prototype, same
-    // residual risk as users/** above); tighten to `request.auth.uid == ownerUid`
-    // when real Firebase Auth lands.
+    // Writes are DENIED to clients: since the 5a share-privacy fix, publishing
+    // and unpublishing go exclusively through the Admin-SDK endpoints
+    // (`publish_share_http`/`unpublish_share_http`), so any direct client write
+    // here is defacement/spam, not a product path. Matches the locked ruleset.
     match /shared_collections/{shareId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if false;
     }
     match /shared_cards/{shareId} {
       allow read: if true;
-      allow write: if true;
+      allow write: if false;
     }
 
     // pending_processing: only Cloud Functions (admin SDK)

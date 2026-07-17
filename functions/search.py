@@ -18,6 +18,7 @@ from google import genai
 
 from db import get_db
 from ai_service import embedding_needs_repair, collect_notes_text
+from rate_limit import check_rate_limit
 
 logger = logging.getLogger(__name__)
 
@@ -453,6 +454,26 @@ def sync_link_embedding(event: firestore_fn.Event[firestore_fn.Change[firestore_
         # the headline, so a card is findable by the details it actually holds.
         text_to_embed = build_embedding_text(data)
         if not text_to_embed:
+            return
+
+        # Cost backstop (defense-in-depth): this trigger fires on ANY write to
+        # users/{uid}/links/** — pre-cutover the live rules leave that path
+        # world-writable, so a direct Firestore write (bypassing every HTTP rate
+        # limit and quota) reaches this paid embedding call. Cap per uid for
+        # fairness AND globally, because a writer minting random uids gets a
+        # fresh per-uid bucket each time — only the global ceiling bounds that.
+        # Both limits sit far above legitimate flow (saves are capped at
+        # ≤60/hr/uid upstream; embeds ≈ saves + retries). Over-limit or
+        # limiter error → skip WITHOUT writing: the missing/flagged vector keeps
+        # embedding_needs_repair() true so a later write or Settings→Connections
+        # rebuild repairs the card, whereas writing a marker here would re-fire
+        # this trigger and loop. Fail-closed like every paid bucket (report 3.5);
+        # a skipped embed degrades search for one card, never loses data.
+        if not check_rate_limit(f"embed-uid:{uid}", 150, 3600, fail_open=False):
+            logger.warning("Per-uid embed rate limit hit — deferring embedding")
+            return
+        if not check_rate_limit("embed-global", 1000, 3600, fail_open=False):
+            logger.warning("Global embed rate limit hit — deferring embedding")
             return
 
         db = get_db()
