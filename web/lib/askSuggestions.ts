@@ -407,6 +407,37 @@ function chipFamily(text: string): string {
         .trim();
 }
 
+// INTENT RULE (one step above family): several templates are the SAME ask in
+// different words — "key points", "key takeaways", "highlights", "sum it up"
+// all mean "restate the answer". Family dedup sees distinct templates, so a
+// row could offer three of them at once (observed: video angle's takeaways +
+// highlights + the key-points fallback), and the next turn could offer yet
+// another synonym of something already tapped. Intent identity fixes both:
+//   - a single offered row holds at most ONE chip per intent;
+//   - an intent the user already asked this conversation is consumed — no
+//     synonym of it is offered again (mirrors the family NO-REPEAT RULE).
+// Patterns run against chipFamily(text) (lowercased, titles stripped). Order
+// matters: specific intents (steps/ingredients) before the broad restate
+// catch-all. Unmatched text is its own intent — free-typed questions never
+// accidentally consume a group.
+const INTENT_PATTERNS: Array<[RegExp, string]> = [
+    [/more detail|go deeper|tell me more/, 'expand'],
+    [/ingredient/, 'ingredients'],
+    [/steps/, 'steps'],
+    [/compare|common thread/, 'synthesis'],
+    [/what else did i save/, 'graph'],
+    [/simpl/, 'simplify'],
+    [/matter|important/, 'significance'],
+    [/key points|takeaway|highlight|sum up|sum it up|one line|remember|main argument|key finding|gist|summar/, 'restate'],
+];
+function chipIntent(text: string): string {
+    const f = chipFamily(text);
+    for (const [re, intent] of INTENT_PATTERNS) {
+        if (re.test(f)) return intent;
+    }
+    return f;
+}
+
 // Always-answerable top-ups (pure restatements of stored content, anchored to
 // the cited title) used only when the gated angle set comes up short. Deep in
 // a conversation most families are already consumed, so this pool carries a
@@ -464,36 +495,37 @@ export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
         candidates.push({ label: `What else did I save on ${related}?`, question: `What else did I save on ${related}?` });
     }
 
-    // Dedupe by template family (NO-REPEAT RULE above) and drop anything whose
-    // family was already asked/tapped this conversation. Families come from the
-    // persisted user messages, so the rule survives reloads and re-anchoring.
+    // Dedupe by template family (NO-REPEAT RULE) and by intent group (INTENT
+    // RULE) — and drop anything whose family OR intent was already asked this
+    // conversation. Both come from the persisted user messages, so the rules
+    // survive reloads and re-anchoring.
     const asked = new Set(askedTexts.map(chipFamily));
+    const askedIntents = new Set(askedTexts.map(chipIntent));
     const seen = new Set<string>();
-    let chips = candidates.filter(c => {
+    const seenIntents = new Set<string>();
+    const admit = (c: FollowUpChip): boolean => {
         const qf = chipFamily(c.question);
         const lf = chipFamily(c.label);
+        const intent = chipIntent(c.label);
         if (seen.has(qf) || seen.has(lf) || asked.has(qf) || asked.has(lf)) return false;
+        if (seenIntents.has(intent) || askedIntents.has(intent)) return false;
         seen.add(qf);
         seen.add(lf);
+        seenIntents.add(intent);
         return true;
-    });
+    };
+    let chips = candidates.filter(admit);
 
     // Deeper into the thread, prefer deepening/branching over restart-y chips.
     if (exchangeCount >= 2) {
         chips = [...chips.filter(c => DEEPENING_RE.test(c.label)), ...chips.filter(c => !DEEPENING_RE.test(c.label))];
     }
 
-    // Top up toward 3 without repeating any family used or already shown.
+    // Top up toward 3 without repeating any family OR intent used/shown.
     if (chips.length < 3) {
         for (const f of safeFallbacks(t)) {
             if (chips.length >= 3) break;
-            const qf = chipFamily(f.question);
-            const lf = chipFamily(f.label);
-            if (!seen.has(qf) && !seen.has(lf) && !asked.has(qf) && !asked.has(lf)) {
-                chips.push(f);
-                seen.add(qf);
-                seen.add(lf);
-            }
+            if (admit(f)) chips.push(f);
         }
     }
     return chips.slice(0, 3);
