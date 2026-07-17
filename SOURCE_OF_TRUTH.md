@@ -657,6 +657,9 @@ exact-match, capped.
   Settings-only on purpose — the mobile toolbar is a fixed three-zone bar and
   the product line is subtraction; no new top-level surface. Verified light +
   dark, desktop + 375px mobile, in the emulator UI; `tsc --noEmit` clean.
+  **Shipped:** merge `215efad` → Vercel (web); TestFlight run #105 = build
+  **1105** (also carries the Ask-chips intent-dedup/no-padding work from the
+  parallel session, which had only shipped to web).
 - **2026-07-17 — Ask follow-up chips: INTENT dedup — no more synonym
   rows (branch `claude/starred-chat-sidebar-persist-d35ztb`).** Owner repro
   (screenshot): after a video answer the row offered "key takeaways" + "give
