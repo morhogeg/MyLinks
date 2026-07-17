@@ -22,6 +22,10 @@ interface AddLinkFormProps {
     onLinkAdded: () => void;
     /** Hide the floating button (e.g. in Ask mode, where it's irrelevant). */
     hidden?: boolean;
+    /** Bumped by the bottom tab bar's center + (mobile v4); each increment
+        pops the capture form open. The mobile FAB itself is retired — on
+        phones the bar's + IS the capture affordance; desktop keeps the FAB. */
+    openSignal?: number;
     /** Publish in-flight analysis state so the page can show a persistent
      *  banner that outlives this form being collapsed/closed. */
     onAnalyzingChange?: (state: { active: boolean; progress: number; kind: 'link' | 'image' | 'video' }) => void;
@@ -79,7 +83,7 @@ const fetchWithTimeout = async (input: string, init: RequestInit) => {
 /**
  * Form for manually adding URLs
  */
-export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingChange }: AddLinkFormProps) {
+export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingChange, openSignal = 0 }: AddLinkFormProps) {
     const { uid } = useAuth();
     const toast = useToast();
     const router = useRouter();
@@ -92,6 +96,11 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
+
+    // Bottom-bar capture (mobile v4): each openSignal bump opens the form.
+    useEffect(() => {
+        if (openSignal > 0) setIsExpanded(true);
+    }, [openSignal]);
     const [progress, setProgress] = useState(0);
     const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -672,7 +681,9 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 </div>
             )}
 
-            <div className={`fixed bottom-6 right-4 sm:right-6 z-40 ${hidden ? 'hidden' : 'flex'} flex-col items-end gap-3`} style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+            {/* FAB is desktop-only now — on phones the bottom bar's center +
+                is the capture button (see BottomTabBar). */}
+            <div className={`fixed bottom-6 right-4 sm:right-6 z-40 ${hidden ? 'hidden' : 'hidden sm:flex'} flex-col items-end gap-3`} style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
                 {/* The in-flight "Analyzing… N%" indicator now lives at the page
                     level (AnalyzingBanner) so it persists after this form is
                     collapsed or closed — see page.tsx. */}

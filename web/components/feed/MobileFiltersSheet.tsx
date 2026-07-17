@@ -3,11 +3,9 @@
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { X, Tag as TagIcon, Shapes } from 'lucide-react';
 import Dropdown, { type DropdownOption } from '../Dropdown';
-import SourceFacetList from '../SourceFacetList';
 import TagExplorer from '../TagExplorer';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
-import type { SourceFacet } from '@/lib/source';
 import type { FilterType } from '@/lib/useFeedFilters';
 
 /**
@@ -25,11 +23,8 @@ export default function MobileFiltersSheet({
     setFilter,
     statusTriggerIcon,
     statusOptions,
-    sourceFacets,
     selectedSources,
     setSelectedSources,
-    onToggleSource,
-    onToggleSourceKeys,
     activeMobileFilters,
     setSelectedTags,
     categories,
@@ -48,11 +43,10 @@ export default function MobileFiltersSheet({
     setFilter: (filter: FilterType) => void;
     statusTriggerIcon: ReactNode;
     statusOptions: DropdownOption[];
-    sourceFacets: SourceFacet[];
+    /** Kept for the footer's "Clear all" — the sources UI itself moved to
+        MobileSourcesSheet. */
     selectedSources: Set<string>;
     setSelectedSources: Dispatch<SetStateAction<Set<string>>>;
-    onToggleSource: (key: string) => void;
-    onToggleSourceKeys: (keys: string[]) => void;
     activeMobileFilters: number;
     setSelectedTags: Dispatch<SetStateAction<Set<string>>>;
     categories: string[];
@@ -197,32 +191,8 @@ export default function MobileFiltersSheet({
                         </div>
                     )}
 
-                    {/* Sources — the grouped source list (platform → account).
-                        Replaces the old redundant row of platform icons; the
-                        Screenshots bucket is included in the list. */}
-                    {sourceFacets.length > 0 && (
-                        <div>
-                            <div className="flex items-center justify-between mb-2">
-                                <label className="block text-[11px] font-bold uppercase tracking-wider text-text-muted">Sources</label>
-                                {selectedSources.size > 0 && (
-                                    <button
-                                        onClick={() => setSelectedSources(new Set())}
-                                        className="text-[11px] font-semibold text-text-muted hover:text-accent transition-colors"
-                                    >
-                                        Clear
-                                    </button>
-                                )}
-                            </div>
-                            <div className="max-h-[38vh] overflow-y-auto overscroll-contain -mx-1 px-1">
-                                <SourceFacetList
-                                    facets={sourceFacets}
-                                    selected={selectedSources}
-                                    onToggleKey={onToggleSource}
-                                    onToggleKeys={onToggleSourceKeys}
-                                />
-                            </div>
-                        </div>
-                    )}
+                    {/* Sources moved OUT to their own dedicated sheet (the toolbar's
+                        globe / the header's globe glyph) — see MobileSourcesSheet. */}
 
                     {/* Footer */}
                     <div className="flex items-center gap-3 pt-1">

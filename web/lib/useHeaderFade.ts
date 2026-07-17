@@ -30,7 +30,11 @@ import { useCallback, useEffect, useRef } from 'react';
  * actually exists and tears it down when it goes away — an effect with []
  * deps would run against a null ref once and never recover.
  */
-export function useHeaderFade<T extends HTMLElement>() {
+export function useHeaderFade<T extends HTMLElement>(
+    /** Which screen edge the bar hugs: drift direction flips for a bottom bar
+        (it slides DOWN out of view). Same scrub physics either way. */
+    edge: 'top' | 'bottom' = 'top',
+) {
     const cleanupRef = useRef<(() => void) | null>(null);
 
     // Tear down on hook unmount too (React calls the callback with null when
@@ -73,7 +77,8 @@ export function useHeaderFade<T extends HTMLElement>() {
                 ? 'opacity 320ms var(--ease-modal), transform 320ms var(--ease-modal)'
                 : 'none';
             el.style.opacity = String(1 - p);
-            el.style.transform = reduced ? '' : `translateY(${(-DRIFT_PX * p).toFixed(2)}px)`;
+            const drift = (edge === 'bottom' ? DRIFT_PX : -DRIFT_PX) * p;
+            el.style.transform = reduced ? '' : `translateY(${drift.toFixed(2)}px)`;
             el.style.pointerEvents = p > 0.9 ? 'none' : '';
         };
 
@@ -121,5 +126,5 @@ export function useHeaderFade<T extends HTMLElement>() {
             el.style.pointerEvents = '';
             el.style.willChange = '';
         };
-    }, []);
+    }, [edge]);
 }

@@ -26,6 +26,9 @@ import FeedSkeleton from './feed/FeedSkeleton';
 import PullRefreshSpinner from './feed/PullRefreshSpinner';
 import MobileFiltersSheet from './feed/MobileFiltersSheet';
 import MobileSortSheet from './feed/MobileSortSheet';
+import MobileDisplaySheet from './feed/MobileDisplaySheet';
+import MobileSourcesSheet from './feed/MobileSourcesSheet';
+import BottomTabBar, { type BottomTab } from './BottomTabBar';
 import MobileTagExplorerDrawer from './feed/MobileTagExplorerDrawer';
 import Card from './Card';
 import ListCard from './ListCard';
@@ -76,7 +79,7 @@ const noop = () => { };
  * - Two card views (grid / list), plus review, ask, and collections modes
  * - Deep linking to specific links via URL params
  */
-function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void }) {
+function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void }) {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
@@ -224,6 +227,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
     const [isSortOpen, setIsSortOpen] = useState(false);
+    // Mobile v4 chrome: the header ⋯ (view/sort/filter/select) and the
+    // dedicated Sources sheet, both reachable from the page header's glyphs.
+    const [isDisplayOpen, setIsDisplayOpen] = useState(false);
+    const [isSourcesOpen, setIsSourcesOpen] = useState(false);
     // Mobile: the search bar is collapsed to an icon; tapping it expands a large
     // search field in place, so the card grid gets the vertical space back.
     const [isTagExplorerCollapsed, setIsTagExplorerCollapsed] = useState(false);
@@ -467,6 +474,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // the gesture never fights a modal's own scrolling.
     const anyOverlayOpen =
         activeLinkId !== null || isTagExplorerOpen || isFiltersOpen || isSortOpen ||
+        isDisplayOpen || isSourcesOpen ||
         reminderModalLink !== null || confirmDeleteId !== null || confirmBulkDelete ||
         addToCollectionLink !== null || collectionFormOpen || confirmDeleteCollection !== null ||
         manageCardsCollection !== null || shareCollection !== null || unlockPrompt !== null ||
@@ -997,6 +1005,35 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const lastLayout = useRef<'grid' | 'list' | 'review'>('grid');
     if (viewMode === 'grid' || viewMode === 'list' || viewMode === 'review') lastLayout.current = viewMode;
 
+    // ---- Mobile v4 chrome (bottom tab bar + header glyphs) ----
+    // Which bottom tab the current viewMode belongs to; detail places roll up
+    // to their parent tab so the bar's highlight never goes blank.
+    const activeTab: BottomTab =
+        viewMode === 'ask' ? 'ask'
+            : viewMode === 'collections' || viewMode === 'collection' ? 'collections'
+                : viewMode === 'digest' || viewMode === 'digestDetail' ? 'digest'
+                    : 'home';
+    useEffect(() => { onTabChange?.(activeTab); }, [activeTab, onTabChange]);
+
+    // Header glyphs (page.tsx) → feed actions. Same nonce-channel pattern as
+    // libraryFacet: the page can't reach into this component's state, so it
+    // hands down a command and we consume it here.
+    useEffect(() => {
+        if (!headerCommand) return;
+        if (headerCommand.action === 'search') openSearch();
+        else if (headerCommand.action === 'sources') setIsSourcesOpen(true);
+        else setIsDisplayOpen(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [headerCommand]);
+
+    const selectTab = (tab: BottomTab) => {
+        if (tab === activeTab && tab === 'home') { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+        if (tab === 'home') setViewMode(lastLayout.current);
+        else if (tab === 'collections') { setSelectedCollections(new Set()); setOpenCollectionId(null); setViewMode('collections'); }
+        else if (tab === 'ask') setViewMode('ask');
+        else setViewMode('digest');
+    };
+
     // Swipe in from the left edge to leave the Digest / Collections pages —
     // the same iOS-style back gesture used by the card detail and Ask screens.
     const [isMobileView, setIsMobileView] = useState(false);
@@ -1405,84 +1442,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 Done
                             </button>
                         </div>
-                    ) : (
-                    <div className="flex sm:hidden items-center gap-2">
-                        {/* Search — icon only; expands into the full field in place.
-                            Accent-filled while a query is active. */}
-                        <button
-                            data-tour="search"
-                            onClick={openSearch}
-                            aria-label="Search"
-                            className={`h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-full border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${searchQuery
-                                ? 'bg-accent text-white border-accent shadow-sm'
-                                : 'bg-card border-border-subtle text-text-muted hover:text-text hover:bg-card-hover'
-                                }`}
-                        >
-                            <Search className="w-4 h-4" />
-                        </button>
-                        {/* Filters — categories, tags, status, sort, sources in one
-                            sheet; one badge for everything active. */}
-                        <button
-                            onClick={() => setIsFiltersOpen(true)}
-                            aria-label="Filters — categories, tags, status, sort, sources"
-                            className={`relative h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-full border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${activeMobileFilters > 0
-                                ? 'bg-accent text-white border-accent shadow-sm'
-                                : 'bg-card border-border-subtle text-text-muted hover:text-text hover:bg-card-hover'
-                                }`}
-                        >
-                            <Filter className="w-4 h-4" />
-                            {activeMobileFilters > 0 && (
-                                <span className="absolute -top-1 -end-1 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold tabular-nums bg-white text-accent border border-background shadow-sm">
-                                    {activeMobileFilters}
-                                </span>
-                            )}
-                        </button>
-                        {/* Sort — its own chip, opening the designated sort sheet. Accent
-                            while the order is non-default so state is visible at a glance. */}
-                        <button
-                            onClick={() => setIsSortOpen(true)}
-                            aria-label="Sort order"
-                            className={`h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-full border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${sortBy !== 'date-desc'
-                                ? 'bg-accent text-white border-accent shadow-sm'
-                                : 'bg-card border-border-subtle text-text-muted hover:text-text hover:bg-card-hover'
-                                }`}
-                        >
-                            <ArrowUpDown className="w-4 h-4" />
-                        </button>
-                        <span className="flex-1" />
-                        {/* Tools capsule — the three view pills and select in ONE shape,
-                            separated by a hairline. */}
-                        <div data-tour="views" className="flex items-center h-10 px-1 rounded-full bg-card border border-border-subtle shrink-0">
-                            {viewModes.map(vm => {
-                                const active = viewMode === vm.key;
-                                return (
-                                    <button
-                                        key={vm.key}
-                                        onClick={() => setViewMode(vm.key)}
-                                        title={vm.hint}
-                                        aria-pressed={active}
-                                        aria-label={vm.hint}
-                                        className={`h-8 w-8 inline-flex items-center justify-center rounded-full cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${active
-                                            ? 'bg-accent text-white shadow-sm'
-                                            : 'text-text-muted hover:text-text hover:bg-card-hover'
-                                            }`}
-                                    >
-                                        {vm.icon}
-                                    </button>
-                                );
-                            })}
-                            <span className="w-px h-5 bg-border-subtle mx-1" aria-hidden="true" />
-                            <button
-                                onClick={() => setIsSelectionMode(true)}
-                                title="Select multiple"
-                                aria-label="Select multiple"
-                                className="h-8 w-8 inline-flex items-center justify-center rounded-full text-text-muted hover:text-accent hover:bg-card-hover cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                            >
-                                <CheckSquare className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
-                    )
+                    ) : null
                 )}
 
 
@@ -1510,12 +1470,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         </button>
                         {/* ONE consolidated Filter button (mirrors the iOS drawer): opens
                             the responsive filters modal holding Show (status), Categories,
-                            and Sources — replacing the old inline Status dropdown + Sources
-                            popover AND the full-width category chip row, which reclaims a
-                            whole line of vertical space for the feed. */}
+                            and Tags. Sources graduated to their own control (globe, next). */}
                         <button
                             onClick={() => setIsFiltersOpen(true)}
-                            aria-label="Filters — status, categories, sources"
+                            aria-label="Filters — status, categories, tags"
                             title="Filters"
                             className={`${ctrlBase} px-3.5 border relative ${activeMobileFilters > 0
                                 ? 'bg-accent text-white border-accent shadow-sm'
@@ -1528,6 +1486,19 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     {activeMobileFilters}
                                 </span>
                             )}
+                        </button>
+
+                        {/* Sources — the dedicated publisher/channel browser. */}
+                        <button
+                            onClick={() => setIsSourcesOpen(true)}
+                            aria-label="Sources"
+                            title="Sources"
+                            className={`${ctrlBase} px-3.5 border ${selectedSources.size > 0
+                                ? 'bg-accent text-white border-accent shadow-sm'
+                                : ctrlIdle}`}
+                        >
+                            <Globe className="w-4 h-4" />
+                            <span>Sources</span>
                         </button>
 
                         {/* Sort — ordering is orthogonal to filtering, so it stays its own control. */}
@@ -1544,51 +1515,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     {/* (Mobile: the Filter funnel lives in the search row above. Desktop:
                         the Filter button is in the left cluster of this row.) */}
 
-                    {/* Mobile Row 2 — DESTINATIONS as three EQUAL segments filling the
-                        row: Collections · Ask (dead center) · Digest. Equal widths make
-                        the geometry symmetric — same chip size, same gaps, Ask exactly
-                        centered — instead of unequal chips hugging the edges with lopsided
-                        whitespace. The view switcher + select chip moved up to Row 1, so
-                        those live here desktop-only (`hidden sm:contents`); on desktop
-                        every `sm:contents` wrapper dissolves back into the inline cluster
-                        (`sm:w-auto` on the chips restores their intrinsic width). */}
+                    {/* Destinations. Mobile v4: these moved to the bottom tab bar —
+                        this row is now desktop-only (`hidden sm:contents` wrappers). */}
                     <div className="flex items-center w-full gap-2 sm:w-auto">
-                        {/* Mobile: ONE continuous bar, three equal zones divided by
-                            hairlines (the QuickType-bar pattern) — a single object
-                            instead of three floating pills. Ask holds the center by
-                            construction. */}
-                        <div className="grid sm:hidden grid-cols-3 items-stretch h-10 w-full gap-2">
-                            <button
-                                data-tour="collections"
-                                onClick={() => setViewMode('collections')}
-                                title="Browse collections"
-                                aria-label="Browse collections"
-                                className="inline-flex items-center justify-center gap-1.5 rounded-full bg-card border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:bg-card-hover active:bg-card-hover transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                            >
-                                <Layers className="w-4 h-4" />
-                                <span>Collections</span>
-                            </button>
-                            <button
-                                data-tour="ask"
-                                onClick={() => setViewMode('ask')}
-                                title="Ask your brain"
-                                aria-label="Ask your brain"
-                                className="inline-flex items-center justify-center gap-1.5 rounded-full bg-card border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:bg-card-hover active:bg-card-hover transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                            >
-                                <MessagesSquare className="w-4 h-4" />
-                                <span>Ask</span>
-                            </button>
-                            <button
-                                onClick={() => setViewMode('digest')}
-                                title="Your curated digests"
-                                aria-label="Digest"
-                                className="inline-flex items-center justify-center gap-1.5 rounded-full bg-card border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:bg-card-hover active:bg-card-hover transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                            >
-                                <Newspaper className="w-4 h-4" />
-                                <span>Digest</span>
-                            </button>
-                        </div>
-
                         {/* Desktop: the original inline chips. */}
                         <div className="hidden sm:contents">
                             <button
@@ -1930,11 +1859,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     setFilter={handleFilterSelect}
                     statusTriggerIcon={statusTriggerIcon}
                     statusOptions={statusOptions}
-                    sourceFacets={sourceFacets}
                     selectedSources={selectedSources}
                     setSelectedSources={setSelectedSources}
-                    onToggleSource={handleToggleSource}
-                    onToggleSourceKeys={handleToggleSourceKeys}
                     activeMobileFilters={activeMobileFilters}
                     setSelectedTags={setSelectedTags}
                     categories={categories}
@@ -1955,6 +1881,38 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     setSortBy={setSortBy}
                     sortOptions={sortOptions}
                 />
+
+                {/* Display Sheet (Mobile) — header ⋯: view, sort, filter, select. */}
+                <MobileDisplaySheet
+                    isOpen={isDisplayOpen}
+                    onClose={() => setIsDisplayOpen(false)}
+                    viewModes={viewModes}
+                    viewMode={viewMode}
+                    setViewMode={(v) => setViewMode(v as typeof viewMode)}
+                    sortOptions={sortOptions}
+                    sortBy={sortBy}
+                    setSortBy={setSortBy}
+                    onOpenFilters={() => setIsFiltersOpen(true)}
+                    onSelectCards={() => { setViewMode(lastLayout.current); setIsSelectionMode(true); }}
+                />
+
+                {/* Sources Sheet — the dedicated publisher/channel browser (all
+                    breakpoints; sources moved OUT of the Filters sheet). */}
+                <MobileSourcesSheet
+                    isOpen={isSourcesOpen}
+                    onClose={() => setIsSourcesOpen(false)}
+                    sourceFacets={sourceFacets}
+                    selectedSources={selectedSources}
+                    setSelectedSources={setSelectedSources}
+                    onToggleSource={handleToggleSource}
+                    onToggleSourceKeys={handleToggleSourceKeys}
+                />
+
+                {/* Bottom tab bar (phones) — hidden in Ask, whose composer owns
+                    the bottom edge and the keyboard. */}
+                {viewMode !== 'ask' && (
+                    <BottomTabBar active={activeTab} onSelect={selectTab} onCapture={() => onCapture?.()} />
+                )}
 
                 {/* Tag Explorer Drawer (Mobile) */}
                 <MobileTagExplorerDrawer
@@ -2503,14 +2461,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     );
 }
 
-export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void }) {
+export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void }) {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-2 border-text/20 border-t-text rounded-full animate-spin" />
             </div>
         }>
-            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} libraryFacet={libraryFacet} onLibraryFacetApplied={onLibraryFacetApplied} onBackToInsights={onBackToInsights} />
+            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} libraryFacet={libraryFacet} onLibraryFacetApplied={onLibraryFacetApplied} onBackToInsights={onBackToInsights} headerCommand={headerCommand} onCapture={onCapture} onTabChange={onTabChange} />
         </Suspense>
     );
 }
