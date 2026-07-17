@@ -647,7 +647,32 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-17 (latest) — ABUSE HARDENING: embed-trigger cost backstop + live
+- **2026-07-18 (latest) — MOBILE v4 CHROME: bottom tab bar + one-line header +
+  dedicated Sources (owner-approved via 4 mockup rounds; commit `4028979`,
+  merge `4c5d10b`).** Phones only — desktop untouched. Bottom bar: Home /
+  Collections / raised gradient center CAPTURE (replaces the mobile FAB —
+  `AddLinkForm` grew `openSignal`; FAB is `hidden sm:flex`) / Ask / Digest
+  (`BottomTabBar.tsx`); hidden in Ask (composer owns the bottom edge);
+  fades with scroll via `useHeaderFade('bottom')` (hook grew an `edge` param).
+  Header is now the ONLY top chrome: bare glyphs (search / sources-globe /
+  ⋯ display) beside the gear, commanding Feed through a nonce channel; the
+  old mobile toolbar row + three-zone destinations row are DELETED. ⋯ opens
+  `MobileDisplaySheet` (view, sort, Filter…, Select cards — Files-app
+  pattern). Sources graduated OUT of the Filters sheet into a searchable,
+  count-sorted `MobileSourcesSheet` (globe glyph on mobile; new "Sources"
+  toolbar button on desktop). Merge conflict with the search-rebuild session
+  resolved by keeping the row deletion and routing the header search glyph
+  through their `openSearch()` (library prefetch preserved). Verified in the
+  emulator: tabs, capture, all sheets, filters-without-sources, selection
+  mode, light+dark, desktop intact; `tsc` clean. **Known-unverifiable in the
+  emulator: the scroll hide/reveal** — window scrolling is dead in the
+  Browser-pane emulator for BOTH old and new code (pre-existing pane quirk,
+  proven by stash test; static pages scroll fine), so the LinkedIn-style bar
+  fade needs owner on-device confirmation in build **1110** (run #110).
+  OWNER STEP: judge the whole redesign on-device; the old chrome is one
+  `git revert 4028979` away if it disappoints. Shipped: Vercel + TestFlight
+  run #110 = build **1110**.
+- **2026-07-17 — ABUSE HARDENING: embed-trigger cost backstop + live
   `shared_*` write lockdown (branch `claude/gemini-pricing-analysis-ab575e`).**
   Cost research first (owner asked pre-launch): per-card analysis ≈ $0.002
   (flash-lite $0.25/$1.50 per M, embeddings $0.15/M) → 100 cards ≈ $0.20;
