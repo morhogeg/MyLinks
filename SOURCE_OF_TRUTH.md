@@ -637,7 +637,49 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-17 (latest) — Settings → Insights: on-device library stats.** New
+- **2026-07-17 (latest) — SEARCH REBUILT FROM SCRATCH: simple, instant,
+  full-library title/summary matching; entire semantic/hybrid stack removed
+  (branch `claude/search-feature-rebuild-3d78ac`).** Owner: "search is still
+  not working — remove all search features and rebuild from the ground up;
+  dynamic as-you-type; must find by title or summary." The recurring breakage
+  all lived in the server half (rerank crashes, distance thresholds, junk
+  neighbours), so the rebuild is 100% client-side and literal: a card matches
+  when EVERY query word appears (substring) in its normalized TITLE or
+  SUMMARY — no vector search, no server round-trip, no debounce, no score
+  fusion. DELETED: `useSemanticSearch.ts` (server hybrid caller) and
+  `searchRank.ts` (field-weighted scoring + RRF fusion). NEW:
+  `web/lib/searchMatch.ts` (normalize — lowercase/NFKC/niqqud stripped/Hebrew
+  finals folded — tokenize, AND-match, titleHit flag) and
+  `web/lib/useSearchLibrary.ts` (`ensureLibrary()`: one-shot full links
+  fetch, cached per session, triggered from search-open/typing handlers —
+  event-driven, no set-state-in-effect). `useFeedFilters` now unions the
+  library snapshot into the window (window docs win) and sorts search results
+  title-matches-first, then recency; `Feed.tsx` activeLink falls back to the
+  library snapshot so an out-of-window result opens on tap (was impossible
+  before), and hints read "Searching your library…". Trade-offs accepted by
+  owner: cross-language matching (English query → Hebrew-only card) is gone;
+  tags/source/notes no longer match cards (the Sources typeahead row still
+  handles source queries). Backend untouched — `search.py` stays for
+  ask_brain; `search_links`/`search_links_http` remain deployed but have no
+  callers (removable later). VERIFIED end-to-end on Firebase emulators
+  (seeded 168-card library incl. Hebrew niqqud cards + cards 300d old beyond
+  the 150-card window): per-keystroke narrowing, title+summary+AND matching,
+  Hebrew normalization live, out-of-window recall AND its detail modal, tier
+  ordering (310d-old title match ranks above 12h-old summary match), empty
+  state, clear-restores-feed — mobile and desktop widths; `tsc`/eslint clean.
+  FOLLOW-UP same session (owner: "is it best practice? refine"): three
+  recall refinements, all literal/zero-junk — (1) English plural tolerance
+  ("muffins" finds "Muffin"; never applied to Hebrew tokens); (2) apostrophe/
+  geresh/gershayim folded out ("ציפס" finds "צ׳יפס", "dont" finds "Don't");
+  (3) mark-stripping generalized via NFKD+\p{M} ("cafe" finds "Café";
+  subsumes niqqud). Typo/fuzzy matching deliberately REJECTED (reintroduces
+  unexplainable results). Cross-language (English↔Hebrew) stays OUT of the
+  search bar by design — Ask Machina is the semantic surface; if ever needed
+  in-bar, the path is AI-stamped bilingual keywords at save time, not
+  vectors. All re-verified live on emulators + offline assertions.
+  SHIPPED this session — merge + TestFlight build noted below once run
+  numbers land.
+- **2026-07-17 — Settings → Insights: on-device library stats.** New
   "Your library → Insights" sub-screen in Settings (`settings/StatsView.tsx` +
   `lib/stats.ts`): stat tiles (total saves + this-month delta, % read, day
   streak), a 12-week saves column chart, category bars, top tags/domains, and a

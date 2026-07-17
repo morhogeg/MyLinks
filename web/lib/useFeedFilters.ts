@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link } from '@/lib/types';
 import { getSourceInfo, buildSourceFacets, sourceMatchesQuery } from '@/lib/source';
-import { PLATFORM_LABELS, prettyHost, type PlatformKey } from '@/lib/platform';
+import { PLATFORM_LABELS, type PlatformKey } from '@/lib/platform';
 import { isPending, getTimestampNumber } from '@/lib/feedUtils';
-import { tokenizeSearch, normalizeSearchText, getCardFields, scoreCard, fuseRankings, ranksFromScores, recencyOf } from '@/lib/searchRank';
+import { tokenizeSearch, matchCard } from '@/lib/searchMatch';
 
 export type FilterType = 'all' | 'unread' | 'read' | 'archived' | 'favorite' | 'reminders' | 'private';
 export type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
@@ -12,14 +12,16 @@ export type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
  * Feed selection state + the memoized filter/sort pipeline and facet counts,
  * extracted verbatim from Feed (R-3). Owns filter/category/tags/collections/
  * sources/sort selection; consumes the live links plus the LIVE search query
- * (keyword matching is instant, per keystroke — only the server call debounces)
- * + the server's hybrid results to produce `filteredLinks` and every facet.
+ * (matching is instant, per keystroke) + the full-library snapshot so search
+ * reaches cards older than the loaded window, producing `filteredLinks` and
+ * every facet.
  */
 export function useFeedFilters(
     links: Link[],
-    /** The LIVE query (not debounced): local scoring must react per keystroke. */
+    /** The LIVE query (not debounced): matching reacts per keystroke. */
     searchQuery: string,
-    searchResults: Link[],
+    /** Full-library snapshot (useSearchLibrary) — empty until search is first used. */
+    searchLibrary: Link[],
     /** Ids of collections marked Private — their members INHERIT privacy (see below). */
     privateCollectionIds: Set<string>,
 ) {
@@ -72,66 +74,37 @@ export function useFeedFilters(
     const contentLinks = useMemo(() => links.filter(isContentCard), [links, isContentCard]);
     const privateCards = useMemo(() => links.filter(isPrivateCard), [links, isPrivateCard]);
 
-    // Keyword-search tokens + normalized phrase for the LIVE query, prepped ONCE
-    // per keystroke (not per card). Tokens drive the scored AND-match; the phrase
-    // drives the exact-title bonus.
+    // Query words for the LIVE query, tokenized ONCE per keystroke (not per card).
     const queryTokens = useMemo(() => tokenizeSearch(searchQuery), [searchQuery]);
-    const queryPhrase = useMemo(() => normalizeSearchText(searchQuery.trim()), [searchQuery]);
 
-    // Base set for the filter pipeline. When a server search is active, UNION
-    // its results (full Link objects) into the loaded window so a match OLDER
-    // than the window still renders — old-item recall is the whole point of the
-    // server's hybrid search (vector + newest-1000 lexical scan), and a pure
-    // window membership test hides it. The unioned docs are deduped by id
-    // (window docs win) and run through the SAME pending/privacy predicate as
-    // the window, then flow through every facet/status filter below, so e.g.
+    // Base set for the filter pipeline. While searching, UNION the full-library
+    // snapshot (useSearchLibrary) into the loaded window so a match OLDER than
+    // the window still renders — the window alone can't reach old cards. The
+    // unioned docs are deduped by id (window docs win — they're the live
+    // snapshot) and run through the SAME pending/privacy predicate as the
+    // window, then flow through every facet/status filter below, so e.g.
     // archived filtering stays consistent.
     const searchBase = useMemo(() => {
         const base = filter === 'private' ? privateCards : contentLinks;
-        if (!searchQuery.trim() || searchResults.length === 0) return base;
+        if (queryTokens.length === 0 || searchLibrary.length === 0) return base;
         const gate = filter === 'private' ? isPrivateCard : isContentCard;
         const seen = new Set(base.map((l) => l.id));
-        const extra = searchResults.filter((r) => !seen.has(r.id) && gate(r));
+        const extra = searchLibrary.filter((r) => !seen.has(r.id) && gate(r));
         return extra.length ? base.concat(extra) : base;
-    }, [filter, privateCards, contentLinks, searchQuery, searchResults, isPrivateCard, isContentCard]);
+    }, [filter, privateCards, contentLinks, queryTokens, searchLibrary, isPrivateCard, isContentCard]);
 
-    // Server hybrid results as id → rank (server order is already quality-gated
-    // + reranked server-side). Set-membership also gates the search filter.
-    const serverRanks = useMemo(() => {
-        const m = new Map<string, number>();
-        searchResults.forEach((r, i) => m.set(r.id, i));
-        return m;
-    }, [searchResults]);
-
-    // Local relevance scores for the live query — the INSTANT half of hybrid
-    // search, recomputed per keystroke (field caching keeps it cheap). Folds the
-    // precise source/host match in as a modest fixed score so "twitter" still
-    // surfaces every X card even when the word appears nowhere in the text.
-    const kwScores = useMemo(() => {
-        const m = new Map<string, number>();
-        if (!searchQuery.trim()) return m;
-        const rawQuery = searchQuery.toLowerCase();
+    // The matches for the live query: id → whether the TITLE covered every
+    // query word (those rank above summary matches). Recomputed per keystroke;
+    // per-card normalized text is cached, so this is a cheap substring pass.
+    const searchMatches = useMemo(() => {
+        const m = new Map<string, boolean>();
+        if (queryTokens.length === 0) return m;
         for (const link of searchBase) {
-            let s = queryTokens.length > 0 ? scoreCard(getCardFields(link), queryTokens, queryPhrase) : 0;
-            if (s === 0 && (
-                sourceMatchesQuery(getSourceInfo(link), rawQuery) ||
-                prettyHost(link.url).toLowerCase().includes(rawQuery)
-            )) {
-                s = 3; // ~source-field weight: a real match, below any title hit
-            }
-            if (s > 0) m.set(link.id, s);
+            const match = matchCard(link, queryTokens);
+            if (match) m.set(link.id, match.titleHit);
         }
         return m;
-    }, [searchBase, searchQuery, queryTokens, queryPhrase]);
-
-    // Fused relevance: reciprocal-rank fusion of the local scored ranking and
-    // the server's hybrid ranking. A card both halves agree on rises above a
-    // card only one half found; before the server responds this is simply the
-    // local order, so results never jump from "date order" to "relevance order".
-    const fusedScores = useMemo(() => {
-        if (!searchQuery.trim()) return new Map<string, number>();
-        return fuseRankings(ranksFromScores(Array.from(kwScores.entries())), serverRanks);
-    }, [searchQuery, kwScores, serverRanks]);
+    }, [searchBase, queryTokens]);
 
     // 4. Hybrid Search Logic — memoized so a banner tick or any unrelated state
     // change (search typing, overlay toggles) doesn't re-run the 6-stage filter +
@@ -172,21 +145,19 @@ export function useFeedFilters(
             return selectedSources.has(getSourceInfo(link).key);
         })
         .filter((link) => {
-            // Apply search (hybrid): the local scored match (kwScores already
-            // folds in the token AND-match plus the precise source/host tests)
-            // OR membership in the server's quality-gated hybrid results.
-            if (!searchQuery.trim()) return true;
-            return kwScores.has(link.id) || serverRanks.has(link.id);
+            // Apply search: every query word in the title or the summary.
+            if (queryTokens.length === 0) return true;
+            return searchMatches.has(link.id);
         })
         .sort((a, b) => {
-            // Relevance order while searching (fused local + server ranking,
-            // recency tiebreak) — unless the user explicitly picked a different
-            // sort, which then wins outright.
-            if (searchQuery.trim() && sortBy === 'date-desc') {
-                const fa = fusedScores.get(a.id) ?? 0;
-                const fb = fusedScores.get(b.id) ?? 0;
-                if (fa !== fb) return fb - fa;
-                return recencyOf(b) - recencyOf(a);
+            // While searching (under the default sort): title matches first,
+            // then summary matches, newest first within each tier. An explicit
+            // non-default sort wins outright.
+            if (queryTokens.length > 0 && sortBy === 'date-desc') {
+                const ta = searchMatches.get(a.id) ? 1 : 0;
+                const tb = searchMatches.get(b.id) ? 1 : 0;
+                if (ta !== tb) return tb - ta;
+                return getTimestampNumber(b.createdAt) - getTimestampNumber(a.createdAt);
             }
 
             if (filter === 'reminders') {
@@ -207,7 +178,7 @@ export function useFeedFilters(
                     return 0;
             }
         }),
-        [searchBase, filter, selectedCategory, selectedTags, selectedCollections, selectedSources, searchQuery, kwScores, serverRanks, fusedScores, sortBy]);
+        [searchBase, filter, selectedCategory, selectedTags, selectedCollections, selectedSources, queryTokens, searchMatches, sortBy]);
 
     // Faceted counts — the numbers update live as you tap. Each facet's counts are
     // computed against the OTHER facet's current selection (but never its own), so
