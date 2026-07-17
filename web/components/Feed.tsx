@@ -18,7 +18,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { useLinks } from '@/lib/useLinks';
-import { useSemanticSearch } from '@/lib/useSemanticSearch';
+import { useSearchLibrary } from '@/lib/useSearchLibrary';
 import { useLinkActions } from '@/lib/useLinkActions';
 import { useFeedFilters, type FilterType, type SortType } from '@/lib/useFeedFilters';
 import { isPending, getTimestampNumber } from '@/lib/feedUtils';
@@ -71,7 +71,7 @@ const noop = () => { };
  * Main feed component displaying saved links
  * Features:
  * - Real-time updates via Firestore onSnapshot
- * - Keyword + semantic search
+ * - Instant title/summary search over the full library
  * - Filter by status, category, and tags
  * - Two card views (grid / list), plus review, ask, and collections modes
  * - Deep linking to specific links via URL params
@@ -104,13 +104,25 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         return links.filter((l) => !isEffectivelyPrivateCard(l));
     }, [links, vaultLocked, isEffectivelyPrivateCard]);
     const [searchQuery, setSearchQuery] = useState('');
-    // Debounced, generation-guarded semantic search (R-3: useSemanticSearch).
-    const { debouncedQuery, isSearching, searchResults, searchError } = useSemanticSearch(searchQuery, uid);
-    // True while the server half of the search hasn't answered for what's typed
-    // — either the request is in flight or the debounce hasn't fired yet. Drives
-    // the "Searching by meaning…" hints so a just-typed query never flashes a
-    // premature "No matches".
-    const awaitingServer = isSearching || (!!searchQuery.trim() && searchQuery !== debouncedQuery);
+    // Search field open state (icon → expanded input, both breakpoints).
+    // Declared here so opening search prefetches the library below.
+    const [searchOpen, setSearchOpen] = useState(false);
+    // Full-library snapshot for search — fetched once when search is first
+    // opened/typed, so matches reach cards older than the loaded feed window.
+    const { libraryLinks, isLoadingLibrary, ensureLibrary } = useSearchLibrary(uid);
+    // Open the search field (icon tap). Prefetches the library so full-history
+    // matches are usually ready by the time the user finishes typing.
+    const openSearch = useCallback(() => { ensureLibrary(); setSearchOpen(true); }, [ensureLibrary]);
+    // Every keystroke routes through here so the library fetch can't be missed
+    // (e.g. a query arriving without the icon tap).
+    const updateSearchQuery = useCallback((value: string) => {
+        if (value.trim()) ensureLibrary();
+        setSearchQuery(value);
+    }, [ensureLibrary]);
+    // True while the library fetch is still in flight for an active query —
+    // drives the "Searching your library…" hints so a fresh query never
+    // flashes a premature "No matches".
+    const searchingLibrary = isLoadingLibrary && !!searchQuery.trim();
     // Selection state + filter/sort pipeline + facet counts (R-3: useFeedFilters).
     const {
         filter, setFilter,
@@ -131,8 +143,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         handleToggleSourceKeys,
         matchingSources,
         reminderCount,
-    // LIVE query in, so keyword ranking is instant; only the server call debounces.
-    } = useFeedFilters(visibleLinks, searchQuery, searchResults, privateCollectionIds);
+    // LIVE query in — matching is instant per keystroke, no debounce anywhere.
+    } = useFeedFilters(visibleLinks, searchQuery, libraryLinks, privateCollectionIds);
     // Card action handlers that depend only on [uid, toast] (R-3: useLinkActions).
     const {
         handleStatusChange,
@@ -164,11 +176,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         if (!activeLinkId) return null;
         const inWindow = visibleLinks.find(l => l.id === activeLinkId);
         if (inWindow) return inWindow;
-        const fetched = fetchedCards[activeLinkId];
-        if (!fetched) return null;
-        if (vaultLocked && isEffectivelyPrivateCard(fetched)) return null;
-        return fetched;
-    }, [activeLinkId, visibleLinks, fetchedCards, vaultLocked, isEffectivelyPrivateCard]);
+        // Out-of-window cards: a directly-fetched deep-link doc, else the
+        // search library snapshot (how an old search result opens on tap).
+        // Both go through the SAME vault gate as the window.
+        const fallback = fetchedCards[activeLinkId] ?? libraryLinks.find(l => l.id === activeLinkId);
+        if (!fallback) return null;
+        if (vaultLocked && isEffectivelyPrivateCard(fallback)) return null;
+        return fallback;
+    }, [activeLinkId, visibleLinks, fetchedCards, libraryLinks, vaultLocked, isEffectivelyPrivateCard]);
 
     // Open a card reached from another card's "Related" list — remember where we
     // came from so the back-stack can return there.
@@ -208,7 +223,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [isTagExplorerOpen, setIsTagExplorerOpen] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
-    const [searchOpen, setSearchOpen] = useState(false);
     const [isSortOpen, setIsSortOpen] = useState(false);
     // Mobile: the search bar is collapsed to an icon; tapping it expands a large
     // search field in place, so the card grid gets the vertical space back.
@@ -1257,7 +1271,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             autoFocus
                             dir="auto"
                             value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onChange={(e) => updateSearchQuery(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Escape') { if (searchQuery) setSearchQuery(''); else setSearchOpen(false); } }}
                             placeholder="Search Machina…"
                             className="w-full pl-9 pr-10 py-2 bg-card rounded-xl text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent/30 transition-all"
@@ -1324,7 +1338,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     enterKeyHint="search"
                                     dir="auto"
                                     value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onChange={(e) => updateSearchQuery(e.target.value)}
                                     onKeyDown={(e) => { if (e.key === 'Escape') setSearchOpen(false); }}
                                     placeholder="Search Machina…"
                                     className="w-full h-10 ps-9 pe-9 bg-card border border-border-subtle rounded-full text-[15px] text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-transparent transition-shadow"
@@ -1352,7 +1366,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             Accent-filled while a query is active. */}
                         <button
                             data-tour="search"
-                            onClick={() => setSearchOpen(true)}
+                            onClick={openSearch}
                             aria-label="Search"
                             className={`h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-full border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${searchQuery
                                 ? 'bg-accent text-white border-accent shadow-sm'
@@ -1440,7 +1454,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             query is active so it reads as "on" even when collapsed. */}
                         <button
                             data-tour="search"
-                            onClick={() => setSearchOpen(o => !o)}
+                            onClick={() => (searchOpen ? setSearchOpen(false) : openSearch())}
                             aria-label="Search"
                             title="Search"
                             className={`${ctrlBase} w-9 px-0 border ${searchQuery
@@ -1936,22 +1950,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             )}
                         </div>
                     )}
-                    {/* Meaning-search status. Keyword matches render immediately
-                        (the hybrid filter runs client-side), so while the semantic
-                        half is still in flight — or if it failed — show a subtle
-                        line above the grid instead of blocking the results. The
-                        empty state owns the no-results case (spinner there). */}
-                    {(viewMode === 'grid' || viewMode === 'list') && searchQuery.trim()
-                        && filteredLinks.length > 0 && (awaitingServer || searchError) && (
+                    {/* Library-fetch status. Matches from the loaded window render
+                        immediately; while the one-time full-library fetch is still
+                        in flight, older cards may be missing — show a subtle line
+                        above the grid instead of blocking the results. The empty
+                        state owns the no-results case (spinner there). */}
+                    {(viewMode === 'grid' || viewMode === 'list') && filteredLinks.length > 0 && searchingLibrary && (
                         <div className="flex items-center gap-2 mb-4 text-xs" aria-live="polite">
-                            {awaitingServer ? (
-                                <>
-                                    <div className="w-3.5 h-3.5 border-2 border-accent/20 border-t-accent rounded-full animate-spin shrink-0" />
-                                    <span className="text-text-muted font-medium">Searching by meaning…</span>
-                                </>
-                            ) : (
-                                <span className="text-text-muted">Showing keyword matches — meaning search is unavailable right now.</span>
-                            )}
+                            <div className="w-3.5 h-3.5 border-2 border-accent/20 border-t-accent rounded-full animate-spin shrink-0" />
+                            <span className="text-text-muted font-medium">Searching your library…</span>
                         </div>
                     )}
                     {viewMode === 'collection' ? (
@@ -2012,9 +2019,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             const empty = searchQuery
                                 ? {
                                     Icon: Search, title: 'No matches',
-                                    body: awaitingServer ? null
-                                        : searchError ? 'No keyword matches, and meaning search is unavailable right now.'
-                                        : 'Try different words — search reads titles, summaries, and meaning.',
+                                    body: searchingLibrary ? null
+                                        : 'Try different words — search looks in card titles and summaries.',
                                 }
                                 : filter === 'reminders' ? {
                                     Icon: Bell, title: 'No reminders set',
@@ -2062,10 +2068,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 <empty.Icon className="w-7 h-7 text-accent" strokeWidth={1.75} />
                             </div>
                             <h3 className="text-base font-bold text-text">{empty.title}</h3>
-                            {searchQuery && awaitingServer && (
+                            {searchingLibrary && (
                                 <div className="flex items-center justify-center gap-2 text-accent mt-2">
                                     <div className="w-4 h-4 border-2 border-accent/20 border-t-accent rounded-full animate-spin" />
-                                    <span className="text-sm font-medium">Searching by meaning…</span>
+                                    <span className="text-sm font-medium">Searching your library…</span>
                                 </div>
                             )}
                             {empty.body && (
@@ -2075,7 +2081,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 filters): offer a one-tap seeded example so Ask /
                                 search / Collections demo against something real
                                 in the first minute — instead of a dead end. */}
-                            {links.length === 0 && filter === 'all' && !searchQuery && !debouncedQuery &&
+                            {links.length === 0 && filter === 'all' && !searchQuery &&
                                 selectedCategory.size === 0 && selectedTags.size === 0 &&
                                 selectedSources.size === 0 && selectedCollections.size === 0 && (
                                 <button
