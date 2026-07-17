@@ -30,8 +30,9 @@ export default function Home() {
   const { uid, loading } = useAuth();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   // When set, the Settings sheet opens straight to that sub-screen (e.g. the
-  // digest settings, deep-linked from the empty Digest page).
-  const [settingsSection, setSettingsSection] = useState<'digest' | null>(null);
+  // digest settings deep-linked from the empty Digest page, or Insights from
+  // the feed's "Back to Insights" chip).
+  const [settingsSection, setSettingsSection] = useState<'digest' | 'stats' | null>(null);
   // A tapped Insights row (category/tag/source): Settings closes and Feed
   // applies this as its active filter, then clears it via the callback.
   const [libraryFacet, setLibraryFacet] = useState<LibraryFacetRequest | null>(null);
@@ -163,7 +164,7 @@ export default function Home() {
         {/* The feed is already live via onSnapshot, so a new save streams in on
             its own — no remount needed. (Previously keyed on refreshKey, which
             tore down listeners and wiped view/filter/search on every add.) */}
-        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onHasCardsChange={setHasCards} libraryFacet={libraryFacet} onLibraryFacetApplied={() => setLibraryFacet(null)} />
+        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onHasCardsChange={setHasCards} libraryFacet={libraryFacet} onLibraryFacetApplied={() => setLibraryFacet(null)} onBackToInsights={() => { setSettingsSection('stats'); setIsSettingsOpen(true); }} />
       </main>
 
       {/* Add Link FAB — hidden in Ask & Collections (neither view captures links). */}

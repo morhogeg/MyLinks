@@ -30,9 +30,10 @@ interface SettingsModalProps {
     onClose: () => void;
     /** Replay the first-run product tour. */
     onReplayTour?: () => void;
-    /** Deep-link the sheet straight to a sub-screen on open (e.g. the digest
-        settings, reached as main → Reminders & Digest). */
-    initialSection?: 'digest';
+    /** Deep-link the sheet straight to a sub-screen on open: the digest
+        settings (main → Reminders & Digest) or Insights (main → Insights,
+        used by the feed's "Back to Insights" chip). */
+    initialSection?: 'digest' | 'stats';
     /** Insights row tapped: open the library filtered to this facet. The
         HANDLER owns closing the sheet (page.tsx closes it, then hands the
         request to Feed). */
@@ -207,7 +208,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
         if (isOpen && uid) {
             // Deep-link: open straight to the digest screen (main → Reminders &
             // Digest) so Back still walks out one level at a time.
-            setStack(initialSection === 'digest' ? ['main', 'resurfacing'] : ['main']);
+            setStack(initialSection === 'digest' ? ['main', 'resurfacing'] : initialSection === 'stats' ? ['main', 'stats'] : ['main']);
             setTopicQuery('');
             loadSettings();
             loadDigestExtras();
