@@ -17,6 +17,7 @@ import re
 import json
 import hmac
 import html as _html
+import math
 import logging
 import requests
 from typing import Optional
@@ -93,7 +94,13 @@ APP_URL = os.environ.get("APP_URL", "https://secondbrain-app-94da2.web.app")
 def _allowed_origins() -> list:
     raw = os.environ.get("CORS_ORIGIN", "").strip()
     if raw:
-        return [o.strip() for o in raw.split(",") if o.strip()]
+        parsed = [o.strip() for o in raw.split(",") if o.strip()]
+        # A degenerate value (e.g. ",") must fall back to the defaults — an
+        # empty allowlist would IndexError in _resolve_origin while building
+        # headers, i.e. before any handler's try: a total outage from one env
+        # var typo.
+        if parsed:
+            return parsed
     return [
         APP_URL,
         "https://secondbrain-app-94da2.firebaseapp.com",
@@ -330,7 +337,11 @@ def _sanitize_history(history) -> list:
     if not isinstance(history, list):
         return []
     cleaned = []
-    for item in history[-MAX_HISTORY_ITEMS:]:
+    # Walk newest-first and cap AFTER filtering: with the old `[-N:]` slice, a
+    # payload whose newest N entries were junk evicted every real turn.
+    for item in reversed(history):
+        if len(cleaned) >= MAX_HISTORY_ITEMS:
+            break
         if not isinstance(item, dict):
             continue
         role = item.get("role")
@@ -340,6 +351,7 @@ def _sanitize_history(history) -> list:
         if not isinstance(content, str):
             content = "" if content is None else str(content)
         cleaned.append({"role": role, "content": content[:MAX_HISTORY_CONTENT_LENGTH]})
+    cleaned.reverse()
     return cleaned
 
 
@@ -354,10 +366,18 @@ def _sanitize_tags(tags) -> list:
     if not isinstance(tags, list):
         return []
     cleaned = []
-    for tag in tags[:MAX_TAGS]:
+    for tag in tags:
+        # Only strings and real numbers count as tags. None/bools would coerce
+        # to the literal strings "None"/"False" and leak into the prompt.
+        if not isinstance(tag, (str, int, float)) or isinstance(tag, bool):
+            continue
         s = (tag if isinstance(tag, str) else str(tag)).strip()[:MAX_TAG_LENGTH]
         if s:
             cleaned.append(s)
+        # Cap AFTER filtering: with the old `tags[:MAX_TAGS]` slice, a payload
+        # padded with junk/empty entries evicted every real tag.
+        if len(cleaned) >= MAX_TAGS:
+            break
     return cleaned
 
 
@@ -505,6 +525,10 @@ def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = Non
 
 def _format_duration(minutes: int) -> str:
     """Render a watch-time label, e.g. 12 -> '12 min', 75 -> '1h 15m'."""
+    try:
+        minutes = int(minutes)  # a float (or NaN) would crash the :02d format
+    except (TypeError, ValueError, OverflowError):
+        return ""
     if not minutes or minutes < 1:
         return ""
     if minutes < 60:
@@ -925,8 +949,14 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         if not data:
             return _error_response("Invalid JSON body", 400, headers)
 
+        # Non-string scalars (a number/list where a string belongs) are treated
+        # as absent: they must produce a 400, not an AttributeError→500.
         url = data.get('url')
+        if not isinstance(url, str):
+            url = ''
         text = data.get('text') or data.get('note')
+        if not isinstance(text, str):
+            text = ''
         existing_tags = _sanitize_tags(data.get('existingTags'))
 
         # NOTE PATH — a URL-less thought captured from the "Note" tab. Analyze the
@@ -1135,7 +1165,8 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             if rl:
                 return rl
 
-        question = (data.get('question') or '').strip()
+        question = data.get('question')
+        question = question.strip() if isinstance(question, str) else ''
         # Clamp client-supplied history before it reaches the Gemini prompt
         # (last few turns, per-item length cap, roles whitelisted).
         history = _sanitize_history(data.get('history'))
@@ -1360,7 +1391,8 @@ def search_links_http(req: https_fn.Request) -> https_fn.Response:
             if rl:
                 return rl
 
-        query_text = (data.get('query') or '').strip()
+        query_text = data.get('query')
+        query_text = query_text.strip() if isinstance(query_text, str) else ''
         if not query_text:
             return _error_response("query is required", 400, headers)
         if len(query_text) > MAX_QUESTION_LENGTH:
@@ -1404,7 +1436,7 @@ def get_article(req: https_fn.Request) -> https_fn.Response:
     try:
         data = req.get_json()
         url = (data or {}).get('url')
-        if not url:
+        if not url or not isinstance(url, str):
             return _error_response("url is required", 400, headers)
         if len(url) > MAX_URL_LENGTH:
             return _error_response("URL is too long", 400, headers)
@@ -1564,11 +1596,16 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
 # ─────────────────────────────────────────────
 
 def _extract_url(*candidates: str) -> str:
-    """Return the first http(s) URL found across the candidate strings."""
+    """Return the first http(s) URL found across the candidate strings.
+
+    Candidates come straight from a client JSON body — a non-string entry is
+    skipped (re.search on a number raises). Scheme matching is case-insensitive
+    (an uppercase HTTPS:// share must queue as a URL capture, not degrade to a
+    note card)."""
     for candidate in candidates:
-        if not candidate:
+        if not candidate or not isinstance(candidate, str):
             continue
-        match = re.search(r'https?://[^\s]+', candidate)
+        match = re.search(r'https?://[^\s]+', candidate, re.IGNORECASE)
         if match:
             return match.group(0)
     return ""
@@ -2071,7 +2108,8 @@ def _device_token_request(req):
         return None, None, _error_response("No workspace linked to this account", 403, headers)
 
     data = req.get_json(silent=True) or {}
-    token = (data.get("token") or "").strip()
+    token = data.get("token")
+    token = token.strip() if isinstance(token, str) else ""
     if not token or len(token) > MAX_DEVICE_TOKEN_LENGTH:
         return None, None, _error_response("Missing or invalid token", 400, headers)
 
@@ -2573,6 +2611,8 @@ def _to_ms(value) -> Optional[int]:
     """Coerce a Firestore timestamp field to epoch-ms. Handles our int-ms writes
     and Firestore `Timestamp`/`datetime` (from `serverTimestamp()`); returns None
     for anything unrecognised (or a still-unresolved pending server timestamp)."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return None  # NaN/inf: int() would raise, and one poisoned doc must not abort the janitor sweep
     if isinstance(value, (int, float)):
         return int(value)
     if hasattr(value, "timestamp"):

@@ -61,6 +61,11 @@ def _harness(monkeypatch):
 def test_options_returns_cors_preflight_204():
     resp = main.search_links_http(_Req(method="OPTIONS"))
     assert resp.status == 204
+    # The headers ARE the point of a preflight — the WKWebView failure this
+    # documents was a headers problem, so pin them, not just the status.
+    assert resp.headers.get("Access-Control-Allow-Origin")
+    assert "POST" in resp.headers.get("Access-Control-Allow-Methods", "")
+    assert resp.headers.get("Access-Control-Allow-Headers")
 
 
 def test_missing_auth_and_uid_is_rejected(monkeypatch):
@@ -74,6 +79,15 @@ def test_missing_auth_and_uid_is_rejected(monkeypatch):
 
 def test_empty_query_is_rejected():
     resp = main.search_links_http(_Req(json_body={"query": "   ", "uid": "user1"}))
+    assert resp.status == 400
+
+
+def test_non_string_query_is_400_not_500(monkeypatch):
+    # {"query": 123} used to reach `.strip()` → AttributeError → 500. A wrong
+    # type in a client payload is the client's error: 400.
+    monkeypatch.setattr(main, "perform_hybrid_search",
+                        lambda *a, **k: pytest.fail("search ran on junk query"))
+    resp = main.search_links_http(_Req(json_body={"query": 123, "uid": "user1"}))
     assert resp.status == 400
 
 
@@ -96,3 +110,56 @@ def test_happy_path_runs_hybrid_search(monkeypatch):
     assert captured["args"] == ("user1", "dogs", 5)
     payload = json.loads(resp.body)
     assert [c["id"] for c in payload["links"]] == ["a", "b"]
+
+
+# ── parse_search_payload: the shared callable/HTTP validation contract ──────
+
+from search import parse_search_payload
+
+
+def test_search_payload_valid():
+    assert parse_search_payload({"query": "  dogs  ", "limit": 5}) == ("dogs", 5)
+
+
+@pytest.mark.parametrize("bad", [
+    None,                       # data absent entirely (req.data = None)
+    {},                         # no query
+    {"query": "   "},           # blank
+    {"query": 123},             # wrong type — used to 500 via .strip()
+    {"query": ["dogs"]},        # wrong type
+])
+def test_search_payload_rejects_bad_query(bad):
+    with pytest.raises(ValueError):
+        parse_search_payload(bad)
+
+
+def test_search_payload_rejects_over_length_query():
+    with pytest.raises(ValueError):
+        parse_search_payload({"query": "x" * (main.MAX_QUESTION_LENGTH + 1)})
+    # Boundary: exactly at the cap is accepted.
+    q, _ = parse_search_payload({"query": "x" * main.MAX_QUESTION_LENGTH})
+    assert len(q) == main.MAX_QUESTION_LENGTH
+
+
+@pytest.mark.parametrize("raw,expected", [
+    ("10", 10),      # numeric string coerces (used to TypeError the slice)
+    ("junk", 10),    # unparseable → default
+    (None, 10),
+    (0, 1),          # clamp floor — 0 used to silently blank all results
+    (-5, 1),         # negative used to slice off the BEST results
+    (500, 50),       # clamp ceiling
+])
+def test_search_payload_clamps_limit(raw, expected):
+    assert parse_search_payload({"query": "q", "limit": raw}) == ("q", expected)
+
+
+# ── CORS origin resolution ──────────────────────────────────────────────────
+
+def test_degenerate_cors_origin_env_falls_back_to_defaults(monkeypatch):
+    # CORS_ORIGIN="," used to parse to an empty allowlist → IndexError while
+    # building headers — before any handler try — i.e. a total outage on every
+    # endpoint from one env-var typo.
+    monkeypatch.setenv("CORS_ORIGIN", ", ,")
+    origin = main._resolve_origin(None)
+    assert origin  # a real default, not an IndexError
+    assert origin in main._allowed_origins()

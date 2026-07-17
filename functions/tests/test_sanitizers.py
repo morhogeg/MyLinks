@@ -91,6 +91,15 @@ def test_history_coerces_non_string_content():
     assert out_none[0]["content"] == ""
 
 
+def test_history_junk_padding_does_not_evict_real_turns():
+    # Adversarial: junk appended after real turns must not consume the cap —
+    # the old [-N:] slice let N trailing junk items evict every real turn.
+    real = [{"role": "user", "content": f"m{i}"} for i in range(3)]
+    junk = ["x"] * (MAX_HISTORY_ITEMS + 2)
+    out = _sanitize_history(real + junk)
+    assert [t["content"] for t in out] == ["m0", "m1", "m2"]
+
+
 # ── _sanitize_tags ────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("bad", [None, "notalist", 5, {"a": 1}])
@@ -117,3 +126,17 @@ def test_tags_drops_empty_and_whitespace_only():
 def test_tags_coerces_non_strings():
     out = _sanitize_tags([123, "tag"])
     assert out == ["123", "tag"]
+
+
+def test_tags_drops_none_and_bools():
+    # None/True/False used to coerce to the literal strings "None"/"False" and
+    # leak into the Gemini prompt as real tags.
+    assert _sanitize_tags([None, False, True, "ok"]) == ["ok"]
+
+
+def test_tags_junk_padding_does_not_evict_real_tags():
+    # Adversarial: MAX_TAGS empty strings followed by a real tag must not
+    # zero out existingTags — the old tags[:MAX_TAGS] slice capped before
+    # filtering, so junk consumed the whole budget.
+    out = _sanitize_tags([""] * (MAX_TAGS + 5) + ["real"])
+    assert out == ["real"]

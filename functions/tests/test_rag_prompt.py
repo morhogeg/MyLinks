@@ -85,6 +85,29 @@ def test_card_block_includes_multi_note_array():
     assert "second note" in block
 
 
+def test_card_block_survives_non_string_tags():
+    # One numeric tag on a retrieved card must not TypeError the whole RAG
+    # prompt build (which sat outside ask_brain's retrieval try → 500).
+    block = _rag_card_block({"id": "x", "title": "T", "tags": [2024, "ai"]})
+    assert "2024" in block and "ai" in block
+
+
+def test_card_block_caps_note_length():
+    # Notes are the one client-controlled field that was folded in unbounded —
+    # a multi-KB note must be clamped so 15 cards can't balloon the paid prompt.
+    from ai_service import _RAG_NOTE_MAX_CHARS
+    block = _rag_card_block({"id": "x", "title": "T", "userNote": "n" * 50_000})
+    assert len(block) < _RAG_NOTE_MAX_CHARS + 500
+
+
+def test_prompt_survives_junk_history_items():
+    # history is client-supplied: a stray string / number in the list must be
+    # skipped, not AttributeError the ask.
+    prompt = _build_rag_prompt("q", [{"id": "a", "title": "T"}],
+                               history=["junk", 42, {"role": "user", "content": "real"}])
+    assert "real" in prompt
+
+
 def test_card_block_omits_note_line_when_no_notes():
     block = _rag_card_block({"id": "x", "title": "T", "summary": "S"})
     assert "My note:" not in block
@@ -157,6 +180,20 @@ def test_valid_cited_handles_none_and_non_list():
     assert _valid_cited_ids(None, _CARDS) == []
     assert _valid_cited_ids("id1", _CARDS) == []
     assert _valid_cited_ids(123, _CARDS) == []
+
+
+def test_valid_cited_survives_unhashable_and_non_string_ids():
+    # The docstring promises defense against "non-string ids" — a dict/list
+    # element (schema slip on citedIds) used to TypeError the set lookup and
+    # 500 the whole ask instead of just dropping the bad citation.
+    cards = [{"id": "a"}, {"id": "b"}]
+    assert _valid_cited_ids([{"id": "a"}, ["b"], "a", 7], cards) == ["a"]
+
+
+def test_valid_cited_null_id_never_validates():
+    # A card missing its id puts None in the valid set; citedIds:[null] must
+    # not come back as a "valid" citation.
+    assert _valid_cited_ids([None], [{"title": "no id"}]) == []
 
 
 def test_valid_cited_empty_when_no_overlap():

@@ -6,6 +6,7 @@ Handles embedding generation and vector search queries.
 import os
 import re
 import json
+import math
 import logging
 from datetime import datetime
 from typing import List, Optional, Any
@@ -73,9 +74,15 @@ def build_embedding_text(data: dict) -> str:
     # The user's own annotations — high-signal, their words, not the model's.
     # Merges the legacy `userNote` string + the multi-note `userNotes` array.
     note = collect_notes_text(data).strip()
-    tags = ", ".join(t for t in (data.get("tags") or []) if t)
-    concepts = ", ".join(c for c in (data.get("concepts") or []) if c)
-    meta = data.get("metadata") or {}
+    # str() every element — tags/concepts written by older clients or direct
+    # Firestore writes can carry numbers; a non-str item must degrade to text,
+    # not TypeError the embed (which silently un-searches the card, and aborts
+    # a whole backfill run).
+    tags = ", ".join(str(t) for t in (data.get("tags") or []) if t)
+    concepts = ", ".join(str(c) for c in (data.get("concepts") or []) if c)
+    meta = data.get("metadata")
+    if not isinstance(meta, dict):
+        meta = {}
     takeaway = (meta.get("actionableTakeaway") or "").strip()
     highlights = [str(h) for h in (data.get("videoHighlights") or []) if h]
 
@@ -113,10 +120,20 @@ _RANK_STOPWORDS = {
 }
 
 
+# Token splitter for lexical scoring. `[\W_]+` (Unicode-aware) instead of
+# `[^a-z0-9]+`: the ASCII class silently reduced every Hebrew/Arabic/CJK query
+# to zero tokens, so a user typing the exact Hebrew title of a card got no
+# lexical hits at all — despite cross-language recall being this module's own
+# headline use case (see apply_distance_threshold's docstring).
+_TOKEN_SPLIT = re.compile(r"[\W_]+", re.UNICODE)
+
+
 def keyword_query_tokens(question: str) -> set:
     """Content tokens (len >= 3, non-stopword) from a user question."""
+    if not isinstance(question, str):
+        question = "" if question is None else str(question)
     return {
-        t for t in re.split(r"[^a-z0-9]+", (question or "").lower())
+        t for t in _TOKEN_SPLIT.split(question.lower())
         if len(t) >= 3 and t not in _RANK_STOPWORDS
     }
 
@@ -124,7 +141,9 @@ def keyword_query_tokens(question: str) -> set:
 def _card_haystack(data: dict) -> str:
     return " ".join(str(x) for x in [
         data.get("title", ""), data.get("summary", ""),
-        " ".join(data.get("tags", []) or []),
+        # str() each tag — a single numeric tag on one card must not TypeError
+        # (and thereby 500) every search/ask request that ranks the card.
+        " ".join(str(t) for t in (data.get("tags") or []) if t is not None),
         data.get("sourceName", ""), data.get("category", ""),
         # The user's own notes are searchable too — a literal word they wrote
         # should surface the card in keyword fallback and rerank. Covers both the
@@ -178,6 +197,8 @@ def _to_unix_ms(val) -> int:
             return int(val.timestamp() * 1000)
         except Exception:
             return 0
+    if isinstance(val, float) and not math.isfinite(val):
+        return 0  # NaN/inf: int() would raise, breaking the "0 when unparseable" promise
     if isinstance(val, (int, float)):
         return int(val * 1000) if val < 1e12 else int(val)
     if isinstance(val, str):
@@ -186,6 +207,13 @@ def _to_unix_ms(val) -> int:
         except Exception:
             return 0
     return 0
+
+
+def _finite_distance(d) -> bool:
+    """A usable vector distance: numeric AND finite. NaN passes isinstance —
+    and poisons min()/comparisons order-dependently — so treat it like a
+    missing distance (fail open, order already encodes rank)."""
+    return isinstance(d, (int, float)) and math.isfinite(d)
 
 
 def apply_distance_threshold(results: List[dict],
@@ -216,14 +244,14 @@ def apply_distance_threshold(results: List[dict],
     margin = _DISTANCE_MARGIN if margin is None else margin
     hard_ceiling = _DISTANCE_HARD_CEILING if hard_ceiling is None else hard_ceiling
     dists = [r.get("vector_distance") for r in results
-             if isinstance(r.get("vector_distance"), (int, float))]
+             if _finite_distance(r.get("vector_distance"))]
     if not dists:
         return list(results)
     cutoff = min(min(dists) + margin, ceiling)
     kept = []
     for i, r in enumerate(results):
         d = r.get("vector_distance")
-        if not isinstance(d, (int, float)) or d <= cutoff or (i < min_keep and d <= hard_ceiling):
+        if not _finite_distance(d) or d <= cutoff or (i < min_keep and d <= hard_ceiling):
             kept.append(r)
     return kept
 
@@ -247,7 +275,7 @@ def cut_at_distance_cliff(results: List[dict], min_keep: int = 2,
     dists = []
     for r in results:
         d = r.get("vector_distance")
-        if not isinstance(d, (int, float)):
+        if not _finite_distance(d):
             return list(results)[:max_keep]  # no distances → order is all we have
         dists.append(d)
     cut = min(len(results), max_keep)
@@ -351,8 +379,8 @@ def rerank_candidates(question: str, candidates: List[dict], top_k: int = 10) ->
     for rank, c in enumerate(candidates):
         vscore = 1.0 - (rank / n)  # rank 0 -> 1.0, decays toward 0
         if q_tokens:
-            hay_tokens = set(re.split(r"[^a-z0-9]+", _card_haystack(c)))
-            title_tokens = set(re.split(r"[^a-z0-9]+", str(c.get("title", "")).lower()))
+            hay_tokens = set(_TOKEN_SPLIT.split(_card_haystack(c)))
+            title_tokens = set(_TOKEN_SPLIT.split(str(c.get("title", "")).lower()))
             overlap = len(q_tokens & hay_tokens) / len(q_tokens)
             title_overlap = len(q_tokens & title_tokens) / len(q_tokens)
         else:
@@ -615,6 +643,30 @@ def perform_hybrid_search(uid: str, query_text: str, limit: int = 20) -> List[di
     return ranked
 
 
+def parse_search_payload(data) -> tuple:
+    """Validate the search callable's payload — pure, mirrors search_links_http.
+
+    Returns ``(query_text, limit)`` with the query stripped and the limit
+    clamped to [1, 50] (bad/absent limit → 10). Raises ``ValueError`` when the
+    query is missing, blank, non-string, or over the length cap — the caller
+    maps that to INVALID_ARGUMENT. Keeping this shared logic pure means the
+    callable can never again drift behind its HTTP twin's validation (which is
+    how data=None / numeric query / string limit used to 500 here)."""
+    from main import MAX_QUESTION_LENGTH
+    data = data if isinstance(data, dict) else {}
+    query_text = data.get("query")
+    query_text = query_text.strip() if isinstance(query_text, str) else ""
+    if not query_text:
+        raise ValueError("Query text is required")
+    if len(query_text) > MAX_QUESTION_LENGTH:
+        raise ValueError("Query is too long")
+    try:
+        limit = int(data.get("limit", 10))
+    except (TypeError, ValueError):
+        limit = 10
+    return query_text, max(1, min(limit, 50))
+
+
 @https_fn.on_call(max_instances=10)
 def search_links(req: https_fn.CallableRequest) -> Any:
     """
@@ -627,17 +679,21 @@ def search_links(req: https_fn.CallableRequest) -> Any:
         # REQUIRE_AUTH is off (staged rollout).
         from link_service import find_data_uid_by_auth_uid
         from main import REQUIRE_AUTH
+        # Mirror the HTTP twin's validation (search_links_http): a hostile or
+        # buggy payload (data=None, numeric query, string/negative limit) must
+        # be a clean INVALID_ARGUMENT, never an INTERNAL 500 — the two paths
+        # had drifted apart.
+        data = req.data if isinstance(req.data, dict) else {}
         uid = find_data_uid_by_auth_uid(req.auth.uid) if req.auth else None
-        if not uid and not REQUIRE_AUTH and req.data:
-            uid = req.data.get("uid") or req.data.get("test_uid")
+        if not uid and not REQUIRE_AUTH:
+            uid = data.get("uid") or data.get("test_uid")
         if not uid:
             raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.UNAUTHENTICATED, message="User must be authenticated")
 
-        query_text = req.data.get("query")
-        limit = req.data.get("limit", 10)
-
-        if not query_text:
-            raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message="Query text is required")
+        try:
+            query_text, limit = parse_search_payload(data)
+        except ValueError as ve:
+            raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INVALID_ARGUMENT, message=str(ve))
 
         links = perform_hybrid_search(uid, query_text, limit)
         return {"links": links}

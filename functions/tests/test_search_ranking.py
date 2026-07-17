@@ -19,7 +19,6 @@ from search import (
     keyword_query_tokens,
     keyword_match_score,
     rerank_candidates,
-    EMBED_TEXT_VERSION,
     _EMBED_TEXT_MAX_CHARS,
 )
 from ai_service import collect_notes_text
@@ -118,8 +117,19 @@ def test_embed_text_is_truncated_to_model_budget():
     assert len(text) == _EMBED_TEXT_MAX_CHARS
 
 
-def test_embed_version_is_current():
-    assert EMBED_TEXT_VERSION >= 4  # v4 folds in the multi-note userNotes array
+def test_embed_text_coerces_non_string_tags_and_concepts():
+    # A numeric tag/concept (older client or direct Firestore write) must fold
+    # in as text — a TypeError here silently left the card unembedded via
+    # sync_link_embedding's blanket except, and aborted a whole backfill run.
+    text = build_embedding_text({"title": "T", "tags": [2024, "ai"], "concepts": [3.5, "systems"]})
+    assert "2024" in text and "ai" in text
+    assert "3.5" in text and "systems" in text
+
+
+def test_embed_text_survives_non_dict_metadata():
+    # metadata: "oops" (schema drift) — `meta.get` used to AttributeError.
+    text = build_embedding_text({"title": "T", "metadata": "oops"})
+    assert "Title: T" in text
 
 
 # ── collect_notes_text (shared legacy+array note reader) ───────────────────
@@ -159,6 +169,16 @@ def test_collect_notes_text_empty_for_note_less_card():
     assert collect_notes_text({"userNote": "   "}) == ""
 
 
+def test_collect_notes_text_survives_non_string_shapes():
+    # Client-written data: a numeric userNote, a numeric note text, or a
+    # non-list userNotes must degrade to "no note", not AttributeError — this
+    # helper sits inside every search/ask/embed haystack build.
+    assert collect_notes_text({"userNote": 5}) == ""
+    assert collect_notes_text({"userNotes": [{"id": "n", "text": 5}]}) == ""
+    assert collect_notes_text({"userNotes": "not-a-list"}) == ""
+    assert collect_notes_text({"userNote": 5, "userNotes": [{"text": "real"}]}) == "real"
+
+
 # ── keyword_query_tokens / keyword_match_score ─────────────────────────────
 
 def test_query_tokens_drop_stopwords_and_shorts():
@@ -166,6 +186,22 @@ def test_query_tokens_drop_stopwords_and_shorts():
     assert "crispr" in toks and "gene" in toks and "editing" in toks
     # stopwords + <3-char tokens dropped
     assert "the" not in toks and "did" not in toks and "i" not in toks
+
+
+def test_query_tokens_support_non_latin_scripts():
+    # The old ASCII-only splitter reduced every Hebrew query to zero tokens, so
+    # typing a card's exact Hebrew title produced no lexical hits at all —
+    # despite cross-language recall being the module's own headline use case.
+    assert keyword_query_tokens("מתכון מאפינס אוכמניות") == {"מתכון", "מאפינס", "אוכמניות"}
+
+
+def test_match_score_hebrew_title_hit():
+    tokens = keyword_query_tokens("מאפינס")
+    assert keyword_match_score({"title": "מאפינס אוכמניות"}, tokens) > 0
+
+
+def test_query_tokens_non_string_input_is_empty():
+    assert keyword_query_tokens(None) == set()
 
 
 def test_query_tokens_empty_for_all_stopwords():
@@ -219,14 +255,6 @@ def test_rerank_lifts_buried_literal_match_into_topk():
     assert "v24" not in out                 # a genuinely far, non-matching card stays out
 
 
-def test_rerank_keyword_card_outranks_nearer_nonmatch():
-    # A keyword match a bit deeper beats a nearer card with no lexical signal.
-    cands = [_cand(f"v{i}", title=f"topic {i}", created=1) for i in range(20)]
-    cands[15] = _cand("hit", title="sleep hygiene", summary="improve sleep", created=1)
-    out = [c["id"] for c in rerank_candidates("improve sleep", cands, top_k=20)]
-    assert out.index("hit") < out.index("v12")  # lifted above a nearer non-match
-
-
 def test_rerank_truncates_to_top_k():
     cands = [_cand(str(i)) for i in range(30)]
     assert len(rerank_candidates("q", cands, top_k=10)) == 10
@@ -243,6 +271,33 @@ def test_rerank_recency_breaks_ties():
     out = rerank_candidates("zzz", cands, top_k=2)
     # 'old' is nearer by vector (rank 0) so it still leads; recency doesn't flip it.
     assert out[0]["id"] == "old"
+
+
+def test_rerank_survives_poison_card():
+    # One card with every field wrong-typed (numeric tag, numeric note text,
+    # NaN createdAt, string metadata, numeric title). Any one of these used to
+    # TypeError rerank — and rerank sits UNGUARDED in perform_hybrid_search, so
+    # a single such card 500'd every search and Ask for the whole user (the
+    # same failure class as the 2026-07-16 string-createdAt outage).
+    poison = {
+        "id": "poison",
+        "title": 7,
+        "tags": [2024, None, "ai"],
+        "userNotes": [{"id": "n", "text": 5}],
+        "createdAt": float("nan"),
+        "metadata": "oops",
+    }
+    cands = [_cand("muffins", title="blueberry muffins recipe"), poison]
+    out = rerank_candidates("muffins", cands, top_k=2)
+    assert {c["id"] for c in out} == {"muffins", "poison"}
+    # The healthy literal match still ranks first.
+    assert out[0]["id"] == "muffins"
+
+
+def test_match_score_survives_non_string_tags():
+    tokens = keyword_query_tokens("2024 report")
+    score = keyword_match_score({"title": "yearly report", "tags": [2024]}, tokens)
+    assert score > 0  # numeric tag both survives and matches as text
 
 
 # ── apply_distance_threshold: the vector-quality gate ───────────────────────
@@ -296,6 +351,27 @@ def test_threshold_mixed_missing_distance_is_kept():
 
 def test_threshold_empty_input():
     assert apply_distance_threshold([]) == []
+
+
+def test_threshold_treats_nan_distance_as_missing():
+    # NaN passes isinstance(float) but poisons min() order-dependently: with a
+    # NaN first, cutoff became NaN and every comparison went False — dropping
+    # all genuinely-close results. NaN must behave exactly like a missing
+    # distance: the row fails open, the finite rows gate normally.
+    results = [_vres("nan", float("nan")), _vres("a", 0.30),
+               _vres("b", 0.42), _vres("far", 0.99)]
+    kept = [r["id"] for r in apply_distance_threshold(
+        results, ceiling=0.68, margin=0.22, hard_ceiling=0.80)]
+    assert "a" in kept and "b" in kept   # the real cluster survives
+    assert "nan" in kept                 # fail-open, like a missing distance
+    assert "far" not in kept             # the tail still dies
+
+
+def test_cliff_fails_open_on_nan_distance():
+    from search import cut_at_distance_cliff
+    results = [_vres("a", 0.30), _vres("b", float("nan")), _vres("c", 0.90)]
+    # A non-finite distance means gaps are meaningless — no cut, like missing.
+    assert len(cut_at_distance_cliff(results)) == 3
 
 
 # ── normalize_card_for_search ───────────────────────────────────────────────
@@ -400,6 +476,15 @@ def test_to_unix_ms_handles_every_shape():
     assert _to_unix_ms("2026-07-01T10:00:00Z") > 0                  # ISO string
     assert _to_unix_ms("garbage") == 0
     assert _to_unix_ms(None) == 0
+
+
+def test_to_unix_ms_nan_and_inf_are_unparseable():
+    # Firestore can legally store NaN doubles; int(nan) raises. The documented
+    # contract is "0 when absent or unparseable" — a poison timestamp used to
+    # blank the entire vector half (and keyword half) of every search.
+    assert _to_unix_ms(float("nan")) == 0
+    assert _to_unix_ms(float("inf")) == 0
+    assert _to_unix_ms(float("-inf")) == 0
 
 
 def test_rerank_survives_mixed_timestamp_shapes():

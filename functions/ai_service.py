@@ -222,12 +222,18 @@ def collect_notes_text(data: dict) -> str:
     """
     data = data or {}
     parts = []
-    legacy = (data.get("userNote") or "").strip()
+    # isinstance guards throughout: notes are client-written Firestore data, so
+    # a non-string userNote / note text (number, dict) must degrade to "absent",
+    # not AttributeError every search/ask/embed that touches the card.
+    legacy = data.get("userNote")
+    legacy = legacy.strip() if isinstance(legacy, str) else ""
     if legacy:
         parts.append(legacy)
-    for n in (data.get("userNotes") or []):
+    notes = data.get("userNotes")
+    for n in (notes if isinstance(notes, list) else []):
         if isinstance(n, dict):
-            t = (n.get("text") or "").strip()
+            t = n.get("text")
+            t = t.strip() if isinstance(t, str) else ""
             if t:
                 parts.append(t)
     return "\n".join(parts)
@@ -249,11 +255,17 @@ def _rag_source_label(c: dict) -> str:
         return ""
 
 
+# Per-card ceiling for user notes folded into the RAG prompt. Generous for real
+# annotations while bounding prompt cost against a pathological multi-KB note.
+_RAG_NOTE_MAX_CHARS = 4000
+
+
 def _rag_card_block(c: dict) -> str:
     src = _rag_source_label(c)
     meta = [f"source: {src}"] if src else []
     meta.append(f"category: {c.get('category', 'General')}")
-    meta.append(f"tags: {', '.join(c.get('tags', []) or [])}")
+    # str() each tag — one numeric tag must not TypeError the whole RAG prompt.
+    meta.append(f"tags: {', '.join(str(t) for t in (c.get('tags') or []) if t is not None)}")
     block = (
         f"[{c.get('id')}] {c.get('title', 'Untitled')} "
         f"({'; '.join(meta)})\n{c.get('summary', '')}"
@@ -261,7 +273,9 @@ def _rag_card_block(c: dict) -> str:
     # The user's OWN notes on the card — their words, distinct from the machine
     # summary. Surfaced to the model so it can answer "what did I think about…".
     # Merges the legacy string + the multi-note array via the shared reader.
-    note = collect_notes_text(c).strip()
+    # Capped per card: history and tags are clamped upstream, and unbounded
+    # notes were the one remaining way to balloon the paid prompt.
+    note = collect_notes_text(c).strip()[:_RAG_NOTE_MAX_CHARS]
     if note:
         block += f"\nMy note: {note}"
     return block
@@ -280,12 +294,15 @@ def _build_rag_prompt(question: str, cards: list, history: list = None) -> str:
     sources_text = "\n\n".join(_rag_card_block(c) for c in cards)
 
     history_text = ""
-    if history:
+    if isinstance(history, list) and history:
         turns = []
         for h in history[-6:]:  # keep the prompt bounded
+            if not isinstance(h, dict):
+                continue  # client-supplied — a stray string must not 500 the ask
             role = "User" if h.get("role") == "user" else "Assistant"
             turns.append(f"{role}: {h.get('content', '')}")
-        history_text = "\n\nEarlier in this conversation:\n" + "\n".join(turns)
+        if turns:
+            history_text = "\n\nEarlier in this conversation:\n" + "\n".join(turns)
 
     return f"""You are Machina AI, the user's personal knowledge assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved.
 
@@ -350,7 +367,10 @@ def _valid_cited_ids(cited, cards: list) -> list:
     seen = set()
     out = []
     for cid in cited:
-        if cid in valid and cid not in seen:
+        # Only real string ids count: an unhashable item (dict/list from a
+        # schema slip) would TypeError the set lookup, and a card with no id
+        # puts None in `valid`, which must not validate a null citation.
+        if isinstance(cid, str) and cid in valid and cid not in seen:
             seen.add(cid)
             out.append(cid)
     return out
