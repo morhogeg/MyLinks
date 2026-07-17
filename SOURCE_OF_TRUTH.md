@@ -661,6 +661,16 @@ exact-match, capped.
   Hebrew normalization live, out-of-window recall AND its detail modal, tier
   ordering (310d-old title match ranks above 12h-old summary match), empty
   state, clear-restores-feed — mobile and desktop widths; `tsc`/eslint clean.
+  FOLLOW-UP same session (owner: "is it best practice? refine"): three
+  recall refinements, all literal/zero-junk — (1) English plural tolerance
+  ("muffins" finds "Muffin"; never applied to Hebrew tokens); (2) apostrophe/
+  geresh/gershayim folded out ("ציפס" finds "צ׳יפס", "dont" finds "Don't");
+  (3) mark-stripping generalized via NFKD+\p{M} ("cafe" finds "Café";
+  subsumes niqqud). Typo/fuzzy matching deliberately REJECTED (reintroduces
+  unexplainable results). Cross-language (English↔Hebrew) stays OUT of the
+  search bar by design — Ask Machina is the semantic surface; if ever needed
+  in-bar, the path is AI-stamped bilingual keywords at save time, not
+  vectors. All re-verified live on emulators + offline assertions.
   NOT yet merged/deployed — ship via `/ship` when owner says go.
 - **2026-07-17 — SELF-SERVE DEPLOYS: push-triggered CI for functions
   + TestFlight (commits `aae5066`, `4de6f6e` — landed via GitHub API
