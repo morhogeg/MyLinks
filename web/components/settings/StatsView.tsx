@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RefreshCw, BarChart3 } from 'lucide-react';
 import { loadStats, LibraryStats, LibraryFacetRequest } from '@/lib/stats';
 import { track } from '@/lib/analytics';
@@ -15,6 +15,11 @@ import { LargeTitle, SectionHeader, Footnote, List, RowShell, RowText, Chevron }
  */
 
 const MAX_CATEGORY_ROWS = 6;
+
+// Where the user was in the Insights screen when they tapped through to the
+// library. "Back to Insights" remounts the whole Settings sheet, so this lives
+// at module level (session-scoped) and is consumed one-shot on restore.
+let savedScrollTop: number | null = null;
 const GROW = 'transition-all duration-700 motion-reduce:transition-none';
 const GROW_EASE = 'var(--ease-modal)';
 
@@ -178,11 +183,14 @@ function Skeleton() {
     );
 }
 
-export function StatsView({ uid, onOpenFacet }: {
+export function StatsView({ uid, onOpenFacet, restoreScroll }: {
     uid: string;
     /** Open the library filtered to a facet (closes Settings). Rows/pills are
         only tappable when this is provided. */
     onOpenFacet?: (req: LibraryFacetRequest) => void;
+    /** True when this mount came from the feed's "Back to Insights" chip —
+        restore the scroll position saved when the user tapped through. */
+    restoreScroll?: boolean;
 }) {
     const [stats, setStats] = useState<LibraryStats | null>(null);
     const [failed, setFailed] = useState(false);
@@ -190,6 +198,15 @@ export function StatsView({ uid, onOpenFacet }: {
     // Flips true one frame after stats land, so bars/columns transition from
     // zero to their real size instead of appearing fully grown.
     const [grown, setGrown] = useState(false);
+    const rootRef = useRef<HTMLDivElement>(null);
+
+    // One handler for every tappable row: remember where the user is in the
+    // sheet (so Back can land them right here), then hand off to the page.
+    const openFacet = (req: LibraryFacetRequest) => {
+        savedScrollTop = rootRef.current?.closest('.overflow-y-auto')?.scrollTop ?? null;
+        track('insights_facet_opened', { kind: req.kind });
+        onOpenFacet?.(req);
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -209,6 +226,16 @@ export function StatsView({ uid, onOpenFacet }: {
         const raf = requestAnimationFrame(() => requestAnimationFrame(() => setGrown(true)));
         return () => cancelAnimationFrame(raf);
     }, [stats]);
+
+    // Back-from-library: put the sheet back exactly where the user tapped.
+    // Runs once the real content is mounted (stats are session-cached, so
+    // that's the first paint) and consumes the saved position one-shot.
+    useEffect(() => {
+        if (!stats || !restoreScroll || savedScrollTop === null) return;
+        const scroller = rootRef.current?.closest('.overflow-y-auto');
+        if (scroller) scroller.scrollTop = savedScrollTop;
+        savedScrollTop = null;
+    }, [stats, restoreScroll]);
 
     if (failed) {
         return (
@@ -260,7 +287,7 @@ export function StatsView({ uid, onOpenFacet }: {
     const hasReadTime = stats.totalReadMinutes > 0;
 
     return (
-        <div className="animate-fade-in">
+        <div ref={rootRef} className="animate-fade-in">
             <LargeTitle>Insights</LargeTitle>
             {since && (
                 <p className="text-[13px] text-text-muted px-1 -mt-1">Your library since {since}</p>
@@ -294,7 +321,7 @@ export function StatsView({ uid, onOpenFacet }: {
             <CategoryBars
                 stats={stats}
                 grown={grown}
-                onOpen={onOpenFacet && ((category) => { track('insights_facet_opened', { kind: 'category' }); onOpenFacet({ kind: 'category', value: category }); })}
+                onOpen={onOpenFacet && ((category) => openFacet({ kind: 'category', value: category }))}
             />
 
             {stats.topTags.length > 0 && (
@@ -302,7 +329,7 @@ export function StatsView({ uid, onOpenFacet }: {
                     <SectionHeader>Top tags</SectionHeader>
                     <CountPills
                         items={stats.topTags}
-                        onOpen={onOpenFacet && ((tag) => { track('insights_facet_opened', { kind: 'tag' }); onOpenFacet({ kind: 'tag', value: tag }); })}
+                        onOpen={onOpenFacet && ((tag) => openFacet({ kind: 'tag', value: tag }))}
                     />
                 </>
             )}
@@ -314,7 +341,7 @@ export function StatsView({ uid, onOpenFacet }: {
                         {stats.topSources.map((d) => (
                             <RowShell
                                 key={d.key}
-                                onClick={onOpenFacet && (() => { track('insights_facet_opened', { kind: 'source' }); onOpenFacet({ kind: 'source', value: d.key }); })}
+                                onClick={onOpenFacet && (() => openFacet({ kind: 'source', value: d.key }))}
                             >
                                 <RowText title={d.name} />
                                 <span className="ml-auto text-[15px] text-text-muted tabular-nums">{d.count.toLocaleString()}</span>
