@@ -42,7 +42,7 @@ import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
 import LoadMoreSentinel from './feed/LoadMoreSentinel';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, Sparkles, Lock, BookOpenCheck } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, Sparkles, Lock, BookOpenCheck, ChevronLeft, BarChart3 } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
@@ -76,7 +76,7 @@ const noop = () => { };
  * - Two card views (grid / list), plus review, ask, and collections modes
  * - Deep linking to specific links via URL params
  */
-function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void }) {
+function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void }) {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
@@ -684,6 +684,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // Settings arrives here as `libraryFacet`. Apply it the way openCollection
     // scopes the feed — the one facet set, everything else cleared — landing on
     // the grid so the user sees exactly "the cards behind that number".
+    // The facet that Insights applied — kept so the "Back to Insights" chip can
+    // show while (and only while) that facet is still the feed's sole scope.
+    const [insightsFacet, setInsightsFacet] = useState<import('@/lib/stats').LibraryFacetRequest | null>(null);
     useEffect(() => {
         if (!libraryFacet) return;
         setSelectedCategory(libraryFacet.kind === 'category' ? new Set([libraryFacet.value]) : new Set());
@@ -694,9 +697,33 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         setSearchQuery('');
         setOpenCollectionId(null);
         setViewMode('grid');
+        setInsightsFacet(libraryFacet);
         window.scrollTo({ top: 0 });
         onLibraryFacetApplied?.();
     }, [libraryFacet, onLibraryFacetApplied, setSelectedCategory, setSelectedTags, setSelectedSources, setSelectedCollections, setFilter]);
+
+    // True while the Insights-applied facet is still exactly what the feed
+    // shows. The user changing ANYTHING (adding/removing a facet, searching,
+    // picking a collection) dissolves the "came from Insights" context and the
+    // back chip disappears — it never lies about where back would go.
+    const insightsBackVisible = !!onBackToInsights && !!insightsFacet && !searchQuery
+        && selectedCollections.size === 0 && filter === 'all'
+        && (insightsFacet.kind === 'category'
+            ? selectedCategory.size === 1 && selectedCategory.has(insightsFacet.value) && selectedTags.size === 0 && selectedSources.size === 0
+            : insightsFacet.kind === 'tag'
+                ? selectedTags.size === 1 && selectedTags.has(insightsFacet.value) && selectedCategory.size === 0 && selectedSources.size === 0
+                : selectedSources.size === 1 && selectedSources.has(insightsFacet.value) && selectedCategory.size === 0 && selectedTags.size === 0);
+
+    // Back to Insights: undo the facet this chip belongs to, then reopen
+    // Settings deep-linked to the Insights screen — a true "back", landing the
+    // user where they tapped with the library restored to unfiltered.
+    const backToInsights = () => {
+        setSelectedCategory(new Set());
+        setSelectedTags(new Set());
+        setSelectedSources(new Set());
+        setInsightsFacet(null);
+        onBackToInsights?.();
+    };
 
     // Open a collection as its own place (Task A): a dedicated detail view with
     // its own header + back navigation, NOT the generic filtered grid. We scope
@@ -1717,6 +1744,21 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 );
             })()}
 
+            {/* Back to Insights — shown while the feed is scoped to exactly the
+                facet a tapped Insights row applied (see insightsBackVisible). */}
+            {isLibraryView && insightsBackVisible && (
+                <div className="-mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <button
+                        onClick={backToInsights}
+                        className="inline-flex items-center gap-1 ps-1.5 pe-3 py-1.5 rounded-full bg-card border border-border-subtle text-xs font-semibold text-text-secondary hover:text-text hover:border-accent/40 shadow-sm transition-colors cursor-pointer"
+                    >
+                        <ChevronLeft className="w-4 h-4 rtl:rotate-180 text-accent" />
+                        <BarChart3 className="w-3.5 h-3.5 text-accent" />
+                        <span>Back to Insights</span>
+                    </button>
+                </div>
+            )}
+
             {/* Active Tag Filters — shown above the cards (not in Ask mode). */}
             {isLibraryView && selectedTags.size > 0 && (
                 <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
@@ -2455,14 +2497,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     );
 }
 
-export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void }) {
+export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void }) {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-2 border-text/20 border-t-text rounded-full animate-spin" />
             </div>
         }>
-            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} libraryFacet={libraryFacet} onLibraryFacetApplied={onLibraryFacetApplied} />
+            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} libraryFacet={libraryFacet} onLibraryFacetApplied={onLibraryFacetApplied} onBackToInsights={onBackToInsights} />
         </Suspense>
     );
 }
