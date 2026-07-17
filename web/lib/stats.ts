@@ -33,6 +33,11 @@ export interface LibraryStats {
     firstSaveAt: number | null;
     /** Consecutive days (ending today or yesterday) with at least one save. */
     streakDays: number;
+    /** Sum of `metadata.estimatedReadTime` across the library, in minutes. */
+    totalReadMinutes: number;
+    /** Weekday (0=Sun … 6=Sat) with the most saves — null until the pattern is
+        meaningful (≥ 14 dated saves) or when there's no single winner. */
+    busiestWeekday: number | null;
     /** Last 12 calendar weeks, oldest → newest (current week last). */
     weeks: WeekBucket[];
     /** All categories, count desc. */
@@ -109,9 +114,16 @@ export function computeStats(links: Link[], now = Date.now()): LibraryStats {
     let savedThisMonth = 0;
     let readCount = 0;
     let firstSaveAt: number | null = null;
+    let totalReadMinutes = 0;
+    let datedSaves = 0;
+    const weekdayCounts = new Array(7).fill(0) as number[];
 
     for (const card of cards) {
         if (card.isRead) readCount++;
+        const readTime = card.metadata?.estimatedReadTime;
+        if (typeof readTime === 'number' && Number.isFinite(readTime) && readTime > 0) {
+            totalReadMinutes += readTime;
+        }
         bump(categories, card.category || 'General');
         for (const tag of card.tags) bump(tags, tag);
 
@@ -127,9 +139,11 @@ export function computeStats(links: Link[], now = Date.now()): LibraryStats {
 
         const ms = toMillis(card.createdAt);
         if (ms === null) continue;
+        datedSaves++;
         if (firstSaveAt === null || ms < firstSaveAt) firstSaveAt = ms;
         if (ms >= monthStart) savedThisMonth++;
         saveDays.add(dayKey(ms));
+        weekdayCounts[new Date(ms).getDay()]++;
         const bucket = Math.floor((weekStart(ms) - weeks[0].start) / WEEK_MS);
         if (bucket >= 0 && bucket < 12) weeks[bucket].count++;
     }
@@ -144,12 +158,23 @@ export function computeStats(links: Link[], now = Date.now()): LibraryStats {
         cursor--;
     }
 
+    // Busiest weekday — only once there's a real pattern (2+ weeks of dated
+    // saves) and a strict winner, so the screen never over-claims from noise.
+    let busiestWeekday: number | null = null;
+    if (datedSaves >= 14) {
+        const max = Math.max(...weekdayCounts);
+        const winners = weekdayCounts.filter((c) => c === max).length;
+        if (max > 0 && winners === 1) busiestWeekday = weekdayCounts.indexOf(max);
+    }
+
     return {
         total: cards.length,
         savedThisMonth,
         readCount,
         firstSaveAt,
         streakDays,
+        totalReadMinutes,
+        busiestWeekday,
         weeks,
         categories: topN(categories, Infinity),
         topTags: topN(tags, 5),

@@ -1,43 +1,72 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, BarChart3 } from 'lucide-react';
 import { loadStats, LibraryStats } from '@/lib/stats';
+import { track } from '@/lib/analytics';
 import { LargeTitle, SectionHeader, Footnote, List, RowShell, RowText } from './primitives';
 
 /**
  * Settings → Insights: a birds-eye view of the library, computed entirely
  * on-device (see lib/stats.ts). Single-hue accent marks throughout — length
  * carries the magnitude, so no categorical palette is needed; all text stays
- * in text tokens.
+ * in text tokens. Marks grow in on mount (700ms, --ease-modal, staggered);
+ * `motion-reduce:transition-none` respects reduced-motion.
  */
 
 const MAX_CATEGORY_ROWS = 6;
+const GROW = 'transition-all duration-700 motion-reduce:transition-none';
+const GROW_EASE = 'var(--ease-modal)';
 
-function StatTile({ label, value, note }: { label: string; value: string; note?: string }) {
+/** 90 → "1h 30m", 45 → "45m", 900 → "15h" — compact, no false precision. */
+function formatMinutes(min: number): string {
+    if (min < 60) return `${Math.round(min)}m`;
+    const h = Math.floor(min / 60);
+    if (h >= 10) return `${h}h`;
+    const m = Math.round(min % 60);
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+/** Weekday name for a 0=Sun … 6=Sat index, in the user's locale. */
+function weekdayName(idx: number): string {
+    // 2021-08-01 was a Sunday; offsetting from it yields each weekday.
+    return new Date(2021, 7, 1 + idx).toLocaleDateString(undefined, { weekday: 'long' });
+}
+
+function StatTile({ label, value, note, accentNote }: { label: string; value: string; note?: string; accentNote?: boolean }) {
     return (
         <div className="rounded-[14px] border border-border-subtle bg-card px-3.5 py-3 min-w-0">
             <div className="text-[12px] text-text-muted leading-tight truncate">{label}</div>
             <div className="text-[22px] font-semibold text-text tracking-[-0.01em] mt-1 leading-none">{value}</div>
-            {note && <div className="text-[11.5px] text-text-muted mt-1.5 leading-tight truncate">{note}</div>}
+            {note && (
+                <div className={`text-[11.5px] mt-1.5 leading-tight truncate ${accentNote ? 'text-accent font-medium' : 'text-text-muted'}`}>
+                    {note}
+                </div>
+            )}
         </div>
     );
 }
 
-/** 12 columns, accent fill, rounded caps, square baseline; a 2px stub marks a
-    quiet week so the axis never has holes. */
-function WeeklyChart({ stats }: { stats: LibraryStats }) {
+/** 12 columns, accent fill (current week wears the accent gradient), rounded
+    caps, square baseline; a 2px stub marks a quiet week so the axis never has
+    holes. Columns grow up from the baseline on mount, gently staggered. */
+function WeeklyChart({ stats, grown }: { stats: LibraryStats; grown: boolean }) {
     const max = Math.max(...stats.weeks.map((w) => w.count), 1);
     const fmt = (ms: number) =>
         new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const last = stats.weeks.length - 1;
     return (
         <div className="rounded-[14px] border border-border-subtle bg-card px-4 pt-4 pb-3">
             <div className="flex items-end gap-[6px] h-16">
-                {stats.weeks.map((w) => (
+                {stats.weeks.map((w, i) => (
                     <div key={w.start} className="flex-1 max-w-[24px] mx-auto flex flex-col justify-end h-full" title={`Week of ${fmt(w.start)} — ${w.count} save${w.count === 1 ? '' : 's'}`}>
                         <div
-                            className={`w-full rounded-t-[4px] ${w.count > 0 ? 'bg-accent' : 'bg-border-subtle'}`}
-                            style={{ height: w.count > 0 ? `${Math.max((w.count / max) * 100, 6)}%` : '2px' }}
+                            className={`w-full rounded-t-[4px] ${GROW} ${w.count === 0 ? 'bg-border-subtle' : i === last ? 'bg-[image:var(--accent-gradient)]' : 'bg-accent'}`}
+                            style={{
+                                height: w.count > 0 && grown ? `${Math.max((w.count / max) * 100, 6)}%` : '2px',
+                                transitionTimingFunction: GROW_EASE,
+                                transitionDelay: `${i * 30}ms`,
+                            }}
                         />
                     </div>
                 ))}
@@ -52,8 +81,9 @@ function WeeklyChart({ stats }: { stats: LibraryStats }) {
 }
 
 /** Horizontal magnitude bars: label + count in text tokens, an accent bar on a
-    light accent track underneath. Widths are relative to the biggest category. */
-function CategoryBars({ stats }: { stats: LibraryStats }) {
+    light accent track underneath. Widths are relative to the biggest category
+    and grow in from zero on mount. */
+function CategoryBars({ stats, grown }: { stats: LibraryStats; grown: boolean }) {
     const shown = stats.categories.slice(0, MAX_CATEGORY_ROWS);
     const rest = stats.categories.slice(MAX_CATEGORY_ROWS);
     const rows = rest.length > 0
@@ -62,14 +92,21 @@ function CategoryBars({ stats }: { stats: LibraryStats }) {
     const max = Math.max(...rows.map((r) => r.count), 1);
     return (
         <div className="rounded-[14px] border border-border-subtle bg-card px-4 py-3.5 space-y-3">
-            {rows.map((row) => (
-                <div key={row.name}>
+            {rows.map((row, i) => (
+                <div key={row.name} title={`${row.name} — ${Math.round((row.count / stats.total) * 100)}% of your library`}>
                     <div className="flex items-baseline justify-between gap-3 mb-1">
                         <span className="text-[13.5px] text-text truncate">{row.name}</span>
-                        <span className="text-[13px] text-text-muted tabular-nums shrink-0">{row.count}</span>
+                        <span className="text-[13px] text-text-muted tabular-nums shrink-0">{row.count.toLocaleString()}</span>
                     </div>
                     <div className="h-2 rounded-full bg-accent/10 overflow-hidden">
-                        <div className="h-full rounded-full bg-accent" style={{ width: `${(row.count / max) * 100}%` }} />
+                        <div
+                            className={`h-full rounded-full bg-accent ${GROW}`}
+                            style={{
+                                width: grown ? `${(row.count / max) * 100}%` : '0%',
+                                transitionTimingFunction: GROW_EASE,
+                                transitionDelay: `${i * 40}ms`,
+                            }}
+                        />
                     </div>
                 </div>
             ))}
@@ -83,9 +120,24 @@ function CountPills({ items }: { items: { name: string; count: number }[] }) {
             {items.map((t) => (
                 <span key={t.name} className="inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-card border border-border-subtle text-[12.5px] font-medium text-text-secondary">
                     {t.name}
-                    <span className="text-text-muted tabular-nums">{t.count}</span>
+                    <span className="text-text-muted tabular-nums">{t.count.toLocaleString()}</span>
                 </span>
             ))}
+        </div>
+    );
+}
+
+/** Shimmering placeholders in the exact final layout, so content doesn't jump. */
+function Skeleton() {
+    return (
+        <div className="animate-pulse">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
+                {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="rounded-[14px] border border-border-subtle bg-card h-[86px]" />
+                ))}
+            </div>
+            <div className="mt-9 rounded-[14px] border border-border-subtle bg-card h-28" />
+            <div className="mt-9 rounded-[14px] border border-border-subtle bg-card h-56" />
         </div>
     );
 }
@@ -94,15 +146,28 @@ export function StatsView({ uid }: { uid: string }) {
     const [stats, setStats] = useState<LibraryStats | null>(null);
     const [failed, setFailed] = useState(false);
     const [attempt, setAttempt] = useState(0);
+    // Flips true one frame after stats land, so bars/columns transition from
+    // zero to their real size instead of appearing fully grown.
+    const [grown, setGrown] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
         setFailed(false);
         loadStats(uid)
-            .then((s) => { if (!cancelled) setStats(s); })
+            .then((s) => {
+                if (cancelled) return;
+                setStats(s);
+                track('insights_opened', { total: s.total });
+            })
             .catch(() => { if (!cancelled) setFailed(true); });
         return () => { cancelled = true; };
     }, [uid, attempt]);
+
+    useEffect(() => {
+        if (!stats) return;
+        const raf = requestAnimationFrame(() => requestAnimationFrame(() => setGrown(true)));
+        return () => cancelAnimationFrame(raf);
+    }, [stats]);
 
     if (failed) {
         return (
@@ -123,9 +188,7 @@ export function StatsView({ uid }: { uid: string }) {
         return (
             <>
                 <LargeTitle>Insights</LargeTitle>
-                <div className="flex justify-center py-16">
-                    <div className="w-7 h-7 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
-                </div>
+                <Skeleton />
             </>
         );
     }
@@ -134,39 +197,60 @@ export function StatsView({ uid }: { uid: string }) {
         return (
             <>
                 <LargeTitle>Insights</LargeTitle>
-                <Footnote>Nothing to chart yet — save a few links and this becomes your library&apos;s birds-eye view.</Footnote>
+                <div className="flex flex-col items-center text-center gap-3 py-16">
+                    <span className="w-12 h-12 rounded-2xl bg-accent/10 text-accent flex items-center justify-center">
+                        <BarChart3 className="w-6 h-6" />
+                    </span>
+                    <p className="text-[14px] text-text-muted leading-snug max-w-[240px]">
+                        Nothing to chart yet — save a few links and this becomes your library&apos;s birds-eye view.
+                    </p>
+                </div>
             </>
         );
     }
 
     const readPct = Math.round((stats.readCount / stats.total) * 100);
+    // "in July" beats "this month": it's friendlier AND short enough that the
+    // note never truncates in a 3-across tile on a 375px phone.
+    const monthName = new Date().toLocaleDateString(undefined, { month: 'long' });
     const since = stats.firstSaveAt
-        ? new Date(stats.firstSaveAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+        ? new Date(stats.firstSaveAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
         : null;
+    const hasReadTime = stats.totalReadMinutes > 0;
 
     return (
-        <>
+        <div className="animate-fade-in">
             <LargeTitle>Insights</LargeTitle>
+            {since && (
+                <p className="text-[13px] text-text-muted px-1 -mt-1">Your library since {since}</p>
+            )}
 
-            <div className="grid grid-cols-3 gap-2.5 pt-2">
+            <div className={`grid gap-2.5 pt-3 ${hasReadTime ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
                 <StatTile
                     label="Saved"
-                    value={String(stats.total)}
-                    note={stats.savedThisMonth > 0 ? `+${stats.savedThisMonth} this month` : since ? `since ${since}` : undefined}
+                    value={stats.total.toLocaleString()}
+                    note={stats.savedThisMonth > 0 ? `+${stats.savedThisMonth.toLocaleString()} in ${monthName}` : `none yet in ${monthName}`}
+                    accentNote={stats.savedThisMonth > 0}
                 />
-                <StatTile label="Read" value={`${readPct}%`} note={`${stats.readCount} of ${stats.total}`} />
+                <StatTile label="Read" value={`${readPct}%`} note={`${stats.readCount.toLocaleString()} of ${stats.total.toLocaleString()}`} />
                 <StatTile
                     label="Streak"
-                    value={`${stats.streakDays}d`}
-                    note={stats.streakDays > 0 ? 'days saving in a row' : 'save today to start one'}
+                    value={String(stats.streakDays)}
+                    note={stats.streakDays === 1 ? 'day in a row' : stats.streakDays > 1 ? 'days in a row' : 'save today to start one'}
                 />
+                {hasReadTime && (
+                    <StatTile label="Reading time" value={formatMinutes(stats.totalReadMinutes)} note="captured for later" />
+                )}
             </div>
 
             <SectionHeader>Saves per week</SectionHeader>
-            <WeeklyChart stats={stats} />
+            <WeeklyChart stats={stats} grown={grown} />
+            {stats.busiestWeekday !== null && (
+                <Footnote>Most of your saving happens on {weekdayName(stats.busiestWeekday)}s.</Footnote>
+            )}
 
             <SectionHeader>Categories</SectionHeader>
-            <CategoryBars stats={stats} />
+            <CategoryBars stats={stats} grown={grown} />
 
             {stats.topTags.length > 0 && (
                 <>
@@ -182,7 +266,7 @@ export function StatsView({ uid }: { uid: string }) {
                         {stats.topDomains.map((d) => (
                             <RowShell key={d.name}>
                                 <RowText title={d.name} />
-                                <span className="ml-auto text-[15px] text-text-muted tabular-nums">{d.count}</span>
+                                <span className="ml-auto text-[15px] text-text-muted tabular-nums">{d.count.toLocaleString()}</span>
                             </RowShell>
                         ))}
                     </List>
@@ -197,6 +281,6 @@ export function StatsView({ uid }: { uid: string }) {
             )}
 
             <Footnote>Computed on this device from your saved cards. Private cards aren&apos;t included.</Footnote>
-        </>
+        </div>
     );
 }

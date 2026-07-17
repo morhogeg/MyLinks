@@ -642,7 +642,15 @@ exact-match, capped.
   lazy-imports `lib/storage` inside `loadStats` so the pure `computeStats` half
   stays importable in Node — it's covered by a concrete-case test run via tsx
   (streak gap, ISO/Timestamp/epoch createdAt shapes, private exclusion, week
-  bucketing). Verified in the emulator UI; `tsc --noEmit` clean.
+  bucketing, weekday tie/threshold suppression). Polish pass same session:
+  marks grow in on mount (700ms `--ease-modal`, staggered, reduced-motion
+  safe), current week wears the accent gradient, skeleton loading in the final
+  layout, "Reading time" tile (sum of `estimatedReadTime`, only when > 0) and a
+  busiest-weekday line (needs ≥14 dated saves AND a strict winner — never
+  over-claims from noise), `insights_opened` analytics. Placement decision:
+  Settings-only on purpose — the mobile toolbar is a fixed three-zone bar and
+  the product line is subtraction; no new top-level surface. Verified light +
+  dark, desktop + 375px mobile, in the emulator UI; `tsc --noEmit` clean.
 - **2026-07-17 — SELF-SERVE DEPLOYS: push-triggered CI for functions
   + TestFlight (commits `aae5066`, `4de6f6e` — landed via GitHub API
   `push_files`; the session's `git push` to main was blocked by the local
