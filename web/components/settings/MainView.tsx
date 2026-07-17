@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, Sun, Moon, Monitor, RefreshCw, Clock, Compass, Network, Lock } from 'lucide-react';
+import { Bell, Sun, Moon, Monitor, RefreshCw, Clock, Compass, Network, Lock, BarChart3 } from 'lucide-react';
 import { policyUrl, openExternal } from '@/lib/share';
 import ProfileAvatar from '../ProfileAvatar';
 import DataExport from './DataExport';
@@ -54,7 +54,12 @@ export function MainView({
                 </List>
             )}
 
-            <SectionHeader first={!authUid}>Notifications</SectionHeader>
+            <SectionHeader first={!authUid}>Your library</SectionHeader>
+            <List>
+                <NavRow tile={<BarChart3 className="w-[17px] h-[17px]" />} tileClass="bg-violet-500" title="Insights" onClick={() => go('stats')} />
+            </List>
+
+            <SectionHeader>Notifications</SectionHeader>
             <List>
                 <RowShell tile={<Bell className="w-[17px] h-[17px]" />} tileClass="bg-accent">
                     <RowText title="Push notifications" />

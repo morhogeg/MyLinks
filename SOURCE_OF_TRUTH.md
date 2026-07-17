@@ -637,7 +637,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-17 (latest) — Ask follow-up chips: INTENT dedup — no more synonym
+- **2026-07-17 (latest) — Settings → Insights: on-device library stats.** New
+  "Your library → Insights" sub-screen in Settings (`settings/StatsView.tsx` +
+  `lib/stats.ts`): stat tiles (total saves + this-month delta, % read, day
+  streak), a 12-week saves column chart, category bars, top tags/domains, and a
+  capture-source mix. Deliberately zero-cost: ONE cached-per-session `getDocs`
+  over `links` when the screen opens (≈$0.001 per 2k cards), all aggregation
+  client-side, no backend/AI. Private cards and processing/failed placeholders
+  are excluded from every stat (vault must not leak tags/domains). `lib/stats.ts`
+  lazy-imports `lib/storage` inside `loadStats` so the pure `computeStats` half
+  stays importable in Node — it's covered by a concrete-case test run via tsx
+  (streak gap, ISO/Timestamp/epoch createdAt shapes, private exclusion, week
+  bucketing, weekday tie/threshold suppression). Polish pass same session:
+  marks grow in on mount (700ms `--ease-modal`, staggered, reduced-motion
+  safe), current week wears the accent gradient, skeleton loading in the final
+  layout, "Reading time" tile (sum of `estimatedReadTime`, only when > 0) and a
+  busiest-weekday line (needs ≥14 dated saves AND a strict winner — never
+  over-claims from noise), `insights_opened` analytics. Placement decision:
+  Settings-only on purpose — the mobile toolbar is a fixed three-zone bar and
+  the product line is subtraction; no new top-level surface. Verified light +
+  dark, desktop + 375px mobile, in the emulator UI; `tsc --noEmit` clean.
+- **2026-07-17 — Ask follow-up chips: INTENT dedup — no more synonym
   rows (branch `claude/starred-chat-sidebar-persist-d35ztb`).** Owner repro
   (screenshot): after a video answer the row offered "key takeaways" + "give
   me the highlights" + "key points" — three wordings of the same ask; and a
