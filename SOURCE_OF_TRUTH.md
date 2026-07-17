@@ -651,8 +651,13 @@ exact-match, capped.
   whole conversation once the user asks anything in it (derived from
   persisted messages — survives reloads). Verified by simulation: the
   screenshot turn now yields restate+simplify+significance, and after
-  tapping "key takeaways" its synonyms never return. Web-only; ships via
-  Vercel on merge + TestFlight build for native.
+  tapping "key takeaways" its synonyms never return. **Follow-up (same day,
+  owner rule): NO-PADDING** — the `safeFallbacks` top-up pool is DELETED;
+  a row is never padded toward 3 with generic filler, even on the first
+  exchange. Whatever survives the evidence + family + intent gates is the
+  row (2, 1, or empty) — "I don't want anything to happen on the app if it
+  does not provide value." Do not reintroduce a fallback pool. Web-only;
+  ships via Vercel on merge + TestFlight build for native.
 - **2026-07-17 — SELF-SERVE DEPLOYS: push-triggered CI for functions
   + TestFlight (commits `aae5066`, `4de6f6e` — landed via GitHub API
   `push_files`; the session's `git push` to main was blocked by the local

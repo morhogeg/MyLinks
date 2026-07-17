@@ -438,20 +438,6 @@ function chipIntent(text: string): string {
     return f;
 }
 
-// Always-answerable top-ups (pure restatements of stored content, anchored to
-// the cited title) used only when the gated angle set comes up short. Deep in
-// a conversation most families are already consumed, so this pool carries a
-// few extra restatement angles to keep fresh chips flowing.
-function safeFallbacks(t: string): FollowUpChip[] {
-    return [
-        { label: 'Give me the key points', question: `Give me the key points of "${t}"` },
-        { label: 'Explain it more simply', question: `Explain "${t}" more simply` },
-        { label: 'Why does this matter?', question: `Why does "${t}" matter?` },
-        { label: 'Sum it up in one line', question: `Sum up "${t}" in one line` },
-        { label: 'What should I remember?', question: `What should I remember from "${t}"?` },
-    ];
-}
-
 /**
  * Up to 3 content-aware follow-up chips derived from what the answer actually
  * discussed. Every chip is (a) gated on evidence the cited cards verifiably
@@ -460,6 +446,13 @@ function safeFallbacks(t: string): FollowUpChip[] {
  * deterministic (no salt). Returns [] when the answer cited nothing, or when
  * no cited card has a usable title to anchor to — a chip whose retrieval we
  * can't guarantee is a chip we don't show.
+ *
+ * NO-PADDING RULE (owner, 2026-07-17): the row is NEVER topped up with generic
+ * filler to look full. If the gated, intent-fresh set has two chips, show two;
+ * one, show one; none, show nothing — even on the first exchange. A chip that
+ * doesn't add value is worse than no chip; UI that doesn't help must not
+ * appear. (A `safeFallbacks` top-up pool used to pad toward 3 — deliberately
+ * removed; do not reintroduce it.)
  */
 export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
     const { citedCards, allLinks, askedTexts, exchangeCount } = ctx;
@@ -521,12 +514,6 @@ export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
         chips = [...chips.filter(c => DEEPENING_RE.test(c.label)), ...chips.filter(c => !DEEPENING_RE.test(c.label))];
     }
 
-    // Top up toward 3 without repeating any family OR intent used/shown.
-    if (chips.length < 3) {
-        for (const f of safeFallbacks(t)) {
-            if (chips.length >= 3) break;
-            if (admit(f)) chips.push(f);
-        }
-    }
+    // NO-PADDING RULE: no top-up. Whatever survived the gates is the row.
     return chips.slice(0, 3);
 }
