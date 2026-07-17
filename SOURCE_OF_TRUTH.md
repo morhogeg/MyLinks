@@ -407,6 +407,12 @@ The multi-user auth work is **fully written but not live**:
 
 ### 🟢 P3 — product roadmap (post-launch)
 
+19b. **[ ] Retire dead search backend (post search-rebuild 2026-07-17):** the
+    client no longer calls `search_links` / `search_links_http` (search is
+    fully client-side, `8e27c5c`). On the next backend-touching ship, delete
+    both callables + the `/api/search` rewrites (firebase.json, web/vercel.json)
+    — keep `search.py` itself (ask_brain imports its helpers) and the embedding
+    pipeline (Ask RAG + related links still use it).
 20. **[ ] M19 Shareable cited answers — FIRST POST-LAUNCH ITEM (re-ranked to the
     top of P3, 2026-07-10 product review).** Ask Machina is the hero; a shareable
     cited answer is its growth surface and every share is a public OG page
@@ -677,8 +683,12 @@ exact-match, capped.
   search bar by design — Ask Machina is the semantic surface; if ever needed
   in-bar, the path is AI-stamped bilingual keywords at save time, not
   vectors. All re-verified live on emulators + offline assertions.
-  SHIPPED this session — merge + TestFlight build noted below once run
-  numbers land.
+  **SHIPPED:** merge `8e27c5c` → Vercel (desktop web, live ~1–2 min after
+  push); **iOS: TestFlight run #106 = build 1106** via the trigger branch
+  (`main:trigger/testflight`). No functions deploy (backend untouched).
+  Cleanup candidate left in §4: retire the now-unused `search_links` /
+  `search_links_http` callables + `/api/search` rewrites on a future
+  backend-touching ship.
 - **2026-07-17 — Settings → Insights: on-device library stats.** New
   "Your library → Insights" sub-screen in Settings (`settings/StatsView.tsx` +
   `lib/stats.ts`): stat tiles (total saves + this-month delta, % read, day
