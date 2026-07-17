@@ -33,6 +33,10 @@ interface SettingsModalProps {
     /** Deep-link the sheet straight to a sub-screen on open (e.g. the digest
         settings, reached as main → Reminders & Digest). */
     initialSection?: 'digest';
+    /** Insights row tapped: open the library filtered to this facet. The
+        HANDLER owns closing the sheet (page.tsx closes it, then hands the
+        request to Feed). */
+    onOpenLibraryFacet?: (req: import('@/lib/stats').LibraryFacetRequest) => void;
 }
 
 type Frequency = User['settings']['reminder_frequency'];
@@ -56,7 +60,7 @@ const FREQUENCY_NOTE: Record<string, string> = {
 
 const CADENCE_LABEL: Record<string, string> = { smart: 'Smart', daily: 'Daily', weekly: 'Weekly' };
 
-export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, initialSection }: SettingsModalProps) {
+export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, initialSection, onOpenLibraryFacet }: SettingsModalProps) {
     const { theme, setTheme } = useTheme();
     const { authUid, email: accountEmail, displayName, photoURL, signOut } = useAuth();
 
@@ -310,7 +314,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                             />
                         )}
 
-                        {view === 'stats' && <StatsView uid={uid} />}
+                        {view === 'stats' && <StatsView uid={uid} onOpenFacet={onOpenLibraryFacet} />}
 
                         {view === 'resurfacing' && (
                             <ResurfacingView

@@ -13,6 +13,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { IconButton } from "@/components/ui/Button";
 import { useHeaderFade } from "@/lib/useHeaderFade";
 import { useSharedCaptureBanner } from "@/lib/useSharedCaptureBanner";
+import type { LibraryFacetRequest } from "@/lib/stats";
 
 /** Pick the banner to show: prefer an active source in priority order, else the
  *  first non-null (for the graceful "Saved" finish frame). */
@@ -31,6 +32,9 @@ export default function Home() {
   // When set, the Settings sheet opens straight to that sub-screen (e.g. the
   // digest settings, deep-linked from the empty Digest page).
   const [settingsSection, setSettingsSection] = useState<'digest' | null>(null);
+  // A tapped Insights row (category/tag/source): Settings closes and Feed
+  // applies this as its active filter, then clears it via the callback.
+  const [libraryFacet, setLibraryFacet] = useState<LibraryFacetRequest | null>(null);
   const [isAskMode, setIsAskMode] = useState(false);
   const [hideAddButton, setHideAddButton] = useState(false);
   // In-flight capture analysis for the one "Analyzing… N%" banner. Two sources:
@@ -159,7 +163,7 @@ export default function Home() {
         {/* The feed is already live via onSnapshot, so a new save streams in on
             its own — no remount needed. (Previously keyed on refreshKey, which
             tore down listeners and wiped view/filter/search on every add.) */}
-        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onHasCardsChange={setHasCards} />
+        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onHasCardsChange={setHasCards} libraryFacet={libraryFacet} onLibraryFacetApplied={() => setLibraryFacet(null)} />
       </main>
 
       {/* Add Link FAB — hidden in Ask & Collections (neither view captures links). */}
@@ -177,6 +181,7 @@ export default function Home() {
           onClose={() => setIsSettingsOpen(false)}
           onReplayTour={replayTour}
           initialSection={settingsSection ?? undefined}
+          onOpenLibraryFacet={(req) => { setIsSettingsOpen(false); setLibraryFacet(req); }}
         />
       )}
 

@@ -76,7 +76,7 @@ const noop = () => { };
  * - Two card views (grid / list), plus review, ask, and collections modes
  * - Deep linking to specific links via URL params
  */
-function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void }) {
+function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void }) {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
@@ -693,6 +693,24 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         if (col.isPrivate && vaultLocked) setUnlockPrompt(() => fn);
         else fn();
     }, [vaultLocked]);
+
+    // Insights → library deep-link: a tapped category/tag/source row in
+    // Settings arrives here as `libraryFacet`. Apply it the way openCollection
+    // scopes the feed — the one facet set, everything else cleared — landing on
+    // the grid so the user sees exactly "the cards behind that number".
+    useEffect(() => {
+        if (!libraryFacet) return;
+        setSelectedCategory(libraryFacet.kind === 'category' ? new Set([libraryFacet.value]) : new Set());
+        setSelectedTags(libraryFacet.kind === 'tag' ? new Set([libraryFacet.value]) : new Set());
+        setSelectedSources(libraryFacet.kind === 'source' ? new Set([libraryFacet.value]) : new Set());
+        setSelectedCollections(new Set());
+        setFilter('all');
+        setSearchQuery('');
+        setOpenCollectionId(null);
+        setViewMode('grid');
+        window.scrollTo({ top: 0 });
+        onLibraryFacetApplied?.();
+    }, [libraryFacet, onLibraryFacetApplied, setSelectedCategory, setSelectedTags, setSelectedSources, setSelectedCollections, setFilter]);
 
     // Open a collection as its own place (Task A): a dedicated detail view with
     // its own header + back navigation, NOT the generic filtered grid. We scope
@@ -2443,14 +2461,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     );
 }
 
-export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void }) {
+export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void }) {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-2 border-text/20 border-t-text rounded-full animate-spin" />
             </div>
         }>
-            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} />
+            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} libraryFacet={libraryFacet} onLibraryFacetApplied={onLibraryFacetApplied} />
         </Suspense>
     );
 }
