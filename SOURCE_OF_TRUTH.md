@@ -526,9 +526,13 @@ where it is today: **server-side only, in Cloud Functions env**, never in the
 bundle (the client-side Gemini path was already deleted for exactly this reason).
 The economics support this: analysis runs on `gemini-3.1-flash-lite`, one of the
 cheapest capable models — a typical save (scrape + structured analysis + embedding
-+ graph check) costs a fraction of a cent, and even a heavy user (300 saves + 100
-asks + digests/syntheses a month) lands in the range of **$0.10–$0.50/month** in
-model cost plus Firebase's mostly-free tier. Cost is not the constraint; **abuse**
++ graph check) costs a fraction of a cent (~$0.002; 100 cards ≈ $0.20), and even
+a heavy user (300 saves + 100 asks + digests/syntheses a month) lands around
+**$1.30–2.00/month** in model cost (verified against July 2026 prices:
+flash-lite $0.25/$1.50 per M in/out, flash $0.75/$4.50, embeddings $0.15/M) plus
+Firebase's mostly-free tier; the one per-card outlier is YouTube native video
+ingestion (~100 tokens/sec even at LOW media resolution → ≈$0.09 per hour of
+video, with no pre-call duration cap today). Cost is not the constraint; **abuse**
 is. The real protections are already designed: verified auth on every paid
 endpoint (task 2), App Check enforcement, and per-uid rate limits (task 13) — plus
 GCP budget alerts (task 19) so a surprise never compounds.
@@ -631,7 +635,31 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-17 (latest) — SELF-SERVE DEPLOYS: push-triggered CI for functions
+- **2026-07-17 (latest) — ABUSE HARDENING: embed-trigger cost backstop + live
+  `shared_*` write lockdown (branch `claude/gemini-pricing-analysis-ab575e`).**
+  Cost research first (owner asked pre-launch): per-card analysis ≈ $0.002
+  (flash-lite $0.25/$1.50 per M, embeddings $0.15/M) → 100 cards ≈ $0.20;
+  typical user $0.15–0.30/mo; §7's "$0.10–0.50 heavy user" is stale — heavy is
+  ~$1.30–2/mo at current prices, and the **YouTube native-video path is the
+  outlier** (~100 tok/sec at LOW res → a 1-hr video ≈ $0.09, a 10-hr video ≈
+  $0.90; no pre-call duration cap exists — candidate follow-up). `minimal`
+  thinking is already the flash-lite default, so no thinking-cap change needed.
+  Hardening audit found the endpoints already well-defended (dual IP+uid
+  fail-closed rate limits, monthly quotas, App Check code, admin-token
+  fail-closed, `pending_processing` rules-denied) but ONE unmetered paid path:
+  `sync_link_embedding` fires on world-writable (pre-cutover)
+  `users/{uid}/links/**`, so direct Firestore writes could burn embed spend
+  bypassing every HTTP limiter. Fixed in-trigger: per-uid (150/hr) + global
+  (1000/hr, bounds uid-rotation) fail-closed buckets; over-limit skips WITHOUT
+  writing (loop-safe; card self-heals via `embedding_needs_repair` on next
+  write/rebuild). Tests: `tests/test_embed_trigger_backstop.py` (270 pass).
+  Also staged live `firestore.rules`: `shared_cards`/`shared_collections`
+  writes now `false` (client stopped writing them at 5a; read stays public) —
+  **deploys with the next `firebase deploy --only firestore:rules`** (task 4
+  already has one pending). The decisive protections remain the owner steps:
+  task 2 cutover (`REQUIRE_AUTH` + locked rules), task 5 env
+  (`APPCHECK_ENFORCE`, `ADMIN_TOKEN`, key rotation), task 19 budget alerts.
+- **2026-07-17 — SELF-SERVE DEPLOYS: push-triggered CI for functions
   + TestFlight (commits `aae5066`, `4de6f6e` — landed via GitHub API
   `push_files`; the session's `git push` to main was blocked by the local
   permission classifier, so MCP was the transport).** Owner: "needing to run
