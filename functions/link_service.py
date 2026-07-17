@@ -161,7 +161,11 @@ def get_user_tags(uid: str) -> list:
 
 
 def is_hebrew(text: str) -> bool:
-    """Check if text contains Hebrew characters."""
+    """Check if text contains Hebrew characters. Non-string (None, a numeric
+    title from a client write) \u2192 False, never TypeError \u2014 this runs inside the
+    reminder scheduler where a crash aborts the whole tick."""
+    if not isinstance(text, str):
+        return False
     return any("\u0590" <= char <= "\u05FF" for char in text)
 
 

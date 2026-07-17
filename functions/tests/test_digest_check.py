@@ -94,3 +94,25 @@ def test_slim_scan_uses_field_mask_and_streams(monkeypatch):
     assert sent_for == ["carol"]         # only the due one
     assert report["digests_sent"] == 1
     assert report["cards_delivered"] == 3
+
+
+def test_non_dict_settings_doc_does_not_abort_sweep(monkeypatch):
+    # settings: "on" (truthy non-dict) sat before the per-user try — one
+    # corrupt doc used to AttributeError the whole sweep, so no user after it
+    # ever got a digest.
+    recorder = {}
+    docs = [
+        ("corrupt", {"settings": "on"}),
+        ("good", {"settings": {"digest_enabled": True}, "timezone": "UTC",
+                  "lastDigestSentAt": None, "fcmTokens": []}),
+    ]
+    monkeypatch.setattr(ds, "get_db", lambda: FakeDB(docs, recorder))
+    monkeypatch.setattr(ds, "is_due", lambda settings, tz, last: True)
+    sent_for = []
+    monkeypatch.setattr(ds, "build_and_send_digest",
+                        lambda uid, ud, force=False: (sent_for.append(uid), {"sent": True, "card_count": 1})[1])
+
+    report = ds.run_digest_check()  # must not raise
+
+    assert report["users_checked"] == 2
+    assert sent_for == ["good"]  # the healthy user still got their digest

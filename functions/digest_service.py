@@ -25,6 +25,7 @@ of any of them is mapped to 'smart' at read time (see REMOVED_MODE_ALIASES) so
 existing settings keep working; the removed value is never written back.
 """
 
+import math
 import random
 import logging
 from datetime import datetime, timezone, timedelta
@@ -77,17 +78,37 @@ SYNTHESIS_MIN_CARDS = 3
 
 
 def _to_ms(value) -> int:
-    """Best-effort coerce a Firestore timestamp / ISO string / number to ms."""
-    if value is None:
+    """Best-effort coerce a Firestore timestamp / ISO string / number to ms.
+    0 for anything unusable — including NaN/inf (int() would raise, and this
+    runs inside curate()'s sort keys, where one poison doc used to fail the
+    user's digest every tick) and bools (True is an int subclass, not a time).
+    """
+    if value is None or isinstance(value, bool):
+        return 0
+    if isinstance(value, float) and not math.isfinite(value):
         return 0
     if isinstance(value, (int, float)):
         # Heuristic: seconds vs milliseconds.
         return int(value if value > 1e11 else value * 1000)
     if hasattr(value, "timestamp"):
-        return int(value.timestamp() * 1000)
-    if isinstance(value, str):
         try:
-            return int(datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp() * 1000)
+            return int(value.timestamp() * 1000)
+        except Exception:
+            return 0
+    if isinstance(value, str):
+        s = value.strip()
+        # A stringified number ("1700000000000") isn't ISO — parse it as the
+        # same seconds/ms heuristic instead of silently becoming epoch 0
+        # (which made the card look infinitely old to curation).
+        try:
+            f = float(s)
+            if math.isfinite(f):
+                return int(f if f > 1e11 else f * 1000)
+            return 0
+        except ValueError:
+            pass
+        try:
+            return int(datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp() * 1000)
         except Exception:
             return 0
     return 0
@@ -104,9 +125,15 @@ def _normalize_channels(stored) -> List[str]:
     """
     if stored is None:
         return ["push"]
+    if isinstance(stored, str):
+        # A bare string ("push") would iterate as characters and silently
+        # disable delivery while everything else looked healthy.
+        stored = [stored]
+    if not isinstance(stored, list):
+        return ["push"]
     return list(dict.fromkeys(
         "push" if c == "whatsapp" else c
-        for c in (stored or [])
+        for c in stored
         if c != "email"
     ))
 
@@ -141,7 +168,7 @@ def _normalize_topics(topics) -> List[str]:
         topics = [topics]
     seen, out = set(), []
     for t in topics:
-        key = (t or "").strip().lower()
+        key = t.strip().lower() if isinstance(t, str) else ""
         if key and key not in seen:
             seen.add(key)
             out.append(key)
@@ -159,7 +186,11 @@ def curate(links: List[dict], mode: str, count: int, topics=None) -> List[dict]:
     # stale stored value curates via 'smart' rather than crashing or curating
     # nothing (defense in depth — build_and_send_digest also normalizes on read).
     mode = normalize_mode(mode)
-    count = max(1, min(int(count or 5), 20))
+    try:
+        count = int(count or 5)
+    except (TypeError, ValueError):
+        count = 5  # a wrong-typed stored digest_count must not fail every digest
+    count = max(1, min(count, 20))
     topic_set = set(_normalize_topics(topics))
     # Defense in depth: never surface archived cards even if they slip in.
     links = [l for l in links if l.get("status") != "archived"]
@@ -176,13 +207,17 @@ def curate(links: List[dict], mode: str, count: int, topics=None) -> List[dict]:
         return _to_ms(l.get("lastViewedAt"))
 
     if mode == "topic":
-        pool = [
-            l for l in links
-            if topic_set and (
-                (l.get("category") or "").lower() in topic_set
-                or any(tag.lower() in topic_set for tag in (l.get("tags") or []))
-            )
-        ]
+        def _matches_topic(l):
+            # isinstance guards: category/tags are client data — one numeric
+            # or null entry must not AttributeError the user's digest forever.
+            cat = l.get("category")
+            if isinstance(cat, str) and cat.lower() in topic_set:
+                return True
+            tags = l.get("tags")
+            return any(isinstance(t, str) and t.lower() in topic_set
+                       for t in (tags if isinstance(tags, list) else []))
+
+        pool = [l for l in links if topic_set and _matches_topic(l)]
         random.shuffle(pool)
         return pool[:count]
 
@@ -208,17 +243,33 @@ def curate(links: List[dict], mode: str, count: int, topics=None) -> List[dict]:
     old.sort(key=lambda l: max(viewed(l), created(l)))
 
     picks, seen = [], set()
-    # Roughly 60% fresh backlog, 40% rediscovery, interleaved.
+    # Roughly 60% fresh backlog, 40% rediscovery. `take` caps each source: the
+    # old loop bounded only on the TOTAL, so with a deep backlog the unread
+    # pass filled every slot and rediscovery — the mode's other half — never
+    # contributed a single card.
     fresh_target = max(1, round(count * 0.6))
     for source, take in ((unread, fresh_target), (old, count - fresh_target)):
+        taken = 0
         for l in source:
-            if len(picks) >= count:
+            if taken >= take or len(picks) >= count:
                 break
             if l["id"] in seen:
                 continue
             picks.append(l)
             seen.add(l["id"])
-        # (loop continues to second source)
+            taken += 1
+
+    # One source ran short (e.g. nothing old enough to rediscover) — top up
+    # from the other pools in priority order before falling back to shuffle.
+    if len(picks) < count:
+        for source in (unread, old):
+            for l in source:
+                if len(picks) >= count:
+                    break
+                if l["id"] in seen:
+                    continue
+                picks.append(l)
+                seen.add(l["id"])
 
     # Fill any remainder from a shuffle of everything left.
     if len(picks) < count:
@@ -528,6 +579,15 @@ def _local_now(tz_name: Optional[str]) -> datetime:
     return now
 
 
+def _clamped_int(value, default: int, lo: int, hi: int) -> int:
+    """Coerce a stored setting to an int in [lo, hi]; default when unusable."""
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return default
+    return min(max(value, lo), hi)
+
+
 def is_due(settings: dict, tz_name: Optional[str], last_sent_ms: Optional[int]) -> bool:
     """
     Decide whether a user's digest is due *right now*. Designed to be called by
@@ -535,15 +595,18 @@ def is_due(settings: dict, tz_name: Optional[str], last_sent_ms: Optional[int]) 
     first tick at or after the user's exact local hour:minute, and uses
     last_sent_ms to avoid duplicate sends within the same period.
     """
-    if not settings.get("digest_enabled"):
+    if not isinstance(settings, dict) or not settings.get("digest_enabled"):
         return False
     # NOTE: no digest_channels requirement — the in-app Digest section is the
     # always-on surface, so a digest with zero outbound channels still runs
     # (it just persists to users/{uid}/digests and sends nothing).
 
     local = _local_now(tz_name)
-    target_hour = int(settings.get("digest_hour", 9))
-    target_minute = int(settings.get("digest_minute", 0))
+    # Clamped int coercion: an explicit null (int(None) raises) or an
+    # out-of-range hour (local.replace(hour=24) raises) used to make that
+    # user's digest error every tick and never deliver.
+    target_hour = _clamped_int(settings.get("digest_hour", 9), 9, 0, 23)
+    target_minute = _clamped_int(settings.get("digest_minute", 0), 0, 0, 59)
 
     # Fire on the first scheduler tick in [target, target + cadence). Comparing
     # actual datetimes (not raw hour/minute) makes this correct across midnight:
@@ -555,7 +618,13 @@ def is_due(settings: dict, tz_name: Optional[str], last_sent_ms: Optional[int]) 
     window = timedelta(minutes=DIGEST_CADENCE_MINUTES)
     fired = None
     for candidate in (target_today, target_today - timedelta(days=1)):
-        if timedelta(0) <= (local - candidate) < window:
+        # Subtract in UTC: aware datetimes sharing one ZoneInfo subtract as
+        # naive WALL-CLOCK time, so a target inside the DST spring-forward
+        # skipped hour never landed in any tick's window and that day's digest
+        # silently vanished. In absolute time the skipped wall time maps just
+        # past the jump and the next tick catches it.
+        delta = local.astimezone(timezone.utc) - candidate.astimezone(timezone.utc)
+        if timedelta(0) <= delta < window:
             fired = candidate
             break
     if fired is None:
@@ -570,7 +639,7 @@ def is_due(settings: dict, tz_name: Optional[str], last_sent_ms: Optional[int]) 
         return (now_ms - last) >= 20 * 3600 * 1000
 
     # weekly — the day-of-week is the day the target window opened on.
-    target_day = int(settings.get("digest_day", 0))
+    target_day = _clamped_int(settings.get("digest_day", 0), 0, 0, 6)
     if fired.weekday() != target_day:
         return False
     return (now_ms - last) >= 6 * 86_400 * 1000
@@ -605,7 +674,11 @@ def run_digest_check() -> dict:
         report["users_checked"] += 1
         uid = user_doc.id
         user_data = user_doc.to_dict() or {}
-        settings = user_data.get("settings", {}) or {}
+        settings = user_data.get("settings")
+        if not isinstance(settings, dict):
+            # A corrupt (non-dict) settings field on ONE doc must not abort the
+            # sweep for every user — this ran before the per-user try.
+            settings = {}
 
         if not settings.get("digest_enabled"):
             continue

@@ -457,3 +457,136 @@ def test_coerce_pending_reminder_times_rewrites_legacy(monkeypatch):
     assert links["str"]["nextReminderAt"] == 1_609_459_200_000
     assert links["bad"]["nextReminderAt"] == "garbage"  # left in place
     assert links["done"]["nextReminderAt"] == "2021-01-01T00:00:00Z"  # untouched
+
+
+# ── Corrupt-doc resilience: one bad doc must never take down the tick ───────
+#
+# These pin the blast-radius contract: a malformed field on ONE link or ONE
+# user degrades that item only. Before the fix, each of these aborted the
+# ENTIRE tick — and since the doc stayed due, every subsequent tick died the
+# same way (a permanent, self-sustaining reminder outage).
+
+
+def test_null_title_link_does_not_abort_tick(monkeypatch, past_ms, push_calls):
+    store = {
+        "users": {
+            "alice": {
+                "settings": {}, "fcmTokens": [],
+                "links": {
+                    "bad": {"reminderStatus": "pending", "nextReminderAt": past_ms,
+                            "title": None, "reminderProfile": "smart", "reminderCount": 0},
+                },
+            },
+            "bob": {
+                "settings": {}, "fcmTokens": [],
+                "links": {
+                    "ok": {"reminderStatus": "pending", "nextReminderAt": past_ms,
+                           "title": "fine", "reminderProfile": "smart", "reminderCount": 0},
+                },
+            },
+        }
+    }
+    _install_db(monkeypatch, store)
+
+    report = rs.run_reminder_check()  # must not raise (is_hebrew(None) used to)
+
+    # BOTH links delivered — including the null-title one, as "Untitled".
+    assert store["users"]["bob"]["links"]["ok"]["reminderDue"] is True
+    assert store["users"]["alice"]["links"]["bad"]["reminderDue"] is True
+    assert report["errors"] == []
+
+
+def test_null_profile_does_not_push_spam(monkeypatch, past_ms, push_calls):
+    # reminderProfile: None used to crash AFTER the push was sent but BEFORE
+    # the schedule advanced — so the doc stayed due and the user was pushed
+    # again on every 2-minute tick, forever.
+    store = {
+        "users": {
+            "dana": {
+                "settings": {}, "fcmTokens": ["tok-d"],
+                "links": {
+                    "l": {"reminderStatus": "pending", "nextReminderAt": past_ms,
+                          "title": "t", "reminderProfile": None, "reminderCount": 0},
+                },
+            }
+        }
+    }
+    _install_db(monkeypatch, store)
+
+    rs.run_reminder_check()
+    rs.run_reminder_check()
+
+    assert len(push_calls) == 1  # second tick must NOT re-push
+    assert store["users"]["dana"]["links"]["l"]["nextReminderAt"] != past_ms
+
+
+def test_non_int_reminder_count_still_advances_schedule(monkeypatch, past_ms, push_calls):
+    store = {
+        "users": {
+            "erin": {
+                "settings": {}, "fcmTokens": [],
+                "links": {
+                    "l": {"reminderStatus": "pending", "nextReminderAt": past_ms,
+                          "title": "t", "reminderProfile": "smart", "reminderCount": "2"},
+                },
+            }
+        }
+    }
+    _install_db(monkeypatch, store)
+
+    report = rs.run_reminder_check()
+
+    assert report["errors"] == []
+    # "2" coerces to 2 → third fire → completed (the 3-fire cap).
+    assert store["users"]["erin"]["links"]["l"]["reminderStatus"] == "completed"
+
+
+def test_non_dict_settings_only_affects_that_user(monkeypatch, past_ms, push_calls):
+    store = {
+        "users": {
+            "corrupt": {
+                "settings": "on",  # truthy non-dict — used to AttributeError the tick
+                "fcmTokens": [],
+                "links": {
+                    "l1": {"reminderStatus": "pending", "nextReminderAt": past_ms,
+                           "title": "x", "reminderProfile": "smart", "reminderCount": 0},
+                },
+            },
+            "healthy": {
+                "settings": {}, "fcmTokens": [],
+                "links": {
+                    "l2": {"reminderStatus": "pending", "nextReminderAt": past_ms,
+                           "title": "y", "reminderProfile": "smart", "reminderCount": 0},
+                },
+            },
+        }
+    }
+    _install_db(monkeypatch, store)
+
+    rs.run_reminder_check()  # must not raise
+
+    assert store["users"]["healthy"]["links"]["l2"]["reminderDue"] is True
+
+
+def test_string_reminders_channel_still_pushes(monkeypatch, past_ms, push_calls):
+    # A bare-string channel setting ("push" instead of ["push"]) used to
+    # iterate as characters and silently disable push while everything else
+    # looked healthy.
+    store = {
+        "users": {
+            "fred": {
+                "settings": {"reminders_channel": "push"},
+                "fcmTokens": ["tok-f"],
+                "links": {
+                    "l": {"reminderStatus": "pending", "nextReminderAt": past_ms,
+                          "title": "t", "reminderProfile": "once", "reminderCount": 0},
+                },
+            }
+        }
+    }
+    _install_db(monkeypatch, store)
+
+    report = rs.run_reminder_check()
+
+    assert report["reminders_sent"] == 1
+    assert [c[0] for c in push_calls] == ["fred"]

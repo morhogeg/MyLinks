@@ -5,6 +5,7 @@ Handles reminder scheduling, spaced repetition logic, and reminder checks.
 
 import os
 import re
+import math
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -32,8 +33,23 @@ def format_local_time(dt: datetime, tz_name: Optional[str], is_he: bool = False)
     return dt.strftime('%d/%m %H:%M') if is_he else dt.strftime('%b %d at %I:%M %p')
 
 
+def _bounded_days(raw: str) -> Optional[int]:
+    """Parse a day count from user text, bounded to [1, 365].
+
+    int() rather than isdigit() gating: `"²".isdigit()` is True but int("²")
+    raises, and an unbounded int can overflow timedelta ("in 9999999999 days").
+    Out-of-range or unparseable → None."""
+    try:
+        days = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return days if 1 <= days <= 365 else None
+
+
 def handle_reminder_intent(text: str) -> Optional[datetime]:
     """Parse text for reminder commands (English and Hebrew)."""
+    if not isinstance(text, str):
+        return None
     text = re.sub(r'https?://[^\s]+', '', text).lower().strip()
     now = datetime.now(timezone.utc)
 
@@ -44,7 +60,9 @@ def handle_reminder_intent(text: str) -> Optional[datetime]:
         return now + timedelta(days=7)
     match = re.search(r'\bin (\d+) days?', text)
     if match:
-        return now + timedelta(days=int(match.group(1)))
+        days = _bounded_days(match.group(1))
+        if days is not None:
+            return now + timedelta(days=days)
 
     # Hebrew Patterns
     if 'מחר' in text:
@@ -53,7 +71,9 @@ def handle_reminder_intent(text: str) -> Optional[datetime]:
         return now + timedelta(days=7)
     match_he = re.search(r'(?:בעוד|עוד)\s+(\d+)\s+ימים', text)
     if match_he:
-        return now + timedelta(days=int(match_he.group(1)))
+        days = _bounded_days(match_he.group(1))
+        if days is not None:
+            return now + timedelta(days=days)
 
     # Quick-reply menu: a bare number means "remind me in that many days"
     # (1 -> 1 day, 2 -> 2 days, 7 -> 7 days …). "S" starts spaced repetition,
@@ -62,10 +82,9 @@ def handle_reminder_intent(text: str) -> Optional[datetime]:
     stripped = text.strip()
     if stripped in ('s', 'spaced'):
         return now + timedelta(days=SPACED_START_DAYS)
-    if stripped.isdigit():
-        days = int(stripped)
-        if 1 <= days <= 365:
-            return now + timedelta(days=days)
+    days = _bounded_days(stripped)
+    if days is not None:
+        return now + timedelta(days=days)
 
     return None
 
@@ -93,6 +112,19 @@ def calculate_next_reminder(reminder_count: int, profile: str = "smart") -> date
     - spaced-N: initial N, then progression
     """
     now = datetime.now(timezone.utc)
+
+    # Firestore data: an explicit null / wrong-typed profile or count must fall
+    # back to the defaults. A crash HERE is worse than elsewhere — it happens
+    # after the push was already sent but before the schedule advances, so the
+    # doc stays due and the user is re-pushed every 2-minute tick, forever.
+    if not isinstance(profile, str):
+        profile = "smart"
+    if isinstance(reminder_count, bool):
+        reminder_count = 0
+    try:
+        reminder_count = int(reminder_count)  # accepts a numeric string too
+    except (TypeError, ValueError, OverflowError):
+        reminder_count = 0
 
     if profile.startswith("spaced"):
         start_days = SPACED_START_DAYS
@@ -139,7 +171,12 @@ def should_complete_reminder(profile: str, new_reminder_count: int) -> bool:
 
     Pure decision so it can be unit-tested offline without Firestore.
     """
-    return profile == "once" or new_reminder_count >= 3
+    try:
+        return profile == "once" or new_reminder_count >= 3
+    except TypeError:
+        # A wrong-typed count compares uncomparably — treat as complete rather
+        # than risking an endless recurrence on a corrupt doc.
+        return True
 
 
 # Max due reminders processed per scheduler tick. One bounded collection-group
@@ -325,7 +362,11 @@ def run_reminder_check() -> dict:
             _snooze_due_links(user_links, now_ms + REMINDER_SNOOZE_MS)
             continue
 
-        settings = user_data.get('settings', {}) or {}
+        settings = user_data.get('settings')
+        if not isinstance(settings, dict):
+            # A corrupt (non-dict) settings field is one user's problem — it
+            # must not AttributeError the whole tick for every other user.
+            settings = {}
         enabled = settings.get('reminders_enabled', settings.get('remindersEnabled', True))
 
         if not enabled:
@@ -348,7 +389,11 @@ def run_reminder_check() -> dict:
         # 'whatsapp' entry is normalized to 'push' (deduped). New workspaces
         # default to ["push"] (DEFAULT_USER_SETTINGS in link_service.py).
         stored = settings.get('reminders_channel')
-        if stored is None:
+        if isinstance(stored, str):
+            # A bare string ("push") would otherwise iterate as characters and
+            # silently disable the push channel.
+            stored = [stored]
+        if not isinstance(stored, list):
             channels = ['push']
         else:
             channels = list(dict.fromkeys(
@@ -376,9 +421,22 @@ def run_reminder_check() -> dict:
             if not isinstance(link_data.get('nextReminderAt'), (int, float)):
                 continue
 
-            title = link_data.get('title', 'Untitled')
+            # Field coercions BEFORE any delivery work, all inside the per-link
+            # try below is not enough: a crash on a malformed field out here
+            # used to abort the ENTIRE tick for every user — and since the doc
+            # stayed due, every subsequent tick died the same way (a permanent
+            # reminder outage from one `title: null` doc).
+            title = link_data.get('title') or 'Untitled'
+            if not isinstance(title, str):
+                title = str(title)
             category = link_data.get('category', 'General')
             reminder_count = link_data.get('reminderCount', 0)
+            if isinstance(reminder_count, bool):
+                reminder_count = 0
+            try:
+                reminder_count = int(reminder_count)  # accepts a numeric string too
+            except (TypeError, ValueError, OverflowError):
+                reminder_count = 0
 
             is_he = is_hebrew(title)
 
@@ -404,7 +462,12 @@ def run_reminder_check() -> dict:
                     report["reminders_surfaced"] += 1
 
                 new_reminder_count = reminder_count + 1
-                profile = link_data.get('reminderProfile', 'smart')
+                # `or 'smart'`: an explicit null survives .get()'s default, and
+                # a None profile used to crash AFTER the push was sent but
+                # BEFORE the schedule advanced — push spam every tick, forever.
+                profile = link_data.get('reminderProfile') or 'smart'
+                if not isinstance(profile, str):
+                    profile = 'smart'
 
                 # One-shots ('once' — tomorrow / next week / custom / numbered
                 # quick-reply) fire exactly once. 'smart' and 'spaced-N' recur up
@@ -449,6 +512,10 @@ def _coerce_reminder_ms(value):
     if isinstance(value, int):
         return None, 'ok'
     if isinstance(value, float):
+        if not math.isfinite(value):
+            # NaN/inf: int() raises, and the call site has no per-doc try — one
+            # poisoned doc would abort the whole repair sweep.
+            return None, 'unparseable'
         return int(value), 'converted'
     # Firestore Timestamp / datetime expose .timestamp() → epoch seconds.
     ts = getattr(value, 'timestamp', None)
@@ -460,7 +527,10 @@ def _coerce_reminder_ms(value):
     if isinstance(value, str):
         s = value.strip()
         try:
-            return int(float(s)), 'converted'
+            f = float(s)
+            if not math.isfinite(f):
+                return None, 'unparseable'  # "inf"/"nan" parse but int() raises
+            return int(f), 'converted'
         except ValueError:
             pass
         try:
