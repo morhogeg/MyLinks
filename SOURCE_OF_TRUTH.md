@@ -762,7 +762,13 @@ exact-match, capped.
   is visible ONLY while the Insights-applied facet is the feed's exact scope
   (Feed-local `insightsFacet` + a strict predicate) — search, extra filters, or
   collections dissolve it. Verified round-trip + self-hide/reappear in the
-  emulator. Shipped: Vercel + TestFlight run #108 = build **1108**.
+  emulator. Shipped: Vercel + TestFlight run #108 = build **1108**. **Third
+  follow-up (owner, 2026-07-18): back restores the exact scroll position**
+  (`4229a32`, merge `8204f3f`): tapping a facet saves the settings sheet's
+  scrollTop (module-level one-shot in StatsView); the back chip remounts
+  Insights and restores it exactly (verified 1549.5→1549.5 in the emulator);
+  gear-entry still opens at top. Shipped: Vercel + TestFlight run #109 =
+  build **1109**.
 - **2026-07-17 — Ask follow-up chips: INTENT dedup — no more synonym
   rows (branch `claude/starred-chat-sidebar-persist-d35ztb`).** Owner repro
   (screenshot): after a video answer the row offered "key takeaways" + "give
