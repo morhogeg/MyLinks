@@ -15,6 +15,7 @@ import { useUserSettings } from '@/lib/useUserSettings';
 import type { View } from './settings/types';
 import { MainView } from './settings/MainView';
 import { AccountView } from './settings/AccountSection';
+import { StatsView } from './settings/StatsView';
 import {
     DIGEST_MODES, DAYS, COUNT_OPTIONS, formatTime,
     ResurfacingView, StyleView, ScheduleView, PickerView,
@@ -39,6 +40,7 @@ type Frequency = User['settings']['reminder_frequency'];
 const VIEW_TITLE: Record<View, string> = {
     main: 'Settings',
     account: 'Account',
+    stats: 'Insights',
     resurfacing: 'Reminders & Digest',
     cadence: 'Reminder cadence',
     style: 'Digest style',
@@ -307,6 +309,8 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                                 deleteError={deleteError}
                             />
                         )}
+
+                        {view === 'stats' && <StatsView uid={uid} />}
 
                         {view === 'resurfacing' && (
                             <ResurfacingView
