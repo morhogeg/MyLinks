@@ -711,7 +711,15 @@ exact-match, capped.
   dark, desktop + 375px mobile, in the emulator UI; `tsc --noEmit` clean.
   **Shipped:** merge `215efad` → Vercel (web); TestFlight run #105 = build
   **1105** (also carries the Ask-chips intent-dedup/no-padding work from the
-  parallel session, which had only shipped to web).
+  parallel session, which had only shipped to web). **Follow-up (same day,
+  owner-approved): Insights rows tap through to the filtered library**
+  (`960bc04`, merge `475032a`): category bars / tag pills / source rows close
+  Settings and open the feed scoped to that facet via a `LibraryFacetRequest`
+  threaded page.tsx → Feed (same clearing idiom as `openCollection`); "Top
+  sources" upgraded from raw domains to the feed's own source identity
+  (`getSourceInfo` keys) so labels match cards and filtering is exact; "Other"
+  row stays non-tappable. All three facet kinds verified end-to-end in the
+  emulator. Shipped: Vercel + TestFlight run #107 = build **1107**.
 - **2026-07-17 — Ask follow-up chips: INTENT dedup — no more synonym
   rows (branch `claude/starred-chat-sidebar-persist-d35ztb`).** Owner repro
   (screenshot): after a video answer the row offered "key takeaways" + "give
