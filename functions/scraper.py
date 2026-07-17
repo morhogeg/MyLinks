@@ -10,7 +10,7 @@ import ipaddress
 import requests
 import logging
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +42,12 @@ def validate_public_url(url: str) -> None:
 
     for family, _, _, _, sockaddr in addrinfos:
         ip = ipaddress.ip_address(sockaddr[0])
+        # `not is_global` (not just the negative flags): shared address space
+        # 100.64.0.0/10 (CGNAT — used inside some cloud VPC/NAT fabrics) sets
+        # NONE of the negative flags, so it slipped through the old check.
         if (ip.is_private or ip.is_loopback or ip.is_link_local
-                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+                or ip.is_reserved or ip.is_multicast or ip.is_unspecified
+                or not ip.is_global):
             raise UnsafeURLError(f"URL resolves to a non-public address: {ip}")
 
 
@@ -225,7 +229,10 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
         # real signal — don't throw it away (the special-cased platforms above
         # already use it; the generic branch historically ignored it).
         if message_body:
-            caption_guess = message_body.replace(url, '').strip()
+            # Cap the caption: it's prepended AFTER the page text's 5000-char
+            # slice, so an unbounded share body used to blow straight past the
+            # model-input budget the cap exists to protect.
+            caption_guess = message_body.replace(url, '').strip()[:2000]
             if caption_guess and len(caption_guess) > 5 and caption_guess not in text:
                 text = (f"SHARED CAPTION:\n{caption_guess}\n\n---\n\n{text}").strip()
 
@@ -367,10 +374,19 @@ def _scrape_linkedin_url(url: str) -> dict:
             text_parts.append(p.get_text().strip())
         text = " ".join([t for t in text_parts if t])[:5000]
 
+        # Honest degradation (same contract as the generic branch): LinkedIn
+        # normally serves a JS shell/login wall to server fetches, and the old
+        # `text or html[:5000]` fallback fed 5000 chars of raw markup to the
+        # model — the exact hallucination source scrape_url's comment outlaws.
+        if _readable_len(text) < _MIN_READABLE_CHARS:
+            result = _unreadable_result(title or "LinkedIn post")
+            result["source_name"] = _extract_linkedin_author(html)
+            return result
+
         return {
             "html": html,
             "title": title,
-            "text": text or html[:5000],
+            "text": text,
             "source_name": _extract_linkedin_author(html),
         }
     except Exception as e:
@@ -387,9 +403,16 @@ def _scrape_twitter_url(url: str) -> dict:
     """
     logger.info(f"Analyzing Twitter URL: {url}")
 
+    def _api_url(api_host: str) -> str:
+        # Swap the HOSTNAME, never substring-replace: 'mobile.twitter.com'
+        # became 'mobile.api.fxtwitter.com' (a dead host, so every mobile/www
+        # share silently degraded to the thin metadata scrape), and a
+        # 'twitter.com' inside the query string got mangled too.
+        return urlunparse(urlparse(url)._replace(netloc=api_host))
+
     try:
         # 1. Try fxtwitter.com API first
-        fx_api_url = url.replace('twitter.com', 'api.fxtwitter.com').replace('x.com', 'api.fxtwitter.com')
+        fx_api_url = _api_url('api.fxtwitter.com')
         logger.info(f"Attempting fxtwitter API: {fx_api_url}")
 
         try:
@@ -414,7 +437,7 @@ def _scrape_twitter_url(url: str) -> dict:
 
         # 2. Fallback to vxtwitter.com
         logger.info("fxtwitter failed or empty, trying vxtwitter...")
-        vx_api_url = url.replace('twitter.com', 'api.vxtwitter.com').replace('x.com', 'api.vxtwitter.com')
+        vx_api_url = _api_url('api.vxtwitter.com')
 
         vx_result = None
         try:
@@ -534,9 +557,9 @@ def _format_twitter_article(tweet: dict, article: dict, source: str) -> dict:
     if not body:
         body = (article.get('preview_text') or '').strip()
 
-    author = tweet.get('author', {})
-    author_name = author.get('name', 'Unknown')
-    author_handle = author.get('screen_name', '')
+    author = tweet.get('author') or {}
+    author_name = author.get('name') or 'Unknown'
+    author_handle = author.get('screen_name') or ''
     created_at = tweet.get('created_at', '')
     likes = tweet.get('likes', 0)
     retweets = tweet.get('retweets', 0)
@@ -575,8 +598,12 @@ def _format_twitter_data(tweet: dict, source: str) -> dict:
         content_parts.append(tweet['text'])
 
     if tweet.get('quote'):
-        q_author = tweet['quote'].get('author', {}).get('name', 'Unknown')
-        q_handle = tweet['quote'].get('author', {}).get('screen_name', 'unknown')
+        # `or {}`: a deleted/suspended account serves author as JSON null —
+        # .get('author', {}) keeps the None, and the AttributeError used to
+        # discard the ENTIRE tweet (text included) via the outer except.
+        q_author_obj = tweet['quote'].get('author') or {}
+        q_author = q_author_obj.get('name') or 'Unknown'
+        q_handle = q_author_obj.get('screen_name') or 'unknown'
         q_text = tweet['quote'].get('text', '')
         content_parts.append(f'\n[Replying to/Quoting {q_author} (@{q_handle})]:\n"{q_text}"')
 
@@ -589,9 +616,9 @@ def _format_twitter_data(tweet: dict, source: str) -> dict:
 
     final_tweet_content = "\n\n".join(content_parts) or "[Media-only tweet or no text content available]"
 
-    author = tweet.get('author', {})
-    author_name = author.get('name', 'Unknown')
-    author_handle = author.get('screen_name', '')
+    author = tweet.get('author') or {}
+    author_name = author.get('name') or 'Unknown'
+    author_handle = author.get('screen_name') or ''
     created_at = tweet.get('created_at', '')
     likes = tweet.get('likes', 0)
     retweets = tweet.get('retweets', 0)
@@ -624,10 +651,18 @@ def _format_vxtwitter_data(data: dict) -> dict:
         content_parts.append(data['text'])
 
     if data.get('mediaURLs') or data.get('media_extended'):
-        count = max(len(data.get('mediaURLs', [])), len(data.get('media_extended', [])))
+        # `or []`: a present-but-null key survives .get's default, and
+        # len(None) crashed this formatter even though the caller's truthy
+        # check had passed via the OTHER field.
+        count = max(len(data.get('mediaURLs') or []), len(data.get('media_extended') or []))
         content_parts.append(f"\n[Contains {count} Media Item(s)]")
 
     final_content = "\n\n".join(content_parts) or "[Media-only tweet]"
+
+    # Fallbacks so a sparse payload doesn't leak literal "None" into card
+    # titles and the model text.
+    user_name = data.get('user_name') or 'Unknown'
+    screen_name = data.get('user_screen_name') or 'unknown'
 
     formatted_text = f"""
 TWEET CONTENT:
@@ -635,15 +670,15 @@ TWEET CONTENT:
 
 ---
 METADATA:
-Author: {data.get('user_name')} (@{data.get('user_screen_name')})
-Date: {data.get('date')}
-Engagement: {data.get('likes')} likes, {data.get('retweets')} retweets
+Author: {user_name} (@{screen_name})
+Date: {data.get('date') or ''}
+Engagement: {data.get('likes') or 0} likes, {data.get('retweets') or 0} retweets
 Source: vxtwitter API
 """
 
     return {
         "html": formatted_text,
-        "title": f"Tweet by {data.get('user_name')}: {final_content[:100].replace(chr(10), ' ')}",
+        "title": f"Tweet by {user_name}: {final_content[:100].replace(chr(10), ' ')}",
         "text": formatted_text
     }
 
@@ -736,15 +771,18 @@ def _extract_instagram_handle(
             return h
 
     if html:
-        # 3. Embedded JSON: "username": "veryshortphilosophy"
-        m = re.search(r'"username"\s*:\s*"([A-Za-z0-9._]{1,30})"', html)
-        h = _valid_ig_handle(m.group(1)) if m else None
-        if h:
-            return h
-        # 4. Embedded JSON: "owner": { … "username": "…" }
+        # 3. Embedded JSON, OWNER-scoped first: IG pages embed many usernames
+        # (viewer, commenters, suggested accounts) before the owner block, so
+        # the bare "username" pattern must only be the fallback — checked
+        # first, it mis-attributed the card to whatever name appeared first.
         m = re.search(
             r'"owner"\s*:\s*\{[^}]*?"username"\s*:\s*"([A-Za-z0-9._]{1,30})"', html
         )
+        h = _valid_ig_handle(m.group(1)) if m else None
+        if h:
+            return h
+        # 4. Embedded JSON fallback: any "username": "…"
+        m = re.search(r'"username"\s*:\s*"([A-Za-z0-9._]{1,30})"', html)
         h = _valid_ig_handle(m.group(1)) if m else None
         if h:
             return h
@@ -891,8 +929,14 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
                 best_title = caption_guess[:100].split('\n')[0]
 
     if not metadata_lines and not best_desc:
-        return {"html": "", "title": "Instagram Link", "text": "Instagram content (metadata extraction failed)",
-                "source_name": _instagram_source_name(url, best_title, best_desc, html=raw_html, og_url=og_url)}
+        # Honest total-failure result (same contract as the Facebook branch):
+        # the old fabricated "Instagram content (metadata extraction failed)"
+        # string was 42 readable chars — just over the honesty threshold — so
+        # the model confidently "summarized" a sentence the scraper invented.
+        result = _unreadable_result("Instagram post")
+        result["source_name"] = _instagram_source_name(
+            url, best_title, best_desc, html=raw_html, og_url=og_url)
+        return result
 
     # Final Title fallback
     if best_title in generic_titles and best_desc:
@@ -954,8 +998,14 @@ def _clean_fb_title(raw: Optional[str]) -> tuple:
     author = None
     m = re.search(r"\s*\|\s*([^|\n]{2,60})\s*$", t)
     if m:
-        author = m.group(1).strip()
-        t = t[:m.start()].rstrip()
+        remaining = t[:m.start()].rstrip()
+        # Only split when what's left still looks like a caption: a single-line
+        # caption that itself contains a pipe ("Buy 1 | Get 1 free…") used to
+        # lose everything after the pipe to a bogus byline AND leave a stub too
+        # short to pass _is_real_caption — the whole caption vanished.
+        if len(remaining) >= 10:
+            author = m.group(1).strip()
+            t = remaining
     return t.strip(), author
 
 
@@ -1077,13 +1127,18 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
 
 def _extract_youtube_id(url: str) -> Optional[str]:
     """Extract the 11-char video ID from any common YouTube URL shape
-    (watch?v=, youtu.be/, /shorts/, /embed/, /live/)."""
+    (watch?v=, youtu.be/, /shorts/, /embed/, /live/, legacy /v/).
+
+    The trailing lookahead rejects 12+-char tokens instead of silently
+    truncating them to their first 11 chars — which used to fabricate a
+    watch_url/thumbnail for a WRONG video."""
     patterns = [
-        r"youtu\.be/([A-Za-z0-9_-]{11})",
-        r"[?&]v=([A-Za-z0-9_-]{11})",
-        r"/shorts/([A-Za-z0-9_-]{11})",
-        r"/embed/([A-Za-z0-9_-]{11})",
-        r"/live/([A-Za-z0-9_-]{11})",
+        r"youtu\.be/([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])",
+        r"[?&]v=([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])",
+        r"/shorts/([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])",
+        r"/embed/([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])",
+        r"/live/([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])",
+        r"/v/([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])",
     ]
     for pattern in patterns:
         match = re.search(pattern, url)

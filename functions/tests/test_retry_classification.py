@@ -23,8 +23,11 @@ def test_429_is_retryable():
 
 
 def test_resource_exhausted_status_is_retryable():
+    # code=None so the STATUS branch is what's exercised — with code=429 the
+    # classifier returned True before ever reading the status, so the
+    # RESOURCE_EXHAUSTED string had zero effective coverage.
     assert ai_service._is_retryable_error(
-        FakeAPIError(code=429, status="RESOURCE_EXHAUSTED")) is True
+        FakeAPIError(code=None, status="RESOURCE_EXHAUSTED")) is True
 
 
 def test_500_and_503_are_retryable():
@@ -45,9 +48,6 @@ def test_builtin_timeout_and_connection_errors_are_retryable():
 
 def test_named_timeout_connection_errors_are_retryable():
     class ReadTimeout(Exception):
-        pass
-
-    class ConnectionResetError2(Exception):  # name contains "connection"
         pass
 
     assert ai_service._is_retryable_error(ReadTimeout()) is True

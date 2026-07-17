@@ -68,6 +68,7 @@ def test_pdf_url_with_query_and_caps_still_degrades(monkeypatch):
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("fetched a .pdf")))
     result = scraper.scrape_url("https://example.com/DOC.PDF?download=1")
     assert result["truncated"] is True
+    assert result["text"] == "[no text content available]"  # the load-bearing placeholder
 
 
 def test_pdf_content_type_degrades(monkeypatch):
