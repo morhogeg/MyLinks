@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { RefreshCw, BarChart3 } from 'lucide-react';
-import { loadStats, LibraryStats } from '@/lib/stats';
+import { loadStats, LibraryStats, LibraryFacetRequest } from '@/lib/stats';
 import { track } from '@/lib/analytics';
-import { LargeTitle, SectionHeader, Footnote, List, RowShell, RowText } from './primitives';
+import { LargeTitle, SectionHeader, Footnote, List, RowShell, RowText, Chevron } from './primitives';
 
 /**
  * Settings → Insights: a birds-eye view of the library, computed entirely
@@ -82,47 +82,83 @@ function WeeklyChart({ stats, grown }: { stats: LibraryStats; grown: boolean }) 
 
 /** Horizontal magnitude bars: label + count in text tokens, an accent bar on a
     light accent track underneath. Widths are relative to the biggest category
-    and grow in from zero on mount. */
-function CategoryBars({ stats, grown }: { stats: LibraryStats; grown: boolean }) {
+    and grow in from zero on mount. Real categories are tappable — they open
+    the library filtered to that category ("Other" is an aggregate, so it
+    isn't). */
+function CategoryBars({ stats, grown, onOpen }: { stats: LibraryStats; grown: boolean; onOpen?: (category: string) => void }) {
     const shown = stats.categories.slice(0, MAX_CATEGORY_ROWS);
     const rest = stats.categories.slice(MAX_CATEGORY_ROWS);
     const rows = rest.length > 0
-        ? [...shown, { name: `Other (${rest.length} more)`, count: rest.reduce((s, c) => s + c.count, 0) }]
+        ? [...shown, { name: `Other (${rest.length} more)`, count: rest.reduce((s, c) => s + c.count, 0), aggregate: true }]
         : shown;
     const max = Math.max(...rows.map((r) => r.count), 1);
     return (
         <div className="rounded-[14px] border border-border-subtle bg-card px-4 py-3.5 space-y-3">
-            {rows.map((row, i) => (
-                <div key={row.name} title={`${row.name} — ${Math.round((row.count / stats.total) * 100)}% of your library`}>
-                    <div className="flex items-baseline justify-between gap-3 mb-1">
-                        <span className="text-[13.5px] text-text truncate">{row.name}</span>
-                        <span className="text-[13px] text-text-muted tabular-nums shrink-0">{row.count.toLocaleString()}</span>
+            {rows.map((row, i) => {
+                const tappable = onOpen && !('aggregate' in row);
+                const inner = (
+                    <>
+                        <div className="flex items-baseline justify-between gap-3 mb-1">
+                            <span className="text-[13.5px] text-text truncate">{row.name}</span>
+                            <span className="text-[13px] text-text-muted tabular-nums shrink-0 inline-flex items-center gap-1">
+                                {row.count.toLocaleString()}
+                                {tappable && <Chevron />}
+                            </span>
+                        </div>
+                        <div className="h-2 rounded-full bg-accent/10 overflow-hidden">
+                            <div
+                                className={`h-full rounded-full bg-accent ${GROW}`}
+                                style={{
+                                    width: grown ? `${(row.count / max) * 100}%` : '0%',
+                                    transitionTimingFunction: GROW_EASE,
+                                    transitionDelay: `${i * 40}ms`,
+                                }}
+                            />
+                        </div>
+                    </>
+                );
+                const title = `${row.name} — ${Math.round((row.count / stats.total) * 100)}% of your library`;
+                return tappable ? (
+                    <button
+                        key={row.name}
+                        onClick={() => onOpen(row.name)}
+                        title={`Show ${row.name} cards`}
+                        className="block w-full text-left rounded-lg -mx-1.5 px-1.5 py-0.5 hover:bg-card-hover transition-colors cursor-pointer"
+                    >
+                        {inner}
+                    </button>
+                ) : (
+                    <div key={row.name} title={title} className="px-0 py-0.5">
+                        {inner}
                     </div>
-                    <div className="h-2 rounded-full bg-accent/10 overflow-hidden">
-                        <div
-                            className={`h-full rounded-full bg-accent ${GROW}`}
-                            style={{
-                                width: grown ? `${(row.count / max) * 100}%` : '0%',
-                                transitionTimingFunction: GROW_EASE,
-                                transitionDelay: `${i * 40}ms`,
-                            }}
-                        />
-                    </div>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 }
 
-function CountPills({ items }: { items: { name: string; count: number }[] }) {
+function CountPills({ items, onOpen }: { items: { name: string; count: number }[]; onOpen?: (name: string) => void }) {
+    const cls = 'inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-card border border-border-subtle text-[12.5px] font-medium text-text-secondary';
     return (
         <div className="flex flex-wrap gap-2">
-            {items.map((t) => (
-                <span key={t.name} className="inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-card border border-border-subtle text-[12.5px] font-medium text-text-secondary">
-                    {t.name}
-                    <span className="text-text-muted tabular-nums">{t.count.toLocaleString()}</span>
-                </span>
-            ))}
+            {items.map((t) =>
+                onOpen ? (
+                    <button
+                        key={t.name}
+                        onClick={() => onOpen(t.name)}
+                        title={`Show cards tagged ${t.name}`}
+                        className={`${cls} hover:text-text hover:border-accent/40 transition-colors cursor-pointer`}
+                    >
+                        {t.name}
+                        <span className="text-text-muted tabular-nums">{t.count.toLocaleString()}</span>
+                    </button>
+                ) : (
+                    <span key={t.name} className={cls}>
+                        {t.name}
+                        <span className="text-text-muted tabular-nums">{t.count.toLocaleString()}</span>
+                    </span>
+                ),
+            )}
         </div>
     );
 }
@@ -142,7 +178,12 @@ function Skeleton() {
     );
 }
 
-export function StatsView({ uid }: { uid: string }) {
+export function StatsView({ uid, onOpenFacet }: {
+    uid: string;
+    /** Open the library filtered to a facet (closes Settings). Rows/pills are
+        only tappable when this is provided. */
+    onOpenFacet?: (req: LibraryFacetRequest) => void;
+}) {
     const [stats, setStats] = useState<LibraryStats | null>(null);
     const [failed, setFailed] = useState(false);
     const [attempt, setAttempt] = useState(0);
@@ -250,23 +291,34 @@ export function StatsView({ uid }: { uid: string }) {
             )}
 
             <SectionHeader>Categories</SectionHeader>
-            <CategoryBars stats={stats} grown={grown} />
+            <CategoryBars
+                stats={stats}
+                grown={grown}
+                onOpen={onOpenFacet && ((category) => { track('insights_facet_opened', { kind: 'category' }); onOpenFacet({ kind: 'category', value: category }); })}
+            />
 
             {stats.topTags.length > 0 && (
                 <>
                     <SectionHeader>Top tags</SectionHeader>
-                    <CountPills items={stats.topTags} />
+                    <CountPills
+                        items={stats.topTags}
+                        onOpen={onOpenFacet && ((tag) => { track('insights_facet_opened', { kind: 'tag' }); onOpenFacet({ kind: 'tag', value: tag }); })}
+                    />
                 </>
             )}
 
-            {stats.topDomains.length > 0 && (
+            {stats.topSources.length > 0 && (
                 <>
                     <SectionHeader>Top sources</SectionHeader>
                     <List tight>
-                        {stats.topDomains.map((d) => (
-                            <RowShell key={d.name}>
+                        {stats.topSources.map((d) => (
+                            <RowShell
+                                key={d.key}
+                                onClick={onOpenFacet && (() => { track('insights_facet_opened', { kind: 'source' }); onOpenFacet({ kind: 'source', value: d.key }); })}
+                            >
                                 <RowText title={d.name} />
                                 <span className="ml-auto text-[15px] text-text-muted tabular-nums">{d.count.toLocaleString()}</span>
+                                {onOpenFacet && <Chevron />}
                             </RowShell>
                         ))}
                     </List>

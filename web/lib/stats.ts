@@ -1,4 +1,5 @@
 import { Link } from '@/lib/types';
+import { getSourceInfo } from '@/lib/source';
 
 /**
  * Library insights (Settings → Insights), computed entirely on-device.
@@ -25,6 +26,19 @@ export interface CountedName {
     count: number;
 }
 
+export interface CountedSource extends CountedName {
+    /** The feed's source-facet key (`getSourceInfo().key`) — lets an Insights
+        row open the library already filtered to this exact source. */
+    key: string;
+}
+
+/** A tap on an Insights row → open the library filtered to this facet.
+    `value` is the category name, the tag, or the source-facet key. */
+export interface LibraryFacetRequest {
+    kind: 'category' | 'tag' | 'source';
+    value: string;
+}
+
 export interface LibraryStats {
     total: number;
     savedThisMonth: number;
@@ -43,7 +57,10 @@ export interface LibraryStats {
     /** All categories, count desc. */
     categories: CountedName[];
     topTags: CountedName[];
-    topDomains: CountedName[];
+    /** Top publishers/channels/sites, by the SAME identity the feed's Sources
+        facet uses (lib/source.ts getSourceInfo) — "@naval", "MKBHD", "Ynet" —
+        so labels match the cards and rows can open the filtered library. */
+    topSources: CountedSource[];
     /** Capture-surface mix, count desc: web / youtube / image / note. */
     sourceMix: CountedName[];
 }
@@ -107,7 +124,10 @@ export function computeStats(links: Link[], now = Date.now()): LibraryStats {
 
     const categories = new Map<string, number>();
     const tags = new Map<string, number>();
-    const domains = new Map<string, number>();
+    // Source identity → count, plus key → display label (first one wins; labels
+    // are stable per key by construction).
+    const sourceCounts = new Map<string, number>();
+    const sourceLabels = new Map<string, string>();
     const sources = new Map<string, number>();
     const saveDays = new Set<number>();
 
@@ -130,11 +150,13 @@ export function computeStats(links: Link[], now = Date.now()): LibraryStats {
         const source = card.sourceType || (card.url ? 'web' : 'note');
         bump(sources, SOURCE_LABEL[source] ?? source);
 
-        if (card.url) {
-            try {
-                const host = new URL(card.url).hostname.replace(/^www\./, '');
-                if (host) bump(domains, host);
-            } catch { /* malformed url — skip */ }
+        // URL-less notes have no meaningful source identity; everything else
+        // resolves through the same publisher/channel/site resolution the
+        // feed's Sources facet uses.
+        if (card.url || card.sourceType === 'image') {
+            const info = getSourceInfo(card);
+            bump(sourceCounts, info.key);
+            if (!sourceLabels.has(info.key)) sourceLabels.set(info.key, info.label);
         }
 
         const ms = toMillis(card.createdAt);
@@ -178,7 +200,11 @@ export function computeStats(links: Link[], now = Date.now()): LibraryStats {
         weeks,
         categories: topN(categories, Infinity),
         topTags: topN(tags, 5),
-        topDomains: topN(domains, 5),
+        topSources: topN(sourceCounts, 5).map((s) => ({
+            key: s.name,
+            name: sourceLabels.get(s.name) ?? s.name,
+            count: s.count,
+        })),
         sourceMix: topN(sources, Infinity),
     };
 }
