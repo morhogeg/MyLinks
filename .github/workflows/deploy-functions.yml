@@ -1,9 +1,19 @@
 # Deploy Cloud Functions to Firebase (project: secondbrain-app-94da2).
 #
 # Why this exists (report §3.10): functions previously deployed ONLY from the
-# owner's Mac, which is why prod drifted weeks behind `main`. This manual
-# workflow removes that class of drift — once the two secrets below exist,
-# nobody needs the Mac to deploy again.
+# owner's Mac, which is why prod drifted weeks behind `main`. This workflow
+# removes that class of drift — once the two secrets below exist, nobody needs
+# the Mac to deploy again.
+#
+# HOW DEPLOYS START (cloud sessions can't use the dispatch API — it 403s for
+# the GitHub App integration, so push is the control channel):
+#   - AUTO: any push to `main` touching `functions/**` deploys. Targets come
+#     from an optional "Deploy-Functions: name1,name2" line in the pushed HEAD
+#     commit's message (put it in the merge commit); without one, the whole
+#     codebase deploys ("all").
+#   - Redeploy without a code change: bump `functions/.deploy-ping` in a commit
+#     whose message carries the "Deploy-Functions:" line, and push to main.
+#   - MANUAL: Actions tab → Run workflow (targets input) still works.
 #
 # ─────────────────────────────────────────────────────────────────────────────
 # ⛔ OWNER SETUP (one-time) — required before this workflow can run:
@@ -35,6 +45,14 @@ on:
         required: false
         default: "all"
         type: string
+  # Continuous deployment for the backend, symmetric with Vercel's auto-deploy
+  # of web/ on main: merging a functions change ships it. The workflow file
+  # itself is in the paths so trigger changes take effect on their own merge.
+  push:
+    branches: [main]
+    paths:
+      - "functions/**"
+      - ".github/workflows/deploy-functions.yml"
 
 # Never let two deploys run at once — concurrent `firebase deploy` to the same
 # project fights over the same function resources.
@@ -158,10 +176,19 @@ jobs:
       - name: Deploy functions
         env:
           FIREBASE_TARGETS_INPUT: ${{ inputs.targets }}
+          # Only ever read via $VAR below (never interpolate a commit message
+          # into the script body — that would be shell injection).
+          HEAD_COMMIT_MSG: ${{ github.event.head_commit.message }}
         run: |
           set -euo pipefail
 
-          RAW="${FIREBASE_TARGETS_INPUT:-all}"
+          RAW="${FIREBASE_TARGETS_INPUT:-}"
+          if [ -z "$RAW" ]; then
+            # Push event: honor an optional "Deploy-Functions: a,b" line in the
+            # pushed HEAD commit's message to scope the deploy.
+            RAW=$(printf '%s' "${HEAD_COMMIT_MSG:-}" | sed -n 's/^[Dd]eploy-[Ff]unctions:[[:space:]]*//p' | head -n1)
+          fi
+          RAW="${RAW:-all}"
           if [ "$RAW" = "all" ]; then
             ONLY="functions"
           else

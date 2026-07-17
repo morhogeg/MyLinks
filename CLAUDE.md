@@ -11,9 +11,10 @@ Rules:
   §4, add a §9 session-log entry). Do **not** create new HANDOFF/TASKS/spec/audit
   docs — the old ones were consolidated into it and deleted.
 - Ship via the `/ship` skill (`.claude/skills/ship/SKILL.md`): Vercel (auto on
-  push to main), Cloud Functions via `./deploy-functions.sh`, iOS via the
-  "iOS → TestFlight" GitHub Actions workflow. The iPhone PWA is retired — no
-  routine `./deploy-hosting.sh`.
+  push to main), Cloud Functions auto-deploy on `main` pushes touching
+  `functions/**` (scope with a `Deploy-Functions: a,b` merge-commit line), iOS
+  via `git push -f origin main:trigger/testflight`. The iPhone PWA is retired —
+  no routine `./deploy-hosting.sh`.
 - Verify frontend with `cd web && npx tsc --noEmit`; backend with
   `cd functions && python -m py_compile *.py`.
 - Theme: use the Tailwind token system (`text-text`, `bg-card`, `--accent-gradient`,
