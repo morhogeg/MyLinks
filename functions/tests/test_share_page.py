@@ -97,3 +97,75 @@ class TestSharedCardPage:
         html = _render_shared_card(_card(), "https://x/s?id=a")
         assert "Attention Is All You Need" in html
         assert "View original" in html
+
+    def test_card_page_escapes_malicious_content(self):
+        # The /s card page renders summary/detailedSummary through _md_to_html
+        # and tags through _esc — previously only the collection page had XSS
+        # coverage.
+        evil = _card(
+            title="<script>t</script>",
+            summary="<img src=x onerror=alert(1)>",
+            detailedSummary="## Hi\n<script>d</script>",
+            tags=["<b>tag</b>", "ok"],
+        )
+        html = _render_shared_card(evil, "https://x/s?id=a")
+        assert "<script>" not in html
+        assert "<img src=x" not in html
+        assert "&lt;script&gt;" in html
+        assert "&lt;b&gt;tag&lt;/b&gt;" in html
+
+    def test_card_page_javascript_url_renders_unlinked_title(self):
+        html = _render_shared_card(_card(url="javascript:alert(1)"), "https://x/s?id=a")
+        assert 'href="javascript:' not in html
+        # The card still renders fully — dropping the button, not the page.
+        assert "Attention Is All You Need" in html
+        assert "View original" not in html
+
+
+class TestCorruptFieldDegradation:
+    """One bad field must degrade THAT element, never the whole public page
+    (the outer handler turns any exception into 'This page isn't available')."""
+
+    def test_numeric_url_renders_collection_unlinked(self):
+        html = _render_shared_collection(_collection([_card(url=123)]), "https://x/c?id=a")
+        assert "Attention Is All You Need" in html
+        assert 'href="123"' not in html
+
+    def test_numeric_url_renders_card_page(self):
+        html = _render_shared_card(_card(url=123), "https://x/s?id=a")
+        assert "Attention Is All You Need" in html
+        assert "View original" not in html
+
+    def test_out_of_range_published_at_omits_date_line(self):
+        html = _render_shared_collection(
+            _collection([_card()], publishedAt=10**18), "https://x/c?id=a"
+        )
+        assert "1 curated card" in html   # page renders
+        assert "updated" not in html      # date line simply omitted
+
+    def test_non_list_tags_and_non_string_thumb_render(self):
+        html = _render_shared_card(
+            _card(tags="not-a-list", thumbnailUrl=456), "https://x/s?id=a"
+        )
+        assert "Attention Is All You Need" in html
+
+
+class TestMarkdownInline:
+    def test_bold_inside_href_is_not_rewritten(self):
+        # /path/**b**/x inside a link target used to become a broken href with
+        # a literal <strong> inside the attribute.
+        from share_service import _md_inline, _esc
+        out = _md_inline(_esc("[a](https://x.com/**b**/path) and **real bold**"))
+        assert 'href="https://x.com/**b**/path"' in out
+        assert "<strong>real bold</strong>" in out
+
+    def test_underscores_in_bare_urls_inside_links_survive(self):
+        from share_service import _md_inline, _esc
+        out = _md_inline(_esc("[snake](https://x.com/_snake_case_/end)"))
+        assert 'href="https://x.com/_snake_case_/end"' in out
+        assert "<em>" not in out
+
+    def test_link_label_still_gets_emphasis(self):
+        from share_service import _md_inline, _esc
+        out = _md_inline(_esc("[**bold label**](https://x.com/a)"))
+        assert "<strong>bold label</strong></a>" in out

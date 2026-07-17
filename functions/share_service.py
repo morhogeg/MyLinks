@@ -55,24 +55,43 @@ _MD_ITALIC_RE = re.compile(r"(?<!\*)\*(?!\s)([^*]+?)(?<!\s)\*(?!\*)|(?<![_\w])_(
 _MD_CODE_RE = re.compile(r"`([^`]+)`")
 
 
+def _emphasis(text: str) -> str:
+    """Bold + italic passes (shared by the plain-text and link-label paths)."""
+    text = _MD_BOLD_RE.sub(lambda m: f"<strong>{m.group(1) or m.group(2)}</strong>", text)
+    text = _MD_ITALIC_RE.sub(lambda m: f"<em>{m.group(1) or m.group(2)}</em>", text)
+    return text
+
+
 def _md_inline(text: str) -> str:
     """Render inline markdown for a SINGLE already-HTML-escaped line.
 
     Input MUST be pre-escaped (see _md_to_html). We only translate a fixed set
     of markdown markers into a fixed set of safe tags, so no untrusted text ever
     becomes markup. Links are restricted to http(s) and rel-hardened.
+
+    Rendered anchors are stashed behind placeholders while the bold/italic
+    passes run: those regexes would otherwise rewrite `**`/`_…_` sequences
+    INSIDE the just-emitted href attribute (a URL like /path/**b**/x became a
+    broken link with literal <strong> in the attribute). The label still gets
+    emphasis, applied before stashing.
     """
     # Inline code first so markers inside backticks aren't reinterpreted.
     text = _MD_CODE_RE.sub(lambda m: f"<code>{m.group(1)}</code>", text)
 
+    stash: list[str] = []
+
     def _link(m):
         label, href = m.group(1), m.group(2)
-        return f'<a href="{href}" rel="noopener nofollow" target="_blank">{label}</a>'
+        stash.append(f'<a href="{href}" rel="noopener nofollow" target="_blank">{_emphasis(label)}</a>')
+        return f"\x00{len(stash) - 1}\x00"
 
     text = _MD_LINK_RE.sub(_link, text)
-    text = _MD_BOLD_RE.sub(lambda m: f"<strong>{m.group(1) or m.group(2)}</strong>", text)
-    text = _MD_ITALIC_RE.sub(lambda m: f"<em>{m.group(1) or m.group(2)}</em>", text)
-    return text
+    text = _emphasis(text)
+    return re.sub(
+        r"\x00(\d+)\x00",
+        lambda m: stash[int(m.group(1))] if int(m.group(1)) < len(stash) else m.group(0),
+        text,
+    )
 
 
 def _md_to_html(value) -> str:
@@ -171,10 +190,10 @@ def _share_card_image(card: dict) -> str:
     """Best preview image for a card; falls back to the Machina icon."""
     thumb = card.get("thumbnailUrl")
     if thumb and str(thumb).startswith("http"):
-        return thumb
-    url = card.get("url") or ""
+        return str(thumb)  # str() so callers can .endswith() a weird-typed value
+    url = card.get("url")
     # Image/screenshot cards store the (public) image itself as the url.
-    if card.get("sourceType") == "image" and url.startswith("http"):
+    if card.get("sourceType") == "image" and isinstance(url, str) and url.startswith("http"):
         return url
     return f"{APP_URL}/icon-512.png"
 
@@ -283,8 +302,15 @@ def _render_shared_card(card: dict, share_url: str) -> str:
     detailed = card.get("detailedSummary") or ""
     source = card.get("sourceName") or card.get("category") or ""
     image = _share_card_image(card)
-    original = card.get("url") or ""
-    tags = card.get("tags") or []
+    # isinstance, not truthiness: the payload is persisted verbatim from the
+    # client, and one wrong-typed url must degrade to "unlinked", not turn the
+    # whole public page into "not available" via the outer except.
+    original = card.get("url")
+    if not isinstance(original, str):
+        original = ""
+    tags = card.get("tags")
+    if not isinstance(tags, list):
+        tags = []
 
     has_real_image = image and not image.endswith("/icon-512.png")
     hero = f'<img class="hero" src="{_esc(image)}" alt="">' if has_real_image else ""
@@ -328,7 +354,11 @@ def _render_collection_item(card: dict) -> str:
     """One member card on the public collection page: thumbnail, source kicker,
     title (linked to the original where one exists), and the summary."""
     title = _esc(card.get("title") or "Untitled")
-    url = card.get("url") or ""
+    url = card.get("url")
+    if not isinstance(url, str):
+        # One member card's wrong-typed url must render unlinked, not 404 the
+        # whole collection page via the outer except.
+        url = ""
     # Screenshot/image cards store the image itself as `url` — don't link those.
     linkable = url.startswith("http") and card.get("sourceType") != "image"
 
@@ -367,8 +397,11 @@ def _render_shared_collection(data: dict, share_url: str) -> str:
     published_at = data.get("publishedAt")
     updated = ""
     if isinstance(published_at, (int, float)) and published_at > 0:
-        dt = datetime.fromtimestamp(published_at / 1000, tz=timezone.utc)
-        updated = f' · updated {dt.strftime("%b %-d, %Y")}'
+        try:
+            dt = datetime.fromtimestamp(published_at / 1000, tz=timezone.utc)
+            updated = f' · updated {dt.strftime("%b %-d, %Y")}'
+        except (ValueError, OverflowError, OSError):
+            pass  # out-of-range/NaN timestamp → just omit the date line
 
     items = "".join(_render_collection_item(c) for c in cards[:50])
     overflow = ""
@@ -453,10 +486,15 @@ def _publish_share_logic(uid: str, share_type: str, share_id: str, payload: dict
     doc["shareId"] = share_id
     doc["publishedAt"] = now_ms
 
-    db.collection(public_coll).document(share_id).set(doc)
+    # Ownership FIRST: if the second write fails, an ownerless public snapshot
+    # would be claimable (and overwritable) by any other uid — the takeover the
+    # existing_owner guard exists to prevent. An owner mapping without a
+    # snapshot is the safe partial state: the page 404s, a retry by the owner
+    # succeeds, and nobody else can claim the id.
     db.collection("shared_owners").document(share_id).set({
         "ownerUid": uid, "type": share_type, "publishedAt": now_ms,
     })
+    db.collection(public_coll).document(share_id).set(doc)
     return {"shareId": share_id}
 
 
