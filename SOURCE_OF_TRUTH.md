@@ -747,7 +747,15 @@ exact-match, capped.
   sources" upgraded from raw domains to the feed's own source identity
   (`getSourceInfo` keys) so labels match cards and filtering is exact; "Other"
   row stays non-tappable. All three facet kinds verified end-to-end in the
-  emulator. Shipped: Vercel + TestFlight run #107 = build **1107**.
+  emulator. Shipped: Vercel + TestFlight run #107 = build **1107**. **Second
+  follow-up (owner request): "Back to Insights" chip** (`7ffcb36`, merge
+  `d5cfad8`): the tap-through is no longer one-way — a chip above the filtered
+  grid clears the facet and reopens Settings deep-linked to Insights
+  (`initialSection='stats'`, same mechanism as the digest deep-link). The chip
+  is visible ONLY while the Insights-applied facet is the feed's exact scope
+  (Feed-local `insightsFacet` + a strict predicate) — search, extra filters, or
+  collections dissolve it. Verified round-trip + self-hide/reappear in the
+  emulator. Shipped: Vercel + TestFlight run #108 = build **1108**.
 - **2026-07-17 — Ask follow-up chips: INTENT dedup — no more synonym
   rows (branch `claude/starred-chat-sidebar-persist-d35ztb`).** Owner repro
   (screenshot): after a video answer the row offered "key takeaways" + "give
