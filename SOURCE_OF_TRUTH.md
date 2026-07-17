@@ -666,10 +666,17 @@ exact-match, capped.
   writing (loop-safe; card self-heals via `embedding_needs_repair` on next
   write/rebuild). Tests: `tests/test_embed_trigger_backstop.py` (270 pass).
   Also staged live `firestore.rules`: `shared_cards`/`shared_collections`
-  writes now `false` (client stopped writing them at 5a; read stays public) —
-  **deploys with the next `firebase deploy --only firestore:rules`** (task 4
-  already has one pending). The decisive protections remain the owner steps:
-  task 2 cutover (`REQUIRE_AUTH` + locked rules), task 5 env
+  writes now `false` (client stopped writing them at 5a; read stays public;
+  verified zero writers in web/, extension/, native). **SHIPPED:** branch
+  commit `e5ceaef`, merge `5ea7ffe` → "Deploy Cloud Functions" run
+  29584494319 **green** (scoped `Deploy-Functions: sync_link_embedding`) —
+  the backstop is LIVE; this also confirms the repo secrets the 07-17
+  self-serve-deploys entry was waiting on are in place. **⛔ OWNER:
+  `firebase deploy --only firestore:rules`** — this session's rules deploy
+  was blocked by the permission classifier on both CLI and MCP routes; until
+  run, the `shared_*` write-lockdown + the task-4 `syntheses`/`digests` read
+  rules are staged but NOT live. The decisive protections remain the owner
+  steps: task 2 cutover (`REQUIRE_AUTH` + locked rules), task 5 env
   (`APPCHECK_ENFORCE`, `ADMIN_TOKEN`, key rotation), task 19 budget alerts.
 - **2026-07-17 — SEARCH REBUILT FROM SCRATCH: simple, instant,
   full-library title/summary matching; entire semantic/hybrid stack removed
