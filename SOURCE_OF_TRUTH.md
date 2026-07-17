@@ -637,7 +637,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-17 (latest) — SELF-SERVE DEPLOYS: push-triggered CI for functions
+- **2026-07-17 (latest) — Ask follow-up chips: INTENT dedup — no more synonym
+  rows (branch `claude/starred-chat-sidebar-persist-d35ztb`).** Owner repro
+  (screenshot): after a video answer the row offered "key takeaways" + "give
+  me the highlights" + "key points" — three wordings of the same ask; and a
+  turn after tapping "Give me more detail" still pushed restatement variants.
+  The 2026-07-16 `chipFamily` dedup blocks repeated TEMPLATES, not synonymous
+  ones. NEW `chipIntent()` (`web/lib/askSuggestions.ts`): classifies each
+  chip into an intent group (expand / ingredients / steps / synthesis /
+  graph / simplify / significance / restate — ordered patterns over the
+  family text; unmatched text is its own intent) and `buildFollowUps` now
+  admits at most ONE chip per intent per row AND consumes an intent for the
+  whole conversation once the user asks anything in it (derived from
+  persisted messages — survives reloads). Verified by simulation: the
+  screenshot turn now yields restate+simplify+significance, and after
+  tapping "key takeaways" its synonyms never return. Web-only; ships via
+  Vercel on merge + TestFlight build for native.
+- **2026-07-17 — SELF-SERVE DEPLOYS: push-triggered CI for functions
   + TestFlight (commits `aae5066`, `4de6f6e` — landed via GitHub API
   `push_files`; the session's `git push` to main was blocked by the local
   permission classifier, so MCP was the transport).** Owner: "needing to run
