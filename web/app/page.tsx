@@ -46,6 +46,9 @@ export default function Home() {
   const sendHeaderCommand = (action: 'search' | 'sources' | 'display') =>
     setHeaderCommand((prev) => ({ action, nonce: (prev?.nonce ?? 0) + 1 }));
   const [isAskMode, setIsAskMode] = useState(false);
+  // Full-bleed modes (Ask + Review) drop main's bottom padding so the
+  // self-sized content sits flush to the bottom (no dead scroll band).
+  const [isFullBleed, setIsFullBleed] = useState(false);
   const [hideAddButton, setHideAddButton] = useState(false);
   // In-flight capture analysis for the one "Analyzing… N%" banner. Two sources:
   // `analyzing` = the in-app add flow (real progress); `processing` = captures
@@ -203,11 +206,11 @@ export default function Home() {
 
       {/* Main Content — Ask mode fills to the viewport bottom, so it drops the
           tall bottom padding the grid uses for the FAB. */}
-      <main className={`max-w-[2200px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-2 sm:py-4 ${isAskMode ? 'pb-0 sm:pb-0' : 'pb-24 sm:pb-20'}`}>
+      <main className={`max-w-[2200px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-2 sm:py-4 ${isAskMode || isFullBleed ? 'pb-0 sm:pb-0' : 'pb-24 sm:pb-20'}`}>
         {/* The feed is already live via onSnapshot, so a new save streams in on
             its own — no remount needed. (Previously keyed on refreshKey, which
             tore down listeners and wiped view/filter/search on every add.) */}
-        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onHasCardsChange={setHasCards} libraryFacet={libraryFacet} onLibraryFacetApplied={() => setLibraryFacet(null)} onBackToInsights={() => { setSettingsSection('stats'); setIsSettingsOpen(true); }} headerCommand={headerCommand} onCapture={() => setCaptureSignal((n) => n + 1)} onTabChange={setFeedTab} />
+        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onHasCardsChange={setHasCards} libraryFacet={libraryFacet} onLibraryFacetApplied={() => setLibraryFacet(null)} onBackToInsights={() => { setSettingsSection('stats'); setIsSettingsOpen(true); }} headerCommand={headerCommand} onCapture={() => setCaptureSignal((n) => n + 1)} onTabChange={setFeedTab} onFullBleedChange={setIsFullBleed} />
       </main>
 
       {/* Add Link FAB — hidden in Ask & Collections (neither view captures links). */}

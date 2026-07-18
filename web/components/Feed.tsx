@@ -79,7 +79,7 @@ const noop = () => { };
  * - Two card views (grid / list), plus review, ask, and collections modes
  * - Deep linking to specific links via URL params
  */
-function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void }) {
+function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange, onFullBleedChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void; onFullBleedChange?: (full: boolean) => void }) {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
@@ -1249,6 +1249,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     useEffect(() => {
         onAskModeChange?.(viewMode === 'ask');
     }, [viewMode, onAskModeChange]);
+
+    // Full-bleed modes (Ask + Review) manage their own height and hide the tab
+    // bar, so the page's main should drop its bottom padding — otherwise that
+    // padding stacks under the self-sized deck and makes Review scroll.
+    useEffect(() => {
+        onFullBleedChange?.(viewMode === 'ask' || viewMode === 'review');
+    }, [viewMode, onFullBleedChange]);
 
     // Hide the add-link FAB in Ask, Collections (gallery + detail), Digest (list
     // + detail), and Review — none of these views capture links (and in Review it
@@ -2465,14 +2472,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     );
 }
 
-export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void }) {
+export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange, onFullBleedChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void; onFullBleedChange?: (full: boolean) => void }) {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-2 border-text/20 border-t-text rounded-full animate-spin" />
             </div>
         }>
-            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} libraryFacet={libraryFacet} onLibraryFacetApplied={onLibraryFacetApplied} onBackToInsights={onBackToInsights} headerCommand={headerCommand} onCapture={onCapture} onTabChange={onTabChange} />
+            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} libraryFacet={libraryFacet} onLibraryFacetApplied={onLibraryFacetApplied} onBackToInsights={onBackToInsights} headerCommand={headerCommand} onCapture={onCapture} onTabChange={onTabChange} onFullBleedChange={onFullBleedChange} />
         </Suspense>
     );
 }
