@@ -706,7 +706,13 @@ exact-match, capped.
   `paddingBottom: max(calc(env(safe-area-inset-bottom) - 18px), 4px)` so icons
   sit close to the indicator like native (env=0 in emulator floors to 4px —
   device-only visual, can't verify in pane). Shipped: Vercel + TestFlight run
-  #113 = build **1113**.
+  #113 = build **1113**. **Fix (owner: review still had a big bottom gap;
+  commit `8d46efa`, merge `0edae67`):** polish-3 over-corrected — the deck
+  root reserved the FULL safe-area inset (~34pt), floating the action row that
+  high. Changed the deck `paddingBottom` to the same
+  `max(calc(env(safe-area-inset-bottom) - 18px), 8px)` the tab bar uses, so
+  the Undo/Archive/Remind/Keep row sits ~24pt from the bottom (just clears the
+  home indicator). Shipped: Vercel + TestFlight run #114 = build **1114**.
 - **2026-07-17 — ABUSE HARDENING: embed-trigger cost backstop + live
   `shared_*` write lockdown (branch `claude/gemini-pricing-analysis-ab575e`).**
   Cost research first (owner asked pre-launch): per-card analysis ≈ $0.002
