@@ -749,6 +749,21 @@ exact-match, capped.
   long Collections/Digest list, hiding the bar leaves a ~bar-height strip of
   bg (same color, seamless) rather than reclaiming it — dynamic overlay
   bottom deferred. Shipped: Vercel + TestFlight run #116 = build **1116**.
+- **2026-07-18 — BOTTOM BAR: contain the + , hide via `bottom` (owner: + cut
+  off in Collections/Digest + sliver remnant on hide; commit `8dc5093`, merge
+  `5a1deef`).** Root cause = the RAISED center + (`-top-11` + `ring`): it poked
+  into the full-screen overlays' layer (clipped there) and stuck out above the
+  bar when it slid away (sliver on Home). Fix: **contained the +** inside the
+  bar (40px gradient circle + shadow for depth, no overhang; row 42→44px,
+  overlay clearance 43→45px). Also switched the scroll-away from `transform` to
+  **`bottom`** — the bar's `backdrop-filter` (frosted glass) silently drops
+  transforms in some engines (confirmed in the Chromium Browser-pane: transform
+  computed to identity; `bottom` physically moved it), so `bottom` is the
+  universal reliable slide. NOTE: the hide *animation* still can't be exercised
+  in the pane (dead window-scroll + phantom y=0 events reset the state) — the
+  contained-+ fix is visually confirmed, the `bottom` mechanism is verified to
+  move the element, and the scroll logic is sound for real device scroll.
+  Shipped: Vercel + TestFlight run #117 = build **1117**.
 - **2026-07-17 — ABUSE HARDENING: embed-trigger cost backstop + live
   `shared_*` write lockdown (branch `claude/gemini-pricing-analysis-ab575e`).**
   Cost research first (owner asked pre-launch): per-card analysis ≈ $0.002
