@@ -144,7 +144,7 @@ function Card({
         })();
         return (
             <article
-                className={`surface-card animate-card-enter bg-card rounded-2xl border shadow-[var(--shadow-card)] relative flex flex-col h-full overflow-hidden ${failed ? 'border-red-500/30' : 'border-border-subtle'
+                className={`surface-card animate-card-enter bg-card rounded-[20px] border shadow-[var(--shadow-card)] relative flex flex-col h-full overflow-hidden ${failed ? 'border-red-500/30' : 'border-border-subtle'
                     }`}
                 aria-busy={!failed}
             >
@@ -216,7 +216,7 @@ function Card({
         <>
         <article
             style={{ ['--enter-delay' as string]: enterDelay }}
-            className={`group surface-card animate-card-enter bg-card rounded-2xl border shadow-[var(--shadow-card)] transition-all duration-300 ease-[var(--ease-spring)] cursor-pointer relative flex flex-col items-stretch h-full [@media(hover:hover)]:hover:-translate-y-1 [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] ${isSelected
+            className={`group surface-card animate-card-enter bg-card rounded-[20px] border shadow-[var(--shadow-card)] transition-all duration-300 ease-[var(--ease-spring)] cursor-pointer relative flex flex-col items-stretch h-full [@media(hover:hover)]:hover:-translate-y-1 [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] ${isSelected
                 ? 'border-accent bg-accent/5 ring-1 ring-accent'
                 : 'border-border-subtle hover:border-accent/30'
                 } ${link.isRead ? 'opacity-60 grayscale-[0.3]' : ''} ${isEditingCategory ? 'overflow-visible z-50' : 'overflow-hidden'}`}

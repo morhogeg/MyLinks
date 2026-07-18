@@ -75,15 +75,18 @@
   --surface-inset: rgba(0, 0, 0, 0.04);
   --border-strong: rgba(0, 0, 0, 0.10);
 
-  /* Depth & motion tokens (round 5 / round 6 — amplified for light bg). */
+  /* Depth tokens (light). Apple-grade: a crisp 0.5px hairline grounds the edge
+     and ONE tight, soft shadow gives depth — no wide ambient halo pooling in the
+     outer corners (that read heavy/floaty). Big negative spread keeps the blur
+     hugging the card instead of haloing outward. */
   --shadow-card:
-    0 0 0 1px rgba(16, 24, 40, 0.04),
-    0 1px 2px rgba(16, 24, 40, 0.08),
-    0 6px 16px -2px rgba(16, 24, 40, 0.12);
+    0 0 0 0.5px rgba(16, 24, 40, 0.05),
+    0 1px 2px -1px rgba(16, 24, 40, 0.05),
+    0 8px 20px -12px rgba(16, 24, 40, 0.14);
   --shadow-card-hover:
-    0 0 0 1px var(--accent-ring),
-    0 4px 10px -2px rgba(16, 24, 40, 0.14),
-    0 18px 36px -6px rgba(16, 24, 40, 0.22);
+    0 0 0 0.5px var(--accent-ring),
+    0 2px 6px -2px rgba(16, 24, 40, 0.08),
+    0 16px 32px -14px rgba(16, 24, 40, 0.20);
   --surface-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 45%);
   --accent-gradient: linear-gradient(135deg, #8B5CF6, #EC4899);
   --accent-ring: rgba(139, 92, 246, 0.3);
