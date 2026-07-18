@@ -65,21 +65,33 @@ export default function BottomTabBar({
     return (
         <nav
             aria-label="Main"
-            className={`sm:hidden fixed inset-x-0 bottom-0 z-40 bg-background/85 backdrop-blur-xl border-t border-border-subtle transition-transform duration-300 [transition-timing-function:var(--ease-modal)] motion-reduce:transition-none ${hidden ? 'translate-y-full' : 'translate-y-0'}`}
-            style={{ paddingBottom: 'max(calc(env(safe-area-inset-bottom) - 18px), 4px)' }}
+            className="sm:hidden fixed inset-x-0 z-40 bg-background/85 backdrop-blur-xl border-t border-border-subtle transition-[bottom] duration-300 [transition-timing-function:var(--ease-modal)] motion-reduce:transition-none"
+            style={{
+                paddingBottom: 'max(calc(env(safe-area-inset-bottom) - 18px), 4px)',
+                // Slide via `bottom`, NOT transform: this bar has
+                // backdrop-filter (frosted glass), which silently drops any
+                // transform in WebKit/WKWebView — so translateY did nothing and
+                // the bar never actually hid. `bottom` animates reliably. -90px
+                // clears the tallest bar (row + safe-area pad) plus its shadow.
+                bottom: hidden ? '-90px' : '0px',
+            }}
         >
             {/* hairline accent glow above the bar — the header's, mirrored. */}
             <div className="absolute inset-x-0 top-0 h-px bg-[image:var(--accent-gradient)] opacity-30" />
-            <div className="flex items-center justify-around h-[42px] px-1">
+            <div className="flex items-center justify-around h-[44px] px-1">
                 {tabs.slice(0, 2).map((t) => <TabButton key={t.key} tab={t} active={active === t.key} onSelect={onSelect} />)}
-                {/* Center capture — raised above the bar line, the app's core act. */}
+                {/* Center capture — the app's core act. CONTAINED within the bar
+                    (no upward overhang): a raised button poked above the bar and
+                    got clipped by the full-screen Collections/Digest overlays and
+                    left a sliver when the bar slid away. A shadow gives it depth
+                    instead of an offset, so it still reads as the hero action. */}
                 <button
                     data-tour="add"
                     aria-label="Add to Machina"
                     onClick={() => { hapticMedium(); onCapture(); }}
-                    className="relative -top-[11px] w-[46px] h-[46px] shrink-0 rounded-full bg-[image:var(--accent-gradient)] text-white flex items-center justify-center shadow-lg shadow-accent/30 ring-4 ring-background active:scale-95 transition-transform"
+                    className="w-[40px] h-[40px] shrink-0 rounded-full bg-[image:var(--accent-gradient)] text-white flex items-center justify-center shadow-lg shadow-accent/40 active:scale-95 transition-transform"
                 >
-                    <Plus className="w-[21px] h-[21px]" strokeWidth={2.4} />
+                    <Plus className="w-[20px] h-[20px]" strokeWidth={2.4} />
                 </button>
                 {tabs.slice(2).map((t) => <TabButton key={t.key} tab={t} active={active === t.key} onSelect={onSelect} />)}
             </div>
