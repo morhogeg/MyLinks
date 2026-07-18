@@ -692,7 +692,21 @@ exact-match, capped.
   row + on the caught-up screen) so the Undo/Archive/Remind/Keep action row
   gets full clearance. Verified in the emulator (review hides bar + Done
   returns to grid with bar back; header one clean line; both modes). Shipped:
-  Vercel + TestFlight run #112 = build **1112**.
+  Vercel + TestFlight run #112 = build **1112**. **Polish pass 3 (owner
+  feedback on 1112; commit `3c6ac89`, merge `6e7c4ab`):** (1) haptics weren't
+  felt — `selectionChanged()` is the faintest iOS haptic; tab taps now use
+  `ImpactStyle.Light`, capture uses `Medium`. (2) Review had a huge bottom gap
+  — `SwipeDeck`'s 640px height cap left a dead band on tall phones (worse now
+  the bar hides in review); cap raised to 900 + safe-area `paddingBottom` on
+  the deck root so the action row clears the home indicator, and a new
+  `onFullBleedChange` signal (ask+review) drops `main`'s `pb-24` in review so
+  it no longer scrolls (verified: action row 8px from viewport bottom in
+  emulator, page non-scrollable). (3) Main-view bar sat too high — it reserved
+  the FULL home-indicator inset below the icons; now
+  `paddingBottom: max(calc(env(safe-area-inset-bottom) - 18px), 4px)` so icons
+  sit close to the indicator like native (env=0 in emulator floors to 4px —
+  device-only visual, can't verify in pane). Shipped: Vercel + TestFlight run
+  #113 = build **1113**.
 - **2026-07-17 — ABUSE HARDENING: embed-trigger cost backstop + live
   `shared_*` write lockdown (branch `claude/gemini-pricing-analysis-ab575e`).**
   Cost research first (owner asked pre-launch): per-card analysis ≈ $0.002
