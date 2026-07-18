@@ -764,6 +764,19 @@ exact-match, capped.
   contained-+ fix is visually confirmed, the `bottom` mechanism is verified to
   move the element, and the scroll logic is sound for real device scroll.
   Shipped: Vercel + TestFlight run #117 = build **1117**.
+- **2026-07-18 — BAR: reclaim space on hide + back-to-top on Home (owner;
+  commit `8ecaddf`, merge `825acbb`).** (1) Lifted the scroll-away state into
+  `useScrollAwayBar(resetKey)` (shared) so the bar (now CONTROLLED via a
+  `hidden` prop) and the four full-screen tab overlays read one signal: on hide
+  the overlays drop `bottom` from bar-height → `0px` (transition matched) so
+  Collections/Digest content uses the freed space like the Home feed. Verified
+  in emulator via synthetic inner-scroller: overlay bottom flips to `0px` when
+  hidden. (2) `ScrollToTop` re-enabled on mobile and scoped to the Home feed
+  (`enabled={feedTab==='home'}` — the only window-scrolling view; gated OFF on
+  Collections/Digest/Ask, verified). Works in card AND list views; especially
+  useful now the bar scrolls away (Home tab unreachable then). Positioned
+  bottom-20 right-4, subtle translucent chip. Shipped: Vercel + TestFlight run
+  #118 = build **1118**.
 - **2026-07-17 — ABUSE HARDENING: embed-trigger cost backstop + live
   `shared_*` write lockdown (branch `claude/gemini-pricing-analysis-ab575e`).**
   Cost research first (owner asked pre-launch): per-card analysis ≈ $0.002
