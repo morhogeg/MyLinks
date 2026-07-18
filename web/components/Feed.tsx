@@ -1903,10 +1903,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     onToggleSourceKeys={handleToggleSourceKeys}
                 />
 
-                {/* Bottom tab bar (phones) — hidden in Ask (composer owns the
-                    bottom edge + keyboard) and in Review (a focused swipe session
-                    with its own action row + Done exit; the bar would overlap it). */}
-                {viewMode !== 'ask' && viewMode !== 'review' && (
+                {/* Bottom tab bar (phones) — persistent across the top-level tabs
+                    (Home, Collections gallery, Digest list). Hidden in Ask (chat
+                    composer owns the bottom), Review (focused swipe session), and
+                    the PUSHED detail places (a single collection / digest) which
+                    have their own back button — the Twitter model where opening an
+                    item pushes a bar-less detail. */}
+                {viewMode !== 'ask' && viewMode !== 'review' && viewMode !== 'collection' && viewMode !== 'digestDetail' && (
                     <BottomTabBar active={activeTab} onSelect={selectTab} onCapture={() => onCapture?.()} />
                 )}
 
@@ -2217,7 +2220,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 at the top (its env(safe-area-inset-top) padding now lands at the
                 real screen top), and the gallery scrolls in the region below. */}
             {viewMode === 'collections' && (
-                <div className="sm:hidden fixed inset-x-0 top-0 bottom-0 z-50 bg-background flex flex-col animate-fade-in">
+                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in" style={{ bottom: 'calc(43px + max(calc(env(safe-area-inset-bottom) - 18px), 4px))' }}>
                     <MobileSubheader
                         onBack={() => setViewMode(lastLayout.current)}
                         backLabel="Back to your library"
@@ -2233,7 +2236,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             New
                         </button>
                     </MobileSubheader>
-                    <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+                    <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: '1rem' }}>
                         <CollectionsGallery
                             collections={collections}
                             links={visibleLinks}
@@ -2255,14 +2258,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
             {/* Digest — mobile full-screen overlay (mirrors Collections). */}
             {viewMode === 'digest' && (
-                <div className="sm:hidden fixed inset-x-0 top-0 bottom-0 z-50 bg-background flex flex-col animate-fade-in">
+                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in" style={{ bottom: 'calc(43px + max(calc(env(safe-area-inset-bottom) - 18px), 4px))' }}>
                     <MobileSubheader
                         onBack={() => setViewMode(lastLayout.current)}
                         backLabel="Back to your library"
                         icon={<Newspaper className="w-5 h-5" />}
                         title="Digest"
                     />
-                    <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+                    <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: '1rem' }}>
                         {digestContent}
                     </div>
                 </div>
