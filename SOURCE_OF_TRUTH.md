@@ -671,7 +671,17 @@ exact-match, capped.
   fade needs owner on-device confirmation in build **1110** (run #110).
   OWNER STEP: judge the whole redesign on-device; the old chrome is one
   `git revert 4028979` away if it disappoints. Shipped: Vercel + TestFlight
-  run #110 = build **1110**.
+  run #110 = build **1110**. **Polish pass (owner feedback on 1110; commit
+  `faccd36`, merge `f6d8bb6`):** bottom bar trimmed 54→46px (icons 22→20px,
+  center + 52→48); light-mode inactive tabs were washed out — new
+  `--tabbar-inactive` token (light = `--text-secondary` #4B5563, dark =
+  `--text-muted` #666666 unchanged; it's a token NOT a Tailwind `dark:`
+  because the theme is class-based `.light` and `dark:` here keys off OS);
+  header→first-card gap tightened (mobile toolbar row is now `hidden sm:flex`
+  so it adds no empty row, plus smaller mobile header padding/space-y);
+  scroll-to-top arrow hidden on phones (Home tab scrolls up). Verified in the
+  emulator (both modes, clean-load dark unchanged at #666666). Shipped:
+  Vercel + TestFlight run #111 = build **1111**.
 - **2026-07-17 — ABUSE HARDENING: embed-trigger cost backstop + live
   `shared_*` write lockdown (branch `claude/gemini-pricing-analysis-ab575e`).**
   Cost research first (owner asked pre-launch): per-card analysis ≈ $0.002
