@@ -681,7 +681,18 @@ exact-match, capped.
   so it adds no empty row, plus smaller mobile header padding/space-y);
   scroll-to-top arrow hidden on phones (Home tab scrolls up). Verified in the
   emulator (both modes, clean-load dark unchanged at #666666). Shipped:
-  Vercel + TestFlight run #111 = build **1111**.
+  Vercel + TestFlight run #111 = build **1111**. **Polish pass 2 (owner
+  feedback on 1111; commit `12aec7b`, merge `16de4a9`):** bar trimmed again
+  46→42px (center + 48→46) + haptics on tab switch (`hapticSelection`) and
+  capture (`hapticLight`); header decluttered — the "Capture. Connect.
+  Recall." tagline is now `hidden sm:block` (mobile drops it, desktop keeps
+  it), brand centers, mobile header 60→52px; **review-mode collision FIXED** —
+  the bottom tab bar hides in `review` (added to the `!== 'ask'` guard) and
+  `SwipeDeck` gained an `onExit` "Done" affordance (top-right of the progress
+  row + on the caught-up screen) so the Undo/Archive/Remind/Keep action row
+  gets full clearance. Verified in the emulator (review hides bar + Done
+  returns to grid with bar back; header one clean line; both modes). Shipped:
+  Vercel + TestFlight run #112 = build **1112**.
 - **2026-07-17 — ABUSE HARDENING: embed-trigger cost backstop + live
   `shared_*` write lockdown (branch `claude/gemini-pricing-analysis-ab575e`).**
   Cost research first (owner asked pre-launch): per-card analysis ≈ $0.002
