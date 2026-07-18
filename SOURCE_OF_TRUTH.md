@@ -730,6 +730,25 @@ exact-match, capped.
   Home tab always visible, tapping it is the scroll-to-top; a separate arrow
   would be redundant chrome (mobile ScrollToTop stays `hidden sm:flex`).
   Shipped: Vercel + TestFlight run #115 = build **1115**.
+- **2026-07-18 — BOTTOM BAR: LinkedIn scroll-away, consistent across every tab
+  (owner corrected 1115 — wanted scroll-away, not fixed; commit `2f1d43a`,
+  merge `8c086e6`).** The bar slides down on scroll-down and snaps back on
+  scroll-up, the SAME on every screen. Robust across scrollers: Home scrolls
+  the window, Collections/Digest scroll inner `overflow-y-auto` containers, so
+  `BottomTabBar` now runs a self-contained listener on `document` in the
+  CAPTURE phase (scroll doesn't bubble, capture still sees every scroller),
+  reads position off `e.target` (window.scrollY for the doc, else
+  `el.scrollTop`), rebases on scroller change, and resets to shown on `active`
+  (tab) change so a new screen never opens tucked away. Verified via a
+  synthetic inner-scroller in the emulator: shown → down → hidden → up → shown.
+  Bar now renders on ALL card/collection/digest screens INCLUDING the pushed
+  collection/digest details (hidden only in Ask + Review); all four
+  full-screen overlays now stop just above the bar (`bottom: calc(43px +
+  max(env-18px,4px))`) so it's always visible and never covers content; bar
+  stays **z-40** so every sheet/modal still covers it. KNOWN minor: on a
+  long Collections/Digest list, hiding the bar leaves a ~bar-height strip of
+  bg (same color, seamless) rather than reclaiming it — dynamic overlay
+  bottom deferred. Shipped: Vercel + TestFlight run #116 = build **1116**.
 - **2026-07-17 — ABUSE HARDENING: embed-trigger cost backstop + live
   `shared_*` write lockdown (branch `claude/gemini-pricing-analysis-ab575e`).**
   Cost research first (owner asked pre-launch): per-card analysis ≈ $0.002
