@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Link, LinkStatus, UserNote } from '@/lib/types';
-import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2, ChevronLeft, StickyNote } from 'lucide-react';
-import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle } from '@/lib/platform';
+import SourceByline from './SourceByline';
+import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, BookOpen, Layers, Share2, ChevronLeft, StickyNote } from 'lucide-react';
+import { getPlatform } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import { openExternal } from '@/lib/share';
 import ReadingView from './ReadingView';
@@ -325,22 +326,11 @@ export default function LinkDetailModal({
 
     // Branded source credit, matching the card: YouTube channel in red, X
     // author (@handle from the URL) in the X grey, everything else muted.
-    const platform = getPlatform(link.url);
-    const isYouTube = platform === 'youtube' || link.sourceType === 'youtube';
+    const isYouTube = getPlatform(link.url) === 'youtube' || link.sourceType === 'youtube';
     // Reading mode is for text articles — not videos or screenshots.
     const canRead = !!link.url && /^https?:\/\//.test(link.url) && !isYouTube && link.sourceType !== 'image';
-    const youtubeChannel = link.metadata?.youtubeChannel || link.sourceName;
-    const xAuthor = platform === 'x' ? xHandle(link.url) : null;
-    const isLinkedIn = platform === 'linkedin';
-    // Facebook: credit the author/page name (recovered by the scraper from
-    // og:title) next to the logo — same byline style as X, minus the @.
-    const isFacebook = platform === 'facebook';
-    const fbAuthor = isFacebook && link.sourceName
-        && !['facebook', 'screenshot', 'none'].includes(link.sourceName.trim().toLowerCase())
-        ? link.sourceName : null;
-    // Instagram: the author @handle captured by the scraper (stored in
-    // sourceName as "@handle"), credited in the same byline style as X.
-    const igAuthor = platform === 'instagram' ? instagramHandle(link.sourceName) : null;
+    // The source byline is rendered by the shared <SourceByline> — don't
+    // reintroduce per-view platform/author derivation here.
 
     const getTimeAgo = (timestamp: number | string, now: number): string => {
         if (!timestamp || !now) return '...';
@@ -711,79 +701,7 @@ export default function LinkDetailModal({
                                             </>
                                         )}
                                     </div>
-                                    {isYouTube && youtubeChannel ? (
-                                        <span
-                                            dir="ltr"
-                                            className="flex items-center gap-1.5 min-w-0 text-sm text-text-muted whitespace-nowrap max-w-[240px]"
-                                            title={youtubeChannel}
-                                        >
-                                            <Youtube className="w-4 h-4 text-red-500 shrink-0" />
-                                            <span className="truncate">{youtubeChannel}</span>
-                                        </span>
-                                    ) : xAuthor ? (
-                                        <span
-                                            dir="ltr"
-                                            className="flex items-center gap-1.5 min-w-0 text-sm text-text-muted whitespace-nowrap max-w-[240px]"
-                                            title={`@${xAuthor}`}
-                                        >
-                                            <span className="shrink-0 inline-flex" style={{ color: platformColor('x') }}>
-                                                {platformIcon('x', 'w-4 h-4')}
-                                            </span>
-                                            <span className="truncate">@{xAuthor}</span>
-                                        </span>
-                                    ) : isLinkedIn ? (
-                                        <span
-                                            dir="ltr"
-                                            className="flex items-center gap-1.5 min-w-0 text-sm font-semibold whitespace-nowrap"
-                                            title="LinkedIn"
-                                            aria-label="LinkedIn"
-                                        >
-                                            <span className="shrink-0 inline-flex" style={{ color: platformColor('linkedin') }}>
-                                                {platformIcon('linkedin', 'w-4 h-4')}
-                                            </span>
-                                        </span>
-                                    ) : isFacebook ? (
-                                        <span
-                                            dir="auto"
-                                            className="flex items-center gap-1.5 min-w-0 text-sm text-text-muted whitespace-nowrap max-w-[240px]"
-                                            title={fbAuthor || 'Facebook'}
-                                            aria-label={fbAuthor || 'Facebook'}
-                                        >
-                                            <span className="shrink-0 inline-flex" style={{ color: platformColor('facebook') }}>
-                                                {platformIcon('facebook', 'w-4 h-4')}
-                                            </span>
-                                            {fbAuthor && <span className="truncate">{fbAuthor}</span>}
-                                        </span>
-                                    ) : igAuthor ? (
-                                        <span
-                                            dir="ltr"
-                                            className="flex items-center gap-1.5 min-w-0 text-sm text-text-muted whitespace-nowrap max-w-[240px]"
-                                            title={`@${igAuthor}`}
-                                        >
-                                            <span className="shrink-0 inline-flex" style={{ color: platformColor('instagram') }}>
-                                                {platformIcon('instagram', 'w-4 h-4')}
-                                            </span>
-                                            <span className="truncate">@{igAuthor}</span>
-                                        </span>
-                                    ) : link.sourceType === 'image' ? (
-                                        <span className="flex items-center gap-1.5 text-sm text-text-muted whitespace-nowrap" title="Screenshot">
-                                            <ImageIcon className="w-4 h-4 shrink-0" />
-                                            <span>Screenshot</span>
-                                        </span>
-                                    ) : link.sourceType === 'note' ? (
-                                        <span className="flex items-center gap-1.5 text-sm text-text-muted whitespace-nowrap" title="Note">
-                                            <StickyNote className="w-4 h-4 shrink-0" />
-                                            <span>Note</span>
-                                        </span>
-                                    ) : link.sourceName && link.sourceName !== 'None' ? (
-                                        <span
-                                            dir="auto"
-                                            className="min-w-0 text-sm text-text-muted whitespace-nowrap truncate max-w-[240px]"
-                                            title={link.sourceName}
-                                        >
-                                            {link.sourceName}
-                                        </span>
-                                    ) : null}
+                                    <SourceByline link={link} size="md" />
                                 </div>
                             );
                         })()}

@@ -3,11 +3,11 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from '@/lib/types';
 import { getCategoryColorStyle } from '@/lib/colors';
-import { getPlatform, platformIcon, platformColor, xHandle } from '@/lib/platform';
+import SourceByline from './SourceByline';
 import SimpleMarkdown from './SimpleMarkdown';
 import { hasHebrew } from '@/lib/rtl';
 import { hapticLight } from '@/lib/haptics';
-import { Star, Archive, Bell, RotateCcw, Youtube, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { Star, Archive, Bell, RotateCcw, Sparkles } from 'lucide-react';
 import { REVIEW_SESSION_SIZE, isOpen, reviewSessionQueue } from '@/lib/reviewQueue';
 
 type SwipeDir = 'left' | 'right' | 'up';
@@ -521,12 +521,6 @@ function HintBadge({ label, color, icon, opacity, pos }: { label: string; color:
 const CardFace = memo(function CardFace({ link }: { link: Link }) {
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
     const colorStyle = getCategoryColorStyle(link.category);
-    const platform = getPlatform(link.url);
-    const isYouTube = platform === 'youtube' || link.sourceType === 'youtube';
-    const youtubeChannel = link.metadata?.youtubeChannel || link.sourceName;
-    const xAuthor = platform === 'x' ? xHandle(link.url) : null;
-    const isLinkedIn = platform === 'linkedin';
-    const isFacebook = platform === 'facebook';
 
     return (
         <div className="h-full w-full surface-card bg-card rounded-2xl border border-border-subtle shadow-[var(--shadow-card)] p-5 sm:p-6 flex flex-col overflow-hidden">
@@ -538,32 +532,7 @@ const CardFace = memo(function CardFace({ link }: { link: Link }) {
                 >
                     {link.category}
                 </span>
-                {isYouTube && youtubeChannel ? (
-                    <span dir="ltr" className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-text-secondary whitespace-nowrap max-w-[200px]">
-                        <Youtube className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                        <span className="truncate">{youtubeChannel}</span>
-                    </span>
-                ) : xAuthor ? (
-                    <span dir="ltr" className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-text-secondary whitespace-nowrap max-w-[200px]">
-                        <span className="shrink-0 inline-flex" style={{ color: platformColor('x') }}>{platformIcon('x', 'w-3.5 h-3.5')}</span>
-                        <span className="truncate">@{xAuthor}</span>
-                    </span>
-                ) : isLinkedIn ? (
-                    <span dir="ltr" className="flex items-center gap-1.5 min-w-0 text-xs font-semibold whitespace-nowrap" title="LinkedIn" aria-label="LinkedIn">
-                        <span className="shrink-0 inline-flex" style={{ color: platformColor('linkedin') }}>{platformIcon('linkedin', 'w-4 h-4')}</span>
-                    </span>
-                ) : isFacebook ? (
-                    <span dir="ltr" className="flex items-center gap-1.5 min-w-0 text-xs font-semibold whitespace-nowrap" title="Facebook" aria-label="Facebook">
-                        <span className="shrink-0 inline-flex" style={{ color: platformColor('facebook') }}>{platformIcon('facebook', 'w-4 h-4')}</span>
-                    </span>
-                ) : link.sourceType === 'image' ? (
-                    <span className="flex items-center gap-1.5 text-xs font-semibold text-accent whitespace-nowrap">
-                        <ImageIcon className="w-3.5 h-3.5 shrink-0" />
-                        <span>Screenshot</span>
-                    </span>
-                ) : link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None' ? (
-                    <span className="text-[10px] font-bold text-text-muted/60 uppercase tracking-widest truncate max-w-[160px]">{link.sourceName}</span>
-                ) : null}
+                <SourceByline link={link} />
             </div>
 
             {/* Title */}
