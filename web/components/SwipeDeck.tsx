@@ -391,7 +391,7 @@ export default function SwipeDeck({
     }
 
     return (
-        <div ref={rootRef} className="flex flex-col items-center gap-3 select-none" style={{ height: maxH ? maxH : undefined, paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div ref={rootRef} className="flex flex-col items-center gap-3 select-none" style={{ height: maxH ? maxH : undefined, paddingBottom: 'max(calc(env(safe-area-inset-bottom) - 18px), 8px)' }}>
             <div className="w-full max-w-[440px] flex items-center justify-center shrink-0 relative">
                 <span className="text-xs font-semibold text-text-muted tabular-nums">
                     {passed + 1} of {passed + remaining} · {remaining} left
