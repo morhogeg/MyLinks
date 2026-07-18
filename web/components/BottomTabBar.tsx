@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import { Home, Layers, Plus, MessagesSquare, Newspaper } from 'lucide-react';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
 
@@ -8,53 +7,26 @@ export type BottomTab = 'home' | 'collections' | 'ask' | 'digest';
 
 /**
  * The native-app bottom tab bar (phones only — desktop keeps the toolbar
- * chips). Five slots: Home, Collections, a raised center Capture action
- * (replaces the mobile FAB), Ask, and Digest.
+ * chips). Five slots: Home, Collections, a center Capture action (replaces the
+ * mobile FAB), Ask, and Digest.
  *
- * Scroll-away (LinkedIn): the bar slides down out of view while scrolling DOWN
- * and snaps back the instant you scroll UP — the same feel across every tab.
- * The catch is that Home scrolls the window while Collections/Digest scroll
- * their own inner containers, so we listen on `document` in the CAPTURE phase
- * (scroll doesn't bubble, but capture still sees every scroller) and read the
- * position off whichever element fired. On a tab change we reset to shown so a
- * newly opened screen never starts with the bar tucked away.
+ * Scroll-away is CONTROLLED via the `hidden` prop (see useScrollAwayBar), so the
+ * bar and the tab overlays react to the same signal — the bar slides down while
+ * the overlay grows to reclaim the freed space. The slide is via `bottom`, not
+ * transform: the bar's backdrop-filter (frosted glass) drops transforms in some
+ * engines, so `bottom` is the reliable one.
  */
 export default function BottomTabBar({
     active,
     onSelect,
     onCapture,
+    hidden = false,
 }: {
     active: BottomTab;
     onSelect: (tab: BottomTab) => void;
     onCapture: () => void;
+    hidden?: boolean;
 }) {
-    const [hidden, setHidden] = useState(false);
-    const lastY = useRef(0);
-    const lastTarget = useRef<EventTarget | null>(null);
-
-    // New screen → always show the bar (its scroller starts at the top).
-    useEffect(() => { setHidden(false); lastTarget.current = null; }, [active]);
-
-    useEffect(() => {
-        const TOP_LOCK = 40;   // within this many px of the top, always shown
-        const DELTA = 6;       // ignore sub-pixel jitter before committing
-        const onScroll = (e: Event) => {
-            const t = e.target;
-            const isDoc = t === document || t === document.documentElement || t === document.body;
-            const el = isDoc ? null : (t as HTMLElement);
-            const y = el ? el.scrollTop : window.scrollY;
-            // Scroller changed (switched view / focus) — rebase, no delta.
-            if (t !== lastTarget.current) { lastTarget.current = t; lastY.current = y; return; }
-            const dy = y - lastY.current;
-            lastY.current = y;
-            if (y < TOP_LOCK) setHidden(false);
-            else if (dy > DELTA) setHidden(true);
-            else if (dy < -DELTA) setHidden(false);
-        };
-        document.addEventListener('scroll', onScroll, { capture: true, passive: true });
-        return () => document.removeEventListener('scroll', onScroll, { capture: true } as EventListenerOptions);
-    }, []);
-
     const tabs: { key: BottomTab; label: string; icon: React.ReactNode; tour?: string }[] = [
         { key: 'home', label: 'Home', icon: <Home className="w-[20px] h-[20px]" /> },
         { key: 'collections', label: 'Collections', icon: <Layers className="w-[20px] h-[20px]" />, tour: 'collections' },

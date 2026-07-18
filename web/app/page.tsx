@@ -218,7 +218,9 @@ export default function Home() {
           onSnapshot, so nothing extra is needed here on a successful save. */}
       <AddLinkForm onLinkAdded={() => {}} hidden={hideAddButton} onAnalyzingChange={setAnalyzing} openSignal={captureSignal} />
       <AnalyzingBanner state={bannerState} />
-      <ScrollToTop />
+      {/* Back-to-top only on the Home feed (the window-scrolling view) — on
+          mobile it stands in for the scrolled-away Home tab. */}
+      <ScrollToTop enabled={feedTab === 'home'} />
 
       {/* Settings Modal */}
       {uid && (
