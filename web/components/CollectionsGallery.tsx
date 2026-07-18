@@ -107,7 +107,7 @@ export default function CollectionsGallery({
                 return (
                     <div
                         key={c.id}
-                        className={`group relative min-h-[160px] rounded-2xl border border-border-subtle bg-card shadow-[var(--shadow-card)] cursor-pointer transition-shadow [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] hover:border-accent/30 ${open ? 'z-20' : ''}`}
+                        className={`group relative min-h-[160px] rounded-[20px] border border-border-subtle bg-card shadow-[var(--shadow-card)] cursor-pointer transition-shadow [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] hover:border-accent/30 ${open ? 'z-20' : ''}`}
                         onClick={() => onOpen(c.id)}
                     >
                         {/* Cover — a mosaic of member thumbnails over the collection color. */}

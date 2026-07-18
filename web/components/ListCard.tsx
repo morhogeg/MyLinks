@@ -125,7 +125,7 @@ function ListCard({
         <div
             data-no-edge-swipe
             style={{ ['--enter-delay' as string]: enterDelay }}
-            className={`group animate-card-enter surface-card rounded-xl border shadow-[var(--shadow-card)] overflow-hidden relative transition-[transform,box-shadow,border-color] duration-200 [@media(hover:hover)]:hover:-translate-y-px [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] ${isSelected
+            className={`group animate-card-enter surface-card rounded-2xl border shadow-[var(--shadow-card)] overflow-hidden relative transition-[transform,box-shadow,border-color] duration-200 [@media(hover:hover)]:hover:-translate-y-px [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] ${isSelected
                 ? 'border-accent ring-1 ring-accent'
                 : 'border-border-subtle hover:border-accent/30'
                 } ${link.isRead ? 'opacity-60' : ''}`}

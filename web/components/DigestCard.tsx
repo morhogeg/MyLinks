@@ -89,7 +89,7 @@ export default function DigestCard({
     );
 
     return (
-        <div className="rounded-2xl border border-border-subtle bg-card overflow-hidden">
+        <div className="rounded-[20px] border border-border-subtle bg-card overflow-hidden">
             {/* Header — toggles the list, or a static header in the reading pane */}
             {alwaysOpen ? (
                 <div className="w-full flex items-center gap-3 px-4 py-3.5 min-h-[44px]">{headerInner}</div>
