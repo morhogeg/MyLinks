@@ -44,6 +44,10 @@
   /* Brand gradient — the purple→pink already used by the logo lockup. */
   --accent-gradient: linear-gradient(135deg, #A855F7, #EC4899);
   --accent-ring: rgba(168, 85, 247, 0.35);
+  /* Inactive bottom-tab ink. Dark = the muted grey that looked right; light
+     overrides to the darker secondary so the labels read vividly, not washed
+     out (theme is class-based via .light, so this can't be a Tailwind dark:). */
+  --tabbar-inactive: var(--text-muted);
   /* Shared spring-ish easing for lifts/entrances. */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   /* The one modal-entrance curve (M-P2): Apple's no-overshoot push/present easing.
@@ -83,6 +87,8 @@
   --surface-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 45%);
   --accent-gradient: linear-gradient(135deg, #8B5CF6, #EC4899);
   --accent-ring: rgba(139, 92, 246, 0.3);
+  /* Light mode: darker, vivid inactive tabs (see the :root note). */
+  --tabbar-inactive: var(--text-secondary);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-modal: cubic-bezier(0.32, 0.72, 0, 1);
 }
