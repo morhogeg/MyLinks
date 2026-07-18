@@ -828,6 +828,21 @@ exact-match, capped.
   the source as plain muted text (unchanged). Verified in emulator: no old pill
   in the opened modal; tsc clean. Shipped: Vercel + TestFlight run #123 = build
   **1123**.
+- **2026-07-18 — SOURCE BYLINE: extracted ONE shared component (owner
+  frustrated the source kept differing per screen; commit `102af57`, merge
+  `12bb767`).** ROOT CAUSE of the recurring per-screen fixes: the byline logic
+  was copy-pasted into Card / ListCard / LinkDetailModal / SwipeDeck, so each
+  drifted (review still had the uppercase pill; Facebook dropped the author in
+  review). Created **`web/components/SourceByline.tsx`** — the single
+  implementation (props `link`, `size: 'sm'|'md'`) covering YouTube / X /
+  LinkedIn / Facebook(+author) / Instagram / Screenshot / Note / plain
+  publisher, airy grey. Wired into `Card` (feed grid), `LinkDetailModal`
+  (detail), `SwipeDeck` CardFace (review); removed the three divergent copies
+  (−239/+122 lines) and the now-dead per-card platform/author vars+imports.
+  `ListCard`/`DigestCard` already rendered source as plain muted text (left
+  as-is). **RULE: never reintroduce a per-card source byline — use
+  `SourceByline`.** Verified review + feed render, no old pill, tsc clean.
+  Shipped: Vercel + TestFlight run #124 = build **1124**.
 - **2026-07-17 — ABUSE HARDENING: embed-trigger cost backstop + live
   `shared_*` write lockdown (branch `claude/gemini-pricing-analysis-ab575e`).**
   Cost research first (owner asked pre-launch): per-card analysis ≈ $0.002
