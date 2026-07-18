@@ -843,6 +843,12 @@ exact-match, capped.
   as-is). **RULE: never reintroduce a per-card source byline — use
   `SourceByline`.** Verified review + feed render, no old pill, tsc clean.
   Shipped: Vercel + TestFlight run #124 = build **1124**.
+- **2026-07-18 — Facebook icon → airy outline (owner: FB logo felt heavy/dated
+  vs the outline YouTube/IG/LinkedIn marks; commit `b483317`, merge `6bd8f8d`).**
+  `web/lib/platform.tsx` `FacebookLogo` was a custom SOLID filled disc (the app
+  icon). Replaced with lucide's outline `Facebook` (stroke-based, tinted brand
+  blue via `platformColor`), matching the lightweight outline treatment of the
+  other platform marks. Shipped: Vercel + TestFlight run #125 = build **1125**.
 - **2026-07-17 — ABUSE HARDENING: embed-trigger cost backstop + live
   `shared_*` write lockdown (branch `claude/gemini-pricing-analysis-ab575e`).**
   Cost research first (owner asked pre-launch): per-card analysis ≈ $0.002
