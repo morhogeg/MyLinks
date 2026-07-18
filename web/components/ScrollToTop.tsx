@@ -26,7 +26,7 @@ export default function ScrollToTop() {
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             aria-label="Back to top"
             title="Back to top"
-            className="fixed bottom-24 right-4 sm:right-6 z-40 w-9 h-9 rounded-full bg-card/60 backdrop-blur border border-border-subtle/60 text-text-muted flex items-center justify-center hover:text-text hover:bg-card/90 transition-colors animate-in fade-in duration-200 cursor-pointer"
+            className="hidden sm:flex fixed bottom-24 right-4 sm:right-6 z-40 w-9 h-9 rounded-full bg-card/60 backdrop-blur border border-border-subtle/60 text-text-muted items-center justify-center hover:text-text hover:bg-card/90 transition-colors animate-in fade-in duration-200 cursor-pointer"
             style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
         >
             <ArrowUp className="w-[18px] h-[18px]" />

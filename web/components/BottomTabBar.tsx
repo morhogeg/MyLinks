@@ -26,10 +26,10 @@ export default function BottomTabBar({
     const barRef = useHeaderFade<HTMLElement>('bottom');
 
     const tabs: { key: BottomTab; label: string; icon: React.ReactNode; tour?: string }[] = [
-        { key: 'home', label: 'Home', icon: <Home className="w-[22px] h-[22px]" /> },
-        { key: 'collections', label: 'Collections', icon: <Layers className="w-[22px] h-[22px]" />, tour: 'collections' },
-        { key: 'ask', label: 'Ask', icon: <MessagesSquare className="w-[22px] h-[22px]" />, tour: 'ask' },
-        { key: 'digest', label: 'Digest', icon: <Newspaper className="w-[22px] h-[22px]" /> },
+        { key: 'home', label: 'Home', icon: <Home className="w-[20px] h-[20px]" /> },
+        { key: 'collections', label: 'Collections', icon: <Layers className="w-[20px] h-[20px]" />, tour: 'collections' },
+        { key: 'ask', label: 'Ask', icon: <MessagesSquare className="w-[20px] h-[20px]" />, tour: 'ask' },
+        { key: 'digest', label: 'Digest', icon: <Newspaper className="w-[20px] h-[20px]" /> },
     ];
 
     return (
@@ -41,16 +41,16 @@ export default function BottomTabBar({
         >
             {/* hairline accent glow above the bar — the header's, mirrored. */}
             <div className="absolute inset-x-0 top-0 h-px bg-[image:var(--accent-gradient)] opacity-30" />
-            <div className="flex items-end justify-around h-[54px] px-1">
+            <div className="flex items-center justify-around h-[46px] px-1">
                 {tabs.slice(0, 2).map((t) => <TabButton key={t.key} tab={t} active={active === t.key} onSelect={onSelect} />)}
                 {/* Center capture — raised above the bar line, the app's core act. */}
                 <button
                     data-tour="add"
                     aria-label="Add to Machina"
                     onClick={onCapture}
-                    className="relative -top-[14px] w-[52px] h-[52px] shrink-0 rounded-full bg-[image:var(--accent-gradient)] text-white flex items-center justify-center shadow-lg shadow-accent/30 ring-4 ring-background active:scale-95 transition-transform"
+                    className="relative -top-[12px] w-[48px] h-[48px] shrink-0 rounded-full bg-[image:var(--accent-gradient)] text-white flex items-center justify-center shadow-lg shadow-accent/30 ring-4 ring-background active:scale-95 transition-transform"
                 >
-                    <Plus className="w-6 h-6" strokeWidth={2.4} />
+                    <Plus className="w-[22px] h-[22px]" strokeWidth={2.4} />
                 </button>
                 {tabs.slice(2).map((t) => <TabButton key={t.key} tab={t} active={active === t.key} onSelect={onSelect} />)}
             </div>
@@ -71,7 +71,7 @@ function TabButton({
             onClick={() => onSelect(tab.key)}
             aria-label={tab.label}
             aria-current={active ? 'page' : undefined}
-            className={`flex flex-col items-center justify-center gap-0.5 h-full min-w-[58px] pb-1 transition-colors ${active ? 'text-accent' : 'text-text-muted active:text-text'}`}
+            className={`flex flex-col items-center justify-center gap-[3px] h-full min-w-[58px] transition-colors ${active ? 'text-accent' : 'text-[color:var(--tabbar-inactive)] active:text-text'}`}
         >
             {tab.icon}
             <span className="text-[10px] font-semibold leading-none">{tab.label}</span>

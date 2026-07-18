@@ -1251,12 +1251,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     }
 
     return (
-        <div className={viewMode === 'ask' ? 'space-y-2' : 'space-y-4 lg:space-y-6'}>
+        <div className={viewMode === 'ask' ? 'space-y-2' : 'space-y-2 sm:space-y-4 lg:space-y-6'}>
             {/* Pull-to-refresh spinner (M16) — rides the finger down from just under
                 the safe-area inset and spins while the refetch is in flight. */}
             <PullRefreshSpinner pull={pull} refreshing={refreshing} animating={animating} />
             {/* Header Section (Not Sticky) */}
-            <div className={`pt-2 -mx-4 px-4 sm:mx-0 sm:px-0 transition-all duration-300 ${viewMode === 'ask' ? 'space-y-2 pb-0' : 'space-y-2 sm:space-y-4 pb-3'}`}>
+            <div className={`pt-1 sm:pt-2 -mx-4 px-4 sm:mx-0 sm:px-0 transition-all duration-300 ${viewMode === 'ask' ? 'space-y-2 pb-0' : 'space-y-2 sm:space-y-4 pb-0 sm:pb-3'}`}>
                 {/* Ask mode drops the search bar entirely (typing there just exits Ask)
                     and shows only a Back button, so the chat gets the full height. */}
                 {viewMode === 'ask' ? (
@@ -1433,9 +1433,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
 
                 {/* Row 2: Toolbar — filter / sort / source on the left, view & actions on the
-                    right. Card-browsing layouts only; Ask and Collections hide it. */}
+                    right. DESKTOP ONLY (mobile v4 moved all of this to the header
+                    glyphs + bottom bar); `hidden sm:flex` so it adds no empty row —
+                    or gap — on phones. */}
                 {isLibraryView && (
-                <div className="flex flex-wrap items-center justify-between gap-y-3 gap-x-2 -mx-2 px-2 sm:mx-0 sm:px-0">
+                <div className="hidden sm:flex flex-wrap items-center justify-between gap-y-3 gap-x-2 -mx-2 px-2 sm:mx-0 sm:px-0">
                     {/* Grid filters — inline on desktop/tablet; on mobile they move into the
                         Filters sheet. Hidden entirely in Ask mode (no grid to filter). */}
                     <div className="hidden sm:flex items-center gap-2">
