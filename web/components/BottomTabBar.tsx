@@ -1,7 +1,6 @@
 'use client';
 
 import { Home, Layers, Plus, MessagesSquare, Newspaper } from 'lucide-react';
-import { useHeaderFade } from '@/lib/useHeaderFade';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
 
 export type BottomTab = 'home' | 'collections' | 'ask' | 'digest';
@@ -11,9 +10,10 @@ export type BottomTab = 'home' | 'collections' | 'ask' | 'digest';
  * chips). Five slots: Home, Collections, a raised center Capture action
  * (replaces the mobile FAB), Ask, and Digest.
  *
- * Scroll behavior mirrors the top header exactly: useHeaderFade drives a
- * direction-scrubbed fade (scroll down = away, any scroll up = back), so both
- * bars breathe together and content gets the whole screen while reading.
+ * Persistent (Twitter / iOS standard): the bar is fixed and stays put across
+ * every tab — it does NOT hide on scroll. Only the top header fades while
+ * reading. Present on Home / Collections / Digest; Ask and Review hide it (a
+ * chat composer / a focused swipe session own the bottom edge there).
  */
 export default function BottomTabBar({
     active,
@@ -24,8 +24,6 @@ export default function BottomTabBar({
     onSelect: (tab: BottomTab) => void;
     onCapture: () => void;
 }) {
-    const barRef = useHeaderFade<HTMLElement>('bottom');
-
     const tabs: { key: BottomTab; label: string; icon: React.ReactNode; tour?: string }[] = [
         { key: 'home', label: 'Home', icon: <Home className="w-[20px] h-[20px]" /> },
         { key: 'collections', label: 'Collections', icon: <Layers className="w-[20px] h-[20px]" />, tour: 'collections' },
@@ -35,7 +33,6 @@ export default function BottomTabBar({
 
     return (
         <nav
-            ref={barRef}
             aria-label="Main"
             className="sm:hidden fixed inset-x-0 bottom-0 z-40 bg-background/85 backdrop-blur-xl border-t border-border-subtle"
             // Sit the icons close to the home indicator instead of reserving the
