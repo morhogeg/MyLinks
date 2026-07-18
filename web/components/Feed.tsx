@@ -29,6 +29,7 @@ import MobileSortSheet from './feed/MobileSortSheet';
 import MobileDisplaySheet from './feed/MobileDisplaySheet';
 import MobileSourcesSheet from './feed/MobileSourcesSheet';
 import BottomTabBar, { type BottomTab } from './BottomTabBar';
+import { useScrollAwayBar } from '@/lib/useScrollAwayBar';
 import MobileTagExplorerDrawer from './feed/MobileTagExplorerDrawer';
 import Card from './Card';
 import ListCard from './ListCard';
@@ -1001,6 +1002,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     : 'home';
     useEffect(() => { onTabChange?.(activeTab); }, [activeTab, onTabChange]);
 
+    // Scroll-away bar state, owned here so the tab overlays can grow to reclaim
+    // the space when the bar hides (like the Home feed does). Reset on view
+    // change so a freshly opened screen shows the bar.
+    const barHidden = useScrollAwayBar(viewMode);
+    // How far the full-screen overlays sit above the bar. When the bar hides,
+    // they drop to 0 and use the freed space; the transition matches the bar's.
+    const overlayBottom = barHidden ? '0px' : 'calc(45px + max(calc(env(safe-area-inset-bottom) - 18px), 4px))';
+
     // Header glyphs (page.tsx) → feed actions. Same nonce-channel pattern as
     // libraryFacet: the page can't reach into this component's state, so it
     // hands down a command and we consume it here.
@@ -1909,7 +1918,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     Review (a focused swipe session whose action row sits where
                     the bar would be). */}
                 {viewMode !== 'ask' && viewMode !== 'review' && (
-                    <BottomTabBar active={activeTab} onSelect={selectTab} onCapture={() => onCapture?.()} />
+                    <BottomTabBar active={activeTab} onSelect={selectTab} onCapture={() => onCapture?.()} hidden={barHidden} />
                 )}
 
                 {/* Tag Explorer Drawer (Mobile) */}
@@ -2219,7 +2228,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 at the top (its env(safe-area-inset-top) padding now lands at the
                 real screen top), and the gallery scrolls in the region below. */}
             {viewMode === 'collections' && (
-                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in" style={{ bottom: 'calc(45px + max(calc(env(safe-area-inset-bottom) - 18px), 4px))' }}>
+                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in transition-[bottom] duration-300 [transition-timing-function:var(--ease-modal)]" style={{ bottom: overlayBottom }}>
                     <MobileSubheader
                         onBack={() => setViewMode(lastLayout.current)}
                         backLabel="Back to your library"
@@ -2257,7 +2266,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
             {/* Digest — mobile full-screen overlay (mirrors Collections). */}
             {viewMode === 'digest' && (
-                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in" style={{ bottom: 'calc(45px + max(calc(env(safe-area-inset-bottom) - 18px), 4px))' }}>
+                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in transition-[bottom] duration-300 [transition-timing-function:var(--ease-modal)]" style={{ bottom: overlayBottom }}>
                     <MobileSubheader
                         onBack={() => setViewMode(lastLayout.current)}
                         backLabel="Back to your library"
@@ -2273,7 +2282,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             {/* Collection detail — mobile full-screen place (Task A). Back returns
                 to the gallery (button + edge-swipe), never to the home library. */}
             {viewMode === 'collection' && openCol && (
-                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in" style={{ bottom: 'calc(45px + max(calc(env(safe-area-inset-bottom) - 18px), 4px))' }}>
+                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in transition-[bottom] duration-300 [transition-timing-function:var(--ease-modal)]" style={{ bottom: overlayBottom }}>
                     <MobileSubheader
                         onBack={closeCollectionToGallery}
                         backLabel="Back to collections"
@@ -2289,7 +2298,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             {/* Digest detail — mobile full-screen place (Task B). Back returns to
                 the list of digests. */}
             {viewMode === 'digestDetail' && (
-                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in" style={{ bottom: 'calc(45px + max(calc(env(safe-area-inset-bottom) - 18px), 4px))' }}>
+                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in transition-[bottom] duration-300 [transition-timing-function:var(--ease-modal)]" style={{ bottom: overlayBottom }}>
                     <MobileSubheader
                         onBack={closeDigestToList}
                         backLabel="Back to digests"
