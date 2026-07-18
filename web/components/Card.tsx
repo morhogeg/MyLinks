@@ -84,7 +84,6 @@ function Card({
     const enterDelay = `${Math.min(index, 10) * 16}ms`;
 
     const platform = getPlatform(link.url);
-    const sourceIcon = platform ? platformIcon(platform, 'w-3 h-3 shrink-0 opacity-80') : null;
     // Detect YouTube by URL (reliable) or stored type, since newer items don't
     // always populate metadata.youtubeChannel. The channel name falls back to
     // the generic sourceName so every video gets the red byline treatment.
@@ -520,11 +519,14 @@ function Card({
                         )}
                         {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && !igAuthor && link.sourceType !== 'image' && link.sourceType !== 'note' && link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None' && (
                             <span
-                                className="flex items-center gap-1 text-[9px] font-bold text-text-muted/60 bg-fill-subtle border border-border-strong px-2 py-1 rounded-lg uppercase tracking-widest whitespace-nowrap transition-all max-w-[220px]"
+                                dir="auto"
+                                className="min-w-0 text-xs font-semibold text-text-secondary whitespace-nowrap truncate max-w-[220px]"
                                 title={link.sourceName}
                             >
-                                {sourceIcon}
-                                <span className="truncate">{link.sourceName}</span>
+                                {/* Airy byline: just the source name — no filled pill,
+                                    border, uppercase, or icon (branded sources above
+                                    keep their mark; these are plain publishers). */}
+                                {link.sourceName}
                             </span>
                         )}
                     </div>
