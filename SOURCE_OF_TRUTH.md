@@ -802,6 +802,14 @@ exact-match, capped.
   (unchanged). Seed data has no generic-publisher cards so couldn't screenshot
   live; verified structurally (0 heavy pills remain, tsc clean, branded
   untouched). Shipped: Vercel + TestFlight run #120 = build **1120**.
+- **2026-07-18 — CARD bylines: unified source-name color to the airy grey
+  (owner; commit `1edbfb0`, merge `d7ead16`).** Source name was muted grey in
+  LIST view (`text-[11px] text-text-muted`) but darker/heavier in CARD view
+  (`font-semibold text-text-secondary`). Unified to the airier list treatment:
+  all card publisher bylines (YouTube/X/LinkedIn/FB/IG + generic) → `text-xs
+  text-text-muted` (muted grey, normal weight) so the source recedes
+  consistently across views. Screenshot/Note keep their accent color (distinct
+  capture types). Shipped: Vercel + TestFlight run #121 = build **1121**.
 - **2026-07-17 — ABUSE HARDENING: embed-trigger cost backstop + live
   `shared_*` write lockdown (branch `claude/gemini-pricing-analysis-ab575e`).**
   Cost research first (owner asked pre-launch): per-card analysis ≈ $0.002
