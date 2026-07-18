@@ -713,6 +713,23 @@ exact-match, capped.
   `max(calc(env(safe-area-inset-bottom) - 18px), 8px)` the tab bar uses, so
   the Undo/Archive/Remind/Keep row sits ~24pt from the bottom (just clears the
   home indicator). Shipped: Vercel + TestFlight run #114 = build **1114**.
+- **2026-07-18 — BOTTOM BAR PERSISTENT across tabs (Twitter/iOS model; owner:
+  "must stay constant across screens like Twitter"; commit `4cb5477`, merge
+  `1a7b3ff`).** (1) Removed the bottom bar's scroll-hide (`useHeaderFade` gone
+  from `BottomTabBar`) — it's now truly fixed; only the top header still fades
+  on scroll. (2) The bar now shows on the **Collections gallery + Digest list**:
+  those `fixed inset` overlays changed from `bottom-0` to
+  `bottom: calc(43px + max(env(safe-area-inset-bottom) - 18px, 4px))` so they
+  stop ABOVE the bar instead of covering it (main content is `display:none` on
+  mobile behind them, so nothing peeks under the translucent bar). Bar stays
+  **z-40** so every sheet/modal (z-50+) still covers it — verified in emulator
+  (bar on top on Collections; correctly covered when the display sheet opens).
+  (3) Bar stays HIDDEN on Ask, Review, and the pushed detail views
+  (`collection`, `digestDetail`) — opening an item pushes a bar-less detail
+  with its own back button. **Up-arrow scroll-to-top: decided NO** — with the
+  Home tab always visible, tapping it is the scroll-to-top; a separate arrow
+  would be redundant chrome (mobile ScrollToTop stays `hidden sm:flex`).
+  Shipped: Vercel + TestFlight run #115 = build **1115**.
 - **2026-07-17 — ABUSE HARDENING: embed-trigger cost backstop + live
   `shared_*` write lockdown (branch `claude/gemini-pricing-analysis-ab575e`).**
   Cost research first (owner asked pre-launch): per-card analysis ≈ $0.002
