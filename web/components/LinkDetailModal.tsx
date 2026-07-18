@@ -714,7 +714,7 @@ export default function LinkDetailModal({
                                     {isYouTube && youtubeChannel ? (
                                         <span
                                             dir="ltr"
-                                            className="flex items-center gap-1.5 min-w-0 text-sm font-semibold text-text-secondary whitespace-nowrap max-w-[240px]"
+                                            className="flex items-center gap-1.5 min-w-0 text-sm text-text-muted whitespace-nowrap max-w-[240px]"
                                             title={youtubeChannel}
                                         >
                                             <Youtube className="w-4 h-4 text-red-500 shrink-0" />
@@ -723,7 +723,7 @@ export default function LinkDetailModal({
                                     ) : xAuthor ? (
                                         <span
                                             dir="ltr"
-                                            className="flex items-center gap-1.5 min-w-0 text-sm font-semibold text-text-secondary whitespace-nowrap max-w-[240px]"
+                                            className="flex items-center gap-1.5 min-w-0 text-sm text-text-muted whitespace-nowrap max-w-[240px]"
                                             title={`@${xAuthor}`}
                                         >
                                             <span className="shrink-0 inline-flex" style={{ color: platformColor('x') }}>
@@ -745,7 +745,7 @@ export default function LinkDetailModal({
                                     ) : isFacebook ? (
                                         <span
                                             dir="auto"
-                                            className="flex items-center gap-1.5 min-w-0 text-sm font-semibold text-text-secondary whitespace-nowrap max-w-[240px]"
+                                            className="flex items-center gap-1.5 min-w-0 text-sm text-text-muted whitespace-nowrap max-w-[240px]"
                                             title={fbAuthor || 'Facebook'}
                                             aria-label={fbAuthor || 'Facebook'}
                                         >
@@ -757,7 +757,7 @@ export default function LinkDetailModal({
                                     ) : igAuthor ? (
                                         <span
                                             dir="ltr"
-                                            className="flex items-center gap-1.5 min-w-0 text-sm font-semibold text-text-secondary whitespace-nowrap max-w-[240px]"
+                                            className="flex items-center gap-1.5 min-w-0 text-sm text-text-muted whitespace-nowrap max-w-[240px]"
                                             title={`@${igAuthor}`}
                                         >
                                             <span className="shrink-0 inline-flex" style={{ color: platformColor('instagram') }}>
@@ -766,18 +766,19 @@ export default function LinkDetailModal({
                                             <span className="truncate">@{igAuthor}</span>
                                         </span>
                                     ) : link.sourceType === 'image' ? (
-                                        <span className="flex items-center gap-1.5 text-sm font-semibold text-accent whitespace-nowrap" title="Screenshot">
+                                        <span className="flex items-center gap-1.5 text-sm text-text-muted whitespace-nowrap" title="Screenshot">
                                             <ImageIcon className="w-4 h-4 shrink-0" />
                                             <span>Screenshot</span>
                                         </span>
                                     ) : link.sourceType === 'note' ? (
-                                        <span className="flex items-center gap-1.5 text-sm font-semibold text-accent whitespace-nowrap" title="Note">
+                                        <span className="flex items-center gap-1.5 text-sm text-text-muted whitespace-nowrap" title="Note">
                                             <StickyNote className="w-4 h-4 shrink-0" />
                                             <span>Note</span>
                                         </span>
                                     ) : link.sourceName && link.sourceName !== 'None' ? (
                                         <span
-                                            className="text-[10px] font-black text-text-muted/60 bg-fill-subtle border border-border-strong uppercase tracking-widest px-2.5 py-1.5 rounded-lg shadow-lg shadow-black/5 transition-all"
+                                            dir="auto"
+                                            className="min-w-0 text-sm text-text-muted whitespace-nowrap truncate max-w-[240px]"
                                             title={link.sourceName}
                                         >
                                             {link.sourceName}
