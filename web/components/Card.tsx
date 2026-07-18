@@ -501,7 +501,7 @@ function Card({
                         )}
                         {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && !igAuthor && link.sourceType === 'image' && (
                             <span
-                                className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-accent whitespace-nowrap"
+                                className="flex items-center gap-1.5 min-w-0 text-xs text-text-muted whitespace-nowrap"
                                 title="Screenshot"
                             >
                                 <ImageIcon className="w-3.5 h-3.5 shrink-0" />
@@ -510,7 +510,7 @@ function Card({
                         )}
                         {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && !igAuthor && link.sourceType === 'note' && (
                             <span
-                                className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-accent whitespace-nowrap"
+                                className="flex items-center gap-1.5 min-w-0 text-xs text-text-muted whitespace-nowrap"
                                 title="Note"
                             >
                                 <StickyNote className="w-3.5 h-3.5 shrink-0" />
