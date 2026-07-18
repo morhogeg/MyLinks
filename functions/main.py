@@ -60,6 +60,7 @@ from search import (
     sync_link_embedding, search_links, perform_search_logic, perform_hybrid_search,
     build_embedding_text, rerank_candidates, keyword_query_tokens,
     keyword_match_score, keyword_scan_cards, EmbeddingService, EMBED_TEXT_VERSION,
+    extract_quoted_phrases, pin_quoted_title_cards, is_recency_question, recent_cards,
 )
 from rate_limit import check_rate_limit, client_ip
 # Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
@@ -316,6 +317,15 @@ MAX_HISTORY_ITEMS = 6            # ai_service._build_rag_prompt uses the last 6 
 MAX_HISTORY_CONTENT_LENGTH = 4000
 MAX_TAGS = 50
 MAX_TAG_LENGTH = 60
+
+# How many head-of-list cards ride into the Ask prompt WITH their deep content
+# (detailedSummary / recipe steps / video highlights), and how much of a long
+# detailedSummary each may carry. Retrieval order puts the cards the answer
+# will actually use at the front (rerank → recency merge → quoted-title pin),
+# so depth on the head is depth where it matters; the tail stays summary-only
+# to bound prompt cost.
+ASK_DEEP_CARDS = 6
+ASK_DETAIL_MAX_CHARS = 3500
 
 
 def _sanitize_history(history) -> list:
@@ -1183,24 +1193,93 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         except Exception as e:
             logger.error(f"ask_brain keyword fallback failed: {e}")
 
-        # 2. Slim the cards to just what the model needs (bounded tokens/cost).
-        slim = [{
-            "id": c.get("id"),
-            "title": c.get("title", "Untitled"),
-            "summary": c.get("summary", ""),
-            "category": c.get("category", "General"),
-            "tags": c.get("tags", []),
-            # Publisher/source so the model can answer questions that name it
-            # (e.g. "the CNN fact-check") — it's not in the title/summary text.
-            "sourceName": _card_source_name(c),
-            "url": c.get("url"),
-            # The user's own notes — passed through so the model can ground an
-            # answer in what the user personally wrote about the card. Both the
-            # legacy string and the multi-note array travel so ai_service's
-            # _rag_card_block (via collect_notes_text) surfaces every note.
-            "userNote": c.get("userNote", ""),
-            "userNotes": c.get("userNotes", []),
-        } for c in cards]
+        # 1c. Recency questions ("catch me up on this week's saves", "recap my
+        #     recent saves") are time-anchored, not topic-anchored — pure
+        #     semantic retrieval on such phrasing returns topically arbitrary
+        #     cards. Merge the actually-newest cards IN FRONT (they're the
+        #     ground truth the question is about); the prompt's saved-dates +
+        #     today's-date rules let the model answer the time window honestly.
+        try:
+            if is_recency_question(question):
+                recents = recent_cards(uid, limit=12)
+                recent_ids = {c.get("id") for c in recents}
+                cards = recents + [c for c in cards if c.get("id") not in recent_ids]
+        except Exception as e:
+            logger.error(f"ask_brain recency retrieval failed: {e}")
+
+        # 1d. Chip-anchor guarantee: suggestion/follow-up chips quote the cited
+        #     card's title in the question. That card MUST reach the model, at
+        #     the front (inside the deep-content window below) — a chip we
+        #     offered that then can't see its own card is a broken promise. If
+        #     the quoted card missed retrieval entirely, rescue it with a
+        #     lexical scan on just the quoted phrase before pinning.
+        try:
+            quoted = extract_quoted_phrases(question)
+            if quoted:
+                cards, matched = pin_quoted_title_cards(question, cards)
+                if not matched:
+                    have = {c.get("id") for c in cards}
+                    rescue = keyword_scan_cards(
+                        uid, " ".join(quoted), exclude_ids=have, limit=3)
+                    if rescue:
+                        cards, _ = pin_quoted_title_cards(question, rescue + cards)
+        except Exception as e:
+            logger.error(f"ask_brain quoted-title pinning failed: {e}")
+
+        # 2. Slim the cards to what the model needs (bounded tokens/cost).
+        #    Every card carries its headline fields; the FIRST few additionally
+        #    carry their stored deep content — detailedSummary, structured
+        #    recipe ingredients/steps, video highlights, the takeaway — which
+        #    is what lets "walk me through the steps" answer with the actual
+        #    steps instead of re-paraphrasing the two-sentence summary. Bounded:
+        #    deep fields ride only on the head of the list (where retrieval,
+        #    recency, and pinning put the cards the answer will actually use)
+        #    and detailedSummary is truncated.
+        slim = []
+        for i, c in enumerate(cards):
+            s = {
+                "id": c.get("id"),
+                "title": c.get("title", "Untitled"),
+                "summary": c.get("summary", ""),
+                "category": c.get("category", "General"),
+                "tags": c.get("tags", []),
+                # Publisher/source so the model can answer questions that name it
+                # (e.g. "the CNN fact-check") — it's not in the title/summary text.
+                "sourceName": _card_source_name(c),
+                "url": c.get("url"),
+                # When it was saved (unix ms) — grounds "this week"/"recent" asks.
+                "createdAt": c.get("createdAt"),
+                # The user's own notes — passed through so the model can ground an
+                # answer in what the user personally wrote about the card. Both the
+                # legacy string and the multi-note array travel so ai_service's
+                # _rag_card_block (via collect_notes_text) surfaces every note.
+                "userNote": c.get("userNote", ""),
+                "userNotes": c.get("userNotes", []),
+            }
+            if i < ASK_DEEP_CARDS:
+                detail = (c.get("detailedSummary") or "").strip()
+                if detail:
+                    s["detailedSummary"] = detail[:ASK_DETAIL_MAX_CHARS]
+                takeaway = (c.get("actionableTakeaway") or "").strip()
+                if takeaway:
+                    s["actionableTakeaway"] = takeaway
+                recipe = c.get("recipe")
+                if isinstance(recipe, dict) and (
+                    recipe.get("ingredients") or recipe.get("instructions")
+                ):
+                    s["recipe"] = {
+                        k: recipe.get(k)
+                        for k in ("ingredients", "instructions", "servings",
+                                  "prep_time", "cook_time")
+                        if recipe.get(k)
+                    }
+                highlights = c.get("videoHighlights")
+                if isinstance(highlights, list) and highlights:
+                    s["videoHighlights"] = [str(h) for h in highlights[:8]]
+                speakers = c.get("speakers")
+                if isinstance(speakers, list) and speakers:
+                    s["speakers"] = [str(x) for x in speakers[:6]]
+            slim.append(s)
 
         # 3. Generate a grounded answer with citations.
         ai = GeminiService()

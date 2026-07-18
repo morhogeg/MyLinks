@@ -4,6 +4,7 @@ import logging
 import re
 import time
 import random
+from datetime import datetime, timezone
 from typing import List, Optional
 from google import genai
 from google.cloud.firestore_v1.vector import Vector
@@ -154,6 +155,7 @@ Requirements for the analysis:
    - **SCANNABILITY**: Use **bolding** (double asterisks) for the key terms, names, dates, and numbers in the bullets — the same way the short summary does — so the reader can scan the write-up.
    - Keep the tone neutral and professional throughout.
    - Total length: 120-220 words. It must go DEEPER than the summary and stand on its own as a complete account. Avoid word-for-word repetition of the summary, but NEVER omit a key fact just because the summary already mentioned it — completeness beats non-overlap.
+   - **RECIPES / HOW-TOS**: When the content is a recipe or a step-by-step tutorial, capture the actual procedure so it can be followed later without reopening the source: add an "## Ingredients" section (the complete list, quantities included, as given) for recipes, and a "## Steps" section with the COMPLETE numbered instructions in order (headings translated into the content's language). These two sections are EXEMPT from the total-length cap — never compress steps into a description of what they achieve. If the source shows no explicit ingredients/steps (e.g. a bare photo caption), do NOT invent them.
 
 5. sourceName: Extract the name of the source or publisher (e.g., CNN, The New York Times, X, Reddit, Wikipedia, YouTube, TikTok).
    - For images or screenshots that don't reveal a source, use "Screenshot".
@@ -249,15 +251,76 @@ def _rag_source_label(c: dict) -> str:
         return ""
 
 
+def _saved_date_label(created_at) -> str:
+    """`createdAt` (unix ms, as normalize_card_for_search emits) → "YYYY-MM-DD",
+    or "" when absent/unusable. Grounds "this week"/"recent" questions."""
+    if not isinstance(created_at, (int, float)) or created_at <= 0:
+        return ""
+    try:
+        return datetime.fromtimestamp(created_at / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+    except Exception:
+        return ""
+
+
 def _rag_card_block(c: dict) -> str:
+    """One source card rendered for the grounding prompt.
+
+    Beyond the headline (title/summary/meta), the card's stored DEEP content is
+    surfaced when present — the structured recipe (ingredients + numbered
+    steps), video highlights, the actionable takeaway, and the long-form
+    detailedSummary. This is what makes "walk me through the steps" answerable
+    with the actual steps: the model can only be as specific as the context it
+    is given, and the summary alone is two sentences deep.
+    """
     src = _rag_source_label(c)
     meta = [f"source: {src}"] if src else []
     meta.append(f"category: {c.get('category', 'General')}")
     meta.append(f"tags: {', '.join(c.get('tags', []) or [])}")
+    saved = _saved_date_label(c.get("createdAt"))
+    if saved:
+        meta.append(f"saved: {saved}")
     block = (
         f"[{c.get('id')}] {c.get('title', 'Untitled')} "
         f"({'; '.join(meta)})\n{c.get('summary', '')}"
     )
+
+    takeaway = str(c.get("actionableTakeaway") or "").strip()
+    if takeaway:
+        block += f"\nTakeaway: {takeaway}"
+
+    def _str_items(val) -> list:
+        """Clean string items from a stored list field; [] for any other shape
+        (a string here would otherwise iterate char-by-char)."""
+        if not isinstance(val, (list, tuple)):
+            return []
+        return [s for s in (str(x).strip() for x in val) if s]
+
+    # Structured recipe — the exact ingredients and numbered steps, verbatim.
+    recipe = c.get("recipe")
+    if isinstance(recipe, dict):
+        facts = [f"{label}: {recipe.get(key)}" for key, label in
+                 (("servings", "serves"), ("prep_time", "prep"), ("cook_time", "cook"))
+                 if recipe.get(key)]
+        if facts:
+            block += f"\nRecipe ({'; '.join(facts)}):"
+        ingredients = _str_items(recipe.get("ingredients"))
+        if ingredients:
+            block += "\nIngredients:\n" + "\n".join(f"- {x}" for x in ingredients)
+        steps = _str_items(recipe.get("instructions"))
+        if steps:
+            block += "\nSteps:\n" + "\n".join(f"{i}. {x}" for i, x in enumerate(steps, 1))
+
+    highlights = _str_items(c.get("videoHighlights"))
+    if highlights:
+        block += "\nVideo highlights:\n" + "\n".join(f"- {x}" for x in highlights)
+    speakers = _str_items(c.get("speakers"))
+    if speakers:
+        block += f"\nSpeakers: {', '.join(speakers)}"
+
+    detail = str(c.get("detailedSummary") or "").strip()
+    if detail:
+        block += f"\nDetail:\n{detail}"
+
     # The user's OWN notes on the card — their words, distinct from the machine
     # summary. Surfaced to the model so it can answer "what did I think about…".
     # Merges the legacy string + the multi-note array via the shared reader.
@@ -287,12 +350,21 @@ def _build_rag_prompt(question: str, cards: list, history: list = None) -> str:
             turns.append(f"{role}: {h.get('content', '')}")
         history_text = "\n\nEarlier in this conversation:\n" + "\n".join(turns)
 
-    return f"""You are Machina AI, the user's personal knowledge assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved.
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    return f"""You are Machina AI, the user's personal knowledge assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved. Today's date is {today}.
 
 Rules:
 - Ground every claim in the provided sources. Do NOT use outside knowledge or invent facts.
 - If the sources don't contain the answer, say so plainly and suggest what they could save.
-- Be concise and direct (2-5 sentences, or a short list when that's clearer).
+- MATCH THE FORMAT AND DEPTH TO THE ASK:
+  - Steps / walkthrough / "how do I make or do this" → reproduce the COMPLETE numbered steps from the source's Steps or Detail section, in order. Never replace steps with a description of what the steps achieve.
+  - Ingredients / "what do I need" → the complete list from the source, not a sample.
+  - Key points / highlights / "more detail" → concrete specifics pulled from the source's Detail, Takeaway, or Video highlights sections.
+  - Otherwise → concise and direct (2-5 sentences, or a short list when that's clearer).
+- NEVER answer a request for specifics with a rephrased overview. If a source genuinely lacks the requested specifics (e.g. no step-by-step instructions were captured from it), say exactly that and offer what the source DOES contain.
+- FOLLOW-UPS MUST ADD VALUE: when the conversation history shows you already answered about this source, bring NEW information from the sources — never restate an earlier answer in different words.
+- Questions about recent saves ("this week", "latest", "recap") → judge by each source's saved: date against today's date; only present sources actually in that window as recent, and mention when each was saved.
 - Don't announce a count of items (e.g. "three sources") — just give the list. If you do state a number, it MUST exactly match the number of items you list.
 - CRITICAL — match the user's language: write your ENTIRE answer in the same language as the User question, NOT the language of the sources. If the question is in English, answer in English even when every source is in Hebrew; if the question is in Hebrew, answer in Hebrew. The sources' language must not influence your answer's language.
 - Only cite sources you actually used.

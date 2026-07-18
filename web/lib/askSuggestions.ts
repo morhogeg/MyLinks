@@ -226,7 +226,7 @@ export interface ClassifiableCard {
      *  ("Give me more detail", "Summarize the steps"). */
     detailedSummary?: string;
     sourceType?: string;
-    recipe?: { ingredients?: string[] } | null;
+    recipe?: { ingredients?: string[]; instructions?: string[] } | null;
     metadata?: { videoId?: string } | null;
 }
 
@@ -319,6 +319,8 @@ function findRelatedConcept(cards: ClassifiableCard[], allLinks: Link[]): string
 interface Evidence {
     /** Structured recipe data with actual ingredients. */
     hasIngredients: boolean;
+    /** Structured recipe data with actual step-by-step instructions. */
+    hasSteps: boolean;
     /** A substantial stored long-form analysis (not just the short summary). */
     hasDetail: boolean;
 }
@@ -326,6 +328,7 @@ interface Evidence {
 function gatherEvidence(cards: ClassifiableCard[]): Evidence {
     return {
         hasIngredients: cards.some(c => !!c.recipe?.ingredients?.length),
+        hasSteps: cards.some(c => !!c.recipe?.instructions?.length),
         hasDetail: cards.some(c => (c.detailedSummary?.trim().length ?? 0) >= 200),
     };
 }
@@ -359,7 +362,10 @@ function angleChips(angle: ContentAngle, ev: Evidence, t: string): FollowUpChip[
         case 'recipe':
             return [
                 ...(ev.hasIngredients ? [{ label: 'What ingredients do I need?', question: `What ingredients do I need for "${t}"?` }] : []),
-                ...(ev.hasIngredients || ev.hasDetail ? [{ label: 'Walk me through the steps', question: `Walk me through the steps in "${t}"` }] : []),
+                // Steps require actual stored instructions (or a long-form
+                // Detail section that carries the method) — ingredients alone
+                // can't back a walkthrough, so they don't license this chip.
+                ...(ev.hasSteps || ev.hasDetail ? [{ label: 'Walk me through the steps', question: `Walk me through the steps in "${t}"` }] : []),
                 keyPoints,
             ];
         case 'news':

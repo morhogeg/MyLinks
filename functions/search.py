@@ -370,6 +370,110 @@ def rerank_candidates(question: str, candidates: List[dict], top_k: int = 10) ->
     return [c for _, _, c in scored[:top_k]]
 
 
+# ── Ask retrieval guarantees (pure parts unit-tested) ───────────────────────
+# The Ask UI's suggestion/follow-up chips send questions that embed the cited
+# card's TITLE in quotes (`Walk me through the steps in "Pan con Tomate
+# Recipe"`) — that title is the chip's retrieval anchor, and the chip contract
+# ("every offered chip actually works") depends on the anchored card reaching
+# the model's context AT THE FRONT, where the deep-content window is (see
+# ask_brain's slimming). Vector rank usually gets it there; these helpers make
+# it a guarantee instead of a likelihood.
+
+# A quoted span (straight/curly double quotes or guillemets), long enough to
+# be a title rather than a quoted word. Chip titles are ≤60 chars + a
+# truncation ellipsis. Single/curly-single quotes are deliberately NOT
+# delimiters: chips always quote with double quotes, and a curly apostrophe
+# inside a title ("Rafi’s Pasta") must not split the phrase.
+_QUOTED_RE = re.compile(r'["“”«»]([^"“”«»]{3,120}?)["“”«»]')
+
+
+def extract_quoted_phrases(question: str) -> List[str]:
+    """Quoted spans in a question, with any truncation ellipsis trimmed."""
+    out = []
+    for m in _QUOTED_RE.finditer(question or ""):
+        p = m.group(1).strip().rstrip(".").rstrip("…").strip()
+        if p:
+            out.append(p)
+    return out
+
+
+def _norm_title(s: str) -> str:
+    """Case/punctuation/whitespace-insensitive form for title comparison
+    (unicode-aware, so Hebrew titles compare correctly)."""
+    return re.sub(r"[\W_]+", " ", (s or "").lower(), flags=re.UNICODE).strip()
+
+
+def pin_quoted_title_cards(question: str, cards: List[dict]):
+    """Move cards whose title matches a phrase quoted in the question to the
+    FRONT of the list (otherwise stable). Returns (cards, matched).
+
+    Chip questions quote the cited card's title, sometimes truncated with an
+    ellipsis — so a match is normalized equality or a prefix in either
+    direction (a truncated quote is a prefix of the full title). Prefix
+    matching requires a minimum phrase length so a stray short quoted fragment
+    (a title's own inner quotes, a quoted word) can never pin an unrelated
+    card. `matched` tells the caller whether any quoted phrase found its card,
+    so it can fall back to a lexical scan when the anchor card missed
+    retrieval entirely.
+    """
+    phrases = [p for p in (_norm_title(x) for x in extract_quoted_phrases(question)) if p]
+    if not phrases or not cards:
+        return cards, False
+
+    def _is_match(t: str, p: str) -> bool:
+        if t == p:
+            return True
+        return len(p) >= 6 and (t.startswith(p) or p.startswith(t))
+
+    pinned, rest = [], []
+    for c in cards:
+        t = _norm_title(str(c.get("title", "")))
+        if t and any(_is_match(t, p) for p in phrases):
+            pinned.append(c)
+        else:
+            rest.append(c)
+    return (pinned + rest, True) if pinned else (cards, False)
+
+
+# Recency intent: questions the chips (and users) phrase about WHEN something
+# was saved, not what it says — "catch me up on this week's saves", "recap my
+# recent saves", "what did I save this week?", "what's my latest Tech save
+# about?". Pure semantic retrieval on such text returns topically arbitrary
+# cards; the ground truth is the createdAt ordering, so ask_brain merges the
+# newest cards in front when this matches (see recent_cards).
+_RECENCY_RE = re.compile(
+    r"\b(this week|past week|last week|this month|past month|recent|recently|"
+    r"latest|newest|today|yesterday|last few days|past few days|"
+    r"catch me up|recap)\b",
+    re.IGNORECASE,
+)
+
+
+def is_recency_question(question: str) -> bool:
+    """True when the question is about recently-saved cards (time-anchored)."""
+    return bool(_RECENCY_RE.search(question or ""))
+
+
+def recent_cards(uid: str, limit: int = 12) -> List[dict]:
+    """The newest `limit` settled cards by createdAt — the ground truth behind
+    recency questions. Skips mid-flight/failed captures (nothing to ground an
+    answer in), normalized like every other retrieval path."""
+    db = get_db()
+    links_ref = db.collection("users").document(uid).collection("links")
+    query = links_ref.order_by(
+        "createdAt", direction=gc_firestore.Query.DESCENDING
+    ).limit(limit * 2)  # headroom for skipped processing/failed docs
+    out = []
+    for doc in query.stream():
+        data = doc.to_dict() or {}
+        if data.get("status") in ("processing", "failed"):
+            continue
+        out.append(normalize_card_for_search(data, doc.id))
+        if len(out) >= limit:
+            break
+    return out
+
+
 class EmbeddingService:
     def __init__(self):
         self.api_key = os.environ.get("GEMINI_API_KEY")

@@ -647,7 +647,36 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-18 (latest) — MOBILE v4 CHROME: bottom tab bar + one-line header +
+- **2026-07-18 (latest) — ASK RELIABILITY: chips now always deliver what they
+  promise (deep-content RAG + retrieval guarantees).** Owner repro: the
+  "Walk me through the steps" follow-up chip on a recipe card answered with a
+  re-paraphrase of the 2-sentence summary. Root cause: `ask_brain`'s slimming
+  dropped EVERY deep field — the model never saw `detailedSummary`, the
+  structured `recipe` ingredients/instructions, `actionableTakeaway`,
+  `videoHighlights`, `speakers`, or `createdAt` — so no depth question COULD
+  be answered with depth. Fixes, all under test: (1) the top `ASK_DEEP_CARDS=6`
+  context cards now carry their full deep content (detailedSummary truncated
+  at 3500 chars) and `_rag_card_block` renders it (Ingredients / numbered
+  Steps / Takeaway / Video highlights / Detail / saved-date); (2) prompt rules
+  rewritten — format matches the ask (complete numbered steps for
+  walkthroughs, complete ingredient lists, no rephrased overviews for
+  specifics, follow-ups must add NEW info, honest "the source doesn't contain
+  that" fallback), plus today's date; (3) chip-anchor guarantee: questions
+  quoting a card title (`… in "Title"`) get that card pinned to the FRONT of
+  context via `pin_quoted_title_cards` (normalized exact/prefix match,
+  ellipsis-truncation aware, curly-apostrophe safe) with a lexical rescue
+  scan if retrieval missed it; (4) recency questions ("catch me up on this
+  week's saves", "recap", "latest") merge the actually-newest cards
+  (`recent_cards`, createdAt-ordered) in front instead of semantic-matching
+  the phrase, and per-card `saved:` dates make the window honest; (5) client
+  gating tightened — the steps chip now requires stored `recipe.instructions`
+  or a real Detail section, ingredients alone no longer license it
+  (`askSuggestions.ts` Evidence.hasSteps). 25 new offline tests
+  (`test_ask_retrieval.py` + `test_rag_prompt.py` deep-content/prompt-rule
+  cases); 287 pass, `tsc` clean. Backend deploy needed (`Deploy-Functions:
+  ask_brain` — main.py/ai_service.py/search.py) + Vercel for the web gating.
+
+- **2026-07-18 — MOBILE v4 CHROME: bottom tab bar + one-line header +
   dedicated Sources (owner-approved via 4 mockup rounds; commit `4028979`,
   merge `4c5d10b`).** Phones only — desktop untouched. Bottom bar: Home /
   Collections / raised gradient center CAPTURE (replaces the mobile FAB —
