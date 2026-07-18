@@ -2219,7 +2219,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 at the top (its env(safe-area-inset-top) padding now lands at the
                 real screen top), and the gallery scrolls in the region below. */}
             {viewMode === 'collections' && (
-                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in" style={{ bottom: 'calc(43px + max(calc(env(safe-area-inset-bottom) - 18px), 4px))' }}>
+                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in" style={{ bottom: 'calc(45px + max(calc(env(safe-area-inset-bottom) - 18px), 4px))' }}>
                     <MobileSubheader
                         onBack={() => setViewMode(lastLayout.current)}
                         backLabel="Back to your library"
@@ -2257,7 +2257,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
             {/* Digest — mobile full-screen overlay (mirrors Collections). */}
             {viewMode === 'digest' && (
-                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in" style={{ bottom: 'calc(43px + max(calc(env(safe-area-inset-bottom) - 18px), 4px))' }}>
+                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in" style={{ bottom: 'calc(45px + max(calc(env(safe-area-inset-bottom) - 18px), 4px))' }}>
                     <MobileSubheader
                         onBack={() => setViewMode(lastLayout.current)}
                         backLabel="Back to your library"
@@ -2273,7 +2273,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             {/* Collection detail — mobile full-screen place (Task A). Back returns
                 to the gallery (button + edge-swipe), never to the home library. */}
             {viewMode === 'collection' && openCol && (
-                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in" style={{ bottom: 'calc(43px + max(calc(env(safe-area-inset-bottom) - 18px), 4px))' }}>
+                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in" style={{ bottom: 'calc(45px + max(calc(env(safe-area-inset-bottom) - 18px), 4px))' }}>
                     <MobileSubheader
                         onBack={closeCollectionToGallery}
                         backLabel="Back to collections"
@@ -2289,7 +2289,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             {/* Digest detail — mobile full-screen place (Task B). Back returns to
                 the list of digests. */}
             {viewMode === 'digestDetail' && (
-                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in" style={{ bottom: 'calc(43px + max(calc(env(safe-area-inset-bottom) - 18px), 4px))' }}>
+                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in" style={{ bottom: 'calc(45px + max(calc(env(safe-area-inset-bottom) - 18px), 4px))' }}>
                     <MobileSubheader
                         onBack={closeDigestToList}
                         backLabel="Back to digests"
