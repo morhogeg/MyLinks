@@ -817,6 +817,17 @@ exact-match, capped.
   every other source byline (all 7 source-byline variants now identical grey).
   Kept their type icon (image / sticky-note) as a subtle grey mark. Shipped:
   Vercel + TestFlight run #122 = build **1122**.
+- **2026-07-18 — DETAIL MODAL source bylines → airy grey (owner: open-state
+  cards still showed the old source design; commit `d553d5f`, merge
+  `43312fb`).** `LinkDetailModal` had its own copy of the source rendering:
+  generic publishers as the heavy pill (`text-[10px] font-black
+  text-text-muted/60 bg-fill-subtle border border-border-strong uppercase
+  tracking-widest`), branded as `text-sm font-semibold text-text-secondary`,
+  Screenshot/Note as accent. Unified all to `text-sm text-text-muted` (generic
+  = plain name, no pill), matching the feed card. `ReadingView` already showed
+  the source as plain muted text (unchanged). Verified in emulator: no old pill
+  in the opened modal; tsc clean. Shipped: Vercel + TestFlight run #123 = build
+  **1123**.
 - **2026-07-17 — ABUSE HARDENING: embed-trigger cost backstop + live
   `shared_*` write lockdown (branch `claude/gemini-pricing-analysis-ab575e`).**
   Cost research first (owner asked pre-launch): per-card analysis ≈ $0.002
