@@ -1903,13 +1903,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     onToggleSourceKeys={handleToggleSourceKeys}
                 />
 
-                {/* Bottom tab bar (phones) — persistent across the top-level tabs
-                    (Home, Collections gallery, Digest list). Hidden in Ask (chat
-                    composer owns the bottom), Review (focused swipe session), and
-                    the PUSHED detail places (a single collection / digest) which
-                    have their own back button — the Twitter model where opening an
-                    item pushes a bar-less detail. */}
-                {viewMode !== 'ask' && viewMode !== 'review' && viewMode !== 'collection' && viewMode !== 'digestDetail' && (
+                {/* Bottom tab bar (phones) — on EVERY card/collection/digest
+                    screen with a consistent scroll-away (LinkedIn) feel. Hidden
+                    only in Ask (the chat composer owns the bottom edge) and
+                    Review (a focused swipe session whose action row sits where
+                    the bar would be). */}
+                {viewMode !== 'ask' && viewMode !== 'review' && (
                     <BottomTabBar active={activeTab} onSelect={selectTab} onCapture={() => onCapture?.()} />
                 )}
 
@@ -2274,14 +2273,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             {/* Collection detail — mobile full-screen place (Task A). Back returns
                 to the gallery (button + edge-swipe), never to the home library. */}
             {viewMode === 'collection' && openCol && (
-                <div className="sm:hidden fixed inset-x-0 top-0 bottom-0 z-50 bg-background flex flex-col animate-fade-in">
+                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in" style={{ bottom: 'calc(43px + max(calc(env(safe-area-inset-bottom) - 18px), 4px))' }}>
                     <MobileSubheader
                         onBack={closeCollectionToGallery}
                         backLabel="Back to collections"
                         icon={<Layers className="w-5 h-5" />}
                         title={openCol.name}
                     />
-                    <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+                    <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: '1rem' }}>
                         {collectionDetailContent}
                     </div>
                 </div>
@@ -2290,14 +2289,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             {/* Digest detail — mobile full-screen place (Task B). Back returns to
                 the list of digests. */}
             {viewMode === 'digestDetail' && (
-                <div className="sm:hidden fixed inset-x-0 top-0 bottom-0 z-50 bg-background flex flex-col animate-fade-in">
+                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in" style={{ bottom: 'calc(43px + max(calc(env(safe-area-inset-bottom) - 18px), 4px))' }}>
                     <MobileSubheader
                         onBack={closeDigestToList}
                         backLabel="Back to digests"
                         icon={<Newspaper className="w-5 h-5" />}
                         title={digestDetailTitle}
                     />
-                    <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+                    <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: '1rem' }}>
                         {digestDetailContent}
                     </div>
                 </div>
