@@ -790,6 +790,18 @@ exact-match, capped.
   feed need a whisper of shadow to sit ON the surface (Apple News/App Store
   pattern); flat is for edge-to-edge grouped lists. Verified light + dark in
   emulator. Shipped: Vercel + TestFlight run #119 = build **1119**.
+- **2026-07-18 — CARD source tag: airy plain name for generic publishers
+  (owner; commit `57f44a8`, merge `738cb65`).** Branded sources (YouTube/X/
+  LinkedIn/etc.) already render as a minimal icon+byline; generic publishers
+  (Mako, CNN…) rendered as a heavy filled pill (`bg-fill-subtle` + border +
+  `text-[9px] font-bold uppercase tracking-widest`). Replaced with just the
+  name in the same light byline style the branded ones use
+  (`text-xs font-semibold text-text-secondary`, `truncate`, no pill/border/
+  uppercase/icon — owner: "just the name, no icon"). Removed the now-unused
+  `sourceIcon`. ListCard/DigestCard already showed the source as plain text
+  (unchanged). Seed data has no generic-publisher cards so couldn't screenshot
+  live; verified structurally (0 heavy pills remain, tsc clean, branded
+  untouched). Shipped: Vercel + TestFlight run #120 = build **1120**.
 - **2026-07-17 — ABUSE HARDENING: embed-trigger cost backstop + live
   `shared_*` write lockdown (branch `claude/gemini-pricing-analysis-ab575e`).**
   Cost research first (owner asked pre-launch): per-card analysis ≈ $0.002
