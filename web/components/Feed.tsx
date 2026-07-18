@@ -1910,9 +1910,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     onToggleSourceKeys={handleToggleSourceKeys}
                 />
 
-                {/* Bottom tab bar (phones) — hidden in Ask, whose composer owns
-                    the bottom edge and the keyboard. */}
-                {viewMode !== 'ask' && (
+                {/* Bottom tab bar (phones) — hidden in Ask (composer owns the
+                    bottom edge + keyboard) and in Review (a focused swipe session
+                    with its own action row + Done exit; the bar would overlap it). */}
+                {viewMode !== 'ask' && viewMode !== 'review' && (
                     <BottomTabBar active={activeTab} onSelect={selectTab} onCapture={() => onCapture?.()} />
                 )}
 
@@ -2150,6 +2151,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             onResetStatus={swipeResetStatus}
                             onCancelRemind={swipeCancelRemind}
                             remindSignal={remindSignal}
+                            onExit={() => setViewMode(lastLayout.current === 'review' ? 'grid' : lastLayout.current)}
                         />
                     ) : viewMode === 'list' ? (
                         <div className="flex flex-col gap-2 max-w-3xl mx-auto">
