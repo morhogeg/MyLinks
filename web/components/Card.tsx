@@ -443,7 +443,7 @@ function Card({
                         {isYouTube && youtubeChannel && (
                             <span
                                 dir="ltr"
-                                className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-text-secondary whitespace-nowrap max-w-[220px]"
+                                className="flex items-center gap-1.5 min-w-0 text-xs text-text-muted whitespace-nowrap max-w-[220px]"
                                 title={youtubeChannel}
                             >
                                 <Youtube className="w-3.5 h-3.5 text-red-500 shrink-0" />
@@ -453,7 +453,7 @@ function Card({
                         {!isYouTube && xAuthor && (
                             <span
                                 dir="ltr"
-                                className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-text-secondary whitespace-nowrap max-w-[220px]"
+                                className="flex items-center gap-1.5 min-w-0 text-xs text-text-muted whitespace-nowrap max-w-[220px]"
                                 title={`@${xAuthor}`}
                             >
                                 <span className="shrink-0 inline-flex" style={{ color: platformColor('x') }}>
@@ -477,7 +477,7 @@ function Card({
                         {!isYouTube && !xAuthor && !isLinkedIn && isFacebook && (
                             <span
                                 dir="auto"
-                                className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-text-secondary whitespace-nowrap max-w-[220px]"
+                                className="flex items-center gap-1.5 min-w-0 text-xs text-text-muted whitespace-nowrap max-w-[220px]"
                                 title={fbAuthor || 'Facebook'}
                                 aria-label={fbAuthor || 'Facebook'}
                             >
@@ -490,7 +490,7 @@ function Card({
                         {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && igAuthor && (
                             <span
                                 dir="ltr"
-                                className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-text-secondary whitespace-nowrap max-w-[220px]"
+                                className="flex items-center gap-1.5 min-w-0 text-xs text-text-muted whitespace-nowrap max-w-[220px]"
                                 title={`@${igAuthor}`}
                             >
                                 <span className="shrink-0 inline-flex" style={{ color: platformColor('instagram') }}>
@@ -520,7 +520,7 @@ function Card({
                         {!isYouTube && !xAuthor && !isLinkedIn && !isFacebook && !igAuthor && link.sourceType !== 'image' && link.sourceType !== 'note' && link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None' && (
                             <span
                                 dir="auto"
-                                className="min-w-0 text-xs font-semibold text-text-secondary whitespace-nowrap truncate max-w-[220px]"
+                                className="min-w-0 text-xs text-text-muted whitespace-nowrap truncate max-w-[220px]"
                                 title={link.sourceName}
                             >
                                 {/* Airy byline: just the source name — no filled pill,
