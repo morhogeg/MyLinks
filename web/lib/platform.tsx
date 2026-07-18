@@ -1,6 +1,6 @@
 'use client';
 
-import { Youtube, Instagram, Linkedin, Github } from 'lucide-react';
+import { Youtube, Instagram, Linkedin, Github, Facebook } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 /** Up-to-date X (formerly Twitter) wordmark — lucide still ships the old bird. */
@@ -8,16 +8,6 @@ function XLogo({ className = 'w-3 h-3' }: { className?: string }) {
     return (
         <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
             <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24h-6.66l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117l11.966 15.644Z" />
-        </svg>
-    );
-}
-
-/** Facebook "f" badge — solid brand glyph with the f as negative space, so
-    `currentColor` tints the whole mark in the brand blue like our other logos. */
-function FacebookLogo({ className = 'w-3 h-3' }: { className?: string }) {
-    return (
-        <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
-            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.313 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
         </svg>
     );
 }
@@ -71,7 +61,9 @@ export function platformIcon(key: PlatformKey, className = 'w-3 h-3'): ReactNode
         case 'linkedin':
             return <Linkedin className={className} />;
         case 'facebook':
-            return <FacebookLogo className={className} />;
+            // Outline "f" (lucide) to match the airy, lightweight treatment of
+            // the other marks — the old solid-disc badge read heavy/dated.
+            return <Facebook className={className} />;
         case 'github':
             return <Github className={className} />;
     }
