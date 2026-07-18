@@ -319,6 +319,63 @@ def keyword_scan_cards(uid: str, query_text: str, exclude_ids: set = None,
     return [d for _, d in scored[:limit]]
 
 
+# ── Temporal retrieval (Ask) ────────────────────────────────────────────────
+# Vector search retrieves by MEANING, so a time-scoped ask ("catch me up on
+# this week's saves", "recap my recent saves") matches cards that talk ABOUT
+# weeks or recaps — not the cards actually saved this week. These helpers give
+# ask_brain a literal by-date retrieval leg for such questions, so the
+# suggestion chips that promise a time window actually deliver one.
+
+# Ordered most-specific-first; the SMALLEST matching window wins (e.g.
+# "what did I save this week? anything recent?" → 7 days, not 14).
+_TEMPORAL_PATTERNS = [
+    (re.compile(r"\b(today|last 24 hours)\b", re.IGNORECASE), 1),
+    (re.compile(r"\byesterday\b", re.IGNORECASE), 2),
+    (re.compile(r"\b(this|past|last) week\b|\b(past|last) few days\b", re.IGNORECASE), 7),
+    (re.compile(r"\brecent(ly)?\b|\blatest\b|\bcatch me up\b", re.IGNORECASE), 14),
+    (re.compile(r"\b(this|past|last) month\b", re.IGNORECASE), 31),
+]
+
+
+def temporal_window_days(question: str) -> Optional[int]:
+    """The time window (in days) a question explicitly scopes itself to, or
+    None when it isn't a temporal ask. Pure — unit-testable offline."""
+    matched = [days for rx, days in _TEMPORAL_PATTERNS if rx.search(question or "")]
+    return min(matched) if matched else None
+
+
+def recent_cards(uid: str, days: int, limit: int = 12) -> List[dict]:
+    """The newest ready cards saved within the last `days` days, newest first.
+
+    Scans by createdAt DESC and filters in Python (via the normalized unix-ms
+    timestamp) rather than a typed `where` clause, because legacy docs store
+    createdAt in mixed shapes (ms int / ISO string / datetime) that a Firestore
+    range filter would silently drop. In-flight and failed captures are skipped
+    — a placeholder has nothing to ground an answer in.
+    """
+    cutoff = int(datetime.now().timestamp() * 1000) - days * 86_400_000
+    db = get_db()
+    links_ref = db.collection("users").document(uid).collection("links")
+    query = links_ref.order_by(
+        "createdAt", direction=gc_firestore.Query.DESCENDING
+    ).limit(max(60, limit * 4))
+
+    out = []
+    for doc in query.stream():
+        data = doc.to_dict() or {}
+        if data.get("status") in ("processing", "failed"):
+            continue
+        card = normalize_card_for_search(data, doc.id)
+        if (card.get("createdAt") or 0) < cutoff:
+            # Mixed-type ordering means an old card can appear early in the
+            # stream — keep scanning (bounded by the query limit), don't break.
+            continue
+        out.append(card)
+        if len(out) >= limit:
+            break
+    return out
+
+
 def rerank_candidates(question: str, candidates: List[dict], top_k: int = 10) -> List[dict]:
     """Rerank vector-search candidates down to the best `top_k` for the model.
 

@@ -226,8 +226,8 @@ export interface ClassifiableCard {
      *  ("Give me more detail", "Summarize the steps"). */
     detailedSummary?: string;
     sourceType?: string;
-    recipe?: { ingredients?: string[] } | null;
-    metadata?: { videoId?: string } | null;
+    recipe?: { ingredients?: string[]; instructions?: string[] } | null;
+    metadata?: { videoId?: string; videoHighlights?: string[] } | null;
 }
 
 export interface FollowUpContext {
@@ -319,14 +319,20 @@ function findRelatedConcept(cards: ClassifiableCard[], allLinks: Link[]): string
 interface Evidence {
     /** Structured recipe data with actual ingredients. */
     hasIngredients: boolean;
+    /** Structured recipe data with actual ordered instructions. */
+    hasSteps: boolean;
     /** A substantial stored long-form analysis (not just the short summary). */
     hasDetail: boolean;
+    /** Timestamped video highlights actually captured for the card. */
+    hasHighlights: boolean;
 }
 
 function gatherEvidence(cards: ClassifiableCard[]): Evidence {
     return {
         hasIngredients: cards.some(c => !!c.recipe?.ingredients?.length),
+        hasSteps: cards.some(c => !!c.recipe?.instructions?.length),
         hasDetail: cards.some(c => (c.detailedSummary?.trim().length ?? 0) >= 200),
+        hasHighlights: cards.some(c => !!c.metadata?.videoHighlights?.length),
     };
 }
 
@@ -357,9 +363,13 @@ function angleChips(angle: ContentAngle, ev: Evidence, t: string): FollowUpChip[
     const whyMatters = { label: 'Why does this matter?', question: `Why does "${t}" matter?` };
     switch (angle) {
         case 'recipe':
+            // The steps chip requires stored INSTRUCTIONS or the long-form
+            // analysis — ingredients alone can't support a walkthrough (a chip
+            // licensed by the wrong evidence answers with a summary, the exact
+            // broken promise this section exists to prevent).
             return [
                 ...(ev.hasIngredients ? [{ label: 'What ingredients do I need?', question: `What ingredients do I need for "${t}"?` }] : []),
-                ...(ev.hasIngredients || ev.hasDetail ? [{ label: 'Walk me through the steps', question: `Walk me through the steps in "${t}"` }] : []),
+                ...(ev.hasSteps || ev.hasDetail ? [{ label: 'Walk me through the steps', question: `Walk me through the steps in "${t}"` }] : []),
                 keyPoints,
             ];
         case 'news':
@@ -375,9 +385,12 @@ function angleChips(angle: ContentAngle, ev: Evidence, t: string): FollowUpChip[
         case 'research':
             return [{ label: 'What are the key findings?', question: `What are the key findings in "${t}"?` }, whyMatters];
         case 'video':
+            // Highlights are only promised when timestamped highlights were
+            // actually captured for the card; takeaways restate stored content
+            // so they're always safe.
             return [
                 { label: 'What are the key takeaways?', question: `What are the key takeaways from "${t}"?` },
-                { label: 'Give me the highlights', question: `Give me the highlights of "${t}"` },
+                ...(ev.hasHighlights ? [{ label: 'Give me the highlights', question: `Give me the highlights of "${t}"` }] : []),
             ];
         default:
             return [keyPoints, simpler];

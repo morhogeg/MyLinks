@@ -90,6 +90,65 @@ def test_card_block_omits_note_line_when_no_notes():
     assert "My note:" not in block
 
 
+# ── _rag_card_block: depth fields (what licenses depth asks) ───────────────
+# The client only offers depth chips ("walk me through the steps", "give me
+# more detail", "give me the highlights") when the cited card verifiably
+# carries these fields — so the block MUST surface them to the model, or every
+# depth ask collapses into another summary (the original owner-reported bug).
+
+def test_card_block_includes_detailed_summary():
+    block = _rag_card_block({
+        "id": "x", "title": "T", "summary": "S",
+        "detailedSummary": "## Key Points\n- deep fact one\n- deep fact two",
+    })
+    assert "Details:" in block
+    assert "deep fact one" in block
+
+
+def test_card_block_truncates_oversized_detail():
+    from ai_service import _RAG_DETAIL_CHARS
+    block = _rag_card_block({
+        "id": "x", "title": "T", "detailedSummary": "word " * 2000,
+    })
+    detail = block.split("Details:\n", 1)[1]
+    assert len(detail) <= _RAG_DETAIL_CHARS + 8  # cap + ellipsis slack
+
+
+def test_card_block_includes_recipe_ingredients_and_numbered_steps():
+    block = _rag_card_block({
+        "id": "x", "title": "Shakshuka",
+        "recipe": {
+            "ingredients": ["4 eggs", "2 tomatoes"],
+            "instructions": ["Fry the tomatoes", "Crack in the eggs"],
+        },
+    })
+    assert "Ingredients: 4 eggs; 2 tomatoes" in block
+    assert "Steps:\n1. Fry the tomatoes\n2. Crack in the eggs" in block
+
+
+def test_card_block_includes_video_highlights():
+    block = _rag_card_block({
+        "id": "x", "title": "T",
+        "videoHighlights": ["2:15 — Explains the 2-minute rule", "5:40 — Demo"],
+    })
+    assert "Video highlights:" in block
+    assert "- 2:15 — Explains the 2-minute rule" in block
+
+
+def test_card_block_includes_takeaway():
+    block = _rag_card_block({"id": "x", "title": "T", "actionableTakeaway": "Do the thing."})
+    assert "Takeaway: Do the thing." in block
+
+
+def test_card_block_omits_depth_sections_when_absent():
+    block = _rag_card_block({"id": "x", "title": "T", "summary": "S", "recipe": None})
+    assert "Details:" not in block
+    assert "Ingredients:" not in block
+    assert "Steps:" not in block
+    assert "Video highlights:" not in block
+    assert "Takeaway:" not in block
+
+
 # ── _build_rag_prompt ─────────────────────────────────────────────────────
 
 def _card(i):
@@ -138,6 +197,16 @@ def test_prompt_carries_grounding_rules():
     # A couple of load-bearing instruction lines the model depends on.
     assert "USING ONLY the saved sources" in prompt
     assert "match the user's language" in prompt
+
+
+def test_prompt_carries_depth_rules():
+    # Depth asks must override the concise default (a "walk me through the
+    # steps" tap must never come back as another summary), and partial sources
+    # must produce an honest gap statement, not padding.
+    prompt = _build_rag_prompt("q?", [_card(1)])
+    assert "complete numbered list" in prompt
+    assert "NEVER compress steps into a summary" in prompt
+    assert "say plainly what the saved card doesn't include" in prompt
 
 
 # ── _valid_cited_ids ──────────────────────────────────────────────────────

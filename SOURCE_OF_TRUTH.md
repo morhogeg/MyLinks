@@ -647,7 +647,40 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-18 (latest) — MOBILE v4 CHROME: bottom tab bar + one-line header +
+- **2026-07-18 (latest) — ASK DEPTH FIX: chips now deliver what they promise
+  (owner: "walk me through the steps" on a recipe returned another summary;
+  branch `claude/ask-feature-chips-reliability-y5g91i`).** Root cause was
+  architectural: the client's "airtight" chip gating licenses depth chips on
+  `detailedSummary`/`recipe`/`videoHighlights` existing on the cited card — but
+  `ask_brain`'s slim payload stripped ALL of those before the model saw them,
+  and `_build_rag_prompt` hard-capped every answer at "2-5 sentences", so a
+  depth ask could only ever come back as another summary. Fixes (backend):
+  (1) the slim payload + `_rag_card_block` now carry `detailedSummary` (capped
+  2000 chars), recipe ingredients/instructions verbatim, timestamped
+  `videoHighlights`, and the takeaway; (2) prompt rules now DEPTH-MATCH — steps
+  asks get every step as a complete numbered list, never a compressed summary,
+  and partial sources produce an honest "the saved card doesn't include X"
+  instead of padding; (3) temporal retrieval leg — "this week / recent /
+  today / this month" questions now fetch the cards literally saved in that
+  window (`temporal_window_days` + `recent_cards` in search.py; vector search
+  retrieves by meaning and missed them), so the week/recap chips are genuinely
+  grounded; (4) the previous answer's cited ids ride along from the client
+  (`citedIds` in the /api/chat body) and are PINNED into the context, so typed
+  follow-ups ("walk me through the steps", no title) always see the discussed
+  card even though retrieval is question-text-driven; (5) processing/failed
+  placeholders filtered out of Ask context; context capped at 15 cards.
+  (Frontend): steps chip no longer licensed by ingredients alone
+  (`hasSteps || hasDetail`); video "highlights" chip gated on captured
+  highlights; `ClassifiableCard` grew `recipe.instructions` +
+  `metadata.videoHighlights`. (Capture): SYSTEM_PROMPT now requires recipe/
+  step-by-step content to store a complete "## Ingredients" + numbered
+  "## Steps" section in `detailedSummary` (word cap waived there), so future
+  recipe cards carry the full method Ask now reads. Tests: +14 offline tests
+  (depth-field rendering, truncation, depth-rule presence, temporal detector);
+  suite 278 passed. `tsc` clean, `py_compile` clean. NOTE: needs a functions
+  deploy (`Deploy-Functions:` line) to go live; existing recipe cards keep
+  their old thin detailedSummary — a card re-analyze (Retry) refreshes them.
+- **2026-07-18 — MOBILE v4 CHROME: bottom tab bar + one-line header +
   dedicated Sources (owner-approved via 4 mockup rounds; commit `4028979`,
   merge `4c5d10b`).** Phones only — desktop untouched. Bottom bar: Home /
   Collections / raised gradient center CAPTURE (replaces the mobile FAB —

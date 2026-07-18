@@ -616,6 +616,15 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
         const history = baseMsgs.map(m => ({ role: m.role, content: m.content }));
         const withUser: ChatMessage[] = [...baseMsgs, { role: 'user', content: question }];
 
+        // The previous answer's citations ride along so the backend can PIN
+        // those cards into the retrieval context. Retrieval is question-text
+        // driven, so a typed follow-up ("walk me through the steps") carries
+        // nothing to search with — but the conversation's cards are known.
+        const lastAnswer = [...baseMsgs].reverse().find(m => m.role === 'assistant' && !m.error);
+        const citedIds = lastAnswer && !lastAnswer.ungrounded
+            ? (lastAnswer.sources ?? []).map(s => s.id).slice(0, 6)
+            : [];
+
         // Persist the question RIGHT NOW instead of waiting for the answer: if
         // the user peeks at the sidebar before the reply lands, this chat must
         // already be there at the top. The resolved id also registers this
@@ -695,7 +704,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                     ...(await appCheckHeaders()),
                     ...(await authHeaders()),
                 },
-                body: JSON.stringify({ uid, question, history, stream: wantStream }),
+                body: JSON.stringify({ uid, question, history, stream: wantStream, citedIds }),
                 signal: controller.signal,
             }, 30_000);
 

@@ -60,6 +60,7 @@ from search import (
     sync_link_embedding, search_links, perform_search_logic, perform_hybrid_search,
     build_embedding_text, rerank_candidates, keyword_query_tokens,
     keyword_match_score, keyword_scan_cards, EmbeddingService, EMBED_TEXT_VERSION,
+    temporal_window_days, recent_cards, normalize_card_for_search,
 )
 from rate_limit import check_rate_limit, client_ip
 # Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
@@ -1097,7 +1098,9 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
     search, then has Gemini answer the question grounded ONLY in those cards,
     returning the source ids it cited so the UI can link straight back to them.
 
-    Body: { uid, question, history?: [{role, content}] }
+    Body: { uid, question, history?: [{role, content}], citedIds?: [str] }
+    (citedIds = the previous answer's citations; those cards are pinned into
+    the retrieval context so follow-ups always see what was just discussed.)
     Returns: { success, answer, citedIds, sources: [{id, title, category, sourceName}], ungrounded }
     """
     if req.method == 'OPTIONS':
@@ -1183,11 +1186,73 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         except Exception as e:
             logger.error(f"ask_brain keyword fallback failed: {e}")
 
+        # 1c. Temporal leg: a time-scoped ask ("this week's saves", "recap my
+        #     recent saves") needs the cards literally saved in that window —
+        #     vector search retrieves by meaning and can miss them entirely.
+        #     Those cards LEAD the context (they are what was asked about).
+        try:
+            window = temporal_window_days(question)
+            if window:
+                have = {c.get("id") for c in cards}
+                fresh = [c for c in recent_cards(uid, window, limit=12)
+                         if c.get("id") not in have]
+                cards = fresh + cards
+        except Exception as e:
+            logger.error(f"ask_brain temporal retrieval failed: {e}")
+
+        # 1d. Conversation continuity: the cards the PREVIOUS answer cited
+        #     (ids sent by the client). Retrieval is question-text-driven, so a
+        #     typed follow-up like "walk me through the steps" carries nothing
+        #     to search with — but the conversation's cards are known. Fetching
+        #     them directly guarantees the discussed card is in context for
+        #     every follow-up, typed or chip-tapped. Pinned first: they are the
+        #     most likely subject of the question.
+        try:
+            prev_ids = data.get('citedIds')
+            if isinstance(prev_ids, list) and prev_ids:
+                have = {c.get("id") for c in cards}
+                pinned = []
+                links_ref = (get_db().collection("users").document(uid)
+                             .collection("links"))
+                for cid in prev_ids[:6]:
+                    if not isinstance(cid, str) or not cid or len(cid) > 128:
+                        continue
+                    if cid in have:
+                        # Already retrieved — lift it to the front instead.
+                        pinned.append(next(c for c in cards if c.get("id") == cid))
+                        cards = [c for c in cards if c.get("id") != cid]
+                        continue
+                    doc = links_ref.document(cid).get()
+                    if doc.exists:
+                        pinned.append(normalize_card_for_search(doc.to_dict(), doc.id))
+                cards = pinned + cards
+        except Exception as e:
+            logger.error(f"ask_brain pinned-context fetch failed: {e}")
+
+        # In-flight and failed captures have no analysis to ground an answer in
+        # — the keyword leg can surface them by title, so drop them here (the
+        # search bar's own use of that scan is deliberately untouched).
+        cards = [c for c in cards if c.get("status") not in ("processing", "failed")]
+        # Bound the context: dedup preserved order above; cap the card count so
+        # the merged legs can't stack an oversized prompt.
+        cards = cards[:15]
+
         # 2. Slim the cards to just what the model needs (bounded tokens/cost).
         slim = [{
             "id": c.get("id"),
             "title": c.get("title", "Untitled"),
             "summary": c.get("summary", ""),
+            # The depth layer: long-form analysis, structured recipe data,
+            # timestamped video highlights, the takeaway. These are what make
+            # depth asks ("walk me through the steps", "give me more detail",
+            # "give me the highlights") actually answerable — without them the
+            # model only sees the 2-4 sentence summary and every answer
+            # collapses into another summary. _rag_card_block bounds their
+            # rendered size.
+            "detailedSummary": c.get("detailedSummary", ""),
+            "recipe": c.get("recipe"),
+            "videoHighlights": (c.get("metadata") or {}).get("videoHighlights") or [],
+            "actionableTakeaway": (c.get("metadata") or {}).get("actionableTakeaway") or "",
             "category": c.get("category", "General"),
             "tags": c.get("tags", []),
             # Publisher/source so the model can answer questions that name it

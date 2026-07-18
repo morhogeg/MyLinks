@@ -154,6 +154,7 @@ Requirements for the analysis:
    - **SCANNABILITY**: Use **bolding** (double asterisks) for the key terms, names, dates, and numbers in the bullets — the same way the short summary does — so the reader can scan the write-up.
    - Keep the tone neutral and professional throughout.
    - Total length: 120-220 words. It must go DEEPER than the summary and stand on its own as a complete account. Avoid word-for-word repetition of the summary, but NEVER omit a key fact just because the summary already mentioned it — completeness beats non-overlap.
+   - **RECIPES / STEP-BY-STEP CONTENT — CAPTURE THE METHOD**: If the content is a recipe or a step-by-step tutorial, the detailed summary MUST also include an "## Ingredients" section (recipes — every ingredient with its quantity) and a "## Steps" section listing EVERY step in order as a numbered list (translate these headings into the content's language). These sections are the card's lasting value — the user will later ask to be walked through them — so the 120-220 word cap does NOT apply to them: completeness wins. Never compress or omit steps.
 
 5. sourceName: Extract the name of the source or publisher (e.g., CNN, The New York Times, X, Reddit, Wikipedia, YouTube, TikTok).
    - For images or screenshots that don't reveal a source, use "Screenshot".
@@ -249,6 +250,12 @@ def _rag_source_label(c: dict) -> str:
         return ""
 
 
+# How much of a card's long-form detailedSummary rides into the RAG context.
+# Generous enough to carry complete key points / a recipe's method, capped so a
+# full retrieval set (~15 cards) can't blow the prompt budget.
+_RAG_DETAIL_CHARS = 2000
+
+
 def _rag_card_block(c: dict) -> str:
     src = _rag_source_label(c)
     meta = [f"source: {src}"] if src else []
@@ -258,6 +265,33 @@ def _rag_card_block(c: dict) -> str:
         f"[{c.get('id')}] {c.get('title', 'Untitled')} "
         f"({'; '.join(meta)})\n{c.get('summary', '')}"
     )
+    # The stored long-form analysis — key points, conclusions, a recipe's or
+    # how-to's method. This is what licenses depth asks ("walk me through the
+    # steps", "give me more detail"): without it the model only ever sees the
+    # 2-4 sentence summary and can answer a depth question with nothing but
+    # another summary.
+    detail = (c.get("detailedSummary") or "").strip()
+    if detail:
+        if len(detail) > _RAG_DETAIL_CHARS:
+            detail = detail[:_RAG_DETAIL_CHARS].rstrip() + " …"
+        block += f"\nDetails:\n{detail}"
+    # Structured recipe data (cards that carry it): the literal ingredient list
+    # and the ordered instructions, verbatim.
+    recipe = c.get("recipe")
+    if isinstance(recipe, dict):
+        ingredients = [str(i).strip() for i in (recipe.get("ingredients") or []) if str(i).strip()]
+        if ingredients:
+            block += "\nIngredients: " + "; ".join(ingredients)
+        steps = [str(s).strip() for s in (recipe.get("instructions") or []) if str(s).strip()]
+        if steps:
+            block += "\nSteps:\n" + "\n".join(f"{n}. {s}" for n, s in enumerate(steps, 1))
+    # Timestamped video highlights — what licenses "give me the highlights".
+    highlights = [str(h).strip() for h in (c.get("videoHighlights") or []) if str(h).strip()]
+    if highlights:
+        block += "\nVideo highlights:\n" + "\n".join(f"- {h}" for h in highlights)
+    takeaway = (c.get("actionableTakeaway") or "").strip()
+    if takeaway:
+        block += f"\nTakeaway: {takeaway}"
     # The user's OWN notes on the card — their words, distinct from the machine
     # summary. Surfaced to the model so it can answer "what did I think about…".
     # Merges the legacy string + the multi-note array via the shared reader.
@@ -292,7 +326,9 @@ def _build_rag_prompt(question: str, cards: list, history: list = None) -> str:
 Rules:
 - Ground every claim in the provided sources. Do NOT use outside knowledge or invent facts.
 - If the sources don't contain the answer, say so plainly and suggest what they could save.
-- Be concise and direct (2-5 sentences, or a short list when that's clearer).
+- Match the answer's depth and shape to the ask. Default to concise and direct (2-5 sentences, or a short list when that's clearer).
+- DEPTH REQUESTS override the concise default: when the user asks for steps, instructions, a walkthrough, a how-to, or a recipe's method, give EVERY step the sources contain as a complete numbered list, in order — NEVER compress steps into a summary. When they ask for ingredients or another list, reproduce the complete list. When they ask for more detail, draw on the sources' "Details" sections to genuinely go deeper — do not restate the short summary in different words.
+- If the sources hold only part of what was asked (e.g. a dish's ingredients but not its full method), give exactly what IS there, then say plainly what the saved card doesn't include. Never pad the gap with a repeated summary or invented content.
 - Don't announce a count of items (e.g. "three sources") — just give the list. If you do state a number, it MUST exactly match the number of items you list.
 - CRITICAL — match the user's language: write your ENTIRE answer in the same language as the User question, NOT the language of the sources. If the question is in English, answer in English even when every source is in Hebrew; if the question is in Hebrew, answer in Hebrew. The sources' language must not influence your answer's language.
 - Only cite sources you actually used.
