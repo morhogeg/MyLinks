@@ -29,6 +29,9 @@ interface SwipeDeckProps {
      *  the user set a reminder, false if they cancelled/dismissed. `seq` bumps on
      *  every resolution so the same outcome twice still fires. */
     remindSignal?: { id: string; saved: boolean; seq: number } | null;
+    /** Leave review and return to the previous card layout. Review is a focused
+     *  mode (the bottom tab bar hides while it's open), so it owns its own exit. */
+    onExit?: () => void;
 }
 
 const THRESHOLD = 110; // px past which a drag commits to a swipe
@@ -53,6 +56,7 @@ export default function SwipeDeck({
     onResetStatus,
     onCancelRemind,
     remindSignal,
+    onExit,
 }: SwipeDeckProps) {
     // Ordered card ids for the current session window. Snapshotted so acting on a
     // card never reshuffles the stack mid-session (F-32 keeps order stable).
@@ -360,13 +364,20 @@ export default function SwipeDeck({
                             <RotateCcw className="w-4 h-4" /> Undo last
                         </button>
                     )}
-                    {moreAvailable && (
+                    {moreAvailable ? (
                         <button
                             onClick={deal}
                             className="inline-flex items-center gap-2 h-10 px-5 rounded-full text-white transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold"
                             style={{ backgroundImage: 'var(--accent-gradient)' }}
                         >
                             Review {Math.min(REVIEW_SESSION_SIZE, poolCount)} more
+                        </button>
+                    ) : onExit && (
+                        <button
+                            onClick={onExit}
+                            className="inline-flex items-center gap-2 h-10 px-5 rounded-full bg-accent text-white transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold"
+                        >
+                            Done
                         </button>
                     )}
                 </div>
@@ -376,8 +387,18 @@ export default function SwipeDeck({
 
     return (
         <div ref={rootRef} className="flex flex-col items-center gap-3 select-none" style={{ height: maxH ? maxH : undefined }}>
-            <div className="text-xs font-semibold text-text-muted tabular-nums shrink-0">
-                {passed + 1} of {passed + remaining} · {remaining} left
+            <div className="w-full max-w-[440px] flex items-center justify-center shrink-0 relative">
+                <span className="text-xs font-semibold text-text-muted tabular-nums">
+                    {passed + 1} of {passed + remaining} · {remaining} left
+                </span>
+                {onExit && (
+                    <button
+                        onClick={onExit}
+                        className="absolute end-0 text-[13px] font-semibold text-accent hover:opacity-80 transition-opacity cursor-pointer"
+                    >
+                        Done
+                    </button>
+                )}
             </div>
 
             {/* Card stack — flexes to fill the space above the buttons */}

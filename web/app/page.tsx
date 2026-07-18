@@ -124,7 +124,7 @@ export default function Home() {
            The bar stays sticky and keeps its height, so content never
            reflows; it just glides under. */
         ref={headerRef}
-        className="sticky top-0 z-50 bg-background/70 backdrop-blur-xl border-b border-border-subtle h-[60px] sm:h-[68px] flex items-center"
+        className="sticky top-0 z-50 bg-background/70 backdrop-blur-xl border-b border-border-subtle h-[52px] sm:h-[68px] flex items-center"
         style={{ paddingTop: 'env(safe-area-inset-top)', boxSizing: 'content-box' }}
       >
         {/* hairline accent glow under the bar */}
@@ -140,7 +140,9 @@ export default function Home() {
               <h1 className="text-lg sm:text-xl font-extrabold tracking-tight bg-[image:var(--accent-gradient)] bg-clip-text text-transparent">
                 Machina AI
               </h1>
-              <p className="mt-1 text-[10px] sm:text-[11px] font-medium text-text-muted tracking-wide">
+              {/* Tagline is decorative — desktop keeps it, mobile drops it so the
+                  most-used screen's header is one clean line. */}
+              <p className="hidden sm:block mt-1 text-[10px] sm:text-[11px] font-medium text-text-muted tracking-wide">
                 Capture. Connect. Recall.
               </p>
             </div>
