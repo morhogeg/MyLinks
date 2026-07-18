@@ -810,6 +810,13 @@ exact-match, capped.
   text-text-muted` (muted grey, normal weight) so the source recedes
   consistently across views. Screenshot/Note keep their accent color (distinct
   capture types). Shipped: Vercel + TestFlight run #121 = build **1121**.
+- **2026-07-18 — CARD: Screenshot/Note bylines to the same airy grey (owner;
+  commit `4d8e490`, merge `20d43ca`).** Follow-up to the byline unify — the
+  Screenshot and Note source labels still used accent purple
+  (`text-xs font-semibold text-accent`); now `text-xs text-text-muted` like
+  every other source byline (all 7 source-byline variants now identical grey).
+  Kept their type icon (image / sticky-note) as a subtle grey mark. Shipped:
+  Vercel + TestFlight run #122 = build **1122**.
 - **2026-07-17 — ABUSE HARDENING: embed-trigger cost backstop + live
   `shared_*` write lockdown (branch `claude/gemini-pricing-analysis-ab575e`).**
   Cost research first (owner asked pre-launch): per-card analysis ≈ $0.002
