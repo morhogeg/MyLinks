@@ -777,6 +777,19 @@ exact-match, capped.
   useful now the bar scrolls away (Home tab unreachable then). Positioned
   bottom-20 right-4, subtle translucent chip. Shipped: Vercel + TestFlight run
   #118 = build **1118**.
+- **2026-07-18 — CARDS: modernized light-mode elevation (owner: shadows felt
+  heavy/floaty; commit `437398e`, merge `ae93442`).** The light card stacked
+  three elevation cues (CSS border + `0 0 0 1px` shadow-ring + a wide
+  `0 6px 16px -2px` 12% ambient) that pooled a halo in the outer corners.
+  Refined `--shadow-card`/`-hover` (LIGHT only — dark's lit-edge treatment
+  untouched) to a crisp 0.5px hairline + ONE tight soft shadow with big
+  negative spread (`0 8px 20px -12px`) so the blur hugs the card, not the
+  corners. Corner radius bumped `rounded-2xl`(16)→`rounded-[20px]` on
+  feed/collection/digest cards, list rows `rounded-xl`(12)→`rounded-2xl`(16).
+  Chose "B" (grounded soft shadow) over flat "C" — floating cards on a gray
+  feed need a whisper of shadow to sit ON the surface (Apple News/App Store
+  pattern); flat is for edge-to-edge grouped lists. Verified light + dark in
+  emulator. Shipped: Vercel + TestFlight run #119 = build **1119**.
 - **2026-07-17 — ABUSE HARDENING: embed-trigger cost backstop + live
   `shared_*` write lockdown (branch `claude/gemini-pricing-analysis-ab575e`).**
   Cost research first (owner asked pre-launch): per-card analysis ≈ $0.002
