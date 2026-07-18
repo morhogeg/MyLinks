@@ -2,7 +2,7 @@
 
 import { Home, Layers, Plus, MessagesSquare, Newspaper } from 'lucide-react';
 import { useHeaderFade } from '@/lib/useHeaderFade';
-import { hapticSelection, hapticLight } from '@/lib/haptics';
+import { hapticLight, hapticMedium } from '@/lib/haptics';
 
 export type BottomTab = 'home' | 'collections' | 'ask' | 'digest';
 
@@ -38,7 +38,10 @@ export default function BottomTabBar({
             ref={barRef}
             aria-label="Main"
             className="sm:hidden fixed inset-x-0 bottom-0 z-40 bg-background/85 backdrop-blur-xl border-t border-border-subtle"
-            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+            // Sit the icons close to the home indicator instead of reserving the
+            // FULL inset below them (which left a big dead band). Keep just enough
+            // clearance so the labels clear the indicator; floor for non-notch.
+            style={{ paddingBottom: 'max(calc(env(safe-area-inset-bottom) - 18px), 4px)' }}
         >
             {/* hairline accent glow above the bar — the header's, mirrored. */}
             <div className="absolute inset-x-0 top-0 h-px bg-[image:var(--accent-gradient)] opacity-30" />
@@ -48,7 +51,7 @@ export default function BottomTabBar({
                 <button
                     data-tour="add"
                     aria-label="Add to Machina"
-                    onClick={() => { hapticLight(); onCapture(); }}
+                    onClick={() => { hapticMedium(); onCapture(); }}
                     className="relative -top-[11px] w-[46px] h-[46px] shrink-0 rounded-full bg-[image:var(--accent-gradient)] text-white flex items-center justify-center shadow-lg shadow-accent/30 ring-4 ring-background active:scale-95 transition-transform"
                 >
                     <Plus className="w-[21px] h-[21px]" strokeWidth={2.4} />
@@ -69,7 +72,7 @@ function TabButton({
     return (
         <button
             data-tour={tab.tour}
-            onClick={() => { if (!active) hapticSelection(); onSelect(tab.key); }}
+            onClick={() => { if (!active) hapticLight(); onSelect(tab.key); }}
             aria-label={tab.label}
             aria-current={active ? 'page' : undefined}
             className={`flex flex-col items-center justify-center gap-[2px] h-full min-w-[58px] transition-colors ${active ? 'text-accent' : 'text-[color:var(--tabbar-inactive)] active:text-text'}`}

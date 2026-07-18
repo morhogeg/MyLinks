@@ -152,7 +152,12 @@ export default function SwipeDeck({
             if (!rootRef.current) return;
             const top = rootRef.current.getBoundingClientRect().top;
             const vh = window.visualViewport?.height ?? window.innerHeight;
-            setMaxH(Math.min(Math.max(320, vh - top - 12), 640));
+            // Fill the space from the deck's top to the bottom of the viewport
+            // (a small gap only). The old 640 cap left a big dead band on tall
+            // phones now that Review hides the tab bar; 900 keeps desktop sane
+            // while letting phones fill. Bottom clearance for the home indicator
+            // is a paddingBottom on the root, so it isn't double-counted here.
+            setMaxH(Math.min(Math.max(320, vh - top - 8), 900));
         };
         update();
         window.addEventListener('resize', update);
@@ -386,7 +391,7 @@ export default function SwipeDeck({
     }
 
     return (
-        <div ref={rootRef} className="flex flex-col items-center gap-3 select-none" style={{ height: maxH ? maxH : undefined }}>
+        <div ref={rootRef} className="flex flex-col items-center gap-3 select-none" style={{ height: maxH ? maxH : undefined, paddingBottom: 'env(safe-area-inset-bottom)' }}>
             <div className="w-full max-w-[440px] flex items-center justify-center shrink-0 relative">
                 <span className="text-xs font-semibold text-text-muted tabular-nums">
                     {passed + 1} of {passed + remaining} · {remaining} left
