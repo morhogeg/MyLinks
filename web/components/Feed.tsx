@@ -189,6 +189,35 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         return fallback;
     }, [activeLinkId, visibleLinks, fetchedCards, libraryLinks, vaultLocked, isEffectivelyPrivateCard]);
 
+    // A cited/related card can reference a doc OUTSIDE the loaded feed window —
+    // Ask retrieval spans the whole library — or one that no longer exists.
+    // When activeLinkId can't resolve locally, fetch the doc once and open it;
+    // if it's gone (deleted) or stays blocked (vault-locked private), CLEAR the
+    // id. Leaving it dangling rendered no modal while anyOverlayOpen stayed
+    // true — scroll locked and the back gesture dead until a reload.
+    useEffect(() => {
+        if (!activeLinkId || activeLink || !uid) return;
+        if (fetchedCards[activeLinkId]) {
+            // Already fetched but still unresolvable → vault gate — don't dangle.
+            setActiveLinkId(null);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const snap = await getDoc(doc(db, 'users', uid, 'links', activeLinkId));
+                if (cancelled) return;
+                if (!snap.exists()) { setActiveLinkId(null); return; }
+                const card = toLink(snap as QueryDocumentSnapshot<DocumentData>);
+                setFetchedCards(prev => ({ ...prev, [activeLinkId]: card }));
+            } catch (e) {
+                reportError(e, 'feed-cited-card-fetch');
+                if (!cancelled) setActiveLinkId(null);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [activeLinkId, activeLink, uid, fetchedCards]);
+
     // Open a card reached from another card's "Related" list — remember where we
     // came from so the back-stack can return there.
     const openRelatedLink = (link: Link) => {

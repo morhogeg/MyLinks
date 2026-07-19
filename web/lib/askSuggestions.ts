@@ -31,10 +31,10 @@ export type AskSuggestionKind =
 // explicit; the backend sanitizes and honors them, and free-typed questions
 // simply don't carry any.
 
-/** A full stored title, trimmed to the backend's hint cap. */
+/** A full stored title, trimmed to the backend's hint cap (code-point safe). */
 function hintTitle(raw: string | undefined): string | null {
     const t = raw?.trim().replace(/\s+/g, ' ');
-    return t && t.toLowerCase() !== 'untitled' ? t.slice(0, 120) : null;
+    return t && t.toLowerCase() !== 'untitled' ? [...t].slice(0, 120).join('') : null;
 }
 
 export interface AskSuggestion {
@@ -63,11 +63,17 @@ function readyLinks(links: Link[]): Link[] {
     return links.filter(l => l.status !== 'processing' && l.status !== 'failed');
 }
 
-/** A title short enough to sit inside a chip; null if unusable. */
-function chipTitle(raw: string | undefined, max = 46): string | null {
-    const t = raw?.trim().replace(/\s+/g, ' ');
+/** A title short enough to sit inside a chip; null if unusable.
+ *  - Inner double quotes become apostrophes: chips QUOTE the title, and a
+ *    title's own quotes broke quote-span parsing everywhere downstream
+ *    (family dedup, intent grouping, backend anchor extraction).
+ *  - Truncation is code-POINT safe (Array.from), so a cut can't split an
+ *    emoji surrogate pair into a lone "�". */
+export function chipTitle(raw: string | undefined, max = 46): string | null {
+    const t = raw?.trim().replace(/\s+/g, ' ').replace(/["“”«»]/g, '’');
     if (!t || t.toLowerCase() === 'untitled') return null;
-    return t.length > max ? `${t.slice(0, max).trimEnd()}…` : t;
+    const chars = [...t];
+    return chars.length > max ? `${chars.slice(0, max).join('').trimEnd()}…` : t;
 }
 
 /** The newest ready card with a usable title, or null. */
@@ -193,9 +199,11 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
         });
     });
 
-    // Rediscovery: the dustiest card that was never opened.
+    // Rediscovery: the dustiest card that was never opened — but never the
+    // same card as the latest-save chip (a tiny/stale library can make the
+    // newest card also the dustiest, yielding two chips about one card).
     const dusty = ready
-        .filter(l => !l.isRead && !l.lastViewedAt && chipTitle(l.title) && now - toMs(l.createdAt) > WEEK_MS)
+        .filter(l => l.id !== latest?.id && !l.isRead && !l.lastViewedAt && chipTitle(l.title) && now - toMs(l.createdAt) > WEEK_MS)
         .sort((a, b) => toMs(a.createdAt) - toMs(b.createdAt))[0];
     if (dusty) {
         const t = iso(chipTitle(dusty.title)!);
@@ -207,13 +215,17 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
         });
     }
 
-    // Generic fallback so there are always chips, even in a tiny library.
-    pool.push({
-        text: 'Recap my recent saves',
-        kind: 'recap',
-        key: 'recap',
-        hints: { recency: true },
-    });
+    // Generic fallback so there are always chips, even in a tiny library —
+    // but never NEXT TO the week chip: both are the same recency ask, and a
+    // salt rotation could seat them side by side.
+    if (weekCount < 3) {
+        pool.push({
+            text: 'Recap my recent saves',
+            kind: 'recap',
+            key: 'recap',
+            hints: { recency: true },
+        });
+    }
 
     return [...latestChips, ...rotate(pool, salt).slice(0, 4 - latestChips.length)];
 }
@@ -549,16 +561,21 @@ export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
     if (withTitle.length === 0) return [];
 
     const angle = dominantAngle(citedCards);
-    // ANCHOR RULE: every angle chip must be anchored to a card OF that angle —
-    // never blindly to the first citation. When a news card and a recipe card
-    // are cited together the dominant angle can be `recipe` while citation[0]
-    // is the news card, and "Walk me through the steps in <news article>" is a
-    // broken chip. Evidence is gathered from the same anchor set, so a chip is
-    // only licensed by the card it will actually ask about.
+    // ANCHOR RULE: every angle chip must be anchored to THE ONE card that
+    // carries its evidence — never blindly to the first citation, and never
+    // licensed by evidence pooled across cards (two recipe cards where only
+    // the SECOND has stored steps must not produce "walk me through the steps
+    // in <first>"). Pick the angle-matching card with the strongest stored
+    // evidence, then gather evidence from that single card only, so a chip is
+    // licensed exactly by the card it will ask about.
     const anchorCards = withTitle.filter(c => classifyCard(c) === angle);
-    const anchors = anchorCards.length > 0 ? anchorCards : withTitle;
-    const t = chipTitle(anchors[0].title, 60)!;
-    const ev = gatherEvidence(anchors);
+    const anchorPool = anchorCards.length > 0 ? anchorCards : withTitle;
+    const hasOwnEvidence = (c: ClassifiableCard) =>
+        !!c.recipe?.instructions?.length || !!c.recipe?.ingredients?.length ||
+        (c.detailedSummary?.trim().length ?? 0) >= 200;
+    const anchorCard = anchorPool.find(hasOwnEvidence) ?? anchorPool[0];
+    const t = chipTitle(anchorCard.title, 60)!;
+    const ev = gatherEvidence([anchorCard]);
 
     const related = findRelatedConcept(citedCards, allLinks);
 
@@ -579,8 +596,8 @@ export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
             { label: "What's the common thread?", question: `What's the common thread between "${ta}" and "${tb}"?`, hints: pairHints },
         );
     }
-    const anchorHints: AskHints | undefined = hintTitle(anchors[0].title)
-        ? { anchorTitles: [hintTitle(anchors[0].title)!] }
+    const anchorHints: AskHints | undefined = hintTitle(anchorCard.title)
+        ? { anchorTitles: [hintTitle(anchorCard.title)!] }
         : undefined;
     candidates.push(...angleChips(angle, ev, t).map(c => ({ ...c, hints: anchorHints })));
     // Depth is a guaranteed win only on the card that ACTUALLY carries the
@@ -603,10 +620,13 @@ export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
             question: `What else did I save on ${related}?`,
             hints: {
                 concept: related,
+                // Up to 8 (matches the backend hint cap) — capping at fewer
+                // than the citations lets a just-discussed card slip back in
+                // on exactly the multi-citation answers this chip appears on.
                 excludeTitles: withTitle
                     .map(c => hintTitle(c.title))
                     .filter((x): x is string => !!x)
-                    .slice(0, 4),
+                    .slice(0, 8),
             },
         });
     }

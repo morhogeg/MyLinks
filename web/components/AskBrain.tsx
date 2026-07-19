@@ -5,7 +5,7 @@ import { ArrowUp, FileText, Plus, MessagesSquare, Copy, Check, TriangleAlert, Sp
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import { getDirection, getDominantDirection } from '@/lib/rtl';
+import { getDominantDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS, xHandle, linkedinDisplayName } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
@@ -14,7 +14,7 @@ import { trackFirstAsk, trackAskNoCitations, trackAskSuggestionUsed, trackAskFol
 import { reportError } from '@/lib/errorReporter';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { ChatMessage, ChatSource, ChatSession, Link } from '@/lib/types';
-import { buildAskSuggestions, buildFollowUps, newestReadyLink, iso, AskHints, ClassifiableCard } from '@/lib/askSuggestions';
+import { buildAskSuggestions, buildFollowUps, newestReadyLink, iso, chipTitle, AskHints, ClassifiableCard } from '@/lib/askSuggestions';
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
 import { hapticLight } from '@/lib/haptics';
 import ConfirmDialog from './ConfirmDialog';
@@ -59,25 +59,33 @@ function sourceTag(s: ChatSource): { label: string; platform: ReturnType<typeof 
  *  line-leading bullet glyphs become "- ", inline " • " separators break into
  *  new items, and "1)" numbering becomes "1.". */
 function normalizeListMarkers(md: string): string {
+    // Quoted spans are protected: a card title like "Artist • Song • Live"
+    // must not be chopped into fake list items by the inline-bullet splitter.
+    // Split alternates [outside, quoted, outside, …]; transform outside only.
     return md
-        .replace(/^([ \t]*)[•◦▪‣·][ \t]+/gm, '$1- ')
-        .replace(/[ \t]+[•◦▪‣][ \t]+/g, '\n- ')
-        .replace(/^([ \t]*)(\d{1,2})\)[ \t]+/gm, '$1$2. ');
+        .split(/(["“”«»][^"“”«»\n]{0,200}["“”«»])/)
+        .map((seg, i) => i % 2 === 1 ? seg : seg
+            .replace(/^([ \t]*)[•◦▪‣·][ \t]+/gm, '$1- ')
+            .replace(/[ \t]+[•◦▪‣][ \t]+/g, '\n- ')
+            .replace(/^([ \t]*)(\d{1,2})\)[ \t]+/gm, '$1$2. '))
+        .join('');
 }
 
 /** Renders an assistant answer as Markdown, styled to match the chat. GFM gives
  *  us tables/strikethrough; remark-breaks turns single newlines into <br> so the
  *  model's line breaks survive (like the old whitespace-pre-wrap).
  *
- *  Direction: every block carries the MESSAGE's dominant direction, computed
- *  once over the whole answer — NOT per-block `dir="auto"`. First-strong
- *  detection flipped any English bullet that OPENED with a quoted Hebrew title
- *  into a fully-RTL line (marker on the right, prose right-aligned, trailing
- *  punctuation scrambled). With a single majority direction the answer reads
- *  as one coherent column; embedded opposite-script runs (a Hebrew title in an
- *  English answer) still render correctly inline via standard bidi. */
-function MarkdownMessage({ content }: { content: string }) {
-    const dir = getDominantDirection(content);
+ *  Direction: every block carries ONE direction for the whole message — NOT
+ *  per-block `dir="auto"` (first-strong detection flipped any English bullet
+ *  that OPENED with a quoted Hebrew title into a fully-RTL line). The caller
+ *  passes the direction of the QUESTION the answer replies to: the prompt
+ *  forces the answer's language to match the question's, so the question is
+ *  the most reliable signal — immune to an answer whose quoted/bolded titles
+ *  are mostly in the opposite script (aggregate title mass flipped
+ *  content-majority counting). Falls back to content counting when no
+ *  question direction is available. */
+function MarkdownMessage({ content, dir: dirProp }: { content: string; dir?: 'rtl' | 'ltr' }) {
+    const dir = dirProp ?? getDominantDirection(content);
     return (
         <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}
@@ -259,6 +267,15 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
         streamAbortRef.current = null;
         streamGenRef.current += 1;
     };
+    const detachStreamRef = useRef(detachStream);
+    detachStreamRef.current = detachStream;
+
+    // Leaving Ask entirely (back chevron / edge swipe) unmounts this component —
+    // mid-stream that must DETACH, not drop: the in-flight answer keeps running
+    // and persists to its chat doc via commitDetached, exactly like switching
+    // chats. Without this, the streamed answer was silently discarded and the
+    // chat reopened as an unanswered question.
+    useEffect(() => () => { detachStreamRef.current(); }, []);
 
     // Living suggested prompts, built from the actual library (newest save,
     // this week's activity, shared concepts, top categories, a dusty card) and
@@ -301,11 +318,15 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
         if (!newest) return;
         const ts = typeof newest.createdAt === 'number' ? newest.createdAt : Date.parse(String(newest.createdAt)) || 0;
         const seen = seenNewestRef.current;
-        if (seen && newest.id !== seen.id && ts > seen.ts) {
+        // Only offer the banner while a conversation is ACTIVE — the empty
+        // state's latest-save chip already covers it there, and a banner set
+        // invisibly on the empty state used to pop up later, mid-conversation,
+        // sometimes offering the very card just asked about.
+        if (seen && newest.id !== seen.id && ts > seen.ts && messages.length > 0) {
             setFreshCard({ id: newest.id, title: newest.title });
         }
         seenNewestRef.current = { id: newest.id, ts };
-    }, [links]);
+    }, [links, messages.length]);
 
     // On phones the Ask view is a full-screen chat pinned to the *visual* viewport
     // so the composer rides the keyboard like a native chat app. On desktop it
@@ -484,6 +505,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
         setMessages([]);
         lastSavedRef.current = '';
         setInput('');
+        setFreshCard(null);         // the banner belongs to the conversation it appeared in
         textareaRef.current?.focus();
     };
 
@@ -498,6 +520,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
         setMessages(chat.messages);
         lastSavedRef.current = JSON.stringify(chat.messages);
         setInput('');
+        setFreshCard(null);         // don't carry a banner into an unrelated chat
         // Open on the last exchange, question-first (consistent with new asks).
         let lastUser = -1;
         for (let i = chat.messages.length - 1; i >= 0; i--) {
@@ -633,6 +656,11 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
         // generation as the chat's answer owner, so a backgrounded completion
         // knows whether it may still write.
         const convo = convoRef.current;
+        // Claim answer ownership of an EXISTING chat synchronously — waiting
+        // for the persist round-trip left a window where a detached older
+        // stream's commit could still pass the ownership check and overwrite
+        // the screen, erasing this just-sent question.
+        if (convo.id) chatOwnerGenRef.current.set(convo.id, gen);
         const chatIdReady: Promise<string | null> = hydratedRef.current
             ? persistConversation(withUser, convo)
             : Promise.resolve(null);
@@ -932,6 +960,17 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
 
     const isEmpty = messages.length === 0;
 
+    /** Direction for the assistant message at index `i`: the direction of the
+     *  QUESTION it answers (the prompt forces answer language = question
+     *  language), so an English answer stacked with Hebrew titles — or the
+     *  reverse — can't flip its whole column. */
+    const answerDirFor = (i: number): 'rtl' | 'ltr' | undefined => {
+        for (let j = i - 1; j >= 0; j--) {
+            if (messages[j].role === 'user') return getDominantDirection(messages[j].content);
+        }
+        return undefined;
+    };
+
     // The chat column (top bar on mobile + conversation + composer) is shared by
     // both layouts; the desktop layout wraps it next to the history sidebar.
     const chatColumn = (
@@ -989,7 +1028,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                         </div>
                         <h2 className="text-xl font-semibold text-text mb-1.5">What do you want to recall?</h2>
                         <p className="text-text-muted text-sm max-w-xs mb-6 leading-relaxed">
-                            Answers come only from your {totalLinks} {totalLinks === 1 ? 'save' : 'saves'} — with sources you can open.
+                            {/* totalLinks is the loaded feed WINDOW (caps at 150) — beyond
+                                it the number understates the real library, so go count-free
+                                rather than state a wrong figure. */}
+                            {totalLinks >= 150
+                                ? <>Answers come only from what you&apos;ve saved — with sources you can open.</>
+                                : <>Answers come only from your {totalLinks} {totalLinks === 1 ? 'save' : 'saves'} — with sources you can open.</>}
                         </p>
                         <div className="flex flex-wrap items-center justify-center gap-2 max-w-xl">
                             {suggestions.map(s => (
@@ -1034,7 +1078,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                         // single-language, and chip-built questions isolate
                                         // their embedded titles (see askSuggestions' iso()).
                                         dir={m.role === 'assistant' && !m.error
-                                            ? getDominantDirection(m.content)
+                                            ? (answerDirFor(i) ?? getDominantDirection(m.content))
                                             : 'auto'}
                                         className={
                                             m.role === 'user'
@@ -1049,7 +1093,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                     >
                                         {/* User and error bubbles stay plain text; assistant answers render Markdown. */}
                                         {m.role === 'assistant' && !m.error
-                                            ? <MarkdownMessage content={m.content} />
+                                            ? <MarkdownMessage content={m.content} dir={answerDirFor(i)} />
                                             : m.content}
                                     </div>
 
@@ -1173,7 +1217,9 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                             dir="auto"
                             onClick={() => {
                                 trackAskSuggestionUsed('fresh');
-                                send(`What's the gist of "${iso(freshCard.title)}"?`, undefined, 'card',
+                                // Cap the embedded title like every other chip — a
+                                // 300-char YouTube title must not become the bubble.
+                                send(`What's the gist of "${iso(chipTitle(freshCard.title, 60) ?? freshCard.title)}"?`, undefined, 'card',
                                     { anchorTitles: [freshCard.title.trim().slice(0, 120)] });
                                 setFreshCard(null);
                             }}
@@ -1204,7 +1250,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                         rows={1}
                         placeholder={uid ? 'Ask about anything you’ve saved…' : 'Loading your library…'}
                         disabled={!uid}
-                        dir={getDirection(input)}
+                        // Majority direction, not any-Hebrew-flips-RTL: typing an
+                        // English question that quotes one Hebrew title must not
+                        // flip the whole composer mid-keystroke.
+                        dir={getDominantDirection(input)}
                         className="flex-1 resize-none bg-transparent px-2 py-1.5 text-[15px] text-text placeholder:text-text-muted focus:outline-none max-h-32 disabled:opacity-60"
                     />
                     {busy ? (

@@ -726,6 +726,43 @@ exact-match, capped.
   (20 new), `tsc` clean. NOTE: the category+createdAt composite index
   deploys with firestore:indexes on the next functions deploy; until it
   finishes building, `category_cards` silently uses its unordered fallback.
+  **Round 4 — FULL ADVERSARIAL SWEEP (owner-requested; 2 independent review
+  agents + self-audit; 21 verified fixes).** Highest-impact: (1) PRIVACY —
+  Ask retrieval had NO isPrivate filtering server-side; an effectively-
+  private card (own flag OR private-collection member) could be quoted and
+  cited in chat without the PIN. `strip_private_cards` +
+  `private_collection_ids` now run after all retrieval merges (belt-and-
+  braces card-flag filter on error). (2) Unresolvable citation soft-lock —
+  tapping a cited card outside the loaded feed window (or deleted) set
+  `activeLinkId` with no modal and no clear: scroll locked + back gesture
+  dead until reload. Feed now fetches the doc on demand (opens it!) or
+  clears the id. (3) Leaving Ask mid-stream discarded the streamed answer
+  (question stranded unanswered in history) — unmount now DETACHES so the
+  answer persists to its chat doc; plus the detached-commit race that could
+  erase a just-sent question (ownership now claimed synchronously).
+  (4) Lexical retrieval was ASCII-only — Hebrew questions/titles produced
+  ZERO tokens (keyword fallback, rerank boost, anchor rescue all dead for
+  Hebrew); unicode tokenizer + Hebrew stopwords. (5) Off-library questions:
+  ask now applies the search bar's vector-distance gate — no more junk
+  "sources" + citation pressure. (6) Retrieval outage now returns a
+  refunded 503 instead of the "your library is empty" lie. Also: prompt
+  field caps per card (1 MB doc can't blow up cost), empty-stream →
+  model fallback (was: blank bubble marked done), truncated [[CITED:
+  marker still yields ids, bare "what else about X" no longer EXCLUDES X
+  (explicit prepositions only), intent regexes ignore quoted titles,
+  answer direction now follows the QUESTION's language (immune to Hebrew-
+  title mass), composer uses majority direction, quoted titles protected
+  from the •-list splitter, chip titles strip inner quotes + surrogate-safe
+  truncation, angle chips licensed by the ONE anchor card's own evidence,
+  what-else exclusions cap 4→8, home-chip dedup (week/recap, latest/dusty),
+  fresh-card banner gated to active conversations, count-free copy at the
+  150-card window cap, keyword scan skips processing/failed, _title_match
+  min-length both sides, "aside from"/"last month" regex gaps. 320 backend
+  tests pass, `tsc` clean. DEFERRED (documented, perf-only): keyword-scan
+  read amplification (streams full docs incl. embedding vectors — a
+  Firestore `select()` projection is the fix), category fallback staleness
+  >120 cards while the composite index builds, legacy cards missing
+  `createdAt` invisible to order_by-based retrieval paths.
 
 - **2026-07-18 — MOBILE v4 CHROME: bottom tab bar + one-line header +
   dedicated Sources (owner-approved via 4 mockup rounds; commit `4028979`,

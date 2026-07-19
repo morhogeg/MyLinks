@@ -360,7 +360,7 @@ def _build_rag_prompt(question: str, cards: list, history: list = None,
             "\n\nAlready discussed with the user (do NOT present these as new "
             "findings — for \"what else\"-style questions answer ONLY with "
             "OTHER sources, and if none remain, say so plainly):\n"
-            + "\n".join(f"- {t}" for t in titles[:6])
+            + "\n".join(f"- {t}" for t in titles[:8])
         )
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")

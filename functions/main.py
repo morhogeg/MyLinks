@@ -334,10 +334,13 @@ ASK_DETAIL_MAX_CHARS = 3500
 # context signal-dense; demoted (excluded) cards sit at the back, so they are
 # the first to fall off.
 ASK_CONTEXT_CARDS = 20
-# Caps for the structured chip hints (see _sanitize_hints).
+# Caps for the structured chip hints (see _sanitize_hints). Titles cap at 8:
+# a "what else" chip excludes EVERY cited card of the answer it follows, and
+# multi-card recap answers routinely cite 5-6 — capping below that let a
+# just-discussed card slip back in.
 MAX_HINT_TEXT_LENGTH = 60
 MAX_HINT_TITLE_LENGTH = 120
-MAX_HINT_TITLES = 4
+MAX_HINT_TITLES = 8
 
 
 def _sanitize_history(history) -> list:
