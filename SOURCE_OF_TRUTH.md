@@ -763,6 +763,18 @@ exact-match, capped.
   Firestore `select()` projection is the fix), category fallback staleness
   >120 cards while the composite index builds, legacy cards missing
   `createdAt` invisible to order_by-based retrieval paths.
+  **Round 5 — LABEL-CONGRUENCE RULE (owner repro: 5-card recap offered
+  "Explain it more simply", which answered about ONE card).** A pronoun
+  label after a multi-card answer promises the whole answer while the sent
+  question names one card. Rule: pronoun-labeled angle chips are offered
+  ONLY when exactly one card was cited; multi-card rows carry exclusively
+  self-describing labels — the related-pair compare ("Compare the <shared>
+  saves" / "Compare two related saves"), ONE named drill-in (`More on
+  "<title>"`, anchored to a card with stored depth), and the named concept
+  jump. Drilling in narrows the thread to one card, where the full angle
+  chips return. Intent dedup became PER-ANCHOR (`chipIntentKey` =
+  intent:quoted-title, isolate-stripped) so detail-on-A no longer consumes
+  detail-on-B. 320 tests, `tsc` clean.
 
 - **2026-07-18 — MOBILE v4 CHROME: bottom tab bar + one-line header +
   dedicated Sources (owner-approved via 4 mockup rounds; commit `4028979`,

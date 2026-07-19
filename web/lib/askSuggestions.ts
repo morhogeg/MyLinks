@@ -420,7 +420,13 @@ function findRelatedPair(cards: ClassifiableCard[]):
             for (const [key, label] of bags[i]) {
                 if (!bags[j].has(key)) continue;
                 count += 1;
-                if (!shared || label.length < shared.length) shared = label;
+                // Prefer a display-cased label (concepts are Title Case, tags
+                // are lowercase — "Compare the messi saves" read as sloppy);
+                // among equals, shorter wins for chip compactness.
+                const better = !shared
+                    || (/^\p{Lu}/u.test(label) && !/^\p{Lu}/u.test(shared))
+                    || (/^\p{Lu}/u.test(label) === /^\p{Lu}/u.test(shared) && label.length < shared.length);
+                if (better) shared = label;
             }
             if (count > bestCount && shared) {
                 best = { a: cards[i], b: cards[j], shared };
@@ -484,7 +490,7 @@ function angleChips(angle: ContentAngle, ev: Evidence, t: string): FollowUpChip[
 
 // Chips (by label) that deepen/branch the thread (vs. restart it) — floated to
 // the front once the conversation has a couple of exchanges behind it.
-const DEEPENING_RE = /common thread|compare|what else|why does this matter|more detail/i;
+const DEEPENING_RE = /common thread|compare|what else|why does this matter|more detail|more on/i;
 
 // NO-REPEAT RULE: a chip the user has used must never be offered again in the
 // same conversation — even when the regenerated question isn't byte-identical.
@@ -536,6 +542,21 @@ function chipIntent(text: string): string {
     return f;
 }
 
+// PER-ANCHOR INTENT: an intent is consumed PER CARD, not globally — asking
+// for detail on card A must not block ever offering detail on card B in the
+// same conversation. The dedup key is therefore `intent:anchoredTitle` when
+// the question quotes a title, and the bare intent otherwise (library-wide
+// asks like "what else did I save on X?" stay globally consumed). Bidi
+// isolate characters are stripped so a chip-built question (isolated titles)
+// and a hand-typed one (bare titles) produce the same key.
+function chipIntentKey(text: string): string {
+    const intent = chipIntent(text);
+    const m = (text || '').match(/["“”«»]([^"“”«»]{2,})["“”«»]/);
+    if (!m) return intent;
+    const anchor = m[1].replace(/[\u2066-\u2069\u200E\u200F]/g, '').trim().toLowerCase();
+    return anchor ? `${intent}:${anchor}` : intent;
+}
+
 /**
  * Up to 3 content-aware follow-up chips derived from what the answer actually
  * discussed. Every chip is (a) gated on evidence the cited cards verifiably
@@ -579,6 +600,18 @@ export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
 
     const related = findRelatedConcept(citedCards, allLinks);
 
+    // LABEL-CONGRUENCE RULE (owner, 2026-07-19): a chip's label must NAME what
+    // it operates on unless the referent is unambiguous. After a multi-card
+    // answer, a pronoun label ("Explain it more simply", "Give me the key
+    // points") reads as "…the whole answer" while the sent question secretly
+    // names ONE card — observed: a 5-card recap's "Explain it more simply"
+    // answering about a single Messi card. So pronoun-labeled angle chips are
+    // offered ONLY when exactly one card was cited; multi-card rows carry
+    // exclusively self-describing labels: the related-pair compare, ONE named
+    // "More on <title>" drill-in, and the named concept jump. Drilling in
+    // narrows the next answer to one card, where the full angle chips return.
+    const multiCard = new Set(withTitle.map(c => c.id)).size >= 2;
+
     const candidates: FollowUpChip[] = [];
     // Compare/synthesize ONLY a provably related pair (shared concept/tag).
     // A recap answer cites many unrelated cards; comparing two arbitrary ones
@@ -590,25 +623,39 @@ export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
         const pairHints: AskHints = {
             anchorTitles: [hintTitle(pair.a.title), hintTitle(pair.b.title)].filter((x): x is string => !!x),
         };
-        const label = pair.shared.length <= 14 ? `Compare the ${pair.shared} saves` : 'Compare these';
+        // Capitalize a lowercase (tag-derived) shared label for the chip copy.
+        const sharedLabel = pair.shared.charAt(0).toUpperCase() + pair.shared.slice(1);
+        const label = pair.shared.length <= 14 ? `Compare the ${sharedLabel} saves` : 'Compare two related saves';
         candidates.push(
             { label, question: `Compare "${ta}" with "${tb}"`, hints: pairHints },
             { label: "What's the common thread?", question: `What's the common thread between "${ta}" and "${tb}"?`, hints: pairHints },
         );
     }
-    const anchorHints: AskHints | undefined = hintTitle(anchorCard.title)
-        ? { anchorTitles: [hintTitle(anchorCard.title)!] }
-        : undefined;
-    candidates.push(...angleChips(angle, ev, t).map(c => ({ ...c, hints: anchorHints })));
-    // Depth is a guaranteed win only on the card that ACTUALLY carries the
-    // stored long-form analysis — anchor the chip to that card, not cite[0].
-    const detailCard = withTitle.find(c => (c.detailedSummary?.trim().length ?? 0) >= 200);
-    if (detailCard) {
-        candidates.push({
-            label: 'Give me more detail',
-            question: `Give me more detail on "${iso(chipTitle(detailCard.title, 60)!)}"`,
-            hints: hintTitle(detailCard.title) ? { anchorTitles: [hintTitle(detailCard.title)!] } : undefined,
-        });
+    if (multiCard) {
+        // One NAMED drill-in, anchored to the card that actually carries
+        // stored depth — the natural next step after a recap.
+        const drill = anchorPool.find(hasOwnEvidence) ?? withTitle.find(hasOwnEvidence);
+        if (drill) {
+            candidates.push({
+                label: `More on "${iso(chipTitle(drill.title, 24)!)}"`,
+                question: `Give me more detail on "${iso(chipTitle(drill.title, 60)!)}"`,
+                hints: hintTitle(drill.title) ? { anchorTitles: [hintTitle(drill.title)!] } : undefined,
+            });
+        }
+    } else {
+        const anchorHints: AskHints | undefined = hintTitle(anchorCard.title)
+            ? { anchorTitles: [hintTitle(anchorCard.title)!] }
+            : undefined;
+        candidates.push(...angleChips(angle, ev, t).map(c => ({ ...c, hints: anchorHints })));
+        // Depth is a guaranteed win when the card carries a stored long-form
+        // analysis.
+        if (ev.hasDetail) {
+            candidates.push({
+                label: 'Give me more detail',
+                question: `Give me more detail on "${iso(t)}"`,
+                hints: anchorHints,
+            });
+        }
     }
     // A concept that PROVABLY recurs on other cards → the knowledge-graph jump.
     // "Else" is a CONTRACT: the already-cited cards are sent as exclusions so
@@ -631,23 +678,24 @@ export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
         });
     }
 
-    // Dedupe by template family (NO-REPEAT RULE) and by intent group (INTENT
-    // RULE) — and drop anything whose family OR intent was already asked this
-    // conversation. Both come from the persisted user messages, so the rules
-    // survive reloads and re-anchoring.
+    // Dedupe by template family (NO-REPEAT RULE) and by PER-ANCHOR intent key
+    // (INTENT RULE, scoped: see chipIntentKey — detail-on-A must not consume
+    // detail-on-B) — and drop anything whose family or intent key was already
+    // asked this conversation. Both come from the persisted user messages, so
+    // the rules survive reloads and re-anchoring.
     const asked = new Set(askedTexts.map(chipFamily));
-    const askedIntents = new Set(askedTexts.map(chipIntent));
+    const askedIntentKeys = new Set(askedTexts.map(chipIntentKey));
     const seen = new Set<string>();
-    const seenIntents = new Set<string>();
+    const seenIntentKeys = new Set<string>();
     const admit = (c: FollowUpChip): boolean => {
         const qf = chipFamily(c.question);
         const lf = chipFamily(c.label);
-        const intent = chipIntent(c.label);
+        const key = chipIntentKey(c.question);
         if (seen.has(qf) || seen.has(lf) || asked.has(qf) || asked.has(lf)) return false;
-        if (seenIntents.has(intent) || askedIntents.has(intent)) return false;
+        if (seenIntentKeys.has(key) || askedIntentKeys.has(key)) return false;
         seen.add(qf);
         seen.add(lf);
-        seenIntents.add(intent);
+        seenIntentKeys.add(key);
         return true;
     };
     let chips = candidates.filter(admit);
