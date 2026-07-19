@@ -232,19 +232,36 @@ def test_missing_title_phrases_reports_unretrieved_hint():
 
 # ── is_exclusion_question / demote_cards_by_titles ─────────────────────────
 
-def test_exclusion_matches_what_else_phrasings():
+def test_exclusion_matches_explicit_prepositions_only():
     for q in (
-        "What else did I save on Resilience?",
         'Anything besides "Alpha Protocol"?',
         'Other than "Alpha Protocol", what covers this?',
         "Show me something apart from that article",
+        'What do I have, excluding "Alpha Protocol"?',
     ):
         assert is_exclusion_question(q) is True, q
 
 
-def test_exclusion_negative_on_plain_questions():
-    for q in ("Key points from my Tech saves", 'What was "Alpha" about?', ""):
+def test_exclusion_negative_on_plain_and_bare_what_else_questions():
+    # Bare "what else … about X" means MORE on X — X is the anchor, not an
+    # exclusion (chips express real exclusions via hints.excludeTitles). A
+    # previous over-broad regex demoted the very card being asked about.
+    for q in (
+        "Key points from my Tech saves",
+        'What was "Alpha" about?',
+        'What else can you tell me about "Alpha Protocol"?',
+        "What else did I save on Resilience?",
+        "",
+    ):
         assert is_exclusion_question(q) is False, q
+
+
+def test_intent_regexes_ignore_quoted_titles():
+    # A card TITLE containing an intent keyword must not steer retrieval:
+    # only the user's own words vote.
+    assert is_recency_question('Key points from "The Latest AI News"') is False
+    assert is_recency_question("What's my latest Tech save about?") is True
+    assert is_exclusion_question('Summarize "Life Besides Work"') is False
 
 
 def test_demote_moves_excluded_cards_to_back():
@@ -262,6 +279,31 @@ def test_demote_no_titles_is_a_no_op():
     cards = [{"id": "a", "title": "T"}]
     out, demoted = demote_cards_by_titles([], cards)
     assert out == cards and demoted == []
+
+
+# ── privacy: effectively-private cards never reach the Ask context ─────────
+
+def test_strip_private_drops_flagged_and_collection_private_cards():
+    from search import strip_private_cards
+    cards = [
+        {"id": "a", "title": "Public"},
+        {"id": "b", "title": "Own flag", "isPrivate": True},
+        {"id": "c", "title": "In private collection", "collectionIds": ["colP", "colX"]},
+        {"id": "d", "title": "In public collection", "collectionIds": ["colX"]},
+    ]
+    out = strip_private_cards(cards, {"colP"})
+    assert [c["id"] for c in out] == ["a", "d"]
+
+
+def test_strip_private_handles_malformed_fields():
+    from search import strip_private_cards
+    cards = [
+        {"id": "a", "collectionIds": "not-a-list"},
+        {"id": "b", "collectionIds": None},
+        None,
+    ]
+    out = strip_private_cards(cards, {"colP"})
+    assert [c["id"] for c in out if c] == ["a", "b"]
 
 
 # ── concepts are lexically searchable (the "what else on X" retrieval hole) ─

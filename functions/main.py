@@ -63,6 +63,7 @@ from search import (
     extract_quoted_phrases, pin_title_phrases, missing_title_phrases,
     anchor_phrases_for, is_exclusion_question, demote_cards_by_titles,
     is_recency_question, recent_cards, category_cards,
+    private_collection_ids, strip_private_cards,
 )
 from rate_limit import check_rate_limit, client_ip
 # Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
@@ -1319,7 +1320,21 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         except Exception as e:
             logger.error(f"ask_brain anchor pinning failed: {e}")
 
-        # 1h. Bound the assembled context (excluded cards sit at the back and
+        # 1h. PRIVACY: strip effectively-private cards (own isPrivate flag or
+        #     membership in a private collection) from the assembled context.
+        #     The client keeps them out of feed/search/facets; Ask answers
+        #     QUOTE card content, so the server must enforce the same promise —
+        #     a private card must never reach the model or the citations.
+        #     Runs after ALL merges so every retrieval source is covered, and
+        #     before the cap so the context refills with public cards.
+        try:
+            cards = strip_private_cards(cards, private_collection_ids(uid))
+        except Exception as e:
+            # Belt-and-braces: never serve un-stripped context on a filter bug.
+            logger.error(f"ask_brain privacy strip failed: {e}")
+            cards = [c for c in cards if not c.get("isPrivate")]
+
+        # 1i. Bound the assembled context (excluded cards sit at the back and
         #     fall off first).
         cards = cards[:ASK_CONTEXT_CARDS]
 

@@ -489,19 +489,23 @@ def anchor_phrases_for(question: str, anchor_titles: List[str] = None,
     return out
 
 
-# "What else…" / "besides X" questions: the quoted/hinted titles are the
-# ALREADY-DISCUSSED cards — the user explicitly wants OTHER sources. Treating
-# them as anchors (or letting retrieval rank them first) re-presents the same
-# card as a "new" find, which is the opposite of the ask.
+# "Besides X" questions: the quoted titles are the ALREADY-KNOWN cards — the
+# user explicitly wants OTHER sources. Treating them as anchors (or letting
+# retrieval rank them first) re-presents the same card as a "new" find, the
+# opposite of the ask. Only EXPLICIT exclusion prepositions qualify: a bare
+# "what else can you tell me about 'X'?" means MORE on X (X is the anchor,
+# not an exclusion) — chips express real exclusions via hints.excludeTitles,
+# never by phrasing.
 _EXCLUSION_RE = re.compile(
-    r"\b(besides|other than|apart from|except|excluding|what else)\b",
+    r"\b(besides|other than|apart from|except|excluding)\b",
     re.IGNORECASE,
 )
 
 
 def is_exclusion_question(question: str) -> bool:
-    """True when the question asks for sources BEYOND ones already known."""
-    return bool(_EXCLUSION_RE.search(question or ""))
+    """True when the question EXPLICITLY excludes already-known sources.
+    Quoted spans (card titles) are ignored — only the user's own words vote."""
+    return bool(_EXCLUSION_RE.search(_strip_quoted(question)))
 
 
 def demote_cards_by_titles(titles: List[str], cards: List[dict]):
@@ -520,6 +524,43 @@ def demote_cards_by_titles(titles: List[str], cards: List[dict]):
         else:
             front.append(c)
     return front + back, [str(c.get("title", "")) for c in back]
+
+
+# ── Privacy (Photos-Hidden model) ───────────────────────────────────────────
+# A card is EFFECTIVELY private when it carries its own `isPrivate` flag OR
+# belongs to a private collection (membership = `collectionIds` on the link;
+# the flag lives on the collection doc). The client keeps such cards out of
+# the feed, search results, and facets — but Ask answers QUOTE card content,
+# so the server must enforce the same promise: a private card must never be
+# retrieved into the model's context or cited in an answer.
+
+def private_collection_ids(uid: str) -> set:
+    """Ids of the user's private collections (one small read per ask).
+    On a read failure returns an empty set — card-level `isPrivate` filtering
+    still applies; only collection-inherited privacy degrades, and the error
+    is logged so it is visible."""
+    try:
+        db = get_db()
+        docs = (db.collection("users").document(uid).collection("collections")
+                .where("isPrivate", "==", True).stream())
+        return {d.id for d in docs}
+    except Exception as e:
+        logger.error(f"private_collection_ids read failed: {e}")
+        return set()
+
+
+def is_effectively_private(data: dict, private_ids: set) -> bool:
+    """Card-level flag OR membership in any private collection."""
+    if data.get("isPrivate"):
+        return True
+    ids = data.get("collectionIds")
+    return isinstance(ids, list) and any(i in private_ids for i in ids)
+
+
+def strip_private_cards(cards: List[dict], private_ids: set) -> List[dict]:
+    """Drop effectively-private (and degenerate falsy) cards from a retrieval
+    result."""
+    return [c for c in cards if c and not is_effectively_private(c, private_ids)]
 
 
 def category_cards(uid: str, category: str, limit: int = 10) -> List[dict]:
@@ -548,6 +589,14 @@ def category_cards(uid: str, category: str, limit: int = 10) -> List[dict]:
     return out[:limit]
 
 
+def _strip_quoted(question: str) -> str:
+    """The question with its quoted spans removed. Intent regexes must run on
+    the user's OWN words only: a card literally titled "The Latest AI News"
+    must not flip a question about it into recency retrieval, and a title
+    containing "besides" must not read as an exclusion."""
+    return _QUOTED_RE.sub(" ", question or "")
+
+
 # Recency intent: questions the chips (and users) phrase about WHEN something
 # was saved, not what it says — "catch me up on this week's saves", "recap my
 # recent saves", "what did I save this week?", "what's my latest Tech save
@@ -563,8 +612,9 @@ _RECENCY_RE = re.compile(
 
 
 def is_recency_question(question: str) -> bool:
-    """True when the question is about recently-saved cards (time-anchored)."""
-    return bool(_RECENCY_RE.search(question or ""))
+    """True when the question is about recently-saved cards (time-anchored).
+    Quoted spans (card titles) are ignored — only the user's own words vote."""
+    return bool(_RECENCY_RE.search(_strip_quoted(question)))
 
 
 def recent_cards(uid: str, limit: int = 12) -> List[dict]:

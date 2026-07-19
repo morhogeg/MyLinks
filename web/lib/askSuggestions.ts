@@ -1,4 +1,6 @@
-import { Link } from './types';
+import { AskHints, Link } from './types';
+
+export type { AskHints } from './types';
 
 /**
  * The living suggestion engine for Ask Machina.
@@ -19,28 +21,15 @@ export type AskSuggestionKind =
     | 'rediscover'  // an old never-opened card
     | 'recap';      // generic fallback
 
-/**
- * Structured intent a chip sends ALONGSIDE its prose question (the `hints`
- * field of /api/chat). Chips are machine-generated from provable library
- * facts — the anchor card, the category, the concept, a recency window, the
- * cards a "what else" must exclude. Sending only the prose forced the backend
- * to re-infer that intent from text and sometimes lose it (the "what else did
- * I save on X?" chip re-presenting the very card just discussed). Hints make
- * the chip's contract explicit; the backend sanitizes and honors them, and
- * free-typed questions simply don't carry any.
- */
-export interface AskHints {
-    /** The question is about recently-saved cards → merge newest-first cards. */
-    recency?: boolean;
-    /** Exact stored category the question names → merge that category's cards. */
-    category?: string;
-    /** Concept label the question is about → lexical merge on the label. */
-    concept?: string;
-    /** Full titles of cards the answer MUST have in context (pin + rescue). */
-    anchorTitles?: string[];
-    /** Full titles of already-discussed cards a "what else" must NOT re-present. */
-    excludeTitles?: string[];
-}
+// AskHints (re-exported above, defined in types.ts so ChatMessage can carry
+// it): the structured intent a chip sends ALONGSIDE its prose question.
+// Chips are machine-generated from provable library facts — the anchor card,
+// the category, the concept, a recency window, the cards a "what else" must
+// exclude. Sending only the prose forced the backend to re-infer that intent
+// from text and sometimes lose it (the "what else did I save on X?" chip
+// re-presenting the very card just discussed). Hints make the chip's contract
+// explicit; the backend sanitizes and honors them, and free-typed questions
+// simply don't carry any.
 
 /** A full stored title, trimmed to the backend's hint cap. */
 function hintTitle(raw: string | undefined): string | null {

@@ -314,6 +314,21 @@ export interface ChatSource {
   url?: string | null;
 }
 
+/**
+ * Structured intent an Ask chip sends alongside its prose question (the
+ * `hints` field of /api/chat) — see lib/askSuggestions.ts for how each field
+ * is populated and functions/main.py `_sanitize_hints` for the server clamp.
+ * Lives here (not in askSuggestions) so ChatMessage can carry it without an
+ * import cycle.
+ */
+export interface AskHints {
+  recency?: boolean;
+  category?: string;
+  concept?: string;
+  anchorTitles?: string[];
+  excludeTitles?: string[];
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -323,6 +338,9 @@ export interface ChatMessage {
   // citation, even after a stricter re-ask). The UI drops the "grounded" promise
   // and shows a downgrade notice in place of the source chips.
   ungrounded?: boolean;
+  // The structured chip intent this USER question was sent with, persisted so
+  // a retry re-sends the same intent instead of silently degrading to prose.
+  hints?: AskHints;
 }
 
 /** A saved conversation in the Ask history sidebar (users/{uid}/chats/{id}). */

@@ -623,7 +623,9 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
         // History = the conversation so far (before this turn), trimmed server-side.
         const baseMsgs = base ?? messages;
         const history = baseMsgs.map(m => ({ role: m.role, content: m.content }));
-        const withUser: ChatMessage[] = [...baseMsgs, { role: 'user', content: question }];
+        // The chip's structured intent rides on the persisted user message so a
+        // retry can re-send it instead of silently degrading to prose-only.
+        const withUser: ChatMessage[] = [...baseMsgs, { role: 'user', content: question, ...(hints ? { hints } : {}) }];
 
         // Persist the question RIGHT NOW instead of waiting for the answer: if
         // the user peeks at the sidebar before the reply lands, this chat must
@@ -900,7 +902,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
     };
 
     // One-tap retry for a failed exchange: drop the trailing user+error pair
-    // and re-send the same question, so the history the model sees is clean.
+    // and re-send the same question — WITH its original chip hints, so a
+    // retried chip keeps its structured intent — and a clean history.
     const retryLast = () => {
         const errIdx = messages.length - 1;
         if (errIdx < 0 || !messages[errIdx].error) return;
@@ -909,7 +912,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
             if (messages[i].role === 'user') { userIdx = i; break; }
         }
         if (userIdx < 0) return;
-        send(messages[userIdx].content, messages.slice(0, userIdx));
+        send(messages[userIdx].content, messages.slice(0, userIdx), 'free', messages[userIdx].hints);
     };
 
     // Library is empty — nothing to ask yet.

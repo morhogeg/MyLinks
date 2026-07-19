@@ -30,9 +30,19 @@ export function getDirection(text: string, language?: string): 'rtl' | 'ltr' {
  */
 export function getDominantDirection(text: string): 'rtl' | 'ltr' {
     if (!text) return 'ltr';
-    // Hebrew + Arabic ranges vs Latin letters — strong directional chars only
-    // (digits/punctuation are neutral and must not vote).
-    const rtl = (text.match(/[\u0590-\u05FF\u0600-\u06FF\u0700-\u074F\uFB1D-\uFDFF\uFE70-\uFEFF]/g) ?? []).length;
-    const ltr = (text.match(/[A-Za-z]/g) ?? []).length;
+    // Direction belongs to the PROSE, not to quoted card titles: a Hebrew
+    // answer citing three long English titles must stay RTL (and vice versa),
+    // so quoted spans don't get a vote. If stripping leaves no strong chars
+    // (an answer that is little more than a quoted title), fall back to
+    // counting the full text.
+    const prose = text.replace(/["\u201C\u201D\u00AB\u00BB][^"\u201C\u201D\u00AB\u00BB]{0,200}["\u201C\u201D\u00AB\u00BB]/g, ' ');
+    const count = (s: string) => ({
+        // Hebrew + Arabic ranges vs Latin letters — strong directional chars
+        // only (digits/punctuation are neutral and must not vote).
+        rtl: (s.match(/[\u0590-\u05FF\u0600-\u06FF\u0700-\u074F\uFB1D-\uFDFF\uFE70-\uFEFF]/g) ?? []).length,
+        ltr: (s.match(/[A-Za-z]/g) ?? []).length,
+    });
+    let { rtl, ltr } = count(prose);
+    if (rtl === 0 && ltr === 0) ({ rtl, ltr } = count(text));
     return rtl > ltr ? 'rtl' : 'ltr';
 }
