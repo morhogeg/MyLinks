@@ -14,7 +14,7 @@ import { trackFirstAsk, trackAskNoCitations, trackAskSuggestionUsed, trackAskFol
 import { reportError } from '@/lib/errorReporter';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { ChatMessage, ChatSource, ChatSession, Link } from '@/lib/types';
-import { buildAskSuggestions, buildFollowUps, newestReadyLink, iso, ClassifiableCard } from '@/lib/askSuggestions';
+import { buildAskSuggestions, buildFollowUps, newestReadyLink, iso, AskHints, ClassifiableCard } from '@/lib/askSuggestions';
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
 import { hapticLight } from '@/lib/haptics';
 import ConfirmDialog from './ConfirmDialog';
@@ -601,8 +601,11 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
 
     /** Ask a question. `base` overrides the conversation the turn builds on —
      *  used by retry to drop a failed exchange before re-sending. `origin`
-     *  records how the ask started, which picks the thinking micro-copy. */
-    const send = async (text: string, base?: ChatMessage[], origin: AskOrigin = 'free') => {
+     *  records how the ask started, which picks the thinking micro-copy.
+     *  `hints` is the structured intent a CHIP carries (anchor/category/
+     *  concept/recency/exclusions — see AskHints); free-typed questions and
+     *  retries send none. */
+    const send = async (text: string, base?: ChatMessage[], origin: AskOrigin = 'free', hints?: AskHints) => {
         const question = text.trim();
         if (!question || isThinking || !uid) return;
         setAskOrigin(origin);
@@ -701,7 +704,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                     ...(await appCheckHeaders()),
                     ...(await authHeaders()),
                 },
-                body: JSON.stringify({ uid, question, history, stream: wantStream }),
+                body: JSON.stringify({ uid, question, history, stream: wantStream, ...(hints ? { hints } : {}) }),
                 signal: controller.signal,
             }, 30_000);
 
@@ -996,7 +999,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                     // suggested; the rest genuinely sweep the library.
                                     onClick={() => {
                                         trackAskSuggestionUsed(s.kind);
-                                        send(s.text, undefined, s.kind === 'latest' || s.kind === 'rediscover' ? 'card' : 'library');
+                                        send(s.text, undefined, s.kind === 'latest' || s.kind === 'rediscover' ? 'card' : 'library', s.hints);
                                     }}
                                     className="animate-fade-in px-3.5 py-2 rounded-full bg-card border border-border-subtle text-text-secondary text-sm font-medium hover:border-accent/40 hover:text-text transition-colors cursor-pointer"
                                 >
@@ -1131,7 +1134,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                         // The chip shows the short label; what's SENT is the
                                         // self-contained question carrying the cited card's
                                         // title, so backend retrieval can actually find it.
-                                        onClick={() => { trackAskFollowupUsed(); send(f.question, undefined, 'followup'); }}
+                                        onClick={() => { trackAskFollowupUsed(); send(f.question, undefined, 'followup', f.hints); }}
                                         className="px-3 py-1.5 rounded-full border border-border-subtle text-text-muted text-[13px] hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
                                     >
                                         {f.label}
@@ -1167,7 +1170,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                             dir="auto"
                             onClick={() => {
                                 trackAskSuggestionUsed('fresh');
-                                send(`What's the gist of "${iso(freshCard.title)}"?`, undefined, 'card');
+                                send(`What's the gist of "${iso(freshCard.title)}"?`, undefined, 'card',
+                                    { anchorTitles: [freshCard.title.trim().slice(0, 120)] });
                                 setFreshCard(null);
                             }}
                             className="flex-1 min-w-0 text-start text-[13px] text-text truncate cursor-pointer hover:underline underline-offset-2"

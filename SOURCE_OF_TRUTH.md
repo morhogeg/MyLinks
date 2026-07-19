@@ -702,6 +702,30 @@ exact-match, capped.
   embedded titles in Unicode FSI/PDI isolates (`iso()` in
   askSuggestions.ts) — backend normalization sees through them (tested).
   292 tests pass, `tsc` clean.
+  **Round 3 — STRUCTURED CHIP HINTS (full-audit hardening):** owner repro:
+  the "What else did I save on Resilience?" chip re-presented the very card
+  just discussed. Root cause CLASS: chips are machine-generated with
+  provable intent (anchor card / category / concept / recency / exclusions)
+  but only the prose question was sent — the backend re-inferred intent
+  from text and lost it. Fix: every chip now sends a structured `hints`
+  object with the POST body ({recency, category, concept, anchorTitles,
+  excludeTitles} — `AskHints` in askSuggestions.ts, `_sanitize_hints` in
+  main.py clamps it server-side). Retrieval assembly in `ask_brain` (in
+  order): vector+rerank → keyword merge → concept-hint lexical front-merge
+  → recency merge (hint OR phrasing) → category front-merge (new
+  `category_cards` equality query; new composite index category+createdAt
+  DESC in firestore.indexes.json, unordered fallback while it builds) →
+  exclusion demote (`demote_cards_by_titles` — "what else" cards go to the
+  BACK, plus typed "besides X" via `is_exclusion_question`) → per-anchor
+  rescue+pin (`anchor_phrases_for`/`pin_title_phrases`, anchors minus
+  exclusions) → hard cap `ASK_CONTEXT_CARDS=20`. Prompt: "Already
+  discussed" block (excluded titles) + a "what else = NEW sources only"
+  rule, threaded through both RAG paths. Also fixed: `_card_haystack` was
+  BLIND to `concepts` (a concept living only in that array was lexically
+  unfindable — the exact label concept chips promise). 312 tests pass
+  (20 new), `tsc` clean. NOTE: the category+createdAt composite index
+  deploys with firestore:indexes on the next functions deploy; until it
+  finishes building, `category_cards` silently uses its unordered fallback.
 
 - **2026-07-18 — MOBILE v4 CHROME: bottom tab bar + one-line header +
   dedicated Sources (owner-approved via 4 mockup rounds; commit `4028979`,

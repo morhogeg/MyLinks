@@ -10,8 +10,15 @@ instead of semantic-matching the phrase. All pure, offline over plain dicts.
 from search import (
     extract_quoted_phrases,
     pin_quoted_title_cards,
+    pin_title_phrases,
     missing_quoted_phrases,
+    missing_title_phrases,
+    anchor_phrases_for,
     is_recency_question,
+    is_exclusion_question,
+    demote_cards_by_titles,
+    keyword_match_score,
+    keyword_query_tokens,
 )
 
 
@@ -188,3 +195,81 @@ def test_recency_negative_on_topic_questions():
         "",
     ):
         assert is_recency_question(q) is False, q
+
+
+# ── anchor_phrases_for (question quotes + hints, minus exclusions) ─────────
+
+def test_anchor_merges_quotes_and_hint_titles_deduped():
+    anchors = anchor_phrases_for(
+        'Key points from "Alpha Protocol"',
+        anchor_titles=["Alpha Protocol", "Beta Gamma Notes"])
+    assert anchors == ["Alpha Protocol", "Beta Gamma Notes"]
+
+
+def test_anchor_drops_excluded_titles():
+    # "What else … besides X": X must NOT be re-pinned as an anchor.
+    anchors = anchor_phrases_for(
+        'What else did I save, besides "Alpha Protocol"?',
+        anchor_titles=["Beta Gamma Notes"],
+        excluded_titles=["Alpha Protocol"])
+    assert anchors == ["Beta Gamma Notes"]
+
+
+def test_anchor_empty_when_nothing_supplied():
+    assert anchor_phrases_for("recap my saves") == []
+
+
+def test_pin_title_phrases_pins_hinted_card_without_quotes():
+    cards = [{"id": "a", "title": "Other"}, {"id": "b", "title": "Alpha Protocol"}]
+    out, matched = pin_title_phrases(["Alpha Protocol"], cards)
+    assert matched is True and out[0]["id"] == "b"
+
+
+def test_missing_title_phrases_reports_unretrieved_hint():
+    assert missing_title_phrases(
+        ["Alpha Protocol"], [{"id": "x", "title": "Unrelated"}]) == ["Alpha Protocol"]
+
+
+# ── is_exclusion_question / demote_cards_by_titles ─────────────────────────
+
+def test_exclusion_matches_what_else_phrasings():
+    for q in (
+        "What else did I save on Resilience?",
+        'Anything besides "Alpha Protocol"?',
+        'Other than "Alpha Protocol", what covers this?',
+        "Show me something apart from that article",
+    ):
+        assert is_exclusion_question(q) is True, q
+
+
+def test_exclusion_negative_on_plain_questions():
+    for q in ("Key points from my Tech saves", 'What was "Alpha" about?', ""):
+        assert is_exclusion_question(q) is False, q
+
+
+def test_demote_moves_excluded_cards_to_back():
+    cards = [
+        {"id": "a", "title": "Argentina Comeback Analysis"},
+        {"id": "b", "title": "Fresh Other Card"},
+        {"id": "c", "title": "Third Card"},
+    ]
+    out, demoted = demote_cards_by_titles(["Argentina Comeback Analysis"], cards)
+    assert [c["id"] for c in out] == ["b", "c", "a"]
+    assert demoted == ["Argentina Comeback Analysis"]
+
+
+def test_demote_no_titles_is_a_no_op():
+    cards = [{"id": "a", "title": "T"}]
+    out, demoted = demote_cards_by_titles([], cards)
+    assert out == cards and demoted == []
+
+
+# ── concepts are lexically searchable (the "what else on X" retrieval hole) ─
+
+def test_keyword_score_matches_concept_only_cards():
+    # "Resilience" lives ONLY in the concepts array — the lexical scan must
+    # still find the card, or a concept chip can't deliver.
+    card = {"title": "Análise da vitória", "summary": "Match analysis.",
+            "concepts": ["Resilience", "Team Spirit"]}
+    tokens = keyword_query_tokens("What else did I save on Resilience?")
+    assert keyword_match_score(card, tokens) > 0

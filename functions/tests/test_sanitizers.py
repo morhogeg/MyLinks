@@ -16,12 +16,15 @@ from pathlib import Path
 import pytest
 
 _MAIN = Path(__file__).resolve().parent.parent / "main.py"
-_WANTED_FN = {"_sanitize_history", "_sanitize_tags"}
+_WANTED_FN = {"_sanitize_history", "_sanitize_tags", "_sanitize_hints"}
 _WANTED_CONST = {
     "MAX_HISTORY_ITEMS",
     "MAX_HISTORY_CONTENT_LENGTH",
     "MAX_TAGS",
     "MAX_TAG_LENGTH",
+    "MAX_HINT_TEXT_LENGTH",
+    "MAX_HINT_TITLE_LENGTH",
+    "MAX_HINT_TITLES",
 }
 
 
@@ -117,3 +120,54 @@ def test_tags_drops_empty_and_whitespace_only():
 def test_tags_coerces_non_strings():
     out = _sanitize_tags([123, "tag"])
     assert out == ["123", "tag"]
+
+
+# ── _sanitize_hints (structured Ask-chip intent) ──────────────────────────
+
+_sanitize_hints = _NS["_sanitize_hints"]
+MAX_HINT_TEXT_LENGTH = _NS["MAX_HINT_TEXT_LENGTH"]
+MAX_HINT_TITLE_LENGTH = _NS["MAX_HINT_TITLE_LENGTH"]
+MAX_HINT_TITLES = _NS["MAX_HINT_TITLES"]
+
+
+@pytest.mark.parametrize("bad", [None, "string", 42, ["list"]])
+def test_hints_non_dict_becomes_empty(bad):
+    assert _sanitize_hints(bad) == {}
+
+
+def test_hints_keeps_valid_fields():
+    out = _sanitize_hints({
+        "recency": True,
+        "category": " Tech ",
+        "concept": "Resilience",
+        "anchorTitles": ["Alpha Protocol"],
+        "excludeTitles": ["Beta Notes", "Gamma"],
+    })
+    assert out == {
+        "recency": True,
+        "category": "Tech",
+        "concept": "Resilience",
+        "anchorTitles": ["Alpha Protocol"],
+        "excludeTitles": ["Beta Notes", "Gamma"],
+    }
+
+
+def test_hints_drops_malformed_fields_silently():
+    out = _sanitize_hints({
+        "recency": 0,                      # falsy → omitted
+        "category": 42,                    # non-str → dropped
+        "concept": "   ",                  # blank → dropped
+        "anchorTitles": "not-a-list",      # non-list → dropped
+        "excludeTitles": [1, None, "  ", "ok"],
+    })
+    assert out == {"excludeTitles": ["ok"]}
+
+
+def test_hints_caps_lengths_and_counts():
+    out = _sanitize_hints({
+        "category": "x" * 500,
+        "anchorTitles": ["y" * 500] + [f"t{i}" for i in range(10)],
+    })
+    assert len(out["category"]) == MAX_HINT_TEXT_LENGTH
+    assert len(out["anchorTitles"]) == MAX_HINT_TITLES
+    assert len(out["anchorTitles"][0]) == MAX_HINT_TITLE_LENGTH

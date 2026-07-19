@@ -229,6 +229,26 @@ def test_prompt_includes_todays_date_for_recency_questions():
     assert datetime.now(timezone.utc).strftime("%Y-%m-%d") in prompt
 
 
+def test_prompt_lists_excluded_titles_for_what_else_questions():
+    prompt = _build_rag_prompt(
+        "What else did I save on resilience?", [_card(1)],
+        excluded_titles=["Argentina Comeback Analysis", "  ", None])
+    assert "Already discussed with the user" in prompt
+    assert "- Argentina Comeback Analysis" in prompt
+    # Blank/None entries never render as empty bullets.
+    assert "- \n" not in prompt
+
+
+def test_prompt_omits_excluded_block_when_none():
+    prompt = _build_rag_prompt("q?", [_card(1)])
+    assert "Already discussed with the user" not in prompt
+
+
+def test_prompt_carries_what_else_rule():
+    prompt = _build_rag_prompt("q?", [_card(1)])
+    assert '"What else…" questions' in prompt
+
+
 # ── _valid_cited_ids ──────────────────────────────────────────────────────
 
 _CARDS = [{"id": "id1"}, {"id": "id2"}, {"id": "id3"}]

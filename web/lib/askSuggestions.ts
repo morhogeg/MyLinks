@@ -19,12 +19,43 @@ export type AskSuggestionKind =
     | 'rediscover'  // an old never-opened card
     | 'recap';      // generic fallback
 
+/**
+ * Structured intent a chip sends ALONGSIDE its prose question (the `hints`
+ * field of /api/chat). Chips are machine-generated from provable library
+ * facts — the anchor card, the category, the concept, a recency window, the
+ * cards a "what else" must exclude. Sending only the prose forced the backend
+ * to re-infer that intent from text and sometimes lose it (the "what else did
+ * I save on X?" chip re-presenting the very card just discussed). Hints make
+ * the chip's contract explicit; the backend sanitizes and honors them, and
+ * free-typed questions simply don't carry any.
+ */
+export interface AskHints {
+    /** The question is about recently-saved cards → merge newest-first cards. */
+    recency?: boolean;
+    /** Exact stored category the question names → merge that category's cards. */
+    category?: string;
+    /** Concept label the question is about → lexical merge on the label. */
+    concept?: string;
+    /** Full titles of cards the answer MUST have in context (pin + rescue). */
+    anchorTitles?: string[];
+    /** Full titles of already-discussed cards a "what else" must NOT re-present. */
+    excludeTitles?: string[];
+}
+
+/** A full stored title, trimmed to the backend's hint cap. */
+function hintTitle(raw: string | undefined): string | null {
+    const t = raw?.trim().replace(/\s+/g, ' ');
+    return t && t.toLowerCase() !== 'untitled' ? t.slice(0, 120) : null;
+}
+
 export interface AskSuggestion {
     text: string;
     kind: AskSuggestionKind;
     /** Stable identity for chip animations — changes when the underlying card
      *  changes, so a fresh save visibly re-enters. */
     key: string;
+    /** Structured intent sent with the question (see AskHints). */
+    hints?: AskHints;
 }
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -94,6 +125,7 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
             text: rotate(phrasings, salt)[0],
             kind: 'latest',
             key: `latest:${latest.id}`,
+            hints: { anchorTitles: [hintTitle(latest.title)!] },
         });
     }
 
@@ -114,6 +146,7 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
             text: rotate(phrasings, salt)[0],
             kind: 'week',
             key: 'week',
+            hints: { recency: true },
         });
     }
 
@@ -141,6 +174,7 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
             text: rotate(phrasings, salt)[0],
             kind: 'concept',
             key: `concept:${pick.label}`,
+            hints: { concept: pick.label },
         });
     }
 
@@ -163,6 +197,10 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
             text: rotate(phrasings, salt)[0],
             kind: 'category',
             key: `category:${cat}`,
+            // The exact stored category string — the backend fetches that
+            // category's newest cards directly instead of hoping semantic
+            // retrieval lands on them.
+            hints: { category: cat },
         });
     });
 
@@ -176,6 +214,7 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
             text: `What was "${t}" about again?`,
             kind: 'rediscover',
             key: `rediscover:${dusty.id}`,
+            hints: { anchorTitles: [hintTitle(dusty.title)!] },
         });
     }
 
@@ -184,6 +223,7 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
         text: 'Recap my recent saves',
         kind: 'recap',
         key: 'recap',
+        hints: { recency: true },
     });
 
     return [...latestChips, ...rotate(pool, salt).slice(0, 4 - latestChips.length)];
@@ -340,6 +380,8 @@ function gatherEvidence(cards: ClassifiableCard[]): Evidence {
 export interface FollowUpChip {
     label: string;
     question: string;
+    /** Structured intent sent with the question (see AskHints). */
+    hints?: AskHints;
 }
 
 /** Wrap an embedded title in Unicode first-strong isolates (FSI…PDI) so a
@@ -539,13 +581,19 @@ export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
     if (pair) {
         const ta = iso(chipTitle(pair.a.title, 60)!);
         const tb = iso(chipTitle(pair.b.title, 60)!);
+        const pairHints: AskHints = {
+            anchorTitles: [hintTitle(pair.a.title), hintTitle(pair.b.title)].filter((x): x is string => !!x),
+        };
         const label = pair.shared.length <= 14 ? `Compare the ${pair.shared} saves` : 'Compare these';
         candidates.push(
-            { label, question: `Compare "${ta}" with "${tb}"` },
-            { label: "What's the common thread?", question: `What's the common thread between "${ta}" and "${tb}"?` },
+            { label, question: `Compare "${ta}" with "${tb}"`, hints: pairHints },
+            { label: "What's the common thread?", question: `What's the common thread between "${ta}" and "${tb}"?`, hints: pairHints },
         );
     }
-    candidates.push(...angleChips(angle, ev, t));
+    const anchorHints: AskHints | undefined = hintTitle(anchors[0].title)
+        ? { anchorTitles: [hintTitle(anchors[0].title)!] }
+        : undefined;
+    candidates.push(...angleChips(angle, ev, t).map(c => ({ ...c, hints: anchorHints })));
     // Depth is a guaranteed win only on the card that ACTUALLY carries the
     // stored long-form analysis — anchor the chip to that card, not cite[0].
     const detailCard = withTitle.find(c => (c.detailedSummary?.trim().length ?? 0) >= 200);
@@ -553,12 +601,25 @@ export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
         candidates.push({
             label: 'Give me more detail',
             question: `Give me more detail on "${iso(chipTitle(detailCard.title, 60)!)}"`,
+            hints: hintTitle(detailCard.title) ? { anchorTitles: [hintTitle(detailCard.title)!] } : undefined,
         });
     }
-    // A concept that PROVABLY recurs on other cards → the knowledge-graph jump
-    // (already self-contained — the concept is the retrieval anchor).
+    // A concept that PROVABLY recurs on other cards → the knowledge-graph jump.
+    // "Else" is a CONTRACT: the already-cited cards are sent as exclusions so
+    // the backend demotes them and the model presents genuinely OTHER sources
+    // (re-presenting the just-discussed card here was an observed, real bug).
     if (related) {
-        candidates.push({ label: `What else did I save on ${related}?`, question: `What else did I save on ${related}?` });
+        candidates.push({
+            label: `What else did I save on ${related}?`,
+            question: `What else did I save on ${related}?`,
+            hints: {
+                concept: related,
+                excludeTitles: withTitle
+                    .map(c => hintTitle(c.title))
+                    .filter((x): x is string => !!x)
+                    .slice(0, 4),
+            },
+        });
     }
 
     // Dedupe by template family (NO-REPEAT RULE) and by intent group (INTENT

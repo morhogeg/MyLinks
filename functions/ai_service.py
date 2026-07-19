@@ -330,7 +330,8 @@ def _rag_card_block(c: dict) -> str:
     return block
 
 
-def _build_rag_prompt(question: str, cards: list, history: list = None) -> str:
+def _build_rag_prompt(question: str, cards: list, history: list = None,
+                      excluded_titles: list = None) -> str:
     """Shared grounding prompt for both RAG answer paths (streaming and
     non-streaming).
 
@@ -350,6 +351,18 @@ def _build_rag_prompt(question: str, cards: list, history: list = None) -> str:
             turns.append(f"{role}: {h.get('content', '')}")
         history_text = "\n\nEarlier in this conversation:\n" + "\n".join(turns)
 
+    # Sources the user has ALREADY seen this conversation (the "what else …
+    # besides X" contract): the model must not re-present them as new finds.
+    excluded_text = ""
+    titles = [str(t).strip() for t in (excluded_titles or []) if t and str(t).strip()]
+    if titles:
+        excluded_text = (
+            "\n\nAlready discussed with the user (do NOT present these as new "
+            "findings — for \"what else\"-style questions answer ONLY with "
+            "OTHER sources, and if none remain, say so plainly):\n"
+            + "\n".join(f"- {t}" for t in titles[:6])
+        )
+
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     return f"""You are Machina AI, the user's personal knowledge assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved. Today's date is {today}.
@@ -364,6 +377,7 @@ Rules:
   - Asked to compare sources or find their common thread → organize the answer around what they genuinely share and where they differ, using each source's specifics. Name every quoted source in the comparison; never silently drop one.
   - Otherwise → concise and direct (2-5 sentences, or a short list when that's clearer).
 - NEVER answer a request for specifics with a rephrased overview. If a source genuinely lacks the requested specifics (e.g. no step-by-step instructions were captured from it), say exactly that and offer what the source DOES contain.
+- "What else…" questions → the user wants sources NOT already discussed in this conversation. Never re-present a source from earlier turns (or from the already-discussed list below, when present) as a new find; if nothing new matches, say so plainly.
 - FOLLOW-UPS MUST ADD VALUE: when the conversation history shows you already answered about this source, bring NEW information from the sources — never restate an earlier answer in different words.
 - Questions about recent saves ("this week", "latest", "recap") → judge by each source's saved: date against today's date; only present sources actually in that window as recent, and mention when each was saved.
 - Don't announce a count of items (e.g. "three sources") — just give the list. If you do state a number, it MUST exactly match the number of items you list.
@@ -372,6 +386,7 @@ Rules:
 
 Saved sources:
 {sources_text}
+{excluded_text}
 {history_text}
 
 User question: {question}
@@ -631,7 +646,8 @@ If the image is an article, extract the headline and body."""
                                        model=GEMINI_ANALYSIS_MODEL, attempts=attempts)
 
     def answer_from_context(self, question: str, cards: list, history: list = None,
-                            attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
+                            attempts: int = _MAX_GENERATE_ATTEMPTS,
+                            excluded_titles: list = None) -> dict:
         """Answer a user question grounded ONLY in their saved cards (RAG).
 
         `cards` is a list of dicts with id/title/summary/category/tags. Returns
@@ -662,7 +678,7 @@ If the image is an article, extract the headline and body."""
                 "ungrounded": False,
             }
 
-        prompt = _build_rag_prompt(question, cards, history) + _CITED_JSON_SUFFIX
+        prompt = _build_rag_prompt(question, cards, history, excluded_titles) + _CITED_JSON_SUFFIX
         data = self._answer_json(prompt, "answer", attempts)
         answer = data.get("answer") or ""
         cited = _valid_cited_ids(data.get("citedIds"), cards)
@@ -672,7 +688,7 @@ If the image is an article, extract the headline and body."""
         # No valid citation on the first pass. Re-ask ONCE with a stricter prompt
         # that demands the model name the ids it relied on. A transient failure
         # here must not sink the request — fall through to the ungrounded return.
-        retry_prompt = _build_rag_prompt(question, cards, history) + _CITED_JSON_STRICT_SUFFIX
+        retry_prompt = _build_rag_prompt(question, cards, history, excluded_titles) + _CITED_JSON_STRICT_SUFFIX
         try:
             retry = self._answer_json(retry_prompt, "answer (citation retry)", attempts)
             retry_answer = retry.get("answer") or ""
@@ -688,7 +704,8 @@ If the image is an article, extract the headline and body."""
         logger.warning("ask answer returned no valid citations after retry — flagging ungrounded")
         return {"answer": answer, "citedIds": [], "ungrounded": True}
 
-    def answer_from_context_stream(self, question: str, cards: list, history: list = None):
+    def answer_from_context_stream(self, question: str, cards: list, history: list = None,
+                                   excluded_titles: list = None):
         """Streaming variant of `answer_from_context` (RAG over saved cards).
 
         Yields ("token", text) tuples as the answer streams in, then a final
@@ -728,7 +745,7 @@ If the image is an article, extract the headline and body."""
             yield ("citedIds", [])
             return
 
-        prompt = _build_rag_prompt(question, cards, history) + (
+        prompt = _build_rag_prompt(question, cards, history, excluded_titles) + (
             "Write the answer as plain text (no JSON). Then, on a NEW LINE after "
             "the answer, output a citation marker listing the ids (without "
             "brackets) of the sources you relied on, in exactly this format:\n"

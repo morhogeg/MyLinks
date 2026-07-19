@@ -5,6 +5,20 @@
             "queryScope": "COLLECTION",
             "fields": [
                 {
+                    "fieldPath": "category",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "links",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
                     "fieldPath": "reminderStatus",
                     "order": "ASCENDING"
                 },

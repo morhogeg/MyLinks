@@ -125,6 +125,11 @@ def _card_haystack(data: dict) -> str:
     return " ".join(str(x) for x in [
         data.get("title", ""), data.get("summary", ""),
         " ".join(data.get("tags", []) or []),
+        # Concepts too: an Ask chip can anchor on a concept ("what else did I
+        # save on Resilience?") that appears ONLY in the concepts array — with
+        # concepts absent from the haystack the lexical fallback and rerank
+        # boost were blind to exactly the label the chip promised to find.
+        " ".join(data.get("concepts", []) or []),
         data.get("sourceName", ""), data.get("category", ""),
         # The user's own notes are searchable too — a literal word they wrote
         # should surface the card in keyword fallback and rerank. Covers both the
@@ -403,32 +408,6 @@ def _norm_title(s: str) -> str:
     return re.sub(r"[\W_]+", " ", (s or "").lower(), flags=re.UNICODE).strip()
 
 
-def pin_quoted_title_cards(question: str, cards: List[dict]):
-    """Move cards whose title matches a phrase quoted in the question to the
-    FRONT of the list (otherwise stable). Returns (cards, matched).
-
-    Chip questions quote the cited card's title, sometimes truncated with an
-    ellipsis — so a match is normalized equality or a prefix in either
-    direction (a truncated quote is a prefix of the full title). Prefix
-    matching requires a minimum phrase length so a stray short quoted fragment
-    (a title's own inner quotes, a quoted word) can never pin an unrelated
-    card. `matched` tells the caller whether any quoted phrase found its card,
-    so it can fall back to a lexical scan when the anchor card missed
-    retrieval entirely.
-    """
-    phrases = [p for p in (_norm_title(x) for x in extract_quoted_phrases(question)) if p]
-    if not phrases or not cards:
-        return cards, False
-    pinned, rest = [], []
-    for c in cards:
-        t = _norm_title(str(c.get("title", "")))
-        if t and any(_title_match(t, p) for p in phrases):
-            pinned.append(c)
-        else:
-            rest.append(c)
-    return (pinned + rest, True) if pinned else (cards, False)
-
-
 def _title_match(t: str, p: str) -> bool:
     """Does normalized title `t` match normalized quoted phrase `p`? Exact, or
     a prefix in either direction (truncated quote), with a minimum phrase
@@ -438,14 +417,42 @@ def _title_match(t: str, p: str) -> bool:
     return len(p) >= 6 and (t.startswith(p) or p.startswith(t))
 
 
-def missing_quoted_phrases(question: str, cards: List[dict]) -> List[str]:
-    """The quoted phrases (raw form) that match NO card title in `cards`.
+def pin_title_phrases(phrases: List[str], cards: List[dict]):
+    """Move cards whose title matches any of the (raw) title `phrases` to the
+    FRONT of the list (otherwise stable). Returns (cards, matched).
 
-    A compare question quotes TWO titles; "did anything pin?" is not enough —
-    each quoted anchor the retrieval missed must be rescued individually, or
-    the model is asked to compare a card it cannot see."""
+    Phrases come from quoted titles in the question and/or the client's
+    structured `anchorTitles` hint, sometimes truncated with an ellipsis — so
+    a match is normalized equality or a prefix in either direction. Prefix
+    matching requires a minimum phrase length so a stray short fragment (a
+    title's own inner quotes, a quoted word) can never pin an unrelated card.
+    `matched` tells the caller whether any phrase found its card."""
+    norm = [p for p in (_norm_title(x) for x in phrases or []) if p]
+    if not norm or not cards:
+        return cards, False
+    pinned, rest = [], []
+    for c in cards:
+        t = _norm_title(str(c.get("title", "")))
+        if t and any(_title_match(t, p) for p in norm):
+            pinned.append(c)
+        else:
+            rest.append(c)
+    return (pinned + rest, True) if pinned else (cards, False)
+
+
+def pin_quoted_title_cards(question: str, cards: List[dict]):
+    """Question-text convenience wrapper over `pin_title_phrases`."""
+    return pin_title_phrases(extract_quoted_phrases(question), cards)
+
+
+def missing_title_phrases(phrases: List[str], cards: List[dict]) -> List[str]:
+    """The (raw) title phrases that match NO card title in `cards`.
+
+    A compare question carries TWO anchors; "did anything pin?" is not enough —
+    each anchor the retrieval missed must be rescued individually, or the
+    model is asked to compare a card it cannot see."""
     out = []
-    for raw in extract_quoted_phrases(question):
+    for raw in phrases or []:
         p = _norm_title(raw)
         if not p:
             continue
@@ -453,6 +460,92 @@ def missing_quoted_phrases(question: str, cards: List[dict]) -> List[str]:
         if not any(t and _title_match(t, p) for t in titles):
             out.append(raw)
     return out
+
+
+def missing_quoted_phrases(question: str, cards: List[dict]) -> List[str]:
+    """Question-text convenience wrapper over `missing_title_phrases`."""
+    return missing_title_phrases(extract_quoted_phrases(question), cards)
+
+
+def anchor_phrases_for(question: str, anchor_titles: List[str] = None,
+                       excluded_titles: List[str] = None) -> List[str]:
+    """Every title phrase ask_brain must GUARANTEE in context: the question's
+    quoted titles plus the client's structured `anchorTitles` hint — minus
+    anything the user excluded ("what else … besides X" must not re-pin X).
+    Deduped by normalized form, original order kept."""
+    raw = extract_quoted_phrases(question) + [
+        str(t).strip() for t in (anchor_titles or []) if str(t).strip()
+    ]
+    excluded = [p for p in (_norm_title(t) for t in (excluded_titles or [])) if p]
+    out, seen = [], set()
+    for a in raw:
+        na = _norm_title(a)
+        if not na or na in seen:
+            continue
+        if any(_title_match(na, e) or _title_match(e, na) for e in excluded):
+            continue
+        seen.add(na)
+        out.append(a)
+    return out
+
+
+# "What else…" / "besides X" questions: the quoted/hinted titles are the
+# ALREADY-DISCUSSED cards — the user explicitly wants OTHER sources. Treating
+# them as anchors (or letting retrieval rank them first) re-presents the same
+# card as a "new" find, which is the opposite of the ask.
+_EXCLUSION_RE = re.compile(
+    r"\b(besides|other than|apart from|except|excluding|what else)\b",
+    re.IGNORECASE,
+)
+
+
+def is_exclusion_question(question: str) -> bool:
+    """True when the question asks for sources BEYOND ones already known."""
+    return bool(_EXCLUSION_RE.search(question or ""))
+
+
+def demote_cards_by_titles(titles: List[str], cards: List[dict]):
+    """Move cards whose title matches any of `titles` to the BACK of the list
+    (otherwise stable). They stay in context — the model may reference them
+    ("besides X…") — but they can't crowd the front where the deep-content
+    window and the model's attention live. Returns (cards, demoted_titles)."""
+    norm = [p for p in (_norm_title(t) for t in titles or []) if p]
+    if not norm or not cards:
+        return cards, []
+    front, back = [], []
+    for c in cards:
+        t = _norm_title(str(c.get("title", "")))
+        if t and any(_title_match(t, p) for p in norm):
+            back.append(c)
+        else:
+            front.append(c)
+    return front + back, [str(c.get("title", "")) for c in back]
+
+
+def category_cards(uid: str, category: str, limit: int = 10) -> List[dict]:
+    """The newest settled cards in one exact `category` — the ground truth
+    behind "my <Category> saves" chips (the client sends the stored category
+    string verbatim via hints). Ordered query first (needs the composite
+    category+createdAt index); falls back to an unordered equality scan sorted
+    in memory while that index is missing/building, so the chip never breaks."""
+    db = get_db()
+    links_ref = db.collection("users").document(uid).collection("links")
+    try:
+        docs = list(
+            links_ref.where("category", "==", category)
+            .order_by("createdAt", direction=gc_firestore.Query.DESCENDING)
+            .limit(limit * 2).stream()
+        )
+    except Exception:
+        docs = list(links_ref.where("category", "==", category).limit(120).stream())
+    out = []
+    for doc in docs:
+        data = doc.to_dict() or {}
+        if data.get("status") in ("processing", "failed"):
+            continue
+        out.append(normalize_card_for_search(data, doc.id))
+    out.sort(key=lambda c: c.get("createdAt") or 0, reverse=True)
+    return out[:limit]
 
 
 # Recency intent: questions the chips (and users) phrase about WHEN something

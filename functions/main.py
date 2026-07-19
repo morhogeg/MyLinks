@@ -60,8 +60,9 @@ from search import (
     sync_link_embedding, search_links, perform_search_logic, perform_hybrid_search,
     build_embedding_text, rerank_candidates, keyword_query_tokens,
     keyword_match_score, keyword_scan_cards, EmbeddingService, EMBED_TEXT_VERSION,
-    extract_quoted_phrases, pin_quoted_title_cards, missing_quoted_phrases,
-    is_recency_question, recent_cards,
+    extract_quoted_phrases, pin_title_phrases, missing_title_phrases,
+    anchor_phrases_for, is_exclusion_question, demote_cards_by_titles,
+    is_recency_question, recent_cards, category_cards,
 )
 from rate_limit import check_rate_limit, client_ip
 # Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
@@ -327,6 +328,15 @@ MAX_TAG_LENGTH = 60
 # to bound prompt cost.
 ASK_DEEP_CARDS = 6
 ASK_DETAIL_MAX_CHARS = 3500
+# Hard cap on how many cards reach the Ask prompt after ALL merges (vector +
+# keyword + concept + recency + category). Bounds token cost and keeps the
+# context signal-dense; demoted (excluded) cards sit at the back, so they are
+# the first to fall off.
+ASK_CONTEXT_CARDS = 20
+# Caps for the structured chip hints (see _sanitize_hints).
+MAX_HINT_TEXT_LENGTH = 60
+MAX_HINT_TITLE_LENGTH = 120
+MAX_HINT_TITLES = 4
 
 
 def _sanitize_history(history) -> list:
@@ -352,6 +362,41 @@ def _sanitize_history(history) -> list:
             content = "" if content is None else str(content)
         cleaned.append({"role": role, "content": content[:MAX_HISTORY_CONTENT_LENGTH]})
     return cleaned
+
+
+def _sanitize_hints(hints) -> dict:
+    """Validate the client's structured Ask-chip hints before they steer
+    retrieval or reach the prompt.
+
+    Chips are machine-generated with PROVABLE intent — the anchor card, the
+    category, the concept, a recency window, cards to exclude ("what else…").
+    Sending only the prose question forced the backend to re-infer that intent
+    from text and sometimes lose it (the "what else did I save on X?" chip
+    re-presenting the very card just discussed). `hints` carries the intent
+    explicitly; this clamps every field (types, counts, lengths) since it is
+    still client-supplied input feeding Firestore queries and the prompt.
+    Anything malformed is dropped, never errored — hints only ever improve a
+    request. Non-dict → {}.
+    """
+    if not isinstance(hints, dict):
+        return {}
+    out = {}
+    for key in ("category", "concept"):
+        v = hints.get(key)
+        if isinstance(v, str) and v.strip():
+            out[key] = v.strip()[:MAX_HINT_TEXT_LENGTH]
+    if hints.get("recency"):
+        out["recency"] = True
+    for key in ("anchorTitles", "excludeTitles"):
+        v = hints.get(key)
+        if isinstance(v, list):
+            clean = [
+                s.strip()[:MAX_HINT_TITLE_LENGTH]
+                for s in v[:MAX_HINT_TITLES] if isinstance(s, str) and s.strip()
+            ]
+            if clean:
+                out[key] = clean
+    return out
 
 
 def _sanitize_tags(tags) -> list:
@@ -1150,6 +1195,9 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         # Clamp client-supplied history before it reaches the Gemini prompt
         # (last few turns, per-item length cap, roles whitelisted).
         history = _sanitize_history(data.get('history'))
+        # Structured chip intent (anchor/category/concept/recency/exclusions) —
+        # optional, clamped. See _sanitize_hints for why chips send this.
+        hints = _sanitize_hints(data.get('hints'))
         # Opt-in token streaming (SSE). Only honored for POST so the JSON path is
         # 100% unchanged when not explicitly requested.
         want_stream = bool(data.get('stream')) and req.method == 'POST'
@@ -1194,36 +1242,86 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         except Exception as e:
             logger.error(f"ask_brain keyword fallback failed: {e}")
 
-        # 1c. Recency questions ("catch me up on this week's saves", "recap my
+        # 1c. Concept hint: the chip promised "what I saved on <concept>" — a
+        #     lexical scan on the concept label itself catches cards whose
+        #     concept never surfaces in title/summary (haystack includes
+        #     concepts), independent of how the full question embeds. Merged
+        #     IN FRONT: these are the provable concept carriers the chip is
+        #     about (any already-discussed ones are demoted again below).
+        if hints.get("concept"):
+            try:
+                have = {c.get("id") for c in cards}
+                cards = keyword_scan_cards(
+                    uid, hints["concept"], exclude_ids=have, limit=6) + cards
+            except Exception as e:
+                logger.error(f"ask_brain concept-hint scan failed: {e}")
+
+        # 1d. Recency questions ("catch me up on this week's saves", "recap my
         #     recent saves") are time-anchored, not topic-anchored — pure
         #     semantic retrieval on such phrasing returns topically arbitrary
         #     cards. Merge the actually-newest cards IN FRONT (they're the
         #     ground truth the question is about); the prompt's saved-dates +
         #     today's-date rules let the model answer the time window honestly.
+        #     Chips assert this explicitly (hints.recency); typed questions
+        #     are matched by phrasing.
         try:
-            if is_recency_question(question):
+            if hints.get("recency") or is_recency_question(question):
                 recents = recent_cards(uid, limit=12)
                 recent_ids = {c.get("id") for c in recents}
                 cards = recents + [c for c in cards if c.get("id") not in recent_ids]
         except Exception as e:
             logger.error(f"ask_brain recency retrieval failed: {e}")
 
-        # 1d. Chip-anchor guarantee: suggestion/follow-up chips quote the cited
-        #     card's title in the question. EVERY quoted card must reach the
-        #     model, at the front (inside the deep-content window below) — a
-        #     chip we offered that then can't see its own card is a broken
-        #     promise. Each quoted title retrieval missed is rescued with its
-        #     own lexical scan (a compare question quotes TWO titles; rescuing
-        #     only when none matched would let one of them silently vanish).
+        # 1e. Category hint: "my Tech saves" chips name a stored category
+        #     verbatim — fetch that category's newest cards directly and put
+        #     them FIRST (in front of the recency merge), so "key takeaways
+        #     from my Tech saves" and "my latest Tech save" are grounded in
+        #     actual Tech cards, not semantic near-misses.
+        if hints.get("category"):
+            try:
+                cats = category_cards(uid, hints["category"], limit=10)
+                cat_ids = {c.get("id") for c in cats}
+                cards = cats + [c for c in cards if c.get("id") not in cat_ids]
+            except Exception as e:
+                logger.error(f"ask_brain category retrieval failed: {e}")
+
+        # 1f. Exclusions ("What else did I save on X?"): the already-discussed
+        #     cards must not dominate the answer again. Chips name them
+        #     explicitly (hints.excludeTitles); typed "besides X" questions
+        #     contribute their quoted titles. Matching cards are demoted to
+        #     the BACK of context (still referenceable, never the headline)
+        #     and the prompt gets an explicit already-discussed list.
+        excluded_titles = list(hints.get("excludeTitles") or [])
+        if excluded_titles or is_exclusion_question(question):
+            if is_exclusion_question(question):
+                excluded_titles += extract_quoted_phrases(question)
+            try:
+                cards, _ = demote_cards_by_titles(excluded_titles, cards)
+            except Exception as e:
+                logger.error(f"ask_brain exclusion demote failed: {e}")
+
+        # 1g. Chip-anchor guarantee: EVERY anchored card (question-quoted title
+        #     or hints.anchorTitles, minus exclusions) must reach the model at
+        #     the front (inside the deep-content window below) — a chip we
+        #     offered that then can't see its own card is a broken promise.
+        #     Each anchor retrieval missed is rescued with its own lexical
+        #     scan (a compare question carries TWO anchors; rescuing only when
+        #     none matched would let one silently vanish).
         try:
-            if extract_quoted_phrases(question):
-                for phrase in missing_quoted_phrases(question, cards):
+            anchors = anchor_phrases_for(
+                question, hints.get("anchorTitles"), excluded_titles)
+            if anchors:
+                for phrase in missing_title_phrases(anchors, cards):
                     have = {c.get("id") for c in cards}
                     cards = cards + keyword_scan_cards(
                         uid, phrase, exclude_ids=have, limit=2)
-                cards, _ = pin_quoted_title_cards(question, cards)
+                cards, _ = pin_title_phrases(anchors, cards)
         except Exception as e:
-            logger.error(f"ask_brain quoted-title pinning failed: {e}")
+            logger.error(f"ask_brain anchor pinning failed: {e}")
+
+        # 1h. Bound the assembled context (excluded cards sit at the back and
+        #     fall off first).
+        cards = cards[:ASK_CONTEXT_CARDS]
 
         # 2. Slim the cards to what the model needs (bounded tokens/cost).
         #    Every card carries its headline fields; the FIRST few additionally
@@ -1291,7 +1389,8 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
 
             def _event_stream():
                 try:
-                    for kind, payload in ai.answer_from_context_stream(question, slim, history):
+                    for kind, payload in ai.answer_from_context_stream(
+                            question, slim, history, excluded_titles=excluded_titles):
                         if kind == "token":
                             yield "data: " + json.dumps(
                                 {"type": "token", "text": payload}
@@ -1343,7 +1442,8 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             )
 
         # Synchronous path: 2 Gemini attempts (stay under the 60s budget, report 3.6).
-        result = ai.answer_from_context(question, slim, history, attempts=2)
+        result = ai.answer_from_context(question, slim, history, attempts=2,
+                                        excluded_titles=excluded_titles)
 
         # 4. Return only the cited sources for the UI (clickable chips).
         cited_ids = result.get("citedIds", [])
