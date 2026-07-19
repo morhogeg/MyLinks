@@ -110,15 +110,31 @@ _RANK_STOPWORDS = {
     "do", "does", "did", "done", "can", "could", "would", "should", "will",
     "i", "me", "my", "you", "your", "it", "its", "they", "them", "their",
     "about", "with", "from", "into", "as", "any", "some", "all", "have", "has",
+    # Hebrew function words — the tokenizer is unicode-aware (see below), so
+    # Hebrew questions produce tokens and these must not count as signal.
+    "של", "את", "עם", "על", "זה", "זו", "מה", "איך", "למה", "מתי", "איפה",
+    "הוא", "היא", "אני", "לא", "כן", "כל", "גם", "או", "אבל", "יש", "אין",
+    "עוד", "כמו", "אם", "אז", "רק", "אלו", "האם", "שלי", "לי",
 }
 
 
 def keyword_query_tokens(question: str) -> set:
-    """Content tokens (len >= 3, non-stopword) from a user question."""
-    return {
-        t for t in re.split(r"[^a-z0-9]+", (question or "").lower())
-        if len(t) >= 3 and t not in _RANK_STOPWORDS
-    }
+    """Content tokens (non-stopword) from a user question.
+
+    Unicode-aware on purpose: the old `[^a-z0-9]+` splitter treated EVERY
+    non-ASCII character as a separator, so a Hebrew question (or a Hebrew
+    chip-anchor title) produced zero tokens — the keyword fallback, the
+    rerank overlap boost, and the anchor-rescue scan were all silently dead
+    for exactly the language the product treats as first-class. ASCII tokens
+    keep the len>=3 floor; non-ASCII tokens qualify at len>=2 (Hebrew words
+    are routinely 2-4 letters)."""
+    tokens = set()
+    for t in re.split(r"[\W_]+", (question or "").lower(), flags=re.UNICODE):
+        if not t or t in _RANK_STOPWORDS:
+            continue
+        if len(t) >= 3 or (len(t) >= 2 and not t.isascii()):
+            tokens.add(t)
+    return tokens
 
 
 def _card_haystack(data: dict) -> str:
@@ -316,6 +332,12 @@ def keyword_scan_cards(uid: str, query_text: str, exclude_ids: set = None,
         if doc.id in exclude_ids:
             continue
         data = doc.to_dict() or {}
+        # Mid-flight/failed captures have no settled content to ground an
+        # answer in (matches recent_cards/category_cards) — and the anchor
+        # rescue PINS its results to the front, so a failed placeholder must
+        # never qualify.
+        if data.get("status") in ("processing", "failed"):
+            continue
         score = keyword_match_score(data, tokens)
         if score > 0:
             scored.append((score, normalize_card_for_search(data, doc.id)))
@@ -356,8 +378,10 @@ def rerank_candidates(question: str, candidates: List[dict], top_k: int = 10) ->
     for rank, c in enumerate(candidates):
         vscore = 1.0 - (rank / n)  # rank 0 -> 1.0, decays toward 0
         if q_tokens:
-            hay_tokens = set(re.split(r"[^a-z0-9]+", _card_haystack(c)))
-            title_tokens = set(re.split(r"[^a-z0-9]+", str(c.get("title", "")).lower()))
+            # Unicode-aware split (matches keyword_query_tokens) — the old
+            # ASCII-only split made the overlap boost blind to Hebrew.
+            hay_tokens = set(re.split(r"[\W_]+", _card_haystack(c), flags=re.UNICODE))
+            title_tokens = set(re.split(r"[\W_]+", str(c.get("title", "")).lower(), flags=re.UNICODE))
             overlap = len(q_tokens & hay_tokens) / len(q_tokens)
             title_overlap = len(q_tokens & title_tokens) / len(q_tokens)
         else:
@@ -410,11 +434,15 @@ def _norm_title(s: str) -> str:
 
 def _title_match(t: str, p: str) -> bool:
     """Does normalized title `t` match normalized quoted phrase `p`? Exact, or
-    a prefix in either direction (truncated quote), with a minimum phrase
-    length so a stray short fragment can never claim an unrelated card."""
+    a prefix in either direction (truncated quote), with a minimum length on
+    the SHORTER side so a stray fragment can never claim an unrelated card —
+    in either direction (a card titled just "Pan" must not be claimed by the
+    phrase "Pan con Tomate Recipe", nor vice versa)."""
     if t == p:
         return True
-    return len(p) >= 6 and (t.startswith(p) or p.startswith(t))
+    if len(p) >= 6 and t.startswith(p):
+        return True
+    return len(t) >= 6 and p.startswith(t)
 
 
 def pin_title_phrases(phrases: List[str], cards: List[dict]):
@@ -497,7 +525,7 @@ def anchor_phrases_for(question: str, anchor_titles: List[str] = None,
 # not an exclusion) — chips express real exclusions via hints.excludeTitles,
 # never by phrasing.
 _EXCLUSION_RE = re.compile(
-    r"\b(besides|other than|apart from|except|excluding)\b",
+    r"\b(besides|other than|apart from|aside from|except|excluding)\b",
     re.IGNORECASE,
 )
 
@@ -604,9 +632,9 @@ def _strip_quoted(question: str) -> str:
 # cards; the ground truth is the createdAt ordering, so ask_brain merges the
 # newest cards in front when this matches (see recent_cards).
 _RECENCY_RE = re.compile(
-    r"\b(this week|past week|last week|this month|past month|recent|recently|"
-    r"latest|newest|today|yesterday|last few days|past few days|"
-    r"catch me up|recap)\b",
+    r"\b(this week|past week|last week|this month|past month|last month|"
+    r"recent|recently|latest|newest|today|yesterday|last few days|"
+    r"past few days|catch me up|recap)\b",
     re.IGNORECASE,
 )
 

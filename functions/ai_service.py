@@ -450,12 +450,16 @@ def _parse_cited_marker(full_text: str) -> list:
     Returns the trimmed, comma-split ids exactly as the model wrote them (no
     validation against the supplied cards — callers pass the result through
     `_valid_cited_ids` for that). Missing or unparseable marker → empty list.
-    Pure, so the streaming path's marker handling is unit-testable offline.
+    A marker cut off at the very end of the text (max-length/interrupted
+    generation: `[[CITED: id1, id2` with no closing `]]`) still yields its
+    ids — the model DID name them; dropping them flagged real grounded
+    answers as ungrounded. Pure, so the streaming path's marker handling is
+    unit-testable offline.
     """
     if not full_text:
         return []
     try:
-        m = re.search(r"\[\[CITED:(.*?)\]\]", full_text, re.DOTALL)
+        m = re.search(r"\[\[CITED:([^\[\]]*?)(?:\]\]|$)", full_text, re.DOTALL)
     except Exception:
         return []
     if not m:
@@ -820,6 +824,13 @@ If the image is an article, extract the headline and body."""
                         emitted = True
                         yield ("token", buffer[:emit_to])
                         buffer = buffer[emit_to:]
+                # An entirely-empty stream (e.g. safety-blocked, degenerate
+                # response) is a FAILURE, not a success: the buffered path
+                # treats empty text as AnalysisError and falls back — the
+                # streaming path must match, or the user gets a blank bubble
+                # marked done and the ask unit is silently kept.
+                if not full_text.strip():
+                    raise AnalysisError("Empty answer stream")
                 # Flush any remaining buffered text that turned out not to be a marker.
                 if not marker_seen and buffer:
                     yield ("token", buffer)

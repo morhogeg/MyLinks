@@ -292,6 +292,57 @@ def test_parse_marker_multiline():
     assert _parse_cited_marker("ans\n[[CITED: a,\n b]]") == ["a", "b"]
 
 
+def test_parse_marker_truncated_at_end_still_yields_ids():
+    # Max-length/interrupted generation: the model named its ids but the
+    # closing "]]" never arrived — those citations are real and must count.
+    assert _parse_cited_marker("Answer.\n[[CITED: id1, id2") == ["id1", "id2"]
+
+
+# ── answer_from_context_stream: empty stream is a failure, not a success ───
+
+class _EmptyThenRealModels:
+    """ASK model streams nothing; the fallback streams real chunks."""
+
+    def __init__(self, pieces):
+        self._pieces = pieces
+        self.requested = []
+
+    def generate_content_stream(self, model, contents, config=None):
+        self.requested.append(model)
+        if len(self.requested) == 1:
+            return iter(())  # completes with zero chunks
+        return iter(_FakeChunk(p) for p in self._pieces)
+
+
+def test_stream_empty_answer_falls_back_to_analysis_model():
+    models = _EmptyThenRealModels(["Real answer.\n", "[[CITED: id1]]"])
+    svc = _svc_with_models(models)
+    text, cited, ungrounded = _drain(svc.answer_from_context_stream("q?", _CARDS))
+    assert models.requested == [GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL]
+    assert "Real answer." in text
+    assert cited == ["id1"]
+    assert ungrounded is False
+
+
+def test_stream_empty_on_both_models_raises():
+    import pytest
+    from ai_service import AnalysisError
+
+    class _AlwaysEmpty:
+        def __init__(self):
+            self.requested = []
+
+        def generate_content_stream(self, model, contents, config=None):
+            self.requested.append(model)
+            return iter(())
+
+    models = _AlwaysEmpty()
+    svc = _svc_with_models(models)
+    with pytest.raises(AnalysisError):
+        _drain(svc.answer_from_context_stream("q?", _CARDS))
+    assert models.requested == [GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL]
+
+
 # ── answer_from_context: retry + ungrounded flag (buffered path) ───────────
 
 def _svc_with_json_responses(responses):

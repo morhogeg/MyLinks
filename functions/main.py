@@ -63,7 +63,7 @@ from search import (
     extract_quoted_phrases, pin_title_phrases, missing_title_phrases,
     anchor_phrases_for, is_exclusion_question, demote_cards_by_titles,
     is_recency_question, recent_cards, category_cards,
-    private_collection_ids, strip_private_cards,
+    private_collection_ids, strip_private_cards, apply_distance_threshold,
 )
 from rate_limit import check_rate_limit, client_ip
 # Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
@@ -1225,11 +1225,25 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #    vector rank alone buries a card that literally answers the question
         #    but scores slightly lower; reranking blends vector rank with keyword
         #    overlap + recency to pull it back into context (no extra model call).
+        # Both retrieval halves can fail transiently (Firestore hiccup,
+        # embedding API down). Track it: if EVERY retrieval path failed and
+        # nothing was assembled, the honest response is a retryable error with
+        # the ask unit refunded — NOT the canned "your library is empty"
+        # answer, which gaslights a user with hundreds of saves.
+        retrieval_errors = 0
         try:
             candidates = perform_search_logic(uid, question, limit=30)
+            # Quality-gate the nearest-neighbour output exactly like the
+            # search bar does: find_nearest always returns `limit` results no
+            # matter how far away, so for an off-library question ungated
+            # "sources" are 30 unrelated cards — and the citation invariant
+            # then pressures the model to cite one. Gated, the model honestly
+            # says the library has nothing on it.
+            candidates = apply_distance_threshold(candidates)
             cards = rerank_candidates(question, candidates, top_k=10)
         except Exception as e:
             logger.error(f"ask_brain retrieval failed: {e}")
+            retrieval_errors += 1
             cards = []
 
         # 1b. Hybrid retrieval: add lexical keyword matches vector search may
@@ -1242,6 +1256,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             cards = cards + keyword_scan_cards(uid, question, exclude_ids=have, limit=5)
         except Exception as e:
             logger.error(f"ask_brain keyword fallback failed: {e}")
+            retrieval_errors += 1
 
         # 1c. Concept hint: the chip promised "what I saved on <concept>" — a
         #     lexical scan on the concept label itself catches cards whose
@@ -1338,6 +1353,19 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #     fall off first).
         cards = cards[:ASK_CONTEXT_CARDS]
 
+        # 1j. Retrieval infrastructure failed AND nothing was assembled → this
+        #     is an outage, not an empty library. Refund and return a
+        #     retryable error instead of "try saving a few links" (which is a
+        #     lie to a user with hundreds of cards). A PARTIAL failure with
+        #     usable cards still answers normally.
+        if not cards and retrieval_errors >= 2:
+            if charged:
+                refund_quota(*charged)
+                charged = None
+            return _error_response(
+                "Machina couldn't search your library right now. Please try again in a minute.",
+                503, headers)
+
         # 2. Slim the cards to what the model needs (bounded tokens/cost).
         #    Every card carries its headline fields; the FIRST few additionally
         #    carry their stored deep content — detailedSummary, structured
@@ -1347,14 +1375,24 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #    deep fields ride only on the head of the list (where retrieval,
         #    recency, and pinning put the cards the answer will actually use)
         #    and detailedSummary is truncated.
+        # Every text field is CAPPED before it can reach the prompt: card docs
+        # can be up to 1 MB (and pre-cutover rules leave links world-writable),
+        # so uncapped notes/summaries × 20 cards would be a token/cost blowup —
+        # or a hard Gemini input error — from a single pathological card.
+        def _cap_list(val, max_items, max_chars):
+            if not isinstance(val, list):
+                return []
+            return [str(x)[:max_chars] for x in val[:max_items] if str(x).strip()]
+
         slim = []
         for i, c in enumerate(cards):
+            notes = c.get("userNotes")
             s = {
                 "id": c.get("id"),
-                "title": c.get("title", "Untitled"),
-                "summary": c.get("summary", ""),
-                "category": c.get("category", "General"),
-                "tags": c.get("tags", []),
+                "title": str(c.get("title", "Untitled"))[:300],
+                "summary": str(c.get("summary", ""))[:1500],
+                "category": str(c.get("category", "General"))[:60],
+                "tags": _cap_list(c.get("tags"), 15, 60),
                 # Publisher/source so the model can answer questions that name it
                 # (e.g. "the CNN fact-check") — it's not in the title/summary text.
                 "sourceName": _card_source_name(c),
@@ -1365,8 +1403,12 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                 # answer in what the user personally wrote about the card. Both the
                 # legacy string and the multi-note array travel so ai_service's
                 # _rag_card_block (via collect_notes_text) surfaces every note.
-                "userNote": c.get("userNote", ""),
-                "userNotes": c.get("userNotes", []),
+                "userNote": str(c.get("userNote") or "")[:800],
+                "userNotes": [
+                    {"text": str(n.get("text") or "")[:400]}
+                    for n in (notes if isinstance(notes, list) else [])[:6]
+                    if isinstance(n, dict) and str(n.get("text") or "").strip()
+                ],
             }
             if i < ASK_DEEP_CARDS:
                 detail = (c.get("detailedSummary") or "").strip()
@@ -1374,23 +1416,24 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                     s["detailedSummary"] = detail[:ASK_DETAIL_MAX_CHARS]
                 takeaway = (c.get("actionableTakeaway") or "").strip()
                 if takeaway:
-                    s["actionableTakeaway"] = takeaway
+                    s["actionableTakeaway"] = takeaway[:600]
                 recipe = c.get("recipe")
                 if isinstance(recipe, dict) and (
                     recipe.get("ingredients") or recipe.get("instructions")
                 ):
                     s["recipe"] = {
-                        k: recipe.get(k)
-                        for k in ("ingredients", "instructions", "servings",
-                                  "prep_time", "cook_time")
-                        if recipe.get(k)
+                        "ingredients": _cap_list(recipe.get("ingredients"), 40, 200),
+                        "instructions": _cap_list(recipe.get("instructions"), 40, 500),
+                        **{k: str(recipe.get(k))[:60]
+                           for k in ("servings", "prep_time", "cook_time")
+                           if recipe.get(k)},
                     }
-                highlights = c.get("videoHighlights")
-                if isinstance(highlights, list) and highlights:
-                    s["videoHighlights"] = [str(h) for h in highlights[:8]]
-                speakers = c.get("speakers")
-                if isinstance(speakers, list) and speakers:
-                    s["speakers"] = [str(x) for x in speakers[:6]]
+                highlights = _cap_list(c.get("videoHighlights"), 8, 200)
+                if highlights:
+                    s["videoHighlights"] = highlights
+                speakers = _cap_list(c.get("speakers"), 6, 80)
+                if speakers:
+                    s["speakers"] = speakers
             slim.append(s)
 
         # 3. Generate a grounded answer with citations.

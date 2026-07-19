@@ -308,6 +308,25 @@ def test_strip_private_handles_malformed_fields():
 
 # ── concepts are lexically searchable (the "what else on X" retrieval hole) ─
 
+def test_keyword_tokens_are_unicode_aware():
+    # The old ASCII-only splitter produced ZERO tokens for Hebrew — killing
+    # the keyword fallback, the rerank boost, and the anchor rescue for
+    # exactly the language the product treats as first-class.
+    tokens = keyword_query_tokens('Walk me through the steps in "מתכון שקשוקה"')
+    assert "מתכון" in tokens and "שקשוקה" in tokens
+    # Hebrew function words are stopworded like English ones.
+    assert "של" not in keyword_query_tokens("מה הטעם של זה")
+
+
+def test_title_match_short_title_not_claimed_by_long_phrase():
+    from search import _title_match
+    # A card titled just "Pan" must not be pinned/excluded by the phrase
+    # "pan con tomate recipe" (reverse-prefix over-match).
+    assert _title_match("pan", "pan con tomate recipe") is False
+    assert _title_match("pan con tomate recipe", "pan con tomate") is True
+    assert _title_match("pan", "pan") is True
+
+
 def test_keyword_score_matches_concept_only_cards():
     # "Resilience" lives ONLY in the concepts array — the lexical scan must
     # still find the card, or a concept chip can't deliver.
