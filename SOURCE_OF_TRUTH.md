@@ -775,6 +775,17 @@ exact-match, capped.
   chips return. Intent dedup became PER-ANCHOR (`chipIntentKey` =
   intent:quoted-title, isolate-stripped) so detail-on-A no longer consumes
   detail-on-B. 320 tests, `tsc` clean.
+  **Round 6 — cross-language answers (owner repro: English "Give me more
+  detail on '<Hebrew title>'" answered entirely in Hebrew, then rendered
+  against the question's LTR direction).** Two-layer fix: (a) prompt — the
+  answer-language rule now says to judge the question's language from the
+  user's OWN words, IGNORING quoted card titles (the Hebrew title inside
+  an English question was flipping the model's language detection);
+  (b) client — direction follows the answer's ACTUAL prose (content
+  counting with quoted AND **bolded** title spans stripped; the question's
+  direction is only the neutral-content fallback), so even a
+  language-rule-disobeying answer renders aligned with what it actually
+  says. `getDominantDirection(text, fallback)` in lib/rtl.ts.
 
 - **2026-07-18 — MOBILE v4 CHROME: bottom tab bar + one-line header +
   dedicated Sources (owner-approved via 4 mockup rounds; commit `4028979`,

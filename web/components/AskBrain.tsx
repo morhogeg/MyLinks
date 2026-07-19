@@ -77,15 +77,16 @@ function normalizeListMarkers(md: string): string {
  *
  *  Direction: every block carries ONE direction for the whole message — NOT
  *  per-block `dir="auto"` (first-strong detection flipped any English bullet
- *  that OPENED with a quoted Hebrew title into a fully-RTL line). The caller
- *  passes the direction of the QUESTION the answer replies to: the prompt
- *  forces the answer's language to match the question's, so the question is
- *  the most reliable signal — immune to an answer whose quoted/bolded titles
- *  are mostly in the opposite script (aggregate title mass flipped
- *  content-majority counting). Falls back to content counting when no
- *  question direction is available. */
+ *  that OPENED with a quoted Hebrew title into a fully-RTL line). The
+ *  direction follows the answer's ACTUAL prose — content counting with
+ *  quoted AND bolded title spans stripped, so opposite-script title mass
+ *  can't flip it — because the rendered text is the ground truth even when
+ *  the model disobeys the answer-language rule (observed: an English
+ *  question answered in Hebrew must still render RTL). The QUESTION's
+ *  direction (`dir` prop) is only the fallback for title-only/neutral
+ *  content. */
 function MarkdownMessage({ content, dir: dirProp }: { content: string; dir?: 'rtl' | 'ltr' }) {
-    const dir = dirProp ?? getDominantDirection(content);
+    const dir = getDominantDirection(content, dirProp ?? 'ltr');
     return (
         <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}
@@ -960,10 +961,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
 
     const isEmpty = messages.length === 0;
 
-    /** Direction for the assistant message at index `i`: the direction of the
-     *  QUESTION it answers (the prompt forces answer language = question
-     *  language), so an English answer stacked with Hebrew titles — or the
-     *  reverse — can't flip its whole column. */
+    /** FALLBACK direction for the assistant message at index `i`: the
+     *  direction of the QUESTION it answers — used only when the answer's own
+     *  prose is neutral (title-only content). The primary signal is the
+     *  answer's stripped prose (see MarkdownMessage). */
     const answerDirFor = (i: number): 'rtl' | 'ltr' | undefined => {
         for (let j = i - 1; j >= 0; j--) {
             if (messages[j].role === 'user') return getDominantDirection(messages[j].content);
@@ -1078,7 +1079,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                         // single-language, and chip-built questions isolate
                                         // their embedded titles (see askSuggestions' iso()).
                                         dir={m.role === 'assistant' && !m.error
-                                            ? (answerDirFor(i) ?? getDominantDirection(m.content))
+                                            ? getDominantDirection(m.content, answerDirFor(i) ?? 'ltr')
                                             : 'auto'}
                                         className={
                                             m.role === 'user'

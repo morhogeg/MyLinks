@@ -28,14 +28,18 @@ export function getDirection(text: string, language?: string): 'rtl' | 'ltr' {
  * an English-dominant block LTR (embedded Hebrew runs still render RTL inline,
  * which standard bidi handles correctly) and a Hebrew-dominant block RTL.
  */
-export function getDominantDirection(text: string): 'rtl' | 'ltr' {
-    if (!text) return 'ltr';
-    // Direction belongs to the PROSE, not to quoted card titles: a Hebrew
-    // answer citing three long English titles must stay RTL (and vice versa),
-    // so quoted spans don't get a vote. If stripping leaves no strong chars
-    // (an answer that is little more than a quoted title), fall back to
-    // counting the full text.
-    const prose = text.replace(/["\u201C\u201D\u00AB\u00BB][^"\u201C\u201D\u00AB\u00BB]{0,200}["\u201C\u201D\u00AB\u00BB]/g, ' ');
+export function getDominantDirection(text: string, fallback: 'rtl' | 'ltr' = 'ltr'): 'rtl' | 'ltr' {
+    if (!text) return fallback;
+    // Direction belongs to the PROSE, not to card titles: a Hebrew answer
+    // citing three long English titles must stay RTL (and vice versa), so
+    // neither QUOTED spans nor **bolded** spans (how the model writes titles
+    // in recap bullets) get a vote. If stripping leaves no strong chars (an
+    // answer that is little more than a title), count the full text; if THAT
+    // is neutral too, use the caller's fallback (e.g. the question's
+    // direction).
+    const prose = text
+        .replace(/["\u201C\u201D\u00AB\u00BB][^"\u201C\u201D\u00AB\u00BB]{0,200}["\u201C\u201D\u00AB\u00BB]/g, ' ')
+        .replace(/\*\*[^*\n]{1,200}\*\*/g, ' ');
     const count = (s: string) => ({
         // Hebrew + Arabic ranges vs Latin letters — strong directional chars
         // only (digits/punctuation are neutral and must not vote).
@@ -44,5 +48,6 @@ export function getDominantDirection(text: string): 'rtl' | 'ltr' {
     });
     let { rtl, ltr } = count(prose);
     if (rtl === 0 && ltr === 0) ({ rtl, ltr } = count(text));
+    if (rtl === 0 && ltr === 0) return fallback;
     return rtl > ltr ? 'rtl' : 'ltr';
 }
