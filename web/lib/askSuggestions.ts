@@ -123,16 +123,16 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
     if (latest) {
         // iso(): bidi-isolate the embedded title so a Hebrew title inside an
         // English chip/bubble renders as one intact run (defined below).
-        // Display uses the ellipsized title (pill space); the SENT question
-        // carries the full title (bubbles have room — no truncation).
-        const phrasings = (t: string) => [
+        // FULL title in both the pill and the sent question (owner rule:
+        // never truncate — chips wrap instead).
+        const t = iso(fullTitle(latest.title)!);
+        const phrasings = [
             `What's the gist of "${t}"?`,
             `Key points from "${t}"`,
             `Why is "${t}" worth my time?`,
         ];
         latestChips.push({
-            text: rotate(phrasings(iso(chipTitle(latest.title)!)), salt)[0],
-            question: rotate(phrasings(iso(fullTitle(latest.title)!)), salt)[0],
+            text: rotate(phrasings, salt)[0],
             kind: 'latest',
             key: `latest:${latest.id}`,
             hints: { anchorTitles: [hintTitle(latest.title)!] },
@@ -222,8 +222,7 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
         .sort((a, b) => toMs(a.createdAt) - toMs(b.createdAt))[0];
     if (dusty) {
         pool.push({
-            text: `What was "${iso(chipTitle(dusty.title)!)}" about again?`,
-            question: `What was "${iso(fullTitle(dusty.title)!)}" about again?`,
+            text: `What was "${iso(fullTitle(dusty.title)!)}" about again?`,
             kind: 'rediscover',
             key: `rediscover:${dusty.id}`,
             hints: { anchorTitles: [hintTitle(dusty.title)!] },
@@ -652,8 +651,9 @@ export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
         // stored depth — the natural next step after a recap.
         const drill = anchorPool.find(hasOwnEvidence) ?? withTitle.find(hasOwnEvidence);
         if (drill) {
+            // Full title on the pill too (owner rule) — chips wrap, data wins.
             candidates.push({
-                label: `More on "${iso(chipTitle(drill.title, 24)!)}"`,
+                label: `More on "${iso(fullTitle(drill.title)!)}"`,
                 question: `Give me more detail on "${iso(fullTitle(drill.title)!)}"`,
                 hints: hintTitle(drill.title) ? { anchorTitles: [hintTitle(drill.title)!] } : undefined,
             });

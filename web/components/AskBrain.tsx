@@ -1051,7 +1051,9 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                         // ellipsized text (bubbles never truncate titles).
                                         send(s.question ?? s.text, undefined, s.kind === 'latest' || s.kind === 'rediscover' ? 'card' : 'library', s.hints);
                                     }}
-                                    className="animate-fade-in px-3.5 py-2 rounded-full bg-card border border-border-subtle text-text-secondary text-sm font-medium hover:border-accent/40 hover:text-text transition-colors cursor-pointer"
+                                    // max-w-full + text-start: full titles never truncate —
+                                    // a long chip wraps to a second line inside the row.
+                                    className="animate-fade-in max-w-full px-3.5 py-2 rounded-2xl bg-card border border-border-subtle text-text-secondary text-sm font-medium text-start hover:border-accent/40 hover:text-text transition-colors cursor-pointer"
                                 >
                                     {s.text}
                                 </button>
@@ -1185,7 +1187,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                         // self-contained question carrying the cited card's
                                         // title, so backend retrieval can actually find it.
                                         onClick={() => { trackAskFollowupUsed(); send(f.question, undefined, 'followup', f.hints); }}
-                                        className="px-3 py-1.5 rounded-full border border-border-subtle text-text-muted text-[13px] hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
+                                        // Full labels wrap instead of truncating (owner rule).
+                                        className="max-w-full px-3 py-1.5 rounded-2xl border border-border-subtle text-text-muted text-[13px] text-start hover:text-text hover:border-accent/40 transition-colors cursor-pointer"
                                     >
                                         {f.label}
                                     </button>

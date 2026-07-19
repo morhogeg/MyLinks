@@ -794,6 +794,10 @@ exact-match, capped.
   (`_QUOTED_RE`), direction counting, and the •-splitter guard so long
   full titles keep anchoring/rendering correctly. Bonus: full-title
   questions make backend title pinning EXACT-match instead of prefix.
+  Extended same-session to the CHIP PILLS: labels also carry the full
+  title now (no ellipsis anywhere); chip buttons gained `max-w-full
+  text-start rounded-2xl` so long labels wrap to a second line instead of
+  truncating or overflowing.
 
 - **2026-07-18 — MOBILE v4 CHROME: bottom tab bar + one-line header +
   dedicated Sources (owner-approved via 4 mockup rounds; commit `4028979`,
