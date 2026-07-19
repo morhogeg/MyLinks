@@ -786,6 +786,14 @@ exact-match, capped.
   direction is only the neutral-content fallback), so even a
   language-rule-disobeying answer renders aligned with what it actually
   says. `getDominantDirection(text, fallback)` in lib/rtl.ts.
+  **Round 7 — no truncation in bubbles (owner rule):** sent questions now
+  carry the FULL card title (`fullTitle()`); the ellipsized `chipTitle()`
+  is display-only for the compact pills (AskSuggestion gained a
+  text/question split, mirroring FollowUpChip's label/question).
+  Quote-span bounds raised 120/200→300 across backend extraction
+  (`_QUOTED_RE`), direction counting, and the •-splitter guard so long
+  full titles keep anchoring/rendering correctly. Bonus: full-title
+  questions make backend title pinning EXACT-match instead of prefix.
 
 - **2026-07-18 — MOBILE v4 CHROME: bottom tab bar + one-line header +
   dedicated Sources (owner-approved via 4 mockup rounds; commit `4028979`,

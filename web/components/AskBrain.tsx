@@ -14,7 +14,7 @@ import { trackFirstAsk, trackAskNoCitations, trackAskSuggestionUsed, trackAskFol
 import { reportError } from '@/lib/errorReporter';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { ChatMessage, ChatSource, ChatSession, Link } from '@/lib/types';
-import { buildAskSuggestions, buildFollowUps, newestReadyLink, iso, chipTitle, AskHints, ClassifiableCard } from '@/lib/askSuggestions';
+import { buildAskSuggestions, buildFollowUps, newestReadyLink, iso, fullTitle, AskHints, ClassifiableCard } from '@/lib/askSuggestions';
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
 import { hapticLight } from '@/lib/haptics';
 import ConfirmDialog from './ConfirmDialog';
@@ -63,7 +63,7 @@ function normalizeListMarkers(md: string): string {
     // must not be chopped into fake list items by the inline-bullet splitter.
     // Split alternates [outside, quoted, outside, …]; transform outside only.
     return md
-        .split(/(["“”«»][^"“”«»\n]{0,200}["“”«»])/)
+        .split(/(["“”«»][^"“”«»\n]{0,300}["“”«»])/)
         .map((seg, i) => i % 2 === 1 ? seg : seg
             .replace(/^([ \t]*)[•◦▪‣·][ \t]+/gm, '$1- ')
             .replace(/[ \t]+[•◦▪‣][ \t]+/g, '\n- ')
@@ -1047,7 +1047,9 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                     // suggested; the rest genuinely sweep the library.
                                     onClick={() => {
                                         trackAskSuggestionUsed(s.kind);
-                                        send(s.text, undefined, s.kind === 'latest' || s.kind === 'rediscover' ? 'card' : 'library', s.hints);
+                                        // Send the full-title question; the pill shows the
+                                        // ellipsized text (bubbles never truncate titles).
+                                        send(s.question ?? s.text, undefined, s.kind === 'latest' || s.kind === 'rediscover' ? 'card' : 'library', s.hints);
                                     }}
                                     className="animate-fade-in px-3.5 py-2 rounded-full bg-card border border-border-subtle text-text-secondary text-sm font-medium hover:border-accent/40 hover:text-text transition-colors cursor-pointer"
                                 >
@@ -1218,9 +1220,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                             dir="auto"
                             onClick={() => {
                                 trackAskSuggestionUsed('fresh');
-                                // Cap the embedded title like every other chip — a
-                                // 300-char YouTube title must not become the bubble.
-                                send(`What's the gist of "${iso(chipTitle(freshCard.title, 60) ?? freshCard.title)}"?`, undefined, 'card',
+                                // Full title in the sent bubble (owner rule: no truncation).
+                                send(`What's the gist of "${iso(fullTitle(freshCard.title) ?? freshCard.title)}"?`, undefined, 'card',
                                     { anchorTitles: [freshCard.title.trim().slice(0, 120)] });
                                 setFreshCard(null);
                             }}

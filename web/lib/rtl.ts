@@ -38,8 +38,8 @@ export function getDominantDirection(text: string, fallback: 'rtl' | 'ltr' = 'lt
     // is neutral too, use the caller's fallback (e.g. the question's
     // direction).
     const prose = text
-        .replace(/["\u201C\u201D\u00AB\u00BB][^"\u201C\u201D\u00AB\u00BB]{0,200}["\u201C\u201D\u00AB\u00BB]/g, ' ')
-        .replace(/\*\*[^*\n]{1,200}\*\*/g, ' ');
+        .replace(/["\u201C\u201D\u00AB\u00BB][^"\u201C\u201D\u00AB\u00BB]{0,300}["\u201C\u201D\u00AB\u00BB]/g, ' ')
+        .replace(/\*\*[^*\n]{1,300}\*\*/g, ' ');
     const count = (s: string) => ({
         // Hebrew + Arabic ranges vs Latin letters — strong directional chars
         // only (digits/punctuation are neutral and must not vote).

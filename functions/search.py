@@ -409,11 +409,12 @@ def rerank_candidates(question: str, candidates: List[dict], top_k: int = 10) ->
 # it a guarantee instead of a likelihood.
 
 # A quoted span (straight/curly double quotes or guillemets), long enough to
-# be a title rather than a quoted word. Chip titles are ≤60 chars + a
-# truncation ellipsis. Single/curly-single quotes are deliberately NOT
-# delimiters: chips always quote with double quotes, and a curly apostrophe
-# inside a title ("Rafi’s Pasta") must not split the phrase.
-_QUOTED_RE = re.compile(r'["“”«»]([^"“”«»]{3,120}?)["“”«»]')
+# be a title rather than a quoted word. Chip questions carry FULL titles
+# (no truncation in bubbles), so the span bound is generous. Single/curly-
+# single quotes are deliberately NOT delimiters: chips always quote with
+# double quotes, and a curly apostrophe inside a title ("Rafi’s Pasta") must
+# not split the phrase.
+_QUOTED_RE = re.compile(r'["“”«»]([^"“”«»]{3,300}?)["“”«»]')
 
 
 def extract_quoted_phrases(question: str) -> List[str]:

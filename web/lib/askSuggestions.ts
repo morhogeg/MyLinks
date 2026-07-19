@@ -38,7 +38,11 @@ function hintTitle(raw: string | undefined): string | null {
 }
 
 export interface AskSuggestion {
+    /** What the chip DISPLAYS (titles ellipsized to fit the pill). */
     text: string;
+    /** What is SENT when tapped — same phrasing with the FULL title (bubbles
+     *  have room; sent questions never truncate). Falls back to `text`. */
+    question?: string;
     kind: AskSuggestionKind;
     /** Stable identity for chip animations — changes when the underlying card
      *  changes, so a fresh save visibly re-enters. */
@@ -76,6 +80,15 @@ export function chipTitle(raw: string | undefined, max = 46): string | null {
     return chars.length > max ? `${chars.slice(0, max).join('').trimEnd()}…` : t;
 }
 
+/** The card's FULL title for a SENT question — bubbles have room, so sent
+ *  questions never truncate a title (owner rule, 2026-07-19); only the
+ *  compact chip pills use chipTitle's ellipsis. Same quote/whitespace
+ *  normalization so quote-span parsing stays intact everywhere. */
+export function fullTitle(raw: string | undefined): string | null {
+    const t = raw?.trim().replace(/\s+/g, ' ').replace(/["“”«»]/g, '’');
+    return t && t.toLowerCase() !== 'untitled' ? t : null;
+}
+
 /** The newest ready card with a usable title, or null. */
 export function newestReadyLink(links: Link[]): Link | null {
     let best: Link | null = null;
@@ -110,14 +123,16 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
     if (latest) {
         // iso(): bidi-isolate the embedded title so a Hebrew title inside an
         // English chip/bubble renders as one intact run (defined below).
-        const t = iso(chipTitle(latest.title)!);
-        const phrasings = [
+        // Display uses the ellipsized title (pill space); the SENT question
+        // carries the full title (bubbles have room — no truncation).
+        const phrasings = (t: string) => [
             `What's the gist of "${t}"?`,
             `Key points from "${t}"`,
             `Why is "${t}" worth my time?`,
         ];
         latestChips.push({
-            text: rotate(phrasings, salt)[0],
+            text: rotate(phrasings(iso(chipTitle(latest.title)!)), salt)[0],
+            question: rotate(phrasings(iso(fullTitle(latest.title)!)), salt)[0],
             kind: 'latest',
             key: `latest:${latest.id}`,
             hints: { anchorTitles: [hintTitle(latest.title)!] },
@@ -206,9 +221,9 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
         .filter(l => l.id !== latest?.id && !l.isRead && !l.lastViewedAt && chipTitle(l.title) && now - toMs(l.createdAt) > WEEK_MS)
         .sort((a, b) => toMs(a.createdAt) - toMs(b.createdAt))[0];
     if (dusty) {
-        const t = iso(chipTitle(dusty.title)!);
         pool.push({
-            text: `What was "${t}" about again?`,
+            text: `What was "${iso(chipTitle(dusty.title)!)}" about again?`,
+            question: `What was "${iso(fullTitle(dusty.title)!)}" about again?`,
             kind: 'rediscover',
             key: `rediscover:${dusty.id}`,
             hints: { anchorTitles: [hintTitle(dusty.title)!] },
@@ -595,7 +610,8 @@ export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
         !!c.recipe?.instructions?.length || !!c.recipe?.ingredients?.length ||
         (c.detailedSummary?.trim().length ?? 0) >= 200;
     const anchorCard = anchorPool.find(hasOwnEvidence) ?? anchorPool[0];
-    const t = chipTitle(anchorCard.title, 60)!;
+    // Sent questions carry the FULL title — no truncation in bubbles.
+    const t = fullTitle(anchorCard.title)!;
     const ev = gatherEvidence([anchorCard]);
 
     const related = findRelatedConcept(citedCards, allLinks);
@@ -618,8 +634,8 @@ export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
     // produces "these cover entirely different domains" — worse than no chip.
     const pair = findRelatedPair(withTitle);
     if (pair) {
-        const ta = iso(chipTitle(pair.a.title, 60)!);
-        const tb = iso(chipTitle(pair.b.title, 60)!);
+        const ta = iso(fullTitle(pair.a.title)!);
+        const tb = iso(fullTitle(pair.b.title)!);
         const pairHints: AskHints = {
             anchorTitles: [hintTitle(pair.a.title), hintTitle(pair.b.title)].filter((x): x is string => !!x),
         };
@@ -638,7 +654,7 @@ export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
         if (drill) {
             candidates.push({
                 label: `More on "${iso(chipTitle(drill.title, 24)!)}"`,
-                question: `Give me more detail on "${iso(chipTitle(drill.title, 60)!)}"`,
+                question: `Give me more detail on "${iso(fullTitle(drill.title)!)}"`,
                 hints: hintTitle(drill.title) ? { anchorTitles: [hintTitle(drill.title)!] } : undefined,
             });
         }
