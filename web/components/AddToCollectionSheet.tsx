@@ -82,6 +82,16 @@ export default function AddToCollectionSheet({
 
     const memberIds = useMemo(() => new Set(link.collectionIds ?? []), [link.collectionIds]);
 
+    // Rough size per collection (from the loaded feed — an orientation cue for
+    // picking the right target, not an authoritative count).
+    const rowCounts = useMemo(() => {
+        const counts: Record<string, number> = {};
+        for (const l of links) {
+            for (const cid of l.collectionIds ?? []) counts[cid] = (counts[cid] || 0) + 1;
+        }
+        return counts;
+    }, [links]);
+
     // Best-matching non-member collections for this card, shown first.
     const suggested = useMemo(
         () => (isOpen ? rankCollectionsForLink(link, collections, links) : []),
@@ -177,13 +187,13 @@ export default function AddToCollectionSheet({
                                 <Sparkles className="w-3 h-3" /> Suggested
                             </p>
                             {suggested.map((c) => (
-                                <CollectionRow key={c.id} collection={c} isMember={memberIds.has(c.id)} onToggle={toggle} />
+                                <CollectionRow key={c.id} collection={c} count={rowCounts[c.id] ?? 0} isMember={memberIds.has(c.id)} onToggle={toggle} />
                             ))}
                             {sorted.length > 0 && <div className="mx-5 my-1 border-t border-border-subtle" />}
                         </>
                     )}
                     {sorted.map((c) => (
-                        <CollectionRow key={c.id} collection={c} isMember={memberIds.has(c.id)} onToggle={toggle} />
+                        <CollectionRow key={c.id} collection={c} count={rowCounts[c.id] ?? 0} isMember={memberIds.has(c.id)} onToggle={toggle} />
                     ))}
                 </div>
 
@@ -228,10 +238,12 @@ export default function AddToCollectionSheet({
 /** One toggleable membership row — shared by the Suggested and A–Z sections. */
 function CollectionRow({
     collection,
+    count,
     isMember,
     onToggle,
 }: {
     collection: Collection;
+    count: number;
     isMember: boolean;
     onToggle: (c: Collection) => void;
 }) {
@@ -248,6 +260,9 @@ function CollectionRow({
                 style={{ backgroundColor: dot.color }}
             />
             <span className="flex-1 text-start truncate">{collection.name}</span>
+            {count > 0 && (
+                <span className="shrink-0 text-xs font-semibold text-text-muted tabular-nums">{count}</span>
+            )}
             <span
                 className={`flex items-center justify-center w-6 h-6 rounded-full border transition-colors ${
                     isMember

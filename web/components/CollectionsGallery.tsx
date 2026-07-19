@@ -17,6 +17,12 @@ interface CollectionsGalleryProps {
      *  (no covers, description, or count) and the parent gates every action
      *  behind the PIN. Omit/empty when the vault is unlocked. */
     lockedIds?: Set<string>;
+    /** True member counts from server count() queries (useCollectionCounts).
+     *  `links` is the windowed (and, while the vault is locked, privacy-
+     *  filtered) feed, so counts derived from it read low for collections with
+     *  members outside the window. Server counts win when present; derived is
+     *  the fallback. */
+    serverCounts?: Record<string, number>;
     onOpen: (collectionId: string) => void;
     onEdit: (collection: Collection) => void;
     onShare: (collection: Collection) => void;
@@ -44,6 +50,7 @@ export default function CollectionsGallery({
     links,
     suggestions = [],
     lockedIds,
+    serverCounts,
     onOpen,
     onEdit,
     onShare,
@@ -92,7 +99,8 @@ export default function CollectionsGallery({
         <div className="grid gap-4 sm:gap-5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 240px), 1fr))' }}>
             {sorted.map((c) => {
                 const style = getColorStyleByKey(c.color || c.name);
-                const count = meta.counts[c.id] || 0;
+                const derivedCount = meta.counts[c.id] || 0;
+                const count = serverCounts?.[c.id] ?? derivedCount;
                 const locked = lockedIds?.has(c.id) ?? false;
                 // Explicit cover first, then mosaic fill from member thumbnails.
                 // Locked tiles show nothing of their contents — just the color.
@@ -102,7 +110,13 @@ export default function CollectionsGallery({
                 const thumbs = locked ? [] : explicitCover
                     ? [explicitCover, ...(meta.covers[c.id] ?? []).filter((t) => t !== explicitCover)].slice(0, 4)
                     : meta.covers[c.id] ?? [];
-                const stale = isShareStale(c, meta.members[c.id] ?? []);
+                // Staleness needs the COMPLETE member set; the windowed feed
+                // only has `derivedCount` of the collection's `count` members.
+                // With a partial set the signature always mismatches, so only
+                // flag stale when we can see every member (detail view + Share
+                // sheet compute it from the full set and stay authoritative).
+                const membersComplete = derivedCount === count;
+                const stale = membersComplete && isShareStale(c, meta.members[c.id] ?? []);
                 const open = menu?.collection.id === c.id;
                 return (
                     <div

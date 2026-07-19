@@ -647,7 +647,36 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-19 (latest) — ASK RELIABILITY: chips now always deliver what they
+- **2026-07-19 (latest) — REVIEW DECK: Keep no longer favorites + explicit Star
+  action; COLLECTIONS: honest counts/ordering.** Owner repro: the deck's
+  bottom buttons "don't make sense — Keep actually adds to favorites". It did:
+  right-swipe called `onFavorite`, so every review session silently polluted
+  Favorites with cards the user merely didn't archive. Now **Keep = mark
+  reviewed**: a new client-only `reviewedAt` stamp (+`isRead:true`;
+  `markLinkReviewed`/`undoLinkReviewed` in storage.ts) leaves the card's
+  status untouched and sits it out of the review pool for a 14-day cooldown
+  (`REVIEWED_COOLDOWN_DAYS` in reviewQueue.ts — Keep means "seen it, resurface
+  later", Archive remains the "done with it" exit), after which it naturally
+  resurfaces. **Star is now its own explicit action** — new down-swipe (↓ +
+  button + ArrowDown + STAR drag hint, amber) that favorites intentionally;
+  Keep's icon switched Star→Check so the metaphor is honest. Undo restores the
+  pre-Keep read state; session summary now tallies kept/starred/archived/
+  reminders separately. Gotcha fixed en route: `links.filter(isOpen)` would
+  have passed the array index as isOpen's new `now` param. Collections pass
+  (review-then-improve): (1) gallery tiles now show TRUE member counts via
+  Firestore `getCountFromServer` aggregations (`useCollectionCounts`, fetched
+  only while the gallery is on screen, debounced, refreshed on local
+  membership changes) — the windowed 150-card feed undercounted big
+  collections; (2) the gallery's "Update link" share-stale badge is suppressed
+  when the window doesn't hold the full member set (partial sets ALWAYS
+  mismatched the signature → false "stale" flags; detail view/Share sheet stay
+  authoritative via useCollectionLinks); (3) membership changes now bump the
+  collection's `updatedAt` (best-effort `touchCollection`), so the gallery's
+  recently-active sort is finally true — it used to freeze at the last
+  metadata edit; (4) Add-to-collection sheet rows show each collection's size;
+  (5) removed dead `setLinkCollections` export. All client-side; no backend
+  or functions changes. `tsc` clean.
+- **2026-07-19 — ASK RELIABILITY: chips now always deliver what they
   promise (deep-content RAG + retrieval guarantees; commit `3ce4bcf`, merge
   `5938b2a`).** Owner repro: the
   "Walk me through the steps" follow-up chip on a recipe card answered with a

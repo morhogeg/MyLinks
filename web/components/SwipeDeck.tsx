@@ -7,22 +7,28 @@ import SourceByline from './SourceByline';
 import SimpleMarkdown from './SimpleMarkdown';
 import { hasHebrew } from '@/lib/rtl';
 import { hapticLight } from '@/lib/haptics';
-import { Star, Archive, Bell, RotateCcw, Sparkles } from 'lucide-react';
+import { Star, Archive, Bell, RotateCcw, Sparkles, Check } from 'lucide-react';
 import { REVIEW_SESSION_SIZE, isOpen, reviewSessionQueue } from '@/lib/reviewQueue';
 
-type SwipeDir = 'left' | 'right' | 'up';
+type SwipeDir = 'left' | 'right' | 'up' | 'down';
 type Phase = 'idle' | 'dragging' | 'exiting' | 'waiting';
-type ActionKind = 'keep' | 'archive' | 'remind';
+type ActionKind = 'keep' | 'star' | 'archive' | 'remind';
 
 interface SwipeDeckProps {
     links: Link[];
+    /** Keep: mark the card reviewed/read — it stays in the library untouched
+     *  and sits out of review for a cooldown. NOT a favorite. */
+    onKeep: (link: Link) => void;
+    /** Star: explicitly add the card to favorites. */
     onFavorite: (link: Link) => void;
     onArchive: (link: Link) => void;
     /** Open the reminder modal for `link` (resolves back via `remindSignal`). */
     onRemind: (link: Link) => void;
     onOpen: (link: Link) => void;
-    /** Reverse a favorite/archive back to unread (used by Undo). */
+    /** Reverse a star/archive back to unread (used by Undo). */
     onResetStatus: (link: Link) => void;
+    /** Reverse a Keep: clear the reviewed stamp (used by Undo). */
+    onUndoKeep: (link: Link) => void;
     /** Clear a reminder that was just set (used by Undo of an up-swipe). */
     onCancelRemind: (link: Link) => void;
     /** Outcome of the last reminder modal opened via `onRemind`: `saved` true if
@@ -38,7 +44,8 @@ const THRESHOLD = 110; // px past which a drag commits to a swipe
 
 /**
  * The interactive twin of the digest: a short, curated resurfacing session.
- * Swipe right to keep, left to archive, up to set a reminder; tap to open.
+ * Swipe right to keep (mark reviewed — the card stays in the library as-is),
+ * left to archive, up to set a reminder, down to star (favorite); tap to open.
  *
  * The session is dealt from ONE smart order (see lib/reviewQueue: forgotten
  * cards first, then newest unread, then the rest — no user-facing queue
@@ -49,11 +56,13 @@ const THRESHOLD = 110; // px past which a drag commits to a swipe
  */
 export default function SwipeDeck({
     links,
+    onKeep,
     onFavorite,
     onArchive,
     onRemind,
     onOpen,
     onResetStatus,
+    onUndoKeep,
     onCancelRemind,
     remindSignal,
     onExit,
@@ -69,6 +78,7 @@ export default function SwipeDeck({
     const [lastAction, setLastAction] = useState<{ index: number; kind: ActionKind; link: Link } | null>(null);
     // Session tallies for the summary screen.
     const [kept, setKept] = useState(0);
+    const [starred, setStarred] = useState(0);
     const [archived, setArchived] = useState(0);
     const [reminders, setReminders] = useState(0);
 
@@ -120,6 +130,7 @@ export default function SwipeDeck({
         setPos(0);
         setLastAction(null);
         setKept(0);
+        setStarred(0);
         setArchived(0);
         setReminders(0);
         setPhase('idle');
@@ -133,7 +144,7 @@ export default function SwipeDeck({
     // streamed in, or the feed filter changed under it and every dealt id
     // dropped out. Guarded to zero-activity states so a finished session's
     // summary (tallies or an undoable action present) is never skipped past.
-    const acted = kept + archived + reminders;
+    const acted = kept + starred + archived + reminders;
     useEffect(() => {
         if (current || acted > 0 || lastAction || phase === 'waiting' || poolCount === 0) return;
         deal();
@@ -180,16 +191,22 @@ export default function SwipeDeck({
         exitDir.current = null;
     };
 
-    // Apply a left/right swipe: fire the action, advance past the card, remember
-    // it for Undo. (Up-swipes go through startRemind instead.)
-    const commit = (dir: 'left' | 'right') => {
+    // Apply a left/right/down swipe: fire the action, advance past the card,
+    // remember it for Undo. (Up-swipes go through startRemind instead.)
+    const commit = (dir: 'left' | 'right' | 'down') => {
         const link = current;
         if (!link) return settle();
         const idx = currentIndex;
         if (dir === 'right') {
-            onFavorite(link);
+            // Keep = mark reviewed. The card stays in the library untouched —
+            // keeping is NOT favoriting (that's the explicit Star action).
+            onKeep(link);
             setKept((k) => k + 1);
             setLastAction({ index: idx, kind: 'keep', link });
+        } else if (dir === 'down') {
+            onFavorite(link);
+            setStarred((s) => s + 1);
+            setLastAction({ index: idx, kind: 'star', link });
         } else {
             onArchive(link);
             setArchived((a) => a + 1);
@@ -257,7 +274,8 @@ export default function SwipeDeck({
         setPhase('exiting');
         if (dir === 'right') setDrag({ x: window.innerWidth, y: 0 });
         else if (dir === 'left') setDrag({ x: -window.innerWidth, y: 0 });
-        else setDrag({ x: 0, y: -window.innerHeight });
+        else if (dir === 'up') setDrag({ x: 0, y: -window.innerHeight });
+        else setDrag({ x: 0, y: window.innerHeight });
     };
 
     const onPointerDown = (e: React.PointerEvent) => {
@@ -282,6 +300,7 @@ export default function SwipeDeck({
         if (x > THRESHOLD) return fling('right');
         if (x < -THRESHOLD) return fling('left');
         if (y < -THRESHOLD) return fling('up');
+        if (y > THRESHOLD) return fling('down');
         if (!moved.current && current) onOpen(current);
         setPhase('idle');
         setDrag({ x: 0, y: 0 });
@@ -296,9 +315,12 @@ export default function SwipeDeck({
         if (kind === 'remind') {
             onCancelRemind(link);
             setReminders((r) => Math.max(0, r - 1));
+        } else if (kind === 'keep') {
+            onUndoKeep(link);
+            setKept((k) => Math.max(0, k - 1));
         } else {
             onResetStatus(link);
-            if (kind === 'keep') setKept((k) => Math.max(0, k - 1));
+            if (kind === 'star') setStarred((s) => Math.max(0, s - 1));
             else setArchived((a) => Math.max(0, a - 1));
         }
         setPos(index);
@@ -325,6 +347,7 @@ export default function SwipeDeck({
             if (e.key === 'ArrowLeft') { e.preventDefault(); fling('left'); }
             else if (e.key === 'ArrowRight') { e.preventDefault(); fling('right'); }
             else if (e.key === 'ArrowUp') { e.preventDefault(); fling('up'); }
+            else if (e.key === 'ArrowDown') { e.preventDefault(); fling('down'); }
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
@@ -335,9 +358,10 @@ export default function SwipeDeck({
     const rightHint = Math.max(0, Math.min(1, drag.x / THRESHOLD));
     const leftHint = Math.max(0, Math.min(1, -drag.x / THRESHOLD));
     const upHint = Math.max(0, Math.min(1, -drag.y / THRESHOLD));
+    const downHint = Math.max(0, Math.min(1, drag.y / THRESHOLD));
 
     if (!current) {
-        const acted = kept + archived + reminders;
+        const acted = kept + starred + archived + reminders;
         const moreAvailable = poolCount > 0;
         return (
             <div className="flex flex-col items-center justify-center text-center py-16 gap-4">
@@ -349,6 +373,7 @@ export default function SwipeDeck({
                     <p className="text-sm text-text-muted max-w-xs">
                         {[
                             kept > 0 ? `${kept} kept` : null,
+                            starred > 0 ? `${starred} starred` : null,
                             archived > 0 ? `${archived} archived` : null,
                             reminders > 0 ? `${reminders} reminder${reminders === 1 ? '' : 's'} set` : null,
                         ]
@@ -435,9 +460,10 @@ export default function SwipeDeck({
                             <CardFace link={link} />
                             {isTop && (
                                 <>
-                                    <HintBadge label="KEEP" color="34,197,94" icon={<Star className="w-4 h-4" />} opacity={rightHint} pos="left" />
+                                    <HintBadge label="KEEP" color="34,197,94" icon={<Check className="w-4 h-4" />} opacity={rightHint} pos="left" />
                                     <HintBadge label="ARCHIVE" color="59,130,246" icon={<Archive className="w-4 h-4" />} opacity={leftHint} pos="right" />
                                     <HintBadge label="REMIND" color="168,85,247" icon={<Bell className="w-4 h-4" />} opacity={upHint} pos="top" />
+                                    <HintBadge label="STAR" color="245,158,11" icon={<Star className="w-4 h-4" />} opacity={downHint} pos="bottom" />
                                 </>
                             )}
                         </div>
@@ -457,8 +483,11 @@ export default function SwipeDeck({
                 <DeckAction label="↑ Remind" onClick={() => fling('up')} buttonClassName="text-accent hover:bg-accent hover:text-white border-accent/30">
                     <Bell className="w-6 h-6" />
                 </DeckAction>
-                <DeckAction label="Keep →" onClick={() => fling('right')} buttonClassName="text-green-500 hover:bg-green-500 hover:text-white border-green-500/30">
+                <DeckAction label="↓ Star" onClick={() => fling('down')} buttonClassName="text-amber-500 hover:bg-amber-500 hover:text-white border-amber-500/30">
                     <Star className="w-6 h-6" />
+                </DeckAction>
+                <DeckAction label="Keep →" onClick={() => fling('right')} buttonClassName="text-green-500 hover:bg-green-500 hover:text-white border-green-500/30">
+                    <Check className="w-6 h-6" />
                 </DeckAction>
             </div>
 
@@ -495,9 +524,12 @@ function DeckButton({ children, onClick, title, disabled, className = '' }: { ch
     );
 }
 
-function HintBadge({ label, color, icon, opacity, pos }: { label: string; color: string; icon: React.ReactNode; opacity: number; pos: 'left' | 'right' | 'top' }) {
+function HintBadge({ label, color, icon, opacity, pos }: { label: string; color: string; icon: React.ReactNode; opacity: number; pos: 'left' | 'right' | 'top' | 'bottom' }) {
     const place =
-        pos === 'left' ? 'top-6 left-6 -rotate-12' : pos === 'right' ? 'top-6 right-6 rotate-12' : 'top-6 left-1/2 -translate-x-1/2';
+        pos === 'left' ? 'top-6 left-6 -rotate-12'
+        : pos === 'right' ? 'top-6 right-6 rotate-12'
+        : pos === 'top' ? 'top-6 left-1/2 -translate-x-1/2'
+        : 'bottom-6 left-1/2 -translate-x-1/2';
     return (
         <div
             className={`absolute ${place} flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black tracking-widest text-sm pointer-events-none`}

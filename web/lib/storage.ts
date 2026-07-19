@@ -398,6 +398,24 @@ export async function updateLinkReadStatus(uid: string, id: string, isRead: bool
 }
 
 /**
+ * Review mode "Keep": stamp the card as reviewed (and read) without touching
+ * its status — keeping a card in a review session is an explicit "seen it,
+ * leave it in my library", not a favorite. `reviewedAt` keeps it out of the
+ * review pool for a cooldown (lib/reviewQueue.ts) so kept cards don't get
+ * re-dealt next session.
+ */
+export async function markLinkReviewed(uid: string, id: string): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    await updateDoc(linkRef, { reviewedAt: Date.now(), isRead: true });
+}
+
+/** Undo of a review "Keep": clear the stamp and restore the prior read state. */
+export async function undoLinkReviewed(uid: string, id: string, wasRead: boolean): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    await updateDoc(linkRef, { reviewedAt: deleteField(), isRead: wasRead });
+}
+
+/**
  * Update a link's tags in Firestore
  */
 export async function updateLinkTags(uid: string, id: string, tags: string[]): Promise<void> {

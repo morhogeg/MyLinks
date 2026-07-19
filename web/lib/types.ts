@@ -117,6 +117,10 @@ export interface Link {
   lastViewedAt?: number; // Unix timestamp (ms)
   language?: string;
   isRead?: boolean;
+  // Review mode's "Keep": the user saw this card in a review session and chose
+  // to keep it as-is. Keeps the card out of the review pool for a cooldown
+  // (lib/reviewQueue.ts) WITHOUT touching status — keeping is not favoriting.
+  reviewedAt?: number; // Unix timestamp (ms)
 
   // Personal notes the user attaches to ANY card (link, image, or note-card) —
   // their own annotations, kept distinct from the AI-generated summary. Editable

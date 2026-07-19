@@ -10,7 +10,7 @@ import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
 import DigestView from './DigestView';
 import DigestCard from './DigestCard';
 import Dropdown from './Dropdown';
-import { deleteLink, updateLinkReminder, saveLink, toLink } from '@/lib/storage';
+import { deleteLink, updateLinkReminder, saveLink, toLink, markLinkReviewed, undoLinkReviewed } from '@/lib/storage';
 import { EXAMPLE_CARD } from '@/lib/exampleCard';
 import { track } from '@/lib/analytics';
 import { collection, onSnapshot, doc, getDoc, updateDoc, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
@@ -57,6 +57,7 @@ import { reportError } from '@/lib/errorReporter';
 import PushNudge from './PushNudge';
 import { deleteCollection, createCollection, addLinksToCollection, isShareStale, updateCollection, unpublishCollection, batchedUpdate } from '@/lib/collections';
 import { useCollectionLinks } from '@/lib/useCollectionLinks';
+import { useCollectionCounts } from '@/lib/useCollectionCounts';
 import { suggestNewCollections, dismissSuggestion, type CollectionSuggestion } from '@/lib/collectionSuggest';
 import ShareCollectionSheet from './ShareCollectionSheet';
 import PinLockModal from './PinLockModal';
@@ -894,6 +895,18 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         setFilter(next);
     }, [vaultLocked, filter, setFilter]);
 
+    // True member counts for the gallery tiles — the windowed feed undercounts
+    // collections whose members fall outside the loaded window (report 3.15's
+    // sibling for the gallery; the detail view already uses useCollectionLinks).
+    // Only fetched while the gallery is on screen; the membership tick re-counts
+    // after a local add/remove so tiles don't go stale mid-session.
+    const collectionIdList = useMemo(() => collections.map((c) => c.id), [collections]);
+    const membershipTick = useMemo(
+        () => links.reduce((n, l) => n + (l.collectionIds?.length ?? 0), 0),
+        [links]
+    );
+    const collectionCounts = useCollectionCounts(uid, collectionIdList, viewMode === 'collections', membershipTick);
+
     // Suggested collections — topic clusters detected client-side from the
     // loaded feed (M20-lite). Only surfaced in the Collections view.
     const collectionSuggestions = useMemo(
@@ -963,6 +976,26 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const swipeFavorite = useCallback((link: Link) => handleStatusChange(link.id, 'favorite', { silent: true }), [handleStatusChange]);
     const swipeArchive = useCallback((link: Link) => handleStatusChange(link.id, 'archived', { silent: true }), [handleStatusChange]);
     const swipeResetStatus = useCallback((link: Link) => handleStatusChange(link.id, 'unread', { silent: true }), [handleStatusChange]);
+    // Keep = mark reviewed/read, nothing else — the card stays in the library
+    // exactly as it was (keeping is NOT favoriting; Star is the explicit action).
+    const swipeKeep = useCallback(async (link: Link) => {
+        if (!uid) return;
+        try {
+            await markLinkReviewed(uid, link.id);
+        } catch {
+            toast.error("Couldn't update the card. Please try again.");
+        }
+    }, [uid, toast]);
+    // Undo of a Keep: clear the reviewed stamp and restore the read state the
+    // card had when it was dealt (the deck passes its pre-action snapshot).
+    const swipeUndoKeep = useCallback(async (link: Link) => {
+        if (!uid) return;
+        try {
+            await undoLinkReviewed(uid, link.id, link.isRead ?? false);
+        } catch {
+            toast.error("Couldn't undo. Please try again.");
+        }
+    }, [uid, toast]);
     // Undo of an up-swipe: clear the reminder the deck just set for this card (F-29).
     // Clearing (not restoring a prior state) is safe because reviewQueue.isOpen
     // excludes reminder-pending cards from every deck queue — a dealt card can't
@@ -2055,6 +2088,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 links={visibleLinks}
                                 suggestions={collectionSuggestions}
                                 lockedIds={vaultLocked ? privateCollectionIds : undefined}
+                                serverCounts={collectionCounts}
                                 onOpen={gatedOpenCollection}
                                 onEdit={gatedEditCollection}
                                 onShare={gatedShareCollection}
@@ -2191,11 +2225,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     ) : viewMode === 'review' ? (
                         <SwipeDeck
                             links={filteredLinks}
+                            onKeep={swipeKeep}
                             onFavorite={swipeFavorite}
                             onArchive={swipeArchive}
                             onRemind={handleOpenReminderModal}
                             onOpen={openLinkDetails}
                             onResetStatus={swipeResetStatus}
+                            onUndoKeep={swipeUndoKeep}
                             onCancelRemind={swipeCancelRemind}
                             remindSignal={remindSignal}
                             onExit={() => setViewMode(lastLayout.current === 'review' ? 'grid' : lastLayout.current)}
@@ -2285,6 +2321,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             links={visibleLinks}
                             suggestions={collectionSuggestions}
                             lockedIds={vaultLocked ? privateCollectionIds : undefined}
+                            serverCounts={collectionCounts}
                             onOpen={gatedOpenCollection}
                             onEdit={gatedEditCollection}
                             onShare={gatedShareCollection}

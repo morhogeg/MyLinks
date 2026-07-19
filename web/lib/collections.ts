@@ -104,22 +104,31 @@ export async function deleteCollection(uid: string, id: string, shareId?: string
     await deleteDoc(doc(db, 'users', uid, 'collections', id));
 }
 
+/**
+ * Touch a collection's `updatedAt` after a membership change. The gallery
+ * sorts by `updatedAt` as "recently active" — without this, adding/removing
+ * cards never moved a collection, so the order was effectively frozen at the
+ * last metadata edit. Best-effort: a failed touch must never fail the
+ * membership write it decorates.
+ */
+async function touchCollection(uid: string, collectionId: string): Promise<void> {
+    try {
+        await updateDoc(doc(db, 'users', uid, 'collections', collectionId), { updatedAt: Date.now() });
+    } catch { /* ordering hint only */ }
+}
+
 /** Add a card to a collection (idempotent via arrayUnion). */
 export async function addLinkToCollection(uid: string, linkId: string, collectionId: string): Promise<void> {
     const ref = doc(db, 'users', uid, 'links', linkId);
     await updateDoc(ref, { collectionIds: arrayUnion(collectionId) });
+    await touchCollection(uid, collectionId);
 }
 
 /** Remove a card from a collection. */
 export async function removeLinkFromCollection(uid: string, linkId: string, collectionId: string): Promise<void> {
     const ref = doc(db, 'users', uid, 'links', linkId);
     await updateDoc(ref, { collectionIds: arrayRemove(collectionId) });
-}
-
-/** Overwrite a card's full collection membership (used by the multi-toggle sheet). */
-export async function setLinkCollections(uid: string, linkId: string, collectionIds: string[]): Promise<void> {
-    const ref = doc(db, 'users', uid, 'links', linkId);
-    await updateDoc(ref, { collectionIds });
+    await touchCollection(uid, collectionId);
 }
 
 /** Add many cards to a collection in one batched write (suggested collections). */
@@ -129,6 +138,7 @@ export async function addLinksToCollection(uid: string, linkIds: string[], colle
         linkIds.map((linkId) => doc(db, 'users', uid, 'links', linkId)),
         (batch, ref) => batch.update(ref, { collectionIds: arrayUnion(collectionId) }),
     );
+    await touchCollection(uid, collectionId);
 }
 
 /**
