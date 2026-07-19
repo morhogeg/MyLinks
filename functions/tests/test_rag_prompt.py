@@ -90,6 +90,79 @@ def test_card_block_omits_note_line_when_no_notes():
     assert "My note:" not in block
 
 
+# ── _rag_card_block: deep content (the "walk me through the steps" fix) ─────
+# The model can only be as specific as its context: a card's stored recipe
+# steps, long-form detail, takeaway, and video highlights must reach the
+# prompt, or every depth question degrades to a re-paraphrased summary.
+
+def test_card_block_renders_recipe_ingredients_and_numbered_steps():
+    block = _rag_card_block({
+        "id": "r1",
+        "title": "Pan con Tomate Recipe",
+        "summary": "A simple appetizer.",
+        "recipe": {
+            "ingredients": ["4 slices rustic bread", "2 ripe tomatoes", "olive oil"],
+            "instructions": ["Toast the bread", "Grate the tomatoes", "Spoon over the toast"],
+            "servings": "4",
+            "prep_time": "10 min",
+        },
+    })
+    assert "Ingredients:" in block
+    assert "- 4 slices rustic bread" in block
+    assert "- olive oil" in block
+    assert "Steps:" in block
+    assert "1. Toast the bread" in block
+    assert "2. Grate the tomatoes" in block
+    assert "3. Spoon over the toast" in block
+    assert "serves: 4" in block
+    assert "prep: 10 min" in block
+
+
+def test_card_block_renders_detail_takeaway_highlights_speakers():
+    block = _rag_card_block({
+        "id": "v1",
+        "title": "T",
+        "summary": "S",
+        "detailedSummary": "## Key Points\n- The deep analysis body.",
+        "actionableTakeaway": "Do the thing tomorrow.",
+        "videoHighlights": ["2:15 — Explains the rule", "5:40 — The demo"],
+        "speakers": ["Host Person", "Guest Person"],
+    })
+    assert "Detail:\n## Key Points" in block
+    assert "The deep analysis body." in block
+    assert "Takeaway: Do the thing tomorrow." in block
+    assert "Video highlights:" in block
+    assert "- 2:15 — Explains the rule" in block
+    assert "Speakers: Host Person, Guest Person" in block
+
+
+def test_card_block_renders_saved_date_from_unix_ms():
+    # 2025-07-15T00:00:00Z in unix ms — the shape normalize_card_for_search emits.
+    block = _rag_card_block({"id": "x", "title": "T", "createdAt": 1752537600000})
+    assert "saved: 2025-07-15" in block
+
+
+def test_card_block_omits_deep_sections_when_absent():
+    block = _rag_card_block({"id": "x", "title": "T", "summary": "S"})
+    for marker in ("Ingredients:", "Steps:", "Detail:", "Takeaway:",
+                   "Video highlights:", "Speakers:", "saved:", "Recipe ("):
+        assert marker not in block, marker
+
+
+def test_card_block_ignores_malformed_deep_fields():
+    # A recipe that isn't a dict / highlights that aren't a list must never
+    # crash prompt assembly — the card degrades to its headline fields.
+    block = _rag_card_block({
+        "id": "x", "title": "T", "summary": "S",
+        "recipe": "not-a-dict",
+        "videoHighlights": "not-a-list",
+        "createdAt": "not-a-number",
+    })
+    assert "[x]" in block
+    assert "Ingredients:" not in block
+    assert "saved:" not in block
+
+
 # ── _build_rag_prompt ─────────────────────────────────────────────────────
 
 def _card(i):
@@ -138,6 +211,22 @@ def test_prompt_carries_grounding_rules():
     # A couple of load-bearing instruction lines the model depends on.
     assert "USING ONLY the saved sources" in prompt
     assert "match the user's language" in prompt
+
+
+def test_prompt_carries_format_matching_rules():
+    # The chip contract: "walk me through the steps" must yield the actual
+    # steps, follow-ups must add new information, and a request for specifics
+    # must never come back as a rephrased overview.
+    prompt = _build_rag_prompt("q?", [_card(1)])
+    assert "COMPLETE numbered steps" in prompt
+    assert "NEVER answer a request for specifics with a rephrased overview" in prompt
+    assert "FOLLOW-UPS MUST ADD VALUE" in prompt
+
+
+def test_prompt_includes_todays_date_for_recency_questions():
+    from datetime import datetime, timezone
+    prompt = _build_rag_prompt("q?", [_card(1)])
+    assert datetime.now(timezone.utc).strftime("%Y-%m-%d") in prompt
 
 
 # ── _valid_cited_ids ──────────────────────────────────────────────────────
