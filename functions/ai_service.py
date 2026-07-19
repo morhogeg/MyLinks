@@ -361,6 +361,7 @@ Rules:
   - Steps / walkthrough / "how do I make or do this" → reproduce the COMPLETE numbered steps from the source's Steps or Detail section, in order. Never replace steps with a description of what the steps achieve.
   - Ingredients / "what do I need" → the complete list from the source, not a sample.
   - Key points / highlights / "more detail" → concrete specifics pulled from the source's Detail, Takeaway, or Video highlights sections.
+  - Asked to compare sources or find their common thread → organize the answer around what they genuinely share and where they differ, using each source's specifics. Name every quoted source in the comparison; never silently drop one.
   - Otherwise → concise and direct (2-5 sentences, or a short list when that's clearer).
 - NEVER answer a request for specifics with a rephrased overview. If a source genuinely lacks the requested specifics (e.g. no step-by-step instructions were captured from it), say exactly that and offer what the source DOES contain.
 - FOLLOW-UPS MUST ADD VALUE: when the conversation history shows you already answered about this source, bring NEW information from the sources — never restate an earlier answer in different words.

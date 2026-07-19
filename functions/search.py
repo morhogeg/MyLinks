@@ -419,20 +419,40 @@ def pin_quoted_title_cards(question: str, cards: List[dict]):
     phrases = [p for p in (_norm_title(x) for x in extract_quoted_phrases(question)) if p]
     if not phrases or not cards:
         return cards, False
-
-    def _is_match(t: str, p: str) -> bool:
-        if t == p:
-            return True
-        return len(p) >= 6 and (t.startswith(p) or p.startswith(t))
-
     pinned, rest = [], []
     for c in cards:
         t = _norm_title(str(c.get("title", "")))
-        if t and any(_is_match(t, p) for p in phrases):
+        if t and any(_title_match(t, p) for p in phrases):
             pinned.append(c)
         else:
             rest.append(c)
     return (pinned + rest, True) if pinned else (cards, False)
+
+
+def _title_match(t: str, p: str) -> bool:
+    """Does normalized title `t` match normalized quoted phrase `p`? Exact, or
+    a prefix in either direction (truncated quote), with a minimum phrase
+    length so a stray short fragment can never claim an unrelated card."""
+    if t == p:
+        return True
+    return len(p) >= 6 and (t.startswith(p) or p.startswith(t))
+
+
+def missing_quoted_phrases(question: str, cards: List[dict]) -> List[str]:
+    """The quoted phrases (raw form) that match NO card title in `cards`.
+
+    A compare question quotes TWO titles; "did anything pin?" is not enough —
+    each quoted anchor the retrieval missed must be rescued individually, or
+    the model is asked to compare a card it cannot see."""
+    out = []
+    for raw in extract_quoted_phrases(question):
+        p = _norm_title(raw)
+        if not p:
+            continue
+        titles = (_norm_title(str(c.get("title", ""))) for c in cards)
+        if not any(t and _title_match(t, p) for t in titles):
+            out.append(raw)
+    return out
 
 
 # Recency intent: questions the chips (and users) phrase about WHEN something

@@ -10,6 +10,7 @@ instead of semantic-matching the phrase. All pure, offline over plain dicts.
 from search import (
     extract_quoted_phrases,
     pin_quoted_title_cards,
+    missing_quoted_phrases,
     is_recency_question,
 )
 
@@ -125,6 +126,43 @@ def test_pin_no_quotes_is_a_no_op():
 def test_pin_empty_cards():
     out, matched = pin_quoted_title_cards('About "Anything"', [])
     assert out == [] and matched is False
+
+
+def test_pin_matches_titles_wrapped_in_bidi_isolates():
+    # The client wraps embedded titles in FSI…PDI isolates (U+2068/U+2069) so
+    # mixed-script bubbles render cleanly — normalization must see through them.
+    cards = [{"id": "a", "title": "Other"},
+             {"id": "b", "title": "Pan con Tomate Recipe"}]
+    out, matched = pin_quoted_title_cards(
+        'Walk me through the steps in "⁨Pan con Tomate Recipe⁩"', cards)
+    assert matched is True
+    assert out[0]["id"] == "b"
+
+
+# ── missing_quoted_phrases ─────────────────────────────────────────────────
+
+def test_missing_reports_each_unmatched_phrase():
+    # A compare question quotes TWO titles — the one retrieval missed must be
+    # reported individually so ask_brain can rescue it with its own scan.
+    cards = [{"id": "a", "title": "Alpha Protocol"}]
+    missing = missing_quoted_phrases(
+        'Compare "Alpha Protocol" with "Beta Gamma Notes"', cards)
+    assert missing == ["Beta Gamma Notes"]
+
+
+def test_missing_empty_when_all_matched():
+    cards = [{"id": "a", "title": "Alpha Protocol"},
+             {"id": "b", "title": "Beta Gamma Notes"}]
+    assert missing_quoted_phrases(
+        'Compare "Alpha Protocol" with "Beta Gamma Notes"', cards) == []
+
+
+def test_missing_all_when_no_cards():
+    assert missing_quoted_phrases('About "Alpha Protocol"', []) == ["Alpha Protocol"]
+
+
+def test_missing_none_when_no_quotes():
+    assert missing_quoted_phrases("recap my recent saves", [{"id": "a", "title": "T"}]) == []
 
 
 # ── is_recency_question ────────────────────────────────────────────────────

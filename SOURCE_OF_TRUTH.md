@@ -684,6 +684,24 @@ exact-match, capped.
   saves; re-saving an old recipe link upgrades it. The vestigial client
   `Link.recipe` field is still never written by the backend (structured
   recipe extraction would be a future §4 item if wanted).
+  **Round 2 (owner web repro on the deployed build; same day):** two real
+  gaps. (a) "Compare these" after a 5-card weekly recap compared citation[0]
+  vs citation[1] — a blood-gas report vs. a Messi opinion piece
+  ("entirely different domains"). Fix: compare/common-thread chips are now
+  licensed ONLY by a provably related pair (two cited cards sharing a
+  concept/tag — `findRelatedPair`), anchored to that pair, labeled
+  "Compare the <shared> saves"; every angle/detail chip is now anchored to a
+  card that carries the evidence (ANCHOR RULE — no more "steps in <news
+  article>" when cite[0] isn't the recipe), and the backend rescues EACH
+  quoted title retrieval missed (`missing_quoted_phrases`) so a compare
+  never silently drops one side; prompt gained a comparison-format rule.
+  (b) RTL scrambling: per-block `dir="auto"` flipped any English line
+  OPENING with a Hebrew title fully RTL ("An :(saved: 2026-07-17)…"). Fix:
+  answer blocks use the message's MAJORITY direction
+  (`getDominantDirection` in lib/rtl.ts) and all chip-built questions wrap
+  embedded titles in Unicode FSI/PDI isolates (`iso()` in
+  askSuggestions.ts) — backend normalization sees through them (tested).
+  292 tests pass, `tsc` clean.
 
 - **2026-07-18 — MOBILE v4 CHROME: bottom tab bar + one-line header +
   dedicated Sources (owner-approved via 4 mockup rounds; commit `4028979`,

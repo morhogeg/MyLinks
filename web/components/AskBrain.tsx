@@ -5,7 +5,7 @@ import { ArrowUp, FileText, Plus, MessagesSquare, Copy, Check, TriangleAlert, Sp
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import { getDirection } from '@/lib/rtl';
+import { getDirection, getDominantDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS, xHandle, linkedinDisplayName } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
@@ -14,7 +14,7 @@ import { trackFirstAsk, trackAskNoCitations, trackAskSuggestionUsed, trackAskFol
 import { reportError } from '@/lib/errorReporter';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { ChatMessage, ChatSource, ChatSession, Link } from '@/lib/types';
-import { buildAskSuggestions, buildFollowUps, newestReadyLink, ClassifiableCard } from '@/lib/askSuggestions';
+import { buildAskSuggestions, buildFollowUps, newestReadyLink, iso, ClassifiableCard } from '@/lib/askSuggestions';
 import { subscribeChats, createChat, updateChat, deleteChat } from '@/lib/chats';
 import { hapticLight } from '@/lib/haptics';
 import ConfirmDialog from './ConfirmDialog';
@@ -67,19 +67,25 @@ function normalizeListMarkers(md: string): string {
 
 /** Renders an assistant answer as Markdown, styled to match the chat. GFM gives
  *  us tables/strikethrough; remark-breaks turns single newlines into <br> so the
- *  model's line breaks survive (like the old whitespace-pre-wrap). */
+ *  model's line breaks survive (like the old whitespace-pre-wrap).
+ *
+ *  Direction: every block carries the MESSAGE's dominant direction, computed
+ *  once over the whole answer — NOT per-block `dir="auto"`. First-strong
+ *  detection flipped any English bullet that OPENED with a quoted Hebrew title
+ *  into a fully-RTL line (marker on the right, prose right-aligned, trailing
+ *  punctuation scrambled). With a single majority direction the answer reads
+ *  as one coherent column; embedded opposite-script runs (a Hebrew title in an
+ *  English answer) still render correctly inline via standard bidi. */
 function MarkdownMessage({ content }: { content: string }) {
+    const dir = getDominantDirection(content);
     return (
         <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}
             components={{
-                // dir="auto" per block so each line/item aligns by its own first
-                // strong character — an English answer that cites a Hebrew title
-                // stays left-aligned, while a Hebrew line renders RTL.
-                p: ({ children }) => <p dir="auto" className="mb-2 last:mb-0">{children}</p>,
-                ul: ({ children }) => <ul dir="auto" className="list-disc ps-5 mb-2 last:mb-0 space-y-1">{children}</ul>,
-                ol: ({ children }) => <ol dir="auto" className="list-decimal ps-5 mb-2 last:mb-0 space-y-1">{children}</ol>,
-                li: ({ children }) => <li dir="auto" className="leading-relaxed">{children}</li>,
+                p: ({ children }) => <p dir={dir} className="mb-2 last:mb-0">{children}</p>,
+                ul: ({ children }) => <ul dir={dir} className="list-disc ps-5 mb-2 last:mb-0 space-y-1">{children}</ul>,
+                ol: ({ children }) => <ol dir={dir} className="list-decimal ps-5 mb-2 last:mb-0 space-y-1">{children}</ol>,
+                li: ({ children }) => <li dir={dir} className="leading-relaxed">{children}</li>,
                 strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
                 a: ({ children, href }) => (
                     <a href={href} target="_blank" rel="noopener noreferrer" className="text-accent underline underline-offset-2 hover:text-accent-hover">
@@ -1015,11 +1021,15 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                             <div key={i} data-msg-idx={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start group'}>
                                 <div className={m.role === 'user' ? 'max-w-[85%]' : 'max-w-[90%] w-full'}>
                                     <div
-                                        // dir="auto" everywhere: first-strong detection keeps a
-                                        // mostly-English question with an embedded Hebrew title
-                                        // LTR (getDirection flips RTL on ANY Hebrew char, which
-                                        // scrambled mixed-language bubbles).
-                                        dir="auto"
+                                        // Assistant answers: the message's MAJORITY direction
+                                        // (see MarkdownMessage) so one stray leading Hebrew
+                                        // title can't flip the whole answer RTL. User/error
+                                        // bubbles keep first-strong auto — they're short,
+                                        // single-language, and chip-built questions isolate
+                                        // their embedded titles (see askSuggestions' iso()).
+                                        dir={m.role === 'assistant' && !m.error
+                                            ? getDominantDirection(m.content)
+                                            : 'auto'}
                                         className={
                                             m.role === 'user'
                                                 // User message: a compact accent pill.
@@ -1157,7 +1167,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                             dir="auto"
                             onClick={() => {
                                 trackAskSuggestionUsed('fresh');
-                                send(`What's the gist of "${freshCard.title}"?`, undefined, 'card');
+                                send(`What's the gist of "${iso(freshCard.title)}"?`, undefined, 'card');
                                 setFreshCard(null);
                             }}
                             className="flex-1 min-w-0 text-start text-[13px] text-text truncate cursor-pointer hover:underline underline-offset-2"

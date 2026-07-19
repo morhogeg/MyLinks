@@ -82,7 +82,9 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
     const latest = newestReadyLink(links);
     const latestChips: AskSuggestion[] = [];
     if (latest) {
-        const t = chipTitle(latest.title)!;
+        // iso(): bidi-isolate the embedded title so a Hebrew title inside an
+        // English chip/bubble renders as one intact run (defined below).
+        const t = iso(chipTitle(latest.title)!);
         const phrasings = [
             `What's the gist of "${t}"?`,
             `Key points from "${t}"`,
@@ -169,7 +171,7 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
         .filter(l => !l.isRead && !l.lastViewedAt && chipTitle(l.title) && now - toMs(l.createdAt) > WEEK_MS)
         .sort((a, b) => toMs(a.createdAt) - toMs(b.createdAt))[0];
     if (dusty) {
-        const t = chipTitle(dusty.title)!;
+        const t = iso(chipTitle(dusty.title)!);
         pool.push({
             text: `What was "${t}" about again?`,
             kind: 'rediscover',
@@ -340,6 +342,52 @@ export interface FollowUpChip {
     question: string;
 }
 
+/** Wrap an embedded title in Unicode first-strong isolates (FSI…PDI) so a
+ *  Hebrew title inside an English question (or vice versa) renders as one
+ *  intact run instead of scrambling the surrounding quotes/punctuation.
+ *  Invisible; the backend's quote-extraction and tokenization both strip
+ *  non-word characters, so retrieval is unaffected. */
+export function iso(s: string): string {
+    return `\u2068${s}\u2069`;
+}
+
+/** The most-related PAIR of cited cards: two cards that provably share a
+ *  concept or tag. This is the only license for a "Compare these" chip — a
+ *  multi-card answer (e.g. a weekly recap) cites cards from unrelated domains,
+ *  and comparing two arbitrary ones ("a blood-gas report vs. a Messi opinion
+ *  piece") is a chip with negative value. Returns the pair plus the shared
+ *  label (shortest, for chip copy), or null when no pair shares anything. */
+function findRelatedPair(cards: ClassifiableCard[]):
+    { a: ClassifiableCard; b: ClassifiableCard; shared: string } | null {
+    const bags = cards.map(c => {
+        const bag = new Map<string, string>();
+        for (const raw of [...(c.concepts ?? []), ...(c.tags ?? [])]) {
+            const label = raw?.trim().replace(/\s+/g, ' ');
+            if (label) bag.set(label.toLowerCase(), label);
+        }
+        return bag;
+    });
+    let best: { a: ClassifiableCard; b: ClassifiableCard; shared: string } | null = null;
+    let bestCount = 0;
+    for (let i = 0; i < cards.length; i++) {
+        for (let j = i + 1; j < cards.length; j++) {
+            if (cards[i].id === cards[j].id) continue;
+            let count = 0;
+            let shared: string | null = null;
+            for (const [key, label] of bags[i]) {
+                if (!bags[j].has(key)) continue;
+                count += 1;
+                if (!shared || label.length < shared.length) shared = label;
+            }
+            if (count > bestCount && shared) {
+                best = { a: cards[i], b: cards[j], shared };
+                bestCount = count;
+            }
+        }
+    }
+    return best;
+}
+
 // SELF-CONTAINED RULE (the second half of airtight): the backend retrieves by
 // the QUESTION TEXT alone — it does not resolve "this"/"it" from chat history
 // into a retrieval query. A bare "Give me more detail" contains nothing to
@@ -350,40 +398,41 @@ export interface FollowUpChip {
 // sent bubble shows the full anchored question, which also reads clearer in
 // the transcript.
 
-/** The template chips for an angle, each gated on evidence the cited cards
- *  actually carry and anchored to the cited title `t`. Everything here
- *  restates or reframes STORED content — nothing asks for material that
- *  might not exist. */
+/** The template chips for an angle, each gated on evidence the ANCHOR cards
+ *  actually carry and anchored to the cited title `t` (bidi-isolated in the
+ *  sent question). Everything here restates or reframes STORED content —
+ *  nothing asks for material that might not exist. */
 function angleChips(angle: ContentAngle, ev: Evidence, t: string): FollowUpChip[] {
-    const keyPoints = { label: 'Give me the key points', question: `Give me the key points of "${t}"` };
-    const simpler = { label: 'Explain it more simply', question: `Explain "${t}" more simply` };
-    const whyMatters = { label: 'Why does this matter?', question: `Why does "${t}" matter?` };
+    const q = iso(t);
+    const keyPoints = { label: 'Give me the key points', question: `Give me the key points of "${q}"` };
+    const simpler = { label: 'Explain it more simply', question: `Explain "${q}" more simply` };
+    const whyMatters = { label: 'Why does this matter?', question: `Why does "${q}" matter?` };
     switch (angle) {
         case 'recipe':
             return [
-                ...(ev.hasIngredients ? [{ label: 'What ingredients do I need?', question: `What ingredients do I need for "${t}"?` }] : []),
+                ...(ev.hasIngredients ? [{ label: 'What ingredients do I need?', question: `What ingredients do I need for "${q}"?` }] : []),
                 // Steps require actual stored instructions (or a long-form
                 // Detail section that carries the method) — ingredients alone
                 // can't back a walkthrough, so they don't license this chip.
-                ...(ev.hasSteps || ev.hasDetail ? [{ label: 'Walk me through the steps', question: `Walk me through the steps in "${t}"` }] : []),
+                ...(ev.hasSteps || ev.hasDetail ? [{ label: 'Walk me through the steps', question: `Walk me through the steps in "${q}"` }] : []),
                 keyPoints,
             ];
         case 'news':
             // News / opinion / politics: restate and interpret the saved piece —
             // never debate prompts ("counterargument") the card can't answer.
-            return [{ label: "What's the main argument?", question: `What's the main argument in "${t}"?` }, whyMatters];
+            return [{ label: "What's the main argument?", question: `What's the main argument in "${q}"?` }, whyMatters];
         case 'howto':
             return [
-                ...(ev.hasDetail ? [{ label: 'Summarize the steps', question: `Summarize the steps in "${t}"` }] : []),
+                ...(ev.hasDetail ? [{ label: 'Summarize the steps', question: `Summarize the steps in "${q}"` }] : []),
                 keyPoints,
                 simpler,
             ];
         case 'research':
-            return [{ label: 'What are the key findings?', question: `What are the key findings in "${t}"?` }, whyMatters];
+            return [{ label: 'What are the key findings?', question: `What are the key findings in "${q}"?` }, whyMatters];
         case 'video':
             return [
-                { label: 'What are the key takeaways?', question: `What are the key takeaways from "${t}"?` },
-                { label: 'Give me the highlights', question: `Give me the highlights of "${t}"` },
+                { label: 'What are the key takeaways?', question: `What are the key takeaways from "${q}"?` },
+                { label: 'Give me the highlights', question: `Give me the highlights of "${q}"` },
             ];
         default:
             return [keyPoints, simpler];
@@ -463,31 +512,49 @@ function chipIntent(text: string): string {
 export function buildFollowUps(ctx: FollowUpContext): FollowUpChip[] {
     const { citedCards, allLinks, askedTexts, exchangeCount } = ctx;
     if (citedCards.length === 0) return [];
-    // The anchor: the first cited card with a usable title (60 chars keeps the
-    // sent bubble reasonable while giving retrieval plenty to match on).
-    const titles = citedCards
-        .map(c => chipTitle(c.title, 60))
-        .filter((x): x is string => !!x);
-    if (titles.length === 0) return [];
-    const t = titles[0];
+    // Cards that can serve as a retrieval anchor (usable title; 60 chars keeps
+    // the sent bubble reasonable while giving retrieval plenty to match on).
+    const withTitle = citedCards.filter(c => chipTitle(c.title, 60));
+    if (withTitle.length === 0) return [];
 
     const angle = dominantAngle(citedCards);
+    // ANCHOR RULE: every angle chip must be anchored to a card OF that angle —
+    // never blindly to the first citation. When a news card and a recipe card
+    // are cited together the dominant angle can be `recipe` while citation[0]
+    // is the news card, and "Walk me through the steps in <news article>" is a
+    // broken chip. Evidence is gathered from the same anchor set, so a chip is
+    // only licensed by the card it will actually ask about.
+    const anchorCards = withTitle.filter(c => classifyCard(c) === angle);
+    const anchors = anchorCards.length > 0 ? anchorCards : withTitle;
+    const t = chipTitle(anchors[0].title, 60)!;
+    const ev = gatherEvidence(anchors);
+
     const related = findRelatedConcept(citedCards, allLinks);
-    const multiCard = new Set(citedCards.map(c => c.id)).size >= 2;
-    const ev = gatherEvidence(citedCards);
 
     const candidates: FollowUpChip[] = [];
-    // Multiple cited cards → pulling them together is grounded by definition;
-    // both titles ride along so retrieval can find both cards.
-    if (multiCard && titles.length >= 2) {
+    // Compare/synthesize ONLY a provably related pair (shared concept/tag).
+    // A recap answer cites many unrelated cards; comparing two arbitrary ones
+    // produces "these cover entirely different domains" — worse than no chip.
+    const pair = findRelatedPair(withTitle);
+    if (pair) {
+        const ta = iso(chipTitle(pair.a.title, 60)!);
+        const tb = iso(chipTitle(pair.b.title, 60)!);
+        const label = pair.shared.length <= 14 ? `Compare the ${pair.shared} saves` : 'Compare these';
         candidates.push(
-            { label: 'Compare these', question: `Compare "${titles[0]}" with "${titles[1]}"` },
-            { label: "What's the common thread?", question: `What's the common thread between "${titles[0]}" and "${titles[1]}"?` },
+            { label, question: `Compare "${ta}" with "${tb}"` },
+            { label: "What's the common thread?", question: `What's the common thread between "${ta}" and "${tb}"?` },
         );
     }
     candidates.push(...angleChips(angle, ev, t));
-    // A stored long-form analysis exists → depth is a guaranteed win.
-    if (ev.hasDetail) candidates.push({ label: 'Give me more detail', question: `Give me more detail on "${t}"` });
+    // Depth is a guaranteed win only on the card that ACTUALLY carries the
+    // stored long-form analysis — anchor the chip to that card, not cite[0].
+    const detailCard = withTitle.find(c => (c.detailedSummary?.trim().length ?? 0) >= 200);
+    if (detailCard) {
+        candidates.push({
+            label: 'Give me more detail',
+            question: `Give me more detail on "${iso(chipTitle(detailCard.title, 60)!)}"`,
+        });
+    }
     // A concept that PROVABLY recurs on other cards → the knowledge-graph jump
     // (already self-contained — the concept is the retrieval anchor).
     if (related) {

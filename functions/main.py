@@ -60,7 +60,8 @@ from search import (
     sync_link_embedding, search_links, perform_search_logic, perform_hybrid_search,
     build_embedding_text, rerank_candidates, keyword_query_tokens,
     keyword_match_score, keyword_scan_cards, EmbeddingService, EMBED_TEXT_VERSION,
-    extract_quoted_phrases, pin_quoted_title_cards, is_recency_question, recent_cards,
+    extract_quoted_phrases, pin_quoted_title_cards, missing_quoted_phrases,
+    is_recency_question, recent_cards,
 )
 from rate_limit import check_rate_limit, client_ip
 # Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
@@ -1208,21 +1209,19 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             logger.error(f"ask_brain recency retrieval failed: {e}")
 
         # 1d. Chip-anchor guarantee: suggestion/follow-up chips quote the cited
-        #     card's title in the question. That card MUST reach the model, at
-        #     the front (inside the deep-content window below) — a chip we
-        #     offered that then can't see its own card is a broken promise. If
-        #     the quoted card missed retrieval entirely, rescue it with a
-        #     lexical scan on just the quoted phrase before pinning.
+        #     card's title in the question. EVERY quoted card must reach the
+        #     model, at the front (inside the deep-content window below) — a
+        #     chip we offered that then can't see its own card is a broken
+        #     promise. Each quoted title retrieval missed is rescued with its
+        #     own lexical scan (a compare question quotes TWO titles; rescuing
+        #     only when none matched would let one of them silently vanish).
         try:
-            quoted = extract_quoted_phrases(question)
-            if quoted:
-                cards, matched = pin_quoted_title_cards(question, cards)
-                if not matched:
+            if extract_quoted_phrases(question):
+                for phrase in missing_quoted_phrases(question, cards):
                     have = {c.get("id") for c in cards}
-                    rescue = keyword_scan_cards(
-                        uid, " ".join(quoted), exclude_ids=have, limit=3)
-                    if rescue:
-                        cards, _ = pin_quoted_title_cards(question, rescue + cards)
+                    cards = cards + keyword_scan_cards(
+                        uid, phrase, exclude_ids=have, limit=2)
+                cards, _ = pin_quoted_title_cards(question, cards)
         except Exception as e:
             logger.error(f"ask_brain quoted-title pinning failed: {e}")
 
