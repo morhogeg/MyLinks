@@ -647,8 +647,9 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-18 (latest) — ASK RELIABILITY: chips now always deliver what they
-  promise (deep-content RAG + retrieval guarantees).** Owner repro: the
+- **2026-07-19 (latest) — ASK RELIABILITY: chips now always deliver what they
+  promise (deep-content RAG + retrieval guarantees; commit `3ce4bcf`, merge
+  `5938b2a`).** Owner repro: the
   "Walk me through the steps" follow-up chip on a recipe card answered with a
   re-paraphrase of the 2-sentence summary. Root cause: `ask_brain`'s slimming
   dropped EVERY deep field — the model never saw `detailedSummary`, the
@@ -673,8 +674,16 @@ exact-match, capped.
   or a real Detail section, ingredients alone no longer license it
   (`askSuggestions.ts` Evidence.hasSteps). 25 new offline tests
   (`test_ask_retrieval.py` + `test_rag_prompt.py` deep-content/prompt-rule
-  cases); 287 pass, `tsc` clean. Backend deploy needed (`Deploy-Functions:
-  ask_brain` — main.py/ai_service.py/search.py) + Vercel for the web gating.
+  cases); 287 pass, `tsc` clean. **Shipped:** Vercel (auto on `5938b2a`),
+  full Cloud Functions deploy (run #3 of deploy-functions.yml — no
+  `Deploy-Functions:` scoping on purpose: `ai_service.py`/`search.py` are
+  shared by nearly every function, incl. the analysis-prompt recipe change),
+  TestFlight run #126 = build **1126** (chip-gating change is client-side).
+  Note: existing recipe cards answer as well as their stored detailedSummary
+  allows — the new "## Ingredients / ## Steps" capture rule applies to NEW
+  saves; re-saving an old recipe link upgrades it. The vestigial client
+  `Link.recipe` field is still never written by the backend (structured
+  recipe extraction would be a future §4 item if wanted).
 
 - **2026-07-18 — MOBILE v4 CHROME: bottom tab bar + one-line header +
   dedicated Sources (owner-approved via 4 mockup rounds; commit `4028979`,
