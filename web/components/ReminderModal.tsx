@@ -3,13 +3,13 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from '@/lib/types';
-import { X, Sparkles, Calendar, CalendarClock, Clock, Bell, BellOff, Loader2, ChevronDown } from 'lucide-react';
+import { X, Sparkles, Calendar, CalendarClock, Clock, BellOff, Loader2, Check, ChevronDown } from 'lucide-react';
 import { updateLinkReminder } from '@/lib/storage';
 import { isNativeApp } from '@/lib/api';
 import { trackReminderSet } from '@/lib/analytics';
 import { useToast } from '@/components/Toast';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
-import { hapticSuccess, hapticWarning } from '@/lib/haptics';
+import { hapticSelection, hapticSuccess, hapticWarning } from '@/lib/haptics';
 
 interface ReminderModalProps {
     uid: string;
@@ -19,9 +19,9 @@ interface ReminderModalProps {
     onUpdate?: () => void;
 }
 
-// Which action is mid-save. Presets commit on tap (no select-then-Save step),
-// so the in-flight key drives the row's own spinner while every control locks.
-type SavingKey = 'smart' | 'tomorrow' | 'next-week' | 'custom' | 'off' | null;
+// The options are a radio group: tap around freely, commit with Save (device
+// QA on build 1136 — tap-to-commit closed the sheet under people's fingers).
+type Selection = 'smart' | 'tomorrow' | 'next-week' | 'custom';
 
 // Format a Date to a `YYYY-MM-DD` string in LOCAL time. Using toISOString() here
 // would emit the UTC date, which shifts by a day for users west of UTC.
@@ -43,7 +43,7 @@ const fmtDay = (d: Date) => d.toLocaleDateString([], { weekday: 'short', month: 
 const fmtTime = (d: Date) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const fmtDayTime = (d: Date) => `${fmtDay(d)} · ${fmtTime(d)}`;
 
-// Preset fire times, derived fresh per render so an open modal never drifts
+// Preset fire times, derived fresh per render so an open sheet never drifts
 // across midnight. Tomorrow / Next week land at 9:00 AM; Smart starts +24h
 // (matching the backend's smart profile, which then recurs at 1w and 1mo).
 function presetTimes(now: Date) {
@@ -71,56 +71,56 @@ function profileLabel(link: Link): string {
 /**
  * Set / edit a card's reminder. Bottom sheet on mobile (drag-to-dismiss),
  * centered card on desktop — the same overlay grammar as CardActionSheet /
- * AddToCollectionSheet so the whole app shares one modal personality.
+ * CollectionFormModal so the whole app shares one modal personality.
  *
  * Product model (client-only; storage semantics unchanged):
  * - Smart review  → profile 'smart'  (recurs: +1d, +1w, +1mo — max 3 fires)
  * - Tomorrow / Next week / Pick date & time → profile 'once' (true one-shots)
- * Presets commit on a single tap; only the custom picker has a confirm button
- * (it needs one — the inputs are the commitment). Every row states the real
- * fire time up front, so "when will this actually remind me" is never a guess.
+ * Options are quiet radio rows (every one states its real fire time); the
+ * standard Cancel/Save footer commits, so tapping around never saves anything.
  */
 export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: ReminderModalProps) {
     const toast = useToast();
-    const [saving, setSaving] = useState<SavingKey>(null);
-    const [customOpen, setCustomOpen] = useState(false);
+    const [selected, setSelected] = useState<Selection | null>(null);
+    const [saving, setSaving] = useState(false);
     const [customDate, setCustomDate] = useState('');
     const [customTime, setCustomTime] = useState('09:00');
 
-    const isSaving = saving !== null;
     const isReminderActive = link.reminderStatus === 'pending';
 
-    // On open: reset, and for an editable one-shot ('once' + legacy values)
-    // pre-open the custom picker on the stored fire time so "edit" means edit.
+    // On open: reset. Smart is preselected for a new reminder (the recommended
+    // default — Save is one tap away); an editable one-shot ('once' + legacy
+    // values) preselects the custom picker on its stored fire time so "edit"
+    // means edit; an active smart/spaced reminder preselects Smart review.
     useEffect(() => {
         if (!isOpen) return;
-        setSaving(null);
+        setSaving(false);
         const profile = link.reminderProfile;
         const isOneShot = !!profile && profile !== 'smart' && !profile.startsWith('spaced');
         if (link.reminderStatus === 'pending' && isOneShot && link.nextReminderAt) {
             const d = new Date(link.nextReminderAt);
             setCustomDate(formatLocalDate(d));
             setCustomTime(`${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`);
-            setCustomOpen(true);
+            setSelected('custom');
         } else {
             setCustomDate('');
             setCustomTime('09:00');
-            setCustomOpen(false);
+            setSelected('smart');
         }
     }, [isOpen, link]);
 
-    // Default the custom date the moment the picker opens on a blank state.
-    // Late at night, start on tomorrow so the default 9:00 AM isn't in the past.
+    // Default the custom date the moment the picker is selected on a blank
+    // state. Late at night, start on tomorrow so 9:00 AM isn't in the past.
     useEffect(() => {
-        if (!isOpen || !customOpen || customDate) return;
+        if (!isOpen || selected !== 'custom' || customDate) return;
         const base = new Date();
         if (base.getHours() >= 21) base.setDate(base.getDate() + 1);
         setCustomDate(formatLocalDate(base));
-    }, [isOpen, customOpen, customDate]);
+    }, [isOpen, selected, customDate]);
 
     // Bottom sheet on mobile with drag-to-dismiss; centered modal on desktop.
     const isMobile = useIsMobile();
-    const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose, enabled: isMobile && !isSaving });
+    const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose, enabled: isMobile && !saving });
 
     // A11y: move focus into the dialog on open, restore it to the trigger on
     // close. The sheet node itself (sheetRef, tabIndex -1) receives focus.
@@ -141,13 +141,13 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
     useEffect(() => {
         if (!isOpen) return;
         const onKey = (e: KeyboardEvent) => {
-            if (e.key !== 'Escape' || isSaving) return;
+            if (e.key !== 'Escape' || saving) return;
             e.preventDefault();
             onClose();
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [isOpen, isSaving, onClose]);
+    }, [isOpen, saving, onClose]);
 
     // Recomputed per render (cheap) so previews and past-guards never go stale
     // while the sheet sits open.
@@ -160,7 +160,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
         return formatLocalDate(d);
     }, []);
 
-    // Custom fire time + validity, driving the live preview and confirm button.
+    // Custom fire time + validity, driving the live preview and the Save guard.
     let customTs: number | null = null;
     if (customDate) {
         const picked = parseLocalDate(customDate);
@@ -172,66 +172,110 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
 
     if (!isOpen || typeof document === 'undefined') return null;
 
-    const commit = async (key: Exclude<SavingKey, null>, fireAt?: number) => {
-        if (isSaving) return;
-        setSaving(key);
+    const canSave =
+        !saving && selected !== null &&
+        (selected !== 'custom' || (customTs !== null && !customInPast));
+
+    const finish = () => {
+        // onUpdate (saved) before onClose (dismissed) so callers that treat a
+        // bare onClose as "cancelled" see the save first.
+        if (onUpdate) onUpdate();
+        onClose();
+    };
+
+    const handleSave = async () => {
+        if (!canSave || selected === null) return;
+        setSaving(true);
         try {
-            if (key === 'off') {
-                await updateLinkReminder(uid, link.id, false);
-                hapticSuccess();
-                toast.success('Reminder turned off');
-            } else {
-                // Hard invariant: a reminder can NEVER be created in the past.
-                // Re-derived here so it holds even if the sheet sat open across
-                // midnight or the picked minute has since elapsed.
-                if (!fireAt || fireAt <= Date.now()) {
-                    hapticWarning();
-                    toast.error('Please pick a time in the future — that moment has already passed.');
-                    setSaving(null);
-                    return;
-                }
-                // Profile drives recurrence on the backend: 'smart' recurs
-                // (+1d, +1w, +1mo); everything else here is a true one-shot and
-                // MUST be stored as 'once' so it fires exactly once.
-                const profile = key === 'smart' ? 'smart' : 'once';
-                await updateLinkReminder(uid, link.id, true, fireAt, profile);
-                trackReminderSet();
-                hapticSuccess();
-                toast.success(`Reminder set for ${fmtDayTime(new Date(fireAt))}`);
+            // Fire time is derived at save time (fresh `now`) so a sheet that
+            // sat open never schedules from a stale clock.
+            const t = presetTimes(new Date());
+            const fireAt =
+                selected === 'smart' ? t.smart :
+                selected === 'tomorrow' ? t.tomorrow :
+                selected === 'next-week' ? t.nextWeek :
+                customTs;
+            // Hard invariant: a reminder can NEVER be created in the past.
+            if (!fireAt || fireAt <= Date.now()) {
+                hapticWarning();
+                toast.error('Please pick a time in the future — that moment has already passed.');
+                setSaving(false);
+                return;
             }
-            // onUpdate (saved) before onClose (dismissed) so callers that treat
-            // a bare onClose as "cancelled" see the save first.
-            if (onUpdate) onUpdate();
-            onClose();
+            // Profile drives recurrence on the backend: 'smart' recurs
+            // (+1d, +1w, +1mo); everything else here is a true one-shot and
+            // MUST be stored as 'once' so it fires exactly once.
+            await updateLinkReminder(uid, link.id, true, fireAt, selected === 'smart' ? 'smart' : 'once');
+            trackReminderSet();
+            hapticSuccess();
+            toast.success(`Reminder set for ${fmtDayTime(new Date(fireAt))}`);
+            finish();
         } catch (error) {
-            toast.error(`Couldn't update the reminder: ${error instanceof Error ? error.message : 'please try again.'}`);
-            setSaving(null);
+            toast.error(`Couldn't set the reminder: ${error instanceof Error ? error.message : 'please try again.'}`);
+            setSaving(false);
         }
     };
 
-    // One-tap quiet list row (iOS-Settings grammar): plain icon, label, and the
-    // real fire time right-aligned — no fills or borders, hairline dividers do
-    // the separation. The icon flips to a spinner while its own save is in
-    // flight; every control locks so a double-tap can't double-commit.
-    const QuickRow = ({ savingKey, icon, label, value, onCommit }: {
-        savingKey: Exclude<SavingKey, null>;
+    const handleTurnOff = async () => {
+        if (saving) return;
+        setSaving(true);
+        try {
+            await updateLinkReminder(uid, link.id, false);
+            hapticSuccess();
+            toast.success('Reminder turned off');
+            finish();
+        } catch (error) {
+            toast.error(`Couldn't update the reminder: ${error instanceof Error ? error.message : 'please try again.'}`);
+            setSaving(false);
+        }
+    };
+
+    const select = (s: Selection) => {
+        if (saving) return;
+        hapticSelection();
+        setSelected(s);
+    };
+
+    // Quiet radio row (iOS-Settings grammar): plain icon, label, real fire time
+    // right-aligned, accent check when selected. No fills or borders — hairline
+    // dividers do the separation.
+    const OptionRow = ({ id, icon, label, caption, value, trailing }: {
+        id: Selection;
         icon: React.ReactNode;
         label: string;
-        value: string;
-        onCommit: () => void;
-    }) => (
-        <button
-            onClick={onCommit}
-            disabled={isSaving}
-            className="w-full flex items-center gap-3 px-1.5 py-3.5 min-h-[52px] text-left transition-colors hover:bg-fill-subtle active:bg-fill-strong disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-            <span className="w-6 shrink-0 flex items-center justify-center text-text-muted">
-                {saving === savingKey ? <Loader2 className="w-5 h-5 animate-spin" /> : icon}
-            </span>
-            <span className="flex-1 min-w-0 text-[15px] font-medium text-text">{label}</span>
-            <span className="shrink-0 text-[13px] text-text-muted">{value}</span>
-        </button>
-    );
+        /** Second line under the label (used where a right value wouldn't fit). */
+        caption?: string;
+        value?: string;
+        trailing?: React.ReactNode;
+    }) => {
+        const isSelected = selected === id;
+        return (
+            <button
+                onClick={() => select(id)}
+                disabled={saving}
+                role="radio"
+                aria-checked={isSelected}
+                className="w-full flex items-center gap-3 px-1.5 py-3.5 min-h-[52px] text-left transition-colors hover:bg-fill-subtle active:bg-fill-strong disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+                <span className={`w-6 shrink-0 flex items-center justify-center transition-colors ${isSelected ? 'text-accent' : 'text-text-muted'}`}>
+                    {icon}
+                </span>
+                <span className="flex-1 min-w-0">
+                    <span className={`block text-[15px] font-medium transition-colors ${isSelected ? 'text-accent' : 'text-text'}`}>
+                        {label}
+                    </span>
+                    {caption && (
+                        <span className="block text-[12.5px] text-text-muted leading-snug mt-0.5">{caption}</span>
+                    )}
+                </span>
+                {value && <span className="shrink-0 text-[13px] text-text-muted">{value}</span>}
+                {trailing}
+                <span className="w-5 shrink-0 flex items-center justify-center">
+                    {isSelected && <Check className="w-4 h-4 text-accent" />}
+                </span>
+            </button>
+        );
+    };
 
     return createPortal(
         <div className="fixed inset-0 z-[95] flex items-end sm:items-center justify-center animate-fade-in">
@@ -239,7 +283,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
             <div
                 ref={scrimRef}
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                onClick={isSaving ? undefined : onClose}
+                onClick={saving ? undefined : onClose}
             />
 
             {/* Sheet */}
@@ -256,33 +300,29 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     <div className="sm:hidden flex justify-center pt-3 pb-1">
                         <div className="h-1.5 w-10 rounded-full bg-fill-strong" />
                     </div>
-                    <div className="flex items-center gap-3 px-5 pt-2 pb-3.5 border-b border-border-subtle">
-                        <div className="w-10 h-10 shrink-0 rounded-xl bg-[image:var(--accent-gradient)] flex items-center justify-center shadow-md shadow-accent/20">
-                            <Bell className="w-[18px] h-[18px] text-white" />
-                        </div>
+                    <div className="flex items-start gap-3 px-5 pt-2 pb-3.5 border-b border-border-subtle">
                         <div className="flex-1 min-w-0">
                             <h2 className="text-[17px] font-bold text-text leading-tight">Remind me</h2>
-                            <p className="text-[13px] text-text-secondary leading-snug line-clamp-2" dir="auto" title={link.title}>
+                            <p className="text-[13px] text-text-secondary leading-snug line-clamp-2 mt-0.5" dir="auto" title={link.title}>
                                 {link.title}
                             </p>
                         </div>
                         <button
                             onClick={onClose}
-                            disabled={isSaving}
+                            disabled={saving}
                             aria-label="Close"
-                            className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full text-text-muted hover:text-text hover:bg-fill-subtle transition-colors disabled:opacity-50"
+                            className="w-9 h-9 -mt-1 shrink-0 flex items-center justify-center rounded-full text-text-muted hover:text-text hover:bg-fill-subtle transition-colors disabled:opacity-50"
                         >
                             <X className="w-5 h-5" />
                         </button>
                     </div>
                 </div>
 
-                {/* Body: ONE elevated element (the Smart review hero); everything
-                    else is quiet hairline-divided rows so the sheet stays airy. */}
-                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 pt-3">
+                {/* Body: quiet hairline-divided radio rows. */}
+                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pt-1">
                     {/* Current reminder, when editing one. */}
                     {isReminderActive && link.nextReminderAt && (
-                        <div className="flex items-center gap-2.5 px-3 py-2.5 mb-3 rounded-xl bg-accent/10 border border-accent/15">
+                        <div className="flex items-center gap-2.5 px-3 py-2.5 mt-2 rounded-xl bg-accent/10 border border-accent/15">
                             <Clock className="w-4 h-4 text-accent shrink-0" />
                             <p className="flex-1 min-w-0 text-[13px] leading-snug">
                                 <span className="font-semibold text-text">{fmtDayTime(new Date(link.nextReminderAt))}</span>
@@ -291,60 +331,38 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                         </div>
                     )}
 
-                    <button
-                        onClick={() => commit('smart', presetTimes(new Date()).smart)}
-                        disabled={isSaving}
-                        className="w-full flex items-center gap-3.5 p-3.5 rounded-2xl border border-accent/20 bg-accent/5 hover:bg-accent/10 text-left transition-all active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                        <div className="w-10 h-10 shrink-0 rounded-xl bg-[image:var(--accent-gradient)] text-white shadow-md shadow-accent/20 flex items-center justify-center">
-                            {saving === 'smart' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                                <span className="text-[15px] font-semibold text-text">Smart review</span>
-                                <span className="px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[10px] font-bold uppercase tracking-wide">
-                                    Recommended
-                                </span>
-                            </div>
-                            <div className="text-[12.5px] text-text-muted leading-snug mt-0.5">
-                                Tomorrow · then 1 week &amp; 1 month
-                            </div>
-                        </div>
-                    </button>
-
-                    <div className="mt-1.5 divide-y divide-border-subtle">
-                        <QuickRow
-                            savingKey="tomorrow"
+                    <div role="radiogroup" aria-label="When to remind" className="divide-y divide-border-subtle">
+                        <OptionRow
+                            id="smart"
+                            icon={<Sparkles className="w-5 h-5" />}
+                            label="Smart review"
+                            caption="Tomorrow · then 1 week & 1 month"
+                        />
+                        <OptionRow
+                            id="tomorrow"
                             icon={<Clock className="w-5 h-5" />}
                             label="Tomorrow"
                             value={fmtDayTime(new Date(presets.tomorrow))}
-                            onCommit={() => commit('tomorrow', presetTimes(new Date()).tomorrow)}
                         />
-                        <QuickRow
-                            savingKey="next-week"
+                        <OptionRow
+                            id="next-week"
                             icon={<Calendar className="w-5 h-5" />}
                             label="Next week"
                             value={fmtDayTime(new Date(presets.nextWeek))}
-                            onCommit={() => commit('next-week', presetTimes(new Date()).nextWeek)}
                         />
 
-                        {/* Custom date & time — the one option that needs a confirm. */}
+                        {/* Custom date & time — selecting it reveals the pickers. */}
                         <div>
-                            <button
-                                onClick={() => setCustomOpen((v) => !v)}
-                                disabled={isSaving}
-                                aria-expanded={customOpen}
-                                className="w-full flex items-center gap-3 px-1.5 py-3.5 min-h-[52px] text-left transition-colors hover:bg-fill-subtle active:bg-fill-strong disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                                <span className="w-6 shrink-0 flex items-center justify-center text-text-muted">
-                                    <CalendarClock className="w-5 h-5" />
-                                </span>
-                                <span className="flex-1 min-w-0 text-[15px] font-medium text-text">Pick date &amp; time</span>
-                                <ChevronDown className={`w-4 h-4 shrink-0 text-text-muted transition-transform duration-200 ${customOpen ? 'rotate-180' : ''}`} />
-                            </button>
-
-                            {customOpen && (
-                                <div className="px-1.5 pb-4 space-y-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <OptionRow
+                                id="custom"
+                                icon={<CalendarClock className="w-5 h-5" />}
+                                label="Pick date & time"
+                                trailing={
+                                    <ChevronDown className={`w-4 h-4 shrink-0 text-text-muted transition-transform duration-200 ${selected === 'custom' ? 'rotate-180' : ''}`} />
+                                }
+                            />
+                            {selected === 'custom' && (
+                                <div className="px-1.5 pb-4 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
                                     <div className="grid grid-cols-2 gap-2">
                                         <input
                                             type="date"
@@ -352,7 +370,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                             min={todayStr}
                                             max={maxDate}
                                             onChange={(e) => setCustomDate(e.target.value)}
-                                            disabled={isSaving}
+                                            disabled={saving}
                                             aria-label="Reminder date"
                                             className="w-full bg-fill-subtle border border-border-subtle rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25 [&::-webkit-calendar-picker-indicator]:opacity-60"
                                         />
@@ -360,7 +378,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                             type="time"
                                             value={customTime}
                                             onChange={(e) => setCustomTime(e.target.value)}
-                                            disabled={isSaving}
+                                            disabled={saving}
                                             aria-label="Reminder time"
                                             className="w-full bg-fill-subtle border border-border-subtle rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25 [&::-webkit-calendar-picker-indicator]:opacity-60"
                                         />
@@ -372,20 +390,6 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                                                 ? 'That moment has already passed — pick a future time.'
                                                 : `Will remind you ${fmtDayTime(new Date(customTs))}.`}
                                     </p>
-                                    <button
-                                        onClick={() => customTs !== null && commit('custom', customTs)}
-                                        disabled={isSaving || customTs === null || customInPast}
-                                        className="w-full py-2.5 rounded-xl bg-[image:var(--accent-gradient)] text-white text-[14px] font-semibold shadow-md shadow-accent/20 transition-all active:scale-[0.99] disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                    >
-                                        {saving === 'custom' ? (
-                                            <>
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                                Setting…
-                                            </>
-                                        ) : (
-                                            'Set reminder'
-                                        )}
-                                    </button>
                                 </div>
                             )}
                         </div>
@@ -393,12 +397,12 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                         {/* Turn off — quiet danger row, only when there's something to turn off. */}
                         {isReminderActive && (
                             <button
-                                onClick={() => commit('off')}
-                                disabled={isSaving}
+                                onClick={handleTurnOff}
+                                disabled={saving}
                                 className="w-full flex items-center gap-3 px-1.5 py-3.5 min-h-[52px] text-left text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <span className="w-6 shrink-0 flex items-center justify-center">
-                                    {saving === 'off' ? <Loader2 className="w-5 h-5 animate-spin" /> : <BellOff className="w-5 h-5" />}
+                                    <BellOff className="w-5 h-5" />
                                 </span>
                                 <span className="text-[15px] font-medium">Turn off reminder</span>
                             </button>
@@ -413,6 +417,31 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                             Reminders appear here in the app when they come due.
                         </p>
                     )}
+                </div>
+
+                {/* Footer — the app's standard Cancel/Save pair (CollectionFormModal &c). */}
+                <div className="shrink-0 flex gap-3 px-4 pt-3 pb-4">
+                    <button
+                        onClick={onClose}
+                        disabled={saving}
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-fill-subtle text-text font-medium hover:bg-fill-strong transition-colors disabled:opacity-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        disabled={!canSave}
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-accent text-white font-semibold hover:bg-accent-hover transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                    >
+                        {saving ? (
+                            <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Saving…
+                            </>
+                        ) : (
+                            'Save'
+                        )}
+                    </button>
                 </div>
             </div>
         </div>,
