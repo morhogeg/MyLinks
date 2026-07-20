@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { RefreshCw, BarChart3 } from 'lucide-react';
+import { RefreshCw, BarChart3, StickyNote } from 'lucide-react';
 import { loadStats, LibraryStats, LibraryFacetRequest } from '@/lib/stats';
 import { track } from '@/lib/analytics';
 import { LargeTitle, SectionHeader, Footnote, List, RowShell, RowText, Chevron } from './primitives';
@@ -315,6 +315,24 @@ export function StatsView({ uid, onOpenFacet, restoreScroll }: {
             <WeeklyChart stats={stats} grown={grown} />
             {stats.busiestWeekday !== null && (
                 <Footnote>Most of your saving happens on {weekdayName(stats.busiestWeekday)}s.</Footnote>
+            )}
+
+            {stats.noteCount > 0 && (
+                <>
+                    <SectionHeader>Notes</SectionHeader>
+                    <List>
+                        <RowShell
+                            tile={<StickyNote className="w-[17px] h-[17px]" />}
+                            onClick={onOpenFacet && (() => openFacet({ kind: 'notes', value: '' }))}
+                        >
+                            <RowText
+                                title="My notes"
+                                sub={`${stats.noteCount.toLocaleString()} note${stats.noteCount === 1 ? '' : 's'} on ${stats.notedCards.toLocaleString()} card${stats.notedCards === 1 ? '' : 's'}`}
+                            />
+                            {onOpenFacet && <Chevron />}
+                        </RowShell>
+                    </List>
+                </>
             )}
 
             <SectionHeader>Categories</SectionHeader>

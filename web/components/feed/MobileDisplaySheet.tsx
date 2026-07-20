@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { X, Check, Filter, CheckSquare, SlidersHorizontal } from 'lucide-react';
+import { X, Check, Filter, CheckSquare, SlidersHorizontal, StickyNote } from 'lucide-react';
 import { useSheetDrag } from '@/lib/useSheetDrag';
 import type { SortType } from '@/lib/useFeedFilters';
 
@@ -22,6 +22,7 @@ export default function MobileDisplaySheet({
     setSortBy,
     onOpenFilters,
     onSelectCards,
+    onOpenNotes,
 }: {
     isOpen: boolean;
     onClose: () => void;
@@ -34,6 +35,8 @@ export default function MobileDisplaySheet({
     /** Open the full Filters sheet (status / categories / tags). */
     onOpenFilters: () => void;
     onSelectCards: () => void;
+    /** Open the central My Notes view. */
+    onOpenNotes: () => void;
 }) {
     const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose });
     if (!isOpen) return null;
@@ -109,6 +112,10 @@ export default function MobileDisplaySheet({
                 </div>
 
                 <div className="h-px bg-border-subtle mb-2" />
+                <button onClick={() => { onClose(); onOpenNotes(); }} className={`${row} text-text-secondary hover:bg-card-hover`}>
+                    <StickyNote className="w-[18px] h-[18px] text-text-muted" />
+                    <span className="flex-1 font-medium">My notes</span>
+                </button>
                 <button onClick={() => { onClose(); onOpenFilters(); }} className={`${row} text-text-secondary hover:bg-card-hover`}>
                     <Filter className="w-[18px] h-[18px] text-text-muted" />
                     <span className="flex-1 font-medium">Filter…</span>
