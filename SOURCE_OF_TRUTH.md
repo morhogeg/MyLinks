@@ -647,7 +647,34 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-20 (latest) — REMINDERS REVAMP: the Set Reminder modal rebuilt to
+- **2026-07-20 (latest) — MY NOTES: a central view of every personal note with
+  its card attached (branch `claude/onboard-dedicated-notes-area-71fkrw`).**
+  New `NotesView` (web/components/NotesView.tsx): note-centric rows — the note
+  in the detail modal's accent panel (dir-aware, relative date via the shared
+  `useNow`), the card below it as a compact strip (category color bar, title,
+  `SourceByline`) that opens `LinkDetailModal` right next to the note editor.
+  Client-side search filters note text + card title. Data is pure client-side:
+  new `getAllNotes` in lib/notes.ts flattens both storage shapes via the ONE
+  shared reader; Feed merges the live window ∪ the `useSearchLibrary` full
+  snapshot (`ensureLibrary()` fires on open so notes on cards older than the
+  150-card window appear), gated by the same pending/effectively-private rules
+  as the main feed — private cards' notes never show, locked or not, matching
+  Insights. Deliberately NOT a fifth bottom tab (product review: subtraction/
+  focus): new `viewMode 'notes'` in Feed follows the Digest pattern exactly
+  (desktop inline `MobileSubheader` + content, mobile full-screen overlay,
+  edge-swipe back, FAB hidden, tab bar rolls up to Home). Entry points: desktop
+  "Notes" chip next to Digest, mobile Display sheet (⋯) "My notes" row, and a
+  new Insights → Notes row ("N notes on M cards"; `noteCount`/`notedCards` in
+  lib/stats.ts) that deep-links via `LibraryFacetRequest kind:'notes'` — back
+  from that entry returns to Insights. `tsc` clean, changed files eslint-clean
+  (StatsView's pre-existing `set-state-in-effect` finding untouched); sandbox
+  `next build` fails only on missing Firebase env keys (expected — no
+  `.env.local` in cloud sessions). Stats note counts ride the existing
+  per-session Insights cache, so a note added mid-session shows on the next
+  session's Insights (same as every other stat). Merged cleanly on top of the
+  same-day reminders revamp (Feed.tsx auto-merge re-typechecked, see below).
+  **Shipped:** [merge SHA + TestFlight build stamped below at ship time.]
+- **2026-07-20 — REMINDERS REVAMP: the Set Reminder modal rebuilt to
   the app's design level (client-only; zero backend/profile-semantics changes).**
   Owner flagged the modal as below the rest of the app. `ReminderModal.tsx`
   rewritten as the standard overlay: portal to body (z-95, above the z-50

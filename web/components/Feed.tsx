@@ -45,8 +45,10 @@ import CollectionsGallery from './CollectionsGallery';
 import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
+import NotesView from './NotesView';
+import { getAllNotes } from '@/lib/notes';
 import LoadMoreSentinel from './feed/LoadMoreSentinel';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, Sparkles, Lock, BookOpenCheck, ChevronLeft, BarChart3 } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, Sparkles, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
@@ -244,9 +246,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // filter chrome; 'ask' is the full-screen chat; 'collections' is the gallery
     // and 'collection' is a single collection opened as its own place (Task A);
     // 'digest' is the list of digests and 'digestDetail' is one opened digest
-    // (Task B). The detail places are history-like: back returns to their parent
-    // list, never to the home library.
-    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'ask' | 'collections' | 'collection' | 'digest' | 'digestDetail'>('grid');
+    // (Task B); 'notes' is the central My Notes view. The detail places are
+    // history-like: back returns to their parent list, never to the home library.
+    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'ask' | 'collections' | 'collection' | 'digest' | 'digestDetail' | 'notes'>('grid');
     // The collection currently open as a place (viewMode 'collection').
     const [openCollectionId, setOpenCollectionId] = useState<string | null>(null);
     // The digest currently open as a place (viewMode 'digestDetail'); the sentinel
@@ -753,8 +755,46 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // The facet that Insights applied — kept so the "Back to Insights" chip can
     // show while (and only while) that facet is still the feed's sole scope.
     const [insightsFacet, setInsightsFacet] = useState<import('@/lib/stats').LibraryFacetRequest | null>(null);
+    // True when the My Notes view was entered from Insights — its back then
+    // returns to Insights instead of the library, mirroring the facet chip.
+    const [notesFromInsights, setNotesFromInsights] = useState(false);
+    // Open My Notes: kick off the full-library fetch (the window alone can't
+    // reach notes on old cards) and switch view. Direct entries (toolbar,
+    // display sheet) are not "from Insights".
+    const openNotesView = useCallback((fromInsights = false) => {
+        ensureLibrary();
+        setNotesFromInsights(fromInsights);
+        setViewMode('notes');
+        window.scrollTo({ top: 0 });
+    }, [ensureLibrary]);
+    const closeNotesView = () => {
+        if (notesFromInsights) {
+            setNotesFromInsights(false);
+            setViewMode(lastLayout.current);
+            onBackToInsights?.();
+        } else {
+            setViewMode(lastLayout.current);
+        }
+    };
+    // The rows behind My Notes: live window ∪ full-library snapshot (window
+    // docs win — they're the live snapshot), gated by the same pending/privacy
+    // rules as the main feed, then flattened into {note, link} pairs. Private
+    // cards' notes never appear here, locked or not — same as Insights.
+    const allNotes = useMemo(() => {
+        if (viewMode !== 'notes') return [];
+        const seen = new Set(links.map((l) => l.id));
+        const pool = links.concat(libraryLinks.filter((l) => !seen.has(l.id)))
+            .filter((l) => !isPending(l) && !isEffectivelyPrivateCard(l));
+        return getAllNotes(pool);
+    }, [viewMode, links, libraryLinks, isEffectivelyPrivateCard]);
     useEffect(() => {
         if (!libraryFacet) return;
+        // The 'notes' facet is a place, not a grid filter — open My Notes.
+        if (libraryFacet.kind === 'notes') {
+            openNotesView(true);
+            onLibraryFacetApplied?.();
+            return;
+        }
         setSelectedCategory(libraryFacet.kind === 'category' ? new Set([libraryFacet.value]) : new Set());
         setSelectedTags(libraryFacet.kind === 'tag' ? new Set([libraryFacet.value]) : new Set());
         setSelectedSources(libraryFacet.kind === 'source' ? new Set([libraryFacet.value]) : new Set());
@@ -766,7 +806,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         setInsightsFacet(libraryFacet);
         window.scrollTo({ top: 0 });
         onLibraryFacetApplied?.();
-    }, [libraryFacet, onLibraryFacetApplied, setSelectedCategory, setSelectedTags, setSelectedSources, setSelectedCollections, setFilter]);
+    }, [libraryFacet, onLibraryFacetApplied, openNotesView, setSelectedCategory, setSelectedTags, setSelectedSources, setSelectedCollections, setFilter]);
 
     // True while the Insights-applied facet is still exactly what the feed
     // shows. The user changing ANYTHING (adding/removing a facet, searching,
@@ -1056,7 +1096,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         viewMode === 'ask' ? 'ask'
             : viewMode === 'collections' || viewMode === 'collection' ? 'collections'
                 : viewMode === 'digest' || viewMode === 'digestDetail' ? 'digest'
-                    : 'home';
+                    : 'home'; // 'notes' rolls up to home — it's a library view.
     useEffect(() => { onTabChange?.(activeTab); }, [activeTab, onTabChange]);
 
     // Scroll-away bar state, owned here so the tab overlays can grow to reclaim
@@ -1102,12 +1142,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const handleEdgeBack = useCallback(() => {
         if (viewMode === 'collection') closeCollectionToGallery();
         else if (viewMode === 'digestDetail') closeDigestToList();
+        else if (viewMode === 'notes') closeNotesView();
         else setViewMode(lastLayout.current);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [viewMode]);
+    }, [viewMode, notesFromInsights]);
     useEdgeSwipeBack(
         handleEdgeBack,
-        isMobileView && (viewMode === 'digest' || viewMode === 'collections' || viewMode === 'collection' || viewMode === 'digestDetail'),
+        isMobileView && (viewMode === 'digest' || viewMode === 'collections' || viewMode === 'collection' || viewMode === 'digestDetail' || viewMode === 'notes'),
     );
 
     // If the open collection is deleted out from under the detail view (e.g. from
@@ -1310,12 +1351,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     }, [viewMode, onFullBleedChange]);
 
     // Hide the add-link FAB in Ask, Collections (gallery + detail), Digest (list
-    // + detail), and Review — none of these views capture links (and in Review it
-    // overlaps the Keep button).
+    // + detail), My Notes, and Review — none of these views capture links (and
+    // in Review it overlaps the Keep button).
     useEffect(() => {
         onHideAddButton?.(
             viewMode === 'ask' || viewMode === 'collections' || viewMode === 'collection'
             || viewMode === 'digest' || viewMode === 'digestDetail' || viewMode === 'review'
+            || viewMode === 'notes'
         );
     }, [viewMode, onHideAddButton]);
 
@@ -1399,6 +1441,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             backLabel="Back to digests"
                             icon={<Newspaper className="w-5 h-5" />}
                             title={digestDetailTitle}
+                        />
+                    </div>
+                ) : viewMode === 'notes' ? (
+                    // Desktop only: My Notes flows inline beneath this subheader.
+                    // Mobile renders its own full-screen overlay below.
+                    <div className="hidden sm:block">
+                        <MobileSubheader
+                            onBack={closeNotesView}
+                            backLabel={notesFromInsights ? 'Back to Insights' : 'Back to your library'}
+                            icon={<StickyNote className="w-5 h-5" />}
+                            title="My Notes"
                         />
                     </div>
                 ) : searchOpen ? (
@@ -1611,6 +1664,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             >
                                 <Newspaper className="w-4 h-4" />
                                 <span>Digest</span>
+                            </button>
+                            <button
+                                onClick={() => openNotesView()}
+                                title="All your notes, with their cards"
+                                aria-label="My Notes"
+                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
+                            >
+                                <StickyNote className="w-4 h-4" />
+                                <span>Notes</span>
                             </button>
                         </div>
 
@@ -1955,6 +2017,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     setSortBy={setSortBy}
                     onOpenFilters={() => setIsFiltersOpen(true)}
                     onSelectCards={() => { setViewMode(lastLayout.current); setIsSelectionMode(true); }}
+                    onOpenNotes={() => openNotesView()}
                 />
 
                 {/* Sources Sheet — the dedicated publisher/channel browser (all
@@ -2059,6 +2122,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         // subheader. Mobile renders the full-screen overlay below.
                         <div className="hidden sm:block">
                             {digestContent}
+                        </div>
+                    ) : viewMode === 'notes' ? (
+                        // Desktop only: My Notes flows inline beneath the subheader.
+                        // Mobile renders the full-screen overlay below.
+                        <div className="hidden sm:block">
+                            <NotesView
+                                notes={allNotes}
+                                loading={isLoadingLibrary}
+                                onOpenCard={(link) => setActiveLinkId(link.id)}
+                            />
                         </div>
                     ) : viewMode === 'collections' ? (
                         // Desktop only: gallery flows inline beneath the inline subheader.
@@ -2308,6 +2381,25 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             onCreate={openNewCollectionForm}
                             onCreateSuggestion={handleCreateSuggestion}
                             onDismissSuggestion={handleDismissSuggestion}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* My Notes — mobile full-screen overlay (mirrors Digest). */}
+            {viewMode === 'notes' && (
+                <div className="sm:hidden fixed inset-x-0 top-0 z-50 bg-background flex flex-col animate-fade-in transition-[bottom] duration-300 [transition-timing-function:var(--ease-modal)]" style={{ bottom: overlayBottom }}>
+                    <MobileSubheader
+                        onBack={closeNotesView}
+                        backLabel={notesFromInsights ? 'Back to Insights' : 'Back to your library'}
+                        icon={<StickyNote className="w-5 h-5" />}
+                        title="My Notes"
+                    />
+                    <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: '1rem' }}>
+                        <NotesView
+                            notes={allNotes}
+                            loading={isLoadingLibrary}
+                            onOpenCard={(link) => setActiveLinkId(link.id)}
                         />
                     </div>
                 </div>

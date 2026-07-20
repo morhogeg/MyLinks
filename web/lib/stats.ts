@@ -1,5 +1,6 @@
 import { Link } from '@/lib/types';
 import { getSourceInfo } from '@/lib/source';
+import { getNotes } from '@/lib/notes';
 
 /**
  * Library insights (Settings → Insights), computed entirely on-device.
@@ -33,9 +34,11 @@ export interface CountedSource extends CountedName {
 }
 
 /** A tap on an Insights row → open the library filtered to this facet.
-    `value` is the category name, the tag, or the source-facet key. */
+    `value` is the category name, the tag, or the source-facet key. The
+    'notes' kind opens the My Notes view instead of a filtered grid (no
+    value). */
 export interface LibraryFacetRequest {
-    kind: 'category' | 'tag' | 'source';
+    kind: 'category' | 'tag' | 'source' | 'notes';
     value: string;
 }
 
@@ -63,6 +66,10 @@ export interface LibraryStats {
     topSources: CountedSource[];
     /** Capture-surface mix, count desc: web / youtube / image / note. */
     sourceMix: CountedName[];
+    /** Total personal notes written across the library (both storage shapes). */
+    noteCount: number;
+    /** How many cards carry at least one note. */
+    notedCards: number;
 }
 
 /** createdAt arrives as epoch ms, an ISO string, or a Firestore Timestamp. */
@@ -136,6 +143,8 @@ export function computeStats(links: Link[], now = Date.now()): LibraryStats {
     let firstSaveAt: number | null = null;
     let totalReadMinutes = 0;
     let datedSaves = 0;
+    let noteCount = 0;
+    let notedCards = 0;
     const weekdayCounts = new Array(7).fill(0) as number[];
 
     for (const card of cards) {
@@ -146,6 +155,12 @@ export function computeStats(links: Link[], now = Date.now()): LibraryStats {
         }
         bump(categories, card.category || 'General');
         for (const tag of card.tags) bump(tags, tag);
+
+        const cardNotes = getNotes(card).length;
+        if (cardNotes > 0) {
+            noteCount += cardNotes;
+            notedCards++;
+        }
 
         const source = card.sourceType || (card.url ? 'web' : 'note');
         bump(sources, SOURCE_LABEL[source] ?? source);
@@ -206,6 +221,8 @@ export function computeStats(links: Link[], now = Date.now()): LibraryStats {
             count: s.count,
         })),
         sourceMix: topN(sources, Infinity),
+        noteCount,
+        notedCards,
     };
 }
 

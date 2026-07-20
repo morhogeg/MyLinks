@@ -87,6 +87,26 @@ export function getNotesText(link: Link): string {
     return parts.join(' ');
 }
 
+/** One note paired with the card it was written on — the My Notes view's row. */
+export interface NoteWithCard {
+    note: UserNote;
+    link: Link;
+}
+
+/**
+ * Every note across the library, newest first — the data behind the central
+ * My Notes view. Flattens each card's notes (both storage shapes, via
+ * `getNotes`) into {note, link} pairs so a row can render the note with its
+ * card attached. Callers pass an already privacy/pending-filtered list.
+ */
+export function getAllNotes(links: Link[]): NoteWithCard[] {
+    const rows: NoteWithCard[] = [];
+    for (const link of links) {
+        for (const note of getNotes(link)) rows.push({ note, link });
+    }
+    return rows.sort((a, b) => (b.note.createdAt ?? 0) - (a.note.createdAt ?? 0));
+}
+
 /** Build a brand-new note from composer text, stamped with `createdAt` now. */
 export function makeNote(text: string): UserNote {
     return { id: newNoteId(), text: text.trim(), createdAt: Date.now() };
