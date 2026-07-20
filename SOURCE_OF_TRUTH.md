@@ -672,8 +672,11 @@ exact-match, capped.
   `.env.local` in cloud sessions). Stats note counts ride the existing
   per-session Insights cache, so a note added mid-session shows on the next
   session's Insights (same as every other stat). Merged cleanly on top of the
-  same-day reminders revamp (Feed.tsx auto-merge re-typechecked, see below).
-  **Shipped:** [merge SHA + TestFlight build stamped below at ship time.]
+  same-day reminders revamp (Feed.tsx auto-merge re-typechecked, `tsc` clean
+  post-merge). **Shipped:** feature commit `471fb2c`, merge `6aee775`, pushed
+  as `7c94d49` → Vercel (auto); TestFlight run **#137 = build 1137** (queued
+  behind the reminders round-2 build 1136 in the shared concurrency group —
+  1137 carries BOTH features). No functions changes — no backend deploy.
 - **2026-07-20 — REMINDERS REVAMP: the Set Reminder modal rebuilt to
   the app's design level (client-only; zero backend/profile-semantics changes).**
   Owner flagged the modal as below the rest of the app. `ReminderModal.tsx`
