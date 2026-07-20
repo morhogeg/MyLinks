@@ -494,10 +494,20 @@ a {
   }
 }
 /* Native date/time pickers follow the app theme, not the OS default — without
-   this, WKWebView/desktop render UA-default (light) inputs on the dark theme. */
+   this, WKWebView/desktop render UA-default (light) inputs on the dark theme.
+   `appearance: none` strips iOS's own grey pill chrome, which otherwise draws
+   INSIDE the app's styled field and reads as a broken double box (build 1135
+   device QA); the pseudo-element keeps the value start-aligned (iOS centers it). */
 input[type='date'],
 input[type='time'] {
   color-scheme: dark;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type='date']::-webkit-date-and-time-value,
+input[type='time']::-webkit-date-and-time-value {
+  text-align: start;
 }
 
 .light input[type='date'],

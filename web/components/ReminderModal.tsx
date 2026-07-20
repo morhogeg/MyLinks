@@ -209,44 +209,27 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
         }
     };
 
-    // One-tap preset row. The icon tile flips to a spinner while its own save
-    // is in flight; every control locks so a double-tap can't double-commit.
-    const PresetRow = ({ savingKey, icon, title, subtitle, hero = false, onCommit }: {
+    // One-tap quiet list row (iOS-Settings grammar): plain icon, label, and the
+    // real fire time right-aligned — no fills or borders, hairline dividers do
+    // the separation. The icon flips to a spinner while its own save is in
+    // flight; every control locks so a double-tap can't double-commit.
+    const QuickRow = ({ savingKey, icon, label, value, onCommit }: {
         savingKey: Exclude<SavingKey, null>;
         icon: React.ReactNode;
-        title: string;
-        subtitle: string;
-        hero?: boolean;
+        label: string;
+        value: string;
         onCommit: () => void;
     }) => (
         <button
             onClick={onCommit}
             disabled={isSaving}
-            className={`w-full flex items-center gap-3.5 px-3.5 py-3 min-h-[60px] rounded-2xl border text-left transition-all active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60
-                ${hero
-                    ? 'bg-accent/5 border-accent/25 hover:bg-accent/10'
-                    : 'bg-fill-subtle border-border-subtle hover:bg-fill-strong'
-                }`}
+            className="w-full flex items-center gap-3 px-1.5 py-3.5 min-h-[52px] text-left transition-colors hover:bg-fill-subtle active:bg-fill-strong disabled:opacity-60 disabled:cursor-not-allowed"
         >
-            <div className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center
-                ${hero
-                    ? 'bg-[image:var(--accent-gradient)] text-white shadow-md shadow-accent/20'
-                    : 'bg-fill-strong text-text-secondary'
-                }`}
-            >
+            <span className="w-6 shrink-0 flex items-center justify-center text-text-muted">
                 {saving === savingKey ? <Loader2 className="w-5 h-5 animate-spin" /> : icon}
-            </div>
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                    <span className="text-[15px] font-semibold text-text">{title}</span>
-                    {hero && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[10px] font-bold uppercase tracking-wide">
-                            Recommended
-                        </span>
-                    )}
-                </div>
-                <div className="text-[12.5px] text-text-muted leading-snug mt-0.5">{subtitle}</div>
-            </div>
+            </span>
+            <span className="flex-1 min-w-0 text-[15px] font-medium text-text">{label}</span>
+            <span className="shrink-0 text-[13px] text-text-muted">{value}</span>
         </button>
     );
 
@@ -279,7 +262,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                         </div>
                         <div className="flex-1 min-w-0">
                             <h2 className="text-[17px] font-bold text-text leading-tight">Remind me</h2>
-                            <p className="text-[13px] text-text-secondary truncate" dir="auto" title={link.title}>
+                            <p className="text-[13px] text-text-secondary leading-snug line-clamp-2" dir="auto" title={link.title}>
                                 {link.title}
                             </p>
                         </div>
@@ -294,129 +277,139 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     </div>
                 </div>
 
-                {/* Body */}
-                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-2.5">
+                {/* Body: ONE elevated element (the Smart review hero); everything
+                    else is quiet hairline-divided rows so the sheet stays airy. */}
+                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 pt-3">
                     {/* Current reminder, when editing one. */}
                     {isReminderActive && link.nextReminderAt && (
-                        <div className="flex items-center gap-3 px-3.5 py-3 rounded-2xl bg-accent/10 border border-accent/20">
-                            <div className="w-10 h-10 shrink-0 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
-                                <Clock className="w-5 h-5" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-accent">Next reminder</p>
-                                <p className="text-[14px] font-semibold text-text leading-snug">
-                                    {fmtDayTime(new Date(link.nextReminderAt))}
-                                </p>
-                                <p className="text-[12px] text-text-secondary">{profileLabel(link)}</p>
-                            </div>
+                        <div className="flex items-center gap-2.5 px-3 py-2.5 mb-3 rounded-xl bg-accent/10 border border-accent/15">
+                            <Clock className="w-4 h-4 text-accent shrink-0" />
+                            <p className="flex-1 min-w-0 text-[13px] leading-snug">
+                                <span className="font-semibold text-text">{fmtDayTime(new Date(link.nextReminderAt))}</span>
+                                <span className="block text-[12px] text-text-secondary">{profileLabel(link)}</span>
+                            </p>
                         </div>
                     )}
 
-                    <PresetRow
-                        savingKey="smart"
-                        icon={<Sparkles className="w-5 h-5" />}
-                        title="Smart review"
-                        subtitle="Tomorrow · then 1 week & 1 month"
-                        hero
-                        onCommit={() => commit('smart', presetTimes(new Date()).smart)}
-                    />
-                    <PresetRow
-                        savingKey="tomorrow"
-                        icon={<Clock className="w-5 h-5" />}
-                        title="Tomorrow"
-                        subtitle={fmtDayTime(new Date(presets.tomorrow))}
-                        onCommit={() => commit('tomorrow', presetTimes(new Date()).tomorrow)}
-                    />
-                    <PresetRow
-                        savingKey="next-week"
-                        icon={<Calendar className="w-5 h-5" />}
-                        title="Next week"
-                        subtitle={fmtDayTime(new Date(presets.nextWeek))}
-                        onCommit={() => commit('next-week', presetTimes(new Date()).nextWeek)}
-                    />
-
-                    {/* Custom date & time — the one option that needs a confirm. */}
-                    <div className={`rounded-2xl border transition-colors ${customOpen ? 'bg-fill-subtle border-border-strong' : 'bg-fill-subtle border-border-subtle hover:bg-fill-strong'}`}>
-                        <button
-                            onClick={() => setCustomOpen((v) => !v)}
-                            disabled={isSaving}
-                            aria-expanded={customOpen}
-                            className="w-full flex items-center gap-3.5 px-3.5 py-3 min-h-[60px] text-left disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            <div className="w-10 h-10 shrink-0 rounded-xl bg-fill-strong text-text-secondary flex items-center justify-center">
-                                <CalendarClock className="w-5 h-5" />
+                    <button
+                        onClick={() => commit('smart', presetTimes(new Date()).smart)}
+                        disabled={isSaving}
+                        className="w-full flex items-center gap-3.5 p-3.5 rounded-2xl border border-accent/20 bg-accent/5 hover:bg-accent/10 text-left transition-all active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                        <div className="w-10 h-10 shrink-0 rounded-xl bg-[image:var(--accent-gradient)] text-white shadow-md shadow-accent/20 flex items-center justify-center">
+                            {saving === 'smart' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[15px] font-semibold text-text">Smart review</span>
+                                <span className="px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[10px] font-bold uppercase tracking-wide">
+                                    Recommended
+                                </span>
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <span className="text-[15px] font-semibold text-text">Pick date &amp; time</span>
-                                <div className="text-[12.5px] text-text-muted leading-snug mt-0.5">Choose exactly when</div>
+                            <div className="text-[12.5px] text-text-muted leading-snug mt-0.5">
+                                Tomorrow · then 1 week &amp; 1 month
                             </div>
-                            <ChevronDown className={`w-4 h-4 shrink-0 text-text-muted transition-transform duration-200 ${customOpen ? 'rotate-180' : ''}`} />
-                        </button>
+                        </div>
+                    </button>
 
-                        {customOpen && (
-                            <div className="px-3.5 pb-3.5 space-y-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                                <div className="grid grid-cols-2 gap-2">
-                                    <input
-                                        type="date"
-                                        value={customDate}
-                                        min={todayStr}
-                                        max={maxDate}
-                                        onChange={(e) => setCustomDate(e.target.value)}
-                                        disabled={isSaving}
-                                        aria-label="Reminder date"
-                                        className="w-full bg-surface-inset border border-border-strong rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent/40 [&::-webkit-calendar-picker-indicator]:opacity-60"
-                                    />
-                                    <input
-                                        type="time"
-                                        value={customTime}
-                                        onChange={(e) => setCustomTime(e.target.value)}
-                                        disabled={isSaving}
-                                        aria-label="Reminder time"
-                                        className="w-full bg-surface-inset border border-border-strong rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent/40 [&::-webkit-calendar-picker-indicator]:opacity-60"
-                                    />
+                    <div className="mt-1.5 divide-y divide-border-subtle">
+                        <QuickRow
+                            savingKey="tomorrow"
+                            icon={<Clock className="w-5 h-5" />}
+                            label="Tomorrow"
+                            value={fmtDayTime(new Date(presets.tomorrow))}
+                            onCommit={() => commit('tomorrow', presetTimes(new Date()).tomorrow)}
+                        />
+                        <QuickRow
+                            savingKey="next-week"
+                            icon={<Calendar className="w-5 h-5" />}
+                            label="Next week"
+                            value={fmtDayTime(new Date(presets.nextWeek))}
+                            onCommit={() => commit('next-week', presetTimes(new Date()).nextWeek)}
+                        />
+
+                        {/* Custom date & time — the one option that needs a confirm. */}
+                        <div>
+                            <button
+                                onClick={() => setCustomOpen((v) => !v)}
+                                disabled={isSaving}
+                                aria-expanded={customOpen}
+                                className="w-full flex items-center gap-3 px-1.5 py-3.5 min-h-[52px] text-left transition-colors hover:bg-fill-subtle active:bg-fill-strong disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                <span className="w-6 shrink-0 flex items-center justify-center text-text-muted">
+                                    <CalendarClock className="w-5 h-5" />
+                                </span>
+                                <span className="flex-1 min-w-0 text-[15px] font-medium text-text">Pick date &amp; time</span>
+                                <ChevronDown className={`w-4 h-4 shrink-0 text-text-muted transition-transform duration-200 ${customOpen ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {customOpen && (
+                                <div className="px-1.5 pb-4 space-y-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <input
+                                            type="date"
+                                            value={customDate}
+                                            min={todayStr}
+                                            max={maxDate}
+                                            onChange={(e) => setCustomDate(e.target.value)}
+                                            disabled={isSaving}
+                                            aria-label="Reminder date"
+                                            className="w-full bg-fill-subtle border border-border-subtle rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25 [&::-webkit-calendar-picker-indicator]:opacity-60"
+                                        />
+                                        <input
+                                            type="time"
+                                            value={customTime}
+                                            onChange={(e) => setCustomTime(e.target.value)}
+                                            disabled={isSaving}
+                                            aria-label="Reminder time"
+                                            className="w-full bg-fill-subtle border border-border-subtle rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25 [&::-webkit-calendar-picker-indicator]:opacity-60"
+                                        />
+                                    </div>
+                                    <p aria-live="polite" className={`text-[12.5px] leading-snug px-0.5 ${customInPast ? 'text-red-400' : 'text-text-muted'}`}>
+                                        {customTs === null
+                                            ? 'Pick a date to continue.'
+                                            : customInPast
+                                                ? 'That moment has already passed — pick a future time.'
+                                                : `Will remind you ${fmtDayTime(new Date(customTs))}.`}
+                                    </p>
+                                    <button
+                                        onClick={() => customTs !== null && commit('custom', customTs)}
+                                        disabled={isSaving || customTs === null || customInPast}
+                                        className="w-full py-2.5 rounded-xl bg-[image:var(--accent-gradient)] text-white text-[14px] font-semibold shadow-md shadow-accent/20 transition-all active:scale-[0.99] disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    >
+                                        {saving === 'custom' ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                Setting…
+                                            </>
+                                        ) : (
+                                            'Set reminder'
+                                        )}
+                                    </button>
                                 </div>
-                                <p aria-live="polite" className={`text-[12.5px] leading-snug px-0.5 ${customInPast ? 'text-red-400' : 'text-text-secondary'}`}>
-                                    {customTs === null
-                                        ? 'Pick a date to continue.'
-                                        : customInPast
-                                            ? 'That moment has already passed — pick a future time.'
-                                            : `Will remind you ${fmtDayTime(new Date(customTs))}.`}
-                                </p>
-                                <button
-                                    onClick={() => customTs !== null && commit('custom', customTs)}
-                                    disabled={isSaving || customTs === null || customInPast}
-                                    className="w-full py-3 rounded-xl bg-[image:var(--accent-gradient)] text-white text-[15px] font-semibold shadow-lg shadow-accent/25 transition-all active:scale-[0.99] disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                >
-                                    {saving === 'custom' ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                            Setting…
-                                        </>
-                                    ) : (
-                                        'Set reminder'
-                                    )}
-                                </button>
-                            </div>
+                            )}
+                        </div>
+
+                        {/* Turn off — quiet danger row, only when there's something to turn off. */}
+                        {isReminderActive && (
+                            <button
+                                onClick={() => commit('off')}
+                                disabled={isSaving}
+                                className="w-full flex items-center gap-3 px-1.5 py-3.5 min-h-[52px] text-left text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <span className="w-6 shrink-0 flex items-center justify-center">
+                                    {saving === 'off' ? <Loader2 className="w-5 h-5 animate-spin" /> : <BellOff className="w-5 h-5" />}
+                                </span>
+                                <span className="text-[15px] font-medium">Turn off reminder</span>
+                            </button>
                         )}
                     </div>
-
-                    {/* Turn off — quiet, only when there's something to turn off. */}
-                    {isReminderActive && (
-                        <button
-                            onClick={() => commit('off')}
-                            disabled={isSaving}
-                            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[14px] font-medium text-red-400 hover:bg-red-500/10 hover:text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {saving === 'off' ? <Loader2 className="w-4 h-4 animate-spin" /> : <BellOff className="w-4 h-4" />}
-                            Turn off reminder
-                        </button>
-                    )}
 
                     {/* Web has no push channel — reminders surface in the app itself.
                         Set expectations so "remind me" doesn't imply a notification
                         that can't arrive. (Native handles this via the push nudge.) */}
                     {!isNativeApp() && (
-                        <p className="px-1 pt-0.5 text-[11.5px] text-text-muted leading-snug">
+                        <p className="px-1 pt-2 text-[11.5px] text-text-muted leading-snug">
                             Reminders appear here in the app when they come due.
                         </p>
                     )}
