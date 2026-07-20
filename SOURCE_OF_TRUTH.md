@@ -708,6 +708,18 @@ exact-match, capped.
   deploy) **not yet documented in §3/§4/§9** — that session should write up
   the cutover state; §3 is stale until then. Build 1135 therefore builds on
   top of the cutover code as it stood on main.
+  **Round 2 (owner device QA on build 1135, same day; commit `e1de2af`, merge
+  `a82551f`):** three fixes — (1) header card title two-line clamp instead of
+  truncation; (2) iOS WKWebView drew its own grey pill chrome INSIDE the
+  styled date/time fields (read as a broken double box) —
+  `appearance: none` + `::-webkit-date-and-time-value { text-align: start }`
+  added in `globals.css` (gotcha worth remembering for any future native
+  date/time input); (3) de-boxed the sheet per "too heavy" feedback — only
+  the Smart review hero keeps a card treatment, Tomorrow / Next week / Pick
+  date & time / Turn off are quiet hairline-divided list rows with plain
+  icons and right-aligned fire times, active-reminder banner slimmed.
+  **Shipped:** Vercel (auto), TestFlight run #136 = build **1136** (run #135
+  / build 1135 was green and superseded).
 
 - **2026-07-19 — ASK RELIABILITY: chips now always deliver what they
   promise (deep-content RAG + retrieval guarantees; commit `3ce4bcf`, merge
