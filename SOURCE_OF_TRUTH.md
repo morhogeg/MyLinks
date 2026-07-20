@@ -308,8 +308,9 @@ The multi-user auth work is **fully written but not live**:
    keywords/description), and age-rating answers drafted in
    `docs/APP_STORE.md` §1–§2. In-app Settings link ships with task 6.
    **Remaining manual:** click the declarations + metadata into App Store
-   Connect, take the screenshots (`docs/APP_STORE.md` §4), name a concrete
-   governing-law jurisdiction in `/terms` §10 before public launch.
+   Connect, take the screenshots (`docs/APP_STORE.md` §4). ~~Governing-law
+   jurisdiction~~ — set 2026-07-20 (Israel / Tel Aviv-Jaffa + consumer-law
+   carve-out).
 9. **[ ] Reviewer readiness.** Demo account credentials for App Review (auth will
    be ON) and review notes. `TARGETED_DEVICE_FAMILY = 1` (iPhone-only) is already
    set in all four build configs (App + ShareExt, Debug + Release), so no iPad
@@ -647,7 +648,32 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-20 (latest) — REMINDERS REVAMP: the Set Reminder modal rebuilt to
+- **2026-07-20 (latest) — LAUNCH-READINESS SPRINT: YouTube duration cost cap +
+  governing law set (branch `claude/launch-readiness-assessment-wsex6n`).**
+  Owner asked for a launch go/no-go; assessment: code/infra ready post-cutover,
+  the two open code-level items were closed this session. (1) **YouTube
+  pre-analysis duration cap** — native video ingestion was the one per-card
+  cost outlier (~$0.09/hr, no pre-call cap; flagged 2026-07-17): the scraper
+  now probes the watch page for `lengthSeconds`
+  (`scraper._probe_youtube_duration`, best-effort with a browser UA; bot
+  wall/livestream → unknown) into `youtube_metadata.length_seconds`, and
+  `_analyze_scraped` skips native ingestion over `YOUTUBE_MAX_VIDEO_MINUTES`
+  (env-tunable, default 180, `0` disables) falling back to the existing honest
+  metadata-only card; unknown duration fails OPEN (the model context window
+  still bounds that worst case). The probed duration is ground truth — it now
+  overrides the model's `videoDurationMinutes` estimate on the native path and
+  gives the fallback card a real duration (previously none). 8 new tests in
+  `tests/test_youtube_duration_cap.py`; suite 330 pass (4
+  `test_embed_trigger_backstop` failures are sandbox-only — Python 3.11 env;
+  clean tree fails identically, CI on 3.13 is the arbiter). (2) **Terms §10
+  governing law set** (owner: "do what's best and common"): State of Israel,
+  exclusive Tel Aviv-Jaffa courts, mandatory-consumer-protection carve-out;
+  "Last updated" bumped to July 20 — closes the task-8 remainder. ASSUMPTION:
+  Israel = operator residence (inferred); if wrong it's a one-line edit.
+  `tsc` clean. **NOT deployed** — needs a functions deploy (cap + probe) and
+  Vercel (terms page) via `/ship`.
+
+- **2026-07-20 — REMINDERS REVAMP: the Set Reminder modal rebuilt to
   the app's design level (client-only; zero backend/profile-semantics changes).**
   Owner flagged the modal as below the rest of the app. `ReminderModal.tsx`
   rewritten as the standard overlay: portal to body (z-95, above the z-50

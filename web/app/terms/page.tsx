@@ -20,7 +20,7 @@ export default function TermsPage() {
       <h1 className="mt-6 text-3xl font-semibold tracking-tight text-text">
         Terms of Service
       </h1>
-      <p className="mt-2 text-sm text-text-muted">Last updated: July 3, 2026</p>
+      <p className="mt-2 text-sm text-text-muted">Last updated: July 20, 2026</p>
 
       <p className="mt-6 leading-relaxed text-text-secondary">
         These terms govern your use of Machina AI (&ldquo;Machina&rdquo;, the
@@ -109,10 +109,11 @@ export default function TermsPage() {
 
       <h2 className="mt-10 text-xl font-semibold text-text">10. Governing law</h2>
       <p className="mt-4 leading-relaxed text-text-secondary">
-        {/* TODO(owner): replace with a concrete jurisdiction before public launch. */}
-        These terms are governed by the laws of the operator&rsquo;s jurisdiction of residence,
-        without regard to conflict-of-law rules. The specific governing jurisdiction will be named
-        here before general availability.
+        These terms are governed by the laws of the State of Israel, without regard to
+        conflict-of-law rules, and any dispute arising from them or from the Service will be
+        brought exclusively in the competent courts of Tel Aviv-Jaffa, Israel. If you use the
+        Service as a consumer, this does not affect any mandatory consumer protections or venue
+        rights granted by the law of the country you live in.
       </p>
 
       <h2 className="mt-10 text-xl font-semibold text-text">11. Changes to these terms</h2>

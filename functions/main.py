@@ -476,6 +476,14 @@ APPCHECK_ENFORCE = os.environ.get("APPCHECK_ENFORCE", "").lower() in ("1", "true
 # confirmed working end-to-end. See NATIVE_AUTH_SETUP.md ("Cutover order").
 REQUIRE_AUTH = os.environ.get("REQUIRE_AUTH", "").lower() in ("1", "true", "yes")
 
+# Cost cap for YouTube native video ingestion (~100 tokens/sec at LOW media
+# resolution ≈ $0.09 per hour of video, and the model has no pre-call limit of
+# its own). Videos longer than this get the honest metadata-only card instead
+# of being watched end-to-end. Duration comes from a best-effort watch-page
+# probe (scraper._probe_youtube_duration); unknown duration fails OPEN — the
+# model's context window still bounds that worst case. 0 disables the cap.
+YOUTUBE_MAX_VIDEO_MINUTES = int(os.environ.get("YOUTUBE_MAX_VIDEO_MINUTES", "180") or "0")
+
 
 def _require_app_check(req, headers: dict = None) -> bool:
     """Verify the Firebase App Check token (X-Firebase-AppCheck header).
@@ -547,15 +555,32 @@ def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = Non
     kw = {} if attempts is None else {"attempts": attempts}
     content_type = scraped.get("content_type")
     if content_type == "youtube":
-        watch_url = scraped.get("youtube_metadata", {}).get("watch_url")
-        if watch_url:
+        yt_meta = scraped.get("youtube_metadata", {})
+        watch_url = yt_meta.get("watch_url")
+        length_seconds = yt_meta.get("length_seconds")
+        over_cap = bool(YOUTUBE_MAX_VIDEO_MINUTES and length_seconds
+                        and length_seconds > YOUTUBE_MAX_VIDEO_MINUTES * 60)
+        if over_cap:
+            logger.warning(
+                f"YouTube video over duration cap ({length_seconds}s > "
+                f"{YOUTUBE_MAX_VIDEO_MINUTES}min) — using metadata-only card")
+        elif watch_url:
             try:
-                return ai.analyze_youtube(watch_url, existing_tags=existing_tags, **kw)
+                analysis = ai.analyze_youtube(watch_url, existing_tags=existing_tags, **kw)
+                # The probed duration is ground truth; the model's is an estimate.
+                if isinstance(analysis, dict) and length_seconds:
+                    analysis["videoDurationMinutes"] = max(1, (length_seconds + 59) // 60)
+                return analysis
             except AnalysisError as e:
                 logger.warning(f"Native YouTube analysis failed, using metadata-only fallback: {e}")
         # Fallback: analyze the lightweight oEmbed metadata text honestly.
-        return ai.analyze_text(scraped.get("text") or scraped.get("html", ""),
-                               existing_tags=existing_tags, **kw)
+        analysis = ai.analyze_text(scraped.get("text") or scraped.get("html", ""),
+                                   existing_tags=existing_tags, **kw)
+        # The fallback model never saw the video, so its duration would be a
+        # fabrication — use the probed one when we have it.
+        if isinstance(analysis, dict) and length_seconds:
+            analysis["videoDurationMinutes"] = max(1, (length_seconds + 59) // 60)
+        return analysis
 
     analysis = ai.analyze_text(scraped.get("text") or scraped.get("html", ""),
                                existing_tags=existing_tags, content_type=content_type, **kw)

@@ -204,8 +204,8 @@ Post-launch item; bandwidth cost is real but not a launch blocker.
   current-SDK CI (April-2026 floor); iPhone-only screenshots).
 - **⛔ OWNER remaining (all gated on cutover, §4 steps 7–8):** demo reviewer
   account + credentials in review notes; App Privacy nutrition label + metadata
-  clicked into App Store Connect; 6 screenshots; governing-law jurisdiction in
-  `/terms` §10; on-device verification sweep (SOURCE_OF_TRUTH §4 task 11); the
+  clicked into App Store Connect; 6 screenshots; ~~governing-law jurisdiction in
+  `/terms` §10~~ (set 2026-07-20); on-device verification sweep (SOURCE_OF_TRUTH §4 task 11); the
   **store build must be a `require_auth=true` build made AFTER the cutover**.
 - **Note on quotas & review:** monthly quotas (3.2) are server-side soft caps
   with friendly messaging — no purchase path, so no IAP/paywall review risk at
@@ -270,7 +270,8 @@ quota transactions into one, and a shared paid-endpoint guard helper.
    reminders keep firing under the new scheduler query.
 7. **App Store Connect:** create + seed the demo reviewer account; fill
    credentials into `docs/APP_STORE.md` §3 notes; click in nutrition label +
-   metadata; take the 6 screenshots; set governing law in `/terms` §10.
+   metadata; take the 6 screenshots. ~~Set governing law in `/terms` §10~~
+   (done 2026-07-20: Israel / Tel Aviv-Jaffa).
 8. **Final pass:** on-device verification sweep (SOURCE_OF_TRUTH §4 task 11),
    then submit the post-cutover `require_auth=true` build.
 
