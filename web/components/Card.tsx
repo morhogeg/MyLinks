@@ -346,26 +346,16 @@ function Card({
                                     onUpdateReminder(link);
                                 }}
                                 title={link.reminderStatus === 'pending'
-                                    ? `Reminder active${link.reminderProfile?.startsWith('spaced')
-                                        ? ` (Spaced Repetition${link.reminderProfile.split('-')[1] ? ` - ${link.reminderProfile.split('-')[1]} days` : ''})`
-                                        : ''}`
+                                    ? link.reminderProfile === 'smart'
+                                        ? 'Reminder active (Smart review)'
+                                        : link.reminderProfile?.startsWith('spaced')
+                                            ? 'Reminder active (Spaced review)'
+                                            : 'Reminder active'
                                     : 'Remind me'}
                                 className={`p-1.5 rounded-full transition-all flex items-center justify-center relative ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-accent'
                                     }`}
                             >
-                                {link.reminderStatus === 'pending' ? (
-                                    <>
-                                        <Bell className="w-3 h-3 fill-current" />
-                                        {link.reminderProfile?.startsWith('spaced') && (
-                                            <span className="absolute -top-0.5 -right-0.5 flex h-1.5 w-1.5">
-                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-                                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-accent"></span>
-                                            </span>
-                                        )}
-                                    </>
-                                ) : (
-                                    <Bell className="w-3 h-3" />
-                                )}
+                                <Bell className={`w-3 h-3 ${link.reminderStatus === 'pending' ? 'fill-current' : ''}`} />
                             </button>
                             {onAddToCollection && (
                                 <button

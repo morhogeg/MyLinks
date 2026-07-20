@@ -910,18 +910,9 @@ export default function LinkDetailModal({
                             {isReminderActive && nextReminderDate && (
                                 <span
                                     onClick={handleToggleReminder}
-                                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500 cursor-pointer hover:brightness-110 active:scale-95 transition-all"
+                                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-accent/10 border border-accent/20 text-accent cursor-pointer hover:brightness-110 active:scale-95 transition-all"
                                 >
                                     <Bell className="w-3.5 h-3.5" />
-                                    {link.reminderProfile?.startsWith('spaced') && (
-                                        <span className="font-bold flex items-center mr-1">
-                                            {(() => {
-                                                const parts = link.reminderProfile.split('-');
-                                                const interval = parts.length > 1 ? ` - ${parts[1]}` : '';
-                                                return isRtl ? `[חזרתי${interval}]` : `[Spaced${interval}]`;
-                                            })()}
-                                        </span>
-                                    )}
                                     {isRtl ? 'תזכורת:' : 'Reminder:'} {nextReminderDate.toLocaleDateString(isRtl ? 'he-IL' : undefined)}
                                 </span>
                             )}

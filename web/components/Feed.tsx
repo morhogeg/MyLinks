@@ -617,15 +617,29 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     </div>
                     <div className="divide-y divide-border-subtle">
                         {dueLinks.slice(0, 5).map((l) => (
-                            <button
-                                key={l.id}
-                                onClick={() => { openLinkDetails(l); clearReminderDue(l.id); }}
-                                className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-card-hover transition-colors"
-                            >
-                                <CheckCircle2 className="w-4 h-4 text-accent shrink-0" />
-                                <span className="flex-grow min-w-0 truncate text-[14px] text-text">{l.title}</span>
-                            </button>
+                            <div key={l.id} className="flex items-center hover:bg-card-hover transition-colors">
+                                <button
+                                    onClick={() => { openLinkDetails(l); clearReminderDue(l.id); }}
+                                    className="flex-grow min-w-0 flex items-center gap-3 px-4 py-3 text-left"
+                                >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" aria-hidden />
+                                    <span className="flex-grow min-w-0 truncate text-[14px] font-medium text-text" dir="auto">{l.title}</span>
+                                </button>
+                                <button
+                                    onClick={() => clearReminderDue(l.id)}
+                                    aria-label={`Mark reminder for “${l.title}” as done`}
+                                    title="Mark as done"
+                                    className="w-9 h-9 me-2 shrink-0 flex items-center justify-center rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
+                                >
+                                    <CheckCircle2 className="w-4 h-4" />
+                                </button>
+                            </div>
                         ))}
+                        {dueLinks.length > 5 && (
+                            <div className="px-4 py-2 text-[12px] text-text-muted">
+                                +{dueLinks.length - 5} more waiting
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -2091,8 +2105,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                         : 'Try different words — search looks in card titles and summaries.',
                                 }
                                 : filter === 'reminders' ? {
-                                    Icon: Bell, title: 'No reminders set',
-                                    body: 'Pick “Remind me” on any card and it will resurface here when it’s due.',
+                                    Icon: Bell, title: 'No reminders yet',
+                                    body: 'Tap the bell on any card — Smart review brings it back tomorrow, then after a week and a month.',
                                 }
                                 : filter === 'favorite' ? {
                                     Icon: Star, title: 'No favorites yet',
