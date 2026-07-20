@@ -723,6 +723,20 @@ exact-match, capped.
   icons and right-aligned fire times, active-reminder banner slimmed.
   **Shipped:** Vercel (auto), TestFlight run #136 = build **1136** (run #135
   / build 1135 was green and superseded).
+  **Round 3 (owner device QA on build 1136; commit `52d2fb9`, merge
+  `a9817cb`):** owner verdicts — gradient tiles are "huge purple logos"
+  (gone: header + Smart row now match the quiet rows, Smart keeps a plain
+  accent Sparkles + caption), tap-to-commit closing the sheet is "terrible"
+  (reverted to a radio group: tap selects with accent label + check, Smart
+  preselected, nothing saves until Save), and the gradient confirm block was
+  off-pattern (replaced by the app-standard Cancel/Save footer pair copied
+  from CollectionFormModal — `bg-fill-subtle` + solid `bg-accent`). Custom
+  picker keeps inline preview/past-guard; Save disables while invalid; Turn
+  off stays an immediate quiet row. DESIGN LESSON for future sheets: the
+  owner's bar is "airy like the rest of the app" — quiet hairline rows +
+  ONE standard footer, no per-row cards, no gradient hero tiles.
+  **Shipped:** Vercel (auto on `a9817cb`), TestFlight run #138 = build
+  **1138** (runs #135–#137 all green; #137 was the parallel session's).
 
 - **2026-07-19 — ASK RELIABILITY: chips now always deliver what they
   promise (deep-content RAG + retrieval guarantees; commit `3ce4bcf`, merge
