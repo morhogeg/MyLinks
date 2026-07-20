@@ -647,7 +647,36 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-19 (latest) — ASK RELIABILITY: chips now always deliver what they
+- **2026-07-20 (latest) — REMINDERS REVAMP: the Set Reminder modal rebuilt to
+  the app's design level (client-only; zero backend/profile-semantics changes).**
+  Owner flagged the modal as below the rest of the app. `ReminderModal.tsx`
+  rewritten as the standard overlay: portal to body (z-95, above the z-50
+  detail modal — the old z-60 non-portaled version worked by accident), bottom
+  sheet on mobile with grab handle + `useSheetDrag` drag-to-dismiss, centered
+  card on desktop, gradient-tile header, haptics on save. Product model
+  simplified: **presets commit on ONE tap** (no select-then-Save two-step) and
+  every row states its real fire time; "Smart Reminder" + "Spaced Repetition"
+  collapsed into a single recommended **Smart review** hero row honestly
+  captioned "Tomorrow · then 1 week & 1 month" (matches the backend 1d/7d/30d
+  schedule, max 3 fires); Tomorrow / Next week / **Pick date & time** stay
+  one-shots (stored `'once'` — recurrence semantics untouched). Custom picker:
+  the three raw `<select>`s replaced with native date+time inputs (system
+  wheels on iOS; new theme-aware `color-scheme` rule in `globals.css`), live
+  "Will remind you …" preview, past-time guard inline + the save-time
+  invariant kept, gradient confirm button. Editing: active-reminder summary
+  banner (next fire + "Smart review · n of 3"), one-shots reopen the picker
+  prefilled, quiet "Turn off reminder" row. F-29 SwipeDeck contract preserved
+  (onUpdate-before-onClose). System pass for coherence: Feed "Reminders due"
+  strip rows got a per-row "mark done" check + "+N more waiting" overflow
+  (title-only rows before), reminders empty state explains Smart review, the
+  detail-modal reminder pill switched from off-brand blue + `[Spaced-N]`
+  jargon to accent tokens, Card bell tooltip renamed to Smart/Spaced review
+  and its perpetual ping dot removed. Visual QA via a throwaway harness page +
+  Playwright (mobile/desktop × dark/light × new/edit/custom — all verified,
+  console clean; harness deleted). `tsc` clean; no functions changes, so
+  shipping = Vercel + TestFlight only.
+
+- **2026-07-19 — ASK RELIABILITY: chips now always deliver what they
   promise (deep-content RAG + retrieval guarantees; commit `3ce4bcf`, merge
   `5938b2a`).** Owner repro: the
   "Walk me through the steps" follow-up chip on a recipe card answered with a

@@ -493,3 +493,14 @@ a {
     scroll-behavior: auto !important;
   }
 }
+/* Native date/time pickers follow the app theme, not the OS default — without
+   this, WKWebView/desktop render UA-default (light) inputs on the dark theme. */
+input[type='date'],
+input[type='time'] {
+  color-scheme: dark;
+}
+
+.light input[type='date'],
+.light input[type='time'] {
+  color-scheme: light;
+}
