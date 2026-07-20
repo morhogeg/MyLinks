@@ -673,8 +673,14 @@ exact-match, capped.
   jargon to accent tokens, Card bell tooltip renamed to Smart/Spaced review
   and its perpetual ping dot removed. Visual QA via a throwaway harness page +
   Playwright (mobile/desktop × dark/light × new/edit/custom — all verified,
-  console clean; harness deleted). `tsc` clean; no functions changes, so
-  shipping = Vercel + TestFlight only.
+  console clean; harness deleted). `tsc` clean; no functions changes.
+  **Shipped:** merge `0d9939c` → Vercel (auto), TestFlight run #135 = build
+  **1135**. Ship-time observation for coordination: `main` already carried
+  another session's **auth-cutover commits** (`4172ccf` REQUIRE_AUTH=true,
+  `323cf84` Admin-SDK cold-start fix, `f820609` OWNER_EMAIL/ADMIN_TOKEN
+  deploy) **not yet documented in §3/§4/§9** — that session should write up
+  the cutover state; §3 is stale until then. Build 1135 therefore builds on
+  top of the cutover code as it stood on main.
 
 - **2026-07-19 — ASK RELIABILITY: chips now always deliver what they
   promise (deep-content RAG + retrieval guarantees; commit `3ce4bcf`, merge
