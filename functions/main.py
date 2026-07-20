@@ -40,7 +40,7 @@ from google.cloud.firestore_v1.vector import Vector
 options.set_global_options(max_instances=20)
 
 # Internal modules
-from db import get_db
+from db import get_db, ensure_app
 from models import LinkStatus, ReminderStatus
 from ai_service import GeminiService, AnalysisError
 from link_service import (
@@ -219,6 +219,10 @@ def _verify_bearer(req):
     if not token:
         return None
     try:
+        # The Admin SDK's default app is otherwise only initialized by get_db(),
+        # which every authenticated endpoint calls AFTER this check — so a cold
+        # instance had no app here and every token verification failed.
+        ensure_app()
         return admin_auth.verify_id_token(token)
     except Exception as e:
         logger.warning("ID token verification failed: %s", e)
