@@ -580,10 +580,15 @@ def _format_twitter_data(tweet: dict, source: str) -> dict:
         q_text = tweet['quote'].get('text', '')
         content_parts.append(f'\n[Replying to/Quoting {q_author} (@{q_handle})]:\n"{q_text}"')
 
+    image_urls = []
     if tweet.get('media'):
         media = tweet['media']
-        if media.get('photos'):
-            content_parts.append(f"\n[Contains {len(media['photos'])} Image(s)]")
+        photos = media.get('photos') or []
+        if photos:
+            content_parts.append(f"\n[Contains {len(photos)} Image(s)]")
+            # Surface the photo URLs so the caller can run vision on the images
+            # embedded in the post (fxtwitter photos carry a direct `url`).
+            image_urls = [p.get('url') for p in photos if isinstance(p, dict) and p.get('url')]
         if media.get('videos'):
             content_parts.append("\n[Contains Video]")
 
@@ -613,7 +618,8 @@ Source: {source} API
     return {
         "html": formatted_text,
         "title": title,
-        "text": formatted_text
+        "text": formatted_text,
+        "image_urls": image_urls,
     }
 
 
@@ -623,9 +629,18 @@ def _format_vxtwitter_data(data: dict) -> dict:
     if data.get('text'):
         content_parts.append(data['text'])
 
+    image_urls = []
     if data.get('mediaURLs') or data.get('media_extended'):
         count = max(len(data.get('mediaURLs', [])), len(data.get('media_extended', [])))
         content_parts.append(f"\n[Contains {count} Media Item(s)]")
+        # Prefer media_extended (typed) so we run vision only on photos, never on
+        # video/gif thumbnails; fall back to mediaURLs when types are absent.
+        extended = data.get('media_extended') or []
+        if extended:
+            image_urls = [m.get('url') for m in extended
+                          if isinstance(m, dict) and m.get('type') == 'image' and m.get('url')]
+        else:
+            image_urls = [u for u in (data.get('mediaURLs') or []) if isinstance(u, str)]
 
     final_content = "\n\n".join(content_parts) or "[Media-only tweet]"
 
@@ -644,7 +659,8 @@ Source: vxtwitter API
     return {
         "html": formatted_text,
         "title": f"Tweet by {data.get('user_name')}: {final_content[:100].replace(chr(10), ' ')}",
-        "text": formatted_text
+        "text": formatted_text,
+        "image_urls": image_urls,
     }
 
 

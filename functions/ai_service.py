@@ -572,6 +572,47 @@ class GeminiService:
         prompt = f"{SYSTEM_PROMPT}{tags_context}\n\nContent to analyze:\n{clean_text}"
         return self._generate_json([prompt], "text analysis", attempts=attempts)
 
+    def analyze_text_with_images(self, text: str, images: list, existing_tags: list = None,
+                                 content_type: str = None,
+                                 attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
+        """Analyze text PLUS the images embedded in it (e.g. photos attached to an
+        X post) in a SINGLE multimodal Gemini call, so the resulting card reflects
+        what the images show — not just the surrounding words.
+
+        `images` is a list of (image_bytes, mime_type) tuples. If it's empty this
+        is equivalent to analyze_text (callers should just call that instead).
+        Vision runs at MEDIA_RESOLUTION_LOW: ample to read a screenshot/photo while
+        keeping the per-image token cost small. Raises AnalysisError on failure so
+        the caller can fall back to a text-only card.
+        """
+        from google.genai import types
+
+        clean_text = text[:30000]
+        tags_context = (
+            f"\n\nExisting Tags in Brain (Reuse these if possible):\n{', '.join(existing_tags)}"
+            if existing_tags else ""
+        )
+
+        prompt = f"""{SYSTEM_PROMPT}{tags_context}
+
+The content below is a social post, and {len(images)} image(s) attached to that
+post are provided alongside it. Treat the images as part of the content: read any
+text, charts, or scenes they contain and fold what they reveal into the summary,
+takeaway, tags, and concepts — the post's words alone may not tell the whole story.
+
+Content to analyze:
+{clean_text}"""
+
+        contents = [prompt]
+        for img_bytes, mime in images:
+            contents.append(types.Part.from_bytes(data=img_bytes, mime_type=mime))
+
+        return self._generate_json(
+            contents, "text+image analysis",
+            config_extra={"media_resolution": "MEDIA_RESOLUTION_LOW"},
+            attempts=attempts,
+        )
+
     def analyze_youtube(self, watch_url: str, existing_tags: list = None,
                         attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
         """Analyze an actual YouTube video via Gemini's native video ingestion.
