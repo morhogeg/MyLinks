@@ -647,6 +647,30 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-20 (latest) — MY NOTES ROUND 2: grouped-by-card redesign + placement
+  + swipe fix, from owner device QA on build 1137 (commit `66ee5d8`).** QA
+  verdicts on round 1: ungrouped note rows made note↔card attachment ambiguous,
+  the view felt buried, and edge-swiping back over a card opened FROM My Notes
+  bounced clear back to Insights. Fixes: (1) `getNoteGroups` (lib/notes.ts,
+  replaces `getAllNotes`) groups notes card-by-card, groups ordered by newest
+  note; `NotesView` rebuilt — one container per noted card with a card HEADER
+  (category color bar, YouTube `metadata.thumbnailUrl` thumb when present,
+  title, `SourceByline`, note-count badge when >1) and all its notes stacked
+  beneath on an accent-tinted panel, each note + the header mirrored to its own
+  language; whole group tappable (keyboard-accessible), "N notes on M cards"
+  count line, search narrows a group to its matching notes (title match keeps
+  all). (2) Placement: "My notes" promoted INTO the Display sheet's View
+  selector (radio row with active state, after Cards/List/Review); the buried
+  utility row below the divider removed. Desktop chip + Insights row unchanged.
+  (3) BUG CLASS FIX — `useEdgeSwipeBack` fires EVERY enabled instance per
+  gesture (documented in the hook); the feed's instance for
+  digest/collections/collection/digestDetail/notes now passes
+  `!anyOverlayOpen`, so an open `LinkDetailModal` owns the swipe alone. This
+  also fixes the same latent double-pop for a card modal open over
+  Digest/Collections (Ask already stood down via its own `overlayOpen` prop).
+  `tsc` clean, changed files eslint-clean. **Shipped:** merge to main → Vercel
+  (auto); TestFlight build stamped below. No functions changes.
+
 - **2026-07-20 (latest) — MY NOTES: a central view of every personal note with
   its card attached (branch `claude/onboard-dedicated-notes-area-71fkrw`).**
   New `NotesView` (web/components/NotesView.tsx): note-centric rows — the note
