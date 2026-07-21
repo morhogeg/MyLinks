@@ -666,7 +666,11 @@ exact-match, capped.
   `thumbnailUrl` now rendered (56px rounded, lazy), arrow glyph removed,
   active-press feedback on all rows, topic chips `dir="auto"`. Mode jargon
   ("By topic"/"Smart mix") removed from user-facing digest surfaces. `tsc`
-  clean, changed files eslint-clean. No functions changes.
+  clean, changed files eslint-clean. No functions changes. **Shipped:** feature
+  `cc8b588`, merge `456981b` → Vercel (auto); TestFlight run **#141 = build
+  1141**. Note for future sessions: the backend's static `title` field
+  (`digest_service.py` `_write_inapp_digest`) is now unused by the digest UI
+  except as the detail nav-bar label.
 
 - **2026-07-21 — MY NOTES ROUND 3: "Apple-grade" polish pass (commit
   `4459327`, merge `0275ca4`).** Owner asked whether round 2 met the
