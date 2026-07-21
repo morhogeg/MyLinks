@@ -651,7 +651,28 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-21 (latest) — COLLECTIONS UX ROUND 3, from owner device QA on
+- **2026-07-21 (latest) — COLLECTIONS UX ROUND 4, from owner device QA on
+  build 1147.** Two items on the collection detail view. **(1)** the hero
+  "Manage cards" button was a filled-accent primary — demoted to the same
+  secondary treatment as Share/⋯ (`ctrlIdle`) so the screen has no lone purple
+  button. **(2)** removing a card from a collection required opening the Manage
+  cards dialog or hunting the tiny chip ✕; the shared `Card`'s hover action
+  toolbar is invisible on touch (the owner is on iOS), so removal wasn't
+  discoverable. Now, inside a collection, that collection's own footer chip
+  becomes an **unmistakable red one-tap remove** (`MinusCircle`, `bg-red-500/10
+  text-red-500`, iOS "remove from" idiom) — no dialog; other memberships stay
+  quiet accent labels. Gated on `activeCollectionId && onRemoveFromCollection`
+  (the collection-detail place AND the single-collection filtered grid — same
+  "you're viewing this collection" semantics). Removed the now-redundant accent
+  chip ✕ and the unused `X` import from `Card`. Chose the red inline chip over a
+  literal iOS corner badge because the card's top corners already hold the
+  category chip / source byline; noted to owner as the tradeoff (a jiggle-mode
+  corner badge is the alternative if wanted). RENDER-VERIFIED light+dark
+  (LTR + Hebrew) via the throwaway `/dev-collections` harness rendering `Card`
+  in collection context; harness deleted. `tsc` + eslint clean. No functions
+  changes. **Shipped:** _(pending — see merge below)_.
+
+- **2026-07-21 — COLLECTIONS UX ROUND 3, from owner device QA on
   build 1146.** One QA item: in the suggestion preview drawer, a user should be
   able to open a card in full before deciding whether to keep it. Each drawer row
   is now tap-to-open (`role=button` + hover/active press state); the ✕ remove

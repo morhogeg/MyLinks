@@ -1305,7 +1305,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     <div className="mt-4 flex flex-wrap items-center gap-2">
                         <button
                             onClick={() => setManageCardsCollection(openCol)}
-                            className={`${ctrlBase} px-3.5 bg-accent text-white hover:bg-accent-hover active:scale-[0.98]`}
+                            className={`${ctrlBase} px-3.5 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
                         >
                             <LayoutGrid className="w-4 h-4" /><span>Manage cards</span>
                         </button>
