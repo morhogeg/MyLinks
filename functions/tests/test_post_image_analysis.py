@@ -128,6 +128,9 @@ def test_instagram_photo_post_surfaces_cover_image(monkeypatch):
                         lambda *a, **k: _FakeHTMLResponse(_IG_PHOTO_HTML))
     result = scraper._scrape_instagram_url("https://www.instagram.com/p/ABC123/")
     assert result["image_urls"] == ["https://scontent.cdninstagram.com/v/photo.jpg"]
+    # Instagram is image-first → flag the analysis layer to read the image as the
+    # authoritative (screenshot) source, not a supplement.
+    assert result["image_primary"] is True
 
 
 def test_instagram_reel_is_gated_out_of_vision(monkeypatch):
@@ -208,3 +211,67 @@ def test_post_without_images_stays_text_only(monkeypatch):
 
     assert ai.calls == [("text", 0)]
     assert result["summary"] == "words only"
+
+
+class _PrimaryCapturingAI:
+    """Records the image_is_primary flag passed to the multimodal call."""
+
+    def __init__(self):
+        self.image_is_primary = None
+
+    def analyze_text_with_images(self, text, images, existing_tags=None,
+                                 content_type=None, image_is_primary=False, **kw):
+        self.image_is_primary = image_is_primary
+        return {"summary": "ok"}
+
+    def analyze_text(self, *a, **k):
+        return {"summary": "text"}
+
+
+def test_instagram_scraped_requests_primary_image_treatment(monkeypatch):
+    monkeypatch.setattr(main, "_fetch_post_images",
+                        lambda urls: [(b"x", "image/jpeg")] if urls else [])
+    ai = _PrimaryCapturingAI()
+    # Instagram scraped dict carries image_primary=True.
+    scraped = {"text": "caption teaser", "image_urls": ["u"], "image_primary": True}
+
+    main._analyze_scraped(ai, scraped, existing_tags=[], attempts=2)
+
+    assert ai.image_is_primary is True
+
+
+def test_x_scraped_keeps_text_primary_treatment(monkeypatch):
+    monkeypatch.setattr(main, "_fetch_post_images",
+                        lambda urls: [(b"x", "image/jpeg")] if urls else [])
+    ai = _PrimaryCapturingAI()
+    # X scraped dict has no image_primary key → default text-primary (low-res).
+    scraped = {"text": "tweet body", "image_urls": ["u"]}
+
+    main._analyze_scraped(ai, scraped, existing_tags=[], attempts=2)
+
+    assert ai.image_is_primary is False
+
+
+def test_image_is_primary_switches_resolution_and_prompt():
+    """image_is_primary=True → MEDIUM res + 'authoritative image' prompt;
+    False → LOW res + 'fold in' prompt. Captures the _generate_json call."""
+    from ai_service import GeminiService
+
+    svc = GeminiService.__new__(GeminiService)  # skip __init__ (no API key needed)
+    captured = {}
+
+    def fake_generate_json(contents, what, config_extra=None, model=None, attempts=3):
+        captured["prompt"] = contents[0]
+        captured["media_resolution"] = (config_extra or {}).get("media_resolution")
+        return {"summary": "ok"}
+
+    svc._generate_json = fake_generate_json
+
+    svc.analyze_text_with_images("body", [(b"x", "image/jpeg")], image_is_primary=True)
+    assert captured["media_resolution"] == "MEDIA_RESOLUTION_MEDIUM"
+    assert "AUTHORITATIVE" in captured["prompt"]
+    assert "do NOT" in captured["prompt"]  # preserve outcome/tense guardrail
+
+    svc.analyze_text_with_images("body", [(b"x", "image/jpeg")], image_is_primary=False)
+    assert captured["media_resolution"] == "MEDIA_RESOLUTION_LOW"
+    assert "AUTHORITATIVE" not in captured["prompt"]
