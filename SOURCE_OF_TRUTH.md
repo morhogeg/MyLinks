@@ -651,7 +651,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-21 (latest) — COLLECTIONS UX ROUND 5, from owner device QA on
+- **2026-07-21 (latest) — COLLECTIONS UX ROUND 6, from owner device QA on
+  build 1149.** One layout fix: in the collection ⋯ menu (`CollectionsGallery`
+  `MenuRow`), the "Remove from Private" row wrapped to two lines and rendered
+  centered — because `<button>` defaults to `text-align: center` and the other
+  rows never wrapped, so it went unnoticed. Added `text-start` to the button and
+  wrapped the label in a `flex-1 text-start` span so a wrapping label stays
+  left-aligned under its first line, flush with the icon like Manage cards / Edit
+  / Delete. Render-verified via the `/dev-collections` harness (opened the menu
+  on a private collection); deleted. `tsc` + eslint clean. No functions changes.
+  **Shipped:** _(pending — see merge below)_.
+
+- **2026-07-21 — COLLECTIONS UX ROUND 5, from owner device QA on
   build 1148.** Three fixes, all on the collection-detail / Manage-cards surface.
   **(1)** the Manage cards list rendered a category-initial placeholder box
   (colored "TE"/"PR"/"RE" square) for cards with no thumbnail — removed; a
