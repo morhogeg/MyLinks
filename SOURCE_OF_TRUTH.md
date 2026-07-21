@@ -699,9 +699,17 @@ exact-match, capped.
   "Last updated" bumped to July 21 — closes the task-8 remainder. ASSUMPTION:
   Israel = operator residence (inferred); if wrong it's a one-line edit.
   `tsc` + `py_compile` clean. **Shipped:** feature `74e3368`, merge
-  `<merge-sha>` → Vercel (auto, terms page); Cloud Functions deploy run
-  `<run>` scoped `Deploy-Functions: analyze_link,process_link_background`
-  (cap + probe live). No native/iOS change — no TestFlight build.
+  `ce9d5a4` → Vercel (auto, terms page); Cloud Functions deploy run
+  29820497367 **green** (scoped `Deploy-Functions:
+  analyze_link,process_link_background` — cap + probe live). No native/iOS
+  change — no TestFlight build. Merged cleanly on top of the 38 commits
+  origin/main gained mid-session (Collections UX, digest rounds 1–3, My Notes,
+  /polish skill) — only §9 conflicted (both prepend); resolved by ordering my
+  entry above Collections UX. NOTE for next session: the auth cutover
+  (former task 2 / launch blocker) already shipped 2026-07-19 (deploy run
+  29690151976 "Auth cutover: REQUIRE_AUTH=true" + 07-20 cold-start Admin-SDK
+  fix) — the launch-blocker framing in §3 / this doc predates that and should
+  be reconciled on the next docs pass.
 
 - **2026-07-21 — COLLECTIONS UX ROUND 1 (Apple-grade pass on the
   gallery + collection detail, digest-overhaul method).** Owner asked for a
