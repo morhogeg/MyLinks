@@ -673,8 +673,8 @@ exact-match, capped.
   hiding it. RENDER-VERIFIED light+dark at 390px (X/YouTube/publisher + Hebrew
   fixtures) via the throwaway `/dev-collections` harness; confirmed no-placeholder
   + removable rows + RTL; harness deleted. `tsc` + eslint clean. No functions
-  changes. **Shipped:** feature `c386415`, merge below → Vercel (auto);
-  TestFlight run **#146 = build 1146**.
+  changes. **Shipped:** feature `c386415`, merge `b9a40c0` (on main via
+  `22eb052`) → Vercel (auto); TestFlight run **#146 = build 1146**.
 
 - **2026-07-21 — LAUNCH-READINESS SPRINT: YouTube duration cost cap +
   governing law set (branch `claude/launch-readiness-assessment-wsex6n`).**
