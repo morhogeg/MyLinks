@@ -1,10 +1,13 @@
-"""Tests for pulling in-post images into the summary (X posts with photos).
+"""Tests for pulling in-post images into the summary (X + Instagram photos).
 
-Two layers are covered:
-  1. The Twitter/X scraper formatters now SURFACE the post's photo URLs as
+Three layers are covered:
+  1. The Twitter/X scraper formatters SURFACE the post's photo URLs as
      ``image_urls`` (fxtwitter + vxtwitter shapes) — previously they were dropped
      and only a "[Contains N Image(s)]" placeholder reached the model.
-  2. ``main._analyze_scraped`` routes a post-with-images through the SINGLE
+  2. The Instagram scraper surfaces the post's cover photo (og:image) as
+     ``image_urls`` for PHOTO posts only — reels/IGTV (video, poster-frame only)
+     and login-walled scrapes stay text-only.
+  3. ``main._analyze_scraped`` routes a post-with-images through the SINGLE
      multimodal vision call, and degrades to the text-only card if the fetch or
      the vision call fails — an image must never break a working save.
 
@@ -66,7 +69,87 @@ def test_vxtwitter_formatter_falls_back_to_media_urls_without_types():
     assert result["image_urls"] == ["https://x/only.jpg"]
 
 
-# ── Layer 2: _analyze_scraped routing + fallback ──────────────────────────────
+# ── Layer 2: Instagram cover-photo extraction ────────────────────────────────
+
+def test_ig_url_is_video_detects_reels_and_igtv():
+    assert scraper._ig_url_is_video("https://www.instagram.com/reel/ABC123/") is True
+    assert scraper._ig_url_is_video("https://www.instagram.com/tv/ABC123/") is True
+    assert scraper._ig_url_is_video("https://www.instagram.com/p/ABC123/") is False
+    assert scraper._ig_url_is_video("https://www.instagram.com/cristiano/") is False
+
+
+def test_extract_og_image_rejects_non_http():
+    bs4 = pytest.importorskip("bs4")
+    soup = bs4.BeautifulSoup(
+        '<meta property="og:image" content="/relative/logo.png">', "html.parser")
+    assert scraper._extract_og_image(soup) == ""
+    soup2 = bs4.BeautifulSoup(
+        '<meta property="og:image" content="https://cdn/x.jpg">', "html.parser")
+    assert scraper._extract_og_image(soup2) == "https://cdn/x.jpg"
+
+
+pytest.importorskip("bs4", reason="Instagram scrape parses HTML with BeautifulSoup")
+
+
+class _FakeHTMLResponse:
+    def __init__(self, html, ok=True):
+        self.text = html
+        self.ok = ok
+        self.headers = {"Content-Type": "text/html; charset=utf-8"}
+
+    def raise_for_status(self):
+        return None
+
+
+# A rich photo-post page: real caption (has "Likes,"/"Comments"/"Instagram" so the
+# direct-scrape path keeps it) long enough (>100 chars) to skip the bridges.
+_IG_PHOTO_HTML = """
+<html><head>
+<meta property="og:title" content="cristiano on Instagram: Great win">
+<meta property="og:description" content="1M Likes, 5,000 Comments - cristiano on Instagram: 'What a night, so proud of this team and every single fan who believed in us the whole way through.'">
+<meta property="og:image" content="https://scontent.cdninstagram.com/v/photo.jpg">
+<meta property="og:url" content="https://www.instagram.com/p/ABC123/">
+<meta property="og:type" content="article">
+</head></html>
+"""
+
+# Login wall: generic title, no usable description, but an og:image is present.
+_IG_LOGIN_WALL_HTML = """
+<html><head>
+<meta property="og:title" content="Login • Instagram">
+<meta property="og:image" content="https://static.cdninstagram.com/logo.png">
+</head></html>
+"""
+
+
+def test_instagram_photo_post_surfaces_cover_image(monkeypatch):
+    monkeypatch.setattr(scraper, "validate_public_url", lambda u: None)
+    monkeypatch.setattr(scraper, "safe_get",
+                        lambda *a, **k: _FakeHTMLResponse(_IG_PHOTO_HTML))
+    result = scraper._scrape_instagram_url("https://www.instagram.com/p/ABC123/")
+    assert result["image_urls"] == ["https://scontent.cdninstagram.com/v/photo.jpg"]
+
+
+def test_instagram_reel_is_gated_out_of_vision(monkeypatch):
+    monkeypatch.setattr(scraper, "validate_public_url", lambda u: None)
+    # Same rich page, but a /reel/ URL → og:image is only a poster frame.
+    monkeypatch.setattr(scraper, "safe_get",
+                        lambda *a, **k: _FakeHTMLResponse(_IG_PHOTO_HTML))
+    result = scraper._scrape_instagram_url("https://www.instagram.com/reel/ABC123/")
+    assert result["image_urls"] == []
+
+
+def test_instagram_login_wall_stays_text_only(monkeypatch):
+    monkeypatch.setattr(scraper, "validate_public_url", lambda u: None)
+    monkeypatch.setattr(scraper, "safe_get",
+                        lambda *a, **k: _FakeHTMLResponse(_IG_LOGIN_WALL_HTML))
+    result = scraper._scrape_instagram_url("https://www.instagram.com/p/ABC123/")
+    # No real metadata was extracted → no image attached (avoid running vision on
+    # the Instagram logo). Early failure return carries no image_urls at all.
+    assert not result.get("image_urls")
+
+
+# ── Layer 3: _analyze_scraped routing + fallback ──────────────────────────────
 
 pytest.importorskip("firebase_functions", reason="main.py imports firebase_functions")
 import main  # noqa: E402
