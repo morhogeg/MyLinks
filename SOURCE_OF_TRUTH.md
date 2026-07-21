@@ -647,7 +647,26 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-20 (latest) — MY NOTES ROUND 2: grouped-by-card redesign + placement
+- **2026-07-21 (latest) — MY NOTES ROUND 3: "Apple-grade" polish pass (commit
+  `4459327`, merge `0275ca4`).** Owner asked whether round 2 met the
+  Apple-would-ship bar; audit against the app's own standards said not quite,
+  five gaps closed: (1) opening a card from My Notes now REVEALS its notes
+  section — new `scrollToNotes` prop on `LinkDetailModal` (mount-only, 320ms
+  post-entrance smooth scroll to the ref'd section, `scroll-mt-4`), wired via
+  Feed's `openCardFromNotes` + one-shot `detailScrollToNotes` (cleared when the
+  modal stack closes so feed/search opens stay top-anchored); (2) groups enter
+  with the app's staggered `animate-card-enter` (+`--enter-delay`, min(i,12)×
+  14ms — reduced-motion aware via the existing global rule); (3) touch
+  correctness: hover styles guarded behind `[@media(hover:hover)]` (Card.tsx
+  precedent — no stuck borders after tap), `active:scale-[0.99]` press state;
+  (4) the search field now matches the app's canonical control (h-10
+  rounded-full bordered, enterKeyHint) and the count line reports "N matching
+  notes" while searching; (5) per-note StickyNote icons dropped (text carries
+  the row), descriptive aria-labels on groups, note text up to 15px. `tsc` +
+  eslint clean. **Shipped:** Vercel (auto on `0275ca4`); TestFlight run
+  **#140 = build 1140** (supersedes 1139 before most testers see it). No
+  functions changes.
+- **2026-07-20 — MY NOTES ROUND 2: grouped-by-card redesign + placement
   + swipe fix, from owner device QA on build 1137 (commit `66ee5d8`).** QA
   verdicts on round 1: ungrouped note rows made note↔card attachment ambiguous,
   the view felt buried, and edge-swiping back over a card opened FROM My Notes
