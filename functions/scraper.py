@@ -980,6 +980,11 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
         "text": final_text,
         "source_name": _instagram_source_name(url, best_title, best_desc, html=raw_html, og_url=og_url),
         "image_urls": image_urls,
+        # Instagram is image-first: the cover is usually a screenshot carrying the
+        # post's real text, and the caption we scraped is a teaser. Signals the
+        # analysis layer to read the image at higher resolution and trust it over
+        # the caption. (X posts leave this unset — there the text is primary.)
+        "image_primary": True,
     }
 
 

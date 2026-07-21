@@ -573,17 +573,28 @@ class GeminiService:
         return self._generate_json([prompt], "text analysis", attempts=attempts)
 
     def analyze_text_with_images(self, text: str, images: list, existing_tags: list = None,
-                                 content_type: str = None,
+                                 content_type: str = None, image_is_primary: bool = False,
                                  attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
-        """Analyze text PLUS the images embedded in it (e.g. photos attached to an
-        X post) in a SINGLE multimodal Gemini call, so the resulting card reflects
-        what the images show — not just the surrounding words.
+        """Analyze text PLUS the images embedded in it in a SINGLE multimodal Gemini
+        call, so the resulting card reflects what the images show — not just the
+        surrounding words.
 
         `images` is a list of (image_bytes, mime_type) tuples. If it's empty this
         is equivalent to analyze_text (callers should just call that instead).
-        Vision runs at MEDIA_RESOLUTION_LOW: ample to read a screenshot/photo while
-        keeping the per-image token cost small. Raises AnalysisError on failure so
-        the caller can fall back to a text-only card.
+
+        `image_is_primary` distinguishes two very different post shapes:
+          * FALSE (default — e.g. X/Twitter): the post's TEXT is the primary
+            content and the image supplements it. Vision runs at
+            MEDIA_RESOLUTION_LOW (cheap; ample for a photo/chart) and the image is
+            folded in as extra signal.
+          * TRUE (e.g. Instagram): the post is IMAGE-FIRST — the image is very
+            often a screenshot that CONTAINS the post's actual text, and the
+            caption we scraped is just a teaser. Vision runs at
+            MEDIA_RESOLUTION_MEDIUM (legible for dense text, incl. Hebrew/RTL) and
+            the image is treated as the authoritative source, so the summary
+            preserves the real claims/outcome instead of the caption's framing.
+
+        Raises AnalysisError on failure so the caller can fall back to text-only.
         """
         from google.genai import types
 
@@ -593,12 +604,26 @@ class GeminiService:
             if existing_tags else ""
         )
 
-        prompt = f"""{SYSTEM_PROMPT}{tags_context}
-
-The content below is a social post, and {len(images)} image(s) attached to that
+        if image_is_primary:
+            image_guidance = f"""The content below is an IMAGE-FIRST social post: {len(images)} image(s) from the
+post are attached, and the image is very likely a screenshot that CONTAINS the
+post's actual text. Read the image(s) carefully and treat them as the
+AUTHORITATIVE source of what the post says. Extract the specific, concrete claims
+— not a generic gist. Preserve the real outcome and tense: if the text describes a
+decision already made or an action already taken, report it as done — do NOT
+re-frame a resolved decision as an open question. The scraped caption is often
+just a teaser; when it conflicts with the image, trust the image."""
+            media_resolution = "MEDIA_RESOLUTION_MEDIUM"
+        else:
+            image_guidance = f"""The content below is a social post, and {len(images)} image(s) attached to that
 post are provided alongside it. Treat the images as part of the content: read any
 text, charts, or scenes they contain and fold what they reveal into the summary,
-takeaway, tags, and concepts — the post's words alone may not tell the whole story.
+takeaway, tags, and concepts — the post's words alone may not tell the whole story."""
+            media_resolution = "MEDIA_RESOLUTION_LOW"
+
+        prompt = f"""{SYSTEM_PROMPT}{tags_context}
+
+{image_guidance}
 
 Content to analyze:
 {clean_text}"""
@@ -609,7 +634,7 @@ Content to analyze:
 
         return self._generate_json(
             contents, "text+image analysis",
-            config_extra={"media_resolution": "MEDIA_RESOLUTION_LOW"},
+            config_extra={"media_resolution": media_resolution},
             attempts=attempts,
         )
 

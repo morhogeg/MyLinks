@@ -640,7 +640,12 @@ def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = Non
         try:
             analysis = ai.analyze_text_with_images(
                 content_text, post_images, existing_tags=existing_tags,
-                content_type=content_type, **kw)
+                content_type=content_type,
+                # Instagram marks its cover as image-first (screenshot carrying the
+                # real text) → read at higher res + trust the image over the
+                # caption. X leaves this unset: text stays primary, image low-res.
+                image_is_primary=bool(scraped.get("image_primary")),
+                **kw)
             if isinstance(analysis, dict) and scraped.get("truncated"):
                 analysis["detailedSummary"] = _append_capture_note(
                     analysis.get("detailedSummary"), analysis.get("language"))
