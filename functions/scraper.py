@@ -792,6 +792,37 @@ def _instagram_source_name(
         return None
 
 
+# Instagram content that is a VIDEO rather than a photo — its og:image is only a
+# single poster frame, not the content, so running vision on it is low-value and
+# can mislead. Photo posts (/p/) get vision; reels/IGTV don't.
+_IG_VIDEO_SEGMENTS = frozenset({"reel", "reels", "tv"})
+
+
+def _ig_url_is_video(url: str) -> bool:
+    """True when the Instagram URL is a reel / IGTV (video), by path segment."""
+    try:
+        segs = [s for s in (urlparse(url).path or "").split("/") if s]
+    except Exception:
+        return False
+    return any(s.lower() in _IG_VIDEO_SEGMENTS for s in segs)
+
+
+def _extract_og_image(soup) -> str:
+    """Return the og:image / twitter:image URL from a parsed page, or "".
+
+    Instagram exposes the post's cover photo as og:image (the bridge services
+    proxy the real media there too). Only http(s) URLs are returned so a relative
+    or data: value can't reach the SSRF-guarded fetch as something unexpected.
+    """
+    for tag_name in ("og:image", "og:image:secure_url", "twitter:image"):
+        tag = soup.find('meta', property=tag_name) or soup.find('meta', attrs={'name': tag_name})
+        if tag and tag.get('content'):
+            content = tag['content'].strip()
+            if content.startswith(("http://", "https://")):
+                return content
+    return ""
+
+
 def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
     """
     Scrape Instagram URLs using direct scraping first (reliable with mobile headers),
@@ -802,8 +833,11 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
     metadata_lines = []
     best_title = "Instagram Post"
     best_desc = ""
+    best_image = ""  # og:image (post cover photo) — fed to vision for photo posts
     raw_html = ""   # kept for embedded-author signals (JSON "username"/"owner")
     og_url = ""     # og:url/canonical often carries a profile-scoped path
+    # Reels/IGTV expose only a poster frame as og:image — skip vision for them.
+    is_video = _ig_url_is_video(url)
     generic_titles = ["Instagram Post", "Instagram", "Open in App", "Login • Instagram", "Instagram Video", "Instagram Reel"]
 
     MOBILE_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
@@ -825,6 +859,13 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
             og_tag = soup.find('meta', property='og:url') or soup.find('meta', attrs={'name': 'og:url'})
             if og_tag and og_tag.get('content'):
                 og_url = og_tag['content']
+
+            # Cover photo + a secondary video signal (og:type=video) so a reel
+            # served from a profile-style URL is still gated out of vision.
+            best_image = _extract_og_image(soup) or best_image
+            type_tag = soup.find('meta', property='og:type') or soup.find('meta', attrs={'name': 'og:type'})
+            if type_tag and 'video' in (type_tag.get('content') or '').lower():
+                is_video = True
 
             meta_sources = {
                 'title': ['og:title', 'twitter:title', 'title'],
@@ -882,6 +923,11 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
                     if "AliExpress" in b_title or "AliExpress" in b_desc or "Open in App" in b_title:
                         continue
 
+                    # Bridges expose the real media as og:image — prefer it when
+                    # the direct scrape didn't yield one (login-walled preview).
+                    if not best_image:
+                        best_image = _extract_og_image(soup)
+
                     if b_desc and len(b_desc) > len(best_desc):
                         best_desc = b_desc
                         metadata_lines.append(f"SECONDARY SOURCE DESCRIPTION:\n{b_desc}")
@@ -923,11 +969,17 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
 
     final_text = "\n\n---\n\n".join(metadata_lines)
 
+    # Feed the cover photo to vision ONLY for photo posts with real metadata (we
+    # reached this return, so the scrape wasn't a bare login wall). Reels/IGTV and
+    # missing images yield no image_urls, so those cards stay text-only.
+    image_urls = [best_image] if (best_image and not is_video) else []
+
     return {
         "html": final_text,
         "title": best_title,
         "text": final_text,
         "source_name": _instagram_source_name(url, best_title, best_desc, html=raw_html, og_url=og_url),
+        "image_urls": image_urls,
     }
 
 
