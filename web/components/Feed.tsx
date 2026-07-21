@@ -42,6 +42,9 @@ import SynthesisCard from './SynthesisCard';
 import ConfirmDialog from './ConfirmDialog';
 import AddToCollectionSheet from './AddToCollectionSheet';
 import CollectionsGallery from './CollectionsGallery';
+import SuggestionPreviewSheet from './SuggestionPreviewSheet';
+import OverflowMenu from './OverflowMenu';
+import { getDirection } from '@/lib/rtl';
 import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
@@ -311,6 +314,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     const [confirmDeleteCollection, setConfirmDeleteCollection] = useState<Collection | null>(null);
     const [manageCardsCollection, setManageCardsCollection] = useState<Collection | null>(null);
     const [shareCollection, setShareCollection] = useState<Collection | null>(null);
+    // A suggested collection being previewed (its member cards) before adopting.
+    const [previewSuggestion, setPreviewSuggestion] = useState<CollectionSuggestion | null>(null);
     // Bumped when a suggestion is dismissed so the memo below re-reads localStorage.
     const [suggestionTick, setSuggestionTick] = useState(0);
 
@@ -975,6 +980,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
 
     const handleCreateSuggestion = async (s: CollectionSuggestion) => {
         if (!uid) return;
+        setPreviewSuggestion(null);
         try {
             const id = await createCollection(uid, { name: s.name });
             await addLinksToCollection(uid, s.linkIds, id);
@@ -986,9 +992,20 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     };
 
     const handleDismissSuggestion = (s: CollectionSuggestion) => {
+        setPreviewSuggestion(null);
         dismissSuggestion(s.key);
         setSuggestionTick(t => t + 1);
     };
+
+    // The member cards behind the suggestion currently being previewed, resolved
+    // from the loaded feed in the suggestion's own order.
+    const previewSuggestionMembers = useMemo(() => {
+        if (!previewSuggestion) return [];
+        const byId = new Map(visibleLinks.map((l) => [l.id, l]));
+        return previewSuggestion.linkIds
+            .map((id) => byId.get(id))
+            .filter((l): l is Link => !!l);
+    }, [previewSuggestion, visibleLinks]);
 
     const performDeleteCollection = async (col: Collection) => {
         if (!uid) return;
@@ -1260,16 +1277,19 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         const count = members.length;
         const stale = isShareStale(openCol, members.map((m) => ({ id: m.id })));
         const colStyle = getColorStyleByKey(openCol.color || openCol.name);
+        const nameDir = getDirection(openCol.name);
         return (
             <div>
                 {/* Header — the collection's identity + its own actions, not a
                     filter pill. iOS large-title feel: the bar carries the name,
-                    this hero restates it big with the collection's meta below. */}
+                    this hero restates it big with the collection's meta below.
+                    Hero action is Add cards (primary); Edit/Delete live under the
+                    overflow (⋯) so the destructive action isn't top-level chrome. */}
                 <div className="mb-5">
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2.5" dir={nameDir}>
                         <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: colStyle.color }} />
-                        <h1 className="min-w-0 truncate text-[22px] sm:text-[26px] font-extrabold tracking-tight text-text">{openCol.name}</h1>
-                        <span className="shrink-0 whitespace-nowrap text-[13px] sm:text-[14px] font-medium text-text-muted tabular-nums">· {count} {count === 1 ? 'card' : 'cards'}</span>
+                        <h1 className={`min-w-0 truncate text-[22px] sm:text-[26px] font-extrabold tracking-tight text-text ${nameDir === 'rtl' ? 'font-hebrew' : ''}`}>{openCol.name}</h1>
+                        <span className="shrink-0 whitespace-nowrap text-[13px] sm:text-[14px] font-medium text-text-muted tabular-nums" dir="ltr">· {count} {count === 1 ? 'card' : 'cards'}</span>
                         {openCol.isPublic && (
                             <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide ${stale ? 'bg-amber-500/15 text-amber-600' : 'bg-accent/10 text-accent'}`}>
                                 <Globe className="w-3 h-3" /> {stale ? 'Update link' : 'Shared'}
@@ -1277,9 +1297,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         )}
                     </div>
                     {openCol.description && (
-                        <p className="mt-1.5 text-[14px] leading-relaxed text-text-secondary max-w-2xl">{openCol.description}</p>
+                        <p className={`mt-1.5 text-[14px] leading-relaxed text-text-secondary max-w-2xl ${nameDir === 'rtl' ? 'text-right' : ''}`} dir={nameDir}>{openCol.description}</p>
                     )}
                     <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <button
+                            onClick={() => setManageCardsCollection(openCol)}
+                            className={`${ctrlBase} px-3.5 bg-accent text-white hover:bg-accent-hover active:scale-[0.98]`}
+                        >
+                            <Plus className="w-4 h-4" /><span>Add cards</span>
+                        </button>
                         {/* A private collection can't have a public page — no Share. */}
                         {!openCol.isPrivate && (
                             <button
@@ -1290,25 +1316,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 <span>{openCol.isPublic ? 'Shared' : 'Share'}</span>
                             </button>
                         )}
-                        <button
-                            onClick={() => setManageCardsCollection(openCol)}
-                            className={`${ctrlBase} px-3.5 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
-                        >
-                            <Plus className="w-4 h-4" /><span>Add cards</span>
-                        </button>
-                        <button
-                            onClick={() => openEditCollectionForm(openCol)}
-                            className={`${ctrlBase} px-3.5 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
-                        >
-                            <Pencil className="w-4 h-4" /><span>Edit</span>
-                        </button>
-                        <button
-                            onClick={() => setConfirmDeleteCollection(openCol)}
-                            aria-label="Delete collection"
-                            className={`${ctrlBase} w-9 px-0 ${ctrlIdle} hover:text-red-500 hover:border-red-500/40`}
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
+                        <OverflowMenu
+                            ariaLabel="Collection actions"
+                            items={[
+                                { icon: <Pencil className="w-4 h-4" />, label: 'Edit', onClick: () => openEditCollectionForm(openCol) },
+                                { icon: <Trash2 className="w-4 h-4" />, label: 'Delete', danger: true, onClick: () => setConfirmDeleteCollection(openCol) },
+                            ]}
+                        />
                     </div>
                 </div>
 
@@ -2169,6 +2183,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                 onCreate={openNewCollectionForm}
                                 onCreateSuggestion={handleCreateSuggestion}
                                 onDismissSuggestion={handleDismissSuggestion}
+                                onPreviewSuggestion={setPreviewSuggestion}
                             />
                         </div>
                     ) : viewMode === 'ask' ? (
@@ -2399,6 +2414,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             onCreate={openNewCollectionForm}
                             onCreateSuggestion={handleCreateSuggestion}
                             onDismissSuggestion={handleDismissSuggestion}
+                            onPreviewSuggestion={setPreviewSuggestion}
                         />
                     </div>
                 </div>
@@ -2496,6 +2512,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     onAddToCollection={(link) => setAddToCollectionLink(link)}
                     onShare={handleShareCard}
                     scrollToNotes={detailScrollToNotes}
+                />
+            )}
+
+            {/* Preview a suggested collection's cards before adopting or dismissing it. */}
+            {previewSuggestion && (
+                <SuggestionPreviewSheet
+                    suggestion={previewSuggestion}
+                    members={previewSuggestionMembers}
+                    onCreate={() => handleCreateSuggestion(previewSuggestion)}
+                    onDismiss={() => handleDismissSuggestion(previewSuggestion)}
+                    onClose={() => setPreviewSuggestion(null)}
                 />
             )}
 

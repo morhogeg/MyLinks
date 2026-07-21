@@ -426,8 +426,11 @@ The multi-user auth work is **fully written but not live**:
     collections). **Client-side half shipped 2026-07-11** (collections-elevation
     branch): tag/concept clustering over the loaded feed proposes up to 3
     one-tap collections in the gallery (`web/lib/collectionSuggest.ts`), and the
-    Add-to-collection sheet ranks suggested targets per card. Still open:
-    embedding-based clustering server-side for deeper/semantic groupings.
+    Add-to-collection sheet ranks suggested targets per card. **2026-07-21
+    (Collections UX round 1):** suggestions are no longer blind — tapping a
+    suggested tile opens `SuggestionPreviewSheet` listing the exact member cards
+    before Create/Dismiss. Still open: embedding-based clustering server-side for
+    deeper/semantic groupings.
 24. **[ ] T10 export** (MD/PDF/HTML from ReadingView), **T11 highlights**, T5/T6
     connector framework + YouTube liked-videos sync (pull connectors; IG/FB saved
     have no legitimate API — won't do), Chrome Web Store listing for the extension.
@@ -647,7 +650,43 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-21 (latest) — DIGEST UX ROUND 3, from owner device QA on build
+- **2026-07-21 (latest) — COLLECTIONS UX ROUND 1 (Apple-grade pass on the
+  gallery + collection detail, digest-overhaul method).** Owner asked for a
+  focused round on both Collections screens. Shipped: **(1) Suggestion preview
+  sheet** — the #1 gap: a suggested tile only said "N cards ready to group" with
+  no way to see WHICH cards, so accept/dismiss was blind. New
+  `SuggestionPreviewSheet` (mirrors AddToCollectionSheet — mobile bottom sheet w/
+  drag-to-dismiss, desktop centered modal) lists the member cards (56px
+  thumbnail + per-row `dir`/`font-hebrew` title + shared `SourceByline`) with
+  Create/Dismiss; tapping a suggestion tile opens it. Wired in `Feed` via
+  `previewSuggestion` state + `previewSuggestionMembers` (resolved from
+  `visibleLinks`). **(2) Gallery density** — phones went from ~1 col of tall
+  mostly-empty tiles to a **2-column** grid (Photos-albums idiom;
+  `grid-cols-2 sm:[auto-fill]`); cover shrank 96→80px; tiles with no artwork now
+  show a centered color `Layers` glyph instead of an empty pastel void. Card
+  **count line dropped from real tiles** (config trivia, per the digest
+  precedent) — kept on suggestion tiles where the count IS the decision.
+  **(3) RTL** — `dir`+`font-hebrew` on tile names, suggestion names, and the
+  detail hero `h1`; count/meta lines forced `dir="ltr"` so "2 cards" stops
+  bidi-scrambling to "cards 2"; byline hugs the title's edge. **(4) Touch** —
+  `active:scale` press states + `hapticLight` on tile tap. **(5) Detail hero** —
+  **Add cards** promoted to the primary (filled accent) leading action;
+  **Edit/Delete demoted into a new reusable `OverflowMenu`** (portal-anchored,
+  the gallery's clip-proof pattern extracted) so the destructive action is no
+  longer top-level chrome. **Jargon** — "N cards ready to group" → "N cards".
+  RENDER-VERIFIED light+dark at 390px via a throwaway `/dev-collections`
+  playwright harness (Hebrew+English, X/YouTube/publisher, with/without thumbs);
+  the harness caught three RTL bidi bugs (double-reversed dot, "cards 2",
+  byline pushed to the wrong edge) — all fixed and re-verified before commit;
+  harness deleted. `tsc` + eslint clean. No functions changes. **Product notes
+  for the QA loop:** deferred (flagged, not built) — the nav-bar-vs-hero name
+  duplication in collection detail (wants an iOS collapsing large-title, its own
+  round) and whether the detail hero keeps its `· N cards` (kept for now; would
+  drop for full consistency — owner's call). **Shipped:** _(pending — see merge
+  below)_. Backlog task 23 (M20 auto-collections) advanced: suggestions are now
+  previewable, not blind.
+
+- **2026-07-21 — DIGEST UX ROUND 3, from owner device QA on build
   1143.** (1) Digest card rows now mirror FULLY per card language (ListCard's
   pattern): `dir` on the row flips title alignment and the thumbnail side,
   meta line stays LTR internally but hugs the title's edge, `font-hebrew` on

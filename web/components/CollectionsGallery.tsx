@@ -7,6 +7,8 @@ import { MoreHorizontal, Pencil, Share2, Trash2, Globe, LayoutGrid, Sparkles, Pl
 import { getColorStyleByKey } from '@/lib/colors';
 import { isShareStale } from '@/lib/collections';
 import { CollectionSuggestion } from '@/lib/collectionSuggest';
+import { getDirection } from '@/lib/rtl';
+import { hapticLight } from '@/lib/haptics';
 
 interface CollectionsGalleryProps {
     collections: Collection[];
@@ -27,6 +29,8 @@ interface CollectionsGalleryProps {
     onCreate?: () => void;
     onCreateSuggestion?: (s: CollectionSuggestion) => void;
     onDismissSuggestion?: (s: CollectionSuggestion) => void;
+    /** Open a read-only preview of a suggestion's member cards before adopting it. */
+    onPreviewSuggestion?: (s: CollectionSuggestion) => void;
 }
 
 /**
@@ -53,6 +57,7 @@ export default function CollectionsGallery({
     onCreate,
     onCreateSuggestion,
     onDismissSuggestion,
+    onPreviewSuggestion,
 }: CollectionsGalleryProps) {
     // The open menu is rendered in a portal anchored to its trigger's screen
     // rect, so it can never be clipped by a tile's bounds or stacking context.
@@ -89,10 +94,11 @@ export default function CollectionsGallery({
     );
 
     return (
-        <div className="grid gap-4 sm:gap-5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 240px), 1fr))' }}>
+        // Two columns on phones (the Photos-albums idiom) so many collections
+        // stay scannable; auto-fill grid from tablet up.
+        <div className="grid grid-cols-2 gap-3 sm:gap-5 sm:[grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr))]">
             {sorted.map((c) => {
                 const style = getColorStyleByKey(c.color || c.name);
-                const count = meta.counts[c.id] || 0;
                 const locked = lockedIds?.has(c.id) ?? false;
                 // Explicit cover first, then mosaic fill from member thumbnails.
                 // Locked tiles show nothing of their contents — just the color.
@@ -104,27 +110,35 @@ export default function CollectionsGallery({
                     : meta.covers[c.id] ?? [];
                 const stale = isShareStale(c, meta.members[c.id] ?? []);
                 const open = menu?.collection.id === c.id;
+                const nameDir = getDirection(c.name);
+                const hasCover = !locked && thumbs.length > 0;
                 return (
                     <div
                         key={c.id}
-                        className={`group relative min-h-[160px] rounded-[20px] border border-border-subtle bg-card shadow-[var(--shadow-card)] cursor-pointer transition-shadow [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] hover:border-accent/30 ${open ? 'z-20' : ''}`}
-                        onClick={() => onOpen(c.id)}
+                        className={`group relative rounded-[20px] border border-border-subtle bg-card shadow-[var(--shadow-card)] cursor-pointer transition-all [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] hover:border-accent/30 active:scale-[0.98] ${open ? 'z-20' : ''}`}
+                        onClick={() => { hapticLight(); onOpen(c.id); }}
                     >
-                        {/* Cover — a mosaic of member thumbnails over the collection color. */}
-                        <div className="relative h-24 w-full overflow-hidden rounded-t-2xl" style={{ backgroundColor: style.backgroundColor }}>
+                        {/* Cover — a mosaic of member thumbnails, or (when a collection
+                            has no artwork) a compact color band with a glyph, so the
+                            tile never reads as an empty rectangle. */}
+                        <div className="relative h-20 w-full overflow-hidden rounded-t-[20px]" style={{ backgroundColor: style.backgroundColor }}>
                             {locked && (
                                 <span className="absolute inset-0 flex items-center justify-center">
                                     <Lock className="w-7 h-7 text-white/80" />
                                 </span>
                             )}
-                            {thumbs.length > 0 && (
+                            {hasCover ? (
                                 <div className={`absolute inset-0 grid gap-px ${thumbs.length >= 4 ? 'grid-cols-2 grid-rows-2' : thumbs.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                                     {thumbs.map((t, i) => (
                                         <img key={i} src={t} alt="" loading="lazy" className="w-full h-full object-cover" />
                                     ))}
                                 </div>
+                            ) : !locked && (
+                                <span className="absolute inset-0 flex items-center justify-center">
+                                    <Layers className="w-7 h-7" style={{ color: style.color, opacity: 0.45 }} />
+                                </span>
                             )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-card/90 to-transparent" />
+                            {hasCover && <div className="absolute inset-0 bg-gradient-to-t from-card/90 to-transparent" />}
                             {/* Private badge — icon only (no wording), always shown on
                                 private collections so the lock state is visible even
                                 when the vault is open. */}
@@ -161,46 +175,59 @@ export default function CollectionsGallery({
                             </span>
                         </button>
 
-                        {/* Title + count */}
-                        <div className="p-3.5">
-                            <div className="flex items-center gap-2">
+                        {/* Title — leads with the collection's own name; the count is
+                            config trivia and lives only where it's a decision (the
+                            suggestion tiles). Locked vaults still say so. */}
+                        <div className="p-3" dir={nameDir}>
+                            <div className="flex items-center gap-1.5">
                                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: style.color }} />
-                                <h3 className="flex-1 font-bold text-text text-[15px] leading-tight truncate" title={c.name}>{c.name}</h3>
+                                <h3 className={`flex-1 min-w-0 font-bold text-text text-[14px] leading-tight truncate ${nameDir === 'rtl' ? 'font-hebrew text-right' : ''}`} title={c.name}>{c.name}</h3>
                             </div>
                             {c.description && !locked && (
-                                <p className="mt-1 text-xs text-text-muted line-clamp-2">{c.description}</p>
+                                <p className={`mt-1 text-xs text-text-muted line-clamp-2 ${nameDir === 'rtl' ? 'text-right' : ''}`}>{c.description}</p>
                             )}
-                            <p className="mt-2 text-[11px] font-semibold text-text-muted/70">
-                                {locked ? 'Locked' : `${count} ${count === 1 ? 'card' : 'cards'}`}
-                            </p>
+                            {locked && (
+                                <p className="mt-1.5 text-[11px] font-semibold text-text-muted/70">Locked</p>
+                            )}
                         </div>
                     </div>
                 );
             })}
 
             {/* Suggested collections — topic clusters detected in the feed. Dashed
-                treatment keeps them clearly "not yours yet"; Create adopts the
-                cluster, the X dismisses that topic for good. */}
-            {suggestions.map((s) => (
+                treatment keeps them clearly "not yours yet"; tapping the tile
+                previews the exact cards, Create adopts the cluster, the X dismisses
+                that topic for good. */}
+            {suggestions.map((s) => {
+                const sDir = getDirection(s.name);
+                return (
                 <div
                     key={s.key}
-                    className="relative min-h-[160px] rounded-2xl border border-dashed border-accent/30 bg-accent/[0.03] flex flex-col"
+                    role={onPreviewSuggestion ? 'button' : undefined}
+                    tabIndex={onPreviewSuggestion ? 0 : undefined}
+                    onClick={onPreviewSuggestion ? () => { hapticLight(); onPreviewSuggestion(s); } : undefined}
+                    aria-label={onPreviewSuggestion ? `Preview suggested collection ${s.name}` : undefined}
+                    className={`relative rounded-[20px] border border-dashed border-accent/30 bg-accent/[0.03] flex flex-col transition-transform ${onPreviewSuggestion ? 'cursor-pointer active:scale-[0.98]' : ''}`}
                 >
-                    <div className="relative h-24 w-full overflow-hidden rounded-t-2xl">
-                        {s.thumbnails.length > 0 && (
+                    <div className="relative h-20 w-full overflow-hidden rounded-t-[20px]">
+                        {s.thumbnails.length > 0 ? (
                             <div className={`absolute inset-0 grid gap-px opacity-60 ${s.thumbnails.length >= 4 ? 'grid-cols-2 grid-rows-2' : s.thumbnails.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                                 {s.thumbnails.map((t, i) => (
                                     <img key={i} src={t} alt="" loading="lazy" className="w-full h-full object-cover" />
                                 ))}
                             </div>
+                        ) : (
+                            <span className="absolute inset-0 flex items-center justify-center">
+                                <Sparkles className="w-6 h-6 text-accent/40" />
+                            </span>
                         )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-card/90 to-transparent" />
+                        {s.thumbnails.length > 0 && <div className="absolute inset-0 bg-gradient-to-t from-card/90 to-transparent" />}
                         <span className="absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/85 text-[9px] font-bold uppercase tracking-wide text-white">
                             <Sparkles className="w-2.5 h-2.5" /> Suggested
                         </span>
                         {onDismissSuggestion && (
                             <button
-                                onClick={() => onDismissSuggestion(s)}
+                                onClick={(e) => { e.stopPropagation(); onDismissSuggestion(s); }}
                                 aria-label={`Dismiss suggestion ${s.name}`}
                                 className="absolute top-1 end-1 w-9 h-9 flex items-center justify-center text-white/80 hover:text-white"
                             >
@@ -210,20 +237,21 @@ export default function CollectionsGallery({
                             </button>
                         )}
                     </div>
-                    <div className="flex-1 flex flex-col p-3.5">
-                        <h3 className="font-bold text-text text-[15px] leading-tight truncate" title={s.name}>{s.name}</h3>
-                        <p className="mt-0.5 text-[11px] font-semibold text-text-muted/70">
-                            {s.linkIds.length} cards ready to group
+                    <div className="flex-1 flex flex-col p-3" dir={sDir}>
+                        <h3 className={`font-bold text-text text-[14px] leading-tight truncate ${sDir === 'rtl' ? 'font-hebrew text-right' : ''}`} title={s.name}>{s.name}</h3>
+                        <p dir="ltr" className={`mt-0.5 text-[11px] font-semibold text-text-muted/70 ${sDir === 'rtl' ? 'text-right' : ''}`}>
+                            {s.linkIds.length} {s.linkIds.length === 1 ? 'card' : 'cards'}
                         </p>
                         <button
-                            onClick={() => onCreateSuggestion?.(s)}
-                            className="mt-auto self-start inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-accent text-white text-xs font-bold hover:bg-accent-hover transition-colors"
+                            onClick={(e) => { e.stopPropagation(); onCreateSuggestion?.(s); }}
+                            className="mt-2.5 self-start inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-accent text-white text-xs font-bold hover:bg-accent-hover active:scale-[0.97] transition-all"
                         >
                             <Plus className="w-3.5 h-3.5" /> Create
                         </button>
                     </div>
                 </div>
-            ))}
+                );
+            })}
 
             {/* Empty state — nothing created and nothing to suggest yet. */}
             {sorted.length === 0 && suggestions.length === 0 && (
