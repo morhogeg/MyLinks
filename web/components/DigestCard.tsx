@@ -65,13 +65,13 @@ export default function DigestCard({
             {/* Header — an iOS-style hero in the reading pane, or the tappable
                 collapsed row in a stacked history list. */}
             {alwaysOpen ? (
-                <div className="px-4 pt-3 pb-3.5 max-sm:px-1">
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-accent">
-                        {kindLabel} · {countLabel}
-                    </div>
-                    <h1 className="mt-1 text-[22px] font-extrabold tracking-tight text-text">
+                // One line, mirroring the collection detail header: big date +
+                // muted inline count. The kind lives in the nav bar above.
+                <div className="px-4 pt-2 pb-3 max-sm:px-1 flex items-baseline gap-2 min-w-0">
+                    <h1 className="min-w-0 truncate text-[22px] font-extrabold tracking-tight text-text">
                         {displayTitle}
                     </h1>
+                    <span className="shrink-0 whitespace-nowrap text-[13px] font-medium text-text-muted tabular-nums">· {countLabel}</span>
                 </div>
             ) : (
                 <button
@@ -104,7 +104,7 @@ export default function DigestCard({
                 >
                     {/* Topics as tidy chips (facelift over the old comma string). */}
                     {digest.topics.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mb-1">
+                        <div className="flex flex-wrap gap-1.5 mb-3">
                             {digest.topics.map((t) => (
                                 <span key={t} dir="auto" className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent">
                                     {t}
@@ -113,7 +113,11 @@ export default function DigestCard({
                         </div>
                     )}
 
-                    <div className="flex flex-col divide-y divide-border-subtle">
+                    {/* Each card as its own bordered row — hairline dividers
+                        weren't enough separation once rows carry a title, meta
+                        line, AND a two-line summary (iOS inset-grouped feel on
+                        the flat phone screen). */}
+                    <div className="flex flex-col gap-2">
                         {digest.cards.map((card) => {
                             // Per-row direction so Hebrew titles read (and
                             // truncate) right-to-left instead of clipping into
@@ -125,7 +129,7 @@ export default function DigestCard({
                                 <button
                                     key={card.id}
                                     onClick={() => openCard(card)}
-                                    className="group w-full flex items-start gap-3 py-3 text-left cursor-pointer active:opacity-70 transition-opacity"
+                                    className="group w-full flex items-start gap-3 rounded-2xl border border-border-subtle bg-card px-3.5 py-3 text-left cursor-pointer transition-all hover:bg-card-hover hover:border-text-muted/40 active:scale-[0.99]"
                                 >
                                     <div className="min-w-0 flex-1">
                                         <div

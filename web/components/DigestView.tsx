@@ -125,7 +125,7 @@ export default function DigestView({
                                 key={d.id}
                                 eyebrow={d.frequency === 'weekly' ? digestKindLabel(d.frequency) : undefined}
                                 title={digestDisplayTitle(d)}
-                                meta={<DigestRowMeta digest={d} />}
+                                meta={`${d.cardCount} ${d.cardCount === 1 ? 'card' : 'cards'}`}
                                 active={false}
                                 onClick={() => onOpenDigest?.(d.id)}
                                 trailing={<ChevronRight className="w-4 h-4 text-text-muted shrink-0" />}
@@ -155,7 +155,7 @@ export default function DigestView({
                                     key={d.id}
                                     eyebrow={d.frequency === 'weekly' ? digestKindLabel(d.frequency) : undefined}
                                     title={digestDisplayTitle(d)}
-                                    meta={<DigestRowMeta digest={d} />}
+                                    meta={`${d.cardCount} ${d.cardCount === 1 ? 'card' : 'cards'}`}
                                     active={activeId === d.id}
                                     onClick={() => setSelId(d.id)}
                                 />
@@ -172,26 +172,6 @@ export default function DigestView({
                     ) : null}
                 </div>
             </div>
-        </>
-    );
-}
-
-/** "5 cards · topic, topic, topic +2" — the count stays LTR while the topic
-    preview renders in its own direction, so mixed Hebrew/English topic lists
-    don't bidi-scramble around the separator. Capped at 3 topics. */
-function DigestRowMeta({ digest }: { digest: CuratedDigest }) {
-    const shown = digest.topics.slice(0, 3);
-    const extra = digest.topics.length - shown.length;
-    return (
-        <>
-            <span className="shrink-0">{digest.cardCount} {digest.cardCount === 1 ? 'card' : 'cards'}</span>
-            {shown.length > 0 && (
-                <>
-                    <span className="shrink-0">·</span>
-                    <span dir="auto" className="truncate">{shown.join(', ')}</span>
-                    {extra > 0 && <span className="shrink-0 text-text-muted/70">+{extra}</span>}
-                </>
-            )}
         </>
     );
 }
