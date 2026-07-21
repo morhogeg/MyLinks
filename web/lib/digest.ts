@@ -23,6 +23,37 @@ import { CuratedDigest } from './types';
 
 const digestsCol = (uid: string) => collection(db, 'users', uid, 'digests');
 
+/** "Daily digest" / "Weekly digest" — user-facing kind label. Modes like
+    'topic'/'smart' are curation internals and never shown. */
+export function digestKindLabel(frequency: CuratedDigest['frequency']): string {
+    return frequency === 'weekly' ? 'Weekly digest' : 'Daily digest';
+}
+
+/**
+ * Display title for a digest, derived client-side from its date — the stored
+ * `title` is the same static string on every doc ("Your Daily Brew"), so the
+ * date is what actually tells one digest from another. With `relative`,
+ * today/yesterday collapse to "Today"/"Yesterday" (for the detail hero);
+ * otherwise it's the full "Monday, July 21" (year appended once it's from a
+ * previous year).
+ */
+export function digestDisplayTitle(
+    digest: Pick<CuratedDigest, 'createdAt' | 'frequency'>,
+    opts?: { relative?: boolean },
+): string {
+    const date = new Date(digest.createdAt);
+    const now = new Date();
+    if (opts?.relative && digest.frequency !== 'weekly') {
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        if (digest.createdAt >= startOfToday) return 'Today';
+        if (digest.createdAt >= startOfToday - 86_400_000) return 'Yesterday';
+    }
+    return date.toLocaleDateString(undefined, {
+        weekday: 'long', month: 'long', day: 'numeric',
+        ...(date.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }),
+    });
+}
+
 /** Remove a single digest from the in-app history. The doc id is the digest's
     deterministic period id (e.g. "2026-07-06" / "2026-W28"). The live onSnapshot
     subscription drops it from the view automatically. */

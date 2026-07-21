@@ -5,13 +5,9 @@ import type { ReactNode } from 'react';
 import { Newspaper, Sparkles, ChevronRight } from 'lucide-react';
 import type { CuratedDigest, WeeklySynthesis, DigestCardRef } from '@/lib/types';
 import { track } from '@/lib/analytics';
+import { digestDisplayTitle, digestKindLabel } from '@/lib/digest';
 import DigestCard from './DigestCard';
 import SynthesisCard from './SynthesisCard';
-
-const MODE_LABEL: Record<string, string> = {
-    smart: 'Smart mix', synthesis: 'Weekly synthesis', unread: 'Backlog',
-    rediscover: 'Rediscover', random: 'Surprise me', topic: 'By topic', favorites: 'Favorites',
-};
 
 /** Coarse recency bucket for the sidebar section headers. */
 function bucketLabel(ms: number): string {
@@ -26,7 +22,6 @@ function bucketLabel(ms: number): string {
     if (d.getFullYear() === now.getFullYear()) return d.toLocaleDateString(undefined, { month: 'long' });
     return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 }
-const shortDate = (ms: number) => ms ? new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
 
 interface Props {
     digests: CuratedDigest[];
@@ -128,9 +123,9 @@ export default function DigestView({
                         {g.items.map((d) => (
                             <SidebarRow
                                 key={d.id}
-                                eyebrow={`${shortDate(d.createdAt)} · ${d.topics.length ? d.topics.join(', ') : (MODE_LABEL[d.mode] ?? 'Smart mix')}`}
-                                title={d.title}
-                                meta={`${d.cardCount} ${d.cardCount === 1 ? 'card' : 'cards'}`}
+                                eyebrow={d.frequency === 'weekly' ? digestKindLabel(d.frequency) : undefined}
+                                title={digestDisplayTitle(d)}
+                                meta={<DigestRowMeta digest={d} />}
                                 active={false}
                                 onClick={() => onOpenDigest?.(d.id)}
                                 trailing={<ChevronRight className="w-4 h-4 text-text-muted shrink-0" />}
@@ -158,9 +153,9 @@ export default function DigestView({
                             {g.items.map((d) => (
                                 <SidebarRow
                                     key={d.id}
-                                    eyebrow={`${shortDate(d.createdAt)} · ${d.topics.length ? d.topics.join(', ') : (MODE_LABEL[d.mode] ?? 'Smart mix')}`}
-                                    title={d.title}
-                                    meta={`${d.cardCount} ${d.cardCount === 1 ? 'card' : 'cards'}`}
+                                    eyebrow={d.frequency === 'weekly' ? digestKindLabel(d.frequency) : undefined}
+                                    title={digestDisplayTitle(d)}
+                                    meta={<DigestRowMeta digest={d} />}
                                     active={activeId === d.id}
                                     onClick={() => setSelId(d.id)}
                                 />
@@ -181,8 +176,30 @@ export default function DigestView({
     );
 }
 
+/** "5 cards · topic, topic, topic +2" — the count stays LTR while the topic
+    preview renders in its own direction, so mixed Hebrew/English topic lists
+    don't bidi-scramble around the separator. Capped at 3 topics. */
+function DigestRowMeta({ digest }: { digest: CuratedDigest }) {
+    const shown = digest.topics.slice(0, 3);
+    const extra = digest.topics.length - shown.length;
+    return (
+        <>
+            <span className="shrink-0">{digest.cardCount} {digest.cardCount === 1 ? 'card' : 'cards'}</span>
+            {shown.length > 0 && (
+                <>
+                    <span className="shrink-0">·</span>
+                    <span dir="auto" className="truncate">{shown.join(', ')}</span>
+                    {extra > 0 && <span className="shrink-0 text-text-muted/70">+{extra}</span>}
+                </>
+            )}
+        </>
+    );
+}
+
 function SidebarRow({ icon, eyebrow, title, meta, active, onClick, trailing }: {
-    icon?: ReactNode; eyebrow: string; title: string; meta?: string; active: boolean; onClick: () => void;
+    /** Eyebrow is optional — daily digest rows lead with the date itself
+        (repeating "Daily digest" on every row said nothing). */
+    icon?: ReactNode; eyebrow?: string; title: string; meta?: ReactNode; active: boolean; onClick: () => void;
     /** Optional trailing affordance (e.g. a chevron for rows that navigate). */
     trailing?: ReactNode;
 }) {
@@ -190,17 +207,19 @@ function SidebarRow({ icon, eyebrow, title, meta, active, onClick, trailing }: {
         <button
             onClick={onClick}
             aria-pressed={active}
-            className={`w-full flex items-center gap-2 text-left rounded-xl px-3 py-2.5 border transition-colors cursor-pointer ${active
+            className={`w-full flex items-center gap-2 text-left rounded-xl px-3 py-2.5 border transition-colors cursor-pointer active:opacity-80 ${active
                 ? 'bg-accent/10 border-accent/40'
                 : 'bg-card border-border-subtle hover:bg-card-hover hover:border-text-muted/40'}`}
         >
             <span className="min-w-0 flex-1">
-                <span className={`flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider ${active ? 'text-accent' : 'text-text-muted'}`}>
-                    {icon}
-                    <span className="truncate">{eyebrow}</span>
-                </span>
-                <span className="mt-0.5 block text-[13.5px] font-semibold text-text truncate">{title}</span>
-                {meta && <span className="mt-0.5 block text-[11px] text-text-muted">{meta}</span>}
+                {(icon || eyebrow) && (
+                    <span className={`flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider ${active ? 'text-accent' : 'text-text-muted'}`}>
+                        {icon}
+                        {eyebrow && <span className="truncate">{eyebrow}</span>}
+                    </span>
+                )}
+                <span dir="auto" className={`block text-[13.5px] font-semibold text-text truncate ${(icon || eyebrow) ? 'mt-0.5' : ''}`}>{title}</span>
+                {meta && <span className="mt-0.5 flex items-center gap-1 min-w-0 text-[11px] text-text-muted">{meta}</span>}
             </span>
             {trailing}
         </button>
