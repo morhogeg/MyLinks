@@ -1,7 +1,7 @@
 'use client';
 
 import { Youtube, Image as ImageIcon, StickyNote } from 'lucide-react';
-import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle } from '@/lib/platform';
+import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle, linkedinDisplayName } from '@/lib/platform';
 
 /** The minimal slice of a card the byline reads. A full `Link` satisfies this,
     and so do denormalized card refs (e.g. digest rows) — one byline everywhere,
@@ -42,6 +42,7 @@ export default function SourceByline({
     const youtubeChannel = link.metadata?.youtubeChannel || link.sourceName;
     const xAuthor = platform === 'x' ? xHandle(link.url) : null;
     const isLinkedIn = platform === 'linkedin';
+    const linkedInAuthor = isLinkedIn ? linkedinDisplayName(link.url, link.sourceName) : null;
     const isFacebook = platform === 'facebook';
     const fbAuthor = isFacebook && link.sourceName
         && !['facebook', 'screenshot', 'none'].includes(link.sourceName.trim().toLowerCase())
@@ -66,8 +67,9 @@ export default function SourceByline({
     }
     if (isLinkedIn) {
         return (
-            <span dir="ltr" className={wrap} title="LinkedIn" aria-label="LinkedIn">
+            <span dir="auto" className={wrap} title={linkedInAuthor || 'LinkedIn'} aria-label={linkedInAuthor || 'LinkedIn'}>
                 <span className="shrink-0 inline-flex" style={{ color: platformColor('linkedin') }}>{platformIcon('linkedin', iconCls)}</span>
+                {linkedInAuthor && <span className={nameCls}>{linkedInAuthor}</span>}
             </span>
         );
     }

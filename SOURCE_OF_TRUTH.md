@@ -651,7 +651,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-21 (latest) — INSTAGRAM: READ THE COVER PHOTO INTO THE SUMMARY.**
+- **2026-07-21 (latest) — LINKEDIN: SHOW THE AUTHOR NAME ON THE CARD BYLINE.**
+  LinkedIn cards showed only the bare "in" brand icon while X (@handle), YouTube
+  (channel), Instagram (@handle) and Facebook (author) all show a name next to
+  their mark — an inconsistency the owner flagged from a device screenshot. The
+  resolver already existed: `linkedinDisplayName(url, sourceName)` (`platform.tsx`)
+  prefers a stored author name, else recovers it from the post URL slug (e.g.
+  `posts/amir-hartman-<hash>` → "Amir Hartman"), and `getSourceInfo` already used
+  it for the Sources filter facet — so the filter list and the card disagreed.
+  Fix: one branch in the shared `SourceByline` (`web/components/SourceByline.tsx`)
+  now renders the LinkedIn brand icon + resolved name (mirrors the X/IG/FB
+  branches; `dir="auto"` so Hebrew author names read RTL), with a graceful
+  icon-only fallback when no name is recoverable (e.g. `/feed/update/` URLs). One
+  component feeds every surface (feed grid, detail modal, swipe deck, digest,
+  notes), so all card views update at once. Verified by server-rendering the real
+  component (Amir Hartman via slug, stored Hebrew name, icon-only fallback, X
+  control unchanged); `npx tsc --noEmit` clean. Frontend-only. **Shipped:**
+  <!--SHIP--> Vercel (desktop web) + iOS→TestFlight (card UI change).
+
+- **2026-07-21 — INSTAGRAM: READ THE COVER PHOTO INTO THE SUMMARY.**
   Follow-up to the X-post image work (entry below), same owner session. Instagram
   has no photo API here — `_scrape_instagram_url` (`scraper.py`) only read
   `og:title` / `og:description` (a like/comment blurb + caption) and never the
