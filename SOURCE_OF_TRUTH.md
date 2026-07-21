@@ -668,8 +668,8 @@ exact-match, capped.
   `!anyOverlayOpen`, so an open `LinkDetailModal` owns the swipe alone. This
   also fixes the same latent double-pop for a card modal open over
   Digest/Collections (Ask already stood down via its own `overlayOpen` prop).
-  `tsc` clean, changed files eslint-clean. **Shipped:** merge to main → Vercel
-  (auto); TestFlight build stamped below. No functions changes.
+  `tsc` clean, changed files eslint-clean. **Shipped:** feature `66ee5d8`, pushed as `575b4ec` → Vercel (auto);
+  TestFlight run **#139 = build 1139**. No functions changes.
 
 - **2026-07-20 (latest) — MY NOTES: a central view of every personal note with
   its card attached (branch `claude/onboard-dedicated-notes-area-71fkrw`).**
