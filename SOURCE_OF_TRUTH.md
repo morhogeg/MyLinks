@@ -647,7 +647,28 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-21 (latest) — MY NOTES ROUND 3: "Apple-grade" polish pass (commit
+- **2026-07-21 (latest) — DIGEST SCREENS UX ROUND (Apple-grade pass on list + detail).**
+  Root cause of the "Your Daily Brew on every card" complaint:
+  `digest_service.py` stamps the SAME static title on every digest doc, so the
+  list was a column of identical rows and the detail screen repeated the name.
+  Fix is client-side (retroactive for the whole history — no backend change):
+  new `digestDisplayTitle`/`digestKindLabel` in lib/digest.ts derive the
+  identity from the date. List rows (DigestView) now lead with "Monday,
+  July 21" (eyebrow only for weekly digests), meta = "5 cards · topic, topic,
+  topic +N" with the topic preview in its own bidi span; SidebarRow eyebrow
+  became optional, meta a ReactNode. Detail (DigestCard alwaysOpen): boxed
+  icon-header replaced by an iOS-style hero — eyebrow "Daily digest · 5
+  cards", large-title "Today"/"Yesterday"/date — card chrome dropped on phones
+  (flat edge-to-edge; returns at sm+ for the tablet/desktop pane), nav bar
+  keeps "Your Daily Brew" once. Card rows: category color dot
+  (getCategoryColorStyle), per-row `dir` from getDirection so Hebrew titles
+  truncate RTL (no more leading "…"), meta mirrors alignment, denormalized
+  `thumbnailUrl` now rendered (56px rounded, lazy), arrow glyph removed,
+  active-press feedback on all rows, topic chips `dir="auto"`. Mode jargon
+  ("By topic"/"Smart mix") removed from user-facing digest surfaces. `tsc`
+  clean, changed files eslint-clean. No functions changes.
+
+- **2026-07-21 — MY NOTES ROUND 3: "Apple-grade" polish pass (commit
   `4459327`, merge `0275ca4`).** Owner asked whether round 2 met the
   Apple-would-ship bar; audit against the app's own standards said not quite,
   five gaps closed: (1) opening a card from My Notes now REVEALS its notes
@@ -667,6 +688,7 @@ exact-match, capped.
   **#140 = build 1140** (supersedes 1139 before most testers see it). No
   functions changes.
 - **2026-07-20 — MY NOTES ROUND 2: grouped-by-card redesign + placement
+
   + swipe fix, from owner device QA on build 1137 (commit `66ee5d8`).** QA
   verdicts on round 1: ungrouped note rows made note↔card attachment ambiguous,
   the view felt buried, and edge-swiping back over a card opened FROM My Notes
