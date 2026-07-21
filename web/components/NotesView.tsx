@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Search, StickyNote, X, ChevronRight } from 'lucide-react';
-import type { NoteWithCard } from '@/lib/notes';
+import type { CardNotes } from '@/lib/notes';
 import type { Link } from '@/lib/types';
 import { getDirection } from '@/lib/rtl';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -10,15 +10,17 @@ import { useNow } from '@/lib/useNow';
 import SourceByline from './SourceByline';
 
 /**
- * My Notes — the central view of every personal note across the library,
- * newest first, each with the card it was written on attached. Rows are
- * note-centric (the note is the content, the card is context): the note reads
- * in the same accent panel the detail modal uses, and the card strip below it
- * opens the card's detail modal — landing right next to the note editor.
+ * My Notes — every personal note across the library, grouped BY CARD (device
+ * QA on build 1137: ungrouped rows made note↔card attachment ambiguous). One
+ * container per noted card, ordered by its newest note: the card reads as a
+ * compact header (thumbnail when the card has one, title, source, note count),
+ * and all of its notes stack beneath it on an accent-tinted panel, newest
+ * first. Tapping anywhere in the group opens the card's detail modal, landing
+ * right next to the note editor.
  *
  * Pure client-side: the parent passes the already privacy/pending-filtered
- * {note, link} pairs (Feed merges the live window with the full-library
- * snapshot, so notes on cards older than the loaded feed still appear).
+ * groups (Feed merges the live window with the full-library snapshot, so
+ * notes on cards older than the loaded feed still appear).
  */
 
 /** Compact relative date, matching the card surfaces; falls to an absolute
@@ -39,12 +41,12 @@ function timeAgo(ms: number, now: number, rtl: boolean): string {
 }
 
 export default function NotesView({
-    notes,
+    groups,
     loading,
     onOpenCard,
 }: {
-    /** Every {note, link} pair, newest first (lib/notes getAllNotes). */
-    notes: NoteWithCard[];
+    /** Noted cards with their notes, newest group first (lib/notes getNoteGroups). */
+    groups: CardNotes[];
     /** True while the full-library snapshot is still being fetched — older
         notes may still be on their way. */
     loading?: boolean;
@@ -54,18 +56,30 @@ export default function NotesView({
     // The shared ticking clock (lib/useNow) — SSR-safe and render-pure.
     const now = useNow();
 
+    const totalNotes = useMemo(
+        () => groups.reduce((sum, g) => sum + g.notes.length, 0),
+        [groups],
+    );
+
+    // Search: a title match keeps the whole group; otherwise the group narrows
+    // to just its matching notes — so results always show WHY they matched.
     const shown = useMemo(() => {
         const q = query.trim().toLowerCase();
-        if (!q) return notes;
-        return notes.filter(({ note, link }) =>
-            note.text.toLowerCase().includes(q) || link.title.toLowerCase().includes(q));
-    }, [notes, query]);
+        if (!q) return groups;
+        const out: CardNotes[] = [];
+        for (const g of groups) {
+            if (g.link.title.toLowerCase().includes(q)) { out.push(g); continue; }
+            const hits = g.notes.filter((n) => n.text.toLowerCase().includes(q));
+            if (hits.length > 0) out.push({ ...g, notes: hits });
+        }
+        return out;
+    }, [groups, query]);
 
     return (
         <div className="max-w-2xl mx-auto w-full">
             {/* Search within notes — shown once there's anything to search. */}
-            {notes.length > 0 && (
-                <div className="relative mb-4">
+            {groups.length > 0 && (
+                <div className="relative mb-3">
                     <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                     <input
                         type="text"
@@ -88,6 +102,13 @@ export default function NotesView({
                 </div>
             )}
 
+            {/* One quiet line of scale — how much thinking has collected here. */}
+            {groups.length > 0 && !query.trim() && (
+                <p className="text-[12px] text-text-muted px-1 mb-3">
+                    {totalNotes.toLocaleString()} note{totalNotes === 1 ? '' : 's'} on {groups.length.toLocaleString()} card{groups.length === 1 ? '' : 's'}
+                </p>
+            )}
+
             {loading && (
                 <div className="flex items-center gap-2 mb-4 text-xs" aria-live="polite">
                     <div className="w-3.5 h-3.5 border-2 border-accent/20 border-t-accent rounded-full animate-spin shrink-0" />
@@ -101,7 +122,7 @@ export default function NotesView({
                         <span className="w-12 h-12 rounded-2xl bg-accent/10 text-accent flex items-center justify-center">
                             <StickyNote className="w-6 h-6" />
                         </span>
-                        {notes.length === 0 ? (
+                        {groups.length === 0 ? (
                             <p className="text-[14px] text-text-muted leading-snug max-w-[260px]">
                                 No notes yet — open any card and tap “Add a note”. Everything you write collects here.
                             </p>
@@ -113,43 +134,76 @@ export default function NotesView({
                     </div>
                 )
             ) : (
-                <div className="space-y-3">
-                    {shown.map(({ note, link }) => {
-                        const noteRtl = getDirection(note.text) === 'rtl';
+                <div className="space-y-3.5">
+                    {shown.map(({ link, notes }) => {
                         const titleRtl = getDirection(link.title, link.language) === 'rtl';
                         const colorStyle = getCategoryColorStyle(link.category);
+                        const thumb = link.metadata?.thumbnailUrl;
                         return (
-                            <div key={`${link.id}:${note.id}`} className="rounded-xl bg-accent/[0.06] border border-accent/15 overflow-hidden">
-                                {/* The note itself — the row's content. */}
-                                <div className="px-4 py-3.5">
-                                    <p dir="auto" className={`text-[15px] text-text whitespace-pre-wrap leading-relaxed ${noteRtl ? 'text-right' : ''}`}>
-                                        {note.text}
-                                    </p>
-                                    <span className={`mt-2 block text-[11px] font-medium text-text-muted/60 ${noteRtl ? 'text-right' : ''}`}>
-                                        {timeAgo(note.updatedAt ?? note.createdAt, now, noteRtl)}
-                                    </span>
-                                </div>
-                                {/* The card it was written on — tap to open it. */}
-                                <button
-                                    onClick={() => onOpenCard(link)}
-                                    dir={titleRtl ? 'rtl' : 'ltr'}
-                                    className="group relative w-full flex items-center gap-2.5 ps-3.5 pe-3 py-2.5 bg-card border-t border-accent/10 text-start hover:bg-card-hover transition-colors cursor-pointer"
-                                >
+                            <div
+                                key={link.id}
+                                onClick={() => onOpenCard(link)}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCard(link); } }}
+                                className="group rounded-2xl border border-border-subtle bg-card overflow-hidden cursor-pointer hover:border-accent/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                            >
+                                {/* Card header — the anchor the notes hang from. Mirrors
+                                    per card language so Hebrew cards read right-to-left
+                                    coherently, chevron always at the logical end. */}
+                                <div dir={titleRtl ? 'rtl' : 'ltr'} className="relative flex items-center gap-3 ps-4 pe-3 py-3">
                                     <span
-                                        className="absolute start-0 inset-y-2 w-1 rounded-full"
+                                        className="absolute start-0 inset-y-2.5 w-1.5 rounded-full"
                                         style={{ backgroundColor: colorStyle.backgroundColor }}
                                         aria-hidden
                                     />
-                                    <span className="flex-1 min-w-0">
-                                        <span className={`block truncate text-[13.5px] font-semibold text-text group-hover:text-accent transition-colors ${titleRtl ? 'font-hebrew' : ''}`}>
+                                    {thumb && (
+                                        <img
+                                            src={thumb}
+                                            alt=""
+                                            loading="lazy"
+                                            className="w-11 h-11 rounded-lg object-cover shrink-0 bg-fill-subtle"
+                                        />
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className={`line-clamp-2 font-semibold text-[15px] leading-snug text-text group-hover:text-accent transition-colors ${titleRtl ? 'font-hebrew' : ''}`}>
                                             {link.title}
-                                        </span>
-                                        <span className="mt-0.5 flex items-center" dir="ltr">
+                                        </h3>
+                                        <div className="mt-1 flex items-center gap-1.5 min-w-0 text-[11px] text-text-muted" dir="ltr">
                                             <SourceByline link={link} />
+                                        </div>
+                                    </div>
+                                    {notes.length > 1 && (
+                                        <span className="shrink-0 inline-flex items-center gap-1 px-2 h-6 rounded-full bg-accent/10 text-accent text-[11px] font-bold tabular-nums">
+                                            <StickyNote className="w-3 h-3" />
+                                            {notes.length}
                                         </span>
-                                    </span>
-                                    <ChevronRight className="w-4 h-4 shrink-0 text-text-muted rtl:rotate-180" />
-                                </button>
+                                    )}
+                                    <ChevronRight className="w-4 h-4 shrink-0 text-text-muted/60 rtl:rotate-180" />
+                                </div>
+
+                                {/* The notes — the content this view exists for. A tinted
+                                    panel visually bound to the header above it. */}
+                                <div className="border-t border-border-subtle bg-accent/[0.05]">
+                                    {notes.map((n, i) => {
+                                        const noteRtl = getDirection(n.text) === 'rtl';
+                                        return (
+                                            <div key={n.id} dir={noteRtl ? 'rtl' : 'ltr'} className={`px-4 py-3 ${i > 0 ? 'border-t border-accent/10' : ''}`}>
+                                                <div className="flex gap-2.5">
+                                                    <StickyNote className="w-3.5 h-3.5 mt-[3px] shrink-0 text-accent/70" aria-hidden />
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className={`text-[14.5px] text-text whitespace-pre-wrap leading-relaxed ${noteRtl ? 'font-hebrew' : ''}`}>
+                                                            {n.text}
+                                                        </p>
+                                                        <span className="mt-1 block text-[11px] font-medium text-text-muted/60">
+                                                            {timeAgo(n.updatedAt ?? n.createdAt, now, noteRtl)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         );
                     })}

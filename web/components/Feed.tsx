@@ -46,7 +46,7 @@ import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
 import NotesView from './NotesView';
-import { getAllNotes } from '@/lib/notes';
+import { getNoteGroups } from '@/lib/notes';
 import LoadMoreSentinel from './feed/LoadMoreSentinel';
 import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, Sparkles, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
@@ -776,16 +776,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             setViewMode(lastLayout.current);
         }
     };
-    // The rows behind My Notes: live window ∪ full-library snapshot (window
+    // The groups behind My Notes: live window ∪ full-library snapshot (window
     // docs win — they're the live snapshot), gated by the same pending/privacy
-    // rules as the main feed, then flattened into {note, link} pairs. Private
-    // cards' notes never appear here, locked or not — same as Insights.
-    const allNotes = useMemo(() => {
+    // rules as the main feed, then grouped card-by-card (a card's notes stay
+    // together). Private cards' notes never appear here, locked or not — same
+    // as Insights.
+    const noteGroups = useMemo(() => {
         if (viewMode !== 'notes') return [];
         const seen = new Set(links.map((l) => l.id));
         const pool = links.concat(libraryLinks.filter((l) => !seen.has(l.id)))
             .filter((l) => !isPending(l) && !isEffectivelyPrivateCard(l));
-        return getAllNotes(pool);
+        return getNoteGroups(pool);
     }, [viewMode, links, libraryLinks, isEffectivelyPrivateCard]);
     useEffect(() => {
         if (!libraryFacet) return;
@@ -1146,9 +1147,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         else setViewMode(lastLayout.current);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [viewMode, notesFromInsights]);
+    // Stand down while ANY overlay/modal is open — the top-most surface (e.g.
+    // an open card's LinkDetailModal) owns the edge swipe; every enabled
+    // useEdgeSwipeBack instance fires on the same gesture, so without this a
+    // swipe over an open card popped BOTH the modal and this view (device QA
+    // on build 1137: card opened from My Notes swiped back to Insights).
     useEdgeSwipeBack(
         handleEdgeBack,
-        isMobileView && (viewMode === 'digest' || viewMode === 'collections' || viewMode === 'collection' || viewMode === 'digestDetail' || viewMode === 'notes'),
+        isMobileView && !anyOverlayOpen
+        && (viewMode === 'digest' || viewMode === 'collections' || viewMode === 'collection' || viewMode === 'digestDetail' || viewMode === 'notes'),
     );
 
     // If the open collection is deleted out from under the detail view (e.g. from
@@ -2128,7 +2135,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         // Mobile renders the full-screen overlay below.
                         <div className="hidden sm:block">
                             <NotesView
-                                notes={allNotes}
+                                groups={noteGroups}
                                 loading={isLoadingLibrary}
                                 onOpenCard={(link) => setActiveLinkId(link.id)}
                             />
@@ -2397,7 +2404,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     />
                     <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4" style={{ paddingBottom: '1rem' }}>
                         <NotesView
-                            notes={allNotes}
+                            groups={noteGroups}
                             loading={isLoadingLibrary}
                             onOpenCard={(link) => setActiveLinkId(link.id)}
                         />
