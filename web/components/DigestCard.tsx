@@ -8,6 +8,7 @@ import { digestDisplayTitle, digestKindLabel } from '@/lib/digest';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getDirection } from '@/lib/rtl';
 import SimpleMarkdown from './SimpleMarkdown';
+import SourceByline from './SourceByline';
 
 /**
  * One curated digest in the Digest section's history — modeled on
@@ -53,7 +54,6 @@ export default function DigestCard({
     // labels (date, mode jargon, trailing count).
     const displayTitle = digestDisplayTitle(digest, { relative: true });
     const kindLabel = digestKindLabel(digest.frequency);
-    const countLabel = `${digest.cardCount} ${digest.cardCount === 1 ? 'card' : 'cards'}`;
 
     return (
         // The pinned-open detail is FLAT on phones (an edge-to-edge screen, not
@@ -65,13 +65,13 @@ export default function DigestCard({
             {/* Header — an iOS-style hero in the reading pane, or the tappable
                 collapsed row in a stacked history list. */}
             {alwaysOpen ? (
-                // One line, mirroring the collection detail header: big date +
-                // muted inline count. The kind lives in the nav bar above.
-                <div className="px-4 pt-2 pb-3 max-sm:px-1 flex items-baseline gap-2 min-w-0">
+                // Just the date, large — the digest's name lives in the nav bar
+                // above, and a card count is stats trivia the reader can see by
+                // scrolling (owner cut it 2026-07-21).
+                <div className="px-4 pt-2 pb-3 max-sm:px-1">
                     <h1 className="min-w-0 truncate text-[22px] font-extrabold tracking-tight text-text">
                         {displayTitle}
                     </h1>
-                    <span className="shrink-0 whitespace-nowrap text-[13px] font-medium text-text-muted tabular-nums">· {countLabel}</span>
                 </div>
             ) : (
                 <button
@@ -86,13 +86,10 @@ export default function DigestCard({
                         <div className="text-[11px] font-semibold uppercase tracking-wider text-accent">{kindLabel}</div>
                         <div className="text-[15px] font-bold text-text truncate">{displayTitle}</div>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                        <span className="text-xs text-text-muted mr-1">{countLabel}</span>
-                        <ChevronDown
-                            className={`w-5 h-5 text-text-secondary transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}
-                            style={{ transitionTimingFunction: 'var(--ease-modal)' }}
-                        />
-                    </div>
+                    <ChevronDown
+                        className={`w-5 h-5 shrink-0 text-text-secondary transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}
+                        style={{ transitionTimingFunction: 'var(--ease-modal)' }}
+                    />
                 </button>
             )}
 
@@ -119,34 +116,45 @@ export default function DigestCard({
                         the flat phone screen). */}
                     <div className="flex flex-col gap-2">
                         {digest.cards.map((card) => {
-                            // Per-row direction so Hebrew titles read (and
-                            // truncate) right-to-left instead of clipping into
-                            // a leading "…"; the meta line stays LTR and just
-                            // mirrors its alignment.
+                            // Whole row mirrors per card language (ListCard's
+                            // pattern): dir flips title alignment AND the
+                            // thumbnail to the correct side; the metadata line
+                            // stays LTR internally (brand icon + latin handle)
+                            // but hugs the title's edge on RTL cards.
                             const isRtl = getDirection(card.title) === 'rtl';
                             const colorStyle = getCategoryColorStyle(card.category || 'General');
                             return (
                                 <button
                                     key={card.id}
+                                    dir={isRtl ? 'rtl' : 'ltr'}
                                     onClick={() => openCard(card)}
-                                    className="group w-full flex items-start gap-3 rounded-2xl border border-border-subtle bg-card px-3.5 py-3 text-left cursor-pointer transition-all hover:bg-card-hover hover:border-text-muted/40 active:scale-[0.99]"
+                                    className="group w-full flex items-start gap-3 rounded-2xl border border-border-subtle bg-card px-3.5 py-3 text-start cursor-pointer transition-all hover:bg-card-hover hover:border-text-muted/40 active:scale-[0.99]"
                                 >
                                     <div className="min-w-0 flex-1">
-                                        <div
-                                            dir={isRtl ? 'rtl' : 'ltr'}
-                                            className="text-sm font-semibold text-text group-hover:text-accent transition-colors truncate"
-                                        >
+                                        <div className={`text-sm font-semibold leading-snug text-text group-hover:text-accent transition-colors ${isRtl ? 'font-hebrew' : ''}`}>
                                             {card.title}
                                         </div>
-                                        <div className={`mt-0.5 flex items-center gap-1.5 min-w-0 text-[11px] text-text-muted ${isRtl ? 'justify-end' : ''}`} dir="ltr">
-                                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: colorStyle.color }} aria-hidden />
-                                            <span className="truncate">{[card.category, card.sourceName].filter(Boolean).join(' · ')}</span>
+                                        {/* Same byline language as the home cards:
+                                            SourceByline (X logo + @handle, YouTube
+                                            channel, plain publisher…) + the category
+                                            chip, exactly like ListCard's meta row. */}
+                                        <div className={`mt-1 flex items-center gap-1.5 min-w-0 text-[11px] text-text-muted ${isRtl ? 'justify-end' : ''}`} dir="ltr">
+                                            <SourceByline link={{ url: card.url ?? undefined, sourceName: card.sourceName ?? undefined }} />
+                                            {card.category && (
+                                                <span
+                                                    className="shrink-0 max-w-[120px] px-1.5 py-px rounded-full text-[9px] leading-4 font-bold uppercase tracking-wider truncate"
+                                                    style={{ backgroundColor: colorStyle.backgroundColor, color: colorStyle.color }}
+                                                    title={card.category}
+                                                >
+                                                    {card.category}
+                                                </span>
+                                            )}
                                         </div>
                                         {card.summary && (
                                             <SimpleMarkdown
                                                 inline
                                                 content={card.summary}
-                                                className="mt-1 block text-[13px] leading-relaxed text-text-secondary line-clamp-2"
+                                                className="mt-1 text-[13px] leading-relaxed text-text-secondary line-clamp-2"
                                             />
                                         )}
                                     </div>

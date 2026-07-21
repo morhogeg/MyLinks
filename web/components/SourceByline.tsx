@@ -2,7 +2,16 @@
 
 import { Youtube, Image as ImageIcon, StickyNote } from 'lucide-react';
 import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle } from '@/lib/platform';
-import type { Link } from '@/lib/types';
+
+/** The minimal slice of a card the byline reads. A full `Link` satisfies this,
+    and so do denormalized card refs (e.g. digest rows) — one byline everywhere,
+    including surfaces that only carry a snapshot of the source fields. */
+export interface SourceBylineLink {
+    url?: string;
+    sourceName?: string;
+    sourceType?: string;
+    metadata?: { youtubeChannel?: string };
+}
 
 /**
  * THE single source byline used on every card surface (feed grid, list rows,
@@ -20,7 +29,7 @@ export default function SourceByline({
     link,
     size = 'sm',
 }: {
-    link: Link;
+    link: SourceBylineLink;
     /** sm = cards (12px text, 3.5 icon); md = detail modal (14px, 4 icon). */
     size?: 'sm' | 'md';
 }) {
