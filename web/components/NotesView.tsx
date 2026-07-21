@@ -143,7 +143,7 @@ export default function NotesView({
                     </div>
                 )
             ) : (
-                <div className="space-y-3.5">
+                <div className="space-y-4">
                     {shown.map(({ link, notes }, index) => {
                         const titleRtl = getDirection(link.title, link.language) === 'rtl';
                         const colorStyle = getCategoryColorStyle(link.category);
@@ -157,7 +157,7 @@ export default function NotesView({
                                 aria-label={`${link.title} — ${notes.length === 1 ? 'one note' : `${notes.length} notes`}`}
                                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCard(link); } }}
                                 style={{ ['--enter-delay' as string]: `${Math.min(index, 12) * 14}ms` }}
-                                className="group animate-card-enter rounded-2xl border border-border-subtle bg-card overflow-hidden cursor-pointer transition-all duration-150 [@media(hover:hover)]:hover:border-accent/40 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                                className="group surface-card animate-card-enter rounded-[20px] border border-border-subtle bg-card shadow-[var(--shadow-card)] overflow-hidden cursor-pointer transition-all duration-150 [@media(hover:hover)]:hover:border-accent/40 [@media(hover:hover)]:hover:shadow-[var(--shadow-card-hover)] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                             >
                                 {/* Card header — the anchor the notes hang from. Mirrors
                                     per card language so Hebrew cards read right-to-left
@@ -180,7 +180,7 @@ export default function NotesView({
                                         <h3 className={`line-clamp-2 font-semibold text-[15px] leading-snug text-text transition-colors [@media(hover:hover)]:group-hover:text-accent ${titleRtl ? 'font-hebrew' : ''}`}>
                                             {link.title}
                                         </h3>
-                                        <div className="mt-1 flex items-center gap-1.5 min-w-0 text-[11px] text-text-muted" dir="ltr">
+                                        <div className={`mt-1 flex items-center gap-1.5 min-w-0 text-[11px] text-text-muted ${titleRtl ? 'justify-end' : ''}`} dir="ltr">
                                             <SourceByline link={link} />
                                         </div>
                                     </div>
@@ -193,14 +193,16 @@ export default function NotesView({
                                     <ChevronRight className="w-4 h-4 shrink-0 text-text-muted/60 rtl:rotate-180" />
                                 </div>
 
-                                {/* The notes — the content this view exists for. A tinted
-                                    panel visually bound to the header above it; the text
-                                    speaks for itself, no per-row iconography. */}
-                                <div className="border-t border-border-subtle bg-accent/[0.05]">
-                                    {notes.map((n, i) => {
+                                {/* The notes — the content this view exists for. Each is
+                                    the SAME bordered accent panel the detail modal renders
+                                    notes in (one visual language for "your note" everywhere);
+                                    discrete blocks with real borders survive both themes,
+                                    unlike a faint full-bleed tint (device QA on build 1140). */}
+                                <div className="px-3 pb-3 space-y-2">
+                                    {notes.map((n) => {
                                         const noteRtl = getDirection(n.text) === 'rtl';
                                         return (
-                                            <div key={n.id} dir={noteRtl ? 'rtl' : 'ltr'} className={`px-4 py-3 ${i > 0 ? 'border-t border-accent/10' : ''}`}>
+                                            <div key={n.id} dir={noteRtl ? 'rtl' : 'ltr'} className="rounded-xl bg-accent/[0.06] border border-accent/15 px-3.5 py-3">
                                                 <p className={`text-[15px] text-text whitespace-pre-wrap leading-relaxed ${noteRtl ? 'font-hebrew' : ''}`}>
                                                     {n.text}
                                                 </p>
