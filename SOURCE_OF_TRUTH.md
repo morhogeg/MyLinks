@@ -667,7 +667,9 @@ exact-match, capped.
   notes), so all card views update at once. Verified by server-rendering the real
   component (Amir Hartman via slug, stored Hebrew name, icon-only fallback, X
   control unchanged); `npx tsc --noEmit` clean. Frontend-only. **Shipped:**
-  <!--SHIP--> Vercel (desktop web) + iOS→TestFlight (card UI change).
+  feature `f1390f8`, merge `0383000` → `main` → Vercel (desktop web);
+  iOS→TestFlight run **#151** / build **1151** (card UI change reaches the iPhone
+  app where the owner flagged it).
 
 - **2026-07-21 — INSTAGRAM: READ THE COVER PHOTO INTO THE SUMMARY.**
   Follow-up to the X-post image work (entry below), same owner session. Instagram
