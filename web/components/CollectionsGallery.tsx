@@ -349,7 +349,7 @@ function CollectionMenu({
                     <MenuRow icon={<Share2 className="w-4 h-4" />} label={isPublic ? 'Share / manage' : 'Share'} onClick={onShare} />
                 )}
                 <MenuRow icon={<Pencil className="w-4 h-4" />} label="Edit" onClick={onEdit} />
-                <MenuRow icon={<Lock className="w-4 h-4" />} label={isPrivate ? 'Remove private' : 'Make private'} onClick={onTogglePrivate} />
+                <MenuRow icon={<Lock className="w-4 h-4" />} label={isPrivate ? 'Remove from Private' : 'Make private'} onClick={onTogglePrivate} />
                 <MenuRow icon={<Trash2 className="w-4 h-4" />} label="Delete" danger onClick={onDelete} />
             </div>
         </>,

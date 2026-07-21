@@ -650,7 +650,31 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-21 (latest) — COLLECTIONS UX ROUND 1 (Apple-grade pass on the
+- **2026-07-21 (latest) — COLLECTIONS UX ROUND 2, from owner device QA on the
+  round-1 web deploy.** Five QA items, all client-side: **(1)** the suggestion
+  preview sheet dropped the generic grey placeholder thumbnail — a card's
+  thumbnail renders ONLY when it actually has one (YouTube/articles keep theirs;
+  X/text/social cards are now title+byline full-width, no empty box).
+  **(2) Editable drawer** — each suggested card has a remove (✕) and the sheet
+  holds a client-only `kept` set (nothing written until Create); **Create adopts
+  only the kept cards** (disabled at zero), header reads "N cards · remove any
+  that don't fit". `handleCreateSuggestion(s, linkIds?)` now takes the curated id
+  list (gallery inline Create still passes the full set). **(3) Add more cards**
+  — rather than embed a picker in the drawer, Create now **opens the new
+  collection** (`openCollection(id)`) so Manage cards is one tap away; noted to
+  owner as the scoped choice (an in-drawer pre-create picker is the alternative
+  if wanted). **(4)** collection ⋯ menu copy "Remove private" → **"Remove from
+  Private"** (matches `CardActionSheet`'s existing card copy — one vocabulary).
+  **(5)** the only discoverable removal path from inside a collection was the
+  per-card tag ✕; the hero's **"Add cards" → "Manage cards"** (and the grid
+  filter-chip toolbar's too, `LayoutGrid` icon) — `ManageCollectionCardsSheet`
+  already lists members with a tap-to-remove toggle + search, the label was
+  hiding it. RENDER-VERIFIED light+dark at 390px (X/YouTube/publisher + Hebrew
+  fixtures) via the throwaway `/dev-collections` harness; confirmed no-placeholder
+  + removable rows + RTL; harness deleted. `tsc` + eslint clean. No functions
+  changes. **Shipped:** _(pending — see merge below)_.
+
+- **2026-07-21 — COLLECTIONS UX ROUND 1 (Apple-grade pass on the
   gallery + collection detail, digest-overhaul method).** Owner asked for a
   focused round on both Collections screens. Shipped: **(1) Suggestion preview
   sheet** — the #1 gap: a suggested tile only said "N cards ready to group" with
