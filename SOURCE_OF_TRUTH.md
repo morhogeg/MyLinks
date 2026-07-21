@@ -670,7 +670,8 @@ exact-match, capped.
   corner badge is the alternative if wanted). RENDER-VERIFIED light+dark
   (LTR + Hebrew) via the throwaway `/dev-collections` harness rendering `Card`
   in collection context; harness deleted. `tsc` + eslint clean. No functions
-  changes. **Shipped:** _(pending — see merge below)_.
+  changes. **Shipped:** feature `89b2dd4`, merge `a5151f0` → Vercel (auto);
+  TestFlight run **#148 = build 1148**.
 
 - **2026-07-21 — COLLECTIONS UX ROUND 3, from owner device QA on
   build 1146.** One QA item: in the suggestion preview drawer, a user should be
