@@ -125,7 +125,6 @@ export default function DigestView({
                                 key={d.id}
                                 eyebrow={d.frequency === 'weekly' ? digestKindLabel(d.frequency) : undefined}
                                 title={digestDisplayTitle(d)}
-                                meta={`${d.cardCount} ${d.cardCount === 1 ? 'card' : 'cards'}`}
                                 active={false}
                                 onClick={() => onOpenDigest?.(d.id)}
                                 trailing={<ChevronRight className="w-4 h-4 text-text-muted shrink-0" />}
@@ -155,7 +154,6 @@ export default function DigestView({
                                     key={d.id}
                                     eyebrow={d.frequency === 'weekly' ? digestKindLabel(d.frequency) : undefined}
                                     title={digestDisplayTitle(d)}
-                                    meta={`${d.cardCount} ${d.cardCount === 1 ? 'card' : 'cards'}`}
                                     active={activeId === d.id}
                                     onClick={() => setSelId(d.id)}
                                 />
