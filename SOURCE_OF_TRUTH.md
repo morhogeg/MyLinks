@@ -662,7 +662,8 @@ exact-match, capped.
   `line-clamp-2`'s `-webkit-box`, so summaries rendered unclamped on build
   1143 — clamp restored. Render-verified light+dark via the `/dev-digest`
   harness (X/YouTube/Facebook/publisher + RTL fixtures). `tsc` + eslint
-  clean. No functions changes.
+  clean. No functions changes. **Shipped:** feature `5b4a15f`+`805a770`,
+  merge `9530b56` → Vercel (auto); TestFlight run **#144 = build 1144**.
 
 - **2026-07-21 — DIGEST UX ROUND 2, from owner device QA on build
   1141.** (1) List rows dropped the per-row topic preview — the topics are the
