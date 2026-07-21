@@ -651,7 +651,32 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-21 (latest) — LINKEDIN: SHOW THE AUTHOR NAME ON THE CARD BYLINE.**
+- **2026-07-21 (latest) — INSTAGRAM IMAGE-FIRST FIX (accuracy).** Owner QA on the
+  IG cover-photo feature (entry below): an @idftweets post (a Hebrew text
+  screenshot) came back with an INVERTED summary — the post says the מש"קית
+  already approved the accommodation and is reflecting on whether she was right,
+  but the card said she was "debating whether to approve," and it read hollow.
+  Root cause: these posts are image-first — the cover screenshot carries the real
+  text and the scraped caption ("דילמה… מה אתם חושבים?") is a teaser — but the
+  multimodal call treated the image as a supplement and ran at
+  `MEDIA_RESOLUTION_LOW`, so dense Hebrew lost its resolution/tense and the model
+  followed the caption's open-dilemma framing. Fix, **scoped to Instagram only**
+  (X is text-primary and working well — left unchanged): the IG scraper marks its
+  cover `image_primary=True`; `analyze_text_with_images` (`ai_service.py`) gains an
+  `image_is_primary` flag that switches to `MEDIA_RESOLUTION_MEDIUM` + an
+  image-authoritative prompt (extract concrete claims, preserve the real
+  outcome/tense, never recast a resolved decision as open, trust the image over
+  the teaser caption); `_analyze_scraped` (`main.py`) passes it from
+  `scraped["image_primary"]`. X keeps LOW res + the supplement prompt. Cost delta
+  is IG-only (~250→~560 tok/image, still sub-cent). Can't reproduce the Gemini
+  call headlessly (no API/IG egress) — owner to re-save the post and confirm it
+  now says "approved, reflecting on whether right." Tests: +3 (15 in
+  `test_post_image_analysis.py`) — flag routing X vs IG + resolution/prompt switch;
+  full suite 345 pass (same 4 pre-existing env-only failures). **Shipped:** fix
+  `f5a8b65`, merge `621475e` → `main`; functions deploy run **#15** (scoped
+  `Deploy-Functions: analyze_link,process_link_background`). Backend-only.
+
+- **2026-07-21 — LINKEDIN: SHOW THE AUTHOR NAME ON THE CARD BYLINE.**
   LinkedIn cards showed only the bare "in" brand icon while X (@handle), YouTube
   (channel), Instagram (@handle) and Facebook (author) all show a name next to
   their mark — an inconsistency the owner flagged from a device screenshot. The
