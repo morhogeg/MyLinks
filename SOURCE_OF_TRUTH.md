@@ -647,7 +647,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-21 (latest) — DIGEST UX ROUND 2, from owner device QA on build
+- **2026-07-21 (latest) — DIGEST UX ROUND 3, from owner device QA on build
+  1143.** (1) Digest card rows now mirror FULLY per card language (ListCard's
+  pattern): `dir` on the row flips title alignment and the thumbnail side,
+  meta line stays LTR internally but hugs the title's edge, `font-hebrew` on
+  RTL titles. (2) Titles no longer truncate — full card name, wrapping.
+  (3) Source byline is now THE shared `SourceByline` (X logo + @handle,
+  YouTube channel, plain publisher…) + ListCard's category chip — its `link`
+  prop was widened to a minimal structural `SourceBylineLink` so denormalized
+  digest refs can use it (full `Link` still satisfies it; no call-site
+  changes). (4) Card counts removed everywhere (owner: no value) — list rows
+  are date-only, detail hero is just the big date. Also fixed a round-2
+  regression: `block` on the SimpleMarkdown summary span was overriding
+  `line-clamp-2`'s `-webkit-box`, so summaries rendered unclamped on build
+  1143 — clamp restored. Render-verified light+dark via the `/dev-digest`
+  harness (X/YouTube/Facebook/publisher + RTL fixtures). `tsc` + eslint
+  clean. No functions changes.
+
+- **2026-07-21 — DIGEST UX ROUND 2, from owner device QA on build
   1141.** (1) List rows dropped the per-row topic preview — the topics are the
   digest's CONFIG (identical on every row), not content; rows are now just
   date + "5 cards". Product decision for a future multi-digest world: keep the
