@@ -3,7 +3,7 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizontal, ExternalLink, Layers, Share2, Loader2, RotateCcw, AlertTriangle, StickyNote, Lock, MinusCircle } from 'lucide-react';
+import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizontal, ExternalLink, Layers, Share2, Loader2, RotateCcw, AlertTriangle, StickyNote, Lock } from 'lucide-react';
 import { useState, memo } from 'react';
 import SourceByline from './SourceByline';
 import { useNow } from '@/lib/useNow';
@@ -443,42 +443,22 @@ function Card({
 
                 {/* Footer Section */}
                 <div className="pt-3 sm:pt-4 border-t border-border-subtle flex flex-col space-y-2 sm:space-y-3">
-                    {/* Collection memberships — subtle chips. When viewing inside a
-                        collection, that chip becomes a one-tap "remove from collection". */}
+                    {/* Collection memberships — quiet accent labels (identity only).
+                        Removing a card from a collection is a deliberate, staged
+                        action in the Manage cards sheet, never an accidental tap
+                        on the card face. */}
                     {cardCollections && cardCollections.length > 0 && (
                         <div className="flex flex-wrap gap-1.5">
-                            {cardCollections.map((col) => {
-                                const isActive = col.id === activeCollectionId;
-                                // Inside a collection, its own chip becomes an
-                                // unmistakable one-tap remove — a red minus control
-                                // (iOS "remove from" idiom), no dialog. Other
-                                // memberships stay as quiet accent labels.
-                                if (isActive && onRemoveFromCollection) {
-                                    return (
-                                        <button
-                                            key={col.id}
-                                            type="button"
-                                            onClick={(e) => { e.stopPropagation(); onRemoveFromCollection(link, col.id); }}
-                                            aria-label={`Remove from ${col.name}`}
-                                            title={`Remove from ${col.name}`}
-                                            className="inline-flex items-center gap-1 ps-1 pe-2 py-0.5 rounded-md bg-red-500/10 text-red-500 text-[10px] font-bold border border-red-500/20 [@media(hover:hover)]:hover:bg-red-500/20 active:scale-95 transition-all"
-                                        >
-                                            <MinusCircle className="w-3 h-3" />
-                                            <span className="max-w-[120px] truncate">{col.name}</span>
-                                        </button>
-                                    );
-                                }
-                                return (
-                                    <span
-                                        key={col.id}
-                                        className="inline-flex items-center gap-1 ps-1.5 pe-1.5 py-0.5 rounded-md bg-accent/10 text-accent text-[10px] font-bold border border-accent/15"
-                                        title={`In collection: ${col.name}`}
-                                    >
-                                        <Layers className="w-2.5 h-2.5" />
-                                        <span className="max-w-[120px] truncate">{col.name}</span>
-                                    </span>
-                                );
-                            })}
+                            {cardCollections.map((col) => (
+                                <span
+                                    key={col.id}
+                                    className="inline-flex items-center gap-1 ps-1.5 pe-1.5 py-0.5 rounded-md bg-accent/10 text-accent text-[10px] font-bold border border-accent/15"
+                                    title={`In collection: ${col.name}`}
+                                >
+                                    <Layers className="w-2.5 h-2.5" />
+                                    <span className="max-w-[120px] truncate">{col.name}</span>
+                                </span>
+                            ))}
                         </div>
                     )}
                     {/* Tags */}
