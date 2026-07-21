@@ -660,7 +660,8 @@ exact-match, capped.
   left-aligned under its first line, flush with the icon like Manage cards / Edit
   / Delete. Render-verified via the `/dev-collections` harness (opened the menu
   on a private collection); deleted. `tsc` + eslint clean. No functions changes.
-  **Shipped:** _(pending — see merge below)_.
+  **Shipped:** feature `d65163b`, merge `3243120` → Vercel (auto); TestFlight run
+  **#150 = build 1150**.
 
 - **2026-07-21 — COLLECTIONS UX ROUND 5, from owner device QA on
   build 1148.** Three fixes, all on the collection-detail / Manage-cards surface.
