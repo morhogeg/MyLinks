@@ -788,6 +788,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
             .filter((l) => !isPending(l) && !isEffectivelyPrivateCard(l));
         return getNoteGroups(pool);
     }, [viewMode, links, libraryLinks, isEffectivelyPrivateCard]);
+    // A card opened FROM My Notes reveals its notes section (the user tapped a
+    // note — land them on it). One-shot: cleared when the modal stack closes so
+    // feed/search opens stay top-anchored.
+    const [detailScrollToNotes, setDetailScrollToNotes] = useState(false);
+    const openCardFromNotes = useCallback((link: Link) => {
+        setDetailScrollToNotes(true);
+        setActiveLinkId(link.id);
+    }, []);
+    useEffect(() => {
+        if (!activeLinkId && detailScrollToNotes) setDetailScrollToNotes(false);
+    }, [activeLinkId, detailScrollToNotes]);
     useEffect(() => {
         if (!libraryFacet) return;
         // The 'notes' facet is a place, not a grid filter — open My Notes.
@@ -2137,7 +2148,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             <NotesView
                                 groups={noteGroups}
                                 loading={isLoadingLibrary}
-                                onOpenCard={(link) => setActiveLinkId(link.id)}
+                                onOpenCard={openCardFromNotes}
                             />
                         </div>
                     ) : viewMode === 'collections' ? (
@@ -2406,7 +2417,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         <NotesView
                             groups={noteGroups}
                             loading={isLoadingLibrary}
-                            onOpenCard={(link) => setActiveLinkId(link.id)}
+                            onOpenCard={openCardFromNotes}
                         />
                     </div>
                 </div>
@@ -2484,6 +2495,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     excludeRelatedIds={linkStack}
                     onAddToCollection={(link) => setAddToCollectionLink(link)}
                     onShare={handleShareCard}
+                    scrollToNotes={detailScrollToNotes}
                 />
             )}
 

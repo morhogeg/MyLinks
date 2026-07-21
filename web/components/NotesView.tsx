@@ -15,8 +15,8 @@ import SourceByline from './SourceByline';
  * container per noted card, ordered by its newest note: the card reads as a
  * compact header (thumbnail when the card has one, title, source, note count),
  * and all of its notes stack beneath it on an accent-tinted panel, newest
- * first. Tapping anywhere in the group opens the card's detail modal, landing
- * right next to the note editor.
+ * first. Tapping anywhere in the group opens the card's detail modal revealed
+ * at its notes section (Feed passes `scrollToNotes`).
  *
  * Pure client-side: the parent passes the already privacy/pending-filtered
  * groups (Feed merges the live window with the full-library snapshot, so
@@ -63,6 +63,7 @@ export default function NotesView({
 
     // Search: a title match keeps the whole group; otherwise the group narrows
     // to just its matching notes — so results always show WHY they matched.
+    const searching = !!query.trim();
     const shown = useMemo(() => {
         const q = query.trim().toLowerCase();
         if (!q) return groups;
@@ -74,38 +75,46 @@ export default function NotesView({
         }
         return out;
     }, [groups, query]);
+    const shownNotes = useMemo(
+        () => shown.reduce((sum, g) => sum + g.notes.length, 0),
+        [shown],
+    );
 
     return (
         <div className="max-w-2xl mx-auto w-full">
-            {/* Search within notes — shown once there's anything to search. */}
+            {/* Search within notes — the app's canonical search field. Shown
+                once there's anything to search. */}
             {groups.length > 0 && (
-                <div className="relative mb-3">
-                    <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                <div className="relative mb-2.5">
+                    <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted pointer-events-none" />
                     <input
                         type="text"
                         dir="auto"
+                        enterKeyHint="search"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Escape') setQuery(''); }}
                         placeholder="Search your notes…"
-                        className="w-full ps-9 pe-10 py-2 bg-card rounded-xl text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent/30 transition-all"
+                        className="w-full h-10 ps-9 pe-9 bg-card border border-border-subtle rounded-full text-[15px] text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-transparent transition-shadow"
                     />
                     {query && (
                         <button
                             onClick={() => setQuery('')}
                             aria-label="Clear search"
-                            className="absolute end-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-fill-strong rounded-full transition-all"
+                            className="absolute end-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-muted hover:text-text hover:bg-fill-strong transition-colors"
                         >
-                            <X className="w-4 h-4 text-text-muted" />
+                            <X className="w-4 h-4" />
                         </button>
                     )}
                 </div>
             )}
 
-            {/* One quiet line of scale — how much thinking has collected here. */}
-            {groups.length > 0 && !query.trim() && (
-                <p className="text-[12px] text-text-muted px-1 mb-3">
-                    {totalNotes.toLocaleString()} note{totalNotes === 1 ? '' : 's'} on {groups.length.toLocaleString()} card{groups.length === 1 ? '' : 's'}
+            {/* One quiet line of scale — or of results while searching. */}
+            {groups.length > 0 && (
+                <p className="text-[12px] text-text-muted px-1.5 mb-3" aria-live="polite">
+                    {searching
+                        ? `${shownNotes.toLocaleString()} matching note${shownNotes === 1 ? '' : 's'}`
+                        : `${totalNotes.toLocaleString()} note${totalNotes === 1 ? '' : 's'} on ${groups.length.toLocaleString()} card${groups.length === 1 ? '' : 's'}`}
                 </p>
             )}
 
@@ -118,9 +127,9 @@ export default function NotesView({
 
             {shown.length === 0 ? (
                 !loading && (
-                    <div className="flex flex-col items-center text-center gap-3 py-16">
+                    <div className="flex flex-col items-center text-center gap-3 py-16 animate-fade-in">
                         <span className="w-12 h-12 rounded-2xl bg-accent/10 text-accent flex items-center justify-center">
-                            <StickyNote className="w-6 h-6" />
+                            {groups.length === 0 ? <StickyNote className="w-6 h-6" /> : <Search className="w-6 h-6" />}
                         </span>
                         {groups.length === 0 ? (
                             <p className="text-[14px] text-text-muted leading-snug max-w-[260px]">
@@ -135,7 +144,7 @@ export default function NotesView({
                 )
             ) : (
                 <div className="space-y-3.5">
-                    {shown.map(({ link, notes }) => {
+                    {shown.map(({ link, notes }, index) => {
                         const titleRtl = getDirection(link.title, link.language) === 'rtl';
                         const colorStyle = getCategoryColorStyle(link.category);
                         const thumb = link.metadata?.thumbnailUrl;
@@ -145,8 +154,10 @@ export default function NotesView({
                                 onClick={() => onOpenCard(link)}
                                 role="button"
                                 tabIndex={0}
+                                aria-label={`${link.title} — ${notes.length === 1 ? 'one note' : `${notes.length} notes`}`}
                                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCard(link); } }}
-                                className="group rounded-2xl border border-border-subtle bg-card overflow-hidden cursor-pointer hover:border-accent/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                                style={{ ['--enter-delay' as string]: `${Math.min(index, 12) * 14}ms` }}
+                                className="group animate-card-enter rounded-2xl border border-border-subtle bg-card overflow-hidden cursor-pointer transition-all duration-150 [@media(hover:hover)]:hover:border-accent/40 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                             >
                                 {/* Card header — the anchor the notes hang from. Mirrors
                                     per card language so Hebrew cards read right-to-left
@@ -166,7 +177,7 @@ export default function NotesView({
                                         />
                                     )}
                                     <div className="flex-1 min-w-0">
-                                        <h3 className={`line-clamp-2 font-semibold text-[15px] leading-snug text-text group-hover:text-accent transition-colors ${titleRtl ? 'font-hebrew' : ''}`}>
+                                        <h3 className={`line-clamp-2 font-semibold text-[15px] leading-snug text-text transition-colors [@media(hover:hover)]:group-hover:text-accent ${titleRtl ? 'font-hebrew' : ''}`}>
                                             {link.title}
                                         </h3>
                                         <div className="mt-1 flex items-center gap-1.5 min-w-0 text-[11px] text-text-muted" dir="ltr">
@@ -183,23 +194,19 @@ export default function NotesView({
                                 </div>
 
                                 {/* The notes — the content this view exists for. A tinted
-                                    panel visually bound to the header above it. */}
+                                    panel visually bound to the header above it; the text
+                                    speaks for itself, no per-row iconography. */}
                                 <div className="border-t border-border-subtle bg-accent/[0.05]">
                                     {notes.map((n, i) => {
                                         const noteRtl = getDirection(n.text) === 'rtl';
                                         return (
                                             <div key={n.id} dir={noteRtl ? 'rtl' : 'ltr'} className={`px-4 py-3 ${i > 0 ? 'border-t border-accent/10' : ''}`}>
-                                                <div className="flex gap-2.5">
-                                                    <StickyNote className="w-3.5 h-3.5 mt-[3px] shrink-0 text-accent/70" aria-hidden />
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className={`text-[14.5px] text-text whitespace-pre-wrap leading-relaxed ${noteRtl ? 'font-hebrew' : ''}`}>
-                                                            {n.text}
-                                                        </p>
-                                                        <span className="mt-1 block text-[11px] font-medium text-text-muted/60">
-                                                            {timeAgo(n.updatedAt ?? n.createdAt, now, noteRtl)}
-                                                        </span>
-                                                    </div>
-                                                </div>
+                                                <p className={`text-[15px] text-text whitespace-pre-wrap leading-relaxed ${noteRtl ? 'font-hebrew' : ''}`}>
+                                                    {n.text}
+                                                </p>
+                                                <span className="mt-1.5 block text-[11px] font-medium text-text-muted/60">
+                                                    {timeAgo(n.updatedAt ?? n.createdAt, now, noteRtl)}
+                                                </span>
                                             </div>
                                         );
                                     })}
