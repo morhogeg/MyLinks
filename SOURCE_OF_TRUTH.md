@@ -651,7 +651,29 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-21 (latest) — COLLECTIONS UX ROUND 4, from owner device QA on
+- **2026-07-21 (latest) — COLLECTIONS UX ROUND 5, from owner device QA on
+  build 1148.** Three fixes, all on the collection-detail / Manage-cards surface.
+  **(1)** the Manage cards list rendered a category-initial placeholder box
+  (colored "TE"/"PR"/"RE" square) for cards with no thumbnail — removed; a
+  thumbnail now shows ONLY when the card has a real one, else the title takes the
+  full row (same rule as the suggestion drawer). **(2)** removal was IMMEDIATE
+  (each toggle wrote to Firestore; the round-4 red card chip vanished a card on
+  tap) — owner wants "uncheck, then save". `ManageCollectionCardsSheet` is now a
+  STAGED editor: toggles mutate a local `pending` set only, the primary button
+  reads **Save** when dirty (else Done), and the diff (adds + removes) is
+  committed in one batch on ANY close (button / scrim / drag / Esc) so edits are
+  never lost. **(3)** REVERTED round-4's red `MinusCircle` remove chip on the
+  card face (the "weird red tag") — a card's collection chips are quiet accent
+  labels again; removing a card is now only the deliberate, staged Manage-cards
+  action, never an accidental tap. **Render-verify caught a would-be
+  collection-wiper:** the sheet is conditionally rendered already-open, so
+  seeding `pending` on a closed→open transition never fired → Save would have
+  removed every member; fixed by seeding via the `useState` initializer (correct
+  on mount). Verified light+dark (LTR+Hebrew) via the `/dev-collections` harness;
+  deleted. `tsc` + eslint clean. No functions changes. **Shipped:** _(pending —
+  see merge below)_.
+
+- **2026-07-21 — COLLECTIONS UX ROUND 4, from owner device QA on
   build 1147.** Two items on the collection detail view. **(1)** the hero
   "Manage cards" button was a filled-accent primary — demoted to the same
   secondary treatment as Share/⋯ (`ctrlIdle`) so the screen has no lone purple
