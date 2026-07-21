@@ -67,6 +67,9 @@ interface LinkDetailModalProps {
     excludeRelatedIds?: string[];  // cards already behind you in the back-stack
     onAddToCollection?: (link: Link) => void;
     onShare?: (link: Link) => void;
+    /** Open revealed at the My-notes section (set when entered from the
+        central My Notes view, so the user lands on what they came for). */
+    scrollToNotes?: boolean;
 }
 
 export default function LinkDetailModal({
@@ -92,6 +95,7 @@ export default function LinkDetailModal({
     excludeRelatedIds,
     onAddToCollection,
     onShare,
+    scrollToNotes,
 }: LinkDetailModalProps) {
     const [isReading, setIsReading] = useState(false);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
@@ -159,6 +163,20 @@ export default function LinkDetailModal({
     const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
     const noteEditorRef = useRef<HTMLDivElement>(null);
     const noteActionRef = useRef<'save' | 'cancel' | 'delete' | null>(null);
+    const notesSectionRef = useRef<HTMLDivElement>(null);
+
+    // Entered from the central My Notes view: reveal the notes section once the
+    // entrance animation has settled, so the user lands on what they tapped —
+    // their note — not the top of the card. Mount-only by design: navigating on
+    // to related cards resets to the normal top-anchored open.
+    useEffect(() => {
+        if (!scrollToNotes) return;
+        const t = setTimeout(() => {
+            notesSectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        }, 320);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Auto-grow the composer to fit its content (capped by CSS max-height, which
     // then scrolls) so the whole note is visible while writing — no inner
@@ -973,7 +991,7 @@ export default function LinkDetailModal({
                             appends another. One composer is open at a time. Kept
                             calm — a notes list, not a chat. */}
                         {onUpdateNotes && (
-                            <div className="mb-8 border-t border-border-subtle pt-6">
+                            <div ref={notesSectionRef} className="mb-8 border-t border-border-subtle pt-6 scroll-mt-4">
                                 <h3 className={`text-sm font-bold text-text-muted uppercase tracking-wider mb-3 flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
                                     <StickyNote className="w-4 h-4 text-accent" />
                                     {isRtl ? (notes.length > 1 ? 'ההערות שלי' : 'ההערה שלי') : (notes.length > 1 ? 'My notes' : 'My note')}
