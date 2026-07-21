@@ -651,7 +651,34 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-21 (latest) — COLLECTIONS UX ROUND 6, from owner device QA on
+- **2026-07-21 (latest) — X POSTS: READ EMBEDDED IMAGES INTO THE SUMMARY.**
+  Owner shared an X post whose image carried the substance; Machina summarized
+  the words only. Root cause: X/Twitter is scraped via fxtwitter/vxtwitter, which
+  DO return the post's photo URLs, but `_format_twitter_data` /
+  `_format_vxtwitter_data` (`scraper.py`) dropped them and passed only a
+  `[Contains N Image(s)]` placeholder to `analyze_text` — so the vision model
+  never saw images that arrive INSIDE a link. Fix: the twitter formatters now
+  surface photo URLs as `image_urls` (vxtwitter filters `media_extended` by
+  `type == 'image'` so we never run vision on a video/gif thumbnail; fxtwitter
+  reads `media.photos[].url`). `_analyze_scraped` (`main.py`) fetches up to
+  **2** of them via `_fetch_post_images` — routed through `scraper.safe_get` for
+  the SSRF guard, **8 MB** size cap, non-image content-types skipped — and runs a
+  new **single multimodal** call `GeminiService.analyze_text_with_images`
+  (`ai_service.py`) at `MEDIA_RESOLUTION_LOW` (cheap: ~250–300 tok/image) so text
+  + images produce ONE coherent card. Any fetch/vision failure falls back to the
+  existing text-only card — an image never breaks a save. Both the sync
+  `analyze_link` (attempts=2) and background `process_link_background` paths get
+  it for free (shared chokepoint). Scoped to X posts this round (NOT every `<img>`
+  on every scraped page — deliberately deferred). Tests: new
+  `tests/test_post_image_analysis.py` (7 passing) covers formatter URL extraction
+  + multimodal routing + text-only fallback; full suite 330 pass (4 pre-existing
+  `test_embed_trigger_backstop` failures are an env-only firebase-functions
+  version mismatch, unrelated). `py_compile` clean; no frontend changes.
+  **Shipped:** feature `329c1a6`, merge `6086fa1` → `main`; functions deploy run
+  **#13** (deploy-functions.yml, scoped `Deploy-Functions:
+  analyze_link,process_link_background`). No TestFlight/hosting (backend-only).
+
+- **2026-07-21 — COLLECTIONS UX ROUND 6, from owner device QA on
   build 1149.** One layout fix: in the collection ⋯ menu (`CollectionsGallery`
   `MenuRow`), the "Remove from Private" row wrapped to two lines and rendered
   centered — because `<button>` defaults to `text-align: center` and the other
