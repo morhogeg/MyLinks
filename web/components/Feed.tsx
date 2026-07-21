@@ -2526,6 +2526,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                     onCreate={(ids) => handleCreateSuggestion(previewSuggestion, ids)}
                     onDismiss={() => handleDismissSuggestion(previewSuggestion)}
                     onClose={() => setPreviewSuggestion(null)}
+                    onOpenCard={(id) => setActiveLinkId(id)}
+                    hidden={!!activeLinkId}
                 />
             )}
 

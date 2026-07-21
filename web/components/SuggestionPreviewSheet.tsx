@@ -19,6 +19,11 @@ interface SuggestionPreviewSheetProps {
     onCreate: (linkIds: string[]) => void;
     onDismiss: () => void;
     onClose: () => void;
+    /** Open a card in its full detail view (peek before deciding to keep it). */
+    onOpenCard: (linkId: string) => void;
+    /** Hide the sheet (kept state preserved) while a peeked card is open over it —
+     *  the detail modal sits at a lower z-index, so the sheet must step aside. */
+    hidden?: boolean;
 }
 
 /**
@@ -39,6 +44,8 @@ export default function SuggestionPreviewSheet({
     onCreate,
     onDismiss,
     onClose,
+    onOpenCard,
+    hidden = false,
 }: SuggestionPreviewSheetProps) {
     const vp = useVisualViewport();
     useScrollLock(true);
@@ -82,7 +89,7 @@ export default function SuggestionPreviewSheet({
 
     return (
         <div
-            className="fixed inset-x-0 z-[95] flex items-end sm:items-center justify-center animate-fade-in"
+            className={`fixed inset-x-0 z-[95] flex items-end sm:items-center justify-center animate-fade-in ${hidden ? 'hidden' : ''}`}
             style={{ top: vp.offsetTop || 0, height: vp.height || '100%', bottom: 'auto' }}
         >
             <div ref={scrimRef} className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
@@ -130,7 +137,18 @@ export default function SuggestionPreviewSheet({
                         const dir = getDirection(link.title, link.language);
                         const thumb = link.metadata?.thumbnailUrl;
                         return (
-                            <div key={link.id} className="group flex items-center gap-3 px-5 py-2.5">
+                            // The row opens the card so the user can read it in full
+                            // before deciding to keep it; the ✕ removes it (and stops
+                            // the tap from also opening it).
+                            <div
+                                key={link.id}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => onOpenCard(link.id)}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenCard(link.id); } }}
+                                aria-label={`Open ${link.title}`}
+                                className="group flex items-center gap-3 px-5 py-2.5 cursor-pointer transition-colors hover:bg-fill-subtle active:bg-fill-strong"
+                            >
                                 {/* Thumbnail only when the card actually has one — no
                                     generic placeholder box for text/social cards. */}
                                 {thumb && (
@@ -147,9 +165,9 @@ export default function SuggestionPreviewSheet({
                                     </div>
                                 </div>
                                 <button
-                                    onClick={() => remove(link.id)}
+                                    onClick={(e) => { e.stopPropagation(); remove(link.id); }}
                                     aria-label={`Remove ${link.title} from this suggestion`}
-                                    className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full text-text-muted hover:text-text hover:bg-fill-subtle active:bg-fill-strong transition-colors"
+                                    className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full text-text-muted hover:text-text hover:bg-card active:bg-fill-strong transition-colors"
                                 >
                                     <X className="w-4 h-4" />
                                 </button>
