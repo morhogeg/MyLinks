@@ -647,7 +647,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-21 (latest) — DIGEST UX ROUND 3, from owner device QA on build
+- **2026-07-21 (latest) — NEW `/polish <feature>` SKILL.** Codified the
+  digest-overhaul working method (.claude/skills/polish/SKILL.md) as a reusable
+  feature-agnostic loop: onboard → locate the feature's surfaces → review
+  through 8 fixed lenses (redundancy/info-value, hierarchy, shared-component
+  consistency, RTL/Hebrew mirroring, grouping/separation, touch & motion,
+  jargon leak, product questions) → propose ONE scoped round + approval gate →
+  build with theme tokens → MANDATORY light+dark render-verify via the
+  throwaway harness recipe → /ship → §9 documentation → iterate on owner
+  device QA. Docs/skill only — no deploys.
+
+- **2026-07-21 — DIGEST UX ROUND 3, from owner device QA on build
   1143.** (1) Digest card rows now mirror FULLY per card language (ListCard's
   pattern): `dir` on the row flips title alignment and the thumbnail side,
   meta line stays LTR internally but hugs the title's edge, `font-hebrew` on
