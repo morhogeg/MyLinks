@@ -682,9 +682,10 @@ exact-match, capped.
   for the QA loop:** deferred (flagged, not built) — the nav-bar-vs-hero name
   duplication in collection detail (wants an iOS collapsing large-title, its own
   round) and whether the detail hero keeps its `· N cards` (kept for now; would
-  drop for full consistency — owner's call). **Shipped:** _(pending — see merge
-  below)_. Backlog task 23 (M20 auto-collections) advanced: suggestions are now
-  previewable, not blind.
+  drop for full consistency — owner's call). **Shipped:** feature `7494bb7`,
+  merge `4a5ade4` → Vercel (auto); TestFlight run **#145 = build 1145**. Backlog
+  task 23 (M20 auto-collections) advanced: suggestions are now previewable, not
+  blind.
 
 - **2026-07-21 — NEW `/polish <feature>` SKILL.** Codified the
   digest-overhaul working method (.claude/skills/polish/SKILL.md) as a reusable
