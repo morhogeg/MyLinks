@@ -651,7 +651,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-21 (latest) — COLLECTIONS UX ROUND 2, from owner device QA on the
+- **2026-07-21 (latest) — COLLECTIONS UX ROUND 3, from owner device QA on
+  build 1146.** One QA item: in the suggestion preview drawer, a user should be
+  able to open a card in full before deciding whether to keep it. Each drawer row
+  is now tap-to-open (`role=button` + hover/active press state); the ✕ remove
+  button `stopPropagation`s so removing never also opens. Wiring reuses the app's
+  canonical `setActiveLinkId` (same as `Card`'s `openLinkDetails`). Stacking
+  gotcha handled: `LinkDetailModal` renders at **z-50** but the preview sheet is
+  **z-95**, so a peeked card would render BEHIND the sheet — new `hidden` prop on
+  `SuggestionPreviewSheet` sets the sheet to `display:none` while a card is open
+  (`hidden={!!activeLinkId}`), so the modal shows alone and the sheet returns with
+  its `kept` edit-state intact (component stays mounted — state preserved).
+  RENDER-VERIFIED light+dark at 390px via the throwaway `/dev-collections`
+  harness: row hover affordance, and a z-50 proxy confirming the sheet steps
+  aside when hidden; harness deleted. `tsc` + eslint clean. No functions changes.
+  **Shipped:** feature `cd59939`, merge `70c429d` → Vercel (auto); TestFlight run
+  **#147 = build 1147**.
+
+- **2026-07-21 — COLLECTIONS UX ROUND 2, from owner device QA on the
   round-1 web deploy.** Five QA items, all client-side: **(1)** the suggestion
   preview sheet dropped the generic grey placeholder thumbnail — a card's
   thumbnail renders ONLY when it actually has one (YouTube/articles keep theirs;
