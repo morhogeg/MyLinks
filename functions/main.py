@@ -540,12 +540,60 @@ def _append_capture_note(detailed: str, language: str) -> str:
     return f"{detailed}\n\n{note}" if detailed else note
 
 
+# Images embedded in a shared post (e.g. photos on an X post) that we fetch and
+# feed to vision alongside the text. Bounded so a single save can't balloon in
+# latency or cost: only the first few photos, only reasonably-sized ones.
+_MAX_POST_IMAGES = 2
+_MAX_POST_IMAGE_BYTES = 8 * 1024 * 1024  # 8 MB — skip anything larger
+_POST_IMAGE_FETCH_TIMEOUT = 10  # seconds per image (sync path has a 60s budget)
+
+
+def _fetch_post_images(image_urls: list) -> list:
+    """Download up to _MAX_POST_IMAGES post images as (bytes, mime_type) tuples.
+
+    Routed through scraper.safe_get for the same SSRF guard the image-ingest path
+    uses (per-redirect re-validation) — scraped URLs are externally-controlled and
+    must not be able to make us fetch an internal/metadata endpoint. Best-effort:
+    any URL that fails, is oversized, or isn't an image is skipped, so a flaky
+    media host degrades to a text-only card instead of failing the whole save.
+    """
+    if not image_urls:
+        return []
+    from scraper import safe_get
+
+    images = []
+    for raw_url in image_urls:
+        if len(images) >= _MAX_POST_IMAGES:
+            break
+        if not isinstance(raw_url, str) or not raw_url.startswith(("http://", "https://")):
+            continue
+        try:
+            resp = safe_get(raw_url, timeout=_POST_IMAGE_FETCH_TIMEOUT)
+            resp.raise_for_status()
+            content = resp.content
+            if not content or len(content) > _MAX_POST_IMAGE_BYTES:
+                logger.warning(f"Skipping post image (empty or > cap): {raw_url}")
+                continue
+            mime = (resp.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            if not mime.startswith("image/"):
+                mime = "image/jpeg"  # media CDNs sometimes omit/mislabel the type
+            images.append((content, mime))
+        except Exception as e:
+            logger.warning(f"Failed to fetch post image {raw_url}: {e}")
+            continue
+    return images
+
+
 def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = None):
     """Run the right analysis for scraped content.
 
     For YouTube, use Gemini native video ingestion; if that fails (private /
     unlisted / over-quota / region-blocked), fall back to an honest
     metadata-only text analysis rather than fabricating a summary.
+
+    When the scraped post carries embedded images (e.g. photos on an X post),
+    fetch them and run a single multimodal analysis so the card reflects what the
+    images show — falling back to text-only if the fetch or vision call fails.
 
     `attempts` threads the Gemini retry budget: the SYNCHRONOUS analyze_link path
     passes 2 (stay under the 60s function timeout), while the background pipeline
@@ -582,7 +630,25 @@ def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = Non
             analysis["videoDurationMinutes"] = max(1, (length_seconds + 59) // 60)
         return analysis
 
-    analysis = ai.analyze_text(scraped.get("text") or scraped.get("html", ""),
+    content_text = scraped.get("text") or scraped.get("html", "")
+
+    # If the post carries embedded photos, read them with vision in the SAME call
+    # as the text so the summary reflects both. Any failure (fetch or analysis)
+    # falls back to the text-only card — an image must never break a working save.
+    post_images = _fetch_post_images(scraped.get("image_urls"))
+    if post_images:
+        try:
+            analysis = ai.analyze_text_with_images(
+                content_text, post_images, existing_tags=existing_tags,
+                content_type=content_type, **kw)
+            if isinstance(analysis, dict) and scraped.get("truncated"):
+                analysis["detailedSummary"] = _append_capture_note(
+                    analysis.get("detailedSummary"), analysis.get("language"))
+            return analysis
+        except AnalysisError as e:
+            logger.warning(f"Multimodal post analysis failed, using text-only fallback: {e}")
+
+    analysis = ai.analyze_text(content_text,
                                existing_tags=existing_tags, content_type=content_type, **kw)
     # When the scraper could only get a truncated preview (Facebook text posts),
     # tell the user plainly rather than presenting a thin summary as complete.
