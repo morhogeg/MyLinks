@@ -651,7 +651,29 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-21 (latest) — X POSTS: READ EMBEDDED IMAGES INTO THE SUMMARY.**
+- **2026-07-21 (latest) — INSTAGRAM: READ THE COVER PHOTO INTO THE SUMMARY.**
+  Follow-up to the X-post image work (entry below), same owner session. Instagram
+  has no photo API here — `_scrape_instagram_url` (`scraper.py`) only read
+  `og:title` / `og:description` (a like/comment blurb + caption) and never the
+  image, so IG cards were text-only even though IG is image-first. Fix: extract
+  the post cover via new `_extract_og_image` (og:image / og:image:secure_url /
+  twitter:image, http(s)-only) in BOTH the direct-scrape and bridge paths
+  (bridges — ddinstagram/kkinstagram — proxy the real media there), and surface
+  it as `image_urls`. The existing `_analyze_scraped` multimodal path consumes it
+  with ZERO further change. **Gated to photo posts:** reels/IGTV expose only a
+  poster frame, so `_ig_url_is_video` (URL segment `/reel/`,`/tv/`) + an
+  `og:type=video` fallback signal skip them; images attach ONLY when real metadata
+  was extracted (the success return, never the login-wall early return — avoids
+  running vision on the IG logo). Same safety net: any fetch/vision failure →
+  text-only card. Tests: `tests/test_post_image_analysis.py` extended (+5, 12
+  total) — IG helper unit tests + full-scrape tests with mocked HTML (photo →
+  image, reel → none, login-wall → none). Full suite 342 pass (same 4 pre-existing
+  env-only `test_embed_trigger_backstop` failures). `py_compile` clean; no
+  frontend changes. **Shipped:** feature `523381b`, merge `6622e90` → `main`;
+  functions deploy run **#14** (scoped `Deploy-Functions:
+  analyze_link,process_link_background`). No TestFlight/hosting (backend-only).
+
+- **2026-07-21 — X POSTS: READ EMBEDDED IMAGES INTO THE SUMMARY.**
   Owner shared an X post whose image carried the substance; Machina summarized
   the words only. Root cause: X/Twitter is scraped via fxtwitter/vxtwitter, which
   DO return the post's photo URLs, but `_format_twitter_data` /
