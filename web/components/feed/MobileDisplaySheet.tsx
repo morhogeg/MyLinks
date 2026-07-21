@@ -90,6 +90,19 @@ export default function MobileDisplaySheet({
                             </button>
                         );
                     })}
+                    {/* My Notes — a first-class view alongside the layouts (device
+                        QA: the utility-row placement below was too buried). Routes
+                        through onOpenNotes so the full-library fetch fires. */}
+                    <button
+                        role="radio"
+                        aria-checked={viewMode === 'notes'}
+                        onClick={() => { onClose(); onOpenNotes(); }}
+                        className={`${row} ${viewMode === 'notes' ? 'bg-accent/10 text-text' : 'text-text-secondary hover:bg-card-hover'}`}
+                    >
+                        <span className={viewMode === 'notes' ? 'text-accent' : 'text-text-muted'}><StickyNote className="w-4 h-4" /></span>
+                        <span className="flex-1 font-medium">My notes</span>
+                        {viewMode === 'notes' && <Check className="w-[18px] h-[18px] text-accent" strokeWidth={2.6} />}
+                    </button>
                 </div>
 
                 <label className={sectionLabel}>Sort</label>
@@ -112,10 +125,6 @@ export default function MobileDisplaySheet({
                 </div>
 
                 <div className="h-px bg-border-subtle mb-2" />
-                <button onClick={() => { onClose(); onOpenNotes(); }} className={`${row} text-text-secondary hover:bg-card-hover`}>
-                    <StickyNote className="w-[18px] h-[18px] text-text-muted" />
-                    <span className="flex-1 font-medium">My notes</span>
-                </button>
                 <button onClick={() => { onClose(); onOpenFilters(); }} className={`${row} text-text-secondary hover:bg-card-hover`}>
                     <Filter className="w-[18px] h-[18px] text-text-muted" />
                     <span className="flex-1 font-medium">Filter…</span>

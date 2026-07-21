@@ -87,24 +87,30 @@ export function getNotesText(link: Link): string {
     return parts.join(' ');
 }
 
-/** One note paired with the card it was written on — the My Notes view's row. */
-export interface NoteWithCard {
-    note: UserNote;
+/** One card with ALL of its notes — the My Notes view's group unit. */
+export interface CardNotes {
     link: Link;
+    /** The card's notes, newest first (via `getNotes`). Never empty. */
+    notes: UserNote[];
+    /** createdAt of the newest note — orders the groups. */
+    newestAt: number;
 }
 
 /**
- * Every note across the library, newest first — the data behind the central
- * My Notes view. Flattens each card's notes (both storage shapes, via
- * `getNotes`) into {note, link} pairs so a row can render the note with its
- * card attached. Callers pass an already privacy/pending-filtered list.
+ * Every noted card across the library, grouped card-by-card and ordered by
+ * newest note first — the data behind the central My Notes view. A card with
+ * several notes yields ONE group carrying all of them, so the view never
+ * repeats the same card strip. Callers pass an already privacy/pending-
+ * filtered list.
  */
-export function getAllNotes(links: Link[]): NoteWithCard[] {
-    const rows: NoteWithCard[] = [];
+export function getNoteGroups(links: Link[]): CardNotes[] {
+    const groups: CardNotes[] = [];
     for (const link of links) {
-        for (const note of getNotes(link)) rows.push({ note, link });
+        const notes = getNotes(link);
+        if (notes.length === 0) continue;
+        groups.push({ link, notes, newestAt: notes[0].createdAt ?? 0 });
     }
-    return rows.sort((a, b) => (b.note.createdAt ?? 0) - (a.note.createdAt ?? 0));
+    return groups.sort((a, b) => b.newestAt - a.newestAt);
 }
 
 /** Build a brand-new note from composer text, stamped with `createdAt` now. */
