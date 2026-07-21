@@ -1129,6 +1129,12 @@ def _scrape_youtube_url(url: str, message_body: Optional[str] = None) -> dict:
     except Exception as e:
         logger.warning(f"YouTube oEmbed failed: {e}")
 
+    # Best-effort duration for the pre-analysis cost cap (main.py
+    # YOUTUBE_MAX_VIDEO_MINUTES). The watch page embeds lengthSeconds in its
+    # player config; cloud IPs sometimes get a consent/bot wall instead of the
+    # page, so a miss is expected and fine — the cap fails open without it.
+    length_seconds = _probe_youtube_duration(watch_url)
+
     # A caption shared alongside the link is useful context.
     shared_note = ""
     if message_body:
@@ -1153,6 +1159,31 @@ def _scrape_youtube_url(url: str, message_body: Optional[str] = None) -> dict:
             "watch_url": watch_url,
             "channel": channel,
             "thumbnail_url": thumbnail_url,
+            "length_seconds": length_seconds,
         },
     }
+
+
+def _probe_youtube_duration(watch_url: str) -> Optional[int]:
+    """Return the video length in seconds from the watch page, or None.
+
+    Reads ``"lengthSeconds":"<n>"`` out of the embedded player response. Never
+    raises: any fetch/parse failure returns None so callers treat duration as
+    unknown (livestreams also carry no usable lengthSeconds — "0" is treated
+    as unknown too).
+    """
+    try:
+        resp = safe_get(watch_url, headers={
+            "User-Agent": ("Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) "
+                           "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+                           "Version/16.6 Mobile/15E148 Safari/604.1"),
+            "Accept-Language": "en-US,en;q=0.9",
+        }, timeout=8)
+        if resp.ok:
+            m = re.search(r'"lengthSeconds"\s*:\s*"?(\d+)', resp.text)
+            if m:
+                return int(m.group(1)) or None
+    except Exception as e:
+        logger.warning(f"YouTube duration probe failed: {e}")
+    return None
 
