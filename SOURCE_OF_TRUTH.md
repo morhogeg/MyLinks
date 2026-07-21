@@ -665,7 +665,7 @@ exact-match, capped.
   RENDER-VERIFIED light+dark at 390px via the throwaway `/dev-collections`
   harness: row hover affordance, and a z-50 proxy confirming the sheet steps
   aside when hidden; harness deleted. `tsc` + eslint clean. No functions changes.
-  **Shipped:** feature `cd59939`, merge `70c429d` → Vercel (auto); TestFlight run
+  **Shipped:** feature `cd59939`, merge `8997f13` → Vercel (auto); TestFlight run
   **#147 = build 1147**.
 
 - **2026-07-21 — COLLECTIONS UX ROUND 2, from owner device QA on the
