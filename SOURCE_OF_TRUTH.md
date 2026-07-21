@@ -670,8 +670,9 @@ exact-match, capped.
   seeding `pending` on a closed→open transition never fired → Save would have
   removed every member; fixed by seeding via the `useState` initializer (correct
   on mount). Verified light+dark (LTR+Hebrew) via the `/dev-collections` harness;
-  deleted. `tsc` + eslint clean. No functions changes. **Shipped:** _(pending —
-  see merge below)_.
+  deleted. `tsc` + eslint clean. No functions changes. **Shipped:** feature
+  `8979ee2`, merge `cf304bc` → Vercel (auto); TestFlight run **#149 = build
+  1149**.
 
 - **2026-07-21 — COLLECTIONS UX ROUND 4, from owner device QA on
   build 1147.** Two items on the collection detail view. **(1)** the hero
