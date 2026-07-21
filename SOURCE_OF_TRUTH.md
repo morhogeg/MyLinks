@@ -647,7 +647,20 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-21 (latest) — DIGEST SCREENS UX ROUND (Apple-grade pass on list + detail).**
+- **2026-07-21 (latest) — DIGEST UX ROUND 2, from owner device QA on build
+  1141.** (1) List rows dropped the per-row topic preview — the topics are the
+  digest's CONFIG (identical on every row), not content; rows are now just
+  date + "5 cards". Product decision for a future multi-digest world: keep the
+  single chronological timeline and bring per-row identity back as the eyebrow
+  (digest name/kind, Podcasts-style) — note backend currently supports one
+  digest per period anyway (doc id = date). (2) Detail hero collapsed to one
+  line — big date + muted inline "· 5 cards" (collection-header idiom),
+  eyebrow line removed. (3) Card separation: hairline dividers replaced with
+  iOS inset-grouped rows (rounded-2xl border bg-card, gap-2, hover +
+  active:scale press state) — dividers weren't enough once rows carry
+  title + meta + 2-line summary. `tsc` + eslint clean. No functions changes.
+
+- **2026-07-21 — DIGEST SCREENS UX ROUND (Apple-grade pass on list + detail).**
   Root cause of the "Your Daily Brew on every card" complaint:
   `digest_service.py` stamps the SAME static title on every digest doc, so the
   list was a column of identical rows and the detail screen repeated the name.
