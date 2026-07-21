@@ -1,31 +1,33 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from '@/lib/types';
-import { Image as ImageIcon, Sparkles, X, Plus } from 'lucide-react';
+import { Sparkles, X, Plus } from 'lucide-react';
 import { CollectionSuggestion } from '@/lib/collectionSuggest';
 import SourceByline from '@/components/SourceByline';
 import { getDirection } from '@/lib/rtl';
 import { useScrollLock } from '@/lib/useScrollLock';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
-import { hapticMedium } from '@/lib/haptics';
+import { hapticMedium, hapticLight } from '@/lib/haptics';
 
 interface SuggestionPreviewSheetProps {
     suggestion: CollectionSuggestion;
     /** The suggestion's member cards, already resolved from the feed (order preserved). */
     members: Link[];
-    onCreate: () => void;
+    /** Adopt the suggestion, creating a collection from the cards the user KEPT. */
+    onCreate: (linkIds: string[]) => void;
     onDismiss: () => void;
     onClose: () => void;
 }
 
 /**
- * Preview a suggested collection before adopting it. The gallery tile only says
- * "12 cards ready to group" — this sheet answers "which 12?", so accepting or
- * permanently dismissing a suggestion is an informed choice rather than a blind
- * one. Read-only: it lists the member cards (thumbnail + title + shared byline)
- * exactly as the feed renders them, then offers Create (adopt) or Dismiss.
+ * Preview — and curate — a suggested collection before adopting it. The gallery
+ * tile only says "12 cards ready to group"; this sheet answers "which 12?" and
+ * lets the user drop the ones that don't belong, so Create adopts an edited set
+ * rather than a blind one. Each row is the card as the feed renders it
+ * (thumbnail only when the card actually has one + title + shared byline) with a
+ * remove (✕); Create saves whatever's left, Dismiss buries the topic.
  *
  * Structure mirrors AddToCollectionSheet — bottom sheet on mobile (drag handle,
  * flick-to-dismiss), centered modal on desktop — so the whole app's sheets share
@@ -44,6 +46,16 @@ export default function SuggestionPreviewSheet({
     const isMobile = useIsMobile();
     const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose, enabled: isMobile });
 
+    // Which member cards the user still wants. Starts as all of them; removing a
+    // row drops it here (client-only — nothing is written until Create). Reset
+    // when a different suggestion is opened into the same sheet instance.
+    const [kept, setKept] = useState<Set<string>>(() => new Set(members.map((m) => m.id)));
+    const [key, setKey] = useState(suggestion.key);
+    if (key !== suggestion.key) {
+        setKey(suggestion.key);
+        setKept(new Set(members.map((m) => m.id)));
+    }
+
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
         window.addEventListener('keydown', onKey);
@@ -51,10 +63,21 @@ export default function SuggestionPreviewSheet({
     }, [onClose]);
 
     const nameDir = getDirection(suggestion.name);
+    const shown = useMemo(() => members.filter((m) => kept.has(m.id)), [members, kept]);
+
+    const remove = (id: string) => {
+        hapticLight();
+        setKept((prev) => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+        });
+    };
 
     const handleCreate = () => {
+        if (shown.length === 0) return;
         hapticMedium();
-        onCreate();
+        onCreate(shown.map((m) => m.id));
     };
 
     return (
@@ -97,23 +120,24 @@ export default function SuggestionPreviewSheet({
                     </div>
                 </div>
 
-                {/* Member cards — exactly what adopting this suggestion would group. */}
+                {/* Member cards — curate the set before adopting. Removing the last
+                    card is disallowed (Create needs at least one). */}
                 <div className="flex-1 overflow-y-auto py-1">
                     <p className="px-5 pt-2 pb-1 text-[11px] font-semibold text-text-muted/70">
-                        {members.length} {members.length === 1 ? 'card' : 'cards'} in this suggestion
+                        {shown.length} {shown.length === 1 ? 'card' : 'cards'} · remove any that don’t fit
                     </p>
-                    {members.map((link) => {
+                    {shown.map((link) => {
                         const dir = getDirection(link.title, link.language);
                         const thumb = link.metadata?.thumbnailUrl;
                         return (
-                            <div key={link.id} className="flex items-center gap-3 px-5 py-2.5">
-                                <span className="shrink-0 w-14 h-14 rounded-xl overflow-hidden bg-fill-subtle flex items-center justify-center">
-                                    {thumb ? (
+                            <div key={link.id} className="group flex items-center gap-3 px-5 py-2.5">
+                                {/* Thumbnail only when the card actually has one — no
+                                    generic placeholder box for text/social cards. */}
+                                {thumb && (
+                                    <span className="shrink-0 w-14 h-14 rounded-xl overflow-hidden bg-fill-subtle">
                                         <img src={thumb} alt="" loading="lazy" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <ImageIcon className="w-5 h-5 text-text-muted/50" />
-                                    )}
-                                </span>
+                                    </span>
+                                )}
                                 <div className="flex-1 min-w-0" dir={dir}>
                                     <h3 className={`line-clamp-2 text-[14px] font-semibold leading-snug text-text ${dir === 'rtl' ? 'font-hebrew' : ''}`}>
                                         {link.title}
@@ -122,12 +146,19 @@ export default function SuggestionPreviewSheet({
                                         <SourceByline link={link} />
                                     </div>
                                 </div>
+                                <button
+                                    onClick={() => remove(link.id)}
+                                    aria-label={`Remove ${link.title} from this suggestion`}
+                                    className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full text-text-muted hover:text-text hover:bg-fill-subtle active:bg-fill-strong transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
                             </div>
                         );
                     })}
                 </div>
 
-                {/* Actions — adopt or dismiss the whole suggestion. */}
+                {/* Actions — adopt the kept cards or bury the topic. */}
                 <div className="border-t border-border-subtle p-3 flex items-center gap-2">
                     <button
                         onClick={onDismiss}
@@ -137,7 +168,8 @@ export default function SuggestionPreviewSheet({
                     </button>
                     <button
                         onClick={handleCreate}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 h-11 rounded-full bg-accent text-white text-sm font-bold hover:bg-accent-hover active:scale-[0.99] transition-all"
+                        disabled={shown.length === 0}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 h-11 rounded-full bg-accent text-white text-sm font-bold hover:bg-accent-hover active:scale-[0.99] transition-all disabled:opacity-40 disabled:pointer-events-none"
                     >
                         <Plus className="w-4 h-4" /> Create collection
                     </button>

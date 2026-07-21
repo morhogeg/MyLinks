@@ -978,14 +978,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
         [viewMode, visibleLinks, collections, suggestionTick]
     );
 
-    const handleCreateSuggestion = async (s: CollectionSuggestion) => {
-        if (!uid) return;
+    const handleCreateSuggestion = async (s: CollectionSuggestion, linkIds: string[] = s.linkIds) => {
+        if (!uid || linkIds.length === 0) return;
         setPreviewSuggestion(null);
         try {
             const id = await createCollection(uid, { name: s.name });
-            await addLinksToCollection(uid, s.linkIds, id);
-            track('collection_suggestion_accepted', { cards: s.linkIds.length });
-            toast.success(`Created “${s.name}” with ${s.linkIds.length} cards`);
+            await addLinksToCollection(uid, linkIds, id);
+            track('collection_suggestion_accepted', { cards: linkIds.length });
+            toast.success(`Created “${s.name}” with ${linkIds.length} ${linkIds.length === 1 ? 'card' : 'cards'}`);
+            // Land the user inside the collection they just made — the natural
+            // place to add more or fine-tune via Manage cards.
+            openCollection(id);
         } catch {
             toast.error("Couldn't create the collection. Please try again.");
         }
@@ -1304,7 +1307,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             onClick={() => setManageCardsCollection(openCol)}
                             className={`${ctrlBase} px-3.5 bg-accent text-white hover:bg-accent-hover active:scale-[0.98]`}
                         >
-                            <Plus className="w-4 h-4" /><span>Add cards</span>
+                            <LayoutGrid className="w-4 h-4" /><span>Manage cards</span>
                         </button>
                         {/* A private collection can't have a public page — no Share. */}
                         {!openCol.isPrivate && (
@@ -1954,8 +1957,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                                     title="Add or remove cards in this collection"
                                     className={`${ctrlBase} px-2.5 h-7 ${ctrlIdle} hover:text-accent hover:border-accent/40`}
                                 >
-                                    <Plus className="w-3.5 h-3.5" />
-                                    <span>Add cards</span>
+                                    <LayoutGrid className="w-3.5 h-3.5" />
+                                    <span>Manage cards</span>
                                 </button>
                                 <button
                                     onClick={() => handleShareCollection(col)}
@@ -2520,7 +2523,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                 <SuggestionPreviewSheet
                     suggestion={previewSuggestion}
                     members={previewSuggestionMembers}
-                    onCreate={() => handleCreateSuggestion(previewSuggestion)}
+                    onCreate={(ids) => handleCreateSuggestion(previewSuggestion, ids)}
                     onDismiss={() => handleDismissSuggestion(previewSuggestion)}
                     onClose={() => setPreviewSuggestion(null)}
                 />
