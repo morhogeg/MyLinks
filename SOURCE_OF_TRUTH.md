@@ -647,6 +647,29 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-21 (latest) — MY NOTES ROUND 4: surface contrast fix, first
+  VISUALLY-verified round (commit `d3bfcaf`, merge `ede230d`).** Owner device
+  QA on build 1140: light mode read faded, card↔notes and card↔card divisions
+  invisible on both themes. Root cause: NotesView groups lacked the canonical
+  card surface — no `surface-card` sheen, no `--shadow-card` — so they sat
+  flat on the page, and the notes area's 5%-accent full-bleed tint is
+  imperceptible on #fff and #121212 alike. Fix: groups now wear EXACTLY the
+  feed card treatment (`surface-card` + 20px radius + `--shadow-card`, hover
+  lift on hover-capable devices), and each note is the detail modal's bordered
+  accent panel (`bg-accent/[0.06] border-accent/15` rounded-xl blocks with
+  gaps) — the border does the separating, and "your note" now has ONE visual
+  language app-wide. Also: RTL card bylines right-align under their titles
+  (ListCard's `justify-end`). **Process note for future UI sessions:** this
+  round was verified by RENDERING before shipping — NotesView has no Firebase
+  imports, so a throwaway `/dev-notes` harness page (added to
+  `PUBLIC_ROUTES` locally, dummy `NEXT_PUBLIC_FIREBASE_*` env keys in
+  `web/.env.local` to survive module-eval, both deleted before commit) +
+  `playwright-core` against the preinstalled `/opt/pw-browsers/chromium`
+  captured light+dark screenshots in-session; the RTL byline bug was caught
+  and fixed from those. Don't ship visual work here blind again. `tsc` clean.
+  **Shipped:** Vercel (auto); TestFlight run/build stamped below. No functions
+  changes.
+
 - **2026-07-21 (latest) — DIGEST SCREENS UX ROUND (Apple-grade pass on list + detail).**
   Root cause of the "Your Daily Brew on every card" complaint:
   `digest_service.py` stamps the SAME static title on every digest doc, so the
