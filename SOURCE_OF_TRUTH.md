@@ -667,8 +667,8 @@ exact-match, capped.
   `playwright-core` against the preinstalled `/opt/pw-browsers/chromium`
   captured light+dark screenshots in-session; the RTL byline bug was caught
   and fixed from those. Don't ship visual work here blind again. `tsc` clean.
-  **Shipped:** Vercel (auto); TestFlight run/build stamped below. No functions
-  changes.
+  **Shipped:** pushed as `7be34ef` → Vercel (auto); TestFlight run
+  **#142 = build 1142**. No functions changes.
 
 - **2026-07-21 (latest) — DIGEST SCREENS UX ROUND (Apple-grade pass on list + detail).**
   Root cause of the "Your Daily Brew on every card" complaint:
