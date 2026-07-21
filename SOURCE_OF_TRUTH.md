@@ -658,7 +658,12 @@ exact-match, capped.
   eyebrow line removed. (3) Card separation: hairline dividers replaced with
   iOS inset-grouped rows (rounded-2xl border bg-card, gap-2, hover +
   active:scale press state) — dividers weren't enough once rows carry
-  title + meta + 2-line summary. `tsc` + eslint clean. No functions changes.
+  title + meta + 2-line summary. `tsc` + eslint clean, and RENDER-VERIFIED
+  light+dark in-session (throwaway `/dev-digest` playwright harness per the
+  My-Notes-round-4 process note). **Shipped:** feature `f7a61b2`, merge
+  `ad7d37c` (pushed as `3fbae6a`) → Vercel (auto); TestFlight run **#143 =
+  build 1143** (queued behind the parallel session's #142). No functions
+  changes.
 
 - **2026-07-21 — MY NOTES ROUND 4: surface contrast fix, first
   VISUALLY-verified round (commit `d3bfcaf`, merge `ede230d`).** Owner device
