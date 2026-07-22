@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { Link, LinkStatus, UserNote } from '@/lib/types';
 import { updateLinkStatus, updateLinkTags, updateLinkCategory, updateLinkTitle, updateLinkSummary, updateNoteText, updateLinkNotes, updateLinkReadStatus, retryFailedLink } from '@/lib/storage';
-import { publishCard, removeLinkFromCollection } from '@/lib/collections';
+import { newShareId, publishCard, removeLinkFromCollection } from '@/lib/collections';
 import { shareLink, shareUrlFor } from '@/lib/share';
 import { useToast } from '@/components/Toast';
 
@@ -130,19 +130,46 @@ export function useLinkActions(uid: string | null | undefined, toast: ReturnType
     }, [uid, toast]);
 
     // Share a single card as a public Machina page.
+    //
+    // The shareId is client-generated, so we know the public URL before the
+    // publish round-trip finishes. Open the OS share sheet IMMEDIATELY with that
+    // URL and let the Cloud Function publish run in parallel — otherwise the
+    // sheet waits several seconds on the (cold-startable) network write, and on
+    // mobile web the `await` would also consume the transient user-activation
+    // that navigator.share requires. By the time a recipient taps the link, the
+    // snapshot is live. If the background publish fails we surface a toast.
     const handleShareCard = useCallback(async (link: Link) => {
         if (!uid) return;
-        try {
-            const shareId = await publishCard(uid, link);
-            const outcome = await shareLink(
-                shareUrlFor(`/s?id=${shareId}`),
-                link.title,
-                'Saved on Machina'
+        const shareId = newShareId();
+        // Start the publish, but do NOT await it before opening the sheet.
+        const publishPromise = publishCard(uid, link, shareId);
+
+        const outcome = await shareLink(
+            shareUrlFor(`/s?id=${shareId}`),
+            link.title,
+            'Saved on Machina'
+        );
+
+        if (outcome === 'copied') {
+            // Clipboard path: no share sheet holds the link open, so confirm the
+            // snapshot actually landed before claiming the copied link works.
+            try {
+                await publishPromise;
+                toast.success('Share link copied to clipboard');
+            } catch {
+                toast.error("Couldn't create a share link. Please try again.");
+            }
+        } else if (outcome === 'shared') {
+            // Sheet opened instantly; the publish is racing the user. Warn only
+            // if it loses (otherwise the shared link would 404).
+            publishPromise.catch(() =>
+                toast.error("The share link may not work — please try sharing again.")
             );
-            if (outcome === 'copied') toast.success('Share link copied to clipboard');
-            else if (outcome === 'failed') toast.error("Couldn't create a share link. Please try again.");
-        } catch {
-            toast.error("Couldn't share this card. Please try again.");
+        } else {
+            // 'failed' (couldn't even copy) or 'cancelled': swallow the publish
+            // result so it never surfaces as an unhandled rejection.
+            publishPromise.catch(() => {});
+            if (outcome === 'failed') toast.error("Couldn't create a share link. Please try again.");
         }
     }, [uid, toast]);
 
