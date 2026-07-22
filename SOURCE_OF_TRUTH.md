@@ -727,9 +727,12 @@ exact-match, capped.
   fetch — the bytes are already in hand, so the only added cost is trivial
   Storage + egress (~cents/1000 cards). Frontend: `Card.tsx` renders the same
   short banner the YouTube thumb uses (non-video cards with a `thumbnailUrl`), and
-  `LinkDetailModal.tsx` shows it in the open card; because `metadata.thumbnailUrl`
-  is the generic thumbnail field, collection covers / notes / suggestion sheets
-  pick it up for free. Best-effort throughout — any fetch/decode/store failure
+  `LinkDetailModal.tsx` shows it in the open card; **review mode**
+  (`SwipeDeck.tsx` `CardFace`) shows the same full-bleed short banner; and because
+  `metadata.thumbnailUrl` is the generic thumbnail field, collection covers /
+  notes / suggestion sheets pick it up for free. Device-confirmed working in the
+  open card + review deck (owner screenshots). Best-effort throughout — any
+  fetch/decode/store failure
   degrades to the text-only card, never breaks a save. Reels/IGTV + video stay
   text-only (already gated out of vision). Added `Pillow==11.3.0` to
   `functions/requirements.txt` — the CI functions deploy installs it from
