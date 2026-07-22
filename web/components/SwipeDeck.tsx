@@ -524,6 +524,21 @@ const CardFace = memo(function CardFace({ link }: { link: Link }) {
 
     return (
         <div className="h-full w-full surface-card bg-card rounded-2xl border border-border-subtle shadow-[var(--shadow-card)] p-5 sm:p-6 flex flex-col overflow-hidden">
+            {/* Cover image (X/Instagram post, YouTube thumb): the same visual the
+                feed and open card show, full-bleed to the card edges. Short banner
+                so it never crowds out the gist below. */}
+            {link.metadata?.thumbnailUrl && (
+                <div className="-mx-5 -mt-5 sm:-mx-6 sm:-mt-6 mb-4 h-28 sm:h-32 shrink-0 relative bg-black/40 overflow-hidden">
+                    <img
+                        src={link.metadata.thumbnailUrl}
+                        alt=""
+                        loading="lazy"
+                        className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-card/40 to-transparent" />
+                </div>
+            )}
+
             {/* Header: category + source byline */}
             <div className="flex items-center justify-between gap-2 mb-4">
                 <span
