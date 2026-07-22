@@ -199,7 +199,7 @@ async function callShareApi(path: string, body: Record<string, unknown>): Promis
 }
 
 /** Generate an unguessable share id. */
-function newShareId(): string {
+export function newShareId(): string {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID().replace(/-/g, '');
     return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 }
@@ -251,9 +251,14 @@ export async function unpublishCollection(uid: string, collectionDoc: Collection
     });
 }
 
-/** Publish a single card as a public Machina page; returns the shareId. */
-export async function publishCard(uid: string, link: Link): Promise<string> {
-    const shareId = newShareId();
+/**
+ * Publish a single card as a public Machina page; returns the shareId.
+ *
+ * Accepts an optional pre-generated `shareId` so the caller can build the
+ * share URL and open the OS share sheet BEFORE this network write resolves
+ * (see handleShareCard) — the sheet no longer waits on the publish round-trip.
+ */
+export async function publishCard(uid: string, link: Link, shareId: string = newShareId()): Promise<string> {
     await callShareApi('/api/publish-share', {
         uid,
         type: 'card',

@@ -694,7 +694,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-22 (latest) — SHARE-PREVIEW MARKDOWN STRIP (owner-reported).** Owner
+- **2026-07-22 (latest) — INSTANT CARD SHARE SHEET (owner-reported latency).**
+  Owner: tapping share on a card took ~5s before the OS share sheet appeared,
+  while sharing a collection opens instantly. Root cause: `handleShareCard`
+  (`web/lib/useLinkActions.ts`) **awaited `publishCard()`** — a POST to the
+  publish-share Cloud Function (cold-startable) — BEFORE calling `shareLink()`,
+  so the sheet waited on the full round-trip. The collection flow feels instant
+  because `ShareCollectionSheet` renders its modal first and publishes on a
+  button tap. Fix: the shareId is a client-generated random string, so the
+  public `/s?id=` URL is known before the server responds. Made
+  `publishCard(uid, link, shareId?)` accept a pre-generated id (and exported
+  `newShareId`), then rewrote `handleShareCard` to **open the share sheet
+  immediately** and run the publish in parallel — awaiting it only on the
+  clipboard-fallback path (where no sheet holds the link open) and warning if the
+  background publish loses the race with the user on the native/web-share path.
+  Also fixes a latent mobile-web bug: the pre-share `await` could consume the
+  transient user-activation `navigator.share` requires. `tsc` clean.
+  Frontend-only → Vercel + iOS→TestFlight. **Shipped:** commit `6a6a182`.
+
+- **2026-07-22 — SHARE-PREVIEW MARKDOWN STRIP (owner-reported).** Owner
   (WhatsApp screenshot): the link-preview card for a shared `/s` page showed raw
   markdown — literal `**Claude Security**` / `**Claude Code**` — in its
   description. Root cause: `share_service._render_shared_card` /
