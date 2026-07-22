@@ -694,7 +694,37 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-22 (latest) — RELATED CARDS: PER-ITEM RTL (mixed-language lists).**
+- **2026-07-22 (latest) — ONBOARDING BATCH: 5 owner-reported fixes (My Notes,
+  view names, Settings/Insights cleanup, share).** All frontend-only, delivered
+  via 4 parallel scoped agents (disjoint files) then reviewed + verified together.
+  (1) **My Notes sort** — `lib/notes.ts` now orders both the notes within a card
+  and the cards themselves by `noteActivityAt = max(createdAt, updatedAt)` (new
+  exported helper), so a note *added OR edited* a minute ago bubbles its card to
+  the top (previously createdAt-only, so a freshly edited old note didn't
+  resurface). (2) **View option names** — `Feed.tsx` `viewModes`: `Cards/Card
+  view → Card`, `List view → List`, `Swipe to review → Review` (label + hint both
+  short now; "My notes" 4th option unchanged). (3) **Settings** — removed
+  *Advanced → Rebuild connections* row + its state/handler (`SettingsModal.tsx`,
+  `settings/MainView.tsx`); "Take the tour again" preserved; `lib/rebuildConnections.ts`
+  left in place (backend `rebuild_connections` callable untouched, just no UI
+  entry point now). (4) **Insights** — removed the *My notes* section from
+  `settings/StatsView.tsx` (facet nav for categories/tags/sources kept). (5)
+  **Share button (open card)** — the toolbar Share2 → `handleShareCard` path was
+  fully wired; hardened the last-resort clipboard fallback in `lib/share.ts` with
+  a legacy hidden-`<textarea>` + `execCommand('copy')` path so the button never
+  silently returns `'failed'` in the iOS WKWebView / non-secure contexts / after
+  transient user-activation is consumed by the publish `await` — it now at least
+  copies the link everywhere. **Known caveat:** if the true failure is
+  server-side (`publish_share_http` App-Check gate added in `772ac51`, or a
+  publish error) the toast is "Couldn't share this card" and this client change
+  won't mask it — collections share hits the same endpoint, so if only card
+  share is broken the endpoint is fine and the fallback covers it. `tsc --noEmit`
+  clean; no new eslint errors (2 pre-existing setState-in-effect errors in
+  SettingsModal/StatsView untouched). **Shipped:** commit `6fc947e`, merge
+  `e929f64` → `main` → Vercel (desktop web, auto) + iOS→TestFlight run **#156 =
+  build 1156**.
+
+- **2026-07-22 — RELATED CARDS: PER-ITEM RTL (mixed-language lists).**
   Follow-up to the related-card RTL fix below. That fix keyed direction off the
   PARENT card, so a Hebrew-titled related card inside an English card still
   rendered LTR (title pinned left). Now each related card takes its OWN direction
