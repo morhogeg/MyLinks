@@ -75,6 +75,40 @@ def _md_inline(text: str) -> str:
     return text
 
 
+def _md_to_plain(value, *, limit: int = 200) -> str:
+    """Strip markdown to clean plain text for meta descriptions.
+
+    OpenGraph/Twitter description tags are rendered as PLAIN TEXT by every
+    consumer (WhatsApp, iMessage, Slack, …) — markdown markers are never
+    styled there, so raw `**bold**` shows its literal asterisks in the share
+    preview. This flattens the same small grammar `_md_to_html` understands
+    (bold/italic/code, headings, list & quote markers, links) down to the
+    words alone, collapses whitespace to single spaces, and truncates to a
+    preview-friendly length. The on-page body still renders via `_md_to_html`.
+    """
+    if not value:
+        return ""
+    text = str(value).replace("\r\n", "\n").replace("\r", "\n")
+    # Unwrap links: [label](url) -> label
+    text = _MD_LINK_RE.sub(lambda m: m.group(1), text)
+    # Drop inline code backticks, keeping the code text.
+    text = _MD_CODE_RE.sub(lambda m: m.group(1), text)
+    # Strip bold/italic markers, keeping the emphasized text.
+    text = _MD_BOLD_RE.sub(lambda m: m.group(1) or m.group(2), text)
+    text = _MD_ITALIC_RE.sub(lambda m: m.group(1) or m.group(2), text)
+    # Strip line-leading block markers: headings (#), bullets (-,*,+),
+    # ordered-list numbers (1.), and blockquotes (>).
+    lines = [
+        re.sub(r"^\s*(?:#{1,6}\s+|[-*+]\s+|\d+[.)]\s+|>\s?)", "", ln).strip()
+        for ln in text.split("\n")
+    ]
+    plain = " ".join(ln for ln in lines if ln)
+    plain = re.sub(r"\s+", " ", plain).strip()
+    if len(plain) > limit:
+        plain = plain[: limit - 1].rstrip() + "…"
+    return plain
+
+
 def _md_to_html(value) -> str:
     """Convert stored markdown to safe HTML for the public share pages.
 
@@ -317,7 +351,8 @@ def _render_shared_card(card: dict, share_url: str) -> str:
       </div>
     </div>"""
     return _share_html_shell(
-        title=title, description=summary or detailed or "Shared from Machina",
+        title=title,
+        description=_md_to_plain(summary or detailed) or "Shared from Machina",
         image=image, url=share_url, body=body,
     )
 
@@ -388,7 +423,7 @@ def _render_shared_collection(data: dict, share_url: str) -> str:
       {items}{overflow}
       <div class="actions"><a class="btn btn-primary" href="{_esc(APP_URL)}">Open in Machina</a></div>
     </div>"""
-    og_desc = description or f"A curated collection of {count} card{'s' if count != 1 else ''} on Machina — summaries, sources, and links."
+    og_desc = _md_to_plain(description) or f"A curated collection of {count} card{'s' if count != 1 else ''} on Machina — summaries, sources, and links."
     return _share_html_shell(
         title=name, description=og_desc,
         image=image, url=share_url, body=body,
