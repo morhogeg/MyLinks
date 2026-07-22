@@ -11,7 +11,7 @@ import ReadingView from './ReadingView';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import TagInput from './TagInput';
-import { hasHebrew } from '@/lib/rtl';
+import { hasHebrew, getDominantDirection } from '@/lib/rtl';
 import { useEdgeSwipeBack } from '@/lib/useEdgeSwipeBack';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { getRelatedCards } from '@/lib/related';
@@ -1068,16 +1068,23 @@ export default function LinkDetailModal({
                                     {isRtl ? 'כרטיסים קשורים' : 'Related cards'}
                                 </h3>
                                 <div className="grid gap-3">
-                                    {relatedCards.map(({ link: rel, reason, strong }) => (
+                                    {relatedCards.map(({ link: rel, reason, strong }) => {
+                                        // Each related card takes its OWN direction from its title, not
+                                        // the parent card's — so a Hebrew title leads from the right even
+                                        // inside an English card (and vice versa). The reason line (in the
+                                        // parent's language) follows its card's title direction so each
+                                        // card reads as one coherent, single-direction unit.
+                                        const relRtl = getDominantDirection(rel.title, isRtl ? 'rtl' : 'ltr') === 'rtl';
+                                        return (
                                         <div
                                             key={rel.id}
                                             onClick={() => onOpenOtherLink?.(rel)}
                                             className="group p-3 rounded-xl bg-card-hover border border-border-subtle shadow-sm hover:border-accent/50 transition-all cursor-pointer"
                                         >
-                                            <div className={`flex justify-between items-start gap-3 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                                            <div className={`flex justify-between items-start gap-3 ${relRtl ? 'flex-row-reverse' : ''}`}>
                                                 <h4
-                                                    dir={isRtl ? "rtl" : "ltr"}
-                                                    className={`flex-1 min-w-0 font-medium text-text group-hover:text-accent transition-colors text-sm ${isRtl ? 'text-right' : ''}`}
+                                                    dir={relRtl ? "rtl" : "ltr"}
+                                                    className={`flex-1 min-w-0 font-medium text-text group-hover:text-accent transition-colors text-sm ${relRtl ? 'text-right' : ''}`}
                                                 >
                                                     {rel.title}
                                                 </h4>
@@ -1088,13 +1095,14 @@ export default function LinkDetailModal({
                                                 )}
                                             </div>
                                             <p
-                                                dir={isRtl ? "rtl" : "ltr"}
-                                                className={`text-xs text-text-muted mt-1.5 font-normal italic ${isRtl ? 'text-right' : ''}`}
+                                                dir={relRtl ? "rtl" : "ltr"}
+                                                className={`text-xs text-text-muted mt-1.5 font-normal italic ${relRtl ? 'text-right' : ''}`}
                                             >
                                                 {reason}
                                             </p>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
