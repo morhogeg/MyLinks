@@ -97,7 +97,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     private let linkPreview = UIView()            // faux page container
     private let faviconView = UIImageView()       // site favicon (or globe fallback)
     private let hostLabel = UILabel()             // the link's host
-    private let linkGlyph = UIImageView()         // link icon above the % counter
+    private let linkRing = SpinningRingView()     // spinning "working" ring above the % counter
     private var faviconTask: URLSessionDataTask?
 
     private var displayLink: CADisplayLink?
@@ -314,15 +314,14 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         checkLabel.translatesAutoresizingMaskIntoConstraints = false
         previewView.addSubview(checkLabel)
 
-        // Link icon, shown above the % counter in link mode (mirrors the web
-        // link loader). Hidden in image mode.
-        linkGlyph.image = UIImage(systemName: "link",
-                                  withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .semibold))
-        linkGlyph.tintColor = Self.accent
-        linkGlyph.contentMode = .center
-        linkGlyph.isHidden = true
-        linkGlyph.translatesAutoresizingMaskIntoConstraints = false
-        previewView.addSubview(linkGlyph)
+        // Working ring, shown above the % counter in link mode — the same
+        // spinning "working" mark used across Ask + the in-app save loader
+        // (web `.working-ring`). Replaces the old static link glyph. Hidden in
+        // image mode (the image itself is the visual there).
+        linkRing.ringColor = Self.accent
+        linkRing.isHidden = true
+        linkRing.translatesAutoresizingMaskIntoConstraints = false
+        previewView.addSubview(linkRing)
 
         // Phase label.
         phaseLabel.text = "Uploading…"
@@ -386,8 +385,10 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             checkLabel.centerXAnchor.constraint(equalTo: percentLabel.centerXAnchor),
             checkLabel.centerYAnchor.constraint(equalTo: percentLabel.centerYAnchor),
 
-            linkGlyph.centerXAnchor.constraint(equalTo: percentLabel.centerXAnchor),
-            linkGlyph.bottomAnchor.constraint(equalTo: percentLabel.topAnchor, constant: -2),
+            linkRing.centerXAnchor.constraint(equalTo: percentLabel.centerXAnchor),
+            linkRing.bottomAnchor.constraint(equalTo: percentLabel.topAnchor, constant: -6),
+            linkRing.widthAnchor.constraint(equalToConstant: 30),
+            linkRing.heightAnchor.constraint(equalToConstant: 30),
 
             phaseLabel.topAnchor.constraint(equalTo: percentLabel.bottomAnchor, constant: 4),
             phaseLabel.leadingAnchor.constraint(equalTo: previewView.leadingAnchor, constant: 12),
@@ -545,14 +546,16 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
 
     // MARK: - Progress animation (cosmetic, upload-anchored)
 
-    /// Phase label from progress — mirrors phaseFor() in the matching web loader
-    /// (LinkScanProgress.tsx for links, ImageScanProgress.tsx for images).
+    /// Phase label from progress. For links this MUST match the shared web phase
+    /// source (web/lib/scanPhases.ts → LINK_SCAN_STEPS, used by LinkScanProgress
+    /// and AnalyzingBanner) so the share sheet and the in-app loader never say
+    /// different things at the same %. Images mirror ImageScanProgress.tsx.
     private func phase(for p: CGFloat) -> String {
         if p >= 100 { return "Done!" }
         if isLinkFlow {
             if p >= 92 { return "Organizing & tagging…" }
-            if p >= 72 { return "Writing the summary…" }
-            if p >= 50 { return "Understanding the content…" }
+            if p >= 72 { return "Searching connections…" }
+            if p >= 50 { return "Writing the summary…" }
             if p >= 25 { return "Reading the page…" }
             return "Fetching the link…"
         }
@@ -601,7 +604,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             percentLabel.alpha = 0
             checkLabel.alpha = 1
             sweepView.isHidden = true
-            linkGlyph.alpha = 0
+            linkRing.alpha = 0
         }
         // Animate the bar width change smoothly.
         UIView.animate(withDuration: 0.2) { self.barTrack.layoutIfNeeded() }
@@ -617,7 +620,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             self.displayLink?.invalidate()
             self.displayLink = nil
             self.sweepView.isHidden = true
-            self.linkGlyph.alpha = 0
+            self.linkRing.alpha = 0
             self.percentLabel.alpha = 0
             self.checkLabel.alpha = 1
             self.barFill.backgroundColor = Self.successGreen
@@ -641,7 +644,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             self.clearPendingShareHint()
             if self.isImageFlow || self.isLinkFlow {
                 self.sweepView.isHidden = true
-                self.linkGlyph.alpha = 0
+                self.linkRing.alpha = 0
                 self.percentLabel.alpha = 0
                 self.checkLabel.alpha = 1
                 self.barFill.backgroundColor = Self.successGreen
@@ -689,7 +692,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                     self.sweepView.isHidden = true
                     self.percentLabel.alpha = 0
                     self.checkLabel.alpha = 0
-                    self.linkGlyph.alpha = 0
+                    self.linkRing.alpha = 0
                     self.phaseLabel.text = message
                     self.phaseLabel.textColor = .white
                     if neutral {
@@ -807,7 +810,8 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         imageView.isHidden = true
         linkPreview.isHidden = false
         dimView.backgroundColor = UIColor.black.withAlphaComponent(0.50)
-        linkGlyph.isHidden = false
+        linkRing.isHidden = false
+        linkRing.startSpinning()
         beginScanAnimation()
         view.setNeedsLayout()
         view.layoutIfNeeded()
@@ -1068,5 +1072,74 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         case "webp": return "image/webp"
         default: return "image/jpeg"
         }
+    }
+}
+
+/// The shared "working" ring, natively — a masked conic-gradient (transparent →
+/// accent) that spins, matching the web `.working-ring` used in Ask + the in-app
+/// save loader. A fixed ring-shaped mask sits on the view layer while the conic
+/// gradient rotates inside it, so the bright arc appears to sweep round the ring.
+final class SpinningRingView: UIView {
+    private let gradient = CAGradientLayer()
+    private let ringMask = CAShapeLayer()
+
+    /// The accent the arc fades up to. Defaults to purple; set by the caller.
+    var ringColor: UIColor = UIColor(red: 0xA8 / 255.0, green: 0x55 / 255.0, blue: 0xF7 / 255.0, alpha: 1) {
+        didSet { applyColors() }
+    }
+    /// Ring stroke thickness in points.
+    var thickness: CGFloat = 3 { didSet { setNeedsLayout() } }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        gradient.type = .conic
+        gradient.startPoint = CGPoint(x: 0.5, y: 0.5)  // conic center
+        gradient.endPoint = CGPoint(x: 0.5, y: 0.0)    // 0° points up
+        layer.addSublayer(gradient)
+
+        ringMask.fillColor = UIColor.clear.cgColor
+        ringMask.strokeColor = UIColor.white.cgColor   // opaque → visible band
+        ringMask.lineCap = .round
+        layer.mask = ringMask                          // fixed band; gradient spins inside
+        applyColors()
+    }
+
+    required init?(coder: NSCoder) { fatalError("SpinningRingView is code-only") }
+
+    private func applyColors() {
+        gradient.colors = [
+            ringColor.withAlphaComponent(0).cgColor,
+            ringColor.withAlphaComponent(0).cgColor,
+            ringColor.cgColor,
+        ]
+        gradient.locations = [0.0, 0.12, 1.0]          // matches conic(transparent 12%, accent)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // Disable implicit animations for the layout-driven frame/path updates.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        gradient.frame = bounds
+        let inset = thickness / 2
+        ringMask.frame = bounds
+        ringMask.lineWidth = thickness
+        ringMask.path = UIBezierPath(ovalIn: bounds.insetBy(dx: inset, dy: inset)).cgPath
+        CATransaction.commit()
+    }
+
+    func startSpinning() {
+        guard gradient.animation(forKey: "spin") == nil else { return }
+        let spin = CABasicAnimation(keyPath: "transform.rotation.z")
+        spin.fromValue = 0
+        spin.toValue = 2 * Double.pi
+        spin.duration = 0.85
+        spin.repeatCount = .infinity
+        spin.isRemovedOnCompletion = false
+        gradient.add(spin, forKey: "spin")
+    }
+
+    func stopSpinning() {
+        gradient.removeAnimation(forKey: "spin")
     }
 }
