@@ -694,7 +694,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-22 (latest) — THEME TOGGLE DECLUTTER (owner design nit).** Owner
+- **2026-07-22 (latest) — SHARE-PREVIEW MARKDOWN STRIP (owner-reported).** Owner
+  (WhatsApp screenshot): the link-preview card for a shared `/s` page showed raw
+  markdown — literal `**Claude Security**` / `**Claude Code**` — in its
+  description. Root cause: `share_service._render_shared_card` /
+  `_render_shared_collection` passed the **raw markdown** summary into the
+  `og:description` / `twitter:description` / `<meta description>` tags, and those
+  tags are plain text by spec (WhatsApp/iMessage/Slack never render markdown
+  there), so the asterisks showed literally. The on-page body was already fine
+  (renders via `_md_to_html`). Fix: added `_md_to_plain()` — flattens the same
+  small grammar (`**bold**`, `*italic*`, `` `code` ``, `#` headings, `-`/`1.`
+  list & `>` quote markers, `[label](url)`→`label`) to words only, collapses
+  whitespace, truncates to ~200 chars; applied it at both meta-description call
+  sites. RTL/Hebrew emphasis handled (reuses the existing `_MD_*` regexes).
+  `py_compile` clean + unit-tested the helper in isolation. Backend-only;
+  **deployed via `Deploy-Functions: share_page`**. NB: same network caveat as the
+  batch-2 entry below — this session's policy blocks outbound to the Firebase
+  domain, so the live crawler output couldn't be curled; verified by source +
+  helper unit test. **Shipped:** commit `f3e9af7`, merge → `main` → functions
+  deploy.
+
+- **2026-07-22 — THEME TOGGLE DECLUTTER (owner design nit).** Owner
   (device screenshot, build 1157 with Theme now first): the Theme switcher's grey
   track looked boxed-in and inset from the row edge. In `settings/primitives.tsx`
   `Segmented`, the `iconOnly` variant now drops the `bg-card-hover` track +
