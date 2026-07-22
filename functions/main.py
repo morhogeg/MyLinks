@@ -16,6 +16,7 @@ import os
 import re
 import json
 import hmac
+import hashlib
 import html as _html
 import logging
 import requests
@@ -254,6 +255,20 @@ def _authed_uid(req, headers: dict = None, body_uid: str = None):
     return None, _error_response("Authentication required", 401, headers)
 
 
+def _mask_uid(uid) -> str:
+    """A non-PII, log-safe tag for a uid.
+
+    The data-doc uid IS the user's E.164 phone number, so logging it in plaintext
+    (Cloud Logging) leaks PII. This returns a short, stable, non-reversible tag
+    (`uid#<8 hex>`) that still lets operators correlate a user's log lines within
+    a session without exposing the number.
+    """
+    if not uid:
+        return "uid#none"
+    digest = hashlib.sha256(str(uid).encode("utf-8")).hexdigest()[:8]
+    return f"uid#{digest}"
+
+
 def _require_admin(req, headers: dict = None):
     """Gate internal/admin/debug endpoints behind a shared ADMIN_TOKEN.
 
@@ -275,6 +290,13 @@ def _require_admin(req, headers: dict = None):
 MAX_URL_LENGTH = 2048
 MAX_QUESTION_LENGTH = 2000
 MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
+# Base64 inflates 3 bytes → 4 chars, so an inline image string this long already
+# exceeds MAX_IMAGE_BYTES once decoded. Checking the STRING length before
+# base64.b64decode rejects an oversized payload without first materializing the
+# full decoded buffer in memory (an attacker could otherwise force a ~24 MB
+# allocation up to Cloud Run's body limit before the post-decode size check).
+# The +1024 slack covers data-URI prefixes and base64 padding/whitespace.
+MAX_IMAGE_B64_CHARS = (MAX_IMAGE_BYTES * 4) // 3 + 1024
 
 
 # Per-bucket rate limits: (max_requests, window_seconds, fail_open). The analyze
@@ -308,6 +330,11 @@ _RATE_LIMITS = {
     # writes a client-built snapshot, so bound how fast one account can create/
     # overwrite them (on top of the serialized-size cap in publish_share_http).
     "publish": (30, 3600, False),
+    # Per-IP ceiling on publish/unpublish. The per-uid `publish` bucket alone is
+    # bypassable by a rotating client-supplied uid pre-cutover, so mirror the
+    # IP+uid double-bucket the paid endpoints use. Writes admin-SDK snapshots to
+    # a world-readable collection → fail CLOSED.
+    "publish-ip": (60, 3600, False),
     "device_token": (30, 3600, True),
     # Home search bar (native HTTP twin). Debounced client-side, but a user can
     # still fire many queries in a session, so keep the ceilings generous. Mirror
@@ -1820,6 +1847,10 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
         # Preferred path: the client sends the (already compressed) bytes inline,
         # so we skip the slow upload→re-download round trip entirely.
         if image_b64:
+            # Reject an oversized payload by its ENCODED length before decoding,
+            # so a hostile request can't force a large in-memory decode first.
+            if len(image_b64) > MAX_IMAGE_B64_CHARS:
+                return _error_response("Image is too large", 413, headers)
             try:
                 import base64
                 image_bytes = base64.b64decode(image_b64)
@@ -1865,7 +1896,8 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
             try:
                 import uuid
                 stored_url = _store_image(f"screenshots/{uid}/{uuid.uuid4().hex}.jpg", image_bytes, mime_type)
-                logger.info(f"Stored screenshot at {stored_url}")
+                # Don't log stored_url — the object path embeds the uid (phone #).
+                logger.info(f"Stored screenshot for {_mask_uid(uid)}")
             except Exception as e:
                 # Non-fatal: analysis still succeeds, card just won't show the image.
                 logger.error(f"Failed to store screenshot: {e}")
@@ -1993,6 +2025,10 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 # Tolerate a "data:image/jpeg;base64,...." data-URI prefix.
                 if ',' in image_b64 and image_b64.strip().startswith('data:'):
                     image_b64 = image_b64.split(',', 1)[1]
+                # Reject by encoded length before decoding (see MAX_IMAGE_B64_CHARS)
+                # so an oversized payload can't force a large decode first.
+                if len(image_b64) > MAX_IMAGE_B64_CHARS:
+                    return _error_response("Image is too large", 413, headers)
                 image_bytes = base64.b64decode(image_b64)
             except Exception:
                 return _error_response("Invalid image data", 400, headers)
@@ -2031,7 +2067,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 "status": "queued",
                 "attempts": 0,
             })
-            logger.info(f"Share ingest queued image for user {uid}")
+            logger.info(f"Share ingest queued image for {_mask_uid(uid)}")
             return https_fn.Response(
                 json.dumps({"success": True, "queued": True, "id": process_ref.id, "image": True}),
                 status=200, headers=headers, mimetype='application/json'
@@ -2062,7 +2098,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
                 link_data["needsEmbedding"] = True
                 card_ref = get_db().collection('users').document(uid).collection('links').document()
                 card_ref.set(link_data)
-                logger.info(f"Share ingest saved note for user {uid}")
+                logger.info(f"Share ingest saved note for {_mask_uid(uid)}")
                 return https_fn.Response(
                     json.dumps({"success": True, "saved": True, "id": card_ref.id, "note": True}),
                     status=200, headers=headers, mimetype='application/json'
@@ -2101,7 +2137,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
             source="web" if card_id else "share",
         ))
 
-        logger.info(f"Share ingest queued: {url} for user {uid}")
+        logger.info(f"Share ingest queued: {url} for {_mask_uid(uid)}")
         return https_fn.Response(
             json.dumps({"success": True, "queued": True, "id": process_ref.id, "url": url}),
             status=200, headers=headers, mimetype='application/json'
@@ -2503,6 +2539,15 @@ def publish_share_http(req: https_fn.Request) -> https_fn.Response:
     if req.method == 'OPTIONS':
         return _cors_preflight(req)
     headers = _cors_headers(req)
+    # Per-IP rate limit + App Check BEFORE any work — the publish surface writes
+    # admin-SDK snapshots to a world-readable collection, so gate it like the
+    # paid endpoints (the per-uid `publish` bucket below is bypassable by a
+    # rotating client-supplied uid pre-cutover).
+    rl = _rate_limited("publish-ip", client_ip(req), headers)
+    if rl:
+        return rl
+    if not _require_app_check(req, headers):
+        return _error_response("App Check verification failed", 401, headers)
     # Serialized-payload cap (report 3.4): reject an oversized client snapshot
     # before parsing/storing it. 413 with a plain message.
     raw = req.get_data(cache=True) or b""
@@ -2541,6 +2586,13 @@ def unpublish_share_http(req: https_fn.Request) -> https_fn.Response:
     if req.method == 'OPTIONS':
         return _cors_preflight(req)
     headers = _cors_headers(req)
+    # Per-IP rate limit + App Check (unpublish had neither) — same world-readable
+    # write surface as publish; gate it identically.
+    rl = _rate_limited("publish-ip", client_ip(req), headers)
+    if rl:
+        return rl
+    if not _require_app_check(req, headers):
+        return _error_response("App Check verification failed", 401, headers)
     try:
         data = req.get_json(silent=True) or {}
     except Exception:
@@ -3168,5 +3220,5 @@ def send_digest_now(req: https_fn.CallableRequest) -> dict:
         result = build_and_send_digest(uid, user_data, force=True)
         return result
     except Exception as e:
-        logger.error(f"send_digest_now failed for {uid}: {e}")
+        logger.error(f"send_digest_now failed for {_mask_uid(uid)}: {e}")
         raise https_fn.HttpsError(code=https_fn.FunctionsErrorCode.INTERNAL, message=str(e))
