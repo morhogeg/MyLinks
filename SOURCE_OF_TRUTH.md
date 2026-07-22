@@ -405,16 +405,15 @@ The multi-user auth work is **fully written but not live**:
     ~~Extension token-copy UI in Settings (F-2)~~ — **WON'T DO, owner call
     2026-07-12:** the Settings browser-extension section was removed entirely
     (the `/extension` page and the extension itself remain).
-19c. **[~] Digest feature reliability audit — CODE DONE 2026-07-22, DEPLOY
-    BLOCKED on an owner IAM grant (`digest_service.py`, merge `a4de4a7`).**
-    ⛔ **OWNER:** deploy run #16 went RED — `send_digests` (the scheduled fn)
-    can't reconcile its Cloud Scheduler job: the CI service account
-    (`FIREBASE_SERVICE_ACCOUNT`) lacks `cloudscheduler.jobs.update`. Grant it
-    `roles/cloudscheduler.admin` on `secondbrain-app-94da2` and redeploy (bump
-    `functions/.deploy-ping` with a `Deploy-Functions: send_digests` commit).
-    Until then the scheduled digest path runs the OLD build; the callable
-    `send_digest_now` + `force_send_digests` are already on the new code. Detail
-    in the 2026-07-22 §9 entry.
+19c. **[x] Digest feature reliability audit — DONE + LIVE 2026-07-22
+    (`digest_service.py`, merge `a4de4a7`).** Code + 6 tests shipped; all three
+    digest functions deployed green. The first deploy (run #16) went RED because
+    `send_digests` (the scheduled fn) couldn't reconcile its Cloud Scheduler job —
+    the CI service account lacked `cloudscheduler.jobs.update`; owner granted
+    `roles/cloudscheduler.admin` on `secondbrain-app-94da2` and the scoped
+    redeploy (`ae4c3cd`, run #18) went **green**. Detail in the 2026-07-22 §9
+    entry. (The scheduler IAM permission is now in place for all future scheduled-
+    function deploys.)
     Five fixes in the digest delivery path: (1) the weekly synthesis no longer
     reports `sent` (or stamps `lastDigestSentAt`) when its in-app write fails —
     `_write_inapp_synthesis` returns a bool the caller gates on, mirroring the
@@ -706,7 +705,10 @@ exact-match, capped.
   idempotency + force-bypass, local-day id); full backend suite **332 pass, 7
   skipped**. Backend-only ship — merge `a4de4a7` → `main`, functions deploy
   scoped `Deploy-Functions: send_digests,force_send_digests,send_digest_now`.
-  ⚠️ **DEPLOY PARTIAL — run #16 (29894044747) RED, needs an owner IAM grant.**
+  ✅ **DEPLOY GREEN (resolved) — run #18 (`ae4c3cd`) succeeded** after the owner
+  granted `roles/cloudscheduler.admin`; all three digest functions are live on
+  the new code. History of the blocker below:
+  ⚠️ **DEPLOY PARTIAL — run #16 (29894044747) RED, needed an owner IAM grant.**
   Function CODE updated ✔ for `send_digest_now` and `force_send_digests`, but
   `send_digests` failed at the **Cloud Scheduler reconcile** with `HTTP 403: the
   principal lacks IAM permission "cloudscheduler.jobs.update"` on
