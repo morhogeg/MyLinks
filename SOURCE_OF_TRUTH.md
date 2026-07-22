@@ -694,7 +694,20 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-22 (latest) — DIGEST FEATURE RELIABILITY AUDIT (backend).** Full
+- **2026-07-22 (latest) — RTL FIX: related-card title in the open-card modal.**
+  Owner flagged (desktop web screenshot) that a Hebrew related-card title didn't
+  read RTL. In `LinkDetailModal.tsx` the title/badge row used a plain
+  `flex justify-between`, so for RTL the title sat on the LEFT and the `strong`
+  badge on the RIGHT (mirrored), and the content-sized `<h4>` didn't hug the
+  card's right edge. Fix: `flex-row-reverse` when `isRtl` (matches the section
+  heading) + `flex-1 min-w-0` on the title and `shrink-0` on the badge → title
+  hugs the right, badge sits left; LTR unchanged. Layout-only (no color), so dark
+  mode is unaffected. Render-verified via a standalone Chromium screenshot (RTL
+  ±badge, LTR regression); `tsc` clean. Frontend-only. **Shipped:** fix `99dda5f`,
+  merge `110e0ac` → `main` → Vercel (desktop web, auto). TestFlight NOT triggered
+  (owner viewing on web; offer iOS build separately).
+
+- **2026-07-22 — DIGEST FEATURE RELIABILITY AUDIT (backend).** Full
   read + hardening pass on the digest/synthesis delivery path (`digest_service.py`),
   no client or schema changes. Five fixes (detail in §4 item 19c): (1) **synthesis
   no longer fakes success on a failed write** — `_write_inapp_synthesis` now
