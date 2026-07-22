@@ -709,7 +709,29 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-22 (latest) — UNIFIED "WORKING" RING + STEPPED SAVE PROGRESS (§4
+- **2026-07-22 (latest) — SOCIAL-POST COVER IMAGE ON THE CARD.** X/Instagram
+  photo posts now SHOW the cover image we already fetched for vision, not just
+  summarize it. Backend: `_analyze_scraped` stashes the first analyzed image on
+  `scraped['_post_thumbnail']`; a new `_apply_post_thumbnail` downscales it (new
+  `_downscale_thumbnail`, Pillow → 600px long edge, JPEG q80, alpha flattened to
+  white) and uploads via the existing `_store_image` to `post_thumbs/{uid}/…`,
+  writing the stable URL to `metadata.thumbnailUrl` — NOT the og:image, which is
+  signed/expiring and would rot to a broken image within days. Wired at both save
+  sites (sync `analyze_link`, background pipeline; keyed by `task_id` in the
+  background path so a retry is idempotent). No new model call and no new image
+  fetch — the bytes are already in hand, so the only added cost is trivial
+  Storage + egress (~cents/1000 cards). Frontend: `Card.tsx` renders the same
+  short banner the YouTube thumb uses (non-video cards with a `thumbnailUrl`), and
+  `LinkDetailModal.tsx` shows it in the open card; because `metadata.thumbnailUrl`
+  is the generic thumbnail field, collection covers / notes / suggestion sheets
+  pick it up for free. Best-effort throughout — any fetch/decode/store failure
+  degrades to the text-only card, never breaks a save. Reels/IGTV + video stay
+  text-only (already gated out of vision). Added `Pillow==11.3.0` to
+  `functions/requirements.txt` (needs the owner venv reinstall before the next
+  functions deploy). tsc + py_compile clean; 2 new routing/stash tests in
+  `test_post_image_analysis.py` pass. **Owner:** functions must redeploy for the
+  backend half to go live; web ships on push.
+- **2026-07-22 — UNIFIED "WORKING" RING + STEPPED SAVE PROGRESS (§4
   task 20).** Design iteration with the owner (started from Jakub Antalík's
   "Thinking Orbs") landed on ONE mark for "Machina is working": a small spinning
   gradient ring (`web/components/ui/WorkingRing.tsx` + `.working-ring` in

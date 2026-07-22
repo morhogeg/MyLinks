@@ -676,6 +676,10 @@ def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = Non
             if isinstance(analysis, dict) and scraped.get("truncated"):
                 analysis["detailedSummary"] = _append_capture_note(
                     analysis.get("detailedSummary"), analysis.get("language"))
+            # Keep the cover image we just read so the card can SHOW it, not just
+            # summarize it. The caller persists a downscaled copy (never the
+            # expiring social CDN URL). First image only — the card header is one.
+            scraped["_post_thumbnail"] = post_images[0]
             return analysis
         except AnalysisError as e:
             logger.warning(f"Multimodal post analysis failed, using text-only fallback: {e}")
@@ -718,6 +722,66 @@ def _store_image(blob_path: str, image_bytes: bytes, mime_type: str) -> str:
     blob.upload_from_string(image_bytes, content_type=mime_type)
     encoded = quote(blob_path, safe="")
     return f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/{encoded}?alt=media&token={token}"
+
+
+# A stored social-post thumbnail renders as a small card header, so a 600px long
+# edge at JPEG q80 is ample — and keeps stored/served bytes ~4-10x smaller than the
+# up-to-8MB source we already fetched for vision.
+_POST_THUMB_MAX_EDGE = 600
+_POST_THUMB_JPEG_QUALITY = 80
+
+
+def _downscale_thumbnail(image_bytes: bytes, mime_type: str) -> tuple:
+    """Downscale a post cover image to a small JPEG card thumbnail.
+
+    Returns (bytes, mime_type). Best-effort: on any decode/encode failure (or if
+    Pillow is unavailable) returns the ORIGINAL bytes/mime unchanged — a thumbnail
+    must never break a working save. Transparency is flattened onto white so PNGs
+    with alpha don't go black when re-encoded as JPEG.
+    """
+    try:
+        import io
+        from PIL import Image
+        img = Image.open(io.BytesIO(image_bytes))
+        img.thumbnail((_POST_THUMB_MAX_EDGE, _POST_THUMB_MAX_EDGE))
+        if img.mode in ("RGBA", "LA", "P"):
+            img = img.convert("RGBA")
+            bg = Image.new("RGB", img.size, (255, 255, 255))
+            bg.paste(img, mask=img.split()[-1])
+            img = bg
+        elif img.mode != "RGB":
+            img = img.convert("RGB")
+        out = io.BytesIO()
+        img.save(out, format="JPEG", quality=_POST_THUMB_JPEG_QUALITY, optimize=True)
+        return out.getvalue(), "image/jpeg"
+    except Exception as e:
+        logger.warning(f"Thumbnail downscale failed, storing original: {e}")
+        return image_bytes, mime_type
+
+
+def _apply_post_thumbnail(link_data: dict, scraped: dict, uid: str, key: str = None) -> None:
+    """Persist the social-post cover image we already fetched for vision and record
+    it as the card's `metadata.thumbnailUrl`, so X/Instagram cards SHOW the image
+    they were summarized from — not just the text.
+
+    The bytes come off `scraped['_post_thumbnail']` (stashed by `_analyze_scraped`
+    when multimodal analysis succeeded). We downscale and upload via `_store_image`
+    rather than hotlinking the og:image: social CDN URLs are signed/expiring and
+    would rot to broken images within days. Best-effort — any failure leaves the
+    card text-only rather than breaking the save; no new model call, and no new
+    image fetch (the bytes are already in hand).
+    """
+    thumb = scraped.pop("_post_thumbnail", None)
+    if not thumb or not uid:
+        return
+    try:
+        import uuid
+        image_bytes, mime = _downscale_thumbnail(thumb[0], thumb[1])
+        blob_key = key or uuid.uuid4().hex
+        url = _store_image(f"post_thumbs/{uid}/{blob_key}.jpg", image_bytes, mime)
+        link_data.setdefault("metadata", {})["thumbnailUrl"] = url
+    except Exception as e:
+        logger.warning(f"Failed to store post thumbnail: {e}")
 
 
 def _apply_youtube_metadata(link_data: dict, yt_meta: dict, analysis: dict, minutes: int):
@@ -1262,6 +1326,9 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
         # videos get the same rich metadata (channel, thumbnail, highlights).
         if is_youtube:
             _apply_youtube_metadata(link_data, yt_meta, analysis, estimated_time)
+        else:
+            # X/Instagram photo posts: show the cover image we read for vision.
+            _apply_post_thumbnail(link_data, scraped, uid)
 
         return https_fn.Response(
             json.dumps({"success": True, "link": link_data}),
@@ -2882,6 +2949,10 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # Add YouTube-specific metadata
         if is_youtube:
             _apply_youtube_metadata(link_data, yt_meta, analysis, estimated_time)
+        elif not is_image:
+            # X/Instagram photo posts: show the cover image we read for vision.
+            # task_id keys the blob so a retry reuses the same path (idempotent).
+            _apply_post_thumbnail(link_data, scraped, uid, task_id)
 
         # 5. Save to Firestore — flip the placeholder card to its ready state in
         # place (preserving its id) so it transitions processing → ready without
