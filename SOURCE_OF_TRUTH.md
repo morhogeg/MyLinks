@@ -694,7 +694,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-22 (latest) — ONBOARDING BATCH 2: share preview, Theme-first
+- **2026-07-22 (latest) — THEME TOGGLE DECLUTTER (owner design nit).** Owner
+  (device screenshot, build 1157 with Theme now first): the Theme switcher's grey
+  track looked boxed-in and inset from the row edge. In `settings/primitives.tsx`
+  `Segmented`, the `iconOnly` variant now drops the `bg-card-hover` track +
+  border + `p-1` padding and adds `-me-1`, so the three theme icons sit directly
+  on the white card with only the active accent pill, flush to the row edge. The
+  labeled variant (Digest → Frequency, Daily/Weekly) keeps its track — the branch
+  is purely on `iconOnly`. `tsc` clean. Frontend-only. **Shipped:** commit
+  `f687606`, merge `b598c24` → `main` → Vercel + iOS→TestFlight run **#158 =
+  build 1158**.
+
+- **2026-07-22 — ONBOARDING BATCH 2: share preview, Theme-first
   settings, LinkedIn source grouping (3 owner-reported).** (1) **Share preview
   on WhatsApp/iMessage** — the `/s` share page (`share_service._share_html_shell`)
   already emitted `og:title/description/image` (WhatsApp works off `og:image`,
