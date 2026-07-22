@@ -85,16 +85,45 @@ export async function shareLink(url: string, title?: string, text?: string): Pro
         }
     }
 
-    // Fallback: copy to clipboard.
+    // Fallback: copy to clipboard (robust — async Clipboard API with a legacy
+    // execCommand path for WKWebView / non-secure contexts / lost activation,
+    // where navigator.clipboard is unavailable or rejects).
+    return (await copyToClipboard(url)) ? 'copied' : 'failed';
+}
+
+/** Copy `text`, preferring the async Clipboard API and falling back to a
+    legacy hidden-textarea + execCommand('copy') — which still works inside the
+    iOS WKWebView and after transient user-activation has been consumed by an
+    await, where navigator.clipboard is often unavailable or rejects. */
+async function copyToClipboard(text: string): Promise<boolean> {
     try {
         if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-            await navigator.clipboard.writeText(url);
-            return 'copied';
+            await navigator.clipboard.writeText(text);
+            return true;
         }
     } catch {
-        // ignore
+        // fall through to the legacy path
     }
-    return 'failed';
+    if (typeof document === 'undefined') return false;
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '0';
+        ta.style.left = '0';
+        ta.style.width = '1px';
+        ta.style.height = '1px';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+    } catch {
+        return false;
+    }
 }
 
 function isAbort(e: unknown): boolean {

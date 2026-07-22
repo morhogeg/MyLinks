@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react';
 import { User } from '@/lib/types';
 import { X, RefreshCw, ChevronLeft } from 'lucide-react';
 import { readLocalAiConsent } from '@/lib/aiConsent';
-import { rebuildConnections } from '@/lib/rebuildConnections';
 import { useTheme } from './ThemeProvider';
 import { useAuth } from './AuthProvider';
 import { deleteAccount } from '@/lib/auth';
@@ -129,30 +128,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     useEffect(() => {
         if (isOpen) setAiConsentAt(readLocalAiConsent());
     }, [isOpen]);
-
-    // "Rebuild connections" — backfills the knowledge graph so older cards (saved
-    // before embeddings existed) get their "See also" relations.
-    const [rebuilding, setRebuilding] = useState(false);
-    const [rebuildLabel, setRebuildLabel] = useState<string | null>(null);
-    const handleRebuild = async () => {
-        if (!uid || rebuilding) return;
-        setRebuilding(true);
-        setRebuildLabel('Starting…');
-        try {
-            const result = await rebuildConnections(uid, (p) => {
-                setRebuildLabel(
-                    p.phase === 'embed'
-                        ? `Preparing ${p.processed} cards…`
-                        : `Linking cards… ${p.updated} connected`,
-                );
-            });
-            setRebuildLabel(`Done — ${result.updated} card${result.updated === 1 ? '' : 's'} reconnected.`);
-        } catch {
-            setRebuildLabel('Something went wrong — try again.');
-        } finally {
-            setRebuilding(false);
-        }
-    };
 
     // On phones Settings is a real full-screen page (slides in, fills the screen,
     // clears the notch); on desktop it stays a centered modal.
@@ -294,9 +269,6 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                                 privacyLockOn={hasPin}
                                 onChangePin={() => setPinModal('change')}
                                 onDisablePin={() => setPinModal('disable')}
-                                rebuilding={rebuilding}
-                                rebuildLabel={rebuildLabel}
-                                handleRebuild={handleRebuild}
                                 onReplayTour={onReplayTour}
                                 go={go}
                             />
