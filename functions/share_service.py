@@ -195,10 +195,14 @@ def _share_html_shell(*, title: str, description: str, image: str, url: str, bod
 <meta property="og:title" content="{t}">
 <meta property="og:description" content="{d}">
 <meta property="og:image" content="{img}">
+<meta property="og:image:secure_url" content="{img}">
+<meta property="og:image:alt" content="{t}">
 <meta property="og:url" content="{u}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{t}">
 <meta name="twitter:description" content="{d}">
+<meta name="twitter:image" content="{img}">
+<meta name="twitter:image:alt" content="{t}">
 <link rel="icon" href="{_esc(APP_URL)}/icon-192.png">
 <style>
   :root {{ color-scheme: dark; }}
