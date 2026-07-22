@@ -21,6 +21,7 @@ import ConfirmDialog from './ConfirmDialog';
 import ChatHistorySidebar from './ChatHistorySidebar';
 import MobileSubheader from './MobileSubheader';
 import { IconButton } from './ui/Button';
+import WorkingRing from './ui/WorkingRing';
 import { lockBodyScroll, unlockBodyScroll } from '@/lib/useScrollLock';
 
 /** A usable source name, or null for placeholders the backend stores. */
@@ -171,11 +172,9 @@ function ThinkingIndicator({ origin }: { origin: AskOrigin }) {
     return (
         <div className="flex justify-start">
             <div className="px-1 py-1 inline-flex items-center gap-2.5">
-                <span className="inline-flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce [animation-delay:-0.3s]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce [animation-delay:-0.15s]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-text-muted animate-bounce" />
-                </span>
+                {/* The shared "working" ring — same mark that rides the save steps,
+                    so "Machina is working" reads identically across the app. */}
+                <WorkingRing size={17} />
                 <span key={stage} className="text-[13px] text-text-muted animate-fade-in">{stages[stage]}</span>
             </div>
         </div>

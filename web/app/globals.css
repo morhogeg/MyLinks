@@ -325,6 +325,24 @@ html {
   animation: progress-indeterminate 1.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
+/* The one "working" mark — a spinning gradient ring shared by the Ask thinking
+   row, the active save step, and the persistent AnalyzingBanner. A masked conic
+   ring keeps it airy (thin outline, no filled disc); built from --accent so it
+   recolors in light/dark. Sized by the caller (width/height). */
+@keyframes working-ring-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.working-ring {
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg, transparent 12%, var(--accent));
+  -webkit-mask: radial-gradient(circle, transparent 54%, #000 56%);
+  mask: radial-gradient(circle, transparent 54%, #000 56%);
+  animation: working-ring-spin 0.85s linear infinite;
+}
+
 /* Scale-up: used by ConfirmDialog (was referenced but never defined). */
 @keyframes scale-up {
   from {
@@ -485,6 +503,7 @@ a {
   .animate-pulse-subtle,
   .animate-scan-sweep,
   .animate-progress-indeterminate,
+  .working-ring,
   .skeleton-shimmer::after {
     animation: none !important;
   }
