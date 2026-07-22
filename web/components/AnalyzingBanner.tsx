@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
+import WorkingRing from '@/components/ui/WorkingRing';
+import { linkScanLabel } from '@/lib/scanPhases';
 
 export interface AnalyzingState {
     active: boolean;
@@ -30,12 +32,8 @@ function phaseLabel(kind: AnalyzingState['kind'], pct: number): string {
         if (pct >= 40) return 'Understanding the video…';
         return 'Watching the video…';
     }
-    // link / web article
-    if (pct >= 92) return 'Organizing & tagging…';
-    if (pct >= 72) return 'Writing the summary…';
-    if (pct >= 50) return 'Understanding the content…';
-    if (pct >= 25) return 'Reading the page…';
-    return 'Fetching the link…';
+    // link / web article — mirror the in-dialog stepper exactly (shared source).
+    return linkScanLabel(pct) + '…';
 }
 
 /**
@@ -107,9 +105,9 @@ export default function AnalyzingBanner({ state }: { state: AnalyzingState | nul
             <div className="animate-slide-up pointer-events-auto w-full max-w-xs rounded-2xl bg-card/95 backdrop-blur-xl border border-border-subtle shadow-[var(--shadow-card)] px-3.5 py-2.5">
                 <div className="flex items-center gap-2.5">
                     {done ? (
-                        <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 animate-fade-in" />
+                        <CheckCircle2 className="w-4 h-4 text-accent shrink-0 animate-fade-in" />
                     ) : (
-                        <Loader2 className="w-4 h-4 text-accent shrink-0 animate-spin" />
+                        <WorkingRing size={16} className="shrink-0" />
                     )}
                     <span className="flex-1 text-[13px] font-medium text-text truncate">
                         {done ? 'Saved to Machina' : phaseLabel(shown.kind, pct)}
@@ -120,7 +118,7 @@ export default function AnalyzingBanner({ state }: { state: AnalyzingState | nul
                 </div>
                 <div className="mt-2 h-1 w-full rounded-full bg-fill-strong overflow-hidden">
                     <div
-                        className={`h-full rounded-full transition-[width] duration-300 ease-out ${done ? 'bg-green-500' : 'bg-accent'}`}
+                        className="h-full rounded-full bg-accent transition-[width] duration-300 ease-out"
                         style={{ width: `${pct}%` }}
                     />
                 </div>
