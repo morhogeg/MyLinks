@@ -77,10 +77,14 @@ export default function SourceFacetList({ facets, selected, onToggleKey, onToggl
     return (
         <div className="flex flex-col">
             {groups.map((g) => {
-                // A one-facet group is just that source — render it as a leaf, but
-                // keep the same structure + a chevron-width spacer so it lines up with
-                // the expandable rows instead of floating wider.
-                if (g.facets.length === 1) {
+                // A one-facet NON-platform group (a lone website / screenshot) is
+                // just that source — render it as a leaf, keeping the same structure
+                // + a chevron-width spacer so it lines up with the expandable rows.
+                // Platform groups (X, LinkedIn, Facebook, …) always render as the
+                // platform parent with its account(s) nested beneath, even for a
+                // single account, so LinkedIn reads as "LinkedIn ▸ <person>" like the
+                // other platforms rather than surfacing the bare account name.
+                if (g.facets.length === 1 && !g.id.startsWith('p:')) {
                     const f = g.facets[0];
                     const active = selected.has(f.key);
                     return (

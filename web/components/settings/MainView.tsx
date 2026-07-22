@@ -51,22 +51,7 @@ export function MainView({
                 </List>
             )}
 
-            <SectionHeader first={!authUid}>Your library</SectionHeader>
-            <List>
-                <NavRow tile={<BarChart3 className="w-[17px] h-[17px]" />} tileClass="bg-violet-500" title="Insights" onClick={() => go('stats')} />
-            </List>
-
-            <SectionHeader>Notifications</SectionHeader>
-            <List>
-                <RowShell tile={<Bell className="w-[17px] h-[17px]" />} tileClass="bg-accent">
-                    <RowText title="Push notifications" />
-                    <Toggle on={settings.push_enabled} onChange={togglePush} />
-                </RowShell>
-                <NavRow tile={<Clock className="w-[17px] h-[17px]" />} tileClass="bg-pink-500" title="Reminders & Digest" value={remindersOrDigest ? 'On' : 'Off'} onClick={() => go('resurfacing')} />
-            </List>
-            {pushNote && <p className="text-[12px] text-amber-500 leading-snug px-2 pt-1.5">{pushNote}</p>}
-
-            <SectionHeader>Appearance</SectionHeader>
+            <SectionHeader first={!authUid}>Appearance</SectionHeader>
             <List>
                 <RowShell>
                     <RowText title="Theme" />
@@ -82,6 +67,21 @@ export function MainView({
                     />
                 </RowShell>
             </List>
+
+            <SectionHeader>Your library</SectionHeader>
+            <List>
+                <NavRow tile={<BarChart3 className="w-[17px] h-[17px]" />} tileClass="bg-violet-500" title="Insights" onClick={() => go('stats')} />
+            </List>
+
+            <SectionHeader>Notifications</SectionHeader>
+            <List>
+                <RowShell tile={<Bell className="w-[17px] h-[17px]" />} tileClass="bg-accent">
+                    <RowText title="Push notifications" />
+                    <Toggle on={settings.push_enabled} onChange={togglePush} />
+                </RowShell>
+                <NavRow tile={<Clock className="w-[17px] h-[17px]" />} tileClass="bg-pink-500" title="Reminders & Digest" value={remindersOrDigest ? 'On' : 'Off'} onClick={() => go('resurfacing')} />
+            </List>
+            {pushNote && <p className="text-[12px] text-amber-500 leading-snug px-2 pt-1.5">{pushNote}</p>}
 
             {/* Private collections — only once a PIN exists (it's created the
                 first time a collection is marked Private, in the edit sheet). */}
