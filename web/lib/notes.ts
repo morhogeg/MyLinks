@@ -18,6 +18,13 @@ import { getTimestampNumber } from '@/lib/feedUtils';
  */
 export const LEGACY_NOTE_ID = 'legacy';
 
+/** The most recent moment a note was touched — created or edited. Orders
+    both the notes within a card and the cards within My Notes, so a note
+    added OR edited a minute ago bubbles its card to the top. */
+export function noteActivityAt(n: UserNote): number {
+    return Math.max(n.updatedAt ?? 0, n.createdAt ?? 0);
+}
+
 export function getNotes(link: Link): UserNote[] {
     const list: UserNote[] = [];
 
@@ -46,7 +53,7 @@ export function getNotes(link: Link): UserNote[] {
         });
     }
 
-    return list.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+    return list.sort((a, b) => noteActivityAt(b) - noteActivityAt(a));
 }
 
 /** True when the card carries any personal note (legacy or array). */
@@ -92,7 +99,7 @@ export interface CardNotes {
     link: Link;
     /** The card's notes, newest first (via `getNotes`). Never empty. */
     notes: UserNote[];
-    /** createdAt of the newest note — orders the groups. */
+    /** Most recent note activity (created or edited) — orders the groups. */
     newestAt: number;
 }
 
@@ -108,7 +115,7 @@ export function getNoteGroups(links: Link[]): CardNotes[] {
     for (const link of links) {
         const notes = getNotes(link);
         if (notes.length === 0) continue;
-        groups.push({ link, notes, newestAt: notes[0].createdAt ?? 0 });
+        groups.push({ link, notes, newestAt: noteActivityAt(notes[0]) });
     }
     return groups.sort((a, b) => b.newestAt - a.newestAt);
 }

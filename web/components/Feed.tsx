@@ -1113,9 +1113,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
     // View modes, in a single source of truth so the switcher stays in sync.
     // Layout views only — Ask is a distinct mode, surfaced as its own button.
     const viewModes: { key: typeof viewMode; label: string; icon: React.ReactNode; hint: string }[] = [
-        { key: 'grid', label: 'Cards', icon: <LayoutGrid className="w-4 h-4" />, hint: 'Card view' },
-        { key: 'list', label: 'List', icon: <List className="w-4 h-4" />, hint: 'List view' },
-        { key: 'review', label: 'Review', icon: <GalleryHorizontalEnd className="w-4 h-4" />, hint: 'Swipe to review' },
+        { key: 'grid', label: 'Card', icon: <LayoutGrid className="w-4 h-4" />, hint: 'Card' },
+        { key: 'list', label: 'List', icon: <List className="w-4 h-4" />, hint: 'List' },
+        { key: 'review', label: 'Review', icon: <GalleryHorizontalEnd className="w-4 h-4" />, hint: 'Review' },
     ];
     // The layout the Ask/Collections buttons return you to when you leave them.
     const lastLayout = useRef<'grid' | 'list' | 'review'>('grid');

@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, Sun, Moon, Monitor, RefreshCw, Clock, Compass, Network, Lock, BarChart3 } from 'lucide-react';
+import { Bell, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3 } from 'lucide-react';
 import { policyUrl, openExternal } from '@/lib/share';
 import ProfileAvatar from '../ProfileAvatar';
 import DataExport from './DataExport';
@@ -14,7 +14,7 @@ export function MainView({
     authUid, accountEmail, displayName, photoURL, providerLabel, settings, theme, setTheme,
     togglePush, pushNote, aiConsentAt,
     privacyLockOn, onChangePin, onDisablePin,
-    rebuilding, rebuildLabel, handleRebuild, onReplayTour, go,
+    onReplayTour, go,
 }: {
     authUid: string | null;
     accountEmail: string | null;
@@ -31,9 +31,6 @@ export function MainView({
     privacyLockOn: boolean | null;
     onChangePin: () => void;
     onDisablePin: () => void;
-    rebuilding: boolean;
-    rebuildLabel: string | null;
-    handleRebuild: () => void;
     onReplayTour?: () => void;
     go: (v: View) => void;
 }) {
@@ -115,22 +112,10 @@ export function MainView({
 
             <SectionHeader>Advanced</SectionHeader>
             <List>
-                <RowShell tile={<Network className="w-[16px] h-[16px]" />} tileClass="bg-indigo-500">
-                    <RowText title="Rebuild connections" />
-                    <button
-                        onClick={handleRebuild}
-                        disabled={rebuilding}
-                        className="ml-auto h-8 px-3 rounded-full bg-card-hover border border-border-subtle text-[13px] font-semibold text-text-secondary hover:text-text hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    >
-                        <RefreshCw className={`w-4 h-4 ${rebuilding ? 'animate-spin' : ''}`} />
-                        {rebuilding ? 'Rebuilding…' : 'Rebuild'}
-                    </button>
-                </RowShell>
                 {onReplayTour && (
                     <NavRow tile={<Compass className="w-[16px] h-[16px]" />} tileClass="bg-slate-500" title="Take the tour again" onClick={onReplayTour} />
                 )}
             </List>
-            <Footnote>{rebuildLabel ?? 'Recompute “See also” links across your whole library — useful for cards saved before connections existed.'}</Footnote>
         </>
     );
 }
