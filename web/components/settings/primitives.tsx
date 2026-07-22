@@ -138,7 +138,7 @@ export function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) 
 
 export function Segmented<T extends string>({ value, options, onChange, iconOnly = false, widthClass }: { value: T; options: { value: T; label: string; icon?: ReactNode }[]; onChange: (v: T) => void; iconOnly?: boolean; widthClass?: string }) {
     return (
-        <div className={`flex items-center gap-1 p-1 rounded-2xl bg-card-hover border border-border-subtle ml-auto ${iconOnly ? '' : (widthClass || 'w-full')}`}>
+        <div className={`flex items-center gap-1 ml-auto ${iconOnly ? '-me-1' : `p-1 rounded-2xl bg-card-hover border border-border-subtle ${widthClass || 'w-full'}`}`}>
             {options.map((o) => {
                 const active = o.value === value;
                 return (
