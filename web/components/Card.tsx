@@ -242,6 +242,19 @@ function Card({
                     )}
                 </div>
             )}
+            {/* Social-post cover (X / Instagram): the same image we read for the
+                summary, shown as a short banner. Non-video cards only. */}
+            {link.sourceType !== 'youtube' && link.metadata?.thumbnailUrl && (
+                <div className="relative w-full h-28 sm:h-32 bg-black/40 overflow-hidden">
+                    <img
+                        src={link.metadata.thumbnailUrl}
+                        alt=""
+                        loading="lazy"
+                        className="w-full h-full object-cover transition-transform duration-300 [@media(hover:hover)]:group-hover:scale-[1.03]"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                </div>
+            )}
             <div
                 className="p-4 sm:p-5 flex flex-col h-full space-y-3 sm:space-y-4"
                 dir={isRtl ? "rtl" : "ltr"}

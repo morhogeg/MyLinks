@@ -17,3 +17,7 @@ requests==2.34.2
 pydantic==2.13.4
 # flask>=3.0.0,<4.0
 flask==3.1.3
+# Pillow — downscale social-post cover images to small card thumbnails before
+# storing them (post thumbnails are the only image-processing use).
+# Pillow>=11.0.0,<12.0
+Pillow==11.3.0
