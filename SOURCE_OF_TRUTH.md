@@ -694,7 +694,35 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-22 (latest) — ONBOARDING BATCH: 5 owner-reported fixes (My Notes,
+- **2026-07-22 (latest) — ONBOARDING BATCH 2: share preview, Theme-first
+  settings, LinkedIn source grouping (3 owner-reported).** (1) **Share preview
+  on WhatsApp/iMessage** — the `/s` share page (`share_service._share_html_shell`)
+  already emitted `og:title/description/image` (WhatsApp works off `og:image`,
+  which uses the card thumbnail, icon fallback for imageless cards), but the
+  `summary_large_image` Twitter card had **no `twitter:image`**, so iMessage/
+  Twitter/Slack rendered no image. Added `twitter:image` + `twitter:image:alt`
+  and `og:image:secure_url` + `og:image:alt`. Backend-only; **deployed via
+  `Deploy-Functions: share_page`**. NB: outbound to the Firebase domain is
+  blocked by this session's network policy, so I could not curl the live page to
+  confirm crawler output — verified by source inspection + the rewrite chain
+  (`firebase.json` `/s`→`share_page`; iOS build `NEXT_PUBLIC_SHARE_BASE` = the
+  Firebase host). **Known follow-up:** imageless text cards still fall back to the
+  Machina icon (a small logo, not a card render) — a true "always a rich card
+  image" needs a server-side OG-image generator (deferred). (2) **Settings —
+  Theme first** (`settings/MainView.tsx`): moved the Appearance section above
+  "Your library"/Notifications; `first={!authUid}` now rides on Appearance so it
+  is the top section on native (no account row) and sits right under the profile
+  on web. (3) **Sources — LinkedIn grouping** (`SourceFacetList.tsx`): a
+  single-facet group used to collapse to a bare leaf, so a lone LinkedIn account
+  showed as the person's name ("Amirhartman") with no platform parent. Now
+  platform groups (`id` starts `p:`) ALWAYS render as an expandable platform
+  parent — LinkedIn/X/Facebook/etc. read as "LinkedIn ▸ <person>" even with one
+  account; Websites/Screenshots buckets keep the single-facet leaf collapse.
+  `tsc --noEmit` clean; `py_compile` clean. **Shipped:** commit `eba6ea5`, merge
+  `0a82ee1` → `main` → Vercel (desktop web) + Cloud-Functions run **#19**
+  (`share_page`) + iOS→TestFlight run **#157 = build 1157**.
+
+- **2026-07-22 — ONBOARDING BATCH: 5 owner-reported fixes (My Notes,
   view names, Settings/Insights cleanup, share).** All frontend-only, delivered
   via 4 parallel scoped agents (disjoint files) then reviewed + verified together.
   (1) **My Notes sort** — `lib/notes.ts` now orders both the notes within a card
