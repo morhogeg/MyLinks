@@ -732,10 +732,17 @@ exact-match, capped.
   pick it up for free. Best-effort throughout — any fetch/decode/store failure
   degrades to the text-only card, never breaks a save. Reels/IGTV + video stay
   text-only (already gated out of vision). Added `Pillow==11.3.0` to
-  `functions/requirements.txt` (needs the owner venv reinstall before the next
-  functions deploy). tsc + py_compile clean; 2 new routing/stash tests in
-  `test_post_image_analysis.py` pass. **Owner:** functions must redeploy for the
-  backend half to go live; web ships on push.
+  `functions/requirements.txt` — the CI functions deploy installs it from
+  requirements automatically (the venv-reinstall caveat only applies to the Mac
+  `./deploy-functions.sh` fallback). tsc + py_compile clean; 2 new routing/stash
+  tests in `test_post_image_analysis.py` pass. Feature commit `e4536ca`, merge
+  `f3d61b1`. **Shipped:** merged to `main` (`65cd83d`, integrating the parallel
+  share-extension ship), web live on Vercel; **Deploy Cloud Functions run #21**
+  (deployed "all" — the integration merge commit HEAD didn't carry the
+  `Deploy-Functions:` line, which is fine); **iOS→TestFlight run #162 → build
+  1162**. Only NEW saves of X/Instagram PHOTO posts get the image (no backfill of
+  existing cards). Not render-verified in a browser — reuses the proven YouTube
+  thumbnail markup; on-device QA of an X + IG card (light+dark) still worth a look.
 - **2026-07-22 — WORKING RING IN THE SHARE EXTENSION + PHASE RE-SYNC
   (§4 task 20 follow-up).** Brought the ring to the *native* iOS share-extension
   processing screen (`web/ios/App/ShareExt/ShareViewController.swift`). Owner's
