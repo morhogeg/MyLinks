@@ -405,7 +405,16 @@ The multi-user auth work is **fully written but not live**:
     ~~Extension token-copy UI in Settings (F-2)~~ — **WON'T DO, owner call
     2026-07-12:** the Settings browser-extension section was removed entirely
     (the `/extension` page and the extension itself remain).
-19c. **[x] Digest feature reliability audit — DONE 2026-07-22 (`digest_service.py`).**
+19c. **[~] Digest feature reliability audit — CODE DONE 2026-07-22, DEPLOY
+    BLOCKED on an owner IAM grant (`digest_service.py`, merge `a4de4a7`).**
+    ⛔ **OWNER:** deploy run #16 went RED — `send_digests` (the scheduled fn)
+    can't reconcile its Cloud Scheduler job: the CI service account
+    (`FIREBASE_SERVICE_ACCOUNT`) lacks `cloudscheduler.jobs.update`. Grant it
+    `roles/cloudscheduler.admin` on `secondbrain-app-94da2` and redeploy (bump
+    `functions/.deploy-ping` with a `Deploy-Functions: send_digests` commit).
+    Until then the scheduled digest path runs the OLD build; the callable
+    `send_digest_now` + `force_send_digests` are already on the new code. Detail
+    in the 2026-07-22 §9 entry.
     Five fixes in the digest delivery path: (1) the weekly synthesis no longer
     reports `sent` (or stamps `lastDigestSentAt`) when its in-app write fails —
     `_write_inapp_synthesis` returns a bool the caller gates on, mirroring the
@@ -695,8 +704,25 @@ exact-match, capped.
   stored mixed `number|string`; real fix = numeric sort field, deferred). Tests:
   +6 in `tests/test_digest_delivery.py` (write-failure reporting, weekly
   idempotency + force-bypass, local-day id); full backend suite **332 pass, 7
-  skipped**. Backend-only ship — functions deploy scoped
-  `Deploy-Functions: send_digests,force_send_digests,send_digest_now`.
+  skipped**. Backend-only ship — merge `a4de4a7` → `main`, functions deploy
+  scoped `Deploy-Functions: send_digests,force_send_digests,send_digest_now`.
+  ⚠️ **DEPLOY PARTIAL — run #16 (29894044747) RED, needs an owner IAM grant.**
+  Function CODE updated ✔ for `send_digest_now` and `force_send_digests`, but
+  `send_digests` failed at the **Cloud Scheduler reconcile** with `HTTP 403: the
+  principal lacks IAM permission "cloudscheduler.jobs.update"` on
+  `firebase-schedule-send_digests-us-central1`. `send_digests` is the only
+  *scheduled* function among the three, so prior CI deploys never exercised this
+  permission. The fix doesn't change the `every 15 minutes` schedule (the
+  reconcile is a no-op), but firebase-tools marks the whole function failed, so
+  **the new `send_digests` code is NOT confirmed live** — the scheduled digest
+  path still runs the pre-`a4de4a7` build until a green redeploy. ⛔ **OWNER
+  STEP:** grant the CI deploy service account (`FIREBASE_SERVICE_ACCOUNT`) the
+  role **`roles/cloudscheduler.admin`** (or a custom role with
+  `cloudscheduler.jobs.{get,update,create}`) on project `secondbrain-app-94da2`,
+  then redeploy — bump `functions/.deploy-ping` with a
+  `Deploy-Functions: send_digests` commit to `main`, or Actions → *Deploy Cloud
+  Functions* → Run workflow. The two callable/HTTP digest fns (preview + admin
+  sweep) are already on the new code.
 
 - **2026-07-21 — INSTAGRAM IMAGE-FIRST FIX (accuracy).** Owner QA on the
   IG cover-photo feature (entry below): an @idftweets post (a Hebrew text
