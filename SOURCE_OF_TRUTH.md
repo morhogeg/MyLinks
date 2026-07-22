@@ -449,6 +449,21 @@ The multi-user auth work is **fully written but not live**:
     cloud sandbox). The two real launch blockers remain owner config, not code:
     auth cutover (task 2) + `APPCHECK_ENFORCE=true` (task 5).
 
+20. **[x] Unified "working" indicator — shipped 2026-07-22 (commit `feb3529`,
+    merge `c61a446`).** One spinning gradient ring (`WorkingRing`, globals.css
+    `.working-ring`, built from `--accent`) now marks every "Machina is working"
+    moment: the Ask thinking row (was three bouncing dots), the active save phase,
+    and the persistent `AnalyzingBanner` (was a generic spinner). `LinkScanProgress`
+    rebuilt as an advancing phase checklist (ring on the active step, airy accent
+    check — no circle — on done, hollow dot pending). Phase labels moved to one
+    shared source (`web/lib/scanPhases.ts`) so the dialog + banner (+ share-sheet
+    captures feeding the banner) stay mirrored; merged the redundant
+    "Reading"/"Understanding" phases and added "Searching connections" (count-free:
+    a save won't always have related links). Banner's completed state recolored
+    green→accent. Frontend-only, tsc clean. **Deferred owner step:** on-device
+    light+dark QA of the ring/stepper (esp. WKWebView conic-gradient + CSS mask
+    rendering) — not yet device-verified this session.
+
 ### 🟢 P3 — product roadmap (post-launch)
 
 19b. **[ ] Retire dead search backend (post search-rebuild 2026-07-17):** the
@@ -694,7 +709,29 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-22 (latest) — INSTANT CARD SHARE SHEET (owner-reported latency).**
+- **2026-07-22 (latest) — UNIFIED "WORKING" RING + STEPPED SAVE PROGRESS (§4
+  task 20).** Design iteration with the owner (started from Jakub Antalík's
+  "Thinking Orbs") landed on ONE mark for "Machina is working": a small spinning
+  gradient ring (`web/components/ui/WorkingRing.tsx` + `.working-ring` in
+  globals.css, colored from `--accent`, airy masked conic — no filled disc). It
+  replaces (a) the three bouncing dots in Ask's `ThinkingIndicator`
+  (`AskBrain.tsx`, status copy unchanged), (b) the generic `Loader2` spinner in
+  `AnalyzingBanner.tsx`, and (c) drives the active step in a rebuilt
+  `LinkScanProgress.tsx` — now an advancing checklist (ring = active, bare accent
+  check = done, hollow dot = pending; no green, no filled circle). Phase labels
+  centralized in `web/lib/scanPhases.ts` (single source → the in-dialog stepper
+  and the banner/share-sheet mirror can't drift); merged the redundant
+  Reading/Understanding phases, added count-free "Searching connections". Banner
+  done-state recolored green→accent. Rejected along the way: 5 other orb variants
+  (Pulse/Morph/Swirl/Orbit/Aurora — Pulse reserved for a possible future
+  launch/empty-state hero), a filled-purple check, keeping a separate progress bar
+  in the dialog. No app-logo change (the ring inherits the logo gradient, doesn't
+  replace it). `tsc` clean; frontend-only → **Vercel (main `c61a446`) + iOS→TestFlight
+  build 1160 (run #160)**. **Deferred owner step:** on-device light+dark QA — the
+  ring uses a conic-gradient + CSS mask, worth eyeballing in WKWebView before
+  calling it done. Feature commit `feb3529`.
+
+- **2026-07-22 — INSTANT CARD SHARE SHEET (owner-reported latency).**
   Owner: tapping share on a card took ~5s before the OS share sheet appeared,
   while sharing a collection opens instantly. Root cause: `handleShareCard`
   (`web/lib/useLinkActions.ts`) **awaited `publishCard()`** — a POST to the
