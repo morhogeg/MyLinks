@@ -1074,15 +1074,15 @@ export default function LinkDetailModal({
                                             onClick={() => onOpenOtherLink?.(rel)}
                                             className="group p-3 rounded-xl bg-card-hover border border-border-subtle shadow-sm hover:border-accent/50 transition-all cursor-pointer"
                                         >
-                                            <div className="flex justify-between items-start gap-3">
+                                            <div className={`flex justify-between items-start gap-3 ${isRtl ? 'flex-row-reverse' : ''}`}>
                                                 <h4
                                                     dir={isRtl ? "rtl" : "ltr"}
-                                                    className={`font-medium text-text group-hover:text-accent transition-colors text-sm ${isRtl ? 'text-right' : ''}`}
+                                                    className={`flex-1 min-w-0 font-medium text-text group-hover:text-accent transition-colors text-sm ${isRtl ? 'text-right' : ''}`}
                                                 >
                                                     {rel.title}
                                                 </h4>
                                                 {strong && (
-                                                    <span className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-mono">
+                                                    <span className="shrink-0 text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded font-mono">
                                                         strong
                                                     </span>
                                                 )}
