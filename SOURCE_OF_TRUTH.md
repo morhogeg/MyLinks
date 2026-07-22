@@ -714,7 +714,20 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-22 (latest) — SOCIAL-POST COVER IMAGE ON THE CARD.** X/Instagram
+- **2026-07-22 (latest) — TOAST CHECK UNIFIED + SHORTER DURATIONS.** Owner: the
+  success-toast checkmark was a green circled `CheckCircle2`, out of step with the
+  app's other "done" marks. Swapped it for the same **bare accent `Check`**
+  (strokeWidth 3, `text-accent`, no circle) the save-step checklist uses — one
+  completion language everywhere (`web/components/Toast.tsx`; added an optional
+  per-variant `strokeWidth`). Also cut how long toasts linger: success/info
+  3500→2400ms, error 6000→4500ms. Frontend-only, tsc clean. Feature `877592c`,
+  merge `cca2253`. Pushed to `main` (Vercel). **Note:** this session's push merged
+  in a concurrent session's `main` work (social-post cover image, functions
+  image-analysis tests) via `fa4756a` — not mine. **Held off TestFlight** (no
+  explicit ship this turn + `main` carries another session's in-flight work — see
+  report; owner's call whether to build).
+
+- **2026-07-22 — SOCIAL-POST COVER IMAGE ON THE CARD.** X/Instagram
   photo posts now SHOW the cover image we already fetched for vision, not just
   summarize it. Backend: `_analyze_scraped` stashes the first analyzed image on
   `scraped['_post_thumbnail']`; a new `_apply_post_thumbnail` downscales it (new
