@@ -694,7 +694,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-22 (latest) — RTL FIX: related-card title in the open-card modal.**
+- **2026-07-22 (latest) — RELATED CARDS: PER-ITEM RTL (mixed-language lists).**
+  Follow-up to the related-card RTL fix below. That fix keyed direction off the
+  PARENT card, so a Hebrew-titled related card inside an English card still
+  rendered LTR (title pinned left). Now each related card takes its OWN direction
+  from its OWN title via `getDominantDirection(rel.title, parentDir)`
+  (`lib/rtl.ts`, already existed — majority strong-char count, ignores quoted/
+  bold spans; better than `dir="auto"`): a Hebrew title leads from the right, an
+  English title stays left, in the same list. The `strong` badge and the "why"
+  reason line follow each card's title direction so every card reads as one
+  coherent single-direction unit (`LinkDetailModal.tsx`, related-cards map).
+  Render-verified in Chromium both ways (EN parent + HE related title → HE leads
+  right; HE parent + EN related title → EN stays left); `tsc` clean. Frontend-only.
+  **Shipped:** fix `a99a651`, merge `2b77350` → `main` → Vercel (desktop web,
+  auto) + iOS→TestFlight run **#155 = build 1155** (card UI). Merged around a
+  concurrent session that also touched `LinkDetailModal.tsx` (one small conflict
+  in the related-row block, resolved to the per-item version).
+
+- **2026-07-22 — RTL FIX: related-card title in the open-card modal.**
   Owner flagged (desktop web screenshot) that a Hebrew related-card title didn't
   read RTL. In `LinkDetailModal.tsx` the title/badge row used a plain
   `flex justify-between`, so for RTL the title sat on the LEFT and the `strong`
