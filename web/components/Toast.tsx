@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { Check, AlertCircle, Info, X } from 'lucide-react';
 
 type ToastVariant = 'success' | 'error' | 'info';
 
@@ -59,26 +59,29 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     );
 }
 
-const VARIANTS: Record<ToastVariant, { icon: typeof Info; accent: string }> = {
-    success: { icon: CheckCircle2, accent: 'text-green-400' },
+// Success uses the SAME mark as the app's completed states — a bare accent
+// check (no circle), matching the save-step checkmarks — for one design language.
+const VARIANTS: Record<ToastVariant, { icon: typeof Info; accent: string; strokeWidth?: number }> = {
+    success: { icon: Check, accent: 'text-accent', strokeWidth: 3 },
     error: { icon: AlertCircle, accent: 'text-red-400' },
     info: { icon: Info, accent: 'text-accent' },
 };
 
 function Toast({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) {
-    // Errors linger a bit longer since they may need action.
-    const duration = item.variant === 'error' ? 6000 : 3500;
+    // Errors linger a bit longer since they may need action; everything else is
+    // brief — a confirmation shouldn't hang around after it's been read.
+    const duration = item.variant === 'error' ? 4500 : 2400;
 
     useEffect(() => {
         const timer = setTimeout(onDismiss, duration);
         return () => clearTimeout(timer);
     }, [duration, onDismiss]);
 
-    const { icon: Icon, accent } = VARIANTS[item.variant];
+    const { icon: Icon, accent, strokeWidth } = VARIANTS[item.variant];
 
     return (
         <div className="pointer-events-auto w-full flex items-start gap-3 bg-card border border-border-strong rounded-xl px-4 py-3 shadow-2xl backdrop-blur-lg animate-slide-up">
-            <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${accent}`} />
+            <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${accent}`} strokeWidth={strokeWidth} />
             <p className="flex-1 text-sm text-text leading-snug">{item.message}</p>
             <button
                 type="button"
