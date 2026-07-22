@@ -460,9 +460,14 @@ The multi-user auth work is **fully written but not live**:
     captures feeding the banner) stay mirrored; merged the redundant
     "Reading"/"Understanding" phases and added "Searching connections" (count-free:
     a save won't always have related links). Banner's completed state recolored
-    green→accent. Frontend-only, tsc clean. **Deferred owner step:** on-device
-    light+dark QA of the ring/stepper (esp. WKWebView conic-gradient + CSS mask
-    rendering) — not yet device-verified this session.
+    green→accent. Frontend-only, tsc clean. **Follow-up shipped same day
+    (`ac32efa`, merge `728c16e`, build 1161):** the native iOS share extension
+    (`ShareViewController.swift`) now uses the ring too (scanner kept, `linkGlyph`
+    → `SpinningRingView`) and its `phase(for:)` labels re-synced to `scanPhases`.
+    **Deferred owner step:** on-device light+dark QA of the ring everywhere — Ask,
+    the in-app save stepper (WKWebView conic-gradient + CSS mask), and the native
+    share-sheet scanner (CAGradientLayer `.conic`) — none device-verified this
+    session.
 
 ### 🟢 P3 — product roadmap (post-launch)
 
@@ -731,6 +736,23 @@ exact-match, capped.
   functions deploy). tsc + py_compile clean; 2 new routing/stash tests in
   `test_post_image_analysis.py` pass. **Owner:** functions must redeploy for the
   backend half to go live; web ships on push.
+- **2026-07-22 — WORKING RING IN THE SHARE EXTENSION + PHASE RE-SYNC
+  (§4 task 20 follow-up).** Brought the ring to the *native* iOS share-extension
+  processing screen (`web/ios/App/ShareExt/ShareViewController.swift`). Owner's
+  call: **keep the window scanner** (faux page, sweep line, big %, accent bar,
+  close hint) — only the static link glyph above the % becomes the spinning ring.
+  Added `SpinningRingView` (a fixed ring-shaped `CAShapeLayer` mask with an
+  accent `.conic` `CAGradientLayer` rotating inside — the UIKit twin of the web
+  `.working-ring`), replacing the `linkGlyph` `UIImageView` in the link flow only
+  (image flow unchanged — the image is its own visual). Also re-synced the link
+  `phase(for:)` labels to the shared web source (`scanPhases.ts`): merged
+  Reading/Understanding, added "Searching connections" — the extension had
+  drifted after the prior web ship. The progress CURVE (`ShareProgressCurve` ↔
+  `shareProgress.ts`) is untouched, so the share-sheet↔app % mirror is preserved.
+  Native-only → **iOS→TestFlight build 1161 (run #161)**; **not compilable in the
+  cloud session (no Xcode) — needs on-device QA of the ring in the scanner
+  (light+dark, WKWebView conic-gradient).** Feature commit `ac32efa`, merge `728c16e`.
+  (Prior ship's build 1160 uploaded green.)
 - **2026-07-22 — UNIFIED "WORKING" RING + STEPPED SAVE PROGRESS (§4
   task 20).** Design iteration with the owner (started from Jakub Antalík's
   "Thinking Orbs") landed on ONE mark for "Machina is working": a small spinning
