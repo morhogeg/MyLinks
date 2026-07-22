@@ -731,8 +731,11 @@ exact-match, capped.
   (`SwipeDeck.tsx` `CardFace`) shows the same full-bleed short banner; and because
   `metadata.thumbnailUrl` is the generic thumbnail field, collection covers /
   notes / suggestion sheets pick it up for free. Device-confirmed working in the
-  open card + review deck (owner screenshots). Best-effort throughout — any
-  fetch/decode/store failure
+  open card (build 1162); review-mode banner added after in `SwipeDeck.tsx`
+  (`CardFace`), merge `ce3fff9` → **iOS→TestFlight build 1163** (green). Note: the
+  review banner is `object-cover` at ~120px, so a tall portrait cover center-crops
+  — deliberate for a compact triage card; revisit if owner wants more of the image.
+  Best-effort throughout — any fetch/decode/store failure
   degrades to the text-only card, never breaks a save. Reels/IGTV + video stay
   text-only (already gated out of vision). Added `Pillow==11.3.0` to
   `functions/requirements.txt` — the CI functions deploy installs it from
