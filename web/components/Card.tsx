@@ -114,7 +114,26 @@ function Card({
     // capture is never invisible and never silently dropped. These are terminal
     // presentational states — the normal card body/actions don't apply.
     if (link.status === 'processing' || link.status === 'failed') {
-        const failed = link.status === 'failed';
+        // Client-side staleness fallback: the backend janitor flips a stuck
+        // `processing` card to `failed`, but if enqueue succeeded and the backend
+        // then never resolves (e.g. the reviewer is on a flaky network), the
+        // skeleton would otherwise persist until that sweep runs. Past a generous
+        // multiple of the 300s background budget we surface the same retry
+        // affordance the `failed` branch renders, so a capture is never a
+        // permanent "Saving…". Retry re-stamps processingStartedAt and re-runs.
+        const STALE_PROCESSING_MS = 8 * 60 * 1000;
+        const startedMs =
+            typeof link.processingStartedAt === 'number'
+                ? link.processingStartedAt
+                : typeof link.createdAt === 'number'
+                    ? link.createdAt
+                    : Date.parse(String(link.createdAt));
+        const staleProcessing =
+            link.status === 'processing' &&
+            now > 0 &&
+            startedMs > 0 &&
+            now - startedMs > STALE_PROCESSING_MS;
+        const failed = link.status === 'failed' || staleProcessing;
         const host = (() => {
             try { return new URL(link.url).hostname.replace(/^www\./, ''); }
             catch { return link.url; }

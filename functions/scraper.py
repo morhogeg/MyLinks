@@ -42,8 +42,13 @@ def validate_public_url(url: str) -> None:
 
     for family, _, _, _, sockaddr in addrinfos:
         ip = ipaddress.ip_address(sockaddr[0])
-        if (ip.is_private or ip.is_loopback or ip.is_link_local
-                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+        # Require a GLOBALLY-ROUTABLE address rather than enumerating a denylist
+        # of special ranges. `not ip.is_global` is strictly stronger: it also
+        # rejects shared address space (CGNAT 100.64.0.0/10, IPv6 equivalents)
+        # and any future special-purpose range the explicit flags below miss,
+        # while still catching private / loopback / link-local (metadata
+        # 169.254.169.254) / reserved / multicast / unspecified.
+        if not ip.is_global:
             raise UnsafeURLError(f"URL resolves to a non-public address: {ip}")
 
 

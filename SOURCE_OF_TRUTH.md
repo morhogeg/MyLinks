@@ -437,6 +437,18 @@ The multi-user auth work is **fully written but not live**:
     a clean `order_by("createdAt")` is unsafe because `createdAt` is stored mixed
     `number|string`, so the real fix is a normalized numeric sort field
     (backfill/migration), deferred until it bites.
+19d. **[x] Launch-readiness cutover-independent hardening — SHIPPED + MERGED
+    2026-07-22 (commit `772ac51`, merged to `main`).** From the App Store
+    launch-readiness audit: SSRF `is_global` tightening (+13 tests,
+    `tests/test_ssrf_guard.py`), `publish/unpublish_share_http` per-IP RL
+    (`publish-ip` bucket) + App Check, pre-b64-decode size caps on
+    `analyze_image`/`share_ingest` (`MAX_IMAGE_B64_CHARS`), PII (phone uid)
+    scrubbed from logs (`_mask_uid`), `NEXT_PUBLIC_POLICY_BASE` env for the
+    reviewer policy link, client-side processing-stuck retry fallback (Card).
+    **Still open:** [ ] connection-level IP-pin for the `safe_get` DNS-rebinding
+    TOCTOU — deferred (needs live-HTTPS integration testing; can't run in the
+    cloud sandbox). The two real launch blockers remain owner config, not code:
+    auth cutover (task 2) + `APPCHECK_ENFORCE=true` (task 5).
 
 ### 🟢 P3 — product roadmap (post-launch)
 
@@ -723,6 +735,41 @@ exact-match, capped.
   `Deploy-Functions: send_digests` commit to `main`, or Actions → *Deploy Cloud
   Functions* → Run workflow. The two callable/HTTP digest fns (preview + admin
   sweep) are already on the new code.
+
+- **2026-07-22 — APP STORE LAUNCH-READINESS AUDIT + cutover-independent
+  hardening (branch `claude/app-store-launch-readiness-o9gbfq`).** Ran an
+  Apple-grade pre-submission review (independent verification, not a doc
+  restatement): three parallel audits (iOS build/Xcode config, backend security,
+  web/WKWebView robustness) + the build gates. **Result: engineering is at bar;
+  launch gates on two CONFIG flips, code already written** — (1) `REQUIRE_AUTH=true`
+  + deploy `firestore.rules.locked` (live rules are still `allow read,write: if true`
+  → zero tenant isolation, doc key = enumerable phone #), and (2) `APPCHECK_ENFORCE=true`
+  (currently `_require_app_check` always returns True → no hard Gemini-cost
+  ceiling; **independent of the auth cutover**). No missing feature work blocks
+  submission. iOS config verified clean (signing/icon/privacy manifests/entitlements
+  all CI-tripwire-backstopped; `aps-environment=development` in source is safe —
+  CI hard-fails the exported IPA unless it remaps to `production`). Account
+  deletion, AI-consent-before-Gemini, and Sign-in-with-Apple all wired. **Shipped
+  this session (commit `772ac51`, cutover-independent Medium fixes):**
+  `scraper.validate_public_url` now requires `ip.is_global` (closes CGNAT
+  100.64/10 SSRF gap) +13 tests (`tests/test_ssrf_guard.py`); `publish_share_http`/
+  `unpublish_share_http` gained a per-IP rate bucket (`publish-ip`) + App Check
+  (unpublish had neither); `analyze_image`/`share_ingest` reject oversized inline
+  images by ENCODED length before b64decode (`MAX_IMAGE_B64_CHARS`); E.164 uid
+  scrubbed from Cloud Logging via `_mask_uid`; policy/terms base is env-driven
+  (`NEXT_PUBLIC_POLICY_BASE`) so the reviewer privacy link can't go dead; Card
+  shows a retry affordance when a `processing` card outlives the background budget
+  (no more permanent "Saving…"). Verify: web tsc clean, functions py_compile
+  clean, pytest **358 passed** (4 pre-existing env-only `test_embed_trigger_backstop`
+  failures). **DEFERRED (needs live-HTTPS integration testing unavailable in the
+  cloud sandbox — no egress): connection-level IP-pin for the DNS-rebinding TOCTOU
+  in `safe_get`** (the guard already re-validates every redirect hop with the now-
+  stronger `is_global` check; residual documented in the `safe_get` docstring).
+  **Owner steps unchanged and still gating launch:** the auth cutover (§4 task 2),
+  App Check enable (§4 task 5), key rotation (Gemini + ASC `.p8`), App Store
+  Connect data entry + demo account + screenshots (§4 tasks 8/9), on-device sweep
+  (§4 task 11). **Merged to `main` 2026-07-22** (functions deploy scoped to the
+  touched fns; web via Vercel; TestFlight build triggered).
 
 - **2026-07-21 — INSTAGRAM IMAGE-FIRST FIX (accuracy).** Owner QA on the
   IG cover-photo feature (entry below): an @idftweets post (a Hebrew text

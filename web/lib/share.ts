@@ -27,9 +27,17 @@ export function shareUrlFor(path: string): string {
  * Legal/policy pages (`/privacy`, `/terms`) are served by the Next.js app on
  * Vercel. On the web a relative path is the right link; inside the native
  * shell relative paths resolve against `capacitor://localhost`, so we point
- * at the public Vercel origin and open it externally instead.
+ * at the public web origin and open it externally instead.
+ *
+ * The origin is env-driven (`NEXT_PUBLIC_POLICY_BASE`) so App Review's
+ * privacy/terms link can be repointed to a stable custom domain without a code
+ * change — a hardcoded preview domain that later gets renamed would leave the
+ * in-app "Privacy Policy" link (the first thing a reviewer taps) opening a dead
+ * page, an instant rejection. Falls back to the current Vercel origin.
  */
-const POLICY_BASE = 'https://my-links-sable.vercel.app';
+const POLICY_BASE =
+    process.env.NEXT_PUBLIC_POLICY_BASE?.replace(/\/$/, '') ||
+    'https://my-links-sable.vercel.app';
 
 /** Href for a policy page: relative on the web, absolute (Vercel) on native. */
 export function policyUrl(path: string): string {
