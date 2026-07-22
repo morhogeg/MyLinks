@@ -189,6 +189,33 @@ def test_post_with_images_uses_multimodal(monkeypatch):
     assert result["summary"] == "from image+text"
 
 
+def test_multimodal_success_stashes_cover_for_the_card(monkeypatch):
+    """On a successful multimodal analysis, the cover image is kept on `scraped`
+    so the caller can persist it as the card thumbnail (show, not just summarize).
+    First image only — the card header is a single banner."""
+    monkeypatch.setattr(main, "_fetch_post_images",
+                        lambda urls: [(b"first", "image/jpeg"), (b"second", "image/png")])
+    ai = _FakeAI()
+    scraped = {"text": "tweet body", "image_urls": ["https://x/a.jpg", "https://x/b.jpg"]}
+
+    main._analyze_scraped(ai, scraped, existing_tags=[], attempts=2)
+
+    assert scraped.get("_post_thumbnail") == (b"first", "image/jpeg")
+
+
+def test_multimodal_failure_leaves_no_cover(monkeypatch):
+    """If vision fails and we fall back to text, no thumbnail is stashed — a broken
+    analysis must not leave a dangling image to persist."""
+    monkeypatch.setattr(main, "_fetch_post_images",
+                        lambda urls: [(b"jpgbytes", "image/jpeg")])
+    ai = _FakeAI(image_should_fail=True)
+    scraped = {"text": "tweet body", "image_urls": ["https://x/a.jpg"]}
+
+    main._analyze_scraped(ai, scraped, existing_tags=[], attempts=2)
+
+    assert "_post_thumbnail" not in scraped
+
+
 def test_multimodal_failure_falls_back_to_text(monkeypatch):
     monkeypatch.setattr(main, "_fetch_post_images",
                         lambda urls: [(b"jpgbytes", "image/jpeg")] if urls else [])

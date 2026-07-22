@@ -620,6 +620,19 @@ export default function LinkDetailModal({
                         )
                     )}
 
+                    {/* Social-post cover (X / Instagram): the image we read for the
+                        summary. Non-video, non-screenshot cards only — the youtube
+                        and image blocks own their own rendering above/below. */}
+                    {link.sourceType !== 'youtube' && link.sourceType !== 'image' && link.metadata?.thumbnailUrl && (
+                        <div className="mb-6 rounded-2xl overflow-hidden border border-border-subtle bg-black/40">
+                            <img
+                                src={link.metadata.thumbnailUrl}
+                                alt=""
+                                className="w-full h-auto max-h-[400px] object-contain"
+                            />
+                        </div>
+                    )}
+
                     {/* YouTube: thumbnail (the inline player trips a YouTube "error
                         153" in the WebView) + clickable key moments that deep-link
                         into the video on YouTube. */}
