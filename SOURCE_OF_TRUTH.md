@@ -704,8 +704,9 @@ exact-match, capped.
   hugs the right, badge sits left; LTR unchanged. Layout-only (no color), so dark
   mode is unaffected. Render-verified via a standalone Chromium screenshot (RTL
   ±badge, LTR regression); `tsc` clean. Frontend-only. **Shipped:** fix `99dda5f`,
-  merge `110e0ac` → `main` → Vercel (desktop web, auto). TestFlight NOT triggered
-  (owner viewing on web; offer iOS build separately).
+  merge `110e0ac` → `main` → Vercel (desktop web, auto); iOS→TestFlight run **#154
+  = build 1154** (card UI change). NOTE for future sessions: **ship ALWAYS
+  includes TestFlight** for any frontend/native change — don't ask, just trigger.
 
 - **2026-07-22 — DIGEST FEATURE RELIABILITY AUDIT (backend).** Full
   read + hardening pass on the digest/synthesis delivery path (`digest_service.py`),
