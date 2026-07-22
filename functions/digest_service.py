@@ -116,7 +116,16 @@ def _normalize_channels(stored) -> List[str]:
 # ─────────────────────────────────────────────────────────────────────────
 
 def fetch_candidate_links(uid: str) -> List[dict]:
-    """Load the user's links (excluding archived) as plain dicts with `id`."""
+    """Load the user's links (excluding archived) as plain dicts with `id`.
+
+    KNOWN LIMIT: the fetch is bounded by CANDIDATE_LIMIT but NOT ordered, so a
+    user past that many saves gets an arbitrary (doc-id-ordered) slice — which
+    can thin out rediscover/synthesis quality. A server-side order_by("createdAt")
+    is unsafe here: createdAt is stored mixed number|string across docs (see
+    web/lib/types.ts), and Firestore sorts across types, so it would corrupt the
+    order. A correct fix needs a normalized numeric sort field (a backfill/
+    migration) — tracked in SOURCE_OF_TRUTH §4, deferred until it actually bites.
+    """
     db = get_db()
     links_ref = db.collection("users").document(uid).collection("links")
     docs = links_ref.limit(CANDIDATE_LIMIT).get()
@@ -193,8 +202,11 @@ def curate(links: List[dict], mode: str, count: int, topics=None) -> List[dict]:
         # Prefer the ones gathering the most dust (least recently touched).
         pool.sort(key=lambda l: max(viewed(l), created(l)))
         if len(pool) < count:
-            # Backfill with random older items so the digest isn't thin.
-            extra = [l for l in links if l not in pool]
+            # Backfill with random older items so the digest isn't thin. Dedupe
+            # by id (like smart, below) — not `l not in pool`, which is an O(n²)
+            # whole-dict comparison.
+            pool_ids = {l["id"] for l in pool}
+            extra = [l for l in links if l["id"] not in pool_ids]
             random.shuffle(extra)
             pool += extra
         return pool[:count]
@@ -258,13 +270,17 @@ def _card_index(cards: List[dict]) -> dict:
     return {c["id"]: c for c in cards if c.get("id")}
 
 
-def _write_inapp_synthesis(uid: str, synth: dict, cards: List[dict], week_id: str) -> None:
+def _write_inapp_synthesis(uid: str, synth: dict, cards: List[dict], week_id: str) -> bool:
     """Persist the synthesis as an in-app "special card" the feed surfaces (M12).
 
     Stored at users/{uid}/syntheses/{week_id} (one per ISO week, so a re-run
     within the same week overwrites rather than duplicates). We denormalize the
     referenced cards' id+title+category so the card renders even if a source is
     later deleted — the feed still deep-links by id when the card exists.
+
+    Returns True on a successful write, False if it failed — the caller gates
+    `sent`/`lastDigestSentAt` on this so a swallowed write error isn't reported
+    as a delivered synthesis (which would also suppress the next retry).
     """
     by_id = _card_index(cards)
     referenced_ids = set()
@@ -296,8 +312,10 @@ def _write_inapp_synthesis(uid: str, synth: dict, cards: List[dict], week_id: st
     }
     try:
         get_db().collection("users").document(uid).collection("syntheses").document(week_id).set(doc)
+        return True
     except Exception as e:
         logger.error(f"Failed to write in-app synthesis for {uid}: {e}")
+        return False
 
 
 def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force: bool = False) -> dict:
@@ -312,6 +330,27 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
     settings = user_data.get("settings", {}) or {}
     channels = _normalize_channels(settings.get("digest_channels"))
     result = {"uid": uid, "sent": False, "channels": [], "card_count": 0, "skipped": None, "mode": "synthesis"}
+
+    week_id = _week_id()
+
+    # Synthesis is inherently weekly. The schedule's frequency is independent of
+    # the mode, so a user can pair mode=synthesis with frequency=daily — under
+    # which is_due's 20h guard would fire this path every day, re-generating the
+    # same 7-day recap (wasted Gemini spend) and pushing a duplicate each day.
+    # Guard on the per-week doc: if this week's synthesis already exists, it's
+    # been delivered — skip regen + push. `force` (the preview button) bypasses.
+    if not force:
+        try:
+            existing = (
+                get_db().collection("users").document(uid)
+                .collection("syntheses").document(week_id).get()
+            )
+            if existing.exists:
+                result["skipped"] = "already_sent_this_week"
+                return result
+        except Exception as e:
+            # Fail open: a read error shouldn't block the primary surface.
+            logger.warning(f"Synthesis dedupe check failed for {uid}: {e}")
 
     cards = synthesis_window_cards(links)
     if len(cards) < SYNTHESIS_MIN_CARDS and not force:
@@ -329,10 +368,13 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
         return result
 
     result["card_count"] = len(cards)
-    week_id = _week_id()
 
-    # Primary surface: always write the in-app special card.
-    _write_inapp_synthesis(uid, synth, cards, week_id)
+    # Primary surface: write the in-app special card. If this fails, the
+    # synthesis wasn't delivered — don't report it sent or stamp the send time
+    # (that would suppress the next retry). Mirrors build_and_send_digest.
+    if not _write_inapp_synthesis(uid, synth, cards, week_id):
+        result["skipped"] = "write_failed"
+        return result
     result["channels"].append("in_app")
 
     # Push (native iOS)
@@ -376,13 +418,18 @@ def _digest_id(frequency: str, now: Optional[datetime] = None) -> str:
     return _week_id(now)
 
 
-def _write_inapp_digest(uid: str, cards: List[dict], mode: str, frequency: str, topics) -> Optional[str]:
+def _write_inapp_digest(uid: str, cards: List[dict], mode: str, frequency: str, topics, tz_name: Optional[str] = None) -> Optional[str]:
     """Persist the curated digest to users/{uid}/digests/{digestId} (mirrors
     _write_inapp_synthesis). Cards are denormalized so the digest renders even
     if a source link is later deleted; the app still deep-links by id when the
-    card exists. Returns the doc id, or None if the write failed."""
+    card exists. Returns the doc id, or None if the write failed.
+
+    `tz_name` is the user's IANA timezone: the period id (daily date / ISO week)
+    is derived in local time so it matches the local-time schedule that fired the
+    digest and the local date the client renders — not the UTC day, which can
+    differ by one near midnight for far-from-UTC users."""
     period = "Daily" if frequency == "daily" else "Weekly"
-    digest_id = _digest_id(frequency)
+    digest_id = _digest_id(frequency, _local_now(tz_name))
 
     card_refs = [
         {
@@ -458,7 +505,6 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
     count = settings.get("digest_count", 5)
     frequency = settings.get("digest_frequency", "weekly")
     channels = _normalize_channels(settings.get("digest_channels"))
-    skip_empty = settings.get("digest_skip_empty", True)
 
     links = fetch_candidate_links(uid)
 
@@ -469,9 +515,11 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
 
     cards = curate(links, mode, count, topics)
 
-    if not cards and skip_empty and not force:
-        result["skipped"] = "no_cards"
-        return result
+    # Nothing to curate → nothing to deliver. NOTE: the `digest_skip_empty`
+    # setting is currently inert — an empty digest is always skipped, because a
+    # digest with zero cards has nothing to render or push. The "Skip when empty"
+    # toggle in Settings is decorative pending a product decision (drop it, or
+    # give its off-state a distinct "nothing new this period" behaviour).
     if not cards:
         result["skipped"] = "no_cards"
         return result
@@ -481,8 +529,10 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
     delivered_any = False
 
     # In-app (always-on surface): persist the digest BEFORE any channel sends,
-    # so the Digest section shows it even when every outbound channel fails.
-    digest_id = _write_inapp_digest(uid, cards, mode, frequency, topics)
+    # so the Digest section shows it even when every outbound channel fails. The
+    # digest's period id is computed in the user's local time so its doc id (and
+    # the date the client renders from it) agree with the schedule that fired it.
+    digest_id = _write_inapp_digest(uid, cards, mode, frequency, topics, user_data.get("timezone"))
     if digest_id:
         result["channels"].append("in_app")
         result["digest_id"] = digest_id

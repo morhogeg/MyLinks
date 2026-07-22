@@ -405,6 +405,29 @@ The multi-user auth work is **fully written but not live**:
     ~~Extension token-copy UI in Settings (F-2)~~ — **WON'T DO, owner call
     2026-07-12:** the Settings browser-extension section was removed entirely
     (the `/extension` page and the extension itself remain).
+19c. **[x] Digest feature reliability audit — DONE 2026-07-22 (`digest_service.py`).**
+    Five fixes in the digest delivery path: (1) the weekly synthesis no longer
+    reports `sent` (or stamps `lastDigestSentAt`) when its in-app write fails —
+    `_write_inapp_synthesis` returns a bool the caller gates on, mirroring the
+    curated path (a swallowed Firestore error was faking success AND suppressing
+    the retry); (2) synthesis is now idempotent per ISO week, so `mode=synthesis`
+    paired with `frequency=daily` (both independently selectable) can't
+    re-generate + re-push the same recap every day — it skips if
+    `syntheses/{weekId}` already exists (force/preview bypasses); (3) the dead
+    `digest_skip_empty` double-branch collapsed (empties are always skipped —
+    see deferred note below); (4) the curated digest's period id is now derived
+    in the user's LOCAL time (threaded tz → `_write_inapp_digest` → `_digest_id`)
+    so the doc id + client-rendered date agree near midnight for far-from-UTC
+    users; (5) rediscover backfill dedupes by id, not O(n²) whole-dict `in`.
+    +6 tests (`tests/test_digest_delivery.py`); full suite 332 pass.
+    **Deferred (owner/product calls):** (a) the **"Skip when empty" Settings
+    toggle is now inert** — an empty digest can't be delivered, so its off-state
+    does nothing; decide whether to remove it or give it a real
+    "nothing new this period" behaviour. (b) `fetch_candidate_links` is an
+    **unordered `limit(500)`** — past ~500 saves curation sees an arbitrary slice;
+    a clean `order_by("createdAt")` is unsafe because `createdAt` is stored mixed
+    `number|string`, so the real fix is a normalized numeric sort field
+    (backfill/migration), deferred until it bites.
 
 ### 🟢 P3 — product roadmap (post-launch)
 
@@ -651,7 +674,31 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-21 (latest) — INSTAGRAM IMAGE-FIRST FIX (accuracy).** Owner QA on the
+- **2026-07-22 (latest) — DIGEST FEATURE RELIABILITY AUDIT (backend).** Full
+  read + hardening pass on the digest/synthesis delivery path (`digest_service.py`),
+  no client or schema changes. Five fixes (detail in §4 item 19c): (1) **synthesis
+  no longer fakes success on a failed write** — `_write_inapp_synthesis` now
+  returns a bool the orchestrator gates `sent`/`lastDigestSentAt` on (a swallowed
+  Firestore error was both reporting delivered and suppressing the retry, unlike
+  the curated path's `delivered_any` guard); (2) **synthesis is idempotent per
+  ISO week** — `mode=synthesis` + `frequency=daily` is reachable (mode and
+  frequency are independent Settings screens) and would otherwise re-generate the
+  7-day recap and push a duplicate every day; it now skips when
+  `syntheses/{weekId}` exists (preview/`force` bypasses); (3) **collapsed the dead
+  `digest_skip_empty` branch** (the second `if not cards` subsumed it, making the
+  toggle inert — flagged as a product decision, §4 19c-a); (4) **daily digest doc
+  id is now built in the user's local time** (tz threaded through
+  `_write_inapp_digest` → `_digest_id`) so the id and the client's date agree near
+  midnight for far-from-UTC users; (5) **rediscover backfill dedupes by id** not
+  O(n²) whole-dict `in`. Also documented the unordered `limit(500)` candidate
+  fetch as a known scaling limit (a `createdAt` order_by is unsafe — the field is
+  stored mixed `number|string`; real fix = numeric sort field, deferred). Tests:
+  +6 in `tests/test_digest_delivery.py` (write-failure reporting, weekly
+  idempotency + force-bypass, local-day id); full backend suite **332 pass, 7
+  skipped**. Backend-only ship — functions deploy scoped
+  `Deploy-Functions: send_digests,force_send_digests,send_digest_now`.
+
+- **2026-07-21 — INSTAGRAM IMAGE-FIRST FIX (accuracy).** Owner QA on the
   IG cover-photo feature (entry below): an @idftweets post (a Hebrew text
   screenshot) came back with an INVERTED summary — the post says the מש"קית
   already approved the accommodation and is reflecting on whether she was right,
