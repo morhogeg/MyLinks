@@ -714,7 +714,33 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-23 (latest) — ANALYZING BANNER: PHANTOM "STILL WORKING" AFTER THE
+- **2026-07-23 (latest) — CATEGORIES/TAGS FILTER UX: COUNT-RANKED TAGS + UNIFIED
+  CHIP BAR.** Owner request (two device screenshots). **(1)** The tag picker
+  already shows contextual counts (each tag's count recomputes against the
+  selected category in `useFeedFilters.ts`), but the list was always A–Z, so the
+  one tag that actually matched a chosen category was buried among 0-count tags.
+  `buildTagTree` now takes a `sortByCount` flag (`web/lib/tags.ts`): when set,
+  siblings rank by count desc then A–Z (0-counts sink); `TagExplorer` forwards it
+  as `rankByCount`, wired to `selectedCategory.size > 0` at both call sites
+  (mobile `MobileFiltersSheet`, desktop sidebar in `Feed.tsx`), so the re-rank
+  only kicks in when a category narrows the counts — plain A–Z otherwise, so the
+  untouched list stays predictable. **(2)** The active-filter area was three
+  stacked full-width rows (Categories / Filtered By / Sources), each with its own
+  chunky uppercase label pill and its own "Clear All" — visually noisy. Collapsed
+  into ONE wrapping bar in `Feed.tsx` where each chip self-labels its kind
+  (colored dot = category, `#` = tag, globe = source) with a single "Clear all"
+  that clears all three facets; the Collections banner stays separate (it carries
+  Manage-cards / Share actions). Files: `web/lib/tags.ts`,
+  `web/components/TagExplorer.tsx`, `web/components/feed/MobileFiltersSheet.tsx`,
+  `web/components/Feed.tsx`. Verified: `tsc --noEmit` clean (branch + post-merge).
+  Note: the handed-off worktree branch (`claude/categories-tags-ui-kskprl`) shared
+  a real ancestor with `origin/main` at `cfced5e` but the *local* `main` ref was a
+  stale unrelated history — reset local `main` to `origin/main` before merging
+  (clean ort merge, no conflicts) so main-vs-prod didn't drift. **SHIPPED** —
+  merged to `main` as `7f99e1c` → desktop web via Vercel; iOS → **TestFlight run
+  #171 / build 1171** (the filter UI is the phone's, per the screenshots).
+  Frontend-only; no functions/`firebase.json` change; no owner step.
+- **2026-07-23 — ANALYZING BANNER: PHANTOM "STILL WORKING" AFTER THE
   CARD IS READY.** Owner report (screenshot): a shared capture's card was fully
   ready in the feed while the persistent "Searching connections… 86%" banner kept
   ramping. Root cause: the iOS Share-Extension optimistic bridge
