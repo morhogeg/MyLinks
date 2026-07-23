@@ -780,6 +780,44 @@ def _downscale_thumbnail(image_bytes: bytes, mime_type: str) -> tuple:
         return image_bytes, mime_type, None
 
 
+# A real video frame is at least a few hundred px on its short edge; anything
+# smaller is a favicon/avatar-scale image, not a usable banner.
+_VIDEO_POSTER_MIN_EDGE = 200
+
+
+def _video_poster_looks_like_junk(image_bytes: bytes) -> bool:
+    """True when a video 'poster' is really an avatar / logo / icon on a plain
+    background, or too small to be a real frame — cases that look worse than a
+    clean text card, so we suppress them (the card falls back to text-only).
+
+    Two signals: (1) too small on the short edge; (2) a near-SQUARE frame whose
+    four corners are each visually flat AND match one another — i.e. a subject
+    centered on a uniform background (the classic avatar/logo/title-card shape).
+    Real photographic frames vary corner-to-corner and are usually 16:9/9:16, so
+    they pass. Wide letterboxed frames are intentionally NOT caught (the square
+    gate excludes them) to avoid suppressing legitimate video. Best-effort: any
+    decode/measure failure returns False (keep the poster)."""
+    try:
+        import io
+        from PIL import Image, ImageStat
+        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        w, h = img.size
+        if min(w, h) < _VIDEO_POSTER_MIN_EDGE:
+            return True
+        if not (0.8 <= w / h <= 1.25):  # not square-ish → treat as a real frame
+            return False
+        cw, ch = max(1, w // 6), max(1, h // 6)
+        corners = [img.crop((0, 0, cw, ch)), img.crop((w - cw, 0, w, ch)),
+                   img.crop((0, h - ch, cw, h)), img.crop((w - cw, h - ch, w, h))]
+        stats = [ImageStat.Stat(c) for c in corners]
+        flat_each = all(max(s.stddev) < 14 for s in stats)  # each corner uniform
+        spread = max(max(s.mean[i] for s in stats) - min(s.mean[i] for s in stats)
+                     for i in range(3))                      # corners agree
+        return flat_each and spread < 18
+    except Exception:
+        return False
+
+
 def _apply_post_thumbnail(link_data: dict, scraped: dict, uid: str, key: str = None) -> None:
     """Persist the social-post cover image we already fetched for vision and record
     it as the card's `metadata.thumbnailUrl`, so X/Instagram cards SHOW the image
@@ -795,6 +833,12 @@ def _apply_post_thumbnail(link_data: dict, scraped: dict, uid: str, key: str = N
     thumb = scraped.pop("_post_thumbnail", None)
     is_video_poster = scraped.pop("_post_thumbnail_is_video", False)
     if not thumb or not uid:
+        return
+    # Auto-suppress obviously-bad video posters (avatar/logo/too small) so junk
+    # never shows by default — the card degrades to a clean text card. Photo
+    # covers are the post's actual content, so they're never gated here.
+    if is_video_poster and _video_poster_looks_like_junk(thumb[0]):
+        logger.info("Suppressing low-quality video poster (avatar/logo/too small)")
         return
     try:
         import uuid

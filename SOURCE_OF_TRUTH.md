@@ -714,7 +714,28 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-23 (latest) — CATEGORIES/TAGS FILTER UX: COUNT-RANKED TAGS + UNIFIED
+- **2026-07-23 (latest) — VIDEO THUMBNAIL: auto-suppress junk posters + per-card
+  hide/show toggle.** Owner saw an X card whose "poster" was a tiny avatar-style
+  coffee-cup icon on a plain gray banner — worse than a clean text card. Two-part
+  fix (both). **Auto-suppress (backend):** `_video_poster_looks_like_junk` in
+  `main.py` — a video poster is dropped (card degrades to text-only, nothing
+  stored) when it's below `_VIDEO_POSTER_MIN_EDGE` (200px short edge) OR is
+  near-square with four flat, mutually-matching corners (a subject/logo on a plain
+  background). Gated in `_apply_post_thumbnail` for video posters ONLY — photo
+  covers (the post's actual content) are never suppressed; wide letterboxed frames
+  pass (square gate excludes them). Best-effort (decode failure → keep). **Manual
+  toggle (frontend):** new per-card `⋯ → Hide image / Show image` in
+  `CardActionSheet` (shown whenever the card has a `thumbnailUrl`), persisted as
+  `link.hideThumbnail` via `updateDoc` (`Feed.handleToggleThumbnail`); `Card.tsx`
+  gates BOTH banner branches on `!link.hideThumbnail`; new `Link.hideThumbnail`
+  type field. The action sheet is the touch-only `[@media(hover:none)]` menu —
+  **desktop-hover has no equivalent yet** (possible follow-up). Note: an
+  auto-suppressed poster isn't stored, so "Show image" only re-reveals posters
+  that passed the gate. `tsc` + `py_compile` clean; junk-detector verified by
+  logic review (PIL absent in cloud session — it runs in the deployed env).
+  Backend changed → redeploy `analyze_link` + `process_link_background`.
+
+- **2026-07-23 — CATEGORIES/TAGS FILTER UX: COUNT-RANKED TAGS + UNIFIED
   CHIP BAR.** Owner request (two device screenshots). **(1)** The tag picker
   already shows contextual counts (each tag's count recomputes against the
   selected category in `useFeedFilters.ts`), but the list was always A–Z, so the

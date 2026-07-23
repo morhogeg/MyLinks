@@ -45,6 +45,8 @@ interface CardProps {
     onRemoveFromCollection?: (link: Link, collectionId: string) => void;
     /** Retry analysis for a `failed` capture card (M3). */
     onRetry?: (link: Link) => void;
+    /** Toggle the card's thumbnail banner on/off (⋯ → Hide image / Show image). */
+    onToggleThumbnail?: (link: Link) => void;
 }
 
 /**
@@ -71,6 +73,7 @@ function Card({
     activeCollectionId,
     onRemoveFromCollection,
     onRetry,
+    onToggleThumbnail,
 }: CardProps) {
     const isRtl = link.language === 'he' || hasHebrew(link.title) || hasHebrew(link.summary);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
@@ -230,7 +233,7 @@ function Card({
                 posters (X / Instagram reel / LinkedIn / Facebook) share this exact
                 treatment — fixed height + center crop — so a portrait poster frame
                 doesn't render as a tall banner. */}
-            {(link.sourceType === 'youtube' || link.metadata?.thumbnailIsVideo) && link.metadata?.thumbnailUrl && (
+            {!link.hideThumbnail && (link.sourceType === 'youtube' || link.metadata?.thumbnailIsVideo) && link.metadata?.thumbnailUrl && (
                 <div className="relative w-full h-28 sm:h-32 bg-black/40 overflow-hidden">
                     <img
                         src={link.metadata.thumbnailUrl}
@@ -252,7 +255,7 @@ function Card({
                 show whole; older cards fall back to a fixed short banner. Either way the
                 crop anchors to the top, where social posts put the headline/subject.
                 Video posters are excluded here — they use the fixed banner above. */}
-            {link.sourceType !== 'youtube' && !link.metadata?.thumbnailIsVideo && link.metadata?.thumbnailUrl && (
+            {!link.hideThumbnail && link.sourceType !== 'youtube' && !link.metadata?.thumbnailIsVideo && link.metadata?.thumbnailUrl && (
                 <div
                     className={`relative w-full bg-black/40 overflow-hidden ${link.metadata.thumbnailAspect ? '' : 'h-28 sm:h-32'}`}
                     style={link.metadata.thumbnailAspect ? { aspectRatio: String(link.metadata.thumbnailAspect), maxHeight: '20rem', minHeight: '7rem' } : undefined}
@@ -582,6 +585,7 @@ function Card({
             onAddToCollection={onAddToCollection}
             onShare={onShare}
             onTogglePrivate={onTogglePrivate}
+            onToggleThumbnail={onToggleThumbnail}
             removeFromCollection={
                 activeCollectionId && onRemoveFromCollection
                     ? {

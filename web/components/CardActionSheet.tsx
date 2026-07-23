@@ -1,7 +1,7 @@
 'use client';
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink, Layers, Share2, FolderMinus, Lock } from 'lucide-react';
+import { Archive, Star, Bell, Trash2, Circle, Check, X, ExternalLink, Layers, Share2, FolderMinus, Lock, ImageOff, Image as ImageIcon } from 'lucide-react';
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { IconButton } from './ui/Button';
@@ -20,6 +20,8 @@ interface CardActionSheetProps {
     onShare?: (link: Link) => void;
     /** Toggle the card's Private flag (parent owns PIN setup — lib/privacyLock). */
     onTogglePrivate?: (link: Link) => void;
+    /** Toggle the card's thumbnail banner on/off. */
+    onToggleThumbnail?: (link: Link) => void;
     /** When viewing inside a collection, a one-tap remove from it. */
     removeFromCollection?: { name: string; onRemove: () => void };
 }
@@ -45,6 +47,7 @@ export default function CardActionSheet({
     onAddToCollection,
     onShare,
     onTogglePrivate,
+    onToggleThumbnail,
     removeFromCollection,
 }: CardActionSheetProps) {
     useEffect(() => {
@@ -137,6 +140,13 @@ export default function CardActionSheet({
             icon: <Lock className={`w-5 h-5 ${link.isPrivate ? 'text-accent' : ''}`} />,
             active: !!link.isPrivate,
             onClick: () => onTogglePrivate(link),
+        }] : []),
+        ...(onToggleThumbnail && link.metadata?.thumbnailUrl ? [{
+            key: 'thumbnail',
+            label: link.hideThumbnail ? 'Show image' : 'Hide image',
+            icon: link.hideThumbnail ? <ImageIcon className="w-5 h-5" /> : <ImageOff className="w-5 h-5" />,
+            active: !!link.hideThumbnail,
+            onClick: () => onToggleThumbnail(link),
         }] : []),
         ...(removeFromCollection ? [{
             key: 'remove-collection',

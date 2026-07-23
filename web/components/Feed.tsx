@@ -963,6 +963,18 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         else setPinSetupAction(() => () => void setCardPrivate(link, true));
     }, [hasPin, setCardPrivate]);
 
+    // Per-card thumbnail toggle: hide the banner (→ plain text card) or show it
+    // again. Persisted on the link doc; onSnapshot reflects it live.
+    const handleToggleThumbnail = useCallback(async (link: Link) => {
+        if (!uid) return;
+        const next = !link.hideThumbnail;
+        try {
+            await updateDoc(doc(db, 'users', uid, 'links', link.id), { hideThumbnail: next });
+        } catch {
+            toast.error("Couldn't update the card. Please try again.");
+        }
+    }, [uid, toast]);
+
     // Status-filter selection, PIN-gated for 'private': entering the Private
     // view demands the PIN while the vault is locked, and LEAVING it relocks
     // the vault immediately (mirrors backing out of a private collection).
@@ -1372,6 +1384,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 onAddToCollection={handleAddToCollection}
                                 onShare={handleShareCard}
                                 onTogglePrivate={handleToggleCardPrivate}
+                                onToggleThumbnail={handleToggleThumbnail}
                                 cardCollections={cardCollectionsByLink.get(link.id)}
                                 activeCollectionId={openCol.id}
                                 onRemoveFromCollection={handleRemoveFromCollection}
@@ -2386,6 +2399,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     onAddToCollection={handleAddToCollection}
                                     onShare={handleShareCard}
                                     onTogglePrivate={handleToggleCardPrivate}
+                                    onToggleThumbnail={handleToggleThumbnail}
                                     cardCollections={cardCollectionsByLink.get(link.id)}
                                     activeCollectionId={activeCollectionId}
                                     onRemoveFromCollection={handleRemoveFromCollection}
