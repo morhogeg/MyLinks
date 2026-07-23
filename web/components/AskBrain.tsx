@@ -22,6 +22,7 @@ import ChatHistorySidebar from './ChatHistorySidebar';
 import MobileSubheader from './MobileSubheader';
 import { IconButton } from './ui/Button';
 import WorkingRing from './ui/WorkingRing';
+import AuroraOrb from './ui/AuroraOrb';
 import { lockBodyScroll, unlockBodyScroll } from '@/lib/useScrollLock';
 
 /** A usable source name, or null for placeholders the backend stores. */
@@ -1023,9 +1024,9 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
             >
                 {isEmpty ? (
                     <div className="h-full flex flex-col items-center justify-center text-center px-4">
-                        <div className="w-14 h-14 mb-4 rounded-2xl bg-fill-subtle border border-border-subtle flex items-center justify-center">
-                            <MessagesSquare className="w-7 h-7 text-text-secondary" strokeWidth={1.75} />
-                        </div>
+                        {/* The hero orb — Machina's living identity mark for this
+                            focal, high-attention moment (not the inline ring). */}
+                        <AuroraOrb size={80} className="mb-5" />
                         <h2 className="text-xl font-semibold text-text mb-1.5">What do you want to recall?</h2>
                         <p className="text-text-muted text-sm max-w-xs mb-6 leading-relaxed">
                             {/* totalLinks is the loaded feed WINDOW (caps at 150) — beyond

@@ -1083,10 +1083,14 @@ final class SpinningRingView: UIView {
     private let gradient = CAGradientLayer()
     private let ringMask = CAShapeLayer()
 
-    /// The accent the arc fades up to. Defaults to purple; set by the caller.
+    /// The mid (purple) of the sweep. Defaults to brand purple; set by the caller.
     var ringColor: UIColor = UIColor(red: 0xA8 / 255.0, green: 0x55 / 255.0, blue: 0xF7 / 255.0, alpha: 1) {
         didSet { applyColors() }
     }
+    // The other two brand-gradient stops, so the native ring sweeps lilac →
+    // purple → pink like the web `.working-ring` (not a flat single hue).
+    private static let pink = UIColor(red: 0xEC / 255.0, green: 0x48 / 255.0, blue: 0x99 / 255.0, alpha: 1)
+    private static let lilac = UIColor(red: 0xC0 / 255.0, green: 0x84 / 255.0, blue: 0xFC / 255.0, alpha: 1)
     /// Ring stroke thickness in points.
     var thickness: CGFloat = 3 { didSet { setNeedsLayout() } }
 
@@ -1107,12 +1111,15 @@ final class SpinningRingView: UIView {
     required init?(coder: NSCoder) { fatalError("SpinningRingView is code-only") }
 
     private func applyColors() {
+        // Brand-gradient sweep (lilac → purple → pink), matching web .working-ring.
         gradient.colors = [
-            ringColor.withAlphaComponent(0).cgColor,
-            ringColor.withAlphaComponent(0).cgColor,
+            Self.lilac.withAlphaComponent(0).cgColor,
+            Self.lilac.cgColor,
             ringColor.cgColor,
+            Self.pink.cgColor,
+            Self.pink.withAlphaComponent(0).cgColor,
         ]
-        gradient.locations = [0.0, 0.12, 1.0]          // matches conic(transparent 12%, accent)
+        gradient.locations = [0.04, 0.26, 0.60, 0.88, 1.0]
     }
 
     override func layoutSubviews() {
