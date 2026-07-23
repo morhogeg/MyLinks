@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Check, Globe } from 'lucide-react';
 import { LINK_SCAN_STEPS, linkScanStepIndex } from '@/lib/scanPhases';
-import WorkingRing from '@/components/ui/WorkingRing';
+import BrandOrb from '@/components/ui/BrandOrb';
 
 interface LinkScanProgressProps {
     /** The URL being analyzed (used to show the host + favicon). */
@@ -21,8 +21,8 @@ function hostOf(url: string): string {
 }
 
 /**
- * "Reading your link" — a compact, honest stepper. One spinning ring (the shared
- * `WorkingRing`) rides the active phase; finished phases collapse to an airy
+ * "Reading your link" — a compact, honest stepper. One `BrandOrb` (Thinking Orbs
+ * in our palette) rides the active phase; finished phases collapse to an airy
  * accent checkmark (no circle); upcoming phases show a hollow dot. The phases
  * come from the shared `scanPhases` source, so this and the persistent
  * `AnalyzingBanner` never disagree — including on a share-sheet capture.
@@ -64,7 +64,7 @@ export default function LinkScanProgress({ url, progress }: LinkScanProgressProp
                         <li key={label} className="flex items-center gap-3 py-1.5">
                             <span className="relative w-5 h-5 shrink-0 grid place-items-center">
                                 {state === 'active' ? (
-                                    <WorkingRing size={20} />
+                                    <BrandOrb state="working" size={20} />
                                 ) : state === 'done' ? (
                                     <Check className="w-[15px] h-[15px] text-accent animate-fade-in" strokeWidth={3} />
                                 ) : (

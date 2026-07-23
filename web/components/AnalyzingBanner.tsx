@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
-import WorkingRing from '@/components/ui/WorkingRing';
+import BrandOrb from '@/components/ui/BrandOrb';
 import { linkScanLabel } from '@/lib/scanPhases';
 
 export interface AnalyzingState {
@@ -107,7 +107,7 @@ export default function AnalyzingBanner({ state }: { state: AnalyzingState | nul
                     {done ? (
                         <CheckCircle2 className="w-4 h-4 text-accent shrink-0 animate-fade-in" />
                     ) : (
-                        <WorkingRing size={16} className="shrink-0" />
+                        <BrandOrb state="working" size={20} />
                     )}
                     <span className="flex-1 text-[13px] font-medium text-text truncate">
                         {done ? 'Saved to Machina' : phaseLabel(shown.kind, pct)}

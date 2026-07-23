@@ -6,7 +6,7 @@ import { Link, LinkStatus } from '@/lib/types';
 import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizontal, ExternalLink, Layers, Share2, RotateCcw, AlertTriangle, StickyNote, Lock } from 'lucide-react';
 import { useState, memo } from 'react';
 import SourceByline from './SourceByline';
-import WorkingRing from './ui/WorkingRing';
+import BrandOrb from './ui/BrandOrb';
 import { useNow } from '@/lib/useNow';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -150,7 +150,7 @@ function Card({
                         {failed ? (
                             <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
                         ) : (
-                            <WorkingRing size={16} />
+                            <BrandOrb state="working" size={20} />
                         )}
                         <span className={`text-[10px] uppercase font-black tracking-widest ${failed ? 'text-red-400' : 'text-accent'}`}>
                             {failed ? 'Couldn’t analyze' : 'Saving…'}
