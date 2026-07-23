@@ -22,7 +22,8 @@ import ChatHistorySidebar from './ChatHistorySidebar';
 import MobileSubheader from './MobileSubheader';
 import { IconButton } from './ui/Button';
 import WorkingRing from './ui/WorkingRing';
-import AuroraOrb from './ui/AuroraOrb';
+import { ThinkingOrb } from 'thinking-orbs';
+import { useTheme } from './ThemeProvider';
 import { lockBodyScroll, unlockBodyScroll } from '@/lib/useScrollLock';
 
 /** A usable source name, or null for placeholders the backend stores. */
@@ -202,6 +203,9 @@ interface AskBrainProps {
 const HISTORY_COLLAPSE_KEY = 'askbrain:histcollapsed';
 
 export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayOpen = false, links }: AskBrainProps) {
+    // Pass the app's resolved theme straight to the orb — more reliable than its
+    // auto-detect when the in-app theme and the OS preference disagree.
+    const { resolvedTheme } = useTheme();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
@@ -1024,9 +1028,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
             >
                 {isEmpty ? (
                     <div className="h-full flex flex-col items-center justify-center text-center px-4">
-                        {/* The hero orb — Machina's living identity mark for this
-                            focal, high-attention moment (not the inline ring). */}
-                        <AuroraOrb size={80} className="mb-5" />
+                        {/* The hero orb — Jakub Antalík's Thinking Orbs (the real
+                            library), Machina's living mark for this focal moment.
+                            'listening' = idle, waiting for your question. */}
+                        <ThinkingOrb state="listening" size={64} theme={resolvedTheme} className="mb-5" aria-label="Machina is ready" />
                         <h2 className="text-xl font-semibold text-text mb-1.5">What do you want to recall?</h2>
                         <p className="text-text-muted text-sm max-w-xs mb-6 leading-relaxed">
                             {/* totalLinks is the loaded feed WINDOW (caps at 150) — beyond

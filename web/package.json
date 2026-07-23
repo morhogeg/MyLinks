@@ -23,7 +23,8 @@
     "react-dom": "19.2.3",
     "react-markdown": "^9.1.0",
     "remark-breaks": "^4.0.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "thinking-orbs": "^0.1.1"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.4.1",
