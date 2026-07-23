@@ -21,6 +21,10 @@ export interface LinkMetadata {
   // width/height of the stored cover thumbnail — lets the card banner size to the
   // image (whole image for most shapes; extreme portraits clamp + anchor top).
   thumbnailAspect?: number;
+  // True when thumbnailUrl is a VIDEO poster frame (X / Instagram reel / LinkedIn
+  // / Facebook video). These render at the fixed YouTube-style banner height +
+  // center crop, not sized to the frame's aspect. Photo covers leave it unset.
+  thumbnailIsVideo?: boolean;
   youtubeChannel?: string;
   durationDisplay?: string;
   videoHighlights?: string[]; // each entry prefixed with an "M:SS" timestamp
