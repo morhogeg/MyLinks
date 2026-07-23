@@ -82,6 +82,9 @@ export interface Link {
   // (never in the main feed/search/facets, even while the vault is unlocked);
   // entering that filter requires the PIN.
   isPrivate?: boolean;
+  // User chose to hide this card's thumbnail banner (⋯ → Hide image), turning it
+  // into a plain text card. Per-card, reversible via "Show image".
+  hideThumbnail?: boolean;
   createdAt: number | string; // Handle both Unix timestamp and ISO string
   // When the current processing attempt began (epoch ms). Stamped on the
   // placeholder card by the backend (share path) and createProcessingPlaceholder
