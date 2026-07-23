@@ -331,38 +331,8 @@ html {
   animation: progress-indeterminate 1.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
-/* The one "working" mark — a spinning gradient ring shared by the Ask thinking
-   row, the active save step, and the persistent AnalyzingBanner. A masked conic
-   ring keeps it airy (thin outline, no filled disc); built from --accent so it
-   recolors in light/dark. Sized by the caller (width/height). */
-@keyframes working-ring-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.working-ring {
-  border-radius: 9999px;
-  /* Full brand-gradient sweep (lilac → purple → pink), not a flat single hue —
-     so even the small inline mark reads as Machina, not a stock spinner. */
-  background: conic-gradient(from 0deg,
-    transparent 4%,
-    var(--accent-3) 26%,
-    var(--accent) 60%,
-    var(--accent-2) 88%,
-    transparent 100%);
-  -webkit-mask: radial-gradient(circle, transparent 52%, #000 55%);
-  mask: radial-gradient(circle, transparent 52%, #000 55%);
-  /* spin (rotation) + a soft glow that breathes (box-shadow — no transform
-     conflict with the spin). */
-  animation: working-ring-spin 0.9s linear infinite,
-             working-ring-glow 2.1s ease-in-out infinite;
-}
-
-@keyframes working-ring-glow {
-  0%, 100% { box-shadow: 0 0 6px -2px var(--accent-ring); }
-  50%      { box-shadow: 0 0 15px 0 var(--accent-ring); }
-}
+/* Inline "working" marks are now BrandOrb (thinking-orbs in our palette),
+   rendered to a <canvas> — see components/ui/BrandOrb.tsx. No CSS ring. */
 
 /* Scale-up: used by ConfirmDialog (was referenced but never defined). */
 @keyframes scale-up {
@@ -524,7 +494,6 @@ a {
   .animate-pulse-subtle,
   .animate-scan-sweep,
   .animate-progress-indeterminate,
-  .working-ring,
   .skeleton-shimmer::after {
     animation: none !important;
   }
