@@ -364,27 +364,6 @@ html {
   50%      { box-shadow: 0 0 15px 0 var(--accent-ring); }
 }
 
-/* Aurora — the hero "identity/thinking" orb: gooey brand-gradient metaballs that
-   drift and merge. For focal moments with room (empty Ask state, launch), NOT
-   inline. Pure CSS blobs + the #machina-goo SVG filter (rendered by AuroraOrb).
-   The goo filter is GPU-heavier and finicky in WKWebView — device-verify on iOS;
-   it degrades to three static blend-blobs if the filter is dropped. */
-.aurora-orb {
-  position: relative;
-  border-radius: 9999px;
-  overflow: hidden;
-  filter: url(#machina-goo);
-  background: radial-gradient(circle at 50% 50%,
-    color-mix(in oklab, var(--accent) 12%, transparent), transparent 70%);
-}
-.aurora-orb .blob { position: absolute; border-radius: 9999px; mix-blend-mode: screen; }
-.aurora-orb .blob-1 { width: 60%; height: 60%; top: 6%; left: 8%; background: var(--accent); animation: aurora-1 5s ease-in-out infinite; }
-.aurora-orb .blob-2 { width: 52%; height: 52%; bottom: 4%; right: 6%; background: var(--accent-2); animation: aurora-2 6.2s ease-in-out infinite; }
-.aurora-orb .blob-3 { width: 42%; height: 42%; top: 30%; left: 34%; background: var(--accent-3); animation: aurora-3 4.4s ease-in-out infinite; }
-@keyframes aurora-1 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(22%, 18%) scale(1.12); } }
-@keyframes aurora-2 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-20%, -16%) scale(0.9); } }
-@keyframes aurora-3 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-14%, 22%) scale(1.2); } }
-
 /* Scale-up: used by ConfirmDialog (was referenced but never defined). */
 @keyframes scale-up {
   from {
@@ -546,7 +525,6 @@ a {
   .animate-scan-sweep,
   .animate-progress-indeterminate,
   .working-ring,
-  .aurora-orb .blob,
   .skeleton-shimmer::after {
     animation: none !important;
   }
