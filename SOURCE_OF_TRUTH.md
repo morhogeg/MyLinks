@@ -734,8 +734,9 @@ exact-match, capped.
   exactly as before; the write-gap the bridge exists to cover is preserved.
   Files: `web/lib/useSharedCaptureBanner.ts`, `web/app/page.tsx`,
   `web/components/Feed.tsx`. Verified: `tsc --noEmit` clean, eslint 0 on touched
-  files. **SHIPPED** (desktop web via Vercel; iOS → TestFlight, the fix is native-
-  app-facing).
+  files. **SHIPPED** — merged to `main` as `7b78bec` → desktop web via Vercel;
+  iOS → **TestFlight run #170 / build 1170** (native-app-facing: the bug is in the
+  Share-Extension bridge). No backend/functions change; no owner step.
 - **2026-07-23 — FOLLOW-UP polish on the two above (owner QA round).**
   Three tweaks after device review: **(1)** the active-category chip's color dot used
   `getCategoryColorStyle().backgroundColor` (a 0.1-alpha tint → washed out); now
