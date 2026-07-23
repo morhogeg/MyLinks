@@ -97,7 +97,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     private let linkPreview = UIView()            // faux page container
     private let faviconView = UIImageView()       // site favicon (or globe fallback)
     private let hostLabel = UILabel()             // the link's host
-    private let linkRing = SpinningRingView()     // spinning "working" ring above the % counter
+    private let linkRing = OrbitsOrbView()        // "working" Thinking Orb above the % counter
     private var faviconTask: URLSessionDataTask?
 
     private var displayLink: CADisplayLink?
@@ -318,7 +318,6 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         // spinning "working" mark used across Ask + the in-app save loader
         // (web `.working-ring`). Replaces the old static link glyph. Hidden in
         // image mode (the image itself is the visual there).
-        linkRing.ringColor = Self.accent
         linkRing.isHidden = true
         linkRing.translatesAutoresizingMaskIntoConstraints = false
         previewView.addSubview(linkRing)
@@ -811,7 +810,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         linkPreview.isHidden = false
         dimView.backgroundColor = UIColor.black.withAlphaComponent(0.50)
         linkRing.isHidden = false
-        linkRing.startSpinning()
+        linkRing.start()
         beginScanAnimation()
         view.setNeedsLayout()
         view.layoutIfNeeded()
@@ -1075,78 +1074,122 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     }
 }
 
-/// The shared "working" ring, natively — a masked conic-gradient (transparent →
-/// accent) that spins, matching the web `.working-ring` used in Ask + the in-app
-/// save loader. A fixed ring-shaped mask sits on the view layer while the conic
-/// gradient rotates inside it, so the bright arc appears to sweep round the ring.
-final class SpinningRingView: UIView {
-    private let gradient = CAGradientLayer()
-    private let ringMask = CAShapeLayer()
+/// The "working" Thinking Orb, natively — a faithful port of the library's
+/// `orbits` mode (particles on tilted orbits + a ghost trail), recoloured to
+/// Machina's pink→purple so it matches the in-app orbs. The library is JS/canvas
+/// and can't run in a native share extension, so the exact draw math is ported
+/// here: per-orbit hashed orientation (`hash`), a yaw/pitch projection
+/// (`project`), depth z-sort, and dots painted in our palette by luminance.
+///
+/// Twin: web `BrandOrb` (state="working") — keep the constants below in sync with
+/// resolvePreset('working', 20) if the library is bumped.
+final class OrbitsOrbView: UIView {
+    private var displayLink: CADisplayLink?
+    private var startedAt: CFTimeInterval = 0
 
-    /// The mid (purple) of the sweep. Defaults to brand purple; set by the caller.
-    var ringColor: UIColor = UIColor(red: 0xA8 / 255.0, green: 0x55 / 255.0, blue: 0xF7 / 255.0, alpha: 1) {
-        didSet { applyColors() }
-    }
-    // The other two brand-gradient stops, so the native ring sweeps lilac →
-    // purple → pink like the web `.working-ring` (not a flat single hue).
-    private static let pink = UIColor(red: 0xEC / 255.0, green: 0x48 / 255.0, blue: 0x99 / 255.0, alpha: 1)
-    private static let lilac = UIColor(red: 0xC0 / 255.0, green: 0x84 / 255.0, blue: 0xFC / 255.0, alpha: 1)
-    /// Ring stroke thickness in points.
-    var thickness: CGFloat = 3 { didSet { setNeedsLayout() } }
+    // Brand stops (bright ink → pink, shadowed ink → purple), same mapping as web.
+    private static let pink: (CGFloat, CGFloat, CGFloat) = (236 / 255, 72 / 255, 153 / 255)   // #EC4899
+    private static let purple: (CGFloat, CGFloat, CGFloat) = (168 / 255, 85 / 255, 247 / 255)  // #A855F7
+
+    // resolvePreset('working', 20) — the tuned inline preset.
+    private let orbitN = 3, ghostN = 10, particles = 3
+    private let ghostR = 2.16, ghostA = 0.5, partR = 2.88, partRDepth = 3.84
+    private let rsPow = 0.6, rMin = 0.3, baseSpeed = 3.9
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        gradient.type = .conic
-        gradient.startPoint = CGPoint(x: 0.5, y: 0.5)  // conic center
-        gradient.endPoint = CGPoint(x: 0.5, y: 0.0)    // 0° points up
-        layer.addSublayer(gradient)
+        backgroundColor = .clear
+        isOpaque = false
+        contentMode = .redraw
+    }
+    required init?(coder: NSCoder) { fatalError("OrbitsOrbView is code-only") }
 
-        ringMask.fillColor = UIColor.clear.cgColor
-        ringMask.strokeColor = UIColor.white.cgColor   // opaque → visible band
-        ringMask.lineCap = .round
-        layer.mask = ringMask                          // fixed band; gradient spins inside
-        applyColors()
+    func start() {
+        if UIAccessibility.isReduceMotionEnabled { setNeedsDisplay(); return } // one static frame
+        guard displayLink == nil else { return }
+        startedAt = CACurrentMediaTime()
+        let link = CADisplayLink(target: self, selector: #selector(tick))
+        link.add(to: .main, forMode: .common)
+        displayLink = link
+    }
+    func stop() { displayLink?.invalidate(); displayLink = nil }
+    override func didMoveToWindow() { super.didMoveToWindow(); if window == nil { stop() } }
+    deinit { displayLink?.invalidate() }
+
+    @objc private func tick() { setNeedsDisplay() }
+
+    /// Deterministic hash, = the library's `F(e,n)` (fract of a scaled sine).
+    private func hash(_ e: Double, _ n: Double) -> Double {
+        let s = sin(e * 12.9898 + n * 78.233) * 43758.5453
+        return s - floor(s)
     }
 
-    required init?(coder: NSCoder) { fatalError("SpinningRingView is code-only") }
+    override func draw(_ rect: CGRect) {
+        guard let ctx = UIGraphicsGetCurrentContext() else { return }
+        let n = Double(min(bounds.width, bounds.height))
+        if n <= 0 { return }
+        let elapsed = displayLink == nil ? 0.6 / baseSpeed : (CACurrentMediaTime() - startedAt)
+        let s = elapsed * baseSpeed
 
-    private func applyColors() {
-        // Brand-gradient sweep (lilac → purple → pink), matching web .working-ring.
-        gradient.colors = [
-            Self.lilac.withAlphaComponent(0).cgColor,
-            Self.lilac.cgColor,
-            ringColor.cgColor,
-            Self.pink.cgColor,
-            Self.pink.withAlphaComponent(0).cgColor,
-        ]
-        gradient.locations = [0.04, 0.26, 0.60, 0.88, 1.0]
-    }
+        let cx = n / 2, cy = n / 2, a = n / 2 * 0.82
+        let dotScale = pow(n / 300.0, rsPow)
 
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        // Disable implicit animations for the layout-driven frame/path updates.
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        gradient.frame = bounds
-        let inset = thickness / 2
-        ringMask.frame = bounds
-        ringMask.lineWidth = thickness
-        ringMask.path = UIBezierPath(ovalIn: bounds.insetBy(dx: inset, dy: inset)).cgPath
-        CATransaction.commit()
-    }
+        // Projection q(s*0.12, 0.3, cx, cy, 1): yaw then pitch, orthographic.
+        let yaw = s * 0.12, pitch = 0.3
+        let cosY = cos(yaw), sinY = sin(yaw), cosP = cos(pitch), sinP = sin(pitch)
+        func project(_ mx: Double, _ my: Double, _ mz: Double) -> (Double, Double, Double) {
+            let u = mx * cosY + mz * sinY
+            let h = -mx * sinY + mz * cosY
+            let b = my * cosP - h * sinP
+            let x = my * sinP + h * cosP
+            return (cx + u, cy - b, x)
+        }
 
-    func startSpinning() {
-        guard gradient.animation(forKey: "spin") == nil else { return }
-        let spin = CABasicAnimation(keyPath: "transform.rotation.z")
-        spin.fromValue = 0
-        spin.toValue = 2 * Double.pi
-        spin.duration = 0.85
-        spin.repeatCount = .infinity
-        spin.isRemovedOnCompletion = false
-        gradient.add(spin, forKey: "spin")
-    }
+        struct Dot { let x: Double; let y: Double; let z: Double; let r: Double; let white: Double; let a: Double }
+        var dots: [Dot] = []
 
-    func stopSpinning() {
-        gradient.removeAnimation(forKey: "spin")
+        for orbit in 0..<orbitN {
+            let bd = Double(orbit)
+            let rx = hash(bd, 1.7), ri = hash(bd, 5.2), rp = hash(bd, 8.9)
+            let radius = a * (0.45 + 0.52 * rx)
+            let dLon = rx * 2 * .pi
+            let w = acos(2 * ri - 1)
+            let k = sin(w) * cos(dLon), v = cos(w), rr = sin(w) * sin(dLon)   // orbit normal
+            var px = -v, py = k
+            let f = max(1e-6, (px * px + py * py).squareRoot())
+            px /= f; py /= f                                                  // basis 1 (in-plane)
+            let sX = -rr * py, sY = rr * px, sZ = k * py - v * px             // basis 2 (normal × basis1)
+            let spin = (0.25 + 0.55 * rp) * (rp > 0.5 ? 1.0 : -1.0)
+
+            for c in 0..<ghostN {
+                let e = Double(c) / Double(ghostN) * 2 * .pi
+                let (t, z, nz) = project((px * cos(e) + sX * sin(e)) * radius,
+                                         (py * cos(e) + sY * sin(e)) * radius,
+                                         (sZ * sin(e)) * radius)
+                let depth = (nz / radius + 1) / 2
+                dots.append(Dot(x: t, y: z, z: nz, r: ghostR * dotScale, white: 0.72, a: ghostA * (0.4 + 0.6 * depth)))
+            }
+            for c in 0..<particles {
+                let e = s * spin + Double(c) / Double(particles) * 2 * .pi + ri * 6
+                let (t, z, nz) = project((px * cos(e) + sX * sin(e)) * radius,
+                                         (py * cos(e) + sY * sin(e)) * radius,
+                                         (sZ * sin(e)) * radius)
+                let depth = (nz / radius + 1) / 2
+                dots.append(Dot(x: t, y: z, z: nz, r: (partR + partRDepth * depth) * dotScale, white: 0.3 - 0.22 * depth, a: 1))
+            }
+        }
+
+        // Painter `_`: z-sort back→front, recolour by luminance, draw filled dots.
+        dots.sort { $0.z < $1.z }
+        for dot in dots where dot.a >= 0.02 {
+            let cw = min(1.0, max(0.0, dot.white))
+            let t = CGFloat(1.0 - cw)                        // dark-ink mapping (matches web BrandOrb)
+            let r = Self.pink.0 + (Self.purple.0 - Self.pink.0) * t
+            let g = Self.pink.1 + (Self.purple.1 - Self.pink.1) * t
+            let b = Self.pink.2 + (Self.purple.2 - Self.pink.2) * t
+            ctx.setFillColor(red: r, green: g, blue: b, alpha: CGFloat(dot.a))
+            let rad = CGFloat(max(rMin, dot.r))
+            ctx.fillEllipse(in: CGRect(x: CGFloat(dot.x) - rad, y: CGFloat(dot.y) - rad, width: rad * 2, height: rad * 2))
+        }
     }
 }
