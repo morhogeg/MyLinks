@@ -1870,35 +1870,25 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 </div>
             )}
 
-            {/* Active Category Filters — removable chips (multi-select), so a
-                category chosen in the Filters sheet is visible and clearable on
-                the feed itself, like tags and sources. Tinted with the category's
-                own color so it reads as a category, not a tag. */}
-            {isLibraryView && selectedCategory.size > 0 && (
-                <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
-                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent/5 border border-accent/10">
-                        <LayoutGrid className="w-3 h-3 text-accent" />
-                        <span className="text-[10px] font-bold text-accent uppercase tracking-wider">Categories:</span>
-                    </div>
+            {/* Active filters — categories, tags, and sources share ONE wrapping
+                bar instead of three stacked rows. Each chip self-labels its kind
+                (a colored dot = category, # = tag, a globe = source), so the bulky
+                per-row label pills are gone and a single "Clear all" covers the
+                whole bar. Collections keep their own banner below (extra actions). */}
+            {isLibraryView && (selectedCategory.size > 0 || selectedTags.size > 0 || sourceChips.length > 0) && (
+                <div className="flex flex-wrap items-center gap-1.5 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
                     {Array.from(selectedCategory).map(cat => {
                         const colorStyle = getCategoryColorStyle(cat);
                         return (
                             <div
-                                key={cat}
+                                key={`cat:${cat}`}
                                 className="group flex items-center gap-1.5 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm"
                             >
-                                <span
-                                    className="w-2 h-2 rounded-full shrink-0"
-                                    style={{ backgroundColor: colorStyle.color }}
-                                />
+                                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colorStyle.color }} />
                                 <span>{cat}</span>
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        const next = new Set(selectedCategory);
-                                        next.delete(cat);
-                                        setSelectedCategory(next);
-                                    }}
+                                    onClick={() => setSelectedCategory(prev => { const n = new Set(prev); n.delete(cat); return n; })}
                                     aria-label={`Remove ${cat} filter`}
                                     title="Remove filter"
                                     className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
@@ -1908,29 +1898,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             </div>
                         );
                     })}
-                    {selectedCategory.size > 1 && (
-                        <button
-                            onClick={() => setSelectedCategory(new Set())}
-                            className="text-[10px] font-bold text-text-muted/60 hover:text-accent hover:underline px-2 transition-colors uppercase tracking-tight"
-                        >
-                            Clear All
-                        </button>
-                    )}
-                </div>
-            )}
-
-            {/* Active Tag Filters — shown above the cards (not in Ask mode). */}
-            {isLibraryView && selectedTags.size > 0 && (
-                <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
-                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent/5 border border-accent/10">
-                        <TagIcon className="w-3 h-3 text-accent" />
-                        <span className="text-[10px] font-bold text-accent uppercase tracking-wider">Filtered By:</span>
-                    </div>
                     {Array.from(selectedTags).map(tag => (
                         <div
-                            key={tag}
+                            key={`tag:${tag}`}
                             className="group flex items-center gap-1 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm"
                         >
+                            <span className="text-accent/60 font-bold">#</span>
                             <span>{tag.split('/').pop()}</span>
                             <button
                                 type="button"
@@ -1943,27 +1916,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             </button>
                         </div>
                     ))}
-                    <button
-                        onClick={() => setSelectedTags(new Set())}
-                        className="text-[10px] font-bold text-text-muted/60 hover:text-accent hover:underline px-2 transition-colors uppercase tracking-tight"
-                    >
-                        Clear All
-                    </button>
-                </div>
-            )}
-
-            {/* Active Source filters — removable chips, like tags. */}
-            {isLibraryView && selectedSources.size > 0 && (
-                <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
-                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent/5 border border-accent/10">
-                        <Globe className="w-3 h-3 text-accent" />
-                        <span className="text-[10px] font-bold text-accent uppercase tracking-wider">Sources:</span>
-                    </div>
                     {sourceChips.map(chip => (
                         <div
-                            key={chip.id}
-                            className="group flex items-center gap-1 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm"
+                            key={`src:${chip.id}`}
+                            className="group flex items-center gap-1.5 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm"
                         >
+                            <Globe className="w-3 h-3 text-text-muted shrink-0" />
                             <span>{chip.label}</span>
                             <button
                                 type="button"
@@ -1976,9 +1934,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             </button>
                         </div>
                     ))}
-                    {sourceChips.length > 1 && (
+                    {selectedCategory.size + selectedTags.size + sourceChips.length > 1 && (
                         <button
-                            onClick={() => setSelectedSources(new Set())}
+                            onClick={() => { setSelectedCategory(new Set()); setSelectedTags(new Set()); setSelectedSources(new Set()); }}
                             className="text-[10px] font-bold text-text-muted/60 hover:text-accent hover:underline px-2 transition-colors uppercase tracking-tight"
                         >
                             Clear All
@@ -2060,6 +2018,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     onToggleTag={handleToggleTag}
                                     onClearFilters={() => setSelectedTags(new Set())}
                                     onCollapse={toggleTagExplorer}
+                                    rankByCount={selectedCategory.size > 0}
                                 />
                             </div>
                         )}
