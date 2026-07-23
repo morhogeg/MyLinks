@@ -714,7 +714,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-23 (latest) — TAG SHEET SCROLL LOCK FIX.** Owner report: opening
+- **2026-07-23 (latest) — REAL THINKING ORBS LIBRARY (hero orb).** Owner: the
+  hand-rolled CSS "Aurora" goo blob didn't match Jakub Antalík's reference.
+  Replaced it with the **actual library** — `thinking-orbs@0.1.1` (MIT, zero-dep,
+  canvas, author-published; https://orbs.jakubantalik.com). The Ask empty state
+  now renders `<ThinkingOrb state="listening" size={64} theme={resolvedTheme} />`
+  (`AskBrain.tsx`); `resolvedTheme` is passed from `ThemeProvider` so it's right
+  even when in-app theme ≠ OS preference (the lib's `auto` only detects a
+  `light`/`dark` class, and this app uses a bare `.light` class on `<html>`, no
+  `dark`). Deleted `AuroraOrb.tsx` + its `.aurora-orb` CSS/keyframes; the goo
+  filter is gone (canvas is friendlier to WKWebView anyway). The richer inline
+  `WorkingRing` is unchanged (still CSS). Lib API: 6 states
+  (working/searching/solving/listening/composing/shaping), 2 tuned sizes (64|20).
+  `next build` compiles clean (sandbox prerender fails only on missing Firebase
+  env). Feature `3389873`, merge `755529e` → Vercel. **Not yet on TestFlight**
+  (awaiting web visual confirm before building — build 1165 still carries the old
+  CSS aurora). Possible follow-up: swap inline rings to `ThinkingOrb size={20}`.
+
+- **2026-07-23 — TAG SHEET SCROLL LOCK FIX.** Owner report: opening
   "Add tag" on a card showed the mobile sheet, but touch-scrolling the tag list
   scrolled the feed behind the scrim instead of the list. Root cause: `TagInput`
   was the ONE bottom sheet that never took the ref-counted body scroll lock —
