@@ -1879,7 +1879,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                             >
                                 <span
                                     className="w-2 h-2 rounded-full shrink-0"
-                                    style={{ backgroundColor: colorStyle.backgroundColor }}
+                                    style={{ backgroundColor: colorStyle.color }}
                                 />
                                 <span>{cat}</span>
                                 <button

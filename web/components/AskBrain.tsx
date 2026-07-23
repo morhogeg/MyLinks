@@ -54,21 +54,34 @@ function sourceTag(s: ChatSource): { label: string; platform: ReturnType<typeof 
     return null;
 }
 
-/** The model sometimes writes bullets as literal glyphs ("• a • b • c"),
- *  often inline in one paragraph — Markdown doesn't parse those as a list, so
- *  they render as a wall of text. Normalize them to real Markdown list items:
- *  line-leading bullet glyphs become "- ", inline " • " separators break into
- *  new items, and "1)" numbering becomes "1.". */
+/** The model sometimes writes bullets as literal glyphs ("• a • b • c") or a
+ *  numbered list ("1. a 2. b 3. c") all inline in one paragraph — Markdown
+ *  doesn't parse those as a list, so they render as a wall of text. Normalize
+ *  them to real Markdown list items: line-leading bullet glyphs become "- ",
+ *  inline " • " separators break into new items, "1)" numbering becomes "1.",
+ *  and inline numbered markers each break onto their own line. */
 function normalizeListMarkers(md: string): string {
     // Quoted spans are protected: a card title like "Artist • Song • Live"
     // must not be chopped into fake list items by the inline-bullet splitter.
     // Split alternates [outside, quoted, outside, …]; transform outside only.
     return md
         .split(/(["“”«»][^"“”«»\n]{0,300}["“”«»])/)
-        .map((seg, i) => i % 2 === 1 ? seg : seg
-            .replace(/^([ \t]*)[•◦▪‣·][ \t]+/gm, '$1- ')
-            .replace(/[ \t]+[•◦▪‣][ \t]+/g, '\n- ')
-            .replace(/^([ \t]*)(\d{1,2})\)[ \t]+/gm, '$1$2. '))
+        .map((seg, i) => {
+            if (i % 2 === 1) return seg;
+            let out = seg
+                .replace(/^([ \t]*)[•◦▪‣·][ \t]+/gm, '$1- ')
+                .replace(/[ \t]+[•◦▪‣][ \t]+/g, '\n- ')
+                .replace(/^([ \t]*)(\d{1,2})\)[ \t]+/gm, '$1$2. ');
+            // Inline numbered list: only when the segment actually carries a
+            // "1." followed later on the SAME line by a "2." (a real inline
+            // ordered list) do we break each marker onto its own line — gated so
+            // ordinary prose like "It cost $2. Then I left." is never chopped.
+            // `.` doesn't cross newlines, so already-multiline lists don't match.
+            if (/(?:^|\s)1[.)]\s+\S.*?\s2[.)]\s/.test(out)) {
+                out = out.replace(/(\S)[ \t]+(\d{1,2})[.)][ \t]+/g, '$1\n$2. ');
+            }
+            return out;
+        })
         .join('');
 }
 

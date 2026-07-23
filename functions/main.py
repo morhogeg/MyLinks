@@ -702,6 +702,10 @@ def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = Non
             poster = _fetch_post_images([poster_url])
             if poster:
                 scraped["_post_thumbnail"] = poster[0]
+                # Mark it a video poster so the card renders it at the fixed
+                # YouTube-style banner height (center crop) instead of sizing the
+                # banner to a tall portrait frame.
+                scraped["_post_thumbnail_is_video"] = True
     return analysis
 
 
@@ -789,6 +793,7 @@ def _apply_post_thumbnail(link_data: dict, scraped: dict, uid: str, key: str = N
     image fetch (the bytes are already in hand).
     """
     thumb = scraped.pop("_post_thumbnail", None)
+    is_video_poster = scraped.pop("_post_thumbnail_is_video", False)
     if not thumb or not uid:
         return
     try:
@@ -798,7 +803,12 @@ def _apply_post_thumbnail(link_data: dict, scraped: dict, uid: str, key: str = N
         url = _store_image(f"post_thumbs/{uid}/{blob_key}.jpg", image_bytes, mime)
         meta = link_data.setdefault("metadata", {})
         meta["thumbnailUrl"] = url
-        if aspect:
+        if is_video_poster:
+            # Video posters render at the fixed YouTube-style banner height, so we
+            # omit the per-image aspect (which would size a portrait frame tall)
+            # and flag it so the card uses the video banner treatment.
+            meta["thumbnailIsVideo"] = True
+        elif aspect:
             meta["thumbnailAspect"] = aspect
     except Exception as e:
         logger.warning(f"Failed to store post thumbnail: {e}")
