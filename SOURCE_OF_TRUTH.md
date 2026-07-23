@@ -714,7 +714,29 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-23 (latest) — ACTIVE CATEGORY FILTER CHIPS + VIDEO POSTER THUMBNAILS
+- **2026-07-23 (latest) — ANALYZING BANNER: PHANTOM "STILL WORKING" AFTER THE
+  CARD IS READY.** Owner report (screenshot): a shared capture's card was fully
+  ready in the feed while the persistent "Searching connections… 86%" banner kept
+  ramping. Root cause: the iOS Share-Extension optimistic bridge
+  (`useSharedCaptureBanner`) shows a time-based fake % and only handed off/stopped
+  when it observed a `processing` card take over. When a capture lands already
+  **ready** — backend finished before the live feed ever saw a `processing` state
+  (fast capture, or the app opened a beat late so the placeholder→ready flip had
+  coalesced) — the hand-off never fired and the bridge ramped toward its 92%
+  ceiling for the full 30s `MAX_MS` (86% ≈ 27s in, near the give-up). Fix: the
+  bridge now also retires when the live feed is **authoritative** — `Feed` reports
+  its first Firestore snapshot up via a new `onFeedLoadedChange`
+  (`page.tsx` → `feedLoaded` → `useSharedCaptureBanner(processingActive,
+  feedLoaded)`); once loaded with no in-flight processing card (past a 4s
+  `SETTLE_MS` that still covers a lagging placeholder write), the capture has
+  already resolved, so the bridge flashes "Saved ✓" and slides away instead of
+  faking progress. Truly in-flight captures (processing card present) hand off
+  exactly as before; the write-gap the bridge exists to cover is preserved.
+  Files: `web/lib/useSharedCaptureBanner.ts`, `web/app/page.tsx`,
+  `web/components/Feed.tsx`. Verified: `tsc --noEmit` clean, eslint 0 on touched
+  files. **SHIPPED** (desktop web via Vercel; iOS → TestFlight, the fix is native-
+  app-facing).
+- **2026-07-23 — ACTIVE CATEGORY FILTER CHIPS + VIDEO POSTER THUMBNAILS
   (X / Instagram / LinkedIn / Facebook).** Two owner asks. **(1) Category chips:**
   choosing a category in the Filters sheet left no on-feed trace (unlike tags,
   sources, and the "Show" status pill, which already have removable rows). Added
