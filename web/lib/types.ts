@@ -18,6 +18,9 @@ export interface LinkMetadata {
   videoId?: string;
   watchUrl?: string;
   thumbnailUrl?: string;
+  // width/height of the stored cover thumbnail — lets the card banner size to the
+  // image (whole image for most shapes; extreme portraits clamp + anchor top).
+  thumbnailAspect?: number;
   youtubeChannel?: string;
   durationDisplay?: string;
   videoHighlights?: string[]; // each entry prefixed with an "M:SS" timestamp

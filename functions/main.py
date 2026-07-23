@@ -734,16 +734,22 @@ _POST_THUMB_JPEG_QUALITY = 80
 def _downscale_thumbnail(image_bytes: bytes, mime_type: str) -> tuple:
     """Downscale a post cover image to a small JPEG card thumbnail.
 
-    Returns (bytes, mime_type). Best-effort: on any decode/encode failure (or if
-    Pillow is unavailable) returns the ORIGINAL bytes/mime unchanged — a thumbnail
-    must never break a working save. Transparency is flattened onto white so PNGs
-    with alpha don't go black when re-encoded as JPEG.
+    Returns (bytes, mime_type, aspect) where aspect = width/height rounded to 4dp
+    (or None if it couldn't be measured). The frontend uses `aspect` to size the
+    card banner to the image so most shapes show whole (only extreme portraits get
+    clamped + top-anchored) instead of a fixed center-crop. Best-effort: on any
+    decode/encode failure (or if Pillow is unavailable) returns the ORIGINAL
+    bytes/mime and aspect None — a thumbnail must never break a working save.
+    Transparency is flattened onto white so PNGs with alpha don't go black when
+    re-encoded as JPEG.
     """
     try:
         import io
         from PIL import Image
         img = Image.open(io.BytesIO(image_bytes))
         img.thumbnail((_POST_THUMB_MAX_EDGE, _POST_THUMB_MAX_EDGE))
+        w, h = img.size
+        aspect = round(w / h, 4) if h else None
         if img.mode in ("RGBA", "LA", "P"):
             img = img.convert("RGBA")
             bg = Image.new("RGB", img.size, (255, 255, 255))
@@ -753,10 +759,10 @@ def _downscale_thumbnail(image_bytes: bytes, mime_type: str) -> tuple:
             img = img.convert("RGB")
         out = io.BytesIO()
         img.save(out, format="JPEG", quality=_POST_THUMB_JPEG_QUALITY, optimize=True)
-        return out.getvalue(), "image/jpeg"
+        return out.getvalue(), "image/jpeg", aspect
     except Exception as e:
         logger.warning(f"Thumbnail downscale failed, storing original: {e}")
-        return image_bytes, mime_type
+        return image_bytes, mime_type, None
 
 
 def _apply_post_thumbnail(link_data: dict, scraped: dict, uid: str, key: str = None) -> None:
@@ -776,10 +782,13 @@ def _apply_post_thumbnail(link_data: dict, scraped: dict, uid: str, key: str = N
         return
     try:
         import uuid
-        image_bytes, mime = _downscale_thumbnail(thumb[0], thumb[1])
+        image_bytes, mime, aspect = _downscale_thumbnail(thumb[0], thumb[1])
         blob_key = key or uuid.uuid4().hex
         url = _store_image(f"post_thumbs/{uid}/{blob_key}.jpg", image_bytes, mime)
-        link_data.setdefault("metadata", {})["thumbnailUrl"] = url
+        meta = link_data.setdefault("metadata", {})
+        meta["thumbnailUrl"] = url
+        if aspect:
+            meta["thumbnailAspect"] = aspect
     except Exception as e:
         logger.warning(f"Failed to store post thumbnail: {e}")
 

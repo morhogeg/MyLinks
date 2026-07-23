@@ -748,6 +748,14 @@ exact-match, capped.
   (`CardFace`), merge `ce3fff9` → **iOS→TestFlight build 1163** (green). Note: the
   review banner is `object-cover` at ~120px, so a tall portrait cover center-crops
   — deliberate for a compact triage card; revisit if owner wants more of the image.
+  **Framing follow-up:** `_downscale_thumbnail` now also returns the image aspect
+  (w/h), stored as `metadata.thumbnailAspect`; the feed (`Card.tsx`) and review
+  (`SwipeDeck.tsx`) banners size to the image — capped (feed 20rem, review 12.5rem,
+  min 7rem) so a tall portrait can't dominate — so most shapes show whole, and the
+  crop (when clamped, or on older cards with no stored aspect) anchors `object-top`
+  where social posts put the headline/subject. No reliable "salient region"
+  detection attempted (would be flaky); this just shows more of the image. New
+  saves only for adaptive height; the top-anchor improves existing cards too.
   Best-effort throughout — any fetch/decode/store failure
   degrades to the text-only card, never breaks a save. Reels/IGTV + video stay
   text-only (already gated out of vision). Added `Pillow==11.3.0` to

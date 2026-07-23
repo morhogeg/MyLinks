@@ -243,14 +243,20 @@ function Card({
                 </div>
             )}
             {/* Social-post cover (X / Instagram): the same image we read for the
-                summary, shown as a short banner. Non-video cards only. */}
+                summary. When we know the image's aspect (new saves) the banner sizes
+                to it — capped so a tall portrait can't dominate — so most images show
+                whole; older cards fall back to a fixed short banner. Either way the
+                crop anchors to the top, where social posts put the headline/subject. */}
             {link.sourceType !== 'youtube' && link.metadata?.thumbnailUrl && (
-                <div className="relative w-full h-28 sm:h-32 bg-black/40 overflow-hidden">
+                <div
+                    className={`relative w-full bg-black/40 overflow-hidden ${link.metadata.thumbnailAspect ? '' : 'h-28 sm:h-32'}`}
+                    style={link.metadata.thumbnailAspect ? { aspectRatio: String(link.metadata.thumbnailAspect), maxHeight: '20rem', minHeight: '7rem' } : undefined}
+                >
                     <img
                         src={link.metadata.thumbnailUrl}
                         alt=""
                         loading="lazy"
-                        className="w-full h-full object-cover transition-transform duration-300 [@media(hover:hover)]:group-hover:scale-[1.03]"
+                        className="w-full h-full object-cover object-top transition-transform duration-300 [@media(hover:hover)]:group-hover:scale-[1.03]"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                 </div>
