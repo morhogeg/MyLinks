@@ -723,12 +723,35 @@ exact-match, capped.
   a new **Hide image / Show image** button (ImageOff/Image) sits in the modal's
   action row whenever the card has a `thumbnailUrl`, calling the same
   `handleToggleThumbnail` (persists `link.hideThumbnail`). `tsc` clean. No backend
-  change. Observation for later: LinkedIn's generic **"Posted on LinkedIn"**
-  placeholder og:image slips past auto-suppress (it's wide, not square, so the
-  square gate misses it) — the manual toggle covers it now, but tuning the gate to
-  catch flat-background placeholders (without eating letterboxed frames) is a
-  possible follow-up.
+  change. Merged with the parallel session's `platformSuppressesThumbnail` entry
+  below — both gates now compose in `Card.tsx` + `LinkDetailModal.tsx`
+  (`!hideThumbnail && !platformSuppressesThumbnail(url)`), so the "Posted on
+  LinkedIn" placeholder I'd flagged as a follow-up is already handled at the source
+  (LinkedIn/FB no longer emit `video_thumbnail_url`) AND platform-gated on the
+  frontend.
 
+- **2026-07-23 — NO IMAGES ON LINKEDIN / FACEBOOK CARDS (kill junk
+  posters).** Owner saw a LinkedIn TEXT post (Grace Gong hiring list) rendered
+  with a generic "Posted on LinkedIn" blue-logo banner — an og:image that isn't
+  the post's content. Root cause: the parallel session's video-poster feature
+  (`2bea67e`) emitted `video_thumbnail_url = _extract_og_image(soup)` for LinkedIn
+  UNCONDITIONALLY (and Facebook on any caption). LinkedIn serves that branding
+  og:image even for pure text posts, and `_video_poster_looks_like_junk` can't
+  catch it (it's a wide card, not a small/square logo). Heuristics can't reliably
+  tell branding from content, so the fix is a RULE at the source. **Backend
+  (`scraper.py`):** `_scrape_linkedin_url` and `_scrape_facebook_url` no longer
+  emit `video_thumbnail_url` — we can't distinguish a video/photo post from text
+  on these platforms, and their og:image is branding/link-preview, so their cards
+  stay text-only. **Frontend:** new `platformSuppressesThumbnail(url)` in
+  `platform.tsx` (true for linkedin/facebook) gates the banner in `Card.tsx`,
+  `SwipeDeck.tsx` (review), and `LinkDetailModal.tsx` — so EXISTING LinkedIn/FB
+  cards with a stored junk poster also stop showing it (backend fix only stops new
+  saves). **Kept (per owner's rule — images only for video thumbnails or
+  image-first posts):** YouTube, X photos + X video posters, Instagram photo
+  covers + reel posters. The separate coffee-cup X-video-poster avatar is the
+  other session's `_video_poster_looks_like_junk` domain, untouched here. tsc +
+  py_compile clean; post-image tests pass. Backend changed → redeploy
+  `analyze_link` + `process_link_background`.
 - **2026-07-23 — VIDEO THUMBNAIL: auto-suppress junk posters + per-card
   hide/show toggle.** Owner saw an X card whose "poster" was a tiny avatar-style
   coffee-cup icon on a plain gray banner — worse than a clean text card. Two-part

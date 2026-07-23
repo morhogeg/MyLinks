@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, LinkStatus, UserNote } from '@/lib/types';
 import SourceByline from './SourceByline';
 import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2, ChevronLeft, StickyNote } from 'lucide-react';
-import { getPlatform } from '@/lib/platform';
+import { getPlatform, platformSuppressesThumbnail } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import { openExternal } from '@/lib/share';
 import ReadingView from './ReadingView';
@@ -639,7 +639,7 @@ export default function LinkDetailModal({
                     {/* Social-post cover (X / Instagram): the image we read for the
                         summary. Non-video, non-screenshot cards only — the youtube
                         and image blocks own their own rendering above/below. */}
-                    {!link.hideThumbnail && link.sourceType !== 'youtube' && link.sourceType !== 'image' && link.metadata?.thumbnailUrl && (
+                    {!link.hideThumbnail && link.sourceType !== 'youtube' && link.sourceType !== 'image' && !platformSuppressesThumbnail(link.url) && link.metadata?.thumbnailUrl && (
                         <div className="mb-6 rounded-2xl overflow-hidden border border-border-subtle bg-black/40">
                             <img
                                 src={link.metadata.thumbnailUrl}
