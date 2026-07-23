@@ -714,7 +714,34 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-23 (latest) — SHARE-EXTENSION ORB (native Swift port of "working").**
+- **2026-07-23 (latest) — ACTIVE CATEGORY FILTER CHIPS + VIDEO POSTER THUMBNAILS
+  (X / Instagram / LinkedIn / Facebook).** Two owner asks. **(1) Category chips:**
+  choosing a category in the Filters sheet left no on-feed trace (unlike tags,
+  sources, and the "Show" status pill, which already have removable rows). Added
+  an **"Categories:"** chip row in `Feed.tsx` (right above the tag row, gated on
+  `isLibraryView && selectedCategory.size > 0`), mirroring the tag/source chip
+  markup — each chip tinted with `getCategoryColorStyle(cat)` (small color dot),
+  a ✕ that deletes that one category from the `selectedCategory` Set, and a
+  "Clear All" when >1. `selectedCategory` was already multi-select. Frontend-only;
+  `tsc` clean. **(2) Video poster thumbnails:** we never decoded video *frames*
+  for anyone (YouTube just hotlinks its poster URL). Now non-YouTube video posts
+  surface the platform's **poster frame** as the card banner via the existing
+  `_post_thumbnail` → `_apply_post_thumbnail` re-host path (downscaled, no vision
+  call). Scraper (`scraper.py`) now emits `video_thumbnail_url`: **X** from
+  fx/vxtwitter video/gif `thumbnail_url` (previously discarded); **Instagram**
+  reels/IGTV from the og:image we already fetch but gate out of vision;
+  **LinkedIn** from og:image (was extracting no image at all); **Facebook** from
+  og:image *only when a real caption was scraped* (a login-walled page's og:image
+  is just the FB logo — guarded). `main._analyze_scraped` fetches that single URL
+  (SSRF-guarded `_fetch_post_images`) purely to show. **Graceful fallback
+  throughout:** no poster URL or a failed fetch leaves the card media-less — an
+  image never breaks a save. Backend `py_compile` clean; fx/vx formatters
+  runtime-verified (video→poster+no vision, photo→vision path unchanged). FB/IG/LI
+  og:image paths need on-device QA (real poster vs. occasional logo/avatar,
+  especially LinkedIn text posts). Functions changed → needs deploy
+  (`analyze_link`, `process_link_background`).
+
+- **2026-07-23 — SHARE-EXTENSION ORB (native Swift port of "working").**
   Owner: put a real orb in the iOS share-sheet processing screen too, replacing
   the ring but KEEPING the window scanner. The extension is native (no JS), so
   ported the library's `orbits` ("working") mode to Swift/CoreGraphics —
