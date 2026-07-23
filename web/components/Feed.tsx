@@ -2546,6 +2546,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     excludeRelatedIds={linkStack}
                     onAddToCollection={(link) => setAddToCollectionLink(link)}
                     onShare={handleShareCard}
+                    onToggleThumbnail={handleToggleThumbnail}
                     scrollToNotes={detailScrollToNotes}
                 />
             )}

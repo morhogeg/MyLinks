@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, LinkStatus, UserNote } from '@/lib/types';
 import SourceByline from './SourceByline';
-import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, BookOpen, Layers, Share2, ChevronLeft, StickyNote } from 'lucide-react';
+import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2, ChevronLeft, StickyNote } from 'lucide-react';
 import { getPlatform } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import { openExternal } from '@/lib/share';
@@ -67,6 +67,8 @@ interface LinkDetailModalProps {
     excludeRelatedIds?: string[];  // cards already behind you in the back-stack
     onAddToCollection?: (link: Link) => void;
     onShare?: (link: Link) => void;
+    /** Toggle the card's thumbnail banner on/off (Hide image / Show image). */
+    onToggleThumbnail?: (link: Link) => void;
     /** Open revealed at the My-notes section (set when entered from the
         central My Notes view, so the user lands on what they came for). */
     scrollToNotes?: boolean;
@@ -95,6 +97,7 @@ export default function LinkDetailModal({
     excludeRelatedIds,
     onAddToCollection,
     onShare,
+    onToggleThumbnail,
     scrollToNotes,
 }: LinkDetailModalProps) {
     const [isReading, setIsReading] = useState(false);
@@ -541,6 +544,19 @@ export default function LinkDetailModal({
                                 <BookOpen className="w-[18px] h-[18px]" />
                             </button>
                         )}
+                        {onToggleThumbnail && link.metadata?.thumbnailUrl && (
+                            <button
+                                onClick={() => onToggleThumbnail(link)}
+                                title={link.hideThumbnail ? 'Show image' : 'Hide image'}
+                                aria-label={link.hideThumbnail ? 'Show image' : 'Hide image'}
+                                className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${link.hideThumbnail
+                                    ? 'bg-card-hover text-text'
+                                    : 'text-text-muted hover:text-accent hover:bg-card-hover'
+                                    }`}
+                            >
+                                {link.hideThumbnail ? <ImageIcon className="w-[18px] h-[18px]" /> : <ImageOff className="w-[18px] h-[18px]" />}
+                            </button>
+                        )}
                     </div>
 
                     {/* Delete + Open source + Close — pinned right so they're NEVER
@@ -623,7 +639,7 @@ export default function LinkDetailModal({
                     {/* Social-post cover (X / Instagram): the image we read for the
                         summary. Non-video, non-screenshot cards only — the youtube
                         and image blocks own their own rendering above/below. */}
-                    {link.sourceType !== 'youtube' && link.sourceType !== 'image' && link.metadata?.thumbnailUrl && (
+                    {!link.hideThumbnail && link.sourceType !== 'youtube' && link.sourceType !== 'image' && link.metadata?.thumbnailUrl && (
                         <div className="mb-6 rounded-2xl overflow-hidden border border-border-subtle bg-black/40">
                             <img
                                 src={link.metadata.thumbnailUrl}
@@ -641,6 +657,7 @@ export default function LinkDetailModal({
                         const thumb = link.metadata.thumbnailUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
                         return (
                         <div className="mb-6 space-y-4">
+                            {!link.hideThumbnail && (
                             <button
                                 onClick={() => openExternal(youtubeWatchUrl(videoId))}
                                 aria-label="Watch on YouTube"
@@ -652,6 +669,7 @@ export default function LinkDetailModal({
                                     <Youtube className="w-3.5 h-3.5" /> Watch on YouTube
                                 </span>
                             </button>
+                            )}
 
                             {!!link.metadata.videoHighlights?.length && (
                                 <div className="rounded-2xl border border-border-strong bg-fill-subtle p-4">
