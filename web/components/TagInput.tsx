@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { X, Plus, Check, Search } from 'lucide-react';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { useSheetDrag } from '@/lib/useSheetDrag';
+import { useScrollLock } from '@/lib/useScrollLock';
 
 interface TagInputProps {
     allTags: string[];
@@ -38,6 +39,11 @@ export default function TagInput({
 
     // Visual viewport drives the mobile sheet so it rides above the keyboard.
     const vp = useVisualViewport();
+
+    // Freeze the page behind the mobile sheet (ref-counted, same as every other
+    // sheet). Without it, touch-scrolling the tag list chains through to the feed
+    // behind the scrim instead of scrolling the list.
+    useScrollLock(isOpen && isMobile);
 
     // Drag-to-dismiss for the mobile sheet — closes via the same onCancel the X uses.
     const { sheetRef, scrimRef, handleProps } = useSheetDrag({ onClose: onCancel, enabled: isMobile });

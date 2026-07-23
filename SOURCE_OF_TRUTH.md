@@ -714,7 +714,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-22 (latest) — ORBS: RICHER INLINE RING + AURORA HERO ORB.** Course-
+- **2026-07-23 (latest) — TAG SHEET SCROLL LOCK FIX.** Owner report: opening
+  "Add tag" on a card showed the mobile sheet, but touch-scrolling the tag list
+  scrolled the feed behind the scrim instead of the list. Root cause: `TagInput`
+  was the ONE bottom sheet that never took the ref-counted body scroll lock —
+  every sibling sheet (`MobileFiltersSheet`, `AddToCollectionSheet`,
+  `CardActionSheet`, …) already does. `overscroll-contain` alone doesn't stop
+  the chain at the list's scroll edges. Fix: one line —
+  `useScrollLock(isOpen && isMobile)` in `web/components/TagInput.tsx` (nests
+  cleanly over `LinkDetailModal`'s lock since it's ref-counted). Frontend-only,
+  tsc clean. Pushed to `main` (Vercel). No backend/iOS change.
+
+- **2026-07-22 — ORBS: RICHER INLINE RING + AURORA HERO ORB.** Course-
   correct — owner felt the shipped ring had drifted into a stock spinner vs the
   original "Thinking Orbs" reference. Moved to a **two-tier** system: (1) the
   inline `.working-ring` now sweeps the full brand gradient (lilac→purple→pink,
