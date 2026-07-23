@@ -739,7 +739,12 @@ exact-match, capped.
   (Ask empty/launch), Pulse/Morph kept as safer hero fallbacks. **Aurora's goo
   filter is GPU-heavier + WKWebView-finicky** — degrades to soft blend-blobs if
   dropped; **needs on-device QA** (this is a real risk on iOS). tsc clean.
-  Feature `a4f0c6a`, merge `d1d4762` → Vercel.
+  Feature `a4f0c6a`, merge `d1d4762` → Vercel. **Follow-up:** swapped the
+  `Loader2` spinner on the in-feed "Saving…" processing card (`Card.tsx`) for the
+  same `WorkingRing` too (`ea839bc`, merge `53060e6`). **Note on Aurora
+  visibility:** it renders in the Ask *empty* state (has-saves, no messages —
+  the "What do you want to recall?" screen via New chat), NOT the zero-saves
+  "Nothing to ask about yet" state (still `MessagesSquare`, `AskBrain.tsx:952`).
 
 - **2026-07-22 — TOAST CHECK UNIFIED + SHORTER DURATIONS.** Owner: the
   success-toast checkmark was a green circled `CheckCircle2`, out of step with the
