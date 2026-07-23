@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback, cloneElement, type ReactElement } from 'react';
 import { Link, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef } from '@/lib/types';
-import { getColorStyleByKey } from '@/lib/colors';
+import { getColorStyleByKey, getCategoryColorStyle } from '@/lib/colors';
 import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
 import DigestView from './DigestView';
 import DigestCard from './DigestCard';
@@ -1857,6 +1857,55 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onO
                         <BarChart3 className="w-3.5 h-3.5 text-accent" />
                         <span>Back to Insights</span>
                     </button>
+                </div>
+            )}
+
+            {/* Active Category Filters — removable chips (multi-select), so a
+                category chosen in the Filters sheet is visible and clearable on
+                the feed itself, like tags and sources. Tinted with the category's
+                own color so it reads as a category, not a tag. */}
+            {isLibraryView && selectedCategory.size > 0 && (
+                <div className="flex flex-wrap items-center gap-2 -mx-2 px-2 sm:mx-0 sm:px-0 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent/5 border border-accent/10">
+                        <LayoutGrid className="w-3 h-3 text-accent" />
+                        <span className="text-[10px] font-bold text-accent uppercase tracking-wider">Categories:</span>
+                    </div>
+                    {Array.from(selectedCategory).map(cat => {
+                        const colorStyle = getCategoryColorStyle(cat);
+                        return (
+                            <div
+                                key={cat}
+                                className="group flex items-center gap-1.5 ps-2.5 pe-1 py-1 rounded-full bg-card border border-border-subtle text-text-secondary text-xs font-semibold shadow-sm"
+                            >
+                                <span
+                                    className="w-2 h-2 rounded-full shrink-0"
+                                    style={{ backgroundColor: colorStyle.backgroundColor }}
+                                />
+                                <span>{cat}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const next = new Set(selectedCategory);
+                                        next.delete(cat);
+                                        setSelectedCategory(next);
+                                    }}
+                                    aria-label={`Remove ${cat} filter`}
+                                    title="Remove filter"
+                                    className="flex items-center justify-center rounded-full p-0.5 text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        );
+                    })}
+                    {selectedCategory.size > 1 && (
+                        <button
+                            onClick={() => setSelectedCategory(new Set())}
+                            className="text-[10px] font-bold text-text-muted/60 hover:text-accent hover:underline px-2 transition-colors uppercase tracking-tight"
+                        >
+                            Clear All
+                        </button>
+                    )}
                 </div>
             )}
 

@@ -377,6 +377,11 @@ def _scrape_linkedin_url(url: str) -> dict:
             "title": title,
             "text": text or html[:5000],
             "source_name": _extract_linkedin_author(html),
+            # Best-effort poster: LinkedIn exposes the post/video preview as
+            # og:image. Surfaced as the card banner (no vision) so video and
+            # media posts show a thumbnail; a text-only post with no og:image
+            # simply gets no media.
+            "video_thumbnail_url": _extract_og_image(soup),
         }
     except Exception as e:
         logger.error(f"LinkedIn scrape error for {url}: {e}")
@@ -586,6 +591,7 @@ def _format_twitter_data(tweet: dict, source: str) -> dict:
         content_parts.append(f'\n[Replying to/Quoting {q_author} (@{q_handle})]:\n"{q_text}"')
 
     image_urls = []
+    video_thumbnail_url = ""
     if tweet.get('media'):
         media = tweet['media']
         photos = media.get('photos') or []
@@ -594,8 +600,16 @@ def _format_twitter_data(tweet: dict, source: str) -> dict:
             # Surface the photo URLs so the caller can run vision on the images
             # embedded in the post (fxtwitter photos carry a direct `url`).
             image_urls = [p.get('url') for p in photos if isinstance(p, dict) and p.get('url')]
-        if media.get('videos'):
+        videos = media.get('videos') or []
+        if videos:
             content_parts.append("\n[Contains Video]")
+            # Surface the video's poster frame so the card can SHOW a thumbnail
+            # like YouTube. We never run vision on it (it's one frame, not the
+            # content) — the caller just re-hosts it as the card banner.
+            for v in videos:
+                if isinstance(v, dict) and isinstance(v.get('thumbnail_url'), str) and v['thumbnail_url']:
+                    video_thumbnail_url = v['thumbnail_url']
+                    break
 
     final_tweet_content = "\n\n".join(content_parts) or "[Media-only tweet or no text content available]"
 
@@ -625,6 +639,7 @@ Source: {source} API
         "title": title,
         "text": formatted_text,
         "image_urls": image_urls,
+        "video_thumbnail_url": video_thumbnail_url,
     }
 
 
@@ -635,6 +650,7 @@ def _format_vxtwitter_data(data: dict) -> dict:
         content_parts.append(data['text'])
 
     image_urls = []
+    video_thumbnail_url = ""
     if data.get('mediaURLs') or data.get('media_extended'):
         count = max(len(data.get('mediaURLs', [])), len(data.get('media_extended', [])))
         content_parts.append(f"\n[Contains {count} Media Item(s)]")
@@ -644,6 +660,14 @@ def _format_vxtwitter_data(data: dict) -> dict:
         if extended:
             image_urls = [m.get('url') for m in extended
                           if isinstance(m, dict) and m.get('type') == 'image' and m.get('url')]
+            # A video/gif carries no vision-worthy image, but its poster frame
+            # (thumbnail_url) makes a good card banner — surface the first one so
+            # video tweets get a thumbnail instead of a blank card.
+            for m in extended:
+                if (isinstance(m, dict) and m.get('type') in ('video', 'gif')
+                        and isinstance(m.get('thumbnail_url'), str) and m['thumbnail_url']):
+                    video_thumbnail_url = m['thumbnail_url']
+                    break
         else:
             image_urls = [u for u in (data.get('mediaURLs') or []) if isinstance(u, str)]
 
@@ -666,6 +690,7 @@ Source: vxtwitter API
         "title": f"Tweet by {data.get('user_name')}: {final_content[:100].replace(chr(10), ' ')}",
         "text": formatted_text,
         "image_urls": image_urls,
+        "video_thumbnail_url": video_thumbnail_url,
     }
 
 
@@ -990,6 +1015,11 @@ def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
         # analysis layer to read the image at higher resolution and trust it over
         # the caption. (X posts leave this unset — there the text is primary.)
         "image_primary": True,
+        # Reels/IGTV are gated out of vision above (image_urls stays empty), but
+        # their og:image poster frame still makes a good card banner — surface it
+        # so video posts get a thumbnail like YouTube. Photo posts leave this empty
+        # (their cover already flows through image_urls → the vision thumbnail).
+        "video_thumbnail_url": best_image if (is_video and best_image) else "",
     }
 
 
@@ -1060,6 +1090,7 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
     best_desc = ""
     source_name = None
     truncated = False
+    fb_image = ""  # og:image poster — only trusted when a real caption was found
 
     try:
         headers = {
@@ -1126,6 +1157,11 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
                     best_title = first_line[:120]
                 best_desc = body
                 metadata_lines.append(f"POST CAPTION:\n{body}")
+                # Only pull the og:image poster when we got a real caption — a
+                # login-walled page's og:image is just the Facebook logo, which we
+                # must not show. Best-effort: no image simply leaves the card
+                # media-less.
+                fb_image = _extract_og_image(soup)
     except Exception as e:
         logger.warning(f"Facebook scrape failed: {e}")
 
@@ -1150,7 +1186,8 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
 
     final_text = "\n\n---\n\n".join(metadata_lines)
     return {"html": final_text, "title": best_title, "text": final_text,
-            "source_name": source_name, "truncated": truncated}
+            "source_name": source_name, "truncated": truncated,
+            "video_thumbnail_url": fb_image}
 
 
 def _extract_youtube_id(url: str) -> Optional[str]:

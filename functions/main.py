@@ -691,6 +691,17 @@ def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = Non
     if isinstance(analysis, dict) and scraped.get("truncated"):
         analysis["detailedSummary"] = _append_capture_note(
             analysis.get("detailedSummary"), analysis.get("language"))
+    # Video posts (X / Instagram reels / LinkedIn / Facebook) have no embedded
+    # photo to run vision on, but often expose a poster frame. Fetch that single
+    # image purely to SHOW as the card banner — no model call — so they get a
+    # thumbnail like YouTube. The caller re-hosts it via `_apply_post_thumbnail`.
+    # Best-effort: no poster URL, or a failed fetch, leaves the card media-less.
+    if not scraped.get("_post_thumbnail"):
+        poster_url = scraped.get("video_thumbnail_url")
+        if poster_url:
+            poster = _fetch_post_images([poster_url])
+            if poster:
+                scraped["_post_thumbnail"] = poster[0]
     return analysis
 
 
