@@ -714,7 +714,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-22 (latest) — TOAST CHECK UNIFIED + SHORTER DURATIONS.** Owner: the
+- **2026-07-22 (latest) — ORBS: RICHER INLINE RING + AURORA HERO ORB.** Course-
+  correct — owner felt the shipped ring had drifted into a stock spinner vs the
+  original "Thinking Orbs" reference. Moved to a **two-tier** system: (1) the
+  inline `.working-ring` now sweeps the full brand gradient (lilac→purple→pink,
+  new `--accent-2`/`--accent-3` token stops, both themes) with a soft breathing
+  glow — same footprint, but reads as Machina; the native share-extension ring
+  (`SpinningRingView`) got the same lilac→purple→pink sweep. (2) New **`AuroraOrb`**
+  (`web/components/ui/AuroraOrb.tsx`) — gooey brand-gradient metaballs via an SVG
+  goo filter — is the hero mark for focal moments; dropped into the **empty Ask
+  state** (replacing the flat `MessagesSquare` icon). Design principle recorded:
+  unified mark for *peripheral* indicators, characterful orb for *focal* moments
+  (Ask empty/launch), Pulse/Morph kept as safer hero fallbacks. **Aurora's goo
+  filter is GPU-heavier + WKWebView-finicky** — degrades to soft blend-blobs if
+  dropped; **needs on-device QA** (this is a real risk on iOS). tsc clean.
+  Feature `a4f0c6a`, merge `d1d4762` → Vercel.
+
+- **2026-07-22 — TOAST CHECK UNIFIED + SHORTER DURATIONS.** Owner: the
   success-toast checkmark was a green circled `CheckCircle2`, out of step with the
   app's other "done" marks. Swapped it for the same **bare accent `Check`**
   (strokeWidth 3, `text-accent`, no circle) the save-step checklist uses — one
