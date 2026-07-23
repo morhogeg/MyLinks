@@ -738,8 +738,12 @@ exact-match, capped.
   image never breaks a save. Backend `py_compile` clean; fx/vx formatters
   runtime-verified (video→poster+no vision, photo→vision path unchanged). FB/IG/LI
   og:image paths need on-device QA (real poster vs. occasional logo/avatar,
-  especially LinkedIn text posts). Functions changed → needs deploy
-  (`analyze_link`, `process_link_background`).
+  especially LinkedIn text posts). **SHIPPED:** merge `8b00253` → `main` (web
+  via Vercel); **Deploy Cloud Functions run #24** scoped to
+  `analyze_link,process_link_background`; **iOS→TestFlight run #168 → build
+  1168**. (Note: local `main` had drifted to an unrelated squashed history with
+  no merge-base to `origin/main`; realigned local `main` to `origin/main` before
+  merging — the feature branch was correctly based on `origin/main` all along.)
 
 - **2026-07-23 — SHARE-EXTENSION ORB (native Swift port of "working").**
   Owner: put a real orb in the iOS share-sheet processing screen too, replacing
