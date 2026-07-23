@@ -714,7 +714,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-23 (latest) — REAL THINKING ORBS LIBRARY (hero orb).** Owner: the
+- **2026-07-23 (latest) — BRANDORB: THINKING ORBS EVERYWHERE, IN OUR PALETTE.**
+  Owner: put the real orbs in every live "working" spot AND recolour them to
+  Machina purple→pink. The lib has **no colour prop** — it paints grayscale ink
+  (`fillStyle = rgba(a,a,a,o)`). Solution: new **`BrandOrb`**
+  (`web/components/ui/BrandOrb.tsx`) drives the library's OWN exported draw
+  functions (`MODE_DRAWS`/`resolvePreset`) through a **Canvas2D `Proxy` whose
+  `fillStyle` setter remaps the grey level onto a pink↔purple stop** — identical
+  shipped animations, our colours. rAF loop / DPR / reduced-motion single-frame /
+  off-screen + hidden-tab pausing all mirror `<ThinkingOrb>`. State per context:
+  empty Ask = `listening` (64), Ask thinking = `searching` (20), save-dialog
+  active step + `AnalyzingBanner` pill + in-feed "Saving…" card = `working` (20).
+  **Deleted `WorkingRing` + `.working-ring` CSS** (replaced everywhere); the
+  monochrome `<ThinkingOrb>` is no longer used directly. The **native
+  share-extension keeps its brand-gradient UIKit ring** (can't run the JS lib) —
+  the one spot that stays a ring. `next build` compiles clean; tsc clean.
+  Feature `6836da4`, merge `4304fd7` → Vercel. **Not yet on TestFlight** (awaiting
+  web visual confirm; build 1165 still has the old CSS aurora). **Watch on device:**
+  N canvases in a long feed of processing cards — off-screen pausing should keep
+  it cheap, but verify. Supersedes the monochrome-hero entry below.
+
+- **2026-07-23 — REAL THINKING ORBS LIBRARY (hero orb).** Owner: the
   hand-rolled CSS "Aurora" goo blob didn't match Jakub Antalík's reference.
   Replaced it with the **actual library** — `thinking-orbs@0.1.1` (MIT, zero-dep,
   canvas, author-published; https://orbs.jakubantalik.com). The Ask empty state
