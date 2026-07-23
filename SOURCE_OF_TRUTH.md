@@ -715,7 +715,7 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 
 - **2026-07-23 (latest) — FOLLOW-UP polish on the two above (owner QA round).**
-  Two tweaks after device review: **(1)** the active-category chip's color dot used
+  Three tweaks after device review: **(1)** the active-category chip's color dot used
   `getCategoryColorStyle().backgroundColor` (a 0.1-alpha tint → washed out); now
   uses `.color` (the solid category color) so each dot reads as its real category
   hue. **(2)** Video poster banners were sizing to the frame's aspect
@@ -726,8 +726,14 @@ exact-match, capped.
   `_post_thumbnail_is_video`). Frontend: `Card.tsx` renders
   `thumbnailIsVideo` posters through the YouTube banner branch; new
   `LinkMetadata.thumbnailIsVideo` type field. Photo covers still size to aspect.
-  `tsc` + `py_compile` clean. **SHIPPED** — see build/run numbers in the entry
-  below's ship line (this rides the same deploy).
+  **(3)** Ask answers that were an inline numbered list ("1. … 2. … 3. …" all on
+  one line — observed on a Hebrew recipe) rendered as a wall of text because
+  Markdown treats the run as a single list item. Extended `normalizeListMarkers`
+  in `AskBrain.tsx` to break inline numbered markers onto their own lines —
+  **gated** behind an actual inline "1.…2." run so ordinary prose ("It cost $2.
+  Then…") is never chopped, and `.`-not-crossing-newline so already-multiline
+  lists are untouched. Frontend-only. `tsc` + `py_compile` clean. **SHIPPED** —
+  see build/run numbers in the entry below's ship line (this rides the same deploy).
 
 - **2026-07-23 — ACTIVE CATEGORY FILTER CHIPS + VIDEO POSTER THUMBNAILS
   (X / Instagram / LinkedIn / Facebook).** Two owner asks. **(1) Category chips:**
