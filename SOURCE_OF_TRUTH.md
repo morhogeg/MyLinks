@@ -756,6 +756,8 @@ exact-match, capped.
   where social posts put the headline/subject. No reliable "salient region"
   detection attempted (would be flaky); this just shows more of the image. New
   saves only for adaptive height; the top-anchor improves existing cards too.
+  Shipped: merge `3463d2e`, Deploy Cloud Functions **run #22** green
+  (`analyze_link`,`process_link_background`), **iOS→TestFlight build 1164** green.
   Best-effort throughout — any fetch/decode/store failure
   degrades to the text-only card, never breaks a save. Reels/IGTV + video stay
   text-only (already gated out of vision). Added `Pillow==11.3.0` to
