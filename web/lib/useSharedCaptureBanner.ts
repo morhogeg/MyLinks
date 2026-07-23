@@ -26,8 +26,15 @@ import { progressFor, elapsedForProgress } from './shareProgress';
  * finishes gracefully on its own.
  */
 const MAX_MS = 30_000; // give up (or never start) the optimistic banner past this age
+// Once the live feed is authoritative, a capture with no `processing` card has
+// already resolved to a ready card — but the server-side placeholder can lag the
+// app foreground by a beat, so allow this settle window from capture start before
+// treating "feed loaded + nothing processing" as "already done". Comfortably
+// longer than a placeholder write, far shorter than MAX_MS (which used to keep a
+// finished capture's bar ramping to ~92% for ~30s — the phantom this fixes).
+const SETTLE_MS = 4_000;
 
-export function useSharedCaptureBanner(processingActive: boolean): AnalyzingState | null {
+export function useSharedCaptureBanner(processingActive: boolean, feedLoaded = false): AnalyzingState | null {
     // `startMs` is the shared capture-start wall clock (epoch ms) — progress is a
     // pure function of `Date.now() - startMs`, identical to what the extension
     // and the real processing banner compute.
@@ -46,6 +53,11 @@ export function useSharedCaptureBanner(processingActive: boolean): AnalyzingStat
     useEffect(() => {
         procRef.current = processingActive;
     }, [processingActive]);
+    // Latest feedLoaded, same reason — read inside the ticker without rebinding it.
+    const feedRef = useRef(feedLoaded);
+    useEffect(() => {
+        feedRef.current = feedLoaded;
+    }, [feedLoaded]);
 
     // Poll the native App Group flag on mount and on every foreground. WKWebView
     // fires visibilitychange/focus when the app returns from the Share sheet, so
@@ -107,6 +119,16 @@ export function useSharedCaptureBanner(processingActive: boolean): AnalyzingStat
                 return;
             }
             const t = Date.now();
+            // Feed is authoritative and shows nothing processing (past the settle
+            // window that covers a lagging placeholder write) → the capture already
+            // resolved to a ready card. Finish gracefully instead of ramping a fake
+            // % to MAX_MS while the done card sits in the feed (owner-reported: the
+            // bar "still works" after the card is ready).
+            if (feedRef.current && t - signal.startMs > SETTLE_MS) {
+                setTerminal({ active: false, progress: 100, kind: signal.kind });
+                setSignal(null);
+                return;
+            }
             // Give-up on the shared start clock: no real card ever arrived and the
             // ramp has run its course — hand the banner one terminal frame instead
             // of ticking forever.

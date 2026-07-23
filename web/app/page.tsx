@@ -56,10 +56,16 @@ export default function Home() {
   // one when it's active (it has true milestones); otherwise show the share one.
   const [analyzing, setAnalyzing] = useState<AnalyzingState | null>(null);
   const [processing, setProcessing] = useState<AnalyzingState | null>(null);
+  // Whether the live library has produced its first Firestore snapshot. Gates
+  // the optimistic share bridge below: once the feed is authoritative, a capture
+  // with no `processing` card has already resolved to a ready card, so the bridge
+  // must stop rather than keep ramping its fake %.
+  const [feedLoaded, setFeedLoaded] = useState(false);
   // Optimistic banner for a capture shared from the iOS Share Extension via its
   // "Open Machina" button — shows instantly on open, then hands off to the real
-  // Firestore-driven `processing` banner once the card streams in.
-  const sharedSignal = useSharedCaptureBanner(!!processing?.active);
+  // Firestore-driven `processing` banner once the card streams in. Retires the
+  // moment the feed is authoritative and shows no in-flight processing.
+  const sharedSignal = useSharedCaptureBanner(!!processing?.active, feedLoaded);
   const bannerState = pickBanner(analyzing, processing, sharedSignal);
   const [isTourOpen, setIsTourOpen] = useState(false);
   // Gate the first-run tour to a non-empty library: it spotlights real cards,
@@ -210,7 +216,7 @@ export default function Home() {
         {/* The feed is already live via onSnapshot, so a new save streams in on
             its own — no remount needed. (Previously keyed on refreshKey, which
             tore down listeners and wiped view/filter/search on every add.) */}
-        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onHasCardsChange={setHasCards} libraryFacet={libraryFacet} onLibraryFacetApplied={() => setLibraryFacet(null)} onBackToInsights={() => { setSettingsSection('stats'); setIsSettingsOpen(true); }} headerCommand={headerCommand} onCapture={() => setCaptureSignal((n) => n + 1)} onTabChange={setFeedTab} onFullBleedChange={setIsFullBleed} />
+        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onFeedLoadedChange={setFeedLoaded} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onHasCardsChange={setHasCards} libraryFacet={libraryFacet} onLibraryFacetApplied={() => setLibraryFacet(null)} onBackToInsights={() => { setSettingsSection('stats'); setIsSettingsOpen(true); }} headerCommand={headerCommand} onCapture={() => setCaptureSignal((n) => n + 1)} onTabChange={setFeedTab} onFullBleedChange={setIsFullBleed} />
       </main>
 
       {/* Add Link FAB — hidden in Ask & Collections (neither view captures links). */}

@@ -186,6 +186,7 @@ export default function MobileFiltersSheet({
                                     onClearFilters={() => setSelectedTags(new Set())}
                                     variant="embedded"
                                     className="px-1"
+                                    rankByCount={selectedCategory.size > 0}
                                 />
                             </div>
                         </div>

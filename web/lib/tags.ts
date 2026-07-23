@@ -10,7 +10,17 @@ export interface TagNode {
  * Builds a hierarchical tree from a flat list of tags
  * Hierarchical tags are expected to use '/' as a separator (e.g., "Work/Project")
  */
-export function buildTagTree(tags: string[], tagCounts: Record<string, number>): TagNode[] {
+export function buildTagTree(
+    tags: string[],
+    tagCounts: Record<string, number>,
+    /**
+     * When true, siblings are ranked by count (desc) then name — used when a
+     * category filter is active so the tags that actually match float to the top
+     * and the 0-count ones sink, instead of being buried alphabetically. When
+     * false (the default, no category selected), plain A–Z ordering.
+     */
+    sortByCount = false,
+): TagNode[] {
     const root: TagNode[] = [];
 
     tags.forEach(tag => {
@@ -57,12 +67,19 @@ export function buildTagTree(tags: string[], tagCounts: Record<string, number>):
                 .filter(([path]) => path === node.fullName || path.startsWith(`${node.fullName}/`))
                 .reduce((sum, [, c]) => sum + c, 0);
 
-            node.children.sort((a, b) => a.name.localeCompare(b.name));
+            node.children.sort(compareNodes);
         });
     };
 
+    // Rank by count (desc) then A–Z when a category narrows the counts; plain
+    // A–Z otherwise so the untouched list stays predictable.
+    const compareNodes = (a: TagNode, b: TagNode) =>
+        sortByCount && b.count !== a.count
+            ? b.count - a.count
+            : a.name.localeCompare(b.name);
+
     updateCounts(root);
-    root.sort((a, b) => a.name.localeCompare(b.name));
+    root.sort(compareNodes);
 
     return root;
 }
