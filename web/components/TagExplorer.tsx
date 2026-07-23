@@ -19,6 +19,12 @@ interface TagExplorerProps {
      * can breathe inside a borderless bottom sheet.
      */
     variant?: 'sidebar' | 'embedded';
+    /**
+     * When true, tags are ranked by count (desc) then name instead of A–Z —
+     * set when a category filter is active so the matching tags surface at the
+     * top and 0-count ones sink out of the way.
+     */
+    rankByCount?: boolean;
 }
 
 export default function TagExplorer({
@@ -29,7 +35,8 @@ export default function TagExplorer({
     onClearFilters,
     onCollapse,
     className = "",
-    variant = 'sidebar'
+    variant = 'sidebar',
+    rankByCount = false
 }: TagExplorerProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
@@ -54,8 +61,8 @@ export default function TagExplorer({
             filteredTags = Array.from(allNeededTags);
         }
 
-        return buildTagTree(filteredTags, tagCounts);
-    }, [tags, tagCounts, searchQuery]);
+        return buildTagTree(filteredTags, tagCounts, rankByCount);
+    }, [tags, tagCounts, searchQuery, rankByCount]);
 
     const toggleExpand = (fullName: string, e: React.MouseEvent) => {
         e.stopPropagation();
