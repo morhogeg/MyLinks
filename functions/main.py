@@ -2603,7 +2603,16 @@ def unregister_device_token_http(req: https_fn.Request) -> https_fn.Response:
 # and a readable card for humans with no JS required.
 
 
-@https_fn.on_request()
+# min_instances=1 keeps ONE instance warm. The card-share flow (web/lib/
+# useLinkActions.handleShareCard) opens the OS share sheet immediately and
+# publishes this snapshot in parallel, so the publish must land before the
+# messaging app's link-preview crawler fetches /s?id= (which happens a few
+# seconds later, after the user picks a recipient). A cold Python start (~3-6s)
+# lost that race and the crawler cached an empty preview. Warm ⇒ sub-second
+# publish ⇒ the snapshot is live well before the crawl. Only the publish path
+# needs warming: /s (share_page) can cold-start freely — crawlers wait for it,
+# and previews rendered fine while it was cold; the race was purely the write.
+@https_fn.on_request(min_instances=1)
 def publish_share_http(req: https_fn.Request) -> https_fn.Response:
     """Publish (or re-publish) a card/collection as a public snapshot.
 

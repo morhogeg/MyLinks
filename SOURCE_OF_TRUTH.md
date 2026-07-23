@@ -859,6 +859,24 @@ exact-match, capped.
   build 1160 (run #160)**. **Deferred owner step:** on-device light+dark QA — the
   ring uses a conic-gradient + CSS mask, worth eyeballing in WKWebView before
   calling it done. Feature commit `feb3529`.
+- **2026-07-22 — WARM PUBLISH FUNCTION → reliable share preview.**
+  Follow-up to the instant-share-sheet change below. Owner (WhatsApp screenshot):
+  the sheet now opens fast, but a card shared *today* showed **no link-preview
+  card** (bare URL), while an older share rendered fine. Root cause: the
+  optimistic flow opens the sheet and publishes the snapshot in parallel, but
+  `publish_share_http` (`@https_fn.on_request()`, no min_instances) **cold-starts
+  ~3-6s** (Python), so WhatsApp's crawler — which fetches `/s?id=` a few seconds
+  after the user picks a recipient — beat the write and cached an empty preview.
+  Same cold start was the original ~5s sheet delay. Key evidence it's the *write*
+  losing the race, not the render: previews worked fine under the OLD
+  await-then-share flow even though `/s` (`share_page`) was equally cold — so
+  crawlers tolerate a cold `share_page`; only the publish write is time-critical.
+  Fix: **`min_instances=1` on `publish_share_http`** → sub-second warm publish,
+  lands well before the crawl; the instant sheet (build 1159) is unchanged.
+  Backend-only. **Cost:** one always-warm instance (~a few $/month) — accepted
+  to make sharing reliable. Only the publish path is warmed (share_page left
+  cold). `py_compile` clean. **Shipped:** deployed via
+  `Deploy-Functions: publish_share_http`.
 
 - **2026-07-22 — INSTANT CARD SHARE SHEET (owner-reported latency).**
   Owner: tapping share on a card took ~5s before the OS share sheet appeared,
