@@ -714,7 +714,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-23 (latest) — BRANDORB: THINKING ORBS EVERYWHERE, IN OUR PALETTE.**
+- **2026-07-23 (latest) — SHARE-EXTENSION ORB (native Swift port of "working").**
+  Owner: put a real orb in the iOS share-sheet processing screen too, replacing
+  the ring but KEEPING the window scanner. The extension is native (no JS), so
+  ported the library's `orbits` ("working") mode to Swift/CoreGraphics —
+  `OrbitsOrbView` in `ShareViewController.swift` (replaces `SpinningRingView`):
+  per-orbit hashed orientation (`F`), the yaw/pitch projection (`q`), depth
+  z-sort, dots recoloured pink↔purple by the SAME luminance mapping as web
+  `BrandOrb`. `CADisplayLink` drives it; reduce-motion = one static frame;
+  off-window stops the link. Constants mirror `resolvePreset('working', 20)`.
+  Scanner (faux page, sweep, %, phase label, bar) untouched — only the ring above
+  the % became the orb. State = `working`, matching the in-app save. **Native —
+  not compilable in the cloud session; needs on-device QA (fidelity of the ported
+  math + perf).** Also confirmed: web Ask-thinking uses `searching` (globe).
+  Merge `d33a847` → **iOS→TestFlight build 1167 (run #167)** — first TF build with
+  ALL orb work (web BrandOrb + this native orb + toast). Web unchanged this step.
+
+- **2026-07-23 — BRANDORB: THINKING ORBS EVERYWHERE, IN OUR PALETTE.**
   Owner: put the real orbs in every live "working" spot AND recolour them to
   Machina purple→pink. The lib has **no colour prop** — it paints grayscale ink
   (`fillStyle = rgba(a,a,a,o)`). Solution: new **`BrandOrb`**
