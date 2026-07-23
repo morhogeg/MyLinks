@@ -43,6 +43,10 @@
   --surface-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 45%);
   /* Brand gradient — the purple→pink already used by the logo lockup. */
   --accent-gradient: linear-gradient(135deg, #A855F7, #EC4899);
+  /* Discrete stops of the brand gradient — the working ring + Aurora orb need
+     real color stops (a gradient value can't be sampled). */
+  --accent-2: #EC4899; /* pink (gradient end) */
+  --accent-3: #C4B5FD; /* lilac — lighter for the dark ground */
   --accent-ring: rgba(168, 85, 247, 0.35);
   /* Inactive bottom-tab ink. Dark = the muted grey that looked right; light
      overrides to the darker secondary so the labels read vividly, not washed
@@ -89,6 +93,8 @@
     0 16px 32px -14px rgba(16, 24, 40, 0.20);
   --surface-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 45%);
   --accent-gradient: linear-gradient(135deg, #8B5CF6, #EC4899);
+  --accent-2: #EC4899; /* pink */
+  --accent-3: #C084FC; /* lilac */
   --accent-ring: rgba(139, 92, 246, 0.3);
   /* Light mode: darker, vivid inactive tabs (see the :root note). */
   --tabbar-inactive: var(--text-secondary);
@@ -337,11 +343,47 @@ html {
 
 .working-ring {
   border-radius: 9999px;
-  background: conic-gradient(from 0deg, transparent 12%, var(--accent));
-  -webkit-mask: radial-gradient(circle, transparent 54%, #000 56%);
-  mask: radial-gradient(circle, transparent 54%, #000 56%);
-  animation: working-ring-spin 0.85s linear infinite;
+  /* Full brand-gradient sweep (lilac → purple → pink), not a flat single hue —
+     so even the small inline mark reads as Machina, not a stock spinner. */
+  background: conic-gradient(from 0deg,
+    transparent 4%,
+    var(--accent-3) 26%,
+    var(--accent) 60%,
+    var(--accent-2) 88%,
+    transparent 100%);
+  -webkit-mask: radial-gradient(circle, transparent 52%, #000 55%);
+  mask: radial-gradient(circle, transparent 52%, #000 55%);
+  /* spin (rotation) + a soft glow that breathes (box-shadow — no transform
+     conflict with the spin). */
+  animation: working-ring-spin 0.9s linear infinite,
+             working-ring-glow 2.1s ease-in-out infinite;
 }
+
+@keyframes working-ring-glow {
+  0%, 100% { box-shadow: 0 0 6px -2px var(--accent-ring); }
+  50%      { box-shadow: 0 0 15px 0 var(--accent-ring); }
+}
+
+/* Aurora — the hero "identity/thinking" orb: gooey brand-gradient metaballs that
+   drift and merge. For focal moments with room (empty Ask state, launch), NOT
+   inline. Pure CSS blobs + the #machina-goo SVG filter (rendered by AuroraOrb).
+   The goo filter is GPU-heavier and finicky in WKWebView — device-verify on iOS;
+   it degrades to three static blend-blobs if the filter is dropped. */
+.aurora-orb {
+  position: relative;
+  border-radius: 9999px;
+  overflow: hidden;
+  filter: url(#machina-goo);
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in oklab, var(--accent) 12%, transparent), transparent 70%);
+}
+.aurora-orb .blob { position: absolute; border-radius: 9999px; mix-blend-mode: screen; }
+.aurora-orb .blob-1 { width: 60%; height: 60%; top: 6%; left: 8%; background: var(--accent); animation: aurora-1 5s ease-in-out infinite; }
+.aurora-orb .blob-2 { width: 52%; height: 52%; bottom: 4%; right: 6%; background: var(--accent-2); animation: aurora-2 6.2s ease-in-out infinite; }
+.aurora-orb .blob-3 { width: 42%; height: 42%; top: 30%; left: 34%; background: var(--accent-3); animation: aurora-3 4.4s ease-in-out infinite; }
+@keyframes aurora-1 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(22%, 18%) scale(1.12); } }
+@keyframes aurora-2 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-20%, -16%) scale(0.9); } }
+@keyframes aurora-3 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-14%, 22%) scale(1.2); } }
 
 /* Scale-up: used by ConfirmDialog (was referenced but never defined). */
 @keyframes scale-up {
@@ -504,6 +546,7 @@ a {
   .animate-scan-sweep,
   .animate-progress-indeterminate,
   .working-ring,
+  .aurora-orb .blob,
   .skeleton-shimmer::after {
     animation: none !important;
   }
