@@ -377,11 +377,11 @@ def _scrape_linkedin_url(url: str) -> dict:
             "title": title,
             "text": text or html[:5000],
             "source_name": _extract_linkedin_author(html),
-            # Best-effort poster: LinkedIn exposes the post/video preview as
-            # og:image. Surfaced as the card banner (no vision) so video and
-            # media posts show a thumbnail; a text-only post with no og:image
-            # simply gets no media.
-            "video_thumbnail_url": _extract_og_image(soup),
+            # No poster: LinkedIn serves a GENERIC "Posted on LinkedIn" branding
+            # og:image even for plain text posts, and we can't tell a real
+            # video/photo post from a text one — so any og:image here is unreliable
+            # junk. LinkedIn cards stay text-only (rule: images only for video
+            # thumbnails or image-first posts, neither of which we can trust here).
         }
     except Exception as e:
         logger.error(f"LinkedIn scrape error for {url}: {e}")
@@ -1090,7 +1090,6 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
     best_desc = ""
     source_name = None
     truncated = False
-    fb_image = ""  # og:image poster — only trusted when a real caption was found
 
     try:
         headers = {
@@ -1157,11 +1156,6 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
                     best_title = first_line[:120]
                 best_desc = body
                 metadata_lines.append(f"POST CAPTION:\n{body}")
-                # Only pull the og:image poster when we got a real caption — a
-                # login-walled page's og:image is just the Facebook logo, which we
-                # must not show. Best-effort: no image simply leaves the card
-                # media-less.
-                fb_image = _extract_og_image(soup)
     except Exception as e:
         logger.warning(f"Facebook scrape failed: {e}")
 
@@ -1185,9 +1179,11 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
                 "source_name": source_name, "truncated": True}
 
     final_text = "\n\n---\n\n".join(metadata_lines)
+    # No poster: a Facebook og:image is a link-preview / the FB logo, not the
+    # post's own media, and we can't reliably tell a video/photo post from text —
+    # so Facebook cards stay text-only (same rule as LinkedIn above).
     return {"html": final_text, "title": best_title, "text": final_text,
-            "source_name": source_name, "truncated": truncated,
-            "video_thumbnail_url": fb_image}
+            "source_name": source_name, "truncated": truncated}
 
 
 def _extract_youtube_id(url: str) -> Optional[str]:

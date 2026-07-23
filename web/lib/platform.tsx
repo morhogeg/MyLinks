@@ -47,6 +47,19 @@ export function getPlatform(url?: string): PlatformKey | null {
 }
 
 /**
+ * LinkedIn and Facebook are text-first here: we have no reliable media extraction
+ * for them (their og:image is generic branding — e.g. the "Posted on LinkedIn"
+ * card — or a link-preview, never the post's own content). So their cards render
+ * text-only regardless of any thumbnail an older save may have stored. Video
+ * thumbnails (YouTube, X video, IG reel) and photo posts (X / Instagram) are
+ * unaffected — this only gates the two platforms whose posters can't be trusted.
+ */
+export function platformSuppressesThumbnail(url?: string): boolean {
+    const p = getPlatform(url);
+    return p === 'linkedin' || p === 'facebook';
+}
+
+/**
  * Render the icon element for a platform. Returns a JSX element (not a
  * component reference) so callers can drop it straight into markup.
  */
