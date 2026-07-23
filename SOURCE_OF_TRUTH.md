@@ -714,7 +714,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-23 (latest) — VIDEO THUMBNAIL: auto-suppress junk posters + per-card
+- **2026-07-23 (latest) — HIDE-IMAGE: honor the flag in the OPEN card + add the
+  toggle there.** Two owner bugs on the hide/show-image feature: (1) hiding an
+  image on the feed card still showed it in the open `LinkDetailModal`; (2) no way
+  to hide/show from inside the open card. Fix (frontend-only, `LinkDetailModal.tsx`
+  + one wire in `Feed.tsx`): both image renders — the social-post cover and the
+  YouTube thumbnail button (Key moments kept) — now gate on `!link.hideThumbnail`;
+  a new **Hide image / Show image** button (ImageOff/Image) sits in the modal's
+  action row whenever the card has a `thumbnailUrl`, calling the same
+  `handleToggleThumbnail` (persists `link.hideThumbnail`). `tsc` clean. No backend
+  change. Observation for later: LinkedIn's generic **"Posted on LinkedIn"**
+  placeholder og:image slips past auto-suppress (it's wide, not square, so the
+  square gate misses it) — the manual toggle covers it now, but tuning the gate to
+  catch flat-background placeholders (without eating letterboxed frames) is a
+  possible follow-up.
+
+- **2026-07-23 — VIDEO THUMBNAIL: auto-suppress junk posters + per-card
   hide/show toggle.** Owner saw an X card whose "poster" was a tiny avatar-style
   coffee-cup icon on a plain gray banner — worse than a clean text card. Two-part
   fix (both). **Auto-suppress (backend):** `_video_poster_looks_like_junk` in
