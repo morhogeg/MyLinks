@@ -2013,8 +2013,16 @@ def get_article(req: https_fn.Request) -> https_fn.Response:
         if len(url) > MAX_URL_LENGTH:
             return _error_response("URL is too long", 400, headers)
 
-        from scraper import extract_readable_article
-        article = extract_readable_article(url)
+        from scraper import extract_readable_article, UnsafeURLError
+        try:
+            article = extract_readable_article(url)
+        except UnsafeURLError as e:
+            # Blocked host, oversized body, or a stalled transfer (see
+            # scraper.safe_get). This is a caller problem, so answer 4xx instead
+            # of falling through to _server_error — a 500 here would let an
+            # anonymous caller mint durable `server_errors` records on demand.
+            logger.info("get_article rejected a URL: %s", e)
+            return _error_response("Couldn't read this page.", 422, headers)
 
         if not article.get("paragraphs"):
             return _error_response(
