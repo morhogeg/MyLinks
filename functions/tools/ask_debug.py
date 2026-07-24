@@ -1,14 +1,17 @@
-"""One-off Ask debug harness — run from the `ask-debug` GitHub Actions workflow.
+"""Ask debug harness v2 — end-to-end against PRODUCTION, from CI.
 
-Reproduces the production Ask PROHIBITED_CONTENT prompt-block with the real
-user data + real Gemini key (both available only in CI), and bisects down to
-the exact card/field/sentence Gemini's filter rejects.
+v1 (probe-only) proved: the ask model id 404'd, and the schema-mode call is
+what false-positives PROHIBITED_CONTENT on content that passes plain. The
+deployed fix (plain-mode rescue) still fails the real pasta ask, so v2 closes
+the two reproduction gaps:
+ 1. calls the REAL deployed ask_brain endpoint (CI has egress; a cloud session
+    doesn't) so the true retrieval context + ladder run, then reads the fresh
+    server_errors records to see exactly which stage died;
+ 2. runs mode experiments with FULL generation (not 1-token probes): a blocked
+    CANDIDATE (finish_reason on output) is invisible to input-only probes.
 
-Output contract (the repo is PUBLIC, so Actions logs are public):
-- stdout: ONLY structural findings — booleans, counts, truncated doc ids.
-  NEVER card content, titles, or the uid.
-- ask-debug-report.json (uploaded as a workflow artifact, auth-gated):
-  the full findings including content snippets, for the session to download.
+Public repo ⇒ stdout prints only structural findings + our own static stage
+markers. Full detail goes to the auth-gated artifact.
 """
 
 import json
@@ -16,6 +19,7 @@ import os
 import re
 import sys
 import time
+import urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -26,226 +30,148 @@ from ai_service import (  # noqa: E402
     _build_rag_prompt,
     _CITED_JSON_SUFFIX,
     GEMINI_ANALYSIS_MODEL,
-    GEMINI_ASK_MODEL,
     _ASK_SAFETY_SETTINGS,
 )
+from models import BrainAnswer  # noqa: E402
 
 PROJECT = "secondbrain-app-94da2"
+ASK_URL = f"https://us-central1-{PROJECT}.cloudfunctions.net/ask_brain"
 QUESTION = "מתכון לפסטה"
-MAX_PROBES = 150
 
-probe_count = 0
 client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+report = {"question": QUESTION}
 
 
-def probe(prompt: str, model: str = GEMINI_ANALYSIS_MODEL):
-    """Returns (blocked: bool|None, reason: str). None = transport error."""
-    global probe_count
-    if probe_count >= MAX_PROBES:
-        return None, "probe budget exhausted"
-    probe_count += 1
-    for attempt in range(2):
+def gen_outcome(model, prompt, config):
+    """One full generation; returns structural outcome only."""
+    try:
+        resp = client.models.generate_content(model=model, contents=[prompt],
+                                              config=config)
+        fb = getattr(resp, "prompt_feedback", None)
+        block = getattr(fb, "block_reason", None) if fb else None
+        cands = getattr(resp, "candidates", None) or []
+        finish = getattr(cands[0], "finish_reason", None) if cands else None
         try:
-            resp = client.models.generate_content(
-                model=model, contents=[prompt],
-                config={"max_output_tokens": 1, "temperature": 0.0,
-                        "safety_settings": _ASK_SAFETY_SETTINGS})
-            fb = getattr(resp, "prompt_feedback", None)
-            block = getattr(fb, "block_reason", None) if fb else None
-            if block:
-                return True, str(block)
-            return False, ""
-        except Exception as e:
-            if attempt == 0:
-                time.sleep(1.5)
-                continue
-            return None, f"{type(e).__name__}: {str(e)[:200]}"
+            text = resp.text or ""
+        except Exception:
+            text = ""
+        return {"block_reason": str(block) if block else None,
+                "finish_reason": str(finish) if finish else None,
+                "text_len": len(text), "text": text[:2000]}
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {str(e)[:300]}"}
 
 
-def card_prompt(cards):
-    return _build_rag_prompt(QUESTION, cards, None, None) + _CITED_JSON_SUFFIX
-
-
-def slim(doc_id, d):
-    """Approximate ask_brain's slimming closely enough for filter behavior."""
-    out = {
-        "id": doc_id,
-        "title": str(d.get("title", "Untitled"))[:300],
-        "summary": str(d.get("summary", ""))[:1500],
-        "category": str(d.get("category", "General"))[:60],
-        "tags": [str(t)[:60] for t in (d.get("tags") or [])[:15]],
-        "sourceName": d.get("sourceName"),
-        "url": d.get("url"),
-        "userNote": str(d.get("userNote") or "")[:800],
-    }
-    detail = (d.get("detailedSummary") or "").strip()
-    if detail:
-        out["detailedSummary"] = detail[:3500]
-    takeaway = (d.get("actionableTakeaway") or "").strip()
-    if takeaway:
-        out["actionableTakeaway"] = takeaway[:600]
-    recipe = d.get("recipe")
-    if isinstance(recipe, dict) and (recipe.get("ingredients") or recipe.get("instructions")):
-        out["recipe"] = {
-            "ingredients": [str(x)[:200] for x in (recipe.get("ingredients") or [])[:40]],
-            "instructions": [str(x)[:500] for x in (recipe.get("instructions") or [])[:40]],
-        }
-    vh = d.get("videoHighlights")
-    if isinstance(vh, list) and vh:
-        out["videoHighlights"] = [str(x)[:200] for x in vh[:8]]
+def stage_markers(msg: str) -> list:
+    """Extract only OUR static markers from an error message — safe to print."""
+    out = []
+    if "in plain mode" in msg:
+        out.append("plain-mode")
+    for m in re.findall(r"\[stage: [^\]]{0,120}\]", msg):
+        out.append(m)
+    if "block_reason" in msg:
+        out.append("has-block_reason")
+    if "finish_reason" in msg:
+        out.append("has-finish_reason")
+    if "404" in msg:
+        out.append("has-404")
     return out
 
 
-_SENT_SPLIT = re.compile(r"(?<=[.!?׃])\s+|\n+")
-
-
-def safe_signals(text: str) -> dict:
-    """Content-free structural fingerprint of a snippet, printable to the
-    PUBLIC log: no words leak, but the character-class mix often names the
-    culprit (e.g. invisible bidi control chars corrupting what the filter
-    tokenizer sees)."""
-    t = str(text)
-    return {
-        "len": len(t),
-        "has_url": bool(re.search(r"https?://", t)),
-        "bidi_ctrl": sum(1 for ch in t if ch in "‎‏‪‫‬‭‮⁦⁧⁨⁩"),
-        "zero_width": sum(1 for ch in t if ch in "​‌‍﻿"),
-        "other_ctrl": sum(1 for ch in t if ord(ch) < 32 and ch not in "\n\t\r"),
-        "hebrew": sum(1 for ch in t if "֐" <= ch <= "׿"),
-        "latin": sum(1 for ch in t if ch.isascii() and ch.isalpha()),
-        "digits": sum(1 for ch in t if ch.isdigit()),
-    }
-
-
-def bisect_text_field(base_card, field, text):
-    """Find the first sentence of `text` that makes the single-field card
-    blocked. Returns dict with minimal snippet info."""
-    sentences = [s for s in _SENT_SPLIT.split(text) if s.strip()]
-    if len(sentences) <= 1:
-        return {"sentences": len(sentences), "minimal": text[:300]}
-    # Cumulative prefix probe: first prefix that blocks names the sentence.
-    for i in range(1, len(sentences) + 1):
-        cand = dict(base_card)
-        cand[field] = " ".join(sentences[:i])
-        blocked, _ = probe(card_prompt([cand]))
-        if blocked:
-            sent = sentences[i - 1]
-            alone = dict(base_card)
-            alone[field] = sent
-            alone_blocked, _ = probe(card_prompt([alone]))
-            print(f"    minimal blocked sentence #{i - 1}: signals={safe_signals(sent)}")
-            return {"sentences": len(sentences), "index": i - 1,
-                    "minimal": sent[:300], "blocked_alone": alone_blocked,
-                    "signals": safe_signals(sent)}
-        if probe_count >= MAX_PROBES:
-            break
-    return {"sentences": len(sentences), "minimal": None,
-            "note": "no prefix blocked (order-dependent trigger?)"}
+def fetch_server_errors(db, n=25):
+    return [{**snap.to_dict(), "_doc": snap.id} for snap in
+            db.collection("server_errors").order_by(
+                "timestamp", direction=firestore.Query.DESCENDING).limit(n).stream()]
 
 
 def main():
-    report = {"question": QUESTION, "probes": {}}
     db = firestore.Client(project=PROJECT)
 
-    # 1. server_errors trail (full detail → artifact only).
-    errs = [{**snap.to_dict(), "_doc": snap.id} for snap in
-            db.collection("server_errors").order_by(
-                "timestamp", direction=firestore.Query.DESCENDING).limit(25).stream()]
-    report["server_errors"] = errs
-    ask_errs = [e for e in errs if str(e.get("fn", "")).startswith("ask_brain")]
-    print(f"server_errors: {len(errs)} records, {len(ask_errs)} from ask_brain")
+    # 1. Existing trail: which ladder stages have been dying?
+    errs = fetch_server_errors(db)
+    report["server_errors_before"] = errs
+    print(f"server_errors: {len(errs)} records")
+    for e in errs[:12]:
+        print(f"  {e.get('timestamp', '')[:19]} {e.get('fn')} {e.get('type')} "
+              f"markers={stage_markers(str(e.get('error', '')))}")
 
-    uid = next((e.get("uid") for e in ask_errs if e.get("uid")), None)
+    uid = next((e.get("uid") for e in errs
+                if str(e.get("fn", "")).startswith("ask_brain") and e.get("uid")), None)
     if not uid:
-        print("FATAL: no ask_brain uid in server_errors")
-        report["fatal"] = "no uid"
-        json.dump(report, open("ask-debug-report.json", "w"), ensure_ascii=False,
-                  indent=1, default=str)
+        print("FATAL: no uid")
+        json.dump(report, open("ask-debug-report.json", "w"),
+                  ensure_ascii=False, indent=1, default=str)
         return
     report["uid"] = uid
-    print("uid: found (redacted)")
 
-    # 2. Newest cards for that user.
+    # 2. END-TO-END: the real deployed endpoint, real retrieval, real ladder.
+    body = json.dumps({"uid": uid, "question": QUESTION}).encode()
+    req = urllib.request.Request(
+        ASK_URL, data=body, headers={"Content-Type": "application/json"},
+        method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            status, payload = r.status, r.read().decode()
+    except urllib.error.HTTPError as e:
+        status, payload = e.code, e.read().decode()
+    except Exception as e:
+        status, payload = -1, f"{type(e).__name__}: {e}"
+    report["e2e"] = {"status": status, "body": payload[:4000]}
+    try:
+        pj = json.loads(payload)
+    except Exception:
+        pj = {}
+    if status == 200 and pj.get("success"):
+        print(f"E2E ask: 200 success — answer_len={len(pj.get('answer') or '')} "
+              f"cited={len(pj.get('citedIds') or [])} "
+              f"ungrounded={pj.get('ungrounded')} "
+              f"dropped={pj.get('droppedCardIds')}")
+    else:
+        print(f"E2E ask: status={status} markers={stage_markers(payload)}")
+
+    # 3. Fresh trail records created by the E2E call.
+    time.sleep(3)
+    after = fetch_server_errors(db, 5)
+    report["server_errors_after"] = after
+    for e in after[:5]:
+        print(f"  post-e2e {e.get('fn')} {e.get('type')} "
+              f"markers={stage_markers(str(e.get('error', '')))}")
+
+    # 4. Mode experiments on the newest-25 context (FULL generation, not
+    #    1-token probes — a killed CANDIDATE is invisible to input probes).
     docs = list(db.collection("users").document(uid).collection("links")
                 .order_by("createdAt", direction=firestore.Query.DESCENDING)
                 .limit(25).stream())
-    cards = [slim(s.id, s.to_dict() or {}) for s in docs]
-    print(f"cards loaded: {len(cards)}")
+    cards = []
+    for s in docs:
+        d = s.to_dict() or {}
+        c = {"id": s.id, "title": str(d.get("title", ""))[:300],
+             "summary": str(d.get("summary", ""))[:1500],
+             "category": d.get("category"), "tags": d.get("tags"),
+             "sourceName": d.get("sourceName"), "url": d.get("url")}
+        det = (d.get("detailedSummary") or "").strip()
+        if det:
+            c["detailedSummary"] = det[:3500]
+        rec = d.get("recipe")
+        if isinstance(rec, dict):
+            c["recipe"] = rec
+        cards.append(c)
+    prompt = _build_rag_prompt(QUESTION, cards[:20], None, None) + _CITED_JSON_SUFFIX
 
-    # 3. Template / question baselines.
-    b, r = probe(card_prompt([]))
-    report["probes"]["question_no_cards"] = {"blocked": b, "reason": r}
-    print(f"probe question+template, zero cards: blocked={b} {r}")
+    schema_cfg = {"response_mime_type": "application/json",
+                  "response_schema": BrainAnswer, "temperature": 0.2,
+                  "safety_settings": _ASK_SAFETY_SETTINGS}
+    plain_cfg = {"temperature": 0.2, "safety_settings": _ASK_SAFETY_SETTINGS}
 
-    # 4. Full context (top 20), both models.
-    top = cards[:20]
-    b, r = probe(card_prompt(top))
-    report["probes"]["full_context_flash_lite"] = {"blocked": b, "reason": r}
-    print(f"probe full context (flash-lite): blocked={b} {r}")
-    b2, r2 = probe(card_prompt(top), model=GEMINI_ASK_MODEL)
-    report["probes"]["full_context_flash"] = {"blocked": b2, "reason": r2}
-    print(f"probe full context (flash): blocked={b2} {r2}")
+    for name, cfg in (("schema_mode_full", schema_cfg), ("plain_mode_full", plain_cfg)):
+        out = gen_outcome(GEMINI_ANALYSIS_MODEL, prompt, cfg)
+        report[name] = out
+        print(f"{name}: block={out.get('block_reason')} finish={out.get('finish_reason')} "
+              f"text_len={out.get('text_len')} err={out.get('error')}")
 
-    # 5. Per-card probes (each card alone).
-    per_card = []
-    blocked_cards = []
-    for c in cards:
-        b, r = probe(card_prompt([c]))
-        per_card.append({"id": c["id"], "title": c["title"], "blocked": b, "reason": r})
-        if b:
-            blocked_cards.append(c)
-        print(f"card {c['id'][:8]}…: blocked={b}")
-    report["per_card"] = per_card
-    print(f"blocked cards: {len(blocked_cards)}/{len(cards)}")
-
-    # 6. Per-field + sentence bisect for each blocked card (bounded).
-    field_findings = []
-    for c in blocked_cards[:4]:
-        base = {"id": c["id"], "title": "Card"}  # neutral shell
-        finding = {"id": c["id"], "title": c["title"], "fields": {}}
-        for field in ("title", "summary", "detailedSummary", "actionableTakeaway",
-                      "userNote"):
-            val = c.get(field)
-            if not val or not str(val).strip():
-                continue
-            cand = dict(base)
-            cand[field] = val
-            fb, fr = probe(card_prompt([cand]))
-            entry = {"blocked_alone": fb, "reason": fr}
-            if fb:
-                entry["bisect"] = bisect_text_field(base, field, str(val))
-            finding["fields"][field] = entry
-            print(f"  {c['id'][:8]}… field {field}: blocked={fb}")
-        recipe = c.get("recipe")
-        if isinstance(recipe, dict):
-            for part in ("ingredients", "instructions"):
-                items = recipe.get(part) or []
-                if not items:
-                    continue
-                cand = dict(base)
-                cand["recipe"] = {part: items}
-                fb, fr = probe(card_prompt([cand]))
-                entry = {"blocked_alone": fb, "reason": fr, "items": len(items)}
-                if fb:
-                    hits = []
-                    for i, item in enumerate(items):
-                        ib, _ = probe(card_prompt([{**base, "recipe": {part: [item]}}]))
-                        if ib:
-                            print(f"    blocked {part}[{i}]: signals={safe_signals(item)}")
-                            hits.append({"index": i, "item": str(item)[:200],
-                                         "signals": safe_signals(item)})
-                        if probe_count >= MAX_PROBES:
-                            break
-                    entry["blocked_items"] = hits
-                finding["fields"][f"recipe.{part}"] = entry
-                print(f"  {c['id'][:8]}… recipe.{part}: blocked={fb}")
-        field_findings.append(finding)
-    report["field_findings"] = field_findings
-
-    report["total_probes"] = probe_count
-    json.dump(report, open("ask-debug-report.json", "w"), ensure_ascii=False,
-              indent=1, default=str)
-    print(f"done — {probe_count} probes; full detail in artifact")
+    json.dump(report, open("ask-debug-report.json", "w"),
+              ensure_ascii=False, indent=1, default=str)
+    print("done — full detail in artifact")
 
 
 if __name__ == "__main__":
