@@ -619,6 +619,32 @@ def test_buffered_block_ladder_uncited_reask_stays_plain_and_reduced():
     assert "500g pasta" not in reask  # reduced context carried into the re-ask
 
 
+def test_buffered_block_ladder_final_salvage_drops_poison_in_plain_mode():
+    """All three plain stages fail → the final stage probe-isolates the poison
+    card and generates from the salvaged context IN PLAIN MODE, disclosing the
+    exclusion."""
+    from ai_service import AnalysisError, EmptyGenerationError
+    cards = [
+        {"id": "clean1", "title": "Fine card", "summary": "Totally fine."},
+        {"id": "poison", "title": "Bad card", "summary": "Bad summary."},
+    ]
+    svc = _svc_with_plain_ladder(
+        [EmptyGenerationError("blocked", prompt_blocked=True)],
+        [AnalysisError("s1"), AnalysisError("s2"), AnalysisError("s3"),
+         {"answer": "From the clean rest.", "citedIds": ["clean1"]}])
+    svc._drop_prompt_blocked_cards = (
+        lambda q, c, h=None, x=None, max_drops=3: ([cards[0]], [cards[1]], False))
+    svc._best_clean_variant = lambda q, b, pc, h=None, x=None: (None, None)
+    out = svc.answer_from_context("q?", cards)
+    assert out["answer"].startswith("From the clean rest.")
+    assert 'Your saved card "Bad card" could not be included' in out["answer"]
+    assert out["droppedCardIds"] == ["poison"]
+    # The salvage generation ran in plain mode with only the clean card.
+    final = svc._plain_state["prompts"][3]
+    assert "Bad summary." not in final
+    assert "Fine card" in final
+
+
 def test_buffered_block_ladder_exhausted_raises_with_stage():
     """All three plain stages fail → a stage-tagged error surfaces so the
     diag names the exhausted ladder instead of an opaque block."""

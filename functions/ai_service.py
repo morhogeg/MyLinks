@@ -1114,10 +1114,55 @@ If the image is an article, extract the headline and body."""
                         logger.warning("ask ladder stage '%s' failed: %s",
                                        stage_name, stage_exc)
                 if data is None:
-                    raise EmptyGenerationError(
-                        f"{e} [stage: plain-mode ladder exhausted — "
-                        f"last: {str(last_exc)[:120]}]",
-                        prompt_blocked=True)
+                    # Even headline-only is input-blocked (verified against the
+                    # real retrieved context, harness run #3) → some retrieved
+                    # card's headline text is itself the trigger. Final stage:
+                    # probe-isolate the poison card(s) and salvage — this time
+                    # FULLY mode-consistent: plain 1-token probes AND a plain
+                    # final generation (the round-4 salvage failed because its
+                    # final generation went back to schema mode).
+                    clean, dropped, question_blocked = self._drop_prompt_blocked_cards(
+                        question, cards, history, excluded_titles)
+                    if question_blocked or not dropped:
+                        raise EmptyGenerationError(
+                            f"{e} [stage: plain-mode ladder exhausted — "
+                            f"last: {str(last_exc)[:120]}]",
+                            prompt_blocked=True)
+                    fully_dropped, partially_filtered = [], []
+                    salvaged = {}
+                    salvage_base = list(clean)
+                    for pc in dropped:
+                        variant, removed_fields = self._best_clean_variant(
+                            question, salvage_base, pc, history, excluded_titles)
+                        if variant is None:
+                            fully_dropped.append(pc)
+                        else:
+                            salvage_base.append(variant)
+                            salvaged[pc.get("id")] = variant
+                            if removed_fields:
+                                partially_filtered.append((pc, removed_fields))
+                    clean_ids = {c.get("id") for c in clean}
+                    context_cards = [
+                        salvaged.get(c.get("id"), c) for c in cards
+                        if c.get("id") in clean_ids or c.get("id") in salvaged]
+                    dropped_ids = [c.get("id") for c in fully_dropped]
+                    filtered_cards = [
+                        {"id": pc.get("id"), "title": pc.get("title"),
+                         "removedFields": rf} for pc, rf in partially_filtered]
+                    filter_note = self._filter_note(fully_dropped, partially_filtered)
+                    logger.warning(
+                        "ask plain salvage: %d dropped %s, %d partially filtered",
+                        len(dropped_ids), dropped_ids, len(filtered_cards))
+                    try:
+                        data = self._plain_answer(
+                            _build_rag_prompt(question, context_cards, history,
+                                              excluded_titles) + _CITED_JSON_SUFFIX)
+                        used_plain_mode = True
+                    except AnalysisError as final_exc:
+                        raise EmptyGenerationError(
+                            f"{e} [stage: plain salvage generation still failed: "
+                            f"{str(final_exc)[:100]}]",
+                            prompt_blocked=True)
             else:
                 # The OUTPUT came back empty on every tier — the RECITATION
                 # signature. Retry once asking the model to paraphrase instead
