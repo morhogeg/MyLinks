@@ -595,6 +595,31 @@ def test_buffered_prompt_block_uncited_reask_stays_headline_only():
     assert "500g pasta" not in prompts[2]  # strict re-ask kept the reduced context
 
 
+def test_buffered_prompt_block_rescued_by_plain_mode_first():
+    """A schema-mode prompt block is FIRST retried as a plain (schema-less)
+    generation — CI probes proved the identical prompt passes that way — so
+    the answer keeps FULL context and no card is touched or disclosed."""
+    from ai_service import EmptyGenerationError
+    svc = _svc_with_json_responses([
+        EmptyGenerationError("blocked", prompt_blocked=True),   # schema mode
+    ])
+    plain_prompts = []
+
+    def fake_plain(prompt):
+        plain_prompts.append(prompt)
+        return {"answer": "Full-depth plain answer.", "citedIds": ["id1"]}
+
+    svc._plain_answer = fake_plain
+    # Any probe call would mean salvage ran — it must not.
+    svc._probe_prompt_blocked = lambda prompt: (_ for _ in ()).throw(
+        AssertionError("salvage must not run when plain mode succeeds"))
+    out = svc.answer_from_context("q?", _CARDS)
+    assert out == {"answer": "Full-depth plain answer.", "citedIds": ["id1"],
+                   "ungrounded": False, "droppedCardIds": [], "filteredCards": []}
+    assert len(plain_prompts) == 1
+    assert svc._calls["n"] == 1  # only the schema attempt hit _generate_json
+
+
 def test_buffered_block_salvages_poison_card_with_toxic_field_excised():
     """When the prompt is blocked, the probe bisection finds the poison card
     and the salvage keeps it in context with ONLY the toxic field excised —
@@ -855,9 +880,23 @@ def _svc_with_models(models_obj):
     return svc
 
 
-def test_stream_falls_back_when_ask_model_fails_before_output():
-    models = _SelectiveFailModels(
-        ["Answer body.\n", "[[CITED: id1]]"], bad_models={GEMINI_ASK_MODEL})
+def test_stream_falls_back_when_first_attempt_fails_before_output():
+    """A transport failure on the first stream attempt (before any output)
+    retries on the next ladder attempt instead of failing the ask. (The ask
+    and analysis tiers share a model id since 2026-07-24, so the fake fails
+    by call order, not by model name.)"""
+    class _FailFirstThenReal:
+        def __init__(self, pieces):
+            self._pieces = pieces
+            self.requested = []
+
+        def generate_content_stream(self, model, contents, config=None):
+            self.requested.append(model)
+            if len(self.requested) == 1:
+                raise RuntimeError("transient transport failure")
+            return iter(_FakeChunk(p) for p in self._pieces)
+
+    models = _FailFirstThenReal(["Answer body.\n", "[[CITED: id1]]"])
     svc = _svc_with_models(models)
     text, cited, ungrounded = _drain(svc.answer_from_context_stream("q?", _CARDS))
     assert models.requested == [GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL]
@@ -906,7 +945,10 @@ def test_stream_empty_library_not_flagged():
 
 def test_buffered_answer_uses_ask_model_on_both_passes():
     from ai_service import GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL
-    assert GEMINI_ASK_MODEL != GEMINI_ANALYSIS_MODEL  # it's genuinely a tier up
+    # 2026-07-24: the "tier up" id gemini-3.1-flash proved to be a 404 in
+    # production (CI ask-debug probes) — the ask tier is pinned back to the
+    # proven analysis model until a real higher-tier id is verified.
+    assert GEMINI_ASK_MODEL == GEMINI_ANALYSIS_MODEL
     # First pass uncited → forces the strict re-ask; BOTH calls must use ASK model.
     svc = _svc_with_json_responses([
         {"answer": "uncited", "citedIds": []},

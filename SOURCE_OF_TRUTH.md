@@ -714,7 +714,36 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-24 (latest) — ASK ROUND 4 (owner escalation): whole-card drop made
+- **2026-07-24 (latest) — ASK ROUND 5: GROUND TRUTH VIA CI PROBES → the real
+  causes were (a) a 404 ask-model id and (b) a STRUCTURED-OUTPUT-mode filter
+  false positive.** Blind-fix rounds stopped; built a temporary **`ask-debug`
+  workflow** (push `trigger/ask-debug`; runner has GEMINI_API_KEY +
+  FIREBASE_SERVICE_ACCOUNT) that rebuilt the real Ask prompt from the affected
+  user's actual cards and probed Gemini's filter directly (run #30090210240,
+  31 probes; artifact `ask-debug-report`, logs structural-only — public repo).
+  Findings: (1) **`gemini-3.1-flash` 404s** ("not found for API version
+  v1beta") — the ORIGINAL 07-16 model-id hypothesis was right; every ask
+  burned a 404 then fell back. (2) The **full 20-card context, the question,
+  the template, and 24/25 individual cards all PASS** as plain generations —
+  but prod's buffered path generates with `response_schema=BrainAnswer`, and
+  THAT mode on this content returns empty with PROHIBITED_CONTENT. This is
+  why the model fallback, paraphrase retry, headline retry, and probe-based
+  salvage (probes run schema-less → found "nothing blocked") all failed to
+  rescue, and why streaming/web (schema-less by design) was never the broken
+  path. One new card (`ALxnvalA…`) tips the filter (blocked alone, fields
+  individually clean — the filter aggregates; blocking is NOT monotone).
+  Fixes: **GEMINI_ASK_MODEL pinned back to `gemini-3.1-flash-lite`** (no
+  guessed tier-up ids — verify against ListModels before re-upping), and a
+  new **`_plain_answer` rescue**: on a schema-mode prompt block the buffered
+  path retries the SAME full-depth prompt schema-less (JSON asked for in
+  text, parsed defensively; unparseable prose still becomes an uncited
+  answer), with the card-salvage ladder demoted to last resort. Tests
+  355→356 (plain-rescue-first; ask==analysis tier assert; stream fallback
+  test reworked to call-order). **Cleanup owed once owner confirms Ask
+  works:** remove the `(diag: …)` tail in `main.py`, delete
+  `.github/workflows/ask-debug.yml` + `functions/tools/ask_debug.py` + the
+  `trigger/ask-debug` branch.
+- **2026-07-24 — ASK ROUND 4 (owner escalation): whole-card drop made
   the answer DENY the user's own recipe → field-granular salvage + visible
   disclosure.** Round 3's whole-card drop "worked" (no more 502) but produced
   the worst possible answer: "you have no pasta recipe" + ungrounded warning,
