@@ -714,7 +714,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-24 (latest) — ASK ENDGAME (rounds 8-10): one poison card,
+- **2026-07-24 (latest) — ONBOARDING TOUR REVAMP: 5 → 6 beats, all key features
+  represented, animated brand orb where a surface is "thinking".**
+  `OnboardingTour.tsx` only (frontend, no functions). New order: Capture →
+  Understand → Recall (hero) → **Organize (NEW: "Found, not filed" — semantic
+  search bar mock + collection tiles)** → Resurface (now also shows the review
+  deck: "4 cards due today") → send-off. BrandOrb placements: `working` 20px
+  beside the AI-summary pill (StructuredCardMock), `searching` 20px in the
+  Ask answer header (AskMock, now two citation chips), `listening` 64px
+  replacing the static app icon in the send-off glow. Storage key kept at
+  `machina_onboarding_v1` (existing users are NOT re-shown; replay via
+  Settings → "Take the tour again"). Collections copy says "suggests
+  collections" (adopt flow), not "automatic". Implemented by an Opus
+  subagent, reviewed + copy-corrected in session; tsc clean. Branch
+  `claude/onboarding-apps-revamp-7iko5u`, not yet shipped to main.
+- **2026-07-24 — ASK ENDGAME (rounds 8-10): one poison card,
   no model escape, rewrite insufficient → `askExcluded` flag + context
   filter; ORIGINAL schema path CI-verified restored.** Harness v5: model
   sweep — every other Gemini model 404s for this key ("no longer available

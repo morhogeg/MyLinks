@@ -20,10 +20,14 @@ import {
     MessageCircle,
     Bookmark,
     MoreHorizontal,
+    Search,
+    FolderOpen,
+    Layers,
 } from 'lucide-react';
 import { isNativeApp } from '@/lib/api';
 import { hapticSelection, hapticLight } from '@/lib/haptics';
 import { useVisualViewport } from '@/lib/useVisualViewport';
+import BrandOrb from '@/components/ui/BrandOrb';
 
 /**
  * First-run onboarding tour.
@@ -31,14 +35,16 @@ import { useVisualViewport } from '@/lib/useVisualViewport';
  * A short, full-screen story that showcases what makes Machina different — one
  * crisp headline, one supporting line, and one self-contained illustrative
  * visual per step. The visuals are built entirely from theme-token UI primitives
- * (mock share-sheet row, mock structured card, mock cited answer, mock digest),
- * NOT bitmap assets, so they render correctly in both light and dark themes and
- * never go stale as the real UI evolves.
+ * (mock share-sheet row, mock structured card, mock cited answer, mock organize
+ * screen, mock resurfacing digest), NOT bitmap assets, so they render correctly
+ * in both light and dark themes and never go stale as the real UI evolves. The
+ * animated brand orb appears where a surface is genuinely "thinking".
  *
- * Design goals: showcase the real differentiators (capture anywhere → AI reads
- * everything → ask your knowledge → it comes back to you), stay to ~5 steps,
- * keep a persistent Skip and a progress indicator on every step, and finish on
- * an actionable CTA. It is never an obstacle: it shows once, animates fast
+ * Design goals: showcase the real differentiators across 6 beats (capture
+ * anywhere → AI understands every save → ask your knowledge → organize & find →
+ * it comes back to you → you're set), keep a persistent Skip and a progress
+ * indicator on every step, and finish on an actionable CTA. It is never an
+ * obstacle: it shows once, animates fast
  * (`--ease-modal`), supports swipe + keyboard, and ticks a light haptic on each
  * step (native only).
  *
@@ -122,8 +128,10 @@ function StructuredCardMock() {
             </div>
             <div className="p-3.5">
                 <div className="flex items-center gap-1.5 mb-1.5">
+                    {/* Live brand orb — this card is actively being reasoned about. */}
+                    <BrandOrb state="working" size={20} />
                     <span className="inline-flex items-center gap-1 rounded-full bg-accent/12 text-accent text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 ring-1 ring-accent/20">
-                        <Wand2 className="w-2.5 h-2.5" /> AI summary
+                        AI summary
                     </span>
                 </div>
                 <p className="text-[12.5px] font-bold text-text leading-snug">The science of deep focus</p>
@@ -159,21 +167,51 @@ function AskMock() {
             {/* Answer */}
             <div className="self-start max-w-[92%] rounded-2xl rounded-ss-md bg-card border border-border-subtle px-3.5 py-2.5 shadow-md">
                 <div className="flex items-center gap-1.5 mb-1.5">
-                    <div className="w-5 h-5 rounded-lg bg-accent/12 text-accent flex items-center justify-center ring-1 ring-accent/20">
-                        <Sparkles className="w-3 h-3" />
-                    </div>
+                    {/* Live brand orb — the Recall Engine is searching your knowledge. */}
+                    <BrandOrb state="searching" size={20} />
                     <span className="text-[10px] font-bold text-text-muted uppercase tracking-wide">Answer</span>
                 </div>
                 <p className="text-[11.5px] text-text-secondary leading-relaxed">
                     Your saves point to one habit: protect short, single-task blocks and remove ambient distractions.
                 </p>
-                {/* Citation */}
-                <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-fill-subtle px-2 py-1">
-                    <Quote className="w-3 h-3 text-accent shrink-0" />
-                    <span className="text-[10px] font-semibold text-text-secondary truncate">
-                        The science of deep focus
-                    </span>
+                {/* Citations — the answer is grounded in more than one source. */}
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                    {['The science of deep focus', 'Why single-tasking wins'].map((c) => (
+                        <span key={c} className="inline-flex items-center gap-1.5 rounded-lg bg-fill-subtle px-2 py-1 max-w-full">
+                            <Quote className="w-3 h-3 text-accent shrink-0" />
+                            <span className="text-[10px] font-semibold text-text-secondary truncate">{c}</span>
+                        </span>
+                    ))}
                 </div>
+            </div>
+        </div>
+    );
+}
+
+/** Semantic search over a natural-language query, above a few collection tiles. */
+function OrganizeMock() {
+    return (
+        <div className="w-full rounded-2xl bg-card border border-border-subtle shadow-xl p-3.5" aria-hidden>
+            {/* Natural-language search bar */}
+            <div className="flex items-center gap-2 rounded-xl bg-fill-subtle px-3 py-2">
+                <Search className="w-3.5 h-3.5 text-accent shrink-0" />
+                <span className="text-[11px] text-text-secondary truncate">that video about habit loops</span>
+            </div>
+            {/* Collection tiles */}
+            <div className="grid grid-cols-3 gap-2 mt-3">
+                {[
+                    { icon: <FolderOpen className="w-3.5 h-3.5" />, name: 'Focus', count: 12 },
+                    { icon: <Layers className="w-3.5 h-3.5" />, name: 'Habits', count: 8 },
+                    { icon: <Bookmark className="w-3.5 h-3.5" />, name: 'To read', count: 5 },
+                ].map((c) => (
+                    <div key={c.name} className="flex flex-col gap-1.5 rounded-xl bg-fill-subtle px-2.5 py-2">
+                        <div className="w-6 h-6 rounded-lg bg-accent/12 text-accent flex items-center justify-center ring-1 ring-accent/20">
+                            {c.icon}
+                        </div>
+                        <p className="text-[10.5px] font-semibold text-text truncate">{c.name}</p>
+                        <p className="text-[9px] text-text-muted -mt-1">{c.count} saves</p>
+                    </div>
+                ))}
             </div>
         </div>
     );
@@ -203,10 +241,16 @@ function ResurfaceMock() {
                     </div>
                 ))}
             </div>
-            {/* Reminder chip */}
-            <div className="mt-2.5 flex items-center gap-1.5 text-accent">
-                <Bell className="w-3.5 h-3.5" />
-                <span className="text-[10px] font-semibold">Reminder: revisit “The science of deep focus”</span>
+            {/* Review deck + reminder chips */}
+            <div className="mt-2.5 flex flex-col gap-1.5">
+                <div className="flex items-center gap-1.5 text-accent">
+                    <Layers className="w-3.5 h-3.5 shrink-0" />
+                    <span className="text-[10px] font-semibold">Review: 4 cards due today</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-accent">
+                    <Bell className="w-3.5 h-3.5 shrink-0" />
+                    <span className="text-[10px] font-semibold truncate">Reminder: revisit “The science of deep focus”</span>
+                </div>
             </div>
         </div>
     );
@@ -217,10 +261,8 @@ function ReadyMock() {
     return (
         <div className="relative flex items-center justify-center py-2" aria-hidden>
             <div className="absolute w-24 h-24 rounded-full bg-[image:var(--accent-gradient)] opacity-20 blur-2xl" />
-            <div className="relative w-20 h-20 rounded-3xl overflow-hidden shadow-xl shadow-accent/25 ring-1 ring-white/15">
-                <img src="/app-icon.png" alt="" className="w-full h-full object-cover" />
-            </div>
-            <Sparkles className="absolute -top-1 -end-1 w-6 h-6 text-accent drop-shadow" />
+            {/* Large brand orb, listening — Machina is ready and waiting for you. */}
+            <BrandOrb state="listening" size={64} className="relative drop-shadow" />
         </div>
     );
 }
@@ -251,10 +293,17 @@ function buildSteps(native: boolean): Step[] {
             visual: <AskMock />,
         },
         {
+            icon: <FolderOpen className="w-4 h-4" />,
+            eyebrow: 'Organize',
+            title: 'Found, not filed',
+            body: 'Search by meaning, not exact words — and Machina suggests collections that pull related saves together, no folders to tend.',
+            visual: <OrganizeMock />,
+        },
+        {
             icon: <Bell className="w-4 h-4" />,
             eyebrow: 'Resurface',
             title: 'It comes back to you',
-            body: 'A daily digest, a weekly synthesis, and gentle reminders bring the right save back at exactly the right moment.',
+            body: 'A daily digest, a weekly synthesis, a review deck, and gentle reminders bring the right save back at exactly the right moment.',
             visual: <ResurfaceMock />,
         },
         {
