@@ -714,7 +714,29 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-23 (latest) — HIDE-IMAGE: honor the flag in the OPEN card + add the
+- **2026-07-24 (latest) — FIX OVER-BROAD LINKEDIN/FB IMAGE SUPPRESSION (restore
+  video thumbnails) + menu color.** The prior "no images on LinkedIn/FB" fix was
+  too blunt: it killed the poster on a legit **Facebook VIDEO** (owner: "the
+  thumbnail worked and looked great yesterday, now it's gone"). Owner's rule:
+  video cards show a thumbnail, photo posts show the photo, and a bad one is
+  hidden manually. So the suppression is now precise, not platform-wide.
+  **Backend (`scraper.py`):** new `_og_indicates_video(soup, url)` (og:type=video
+  / og:video tag / video-shaped URL — fb.watch, /watch, /videos/, /reel(s)/).
+  `_scrape_linkedin_url` + `_scrape_facebook_url` emit `video_thumbnail_url` ONLY
+  when this is true — so LinkedIn/FB **videos** get a real poster again while a
+  LinkedIn **text** post (og:type=article → the "Posted on LinkedIn" branding
+  card) stays media-less. **Frontend:** removed the blanket
+  `platformSuppressesThumbnail` helper + its gates in `Card.tsx`/`SwipeDeck.tsx`/
+  `LinkDetailModal.tsx` — the banner now trusts the backend's decision (junk no
+  longer stored for new saves). **Menu color:** the `⋯ → Show image` row dropped
+  its `active` flag in `CardActionSheet.tsx` so it renders in normal text color,
+  not accent/purple. Known limits: FB/LinkedIn **photo** posts stay text-only (a
+  generic og:image can't be reliably told from a real photo on those platforms);
+  a LinkedIn text card saved during the blunt-fix window keeps no image and a FB
+  video saved then needs a re-save to pick up its poster. tsc + py_compile clean;
+  `_og_indicates_video` logic-verified. Backend changed → redeploy `analyze_link`
+  + `process_link_background`.
+- **2026-07-23 — HIDE-IMAGE: honor the flag in the OPEN card + add the
   toggle there.** Two owner bugs on the hide/show-image feature: (1) hiding an
   image on the feed card still showed it in the open `LinkDetailModal`; (2) no way
   to hide/show from inside the open card. Fix (frontend-only, `LinkDetailModal.tsx`
