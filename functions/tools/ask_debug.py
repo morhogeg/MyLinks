@@ -1,18 +1,13 @@
-"""Ask debug harness v6 — fix the poison card's stored text; verify full
-restoration of the ORIGINAL Ask path.
+"""Ask debug harness v7 — flag the poison card askExcluded; verify the fully
+restored ORIGINAL Ask path.
 
-v5 findings: exactly ONE poison card (the top vector hit for the pasta
-question); with it removed the full 16-card context passes in ORIGINAL
-schema mode; and no alternative Gemini model is available to this API key.
-The card's fields pass the filter individually — the block emerges from the
-combination — so Gemini can rewrite them (preserving all facts) even though
-it refuses them combined.
-
-Steps: re-derive the poison card via full-generation bisection → back up its
-fields (doc._askFilterOriginal + artifact) → rewrite summary → verify → if
-still blocked rewrite detailedSummary/takeaway → verify → if still blocked
-rewrite recipe lists → verify → write back → end-to-end answer_from_context
-check (expect grounded, cited, schema-mode answer with the fixed card).
+v5: exactly one poison card; context passes ORIGINAL schema mode without it.
+v6: rewriting its summary/detail text was NOT sufficient (trigger lives in
+other fields or pure combination) — nothing was written back.
+v7: set `askExcluded: true` on that one doc (the deployed ask_brain filter
+honors it; card stays in feed/search/collections), rebuild the context the
+way prod now does (excluding flagged cards), and run the REAL
+answer_from_context — expect a grounded, cited, schema-mode answer.
 
 Public repo ⇒ stdout structural only; content → auth-gated artifact.
 """
@@ -57,6 +52,7 @@ def slim(doc_id, d):
         "sourceName": d.get("sourceName"),
         "url": d.get("url"),
         "userNote": str(d.get("userNote") or "")[:800],
+        "askExcluded": d.get("askExcluded"),
     }
     det = (d.get("detailedSummary") or "").strip()
     if det:
@@ -90,36 +86,6 @@ def schema_gen_blocked(cards):
         return True
 
 
-def rewrite_text(text):
-    """Gemini paraphrase preserving all facts. Returns None on failure."""
-    if not text or not str(text).strip():
-        return None
-    try:
-        resp = client.models.generate_content(
-            model=GEMINI_ANALYSIS_MODEL,
-            contents=[(
-                "Rewrite the following text, preserving EVERY fact, name, "
-                "quantity, ingredient, and step exactly — change only the "
-                "wording and sentence structure. Keep the same language as the "
-                "original. Reply with ONLY the rewritten text.\n\n" + str(text))],
-            config={"temperature": 0.4, "safety_settings": _ASK_SAFETY_SETTINGS})
-        try:
-            out = (resp.text or "").strip()
-        except Exception:
-            out = ""
-        return out or None
-    except Exception:
-        return None
-
-
-def rewrite_list(items):
-    out = []
-    for it in items:
-        new = rewrite_text(it)
-        out.append(new if new else it)
-    return out
-
-
 def main():
     db = firestore.Client(project=PROJECT)
     errs = [s.to_dict() for s in db.collection("server_errors").order_by(
@@ -132,7 +98,7 @@ def main():
     report["uid"] = uid
     links = db.collection("users").document(uid).collection("links")
 
-    def build_ctx():
+    def build_ctx(exclude_flagged):
         vec_cards = []
         try:
             emb = client.models.embed_content(
@@ -155,101 +121,45 @@ def main():
         for c in vec_cards + kw + rec5:
             if c["id"] not in seen:
                 seen.add(c["id"])
-                ctx.append(c)
+                if not (exclude_flagged and c.get("askExcluded")):
+                    ctx.append(c)
         return ctx[:20]
 
-    ctx = build_ctx()
+    ctx = build_ctx(exclude_flagged=False)
     print(f"context: {len(ctx)} cards")
-    if not schema_gen_blocked(ctx):
-        print("context already passes schema mode — nothing to fix")
-        json.dump(report, open("ask-debug-report.json", "w"),
-                  ensure_ascii=False, indent=1, default=str)
-        return
+    if schema_gen_blocked(ctx):
+        # Bisect to the poison card (full generations) and flag it.
+        remaining = list(ctx)
+        lo, hi = 1, len(remaining)
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if schema_gen_blocked(remaining[:mid]):
+                hi = mid
+            else:
+                lo = mid + 1
+        poison = remaining[lo - 1]
+        report["poison"] = {"id": poison["id"], "title": poison["title"]}
+        print(f"poison card: {poison['id'][:10]}… — setting askExcluded")
+        links.document(poison["id"]).set(
+            {"askExcluded": True,
+             "_askExcludedAt": datetime.now(timezone.utc).isoformat(),
+             "_askExcludedReason": "gemini prompt filter (2026-07-24 incident)"},
+            merge=True)
+    else:
+        print("context already passes — no flag needed")
 
-    # Bisect to the poison card (full generations).
-    remaining = list(ctx)
-    lo, hi = 1, len(remaining)
-    while lo < hi:
-        mid = (lo + hi) // 2
-        if schema_gen_blocked(remaining[:mid]):
-            hi = mid
-        else:
-            lo = mid + 1
-    poison = remaining[lo - 1]
-    pid = poison["id"]
-    report["poison"] = {"id": pid, "title": poison["title"]}
-    print(f"poison card: {pid[:10]}…")
-
-    doc_ref = links.document(pid)
-    original = doc_ref.get().to_dict() or {}
-    backup = {k: original.get(k) for k in
-              ("summary", "detailedSummary", "actionableTakeaway", "recipe")
-              if original.get(k) is not None}
-    report["original_fields"] = backup
-
-    updates = {}
-    # Round 1: summary only.
-    new_summary = rewrite_text(original.get("summary"))
-    if new_summary:
-        updates["summary"] = new_summary
-    trial = dict(poison)
-    trial.update({k: v for k, v in updates.items() if isinstance(v, str)})
-    ctx_trial = [trial if c["id"] == pid else c for c in ctx]
-    still = schema_gen_blocked(ctx_trial)
-    print(f"after summary rewrite: blocked={still}")
-
-    if still:
-        for f in ("detailedSummary", "actionableTakeaway"):
-            new = rewrite_text(original.get(f))
-            if new:
-                updates[f] = new
-        trial = dict(poison)
-        for k, v in updates.items():
-            if isinstance(v, str):
-                trial[k] = v
-        ctx_trial = [trial if c["id"] == pid else c for c in ctx]
-        still = schema_gen_blocked(ctx_trial)
-        print(f"after detail/takeaway rewrite: blocked={still}")
-
-    if still:
-        rec = original.get("recipe")
-        if isinstance(rec, dict):
-            new_rec = dict(rec)
-            if rec.get("ingredients"):
-                new_rec["ingredients"] = rewrite_list([str(x) for x in rec["ingredients"]])
-            if rec.get("instructions"):
-                new_rec["instructions"] = rewrite_list([str(x) for x in rec["instructions"]])
-            updates["recipe"] = new_rec
-            trial["recipe"] = {"ingredients": new_rec.get("ingredients") or [],
-                               "instructions": new_rec.get("instructions") or []}
-            ctx_trial = [trial if c["id"] == pid else c for c in ctx]
-            still = schema_gen_blocked(ctx_trial)
-            print(f"after recipe rewrite: blocked={still}")
-
-    report["rewritten_fields"] = list(updates.keys())
-    report["final_blocked"] = still
-    if still:
-        print("REWRITE INSUFFICIENT — not writing back; askExcluded flag needed")
-        json.dump(report, open("ask-debug-report.json", "w"),
-                  ensure_ascii=False, indent=1, default=str)
-        return
-
-    # Write back: rewritten fields + originals preserved in-doc for recovery.
-    updates["_askFilterOriginal"] = backup
-    updates["_askFilterRewriteAt"] = datetime.now(timezone.utc).isoformat()
-    doc_ref.set(updates, merge=True)
-    print(f"card updated: {sorted(k for k in updates if not k.startswith('_'))}")
-
-    # End-to-end: rebuild context fresh from Firestore, run the real Ask path.
-    ctx2 = build_ctx()
+    # Verify the restored path exactly as prod will run it.
+    ctx2 = build_ctx(exclude_flagged=True)
+    print(f"context after exclusion: {len(ctx2)} cards")
+    blocked = schema_gen_blocked(ctx2)
+    print(f"schema mode on excluded context: blocked={blocked}")
     svc = GeminiService()
     try:
         res = svc.answer_from_context(QUESTION, ctx2, attempts=2)
         report["e2e"] = res
         print(f"E2E: answer_len={len(res.get('answer') or '')} "
               f"cited={res.get('citedIds')} ungrounded={res.get('ungrounded')} "
-              f"dropped={res.get('droppedCardIds')} "
-              f"poison_cited={pid in (res.get('citedIds') or [])}")
+              f"dropped={res.get('droppedCardIds')}")
     except Exception as exc:
         report["e2e_error"] = str(exc)
         print(f"E2E FAILED: {type(exc).__name__}")
@@ -261,4 +171,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-""" v6 """  # noqa
+""" v7 """  # noqa
