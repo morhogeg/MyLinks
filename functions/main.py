@@ -1637,6 +1637,14 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             logger.error(f"ask_brain privacy strip failed: {e}")
             cards = [c for c in cards if not c.get("isPrivate")]
 
+        # Cards flagged out of Ask context (`askExcluded` on the link doc).
+        # 2026-07-24 incident: ONE card's stored text trips Gemini's
+        # non-configurable prompt filter and poisons EVERY ask that retrieves
+        # it (CI-verified: with it removed the full context passes in the
+        # original schema mode). The flag removes such a card from the model's
+        # context only — it stays in the feed, search, and collections.
+        cards = [c for c in cards if not c.get("askExcluded")]
+
         # 1i. Bound the assembled context (excluded cards sit at the back and
         #     fall off first).
         cards = cards[:ASK_CONTEXT_CARDS]
