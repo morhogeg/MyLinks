@@ -1091,78 +1091,58 @@ If the image is an article, extract the headline and body."""
                 #   3. plain, headline-only context (input-side poison — every
                 #      card stays present as title+summary, nothing vanishes);
                 #   4. stage-tagged error.
-                logger.warning("ask prompt blocked (%s) — plain-mode ladder", e)
-                headline_prompt = _build_rag_prompt(
-                    question, _headline_cards(cards), history, excluded_titles)
-                ladder = [
-                    ("plain full", base_prompt + _CITED_JSON_SUFFIX, cards),
-                    ("plain paraphrase", base_prompt + _CITED_JSON_PARAPHRASE_SUFFIX, cards),
-                    ("plain headline", headline_prompt + _CITED_JSON_SUFFIX,
-                     _headline_cards(cards)),
+                # Harness runs #3-#4 (2026-07-24) proved 1-token probe verdicts
+                # DON'T predict full-generation blocking (probe-salvage rebuilt
+                # an essentially identical context that still blocked), so the
+                # only reliable test is a full generation itself. The sweep
+                # tries progressively smaller contexts — a blocked attempt
+                # fast-fails pre-generation (<1s); the first attempt that
+                # passes IS the answer. Retrieval ranks the asked-about cards
+                # first, so top-N subsets keep the cards the answer needs while
+                # shedding the lower-ranked poison.
+                logger.warning("ask prompt blocked (%s) — plain-mode context sweep", e)
+                headline_all = _headline_cards(cards)
+                sweep = [
+                    ("plain full", cards, _CITED_JSON_SUFFIX),
+                    ("plain paraphrase", cards, _CITED_JSON_PARAPHRASE_SUFFIX),
+                    ("plain headline", headline_all, _CITED_JSON_SUFFIX),
                 ]
+                for n in (8, 4, 2, 1):
+                    if len(cards) > n:
+                        sweep.append((f"plain top{n}", cards[:n], _CITED_JSON_SUFFIX))
+                        if n == 4:
+                            sweep.append(("plain headline top4",
+                                          headline_all[:4], _CITED_JSON_SUFFIX))
+                if len(cards) > 1:
+                    # Last resort: the top-ranked card ITSELF may be the poison.
+                    sweep.append(("plain skip-first", cards[1:6], _CITED_JSON_SUFFIX))
                 data = None
                 last_exc = None
-                for stage_name, stage_prompt, stage_cards in ladder:
+                for stage_name, stage_cards, stage_suffix in sweep:
                     try:
-                        data = self._plain_answer(stage_prompt)
+                        data = self._plain_answer(_build_rag_prompt(
+                            question, stage_cards, history, excluded_titles) + stage_suffix)
                         context_cards = stage_cards
                         used_plain_mode = True
-                        logger.warning("ask rescued at ladder stage: %s", stage_name)
+                        logger.warning("ask rescued at sweep stage: %s (%d cards)",
+                                       stage_name, len(stage_cards))
                         break
                     except AnalysisError as stage_exc:
                         last_exc = stage_exc
-                        logger.warning("ask ladder stage '%s' failed: %s",
+                        logger.warning("ask sweep stage '%s' failed: %s",
                                        stage_name, stage_exc)
                 if data is None:
-                    # Even headline-only is input-blocked (verified against the
-                    # real retrieved context, harness run #3) → some retrieved
-                    # card's headline text is itself the trigger. Final stage:
-                    # probe-isolate the poison card(s) and salvage — this time
-                    # FULLY mode-consistent: plain 1-token probes AND a plain
-                    # final generation (the round-4 salvage failed because its
-                    # final generation went back to schema mode).
-                    clean, dropped, question_blocked = self._drop_prompt_blocked_cards(
-                        question, cards, history, excluded_titles)
-                    if question_blocked or not dropped:
-                        raise EmptyGenerationError(
-                            f"{e} [stage: plain-mode ladder exhausted — "
-                            f"last: {str(last_exc)[:120]}]",
-                            prompt_blocked=True)
-                    fully_dropped, partially_filtered = [], []
-                    salvaged = {}
-                    salvage_base = list(clean)
-                    for pc in dropped:
-                        variant, removed_fields = self._best_clean_variant(
-                            question, salvage_base, pc, history, excluded_titles)
-                        if variant is None:
-                            fully_dropped.append(pc)
-                        else:
-                            salvage_base.append(variant)
-                            salvaged[pc.get("id")] = variant
-                            if removed_fields:
-                                partially_filtered.append((pc, removed_fields))
-                    clean_ids = {c.get("id") for c in clean}
-                    context_cards = [
-                        salvaged.get(c.get("id"), c) for c in cards
-                        if c.get("id") in clean_ids or c.get("id") in salvaged]
-                    dropped_ids = [c.get("id") for c in fully_dropped]
-                    filtered_cards = [
-                        {"id": pc.get("id"), "title": pc.get("title"),
-                         "removedFields": rf} for pc, rf in partially_filtered]
-                    filter_note = self._filter_note(fully_dropped, partially_filtered)
-                    logger.warning(
-                        "ask plain salvage: %d dropped %s, %d partially filtered",
-                        len(dropped_ids), dropped_ids, len(filtered_cards))
-                    try:
-                        data = self._plain_answer(
-                            _build_rag_prompt(question, context_cards, history,
-                                              excluded_titles) + _CITED_JSON_SUFFIX)
-                        used_plain_mode = True
-                    except AnalysisError as final_exc:
-                        raise EmptyGenerationError(
-                            f"{e} [stage: plain salvage generation still failed: "
-                            f"{str(final_exc)[:100]}]",
-                            prompt_blocked=True)
+                    raise EmptyGenerationError(
+                        f"{e} [stage: plain-mode sweep exhausted — "
+                        f"last: {str(last_exc)[:120]}]",
+                        prompt_blocked=True)
+                if len(context_cards) < len(cards):
+                    # Cards were cut to clear the filter — never silently:
+                    # disclose it in the answer (appended post-generation, so
+                    # the filter can't touch it).
+                    filter_note = ("\n\n⚠️ Some of your saved cards could not be "
+                                   "included in this answer — Google's content "
+                                   "filter rejected their text.")
             else:
                 # The OUTPUT came back empty on every tier — the RECITATION
                 # signature. Retry once asking the model to paraphrase instead

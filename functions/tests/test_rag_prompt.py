@@ -619,30 +619,24 @@ def test_buffered_block_ladder_uncited_reask_stays_plain_and_reduced():
     assert "500g pasta" not in reask  # reduced context carried into the re-ask
 
 
-def test_buffered_block_ladder_final_salvage_drops_poison_in_plain_mode():
-    """All three plain stages fail → the final stage probe-isolates the poison
-    card and generates from the salvaged context IN PLAIN MODE, disclosing the
-    exclusion."""
+def test_buffered_block_sweep_topn_recovers_with_disclosure():
+    """Full/paraphrase/headline all fail -> the sweep shrinks the context to
+    the top-ranked cards; the first PASSING generation is the answer, and the
+    cut is disclosed in the answer text."""
     from ai_service import AnalysisError, EmptyGenerationError
-    cards = [
-        {"id": "clean1", "title": "Fine card", "summary": "Totally fine."},
-        {"id": "poison", "title": "Bad card", "summary": "Bad summary."},
-    ]
+    cards = [{"id": f"id{i}", "title": f"Card {i}", "summary": f"Summary {i}."}
+             for i in range(1, 6)]  # 5 cards -> sweep has top4/top2/top1 stages
     svc = _svc_with_plain_ladder(
         [EmptyGenerationError("blocked", prompt_blocked=True)],
-        [AnalysisError("s1"), AnalysisError("s2"), AnalysisError("s3"),
-         {"answer": "From the clean rest.", "citedIds": ["clean1"]}])
-    svc._drop_prompt_blocked_cards = (
-        lambda q, c, h=None, x=None, max_drops=3: ([cards[0]], [cards[1]], False))
-    svc._best_clean_variant = lambda q, b, pc, h=None, x=None: (None, None)
+        [AnalysisError("full"), AnalysisError("para"), AnalysisError("headline"),
+         {"answer": "From the top four.", "citedIds": ["id1"]}])  # top4 passes
     out = svc.answer_from_context("q?", cards)
-    assert out["answer"].startswith("From the clean rest.")
-    assert 'Your saved card "Bad card" could not be included' in out["answer"]
-    assert out["droppedCardIds"] == ["poison"]
-    # The salvage generation ran in plain mode with only the clean card.
-    final = svc._plain_state["prompts"][3]
-    assert "Bad summary." not in final
-    assert "Fine card" in final
+    assert out["answer"].startswith("From the top four.")
+    assert "could not be included" in out["answer"]  # disclosure for the cut
+    assert out["citedIds"] == ["id1"]
+    top4_prompt = svc._plain_state["prompts"][3]
+    assert "Card 4" in top4_prompt
+    assert "Card 5" not in top4_prompt  # rank 5 was cut
 
 
 def test_buffered_block_ladder_exhausted_raises_with_stage():
@@ -652,10 +646,10 @@ def test_buffered_block_ladder_exhausted_raises_with_stage():
     from ai_service import AnalysisError, EmptyGenerationError
     svc = _svc_with_plain_ladder(
         [EmptyGenerationError("blocked", prompt_blocked=True)],
-        [AnalysisError("s1"), AnalysisError("s2"), AnalysisError("s3")])
+        [AnalysisError(f"s{i}") for i in range(10)])
     with pytest.raises(EmptyGenerationError) as exc_info:
         svc.answer_from_context("q?", _CARDS)
-    assert "plain-mode ladder exhausted" in str(exc_info.value)
+    assert "plain-mode sweep exhausted" in str(exc_info.value)
     assert exc_info.value.prompt_blocked is True
 
 
