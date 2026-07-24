@@ -1,20 +1,18 @@
-"""Ask debug harness v4 — run the REAL answer_from_context ladder against the
-reconstructed failing context.
+"""Ask debug harness v5 — model sweep + full-generation poison bisection.
 
-v3 proved the retrieval-reconstructed context (vector top-12 + keyword +
-recency) reproduces PROHIBITED_CONTENT in ALL simple modes — schema, plain,
-paraphrase, even plain headline — so a retrieved card's headline text is
-itself a trigger. v4 executes the actual production code path
-(GeminiService.answer_from_context, with the new plain-mode ladder + plain
-salvage final stage) on that context: if it returns an answer here, the
-deployed fix will too.
+Goal: restore IDENTICAL-to-before Ask behavior. Two levers, both measured
+with FULL generations (probe verdicts proven unreliable):
+ 1. MODEL SWEEP — the content filter is model-specific: find an available
+    Gemini model that passes the real failing context in FULL schema mode.
+    If one passes, a one-line GEMINI_ASK_MODEL change restores everything.
+ 2. POISON BISECTION — prefix-bisect the failing context with full
+    generations on the baseline model to name the exact poison card(s).
 
-Public repo ⇒ stdout structural only; full detail → auth-gated artifact.
+Public repo ⇒ stdout structural only; ids/titles/answers → artifact.
 """
 
 import json
 import os
-import re
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -24,7 +22,16 @@ from google.cloud import firestore  # noqa: E402
 from google.cloud.firestore_v1.vector import Vector  # noqa: E402
 from google.cloud.firestore_v1.base_vector_query import DistanceMeasure  # noqa: E402
 
-from ai_service import GeminiService, EMBEDDING_MODEL  # noqa: E402
+import ai_service  # noqa: E402
+from ai_service import (  # noqa: E402
+    _build_rag_prompt,
+    _CITED_JSON_SUFFIX,
+    GEMINI_ANALYSIS_MODEL,
+    _ASK_SAFETY_SETTINGS,
+    GeminiService,
+    EMBEDDING_MODEL,
+)
+from models import BrainAnswer  # noqa: E402
 
 PROJECT = "secondbrain-app-94da2"
 QUESTION = "מתכון לפסטה"
@@ -60,15 +67,26 @@ def slim(doc_id, d):
     return out
 
 
-def stage_markers(msg):
-    out = []
-    if "in plain mode" in msg:
-        out.append("plain-mode")
-    for m in re.findall(r"\[stage: [^\]]{0,140}\]", msg):
-        out.append(m)
-    if "block_reason" in msg:
-        out.append("has-block_reason")
-    return out
+def full_gen(model, prompt, schema=True):
+    cfg = ({"response_mime_type": "application/json", "response_schema": BrainAnswer,
+            "temperature": 0.2, "safety_settings": _ASK_SAFETY_SETTINGS}
+           if schema else
+           {"temperature": 0.2, "safety_settings": _ASK_SAFETY_SETTINGS})
+    try:
+        resp = client.models.generate_content(model=model, contents=[prompt], config=cfg)
+        fb = getattr(resp, "prompt_feedback", None)
+        block = getattr(fb, "block_reason", None) if fb else None
+        cands = getattr(resp, "candidates", None) or []
+        finish = getattr(cands[0], "finish_reason", None) if cands else None
+        try:
+            text = resp.text or ""
+        except Exception:
+            text = ""
+        return {"block": str(block) if block else None,
+                "finish": str(finish) if finish else None,
+                "len": len(text), "text": text[:800]}
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {str(e)[:160]}"}
 
 
 def main():
@@ -95,7 +113,7 @@ def main():
             distance_measure=DistanceMeasure.COSINE, limit=12)
         vec_cards = [slim(s.id, s.to_dict() or {}) for s in vq.stream()]
     except Exception as e:
-        print(f"vector retrieval failed: {type(e).__name__}: {str(e)[:150]}")
+        print(f"vector retrieval failed: {type(e).__name__}")
     recent = [(s.id, s.to_dict() or {}) for s in links.order_by(
         "createdAt", direction=firestore.Query.DESCENDING).limit(150).stream()]
     kw = [slim(i, d) for i, d in recent
@@ -109,20 +127,77 @@ def main():
             ctx.append(c)
     ctx = ctx[:20]
     report["context_ids"] = [(c["id"], c["title"]) for c in ctx]
-    print(f"reconstructed context: {len(ctx)} cards "
-          f"(vec={len(vec_cards)} kw={len(kw)} rec={len(rec5)})")
+    print(f"context: {len(ctx)} cards")
+    prompt = _build_rag_prompt(QUESTION, ctx, None, None) + _CITED_JSON_SUFFIX
 
-    svc = GeminiService()
+    # 1. MODEL SWEEP — which available models pass the full schema context?
     try:
-        out = svc.answer_from_context(QUESTION, ctx, attempts=2)
-        report["ladder_result"] = out
-        print(f"LADDER OK: answer_len={len(out.get('answer') or '')} "
-              f"cited={out.get('citedIds')} dropped={out.get('droppedCardIds')} "
-              f"filtered={len(out.get('filteredCards') or [])} "
-              f"ungrounded={out.get('ungrounded')}")
-    except Exception as exc:
-        report["ladder_error"] = str(exc)
-        print(f"LADDER FAILED: {type(exc).__name__} markers={stage_markers(str(exc))}")
+        available = [m.name.replace("models/", "") for m in client.models.list()
+                     if "gemini" in m.name and "embedding" not in m.name]
+    except Exception as e:
+        available = []
+        print(f"ListModels failed: {type(e).__name__}: {str(e)[:120]}")
+    report["available_models"] = available
+    print(f"available gemini models: {len(available)}")
+    seen_m, candidates = set(), []
+    for m in [GEMINI_ANALYSIS_MODEL] + available:
+        base = m.split("-preview")[0]
+        if m not in seen_m and base not in seen_m and "latest" not in m and "exp" not in m:
+            seen_m.add(m)
+            seen_m.add(base)
+            candidates.append(m)
+    candidates = candidates[:10]
+    passing = []
+    report["model_sweep"] = {}
+    for m in candidates:
+        out = full_gen(m, prompt, schema=True)
+        report["model_sweep"][m] = out
+        verdict = "PASS" if (out.get("len") or 0) > 0 else "FAIL"
+        if verdict == "PASS":
+            passing.append(m)
+        print(f"model {m}: {verdict} block={out.get('block')} "
+              f"finish={out.get('finish')} len={out.get('len')} err={out.get('error')}")
+
+    # 2. Verify end-to-end with the best passing model patched in.
+    if passing:
+        best = passing[0]
+        ai_service.GEMINI_ASK_MODEL = best
+        svc = GeminiService()
+        try:
+            res = svc.answer_from_context(QUESTION, ctx, attempts=2)
+            report["e2e_with_best_model"] = res
+            print(f"E2E with {best}: answer_len={len(res.get('answer') or '')} "
+                  f"cited={res.get('citedIds')} ungrounded={res.get('ungrounded')} "
+                  f"dropped={res.get('droppedCardIds')}")
+        except Exception as exc:
+            report["e2e_with_best_model_error"] = str(exc)
+            print(f"E2E with {best} FAILED: {type(exc).__name__}")
+
+    # 3. POISON BISECTION on the baseline model (full generations).
+    def blocked(subset):
+        out = full_gen(GEMINI_ANALYSIS_MODEL,
+                       _build_rag_prompt(QUESTION, subset, None, None) + _CITED_JSON_SUFFIX,
+                       schema=True)
+        return (out.get("len") or 0) == 0
+    remaining = list(ctx)
+    poison = []
+    for _ in range(3):
+        if not remaining or not blocked(remaining):
+            break
+        lo, hi = 1, len(remaining)
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if blocked(remaining[:mid]):
+                hi = mid
+            else:
+                lo = mid + 1
+        poison.append(remaining[lo - 1])
+        print(f"poison card found: {remaining[lo - 1]['id'][:10]}… (position {lo - 1})")
+        remaining = remaining[:lo - 1] + remaining[lo:]
+    report["poison_cards"] = [(c["id"], c["title"]) for c in poison]
+    report["clean_after_removal"] = not blocked(remaining) if poison else True
+    print(f"poison cards: {len(poison)}; clean after removal: "
+          f"{report['clean_after_removal']}")
 
     json.dump(report, open("ask-debug-report.json", "w"),
               ensure_ascii=False, indent=1, default=str)
@@ -131,3 +206,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+""" v5 """  # noqa
