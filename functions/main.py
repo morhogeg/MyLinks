@@ -206,6 +206,23 @@ def _record_server_error(fn: str, exc: Exception, uid: str = None) -> None:
         logger.warning("server_errors write failed (ignored): %s", log_exc)
 
 
+def _ask_diag(exc: Exception) -> str:
+    """TEMPORARY owner-facing diagnostic tail for the Ask error message.
+
+    Ask keeps failing in prod for one owner-reported query and the recorded
+    cause lives in `server_errors`, which is unreadable from a cloud session
+    (no egress, ADMIN_TOKEN unset). Until the real cause is confirmed, append a
+    compact, bounded reason (exception type + trimmed message — which now names
+    the Gemini finish_reason/block_reason) to the sanitized Ask error so the
+    owner can read it straight off the screen. REMOVE once the cause is fixed."""
+    try:
+        detail = str(exc).strip()
+        detail = re.sub(r"\s+", " ", detail)[:180]
+        return f" (diag: {type(exc).__name__}: {detail})" if detail else f" (diag: {type(exc).__name__})"
+    except Exception:
+        return ""
+
+
 def _verify_bearer(req):
     """Verify the Firebase ID token from the Authorization: Bearer header.
 
@@ -1754,6 +1771,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                         refund_quota(*charged)
                     msg = (
                         "Machina couldn't generate an answer right now. Please try again in a minute."
+                        + _ask_diag(stream_exc)  # TEMPORARY diagnostic — remove once cause fixed
                         if isinstance(stream_exc, AnalysisError)
                         else "Internal server error"
                     )
@@ -1810,7 +1828,8 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         _record_server_error("ask_brain", e, uid=uid)
         return _server_error(
             headers, e,
-            "Machina couldn't generate an answer right now. Please try again in a minute.",
+            "Machina couldn't generate an answer right now. Please try again in a minute."
+            + _ask_diag(e),  # TEMPORARY diagnostic — remove once cause fixed
             502,
         )
     except Exception as e:
