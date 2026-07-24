@@ -714,7 +714,32 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-24 (latest) — ASK ROUND 3: headline-only retry ALSO blocked →
+- **2026-07-24 (latest) — ASK ROUND 4 (owner escalation): whole-card drop made
+  the answer DENY the user's own recipe → field-granular salvage + visible
+  disclosure.** Round 3's whole-card drop "worked" (no more 502) but produced
+  the worst possible answer: "you have no pasta recipe" + ungrounded warning,
+  while the pasta card sits in the library — the model literally couldn't see
+  the dropped card. Owner (rightly) escalated. Fix (`ai_service.py`): (1)
+  **`_best_clean_variant`** — after bisection identifies a poison card, greedy
+  additive probing salvages the RICHEST rendering the filter accepts: bare
+  identity (id/title/meta; placeholder title if the title itself is toxic),
+  then re-adds summary → recipe → detailedSummary → takeaway → highlights →
+  speakers → notes one probe at a time, keeping every field that passes. Only
+  the provably toxic field(s) are excised; the card stays in context, citable,
+  full-depth otherwise. Isolation now runs on the FULL card rendering (not
+  headline), so all innocent cards keep complete deep content — headline-only
+  is just the outage fallback when probes can't identify anything. (2)
+  **Visible disclosure**: `_filter_note` appends to the ANSWER TEXT
+  (post-generation — the filter can't touch it): "Some details of 'X' were
+  withheld by Google's content filter." / "Your saved card 'X' could not be
+  included…". An answer must never silently pretend a saved card doesn't
+  exist. Both paths (buffered + stream; stream emits the note as a trailing
+  token). (3) Trail upgraded: `filteredCards` (id/title/removedFields) joins
+  `droppedCardIds` in the result + the `server_errors` record (type
+  "ask_brain (filter-blocked content)") naming exactly which fields of which
+  card are toxic. Tests 354→355. Diag tail still on — remove after owner
+  confirms.
+- **2026-07-24 — ASK ROUND 3: headline-only retry ALSO blocked →
   filter-probe bisection isolates + drops the poison card.** Owner retried
   post-deploy (13:04 IL = 10:04Z, 2 min after the previous fix went live at
   10:02Z — timing verified against the run, so the new code WAS serving) and

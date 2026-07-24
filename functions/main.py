@@ -1792,19 +1792,25 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         result = ai.answer_from_context(question, slim, history, attempts=2,
                                         excluded_titles=excluded_titles)
 
-        # If the answer only succeeded after filter-probe isolation dropped
-        # card(s) (Gemini prompt filter rejects their text — see
-        # _drop_prompt_blocked_cards), leave a durable trail naming the poison
-        # cards so the owner can find and fix/re-save them. Not an error — the
-        # request SUCCEEDED — but server_errors is the queryable admin trail.
+        # If the answer only succeeded after filter-probe isolation excluded or
+        # partially filtered card(s) (Gemini's prompt filter rejects their text
+        # — see _drop_prompt_blocked_cards/_best_clean_variant), leave a durable
+        # trail naming the poison cards + fields so the owner can find and
+        # fix/re-save them. Not an error — the request SUCCEEDED — but
+        # server_errors is the queryable admin trail.
         dropped_card_ids = result.get("droppedCardIds") or []
-        if dropped_card_ids:
+        filtered = result.get("filteredCards") or []
+        if dropped_card_ids or filtered:
             titles = {c.get("id"): str(c.get("title", ""))[:80] for c in cards}
+            parts = [f"dropped {cid}: {titles.get(cid, '?')}"
+                     for cid in dropped_card_ids]
+            parts += [
+                f"filtered {f.get('id')}: {str(f.get('title', '?'))[:80]} "
+                f"(removed: {', '.join(f.get('removedFields') or [])})"
+                for f in filtered]
             _record_server_error(
-                "ask_brain (filter-blocked cards dropped)",
-                Exception(", ".join(
-                    f"{cid}: {titles.get(cid, '?')}" for cid in dropped_card_ids)),
-                uid=uid)
+                "ask_brain (filter-blocked content)",
+                Exception("; ".join(parts)), uid=uid)
 
         # 4. Return only the cited sources for the UI (clickable chips).
         cited_ids = result.get("citedIds", [])
