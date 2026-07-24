@@ -714,7 +714,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-24 (latest) — ASK ROUND 6: the buffered rescue re-entered the
+- **2026-07-24 (latest) — ASK ROUND 7: probes proven unreliable → context-
+  shrinking sweep of REAL generations; CI-verified on the failing context
+  BEFORE deploy.** Harness v4 ran the actual `answer_from_context` on the
+  retrieval-reconstructed failing context: the probe-salvage rebuilt an
+  essentially identical context (bisect "found" offenders, per-field probes
+  passed everything) and the final plain generation still blocked —
+  **1-token probe verdicts do not predict full-generation blocking; probes
+  are dead as a mechanism**. Replaced with a deterministic sweep of actual
+  plain-mode generation attempts over shrinking contexts: full → paraphrase →
+  headline → top8 → top4 → headline-top4 → top2 → top1 → skip-first; blocked
+  attempts fast-fail (<1s), the first pass IS the answer, cuts are disclosed
+  in the answer text. **Harness verification (run #30094889945): `LADDER OK`
+  on the reconstructed pasta context — answer produced (ungrounded-flagged,
+  citations didn't survive plain fallback), no exception.** Deployed to
+  `ask_brain`. Cleanup owed: diag tail, ask-debug workflow/script/branches.
+- **2026-07-24 — ASK ROUND 6: the buffered rescue re-entered the
   BLOCKED schema mode → deterministic plain-mode ladder.** Harness v2
   (run #30093796121) added: E2E from CI is 401 (App Check enforced — the
   fresh error records are the owner's own retries); the newest-25 context now
