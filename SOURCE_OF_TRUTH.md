@@ -714,7 +714,31 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-24 (latest) — ASK ROUND 7: probes proven unreliable → context-
+- **2026-07-24 (latest) — ASK ENDGAME (rounds 8-10): one poison card,
+  no model escape, rewrite insufficient → `askExcluded` flag + context
+  filter; ORIGINAL schema path CI-verified restored.** Harness v5: model
+  sweep — every other Gemini model 404s for this key ("no longer available
+  to new users"); flash-lite is the ONLY text model. Full-generation
+  bisection (probes remain banned): EXACTLY ONE poison card —
+  `ALxnvalAH8…`, the TOP vector hit for the pasta question (the owner's
+  pasta card) — and with it removed the full 16-card context passes in the
+  ORIGINAL schema mode. v6: Gemini-rewriting its summary/detailedSummary/
+  takeaway did NOT clear the block (trigger in remaining fields or pure
+  combination); nothing written back. v7: set `askExcluded: true` on that
+  doc (+ `_askExcludedAt`/`_askExcludedReason`); `ask_brain` now filters
+  `askExcluded` cards from the model context ONLY (card untouched in feed/
+  search/collections). CI-verified: schema mode on the excluded context
+  `blocked=False`; E2E answer generated (honest "no pasta recipe" — the
+  excluded card IS the pasta recipe). **Restoring that one card = owner
+  deletes & re-saves it** (fresh scrape → fresh analysis text; new doc has
+  no flag). Root-cause verdict for the incident: NOT app code — the 07-16
+  failure predates all deployed ask changes, and the same code passed
+  07-23 / failed 07-24; the variable is Google's filter behavior ×
+  the specific card's text. Cleanup owed once owner confirms: diag tail,
+  ask-debug workflow + tools/ask_debug.py + trigger/ask-debug branch +
+  .ask-debug-ping, and §4 item for a Settings surface to manage
+  askExcluded cards.
+- **2026-07-24 — ASK ROUND 7: probes proven unreliable → context-
   shrinking sweep of REAL generations; CI-verified on the failing context
   BEFORE deploy.** Harness v4 ran the actual `answer_from_context` on the
   retrieval-reconstructed failing context: the probe-salvage rebuilt an
