@@ -1,0 +1,72 @@
+# TEMPORARY debug harness for the 2026-07-24 Ask PROHIBITED_CONTENT incident.
+#
+# Cloud sessions can't reach Gemini or Firestore, but this runner can (repo
+# secrets GEMINI_API_KEY + FIREBASE_SERVICE_ACCOUNT). It reproduces the exact
+# Ask prompt from the affected user's real cards, probes Gemini's prompt
+# filter, and bisects to the precise card/field/sentence being rejected.
+#
+# Public repo ⇒ logs print ONLY structural findings (booleans/counts/short
+# ids). Full detail goes to the auth-gated `ask-debug-report` artifact.
+#
+# Trigger: push to `trigger/ask-debug` (dispatch API 403s for cloud sessions;
+# push is the control channel, same pattern as trigger/testflight).
+# DELETE this workflow once the incident is resolved.
+
+name: Ask Debug
+
+on:
+  push:
+    branches: [trigger/ask-debug]
+
+concurrency:
+  group: ask-debug
+  cancel-in-progress: true
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required secrets
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ] || [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error::Missing FIREBASE_SERVICE_ACCOUNT or GEMINI_API_KEY secret."
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install deps
+        run: pip install firebase-admin==6.9.0 google-genai==1.75.0 pydantic==2.13.4
+
+      - name: Write service account credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          creds="$RUNNER_TEMP/firebase-sa.json"
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$creds"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$creds" >> "$GITHUB_ENV"
+
+      - name: Run ask debug probes
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          cd functions
+          python tools/ask_debug.py
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ask-debug-report
+          path: functions/ask-debug-report.json
+          retention-days: 3
