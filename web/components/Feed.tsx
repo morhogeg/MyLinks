@@ -33,6 +33,7 @@ import { useScrollAwayBar } from '@/lib/useScrollAwayBar';
 import MobileTagExplorerDrawer from './feed/MobileTagExplorerDrawer';
 import Card from './Card';
 import ListCard from './ListCard';
+import BrandOrb from './ui/BrandOrb';
 import Masonry from './Masonry';
 import ReminderModal from './ReminderModal';
 import SwipeDeck from './SwipeDeck';
@@ -2168,7 +2169,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                         state owns the no-results case (spinner there). */}
                     {(viewMode === 'grid' || viewMode === 'list') && filteredLinks.length > 0 && searchingLibrary && (
                         <div className="flex items-center gap-2 mb-4 text-xs" aria-live="polite">
-                            <div className="w-3.5 h-3.5 border-2 border-accent/20 border-t-accent rounded-full animate-spin shrink-0" />
+                            {/* Same sentence as Ask's first drafting beat, so it
+                                gets the same orb — a library search looks like a
+                                library search wherever it happens. */}
+                            <BrandOrb state="searching" size={20} />
                             <span className="text-text-muted font-medium">Searching your library…</span>
                         </div>
                     )}
@@ -2292,7 +2296,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             <h3 className="text-base font-bold text-text">{empty.title}</h3>
                             {searchingLibrary && (
                                 <div className="flex items-center justify-center gap-2 text-accent mt-2">
-                                    <div className="w-4 h-4 border-2 border-accent/20 border-t-accent rounded-full animate-spin" />
+                                    <BrandOrb state="searching" size={20} />
                                     <span className="text-sm font-medium">Searching your library…</span>
                                 </div>
                             )}

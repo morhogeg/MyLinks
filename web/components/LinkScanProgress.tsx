@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Check, Globe } from 'lucide-react';
-import { LINK_SCAN_STEPS, linkScanStepIndex } from '@/lib/scanPhases';
+import { LINK_SCAN_STEPS, LINK_SCAN_ORBS, linkScanStepIndex } from '@/lib/scanPhases';
 import BrandOrb from '@/components/ui/BrandOrb';
 
 interface LinkScanProgressProps {
@@ -72,7 +72,11 @@ export default function LinkScanProgress({ url, progress, activeStep }: LinkScan
                         <li key={label} className="flex items-center gap-3 py-1.5">
                             <span className="relative w-5 h-5 shrink-0 grid place-items-center">
                                 {state === 'active' ? (
-                                    <BrandOrb state="working" size={20} />
+                                    // Each phase carries its own orb (shared source),
+                                    // so the shape says what kind of work is running.
+                                    // No dip needed here: the orb doesn't swap in
+                                    // place, it moves down to the next row.
+                                    <BrandOrb state={LINK_SCAN_ORBS[i]} size={20} />
                                 ) : state === 'done' ? (
                                     <Check className="w-[15px] h-[15px] text-accent animate-fade-in" strokeWidth={3} />
                                 ) : (
