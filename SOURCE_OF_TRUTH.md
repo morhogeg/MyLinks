@@ -766,7 +766,16 @@ exact-match, capped.
   light+dark. **Watch on device:** whether three orb swaps in a ~6s window reads
   as fidgety — if so, collapse Ask to two states (`searching` for beats 1+2,
   `shaping` for the write). New §4 item 18c: native share-extension orb is still
-  single-state `working`.
+  single-state `working`. Feature `e28bc4b`, merge **`72de50a`** → Vercel
+  (auto); TestFlight run **#180 green → build 1180**. No functions/hosting
+  deploy (neither `functions/**` nor `firebase.json` changed). **Gotcha for
+  cloud sessions:** `web/.env.local` is gitignored, so a fresh container has no
+  `NEXT_PUBLIC_FIREBASE_*` vars and `next build` dies prerendering `/_not-found`
+  with `auth/invalid-api-key` — nothing to do with the diff. Re-run with
+  placeholder values to get a real signal (`NEXT_PUBLIC_FIREBASE_API_KEY=AIza…`
+  + the other five); Vercel has the real ones. Also beware `npx next build |
+  tail` — `$?`/the background-task exit code is `tail`'s, not the build's, so a
+  failed build reports success.
 
 - **2026-07-24 — NEW `/security` SKILL: code-level-only hardening pass
   (`.claude/skills/security/SKILL.md`).** Owner wanted a dedicated session type
