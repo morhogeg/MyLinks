@@ -524,16 +524,11 @@ const CardFace = memo(function CardFace({ link }: { link: Link }) {
 
     return (
         <div className="h-full w-full surface-card bg-card rounded-2xl border border-border-subtle shadow-[var(--shadow-card)] p-5 sm:p-6 flex flex-col overflow-hidden">
-            {/* Cover image (X/Instagram post, YouTube thumb): the same visual the
-                feed and open card show, full-bleed to the card edges. When we know
-                the aspect (new saves) the banner sizes to the image — capped shorter
-                than the feed since this is a compact triage card — else a fixed short
-                banner. Top-anchored crop so the headline/subject stays visible. */}
+            {/* Cover image (X/Instagram post, YouTube thumb): same fixed banner size
+                as the feed card, full-bleed to the card edges. Top-anchored crop so
+                the headline/subject stays visible. */}
             {!link.hideThumbnail && link.metadata?.thumbnailUrl && (
-                <div
-                    className={`-mx-5 -mt-5 sm:-mx-6 sm:-mt-6 mb-4 shrink-0 relative bg-black/40 overflow-hidden ${link.metadata.thumbnailAspect ? '' : 'h-28 sm:h-32'}`}
-                    style={link.metadata.thumbnailAspect ? { aspectRatio: String(link.metadata.thumbnailAspect), maxHeight: '12.5rem', minHeight: '7rem' } : undefined}
-                >
+                <div className="-mx-5 -mt-5 sm:-mx-6 sm:-mt-6 mb-4 h-28 sm:h-32 shrink-0 relative bg-black/40 overflow-hidden">
                     <img
                         src={link.metadata.thumbnailUrl}
                         alt=""
