@@ -45,12 +45,13 @@ def embedding_needs_repair(raw) -> bool:
 # Single source of truth for the analysis/generation model. Flows to text
 # analysis, image vision, and graph_service. Change here to swap tiers everywhere.
 GEMINI_ANALYSIS_MODEL = "gemini-3.1-flash-lite"
-# The ASK (RAG) answer model — one tier above flash-lite. Used ONLY by the two
-# grounded-answer paths (answer_from_context / answer_from_context_stream), where
-# reasoning quality over the retrieved context matters most and volume is low
-# (a handful of asks per user per day), so the tier bump is affordable. Analysis,
-# vision, and synthesis deliberately stay on GEMINI_ANALYSIS_MODEL.
-GEMINI_ASK_MODEL = "gemini-3.1-flash"
+# The ASK (RAG) answer model. Was "gemini-3.1-flash" (a tier above flash-lite)
+# from 2026-07-11 — but CI filter probes (ask-debug run #1, 2026-07-24) proved
+# that id 404s: "models/gemini-3.1-flash is not found for API version v1beta,
+# or is not supported for generateContent". Every ask burned a 404 + fallback.
+# Pinned back to the production-proven analysis tier until a REAL higher-tier
+# id is verified against ListModels (owner decision; do not guess an id here).
+GEMINI_ASK_MODEL = "gemini-3.1-flash-lite"
 EMBEDDING_MODEL = "models/gemini-embedding-001"
 EMBEDDING_DIMENSIONS = 768
 
@@ -950,6 +951,47 @@ If the image is an article, extract the headline and body."""
                          "content filter.")
         return ("\n\n⚠️ " + " ".join(notes)) if notes else ""
 
+    def _plain_answer(self, prompt: str) -> dict:
+        """The grounded-answer prompt WITHOUT structured output — the rescue for
+        schema-mode prompt blocks.
+
+        Evidence (CI filter probes, ask-debug run #1, 2026-07-24): a context the
+        schema-constrained call (response_schema=BrainAnswer) returns EMPTY for
+        with block_reason=PROHIBITED_CONTENT passes cleanly as a plain
+        generation — the false positive is tied to the structured-output mode,
+        not the content. Structured output exists for JSON escaping on Hebrew
+        answers, so this is a FALLBACK only: it asks for the same JSON object as
+        text and parses defensively; unparseable-but-present prose still becomes
+        the answer (uncited) rather than an error.
+        """
+        if not self.client:
+            raise AnalysisError("Gemini API key is not configured (GEMINI_API_KEY).")
+        try:
+            resp = self.client.models.generate_content(
+                model=GEMINI_ANALYSIS_MODEL,
+                contents=[prompt],
+                config={"temperature": 0.2,
+                        "safety_settings": _ASK_SAFETY_SETTINGS},
+            )
+        except Exception as exc:
+            raise AnalysisError(f"AI answer (plain mode) failed: {exc}")
+        text = _response_text(resp).strip()
+        if not text:
+            raise EmptyGenerationError(
+                f"Empty response from Gemini in plain mode ({_gen_failure_reason(resp)})",
+                prompt_blocked=_prompt_blocked(resp))
+        cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", text,
+                         flags=re.MULTILINE).strip()
+        m = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        if m:
+            try:
+                data = json.loads(m.group(0))
+                if isinstance(data, dict) and str(data.get("answer") or "").strip():
+                    return data
+            except Exception:
+                pass
+        return {"answer": cleaned, "citedIds": []}
+
     def _answer_json(self, prompt: str, what: str, attempts: int) -> dict:
         """One grounded-answer generation call, with a model fallback.
 
@@ -1032,63 +1074,70 @@ If the image is an article, extract the headline and body."""
             data = self._answer_json(base_prompt + _CITED_JSON_SUFFIX, "answer", attempts)
         except EmptyGenerationError as e:
             if e.prompt_blocked:
-                # The INPUT was rejected (e.g. PROHIBITED_CONTENT — card text
-                # false-positives Gemini's non-configurable prompt filter;
-                # confirmed in prod on a Hebrew recipe card 2026-07-24, even at
-                # the title/summary layer). A different output instruction or
-                # model tier can't help; what helps is finding and excising the
-                # EXACT offending text. Probe-bisect the poison card(s), then
-                # salvage each with the richest field subset the filter accepts
-                # — every other card keeps FULL depth, the answer stays whole,
-                # and anything withheld is disclosed in the answer text.
-                logger.warning("ask prompt blocked (%s) — isolating filter-blocked cards", e)
-                clean, dropped, question_blocked = self._drop_prompt_blocked_cards(
-                    question, cards, history, excluded_titles)
-                if question_blocked:
-                    raise EmptyGenerationError(
-                        f"{e} [stage: the question/history itself is rejected "
-                        "by the prompt filter — no card subset can pass]",
-                        prompt_blocked=True)
-                if dropped:
-                    fully_dropped, partially_filtered = [], []
-                    salvaged = {}
-                    base = list(clean)
-                    for pc in dropped:
-                        variant, removed_fields = self._best_clean_variant(
-                            question, base, pc, history, excluded_titles)
-                        if variant is None:
-                            fully_dropped.append(pc)
-                        else:
-                            base.append(variant)
-                            salvaged[pc.get("id")] = variant
-                            if removed_fields:
-                                partially_filtered.append((pc, removed_fields))
-                    # Rebuild in the ORIGINAL retrieval order (it encodes
-                    # relevance — the poison card is often the most relevant).
-                    clean_ids = {c.get("id") for c in clean}
-                    context_cards = [
-                        salvaged.get(c.get("id"), c) for c in cards
-                        if c.get("id") in clean_ids or c.get("id") in salvaged]
-                    dropped_ids = [c.get("id") for c in fully_dropped]
-                    filtered_cards = [
-                        {"id": pc.get("id"), "title": pc.get("title"),
-                         "removedFields": rf} for pc, rf in partially_filtered]
-                    filter_note = self._filter_note(fully_dropped, partially_filtered)
+                # The INPUT was rejected (PROHIBITED_CONTENT). CI probe evidence
+                # (ask-debug run #1, 2026-07-24): this false positive is tied to
+                # the STRUCTURED-OUTPUT mode — the identical prompt passes as a
+                # plain generation. First rescue: the same full-depth prompt in
+                # plain mode — full context, no cards touched.
+                logger.warning("ask prompt blocked (%s) — retrying in plain mode", e)
+                try:
+                    data = self._plain_answer(base_prompt + _CITED_JSON_SUFFIX)
+                except AnalysisError as plain_exc:
+                    # Plain mode failed too → the content itself is the problem.
+                    # Probe-bisect the poison card(s), salvage each with the
+                    # richest field subset the filter accepts — every other
+                    # card keeps FULL depth, and anything withheld is disclosed
+                    # in the answer text.
                     logger.warning(
-                        "ask filter salvage: %d dropped %s, %d partially filtered %s",
-                        len(dropped_ids), dropped_ids, len(filtered_cards),
-                        [(f['id'], f['removedFields']) for f in filtered_cards])
-                    data = self._answer_json(
-                        _build_rag_prompt(question, context_cards, history, excluded_titles)
-                        + _CITED_JSON_SUFFIX, "answer (filtered context)", attempts)
-                else:
-                    # Isolation found nothing provably blocked (e.g. probes
-                    # erroring during an outage) — fall back to headline-only
-                    # context, the coarse-but-safe rendering.
-                    context_cards = _headline_cards(cards)
-                    data = self._answer_json(
-                        _build_rag_prompt(question, context_cards, history, excluded_titles)
-                        + _CITED_JSON_SUFFIX, "answer (reduced context)", attempts)
+                        "ask plain-mode rescue failed (%s) — isolating "
+                        "filter-blocked cards", plain_exc)
+                    clean, dropped, question_blocked = self._drop_prompt_blocked_cards(
+                        question, cards, history, excluded_titles)
+                    if question_blocked:
+                        raise EmptyGenerationError(
+                            f"{e} [stage: the question/history itself is rejected "
+                            "by the prompt filter — no card subset can pass]",
+                            prompt_blocked=True)
+                    if dropped:
+                        fully_dropped, partially_filtered = [], []
+                        salvaged = {}
+                        base = list(clean)
+                        for pc in dropped:
+                            variant, removed_fields = self._best_clean_variant(
+                                question, base, pc, history, excluded_titles)
+                            if variant is None:
+                                fully_dropped.append(pc)
+                            else:
+                                base.append(variant)
+                                salvaged[pc.get("id")] = variant
+                                if removed_fields:
+                                    partially_filtered.append((pc, removed_fields))
+                        # Rebuild in the ORIGINAL retrieval order (it encodes
+                        # relevance — the poison card is often the most relevant).
+                        clean_ids = {c.get("id") for c in clean}
+                        context_cards = [
+                            salvaged.get(c.get("id"), c) for c in cards
+                            if c.get("id") in clean_ids or c.get("id") in salvaged]
+                        dropped_ids = [c.get("id") for c in fully_dropped]
+                        filtered_cards = [
+                            {"id": pc.get("id"), "title": pc.get("title"),
+                             "removedFields": rf} for pc, rf in partially_filtered]
+                        filter_note = self._filter_note(fully_dropped, partially_filtered)
+                        logger.warning(
+                            "ask filter salvage: %d dropped %s, %d partially filtered %s",
+                            len(dropped_ids), dropped_ids, len(filtered_cards),
+                            [(f['id'], f['removedFields']) for f in filtered_cards])
+                        data = self._answer_json(
+                            _build_rag_prompt(question, context_cards, history, excluded_titles)
+                            + _CITED_JSON_SUFFIX, "answer (filtered context)", attempts)
+                    else:
+                        # Isolation found nothing provably blocked (e.g. probes
+                        # erroring during an outage) — fall back to headline-only
+                        # context, the coarse-but-safe rendering.
+                        context_cards = _headline_cards(cards)
+                        data = self._answer_json(
+                            _build_rag_prompt(question, context_cards, history, excluded_titles)
+                            + _CITED_JSON_SUFFIX, "answer (reduced context)", attempts)
             else:
                 # The OUTPUT came back empty on every tier — the RECITATION
                 # signature. Retry once asking the model to paraphrase instead
