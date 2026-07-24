@@ -444,7 +444,8 @@ def test_answer_first_pass_cited_no_retry():
         {"answer": "A grounded answer.", "citedIds": ["id1"]},
     ])
     out = svc.answer_from_context("q?", _CARDS)
-    assert out == {"answer": "A grounded answer.", "citedIds": ["id1"], "ungrounded": False}
+    assert out == {"answer": "A grounded answer.", "citedIds": ["id1"], "ungrounded": False,
+                   "droppedCardIds": []}
     assert svc._calls["n"] == 1  # never re-asked
 
 
@@ -454,7 +455,8 @@ def test_answer_retry_recovers_citation():
         {"answer": "Second, now cited.", "citedIds": ["id2"]},
     ])
     out = svc.answer_from_context("q?", _CARDS)
-    assert out == {"answer": "Second, now cited.", "citedIds": ["id2"], "ungrounded": False}
+    assert out == {"answer": "Second, now cited.", "citedIds": ["id2"], "ungrounded": False,
+                   "droppedCardIds": []}
     assert svc._calls["n"] == 2  # re-asked exactly once
 
 
@@ -482,7 +484,8 @@ def test_answer_retry_exception_still_flags_ungrounded():
         AnalysisError("fallback model failure"),
     ])
     out = svc.answer_from_context("q?", _CARDS)
-    assert out == {"answer": "Uncited answer.", "citedIds": [], "ungrounded": True}
+    assert out == {"answer": "Uncited answer.", "citedIds": [], "ungrounded": True,
+                   "droppedCardIds": []}
     assert svc._calls["n"] == 3
 
 
@@ -495,7 +498,8 @@ def test_answer_falls_back_to_analysis_model_when_ask_model_fails():
         {"answer": "Recovered.", "citedIds": ["id1"]},   # GEMINI_ANALYSIS_MODEL
     ])
     out = svc.answer_from_context("q?", _CARDS)
-    assert out == {"answer": "Recovered.", "citedIds": ["id1"], "ungrounded": False}
+    assert out == {"answer": "Recovered.", "citedIds": ["id1"], "ungrounded": False,
+                   "droppedCardIds": []}
     assert svc._calls["models"] == [GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL]
 
 
@@ -519,7 +523,8 @@ def test_buffered_empty_generation_retries_paraphrase_safe():
 
     svc._generate_json = _capture
     out = svc.answer_from_context("q?", _CARDS)
-    assert out == {"answer": "Paraphrased, grounded.", "citedIds": ["id1"], "ungrounded": False}
+    assert out == {"answer": "Paraphrased, grounded.", "citedIds": ["id1"], "ungrounded": False,
+                   "droppedCardIds": []}
     assert svc._calls["n"] == 3  # ask + analysis (both empty) + paraphrase retry
     assert "YOUR OWN WORDS" in prompts[2]
     assert "YOUR OWN WORDS" not in prompts[0]
@@ -550,7 +555,8 @@ def test_buffered_prompt_block_retries_headline_only_context():
 
     svc._generate_json = _capture
     out = svc.answer_from_context("q?", deep_cards)
-    assert out == {"answer": "Grounded on headlines.", "citedIds": ["id1"], "ungrounded": False}
+    assert out == {"answer": "Grounded on headlines.", "citedIds": ["id1"], "ungrounded": False,
+                   "droppedCardIds": []}
     # No analysis-model fallback for a prompt block (same input, same filter):
     # both calls are the ASK tier — full context, then headline-only.
     assert svc._calls["models"] == [GEMINI_ASK_MODEL, GEMINI_ASK_MODEL]
@@ -584,8 +590,92 @@ def test_buffered_prompt_block_uncited_reask_stays_headline_only():
 
     svc._generate_json = _capture
     out = svc.answer_from_context("q?", deep_cards)
-    assert out == {"answer": "Now cited.", "citedIds": ["id1"], "ungrounded": False}
+    assert out == {"answer": "Now cited.", "citedIds": ["id1"], "ungrounded": False,
+                   "droppedCardIds": []}
     assert "500g pasta" not in prompts[2]  # strict re-ask kept the reduced context
+
+
+def test_buffered_headline_block_isolates_poison_card():
+    """When even headline-only context is PROMPT-blocked, the filter-probe
+    bisection finds the poison card, drops it, and the answer is generated
+    from the clean subset — with the dropped id surfaced to the caller."""
+    from ai_service import EmptyGenerationError
+    cards = [
+        {"id": "clean1", "title": "Fine card", "summary": "Totally fine."},
+        {"id": "poison", "title": "POISON TITLE", "summary": "Trips the filter."},
+        {"id": "clean2", "title": "Another fine card", "summary": "Also fine."},
+    ]
+    svc = _svc_with_json_responses([
+        EmptyGenerationError("blocked", prompt_blocked=True),   # full context
+        EmptyGenerationError("blocked", prompt_blocked=True),   # headline-only
+        {"answer": "From the clean subset.", "citedIds": ["clean1"]},
+    ])
+    svc._probe_prompt_blocked = lambda prompt: "POISON TITLE" in prompt
+    seen = svc._generate_json
+    prompts = []
+
+    def _capture(contents, what, config_extra=None, model=None, attempts=None):
+        prompts.append(contents[0])
+        return seen(contents, what, config_extra=config_extra, model=model, attempts=attempts)
+
+    svc._generate_json = _capture
+    out = svc.answer_from_context("q?", cards)
+    assert out["answer"] == "From the clean subset."
+    assert out["citedIds"] == ["clean1"]
+    assert out["droppedCardIds"] == ["poison"]
+    # The generation that succeeded no longer carries the poison card…
+    assert "POISON TITLE" not in prompts[2]
+    # …but keeps the clean ones.
+    assert "Fine card" in prompts[2]
+    assert "Another fine card" in prompts[2]
+
+
+def test_buffered_question_itself_blocked_raises_with_stage():
+    """If even the ZERO-card prompt is rejected, no card subset can pass —
+    fail with a stage-tagged error instead of burning probe calls."""
+    import pytest
+    from ai_service import EmptyGenerationError
+    svc = _svc_with_json_responses([
+        EmptyGenerationError("blocked", prompt_blocked=True),   # full context
+        EmptyGenerationError("blocked", prompt_blocked=True),   # headline-only
+    ])
+    svc._probe_prompt_blocked = lambda prompt: True  # everything blocked
+    with pytest.raises(EmptyGenerationError) as exc_info:
+        svc.answer_from_context("q?", _CARDS)
+    assert "question/history itself" in str(exc_info.value)
+
+
+def test_stream_headline_block_isolates_poison_card():
+    """Stream mirror of the isolation rescue: all four ladder attempts stream
+    nothing, the probe bisection drops the poison card, and a fifth attempt
+    streams a real answer from the clean subset."""
+    cards = [
+        {"id": "clean1", "title": "Fine card", "summary": "Totally fine."},
+        {"id": "poison", "title": "POISON TITLE", "summary": "Trips the filter."},
+    ]
+
+    class _EmptyLadderThenReal:
+        def __init__(self, pieces):
+            self._pieces = pieces
+            self.requested = []
+            self.prompts = []
+
+        def generate_content_stream(self, model, contents, config=None):
+            self.requested.append(model)
+            self.prompts.append(contents[0])
+            if len(self.requested) <= 4:
+                return iter(())  # the whole static ladder streams nothing
+            return iter(_FakeChunk(p) for p in self._pieces)
+
+    models = _EmptyLadderThenReal(["Clean answer.\n", "[[CITED: clean1]]"])
+    svc = _svc_with_models(models)
+    svc._probe_prompt_blocked = lambda prompt: "POISON TITLE" in prompt
+    text, cited, ungrounded = _drain(svc.answer_from_context_stream("q?", cards))
+    assert len(models.requested) == 5
+    assert "Clean answer." in text
+    assert cited == ["clean1"]
+    assert "POISON TITLE" not in models.prompts[4]
+    assert "Fine card" in models.prompts[4]
 
 
 def test_buffered_non_empty_failure_does_not_paraphrase_retry():

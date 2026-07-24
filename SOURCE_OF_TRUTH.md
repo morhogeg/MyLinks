@@ -714,7 +714,33 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-24 (latest) — ASK ROOT CAUSE CONFIRMED: Gemini PROMPT-side
+- **2026-07-24 (latest) — ASK ROUND 3: headline-only retry ALSO blocked →
+  filter-probe bisection isolates + drops the poison card.** Owner retried
+  post-deploy (13:04 IL = 10:04Z, 2 min after the previous fix went live at
+  10:02Z — timing verified against the run, so the new code WAS serving) and
+  got the same `PROHIBITED_CONTENT` diag: the block survives even the
+  headline-only (title+summary) rendering. Combined with owner's "everything
+  worked yesterday": nothing regressed app-side — a recently saved card
+  (prime suspect: the "פסטה שמנת ותרד קלאסית" recipe card) carries text
+  Gemini's non-configurable prompt filter rejects even at the headline layer,
+  and every food ask retrieves it. New last-resort layer (`ai_service.py`):
+  `_probe_prompt_blocked` (1-token generate call — enough for
+  `prompt_feedback.block_reason` to answer "would this prompt be accepted?",
+  near-free since blocked prompts fail pre-generation) +
+  `_drop_prompt_blocked_cards` (prefix-bisection over the card list, ≤3
+  offenders, ~2+log2(n) probes each; a zero-card probe first detects a
+  blocked QUESTION and fails fast with a stage-tagged error). Buffered path:
+  full → headline → isolate-and-drop → generate from the clean subset;
+  returns `droppedCardIds`, and `ask_brain` records a durable
+  `server_errors` trail entry naming the dropped card ids+titles (type
+  "ask_brain (filter-blocked cards dropped)") so the owner can identify and
+  fix/delete the poison save. Stream path: same rescue appended after the
+  4-attempt ladder exhausts (guarded to one shot; probes error out as
+  not-blocked during outages so nothing is dropped spuriously). Stage-tagged
+  EGE messages now name where the ladder died (question blocked / isolation
+  failed) for the diag tail. Tests 351→354. Diag tail still in place —
+  remove with the next cleanup once owner confirms.
+- **2026-07-24 — ASK ROOT CAUSE CONFIRMED: Gemini PROMPT-side
   `PROHIBITED_CONTENT` block on recipe-card context → headline-only-context
   retry + BLOCK_NONE safety settings.** The temporary on-screen diag (previous
   entry) surfaced the real error on the owner's device:

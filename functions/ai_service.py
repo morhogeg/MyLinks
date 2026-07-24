@@ -826,6 +826,66 @@ If the image is an article, extract the headline and body."""
         ]
         return self._generate_json(contents, "image analysis", attempts=attempts)
 
+    def _probe_prompt_blocked(self, prompt: str) -> bool:
+        """Ask Gemini's filter whether it ACCEPTS a prompt, without paying for
+        an answer: a 1-token call is enough for prompt_feedback to report an
+        input block, and a blocked prompt fails before generation, so probes
+        are fast and near-free. Transport errors count as NOT blocked — an
+        outage must not cascade the probe ladder into dropping every card."""
+        try:
+            resp = self.client.models.generate_content(
+                model=GEMINI_ANALYSIS_MODEL, contents=[prompt],
+                config={"max_output_tokens": 1, "temperature": 0.0,
+                        "safety_settings": _ASK_SAFETY_SETTINGS})
+            return _prompt_blocked(resp)
+        except Exception as e:
+            logger.warning("ask filter probe errored (counted as not blocked): %s", e)
+            return False
+
+    def _drop_prompt_blocked_cards(self, question: str, cards: list,
+                                   history: list = None, excluded_titles: list = None,
+                                   max_drops: int = 3):
+        """Isolate the card(s) whose text trips Gemini's non-configurable
+        prompt filter, via probe bisection (see _probe_prompt_blocked).
+
+        Confirmed in prod 2026-07-24: a single saved card can poison EVERY ask
+        that retrieves it (block_reason=PROHIBITED_CONTENT), surviving even the
+        headline-only rendering — so the last resort is to find the exact
+        offender and answer without it. Assumes blocking is monotone (a set
+        containing a blocked card is blocked), which holds for a content
+        filter. Probe cost: ~2 + log2(len(cards)) calls per offender.
+
+        Returns (clean_cards, dropped_cards, question_blocked):
+        - question_blocked=True → even the ZERO-card prompt is rejected; the
+          question/history itself is the trigger and dropping cards can't help.
+        - dropped_cards may be empty (nothing provably blocked — e.g. probes
+          erroring during an outage); clean_cards is then the input unchanged.
+        """
+        def blocked(subset):
+            return self._probe_prompt_blocked(
+                _build_rag_prompt(question, subset, history, excluded_titles)
+                + _CITED_JSON_SUFFIX)
+
+        if blocked([]):
+            return list(cards), [], True
+        remaining = list(cards)
+        dropped = []
+        for _ in range(max_drops):
+            if not remaining or not blocked(remaining):
+                break
+            # Find the FIRST offender: the smallest prefix that is blocked.
+            # Invariant: prefix len(remaining) is blocked, prefix 0 is clean.
+            lo, hi = 1, len(remaining)
+            while lo < hi:
+                mid = (lo + hi) // 2
+                if blocked(remaining[:mid]):
+                    hi = mid
+                else:
+                    lo = mid + 1
+            dropped.append(remaining[lo - 1])
+            remaining = remaining[:lo - 1] + remaining[lo:]
+        return remaining, dropped, False
+
     def _answer_json(self, prompt: str, what: str, attempts: int) -> dict:
         """One grounded-answer generation call, with a model fallback.
 
@@ -893,9 +953,13 @@ If the image is an article, extract the headline and body."""
             }
 
         # `context_cards` is whatever card rendering the model ACTUALLY accepted —
-        # downgraded to headline-only if the full deep-content prompt is blocked —
-        # so the citation re-ask below never re-sends a prompt Gemini rejected.
+        # downgraded to headline-only (or a filter-cleaned subset) if the full
+        # deep-content prompt is blocked — so the citation re-ask below never
+        # re-sends a prompt Gemini rejected. `dropped_ids` names any cards the
+        # filter-probe isolation had to remove (surfaced to the caller so the
+        # poison card is identifiable, not silently vanished).
         context_cards = cards
+        dropped_ids = []
         base_prompt = _build_rag_prompt(question, cards, history, excluded_titles)
         try:
             data = self._answer_json(base_prompt + _CITED_JSON_SUFFIX, "answer", attempts)
@@ -912,8 +976,37 @@ If the image is an article, extract the headline and body."""
                 context_cards = _headline_cards(cards)
                 headline_prompt = _build_rag_prompt(
                     question, context_cards, history, excluded_titles)
-                data = self._answer_json(
-                    headline_prompt + _CITED_JSON_SUFFIX, "answer (reduced context)", attempts)
+                try:
+                    data = self._answer_json(
+                        headline_prompt + _CITED_JSON_SUFFIX, "answer (reduced context)", attempts)
+                except EmptyGenerationError as e2:
+                    if not e2.prompt_blocked:
+                        raise
+                    # Even titles/summaries are rejected (confirmed in prod
+                    # 2026-07-24) → a specific card is the poison. Isolate it
+                    # with filter probes and answer without it.
+                    clean, dropped, question_blocked = self._drop_prompt_blocked_cards(
+                        question, context_cards, history, excluded_titles)
+                    if question_blocked:
+                        raise EmptyGenerationError(
+                            f"{e2} [stage: the question/history itself is rejected "
+                            "by the prompt filter — no card subset can pass]",
+                            prompt_blocked=True)
+                    if not dropped or not clean:
+                        raise EmptyGenerationError(
+                            f"{e2} [stage: headline-only still blocked; isolation "
+                            f"dropped={len(dropped)} clean={len(clean)}]",
+                            prompt_blocked=True)
+                    dropped_ids = [c.get("id") for c in dropped]
+                    logger.warning(
+                        "ask: dropped %d filter-blocked card(s): %s",
+                        len(dropped), dropped_ids)
+                    context_cards = clean
+                    clean_prompt = _build_rag_prompt(
+                        question, clean, history, excluded_titles)
+                    data = self._answer_json(
+                        clean_prompt + _CITED_JSON_SUFFIX,
+                        "answer (blocked cards dropped)", attempts)
             else:
                 # The OUTPUT came back empty on every tier — the RECITATION
                 # signature. Retry once asking the model to paraphrase instead
@@ -925,7 +1018,8 @@ If the image is an article, extract the headline and body."""
         answer = data.get("answer") or ""
         cited = _valid_cited_ids(data.get("citedIds"), cards)
         if cited:
-            return {"answer": answer, "citedIds": cited, "ungrounded": False}
+            return {"answer": answer, "citedIds": cited, "ungrounded": False,
+                    "droppedCardIds": dropped_ids}
 
         # No valid citation on the first pass. Re-ask ONCE with a stricter prompt
         # that demands the model name the ids it relied on. A transient failure
@@ -936,7 +1030,8 @@ If the image is an article, extract the headline and body."""
             retry_answer = retry.get("answer") or ""
             retry_cited = _valid_cited_ids(retry.get("citedIds"), cards)
             if retry_cited:
-                return {"answer": retry_answer, "citedIds": retry_cited, "ungrounded": False}
+                return {"answer": retry_answer, "citedIds": retry_cited, "ungrounded": False,
+                        "droppedCardIds": dropped_ids}
         except AnalysisError as e:
             logger.warning(f"ask citation retry failed: {e}")
 
@@ -944,7 +1039,8 @@ If the image is an article, extract the headline and body."""
         # UI drops the "grounded" promise rather than shipping a confident,
         # unverifiable answer with no source chips.
         logger.warning("ask answer returned no valid citations after retry — flagging ungrounded")
-        return {"answer": answer, "citedIds": [], "ungrounded": True}
+        return {"answer": answer, "citedIds": [], "ungrounded": True,
+                "droppedCardIds": dropped_ids}
 
     def answer_from_context_stream(self, question: str, cards: list, history: list = None,
                                    excluded_titles: list = None):
@@ -1048,8 +1144,16 @@ If the image is an article, extract the headline and body."""
             (GEMINI_ANALYSIS_MODEL, paraphrase_prompt),
             (GEMINI_ANALYSIS_MODEL, headline_prompt),
         ]
+        # When even the headline-only attempt dies with no output, one final
+        # rescue mirrors the buffered path: probe-bisect the poison card(s) out
+        # (see _drop_prompt_blocked_cards) and stream from the clean subset.
+        # `isolated` guards it to a single shot; a mutable list + index walk (not
+        # a for-loop) lets that rescue attempt be appended mid-iteration.
+        isolated = False
         full_text = ""
-        for attempt_idx, (attempt_model, attempt_prompt) in enumerate(attempts):
+        attempt_idx = 0
+        while attempt_idx < len(attempts):
+            attempt_model, attempt_prompt = attempts[attempt_idx]
             is_last_attempt = attempt_idx == len(attempts) - 1
             # Per-attempt state: a failed attempt must not leak partial
             # accumulation into the next run.
@@ -1106,11 +1210,34 @@ If the image is an article, extract the headline and body."""
                     yield ("token", buffer)
                 break  # this attempt completed — don't try the remaining fallbacks
             except Exception as e:
-                if emitted or is_last_attempt:
+                if emitted:
+                    # Prose already reached the client — a restart would
+                    # duplicate it; surface the failure.
+                    logger.error(f"Gemini answer stream failed: {e}")
+                    raise AnalysisError(f"AI answer failed: {e}")
+                if is_last_attempt and not isolated:
+                    # The whole ladder produced nothing. Last resort: isolate
+                    # filter-blocked card(s) and stream from the clean subset.
+                    # During a genuine outage the probes error out as
+                    # not-blocked, nothing is dropped, and we fall through to
+                    # the raise — no wasted generation.
+                    isolated = True
+                    clean, dropped, question_blocked = self._drop_prompt_blocked_cards(
+                        question, _headline_cards(cards), history, excluded_titles)
+                    if dropped and clean and not question_blocked:
+                        logger.warning(
+                            "ask stream: dropped %d filter-blocked card(s): %s",
+                            len(dropped), [c.get("id") for c in dropped])
+                        attempts.append((GEMINI_ANALYSIS_MODEL, _build_rag_prompt(
+                            question, clean, history, excluded_titles) + marker_instruction))
+                        attempt_idx += 1
+                        continue
+                if is_last_attempt:
                     logger.error(f"Gemini answer stream failed: {e}")
                     raise AnalysisError(f"AI answer failed: {e}")
                 logger.error("Ask stream attempt %d (model %s) produced no output — "
                              "trying next fallback: %s", attempt_idx, attempt_model, e)
+                attempt_idx += 1
 
         # Parse the citation marker out of the accumulated full text, then keep
         # only ids the model actually named that we in fact supplied. If the

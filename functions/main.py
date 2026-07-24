@@ -1792,6 +1792,20 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         result = ai.answer_from_context(question, slim, history, attempts=2,
                                         excluded_titles=excluded_titles)
 
+        # If the answer only succeeded after filter-probe isolation dropped
+        # card(s) (Gemini prompt filter rejects their text — see
+        # _drop_prompt_blocked_cards), leave a durable trail naming the poison
+        # cards so the owner can find and fix/re-save them. Not an error — the
+        # request SUCCEEDED — but server_errors is the queryable admin trail.
+        dropped_card_ids = result.get("droppedCardIds") or []
+        if dropped_card_ids:
+            titles = {c.get("id"): str(c.get("title", ""))[:80] for c in cards}
+            _record_server_error(
+                "ask_brain (filter-blocked cards dropped)",
+                Exception(", ".join(
+                    f"{cid}: {titles.get(cid, '?')}" for cid in dropped_card_ids)),
+                uid=uid)
+
         # 4. Return only the cited sources for the UI (clickable chips).
         cited_ids = result.get("citedIds", [])
         by_id = {c.get("id"): c for c in cards}
