@@ -1,3 +1,5 @@
+import type { OrbState } from 'thinking-orbs';
+
 /**
  * Single source of truth for the link-save processing phases.
  *
@@ -19,6 +21,36 @@ export const LINK_SCAN_STEPS = [
     'Searching connections',
     'Organizing & tagging',
 ] as const;
+
+/**
+ * The Thinking Orb that rides each phase, positionally matched to
+ * `LINK_SCAN_STEPS`. One verb → one orb, app-wide:
+ *
+ * - `working`   — fetching, in flight
+ * - `searching` — scanning, reading, looking something up
+ * - `solving`   — relating, sorting, working it out
+ * - `shaping`   — producing the output (the same orb Ask uses for
+ *                 "Writing your answer…", so "writing" always looks the same)
+ *
+ * `listening` is reserved for Ask's idle hero; `composing` is unused — it reads
+ * as texture rather than intent at 20px.
+ *
+ * Repeats are deliberate: the orb changes when the KIND of work changes, not on
+ * every label tick. Two adjacent phases that are both scanning keep the same
+ * orb rather than inventing a difference the pipeline doesn't have.
+ */
+export const LINK_SCAN_ORBS = [
+    'working',    // Fetching the link
+    'searching',  // Reading the page
+    'shaping',    // Writing the summary
+    'searching',  // Searching connections
+    'solving',    // Organizing & tagging
+] as const satisfies readonly OrbState[];
+
+/** Orb for a 0–100 progress value, mirroring `linkScanLabel`. */
+export function linkScanOrb(progress: number): OrbState {
+    return LINK_SCAN_ORBS[linkScanStepIndex(progress)];
+}
 
 /** Active step index (0..LINK_SCAN_STEPS.length-1) for a 0–100 progress value. */
 export function linkScanStepIndex(progress: number): number {

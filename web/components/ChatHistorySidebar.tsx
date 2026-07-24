@@ -6,14 +6,13 @@ import {
     Trash2,
     X,
     Check,
-    PanelLeftClose,
-    PanelLeftOpen,
     MessagesSquare,
     SquarePen,
     MoreHorizontal,
     Search,
 } from 'lucide-react';
 import { ChatSession } from '@/lib/types';
+import SidebarIcon from './ui/SidebarIcon';
 
 interface ChatHistorySidebarProps {
     chats: ChatSession[];
@@ -322,9 +321,9 @@ export default function ChatHistorySidebar(props: ChatHistorySidebarProps) {
                         onClick={onToggleCollapse}
                         aria-label="Show chat history"
                         title="Show chat history"
-                        className="mt-1 p-2 rounded-xl text-text-secondary hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
+                        className="mt-1 p-2 rounded-xl text-text-secondary hover:text-text hover:bg-card-hover active:scale-95 transition-all cursor-pointer"
                     >
-                        <PanelLeftOpen className="w-5 h-5" />
+                        <SidebarIcon badge={props.chats.length > 0} />
                     </button>
                 ) : (
                     <>
@@ -333,9 +332,11 @@ export default function ChatHistorySidebar(props: ChatHistorySidebarProps) {
                                 onClick={onToggleCollapse}
                                 aria-label="Hide chat history"
                                 title="Hide chat history"
-                                className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-card-hover active:scale-95 transition-all cursor-pointer"
                             >
-                                <PanelLeftClose className="w-4 h-4" />
+                                {/* Same mark as the open control — it's one toggle;
+                                    the label carries the direction. */}
+                                <SidebarIcon className="w-4 h-4" />
                             </button>
                         </div>
                         <NewChatItem onClick={props.onNewChat} />

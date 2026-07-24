@@ -490,6 +490,15 @@ The multi-user auth work is **fully written but not live**:
 
 ### 🟢 P3 — product roadmap (post-launch)
 
+18c. **[ ] Native share-extension orb: per-phase states.** Web now maps every
+    capture phase to its own orb (`LINK_SCAN_ORBS` in `web/lib/scanPhases.ts` —
+    fetch=`working`, read=`searching`, write=`shaping`, connect=`searching`,
+    organize=`solving`). The share extension's Swift `OrbitsOrbView` only ports
+    the `orbits` (`working`) mode, so it shows one shape for the whole save. To
+    match, port `globe`/`morph`/`rubik` to CoreGraphics — or deliberately leave
+    it single-state (the sheet is short-lived and hands off to the in-app
+    banner). Owner call; not blocking.
+
 19b. **[ ] Retire dead search backend (post search-rebuild 2026-07-17):** the
     client no longer calls `search_links` / `search_links_http` (search is
     fully client-side, `8e27c5c`). On the next backend-touching ship, delete
@@ -806,6 +815,46 @@ exact-match, capped.
   `firestore-rules-test` run; decide `get_article` gating (AUDIT.md S-4/M-10 —
   S-7 bounds each call to 10 MB/45 s, which makes "keep anonymous" defensible,
   but it stays an owner call).
+- **2026-07-24 — ONE ORB PER PHRASE + NEW SIDEBAR GLYPH.** Owner: Ask
+  showed a single `searching` orb for all three drafting beats even though the
+  library ships six shapes — give each phrase the orb that describes it. New
+  **verb→orb mapping, app-wide**: `working` = fetching/in-flight, `searching` =
+  scanning/reading/looking up, `solving` = relating/sorting, `shaping` =
+  producing output, `listening` = Ask's idle hero (reserved), `composing` =
+  **dropped** (owner rejected the sash; it reads as texture not intent at 20px).
+  Ask: free/library = searching→solving→shaping, card = working→searching→
+  shaping, followup = searching→solving→shaping. `shaping` won "Writing your
+  answer…" because it's the only HOLLOW mark in the set — the filled balls are
+  indistinguishable at the 20px inline preset, and that beat lives longest (until
+  the first token streams). Capture surfaces now derive from **`LINK_SCAN_ORBS`
+  in `lib/scanPhases.ts`** (positional twin of `LINK_SCAN_STEPS`, so the dialog
+  stepper and the banner can't disagree); `AnalyzingBanner.phaseLabel` →
+  `phaseStatus` returning `{label, orb}` and covers image/video too. **Repeats
+  are deliberate** — the orb changes when the KIND of work changes, not every
+  label tick. **Motion — three rounds to get right:** a 240ms crossfade was
+  harsh (two dot-fields overlapping at 20px = noise); a "dissolve in step" still
+  read as laggy because the orb and phrase were **two elements on two timelines
+  with different easings** — measured 162ms apart at their troughs even though
+  both swapped on the same instant. Fix is structural, not a retune: new
+  **`components/ui/OrbStatus.tsx`** puts orb+label in ONE wrapper on ONE
+  animation (dip to 32% over 152ms ease-in, both exchanged in the same render at
+  the trough, reform over 248ms on `--ease-modal` read from the token at
+  runtime); drift is impossible. Ask + banner both use it. Also: **new
+  `components/ui/SidebarIcon.tsx`** replaces lucide `PanelLeftOpen`/
+  `PanelLeftClose` in Ask (mobile bar + both desktop toggles) — SF-Symbols
+  `sidebar.leading` idiom, 1.6 stroke to match the back chevron, and the "you
+  have history" signal is now the **rail tinted accent at 65%** instead of a dot
+  floating off the button corner (a notched-in badge was tried and broke the
+  outline). Feed's two "Searching your library…" ring spinners → `searching` orb
+  (same sentence as Ask, same indicator); **deliberately NOT orb-ified**: boot
+  Suspense fallback, button spinners, TTS loader — mechanical waits, not
+  thinking. Verified: tsc 0, `next build` 0, eslint 0 errors (2 pre-existing
+  `react-hooks/refs` warnings in AnalyzingBanner untouched), icon render-checked
+  light+dark. **Watch on device:** whether three orb swaps in a ~6s window reads
+  as fidgety — if so, collapse Ask to two states (`searching` for beats 1+2,
+  `shaping` for the write). New §4 item 18c: native share-extension orb is still
+  single-state `working`.
+
 - **2026-07-24 — NEW `/security` SKILL: code-level-only hardening pass
   (`.claude/skills/security/SKILL.md`).** Owner wanted a dedicated session type
   for security that works *only* on what's in the repo, because the highest

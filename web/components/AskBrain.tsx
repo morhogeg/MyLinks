@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, FileText, Plus, MessagesSquare, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X, PanelLeftOpen } from 'lucide-react';
+import { ArrowUp, FileText, Plus, MessagesSquare, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X } from 'lucide-react';
+import type { OrbState } from 'thinking-orbs';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -22,6 +23,8 @@ import ChatHistorySidebar from './ChatHistorySidebar';
 import MobileSubheader from './MobileSubheader';
 import { IconButton } from './ui/Button';
 import BrandOrb from './ui/BrandOrb';
+import OrbStatus from './ui/OrbStatus';
+import SidebarIcon from './ui/SidebarIcon';
 import { lockBodyScroll, unlockBodyScroll } from '@/lib/useScrollLock';
 
 /** A usable source name, or null for placeholders the backend stores. */
@@ -163,32 +166,63 @@ export type AskOrigin =
     | 'library'   // a chip that genuinely sweeps the library (week/topic/recap)
     | 'followup'; // continuing the thread about already-cited sources
 
-const THINKING_STAGES: Record<AskOrigin, string[]> = {
+/** One beat of the wait: the copy, plus the orb whose motion describes it. */
+interface ThinkingStage {
+    phrase: string;
+    orb: OrbState;
+}
+
+/** Each phrase gets the Thinking Orb that actually describes it, so the shape
+ *  changing is a second, wordless read on what Machina is doing.
+ *
+ *  `listening` is spoken for (the 64px idle avatar above the composer) and
+ *  `composing` reads as texture rather than intent at 20px, so the drafting
+ *  beat uses `shaping` — a dotted outline resolving into a definite form. It is
+ *  the only hollow mark in the set, which is what keeps it distinguishable from
+ *  the filled `searching`/`solving` balls at inline size; that matters most
+ *  here, since this beat stays on screen until the first token streams. */
+const THINKING_STAGES: Record<AskOrigin, ThinkingStage[]> = {
     // Count-free phrasing on purpose: these must always be true.
-    free: ['Searching your library…', 'Reviewing relevant cards…', 'Writing your answer…'],
-    card: ['Opening that card…', 'Reading it closely…', 'Writing your answer…'],
-    library: ['Searching your library…', 'Reviewing relevant cards…', 'Writing your answer…'],
-    followup: ['Re-reading the sources…', 'Thinking it through…', 'Writing your answer…'],
+    free: [
+        { phrase: 'Searching your library…', orb: 'searching' },
+        { phrase: 'Reviewing relevant cards…', orb: 'solving' },
+        { phrase: 'Writing your answer…', orb: 'shaping' },
+    ],
+    card: [
+        { phrase: 'Opening that card…', orb: 'working' },
+        { phrase: 'Reading it closely…', orb: 'searching' },
+        { phrase: 'Writing your answer…', orb: 'shaping' },
+    ],
+    library: [
+        { phrase: 'Searching your library…', orb: 'searching' },
+        { phrase: 'Reviewing relevant cards…', orb: 'solving' },
+        { phrase: 'Writing your answer…', orb: 'shaping' },
+    ],
+    followup: [
+        { phrase: 'Re-reading the sources…', orb: 'searching' },
+        { phrase: 'Thinking it through…', orb: 'solving' },
+        { phrase: 'Writing your answer…', orb: 'shaping' },
+    ],
 };
 
 /** Staged "what Machina is doing" status shown while waiting for the answer —
  *  honest theater (mirrors the real pipeline) that makes the wait legible
- *  instead of three anonymous dots. Remounts per ask. */
+ *  instead of three anonymous dots. Remounts per ask. `OrbStatus` owns the
+ *  swap, so the orb and the phrase change as one gesture. */
 function ThinkingIndicator({ origin }: { origin: AskOrigin }) {
     const stages = THINKING_STAGES[origin];
     const [stage, setStage] = useState(0);
+
     useEffect(() => {
         const t1 = setTimeout(() => setStage(1), 1600);
         const t2 = setTimeout(() => setStage(2), 4200);
         return () => { clearTimeout(t1); clearTimeout(t2); };
     }, []);
+
     return (
         <div className="flex justify-start">
-            <div className="px-1 py-1 inline-flex items-center gap-2.5">
-                {/* Thinking Orbs (our palette) — 'searching' = sweeping the
-                    library, matching the status copy. */}
-                <BrandOrb state="searching" size={20} />
-                <span key={stage} className="text-[13px] text-text-muted animate-fade-in">{stages[stage]}</span>
+            <div className="px-1 py-1 inline-flex items-center">
+                <OrbStatus orb={stages[stage].orb} label={stages[stage].phrase} stageKey={stage} />
             </div>
         </div>
     );
@@ -998,19 +1032,15 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                     title="Ask Machina"
                     leading={
                         // A quiet icon button, same footprint as the back chevron and
-                        // "New" action. The panel-open glyph signals it opens a side
-                        // panel; a small dot badges an existing history without adding
-                        // width. (Was a full "History" pill — too heavy in the bar.)
+                        // "New" action. The badge lives inside the glyph (see
+                        // SidebarIcon) rather than floating off the button's corner.
                         <button
                             onClick={() => setHistoryOpen(true)}
                             aria-label="Open chat history"
                             title="Chat history"
-                            className="relative p-2 rounded-full text-text-secondary hover:text-text active:bg-card-hover transition-colors cursor-pointer"
+                            className="p-2 rounded-full text-text-secondary hover:text-text active:bg-card-hover active:scale-95 transition-all cursor-pointer"
                         >
-                            <PanelLeftOpen className="w-5 h-5" />
-                            {chats.length > 0 && (
-                                <span className="absolute top-1 end-1 w-1.5 h-1.5 rounded-full bg-accent" />
-                            )}
+                            <SidebarIcon badge={chats.length > 0} />
                         </button>
                     }
                 >

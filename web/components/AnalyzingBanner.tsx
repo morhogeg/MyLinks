@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
-import BrandOrb from '@/components/ui/BrandOrb';
-import { linkScanLabel, LINK_SCAN_STEPS } from '@/lib/scanPhases';
+import type { OrbState } from 'thinking-orbs';
+import OrbStatus from '@/components/ui/OrbStatus';
+import { linkScanLabel, linkScanOrb, LINK_SCAN_STEPS, LINK_SCAN_ORBS } from '@/lib/scanPhases';
 
 export interface AnalyzingState {
     active: boolean;
@@ -22,24 +23,30 @@ export interface AnalyzingState {
  * (LinkScanProgress / ImageScanProgress / VideoScanProgress) so the banner reads
  * as genuinely working through stages, not a static "Analyzing".
  */
-function phaseLabel(kind: AnalyzingState['kind'], pct: number, stageStep?: number): string {
+function phaseStatus(
+    kind: AnalyzingState['kind'],
+    pct: number,
+    stageStep?: number,
+): { label: string; orb: OrbState } {
     if (kind === 'image') {
-        if (pct >= 95) return 'Finishing up…';
-        if (pct >= 80) return 'Organizing & tagging…';
-        if (pct >= 60) return 'Understanding the content…';
-        if (pct >= 45) return 'Reading the text…';
-        return 'Scanning the image…';
+        if (pct >= 95) return { label: 'Finishing up…', orb: 'shaping' };
+        if (pct >= 80) return { label: 'Organizing & tagging…', orb: 'solving' };
+        if (pct >= 60) return { label: 'Understanding the content…', orb: 'solving' };
+        if (pct >= 45) return { label: 'Reading the text…', orb: 'searching' };
+        return { label: 'Scanning the image…', orb: 'searching' };
     }
     if (kind === 'video') {
-        if (pct >= 92) return 'Organizing & tagging…';
-        if (pct >= 72) return 'Writing the summary…';
-        if (pct >= 40) return 'Understanding the video…';
-        return 'Watching the video…';
+        if (pct >= 92) return { label: 'Organizing & tagging…', orb: 'solving' };
+        if (pct >= 72) return { label: 'Writing the summary…', orb: 'shaping' };
+        if (pct >= 40) return { label: 'Understanding the video…', orb: 'solving' };
+        return { label: 'Watching the video…', orb: 'searching' };
     }
     // link / web article — mirror the in-dialog stepper exactly (shared source).
     // Pin to the backend stage when reported; else derive the phase from the %.
-    if (stageStep != null && LINK_SCAN_STEPS[stageStep]) return LINK_SCAN_STEPS[stageStep] + '…';
-    return linkScanLabel(pct) + '…';
+    if (stageStep != null && LINK_SCAN_STEPS[stageStep]) {
+        return { label: LINK_SCAN_STEPS[stageStep] + '…', orb: LINK_SCAN_ORBS[stageStep] };
+    }
+    return { label: linkScanLabel(pct) + '…', orb: linkScanOrb(pct) };
 }
 
 /**
@@ -102,6 +109,8 @@ export default function AnalyzingBanner({ state }: { state: AnalyzingState | nul
     // eslint-disable-next-line react-hooks/refs
     maxPct.current = pct;
 
+    const phase = phaseStatus(shown.kind, pct, shown.stageStep);
+
     return (
         <div
             className="fixed inset-x-0 z-40 flex justify-center px-4 pointer-events-none"
@@ -111,13 +120,23 @@ export default function AnalyzingBanner({ state }: { state: AnalyzingState | nul
             <div className="animate-slide-up pointer-events-auto w-full max-w-xs rounded-2xl bg-card/95 backdrop-blur-xl border border-border-subtle shadow-[var(--shadow-card)] px-3.5 py-2.5">
                 <div className="flex items-center gap-2.5">
                     {done ? (
-                        <CheckCircle2 className="w-4 h-4 text-accent shrink-0 animate-fade-in" />
+                        <>
+                            <CheckCircle2 className="w-4 h-4 text-accent shrink-0 animate-fade-in" />
+                            <span className="flex-1 text-[13px] font-medium text-text truncate">
+                                Saved to Machina
+                            </span>
+                        </>
                     ) : (
-                        <BrandOrb state="working" size={20} />
+                        // The orb and the phase label change together as one dip;
+                        // the % keeps ticking outside it so the number stays steady.
+                        <OrbStatus
+                            orb={phase.orb}
+                            label={phase.label}
+                            stageKey={phase.label}
+                            className="flex items-center gap-2.5 flex-1 min-w-0"
+                            labelClassName="flex-1 text-[13px] font-medium text-text truncate"
+                        />
                     )}
-                    <span className="flex-1 text-[13px] font-medium text-text truncate">
-                        {done ? 'Saved to Machina' : phaseLabel(shown.kind, pct, shown.stageStep)}
-                    </span>
                     <span className="text-[13px] font-bold tabular-nums text-text-secondary">
                         {pct}%
                     </span>
