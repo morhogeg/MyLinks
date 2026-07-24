@@ -719,7 +719,34 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-24 (latest) — CAPTURE-PROGRESS TRUTHFULNESS (5-fix batch, merge
+- **2026-07-24 (latest) — NEW `/security` SKILL: code-level-only hardening pass
+  (`.claude/skills/security/SKILL.md`).** Owner wanted a dedicated session type
+  for security that works *only* on what's in the repo, because the highest
+  levers (§4 task 2 cutover, task 5 key hygiene) are owner console steps and a
+  session that blocks on them ships nothing. The skill draws that boundary
+  explicitly: IN = `functions/`, `web/`, `extension/`, `safari/`, `web/ios/`,
+  the **staged** `firestore.rules.locked` / `storage.rules`, the
+  `firestore-rules-test/` + `functions/tests/` suites, workflow permission
+  scoping; OUT = flipping `REQUIRE_AUTH`, `firebase deploy --only
+  firestore:rules`, functions env (`ADMIN_TOKEN`/`APPCHECK_ENFORCE`/
+  `OWNER_EMAIL`), key rotation, any console. Owner-only findings are never
+  attempted and never block — they're collected and handed back as a mandatory
+  "Owner actions (not done by me)" section (step 6). Step 2 pins every
+  judgement to the §3 flag state so the pre-cutover client-`uid` fallback isn't
+  re-reported as a new finding each session, and so the cutover stays a config
+  change, not a code change. Eight review lenses, all stack-specific: edge auth
+  (`_verify_bearer`/`_authed_uid`, callable-vs-HTTP-twin drift), tenant
+  isolation/IDOR incl. collection-group queries, the staged ruleset as spec,
+  **SSRF in `scraper.py`** (user-supplied URLs are the product), prompt
+  injection via scraped content into `ai_service.py`/`ask_brain`, secrets & PII
+  (the `ownerUid`-in-`shared_*` leak, §4 5a, as the pattern to check for
+  recurrence), CORS `_allowed_origins()`, and client-side (iOS token storage
+  `H-1`, XSS on the public `/s`,`/c` pages). Reuses `AUDIT.md` finding IDs
+  rather than a parallel scheme, requires a traced `file:line` path per finding
+  (untraceable ones get killed, not reported), respects already-accepted
+  trade-offs (`S-6`), and mandates a regression test per fix. Docs-only change,
+  no deploy.
+- **2026-07-24 — CAPTURE-PROGRESS TRUTHFULNESS (5-fix batch, merge
   `3478f6b`): real pipeline stages on the card doc; '+' dialog stays until done;
   honest share-sheet frame; sourceName grounding; suggestion ranking; toolbar
   pinned to card top.** Owner reported: (1) '+' steps dialog vanished ~2-3s in
