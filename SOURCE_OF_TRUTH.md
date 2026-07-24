@@ -332,6 +332,11 @@ The multi-user auth work is **fully written but not live**:
 
 ### 🟡 P2 — security/cost hardening & honest product surface
 
+11b. **[ ] "Python tests" CI workflow is perpetually red** (runs #47–#51+): the
+    only failures are 4 mocks in `functions/tests/test_embed_trigger_backstop.py`
+    (`SimpleNamespace` lacks `_get_attributes` — firebase_functions version
+    drift). 389 real tests pass. Fix the mocks (or pin the lib) so a red run
+    means something again.
 12. **[ ] Ingest token hardening (audit H-1).** Move from App Group UserDefaults
     to Keychain; server copy to a functions-only collection; add rotation.
 13. **[x] Remaining audit mediums — landed 2026-07-09 (AUDIT.md S-2/S-3).**
@@ -714,7 +719,44 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-24 (latest) — DESKTOP HOVER TOOLBAR: add Hide/Show image button.**
+- **2026-07-24 (latest) — CAPTURE-PROGRESS TRUTHFULNESS (5-fix batch, merge
+  `3478f6b`): real pipeline stages on the card doc; '+' dialog stays until done;
+  honest share-sheet frame; sourceName grounding; suggestion ranking; toolbar
+  pinned to card top.** Owner reported: (1) '+' steps dialog vanished ~2-3s in
+  (it closed on the fast `/api/share` enqueue ack) while the pill ran a
+  DIFFERENT simulated curve — read as a restart; (2) the iOS share sheet showed
+  a green done check at the same enqueue ack while analysis ran ~15-20s more;
+  (3) an alaxon.co.il card showed source "Machina AI" — Gemini leaks the app
+  name from SYSTEM_PROMPT into the model-generated `sourceName` (generic scraper
+  branch never set one); (4) a Messi card suggested the "Politics" collection
+  (raw term-count ranking, plus the A–Z list rendering headerless under
+  "SUGGESTED"); (5) hover toolbar sat mid-card on photo cards. Fixes (3 Opus
+  agents, Fable-reviewed line-by-line): backend `_write_stage` mirrors
+  `processingStage` (scraping→analyzing→connecting→organizing) onto the card doc
+  (best-effort, dropped on done/failed incl. janitor `DELETE_FIELD`); web
+  `stageProgress` in `scanPhases.ts` maps stages to step+floor, `AddLinkForm`
+  keeps the dialog open on an onSnapshot of the placeholder (close = explicit X
+  or real completion; toast moved to completion), pill suppressed for the
+  dialog-owned card (`suppressProcessingId` page→Feed→useProcessingBanner) and
+  resumes at the identical % (same curve+clock+floors); ShareExt
+  `completeScanSuccess` now shows "Saved to Machina ✓ / Analyzing — progress
+  continues in Machina" with the bar mid-flight (accent, never green/full),
+  hand-off hint unchanged; sourceName grounded 3-deep (scraper og:site_name→
+  application-name→twitter:site→prettified host; prompt rule; `_ground_source_name`
+  sanitizer at all 3 call sites) + `SourceByline` rejects "Machina"-named sources
+  for non-Machina hosts and falls back to the URL host (fixes existing bad
+  cards); `rankCollectionsForLink` requires ≥2 distinct idf-weighted shared
+  terms or a name match, size-normalized, threshold-gated + "All collections"
+  header scopes the SUGGESTED section; Card.tsx toolbar pinned `top-2.5` over
+  the image (no jump on hide/show image). Verified: tsc 0, prod build 0,
+  functions 389 pass + 14 new tests (stage order/exception-safety, sanitizer,
+  og extraction). Deploys: Vercel (auto), full functions deploy (shared modules
+  changed — no `Deploy-Functions:` trailer, deliberate), TestFlight build
+  **1179** (run #179) for the ShareExt change. NEW §4 item 11b: "Python tests"
+  CI is perpetually red from 4 pre-existing `test_embed_trigger_backstop.py`
+  mock failures (firebase_functions drift) — NOT this batch (failed identically
+  on runs #47–#50); fix so red means something.
+- **2026-07-24 — DESKTOP HOVER TOOLBAR: add Hide/Show image button.**
   The per-card hide-image toggle lived only in the mobile action sheet
   (`[@media(hover:none)]`); desktop had no equivalent (flagged as a follow-up).
   Added it to the desktop hover toolbar in `Card.tsx` (the floating pill of
