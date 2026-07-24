@@ -14,7 +14,6 @@ import CategoryInput from './CategoryInput';
 import CardActionSheet from './CardActionSheet';
 import { hasHebrew } from '@/lib/rtl';
 import { getNotes } from '@/lib/notes';
-import { platformSuppressesThumbnail } from '@/lib/platform';
 
 interface CardProps {
     link: Link;
@@ -234,7 +233,7 @@ function Card({
                 posters (X / Instagram reel / LinkedIn / Facebook) share this exact
                 treatment — fixed height + center crop — so a portrait poster frame
                 doesn't render as a tall banner. */}
-            {!link.hideThumbnail && !platformSuppressesThumbnail(link.url) && (link.sourceType === 'youtube' || link.metadata?.thumbnailIsVideo) && link.metadata?.thumbnailUrl && (
+            {!link.hideThumbnail && (link.sourceType === 'youtube' || link.metadata?.thumbnailIsVideo) && link.metadata?.thumbnailUrl && (
                 <div className="relative w-full h-28 sm:h-32 bg-black/40 overflow-hidden">
                     <img
                         src={link.metadata.thumbnailUrl}
@@ -256,7 +255,7 @@ function Card({
                 show whole; older cards fall back to a fixed short banner. Either way the
                 crop anchors to the top, where social posts put the headline/subject.
                 Video posters are excluded here — they use the fixed banner above. */}
-            {!link.hideThumbnail && !platformSuppressesThumbnail(link.url) && link.sourceType !== 'youtube' && !link.metadata?.thumbnailIsVideo && link.metadata?.thumbnailUrl && (
+            {!link.hideThumbnail && link.sourceType !== 'youtube' && !link.metadata?.thumbnailIsVideo && link.metadata?.thumbnailUrl && (
                 <div
                     className={`relative w-full bg-black/40 overflow-hidden ${link.metadata.thumbnailAspect ? '' : 'h-28 sm:h-32'}`}
                     style={link.metadata.thumbnailAspect ? { aspectRatio: String(link.metadata.thumbnailAspect), maxHeight: '20rem', minHeight: '7rem' } : undefined}

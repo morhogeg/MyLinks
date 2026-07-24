@@ -377,11 +377,11 @@ def _scrape_linkedin_url(url: str) -> dict:
             "title": title,
             "text": text or html[:5000],
             "source_name": _extract_linkedin_author(html),
-            # No poster: LinkedIn serves a GENERIC "Posted on LinkedIn" branding
-            # og:image even for plain text posts, and we can't tell a real
-            # video/photo post from a text one — so any og:image here is unreliable
-            # junk. LinkedIn cards stay text-only (rule: images only for video
-            # thumbnails or image-first posts, neither of which we can trust here).
+            # Poster ONLY for actual VIDEO posts: LinkedIn serves a generic
+            # "Posted on LinkedIn" branding og:image even for plain TEXT posts, so
+            # we can't blindly trust og:image. Gating on og:type=video / og:video
+            # shows a real video thumbnail while a text post stays media-less.
+            "video_thumbnail_url": _extract_og_image(soup) if _og_indicates_video(soup, url) else "",
         }
     except Exception as e:
         logger.error(f"LinkedIn scrape error for {url}: {e}")
@@ -853,6 +853,33 @@ def _extract_og_image(soup) -> str:
     return ""
 
 
+# URL path segments that mark a LinkedIn/Facebook link as a VIDEO.
+_OG_VIDEO_URL_HINTS = ("fb.watch", "/watch", "/videos/", "/video/", "/reel/", "/reels/")
+
+
+def _og_indicates_video(soup, url: str = "") -> bool:
+    """True when a page's Open Graph metadata (or its URL) marks it as a VIDEO
+    post — so its og:image is a real poster frame worth showing as the card
+    banner, not the generic branding / link-preview image a TEXT post carries
+    (e.g. LinkedIn's "Posted on LinkedIn" card). This is the gate that lets a
+    LinkedIn/Facebook VIDEO show a thumbnail while a text post stays media-less.
+
+    Signals, most-authoritative first: og:type = video.*; a present og:video[:*]
+    tag; then video-shaped URL segments (fb.watch, /watch, /videos/, /reel(s)/).
+    """
+    try:
+        t = soup.find('meta', property='og:type') or soup.find('meta', attrs={'name': 'og:type'})
+        if t and isinstance(t.get('content'), str) and t['content'].strip().lower().startswith('video'):
+            return True
+        for prop in ('og:video', 'og:video:url', 'og:video:secure_url', 'og:video:type'):
+            if soup.find('meta', property=prop):
+                return True
+    except Exception:
+        pass
+    u = (url or "").lower()
+    return any(h in u for h in _OG_VIDEO_URL_HINTS)
+
+
 def _scrape_instagram_url(url: str, message_body: Optional[str] = None) -> dict:
     """
     Scrape Instagram URLs using direct scraping first (reliable with mobile headers),
@@ -1090,6 +1117,7 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
     best_desc = ""
     source_name = None
     truncated = False
+    fb_image = ""  # video poster — set only for actual VIDEO posts (see below)
 
     try:
         headers = {
@@ -1156,6 +1184,12 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
                     best_title = first_line[:120]
                 best_desc = body
                 metadata_lines.append(f"POST CAPTION:\n{body}")
+                # Poster ONLY for actual VIDEO posts (fb.watch / /watch / /reel /
+                # og:type=video): there og:image is a real frame worth showing.
+                # A text/photo post's og:image is the generic FB card / login
+                # logo, so we leave it off (the user can't tell it apart reliably).
+                if _og_indicates_video(soup, url):
+                    fb_image = _extract_og_image(soup)
     except Exception as e:
         logger.warning(f"Facebook scrape failed: {e}")
 
@@ -1179,11 +1213,12 @@ def _scrape_facebook_url(url: str, message_body: Optional[str] = None) -> dict:
                 "source_name": source_name, "truncated": True}
 
     final_text = "\n\n---\n\n".join(metadata_lines)
-    # No poster: a Facebook og:image is a link-preview / the FB logo, not the
-    # post's own media, and we can't reliably tell a video/photo post from text —
-    # so Facebook cards stay text-only (same rule as LinkedIn above).
+    # video_thumbnail_url is set ONLY for actual video posts (gated above); text /
+    # photo posts leave it "" and stay media-less, since a generic FB og:image
+    # can't be told apart from real content reliably.
     return {"html": final_text, "title": best_title, "text": final_text,
-            "source_name": source_name, "truncated": truncated}
+            "source_name": source_name, "truncated": truncated,
+            "video_thumbnail_url": fb_image}
 
 
 def _extract_youtube_id(url: str) -> Optional[str]:

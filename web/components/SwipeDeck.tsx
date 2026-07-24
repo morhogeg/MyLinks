@@ -6,7 +6,6 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import SourceByline from './SourceByline';
 import SimpleMarkdown from './SimpleMarkdown';
 import { hasHebrew } from '@/lib/rtl';
-import { platformSuppressesThumbnail } from '@/lib/platform';
 import { hapticLight } from '@/lib/haptics';
 import { Star, Archive, Bell, RotateCcw, Sparkles } from 'lucide-react';
 import { REVIEW_SESSION_SIZE, isOpen, reviewSessionQueue } from '@/lib/reviewQueue';
@@ -530,7 +529,7 @@ const CardFace = memo(function CardFace({ link }: { link: Link }) {
                 the aspect (new saves) the banner sizes to the image — capped shorter
                 than the feed since this is a compact triage card — else a fixed short
                 banner. Top-anchored crop so the headline/subject stays visible. */}
-            {!link.hideThumbnail && !platformSuppressesThumbnail(link.url) && link.metadata?.thumbnailUrl && (
+            {!link.hideThumbnail && link.metadata?.thumbnailUrl && (
                 <div
                     className={`-mx-5 -mt-5 sm:-mx-6 sm:-mt-6 mb-4 shrink-0 relative bg-black/40 overflow-hidden ${link.metadata.thumbnailAspect ? '' : 'h-28 sm:h-32'}`}
                     style={link.metadata.thumbnailAspect ? { aspectRatio: String(link.metadata.thumbnailAspect), maxHeight: '12.5rem', minHeight: '7rem' } : undefined}

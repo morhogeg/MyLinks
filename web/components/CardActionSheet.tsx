@@ -145,7 +145,8 @@ export default function CardActionSheet({
             key: 'thumbnail',
             label: link.hideThumbnail ? 'Show image' : 'Hide image',
             icon: link.hideThumbnail ? <ImageIcon className="w-5 h-5" /> : <ImageOff className="w-5 h-5" />,
-            active: !!link.hideThumbnail,
+            // Not an "active/on" state — it's a plain toggle, so it renders in the
+            // normal text color (the accent styling read as a highlighted item).
             onClick: () => onToggleThumbnail(link),
         }] : []),
         ...(removeFromCollection ? [{
