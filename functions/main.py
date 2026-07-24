@@ -2455,7 +2455,38 @@ def rebuild_connections(req: https_fn.CallableRequest) -> dict:
     return graph.backfill_batch(uid, phase, cursor=cursor, limit=limit, force=force)
 
 
-def _claim_workspace_logic(auth_uid: str, email: str = None) -> dict:
+def _owner_email_matches(email, token_claims: dict = None) -> bool:
+    """True when `email` is the configured OWNER_EMAIL, for the legacy claim.
+
+    Fails CLOSED when OWNER_EMAIL is unset — the same policy `_require_admin`
+    states ("a prod misconfiguration must not open the door"), which this gate
+    previously inverted: `not owner_email or email == owner_email` meant that
+    with the variable unset (its state in prod today, SOURCE_OF_TRUTH §4 task 5)
+    ANY verified account reaching claim_workspace linked itself to the first
+    users/ doc lacking `authUids` — i.e. the owner's whole library. Setting
+    OWNER_EMAIL is already step (2) of the cutover order, so requiring it here
+    aligns the code with the documented sequence instead of trusting it.
+
+    Also compares case-insensitively (mailbox providers treat the local part as
+    case-insensitive, and a token can carry a differently-cased address) and
+    refuses an address the identity provider marked unverified.
+    """
+    owner_email = (os.environ.get("OWNER_EMAIL", "") or "").strip().lower()
+    if not owner_email:
+        logger.warning("OWNER_EMAIL is unset — refusing the legacy workspace claim")
+        return False
+    if not email or str(email).strip().lower() != owner_email:
+        return False
+    # Only reject an email the provider EXPLICITLY flagged unverified; a token
+    # that simply omits the claim (some Apple ID tokens) still passes.
+    if token_claims is not None and token_claims.get("email_verified") is False:
+        logger.warning("Legacy claim refused: provider reports the email unverified")
+        return False
+    return True
+
+
+def _claim_workspace_logic(auth_uid: str, email: str = None,
+                           token_claims: dict = None) -> dict:
     """Resolve (or set up) the data workspace for a verified account.
 
     Shared core for both the `claim_workspace` callable and the
@@ -2465,7 +2496,9 @@ def _claim_workspace_logic(auth_uid: str, email: str = None) -> dict:
 
     1. Already linked (`authUids array-contains` the caller) → return it.
     2. Legacy owner claim: link the single pre-auth unclaimed doc, gated by the
-       OWNER_EMAIL allowlist when set (only the owner email may claim it).
+       OWNER_EMAIL allowlist (see `_owner_email_matches` — with OWNER_EMAIL
+       unset this step is DENIED, not opened, so a missed cutover step can't
+       hand the owner's workspace to whoever signs in first).
     3. New-user path (REQUIRE_AUTH on only): create a fresh, empty workspace
        keyed by the Firebase Auth uid (see link_service.create_workspace) and
        return it with `created: True` so the client can show onboarding.
@@ -2478,8 +2511,7 @@ def _claim_workspace_logic(auth_uid: str, email: str = None) -> dict:
     if existing:
         return {"uid": existing, "created": False}
 
-    owner_email = os.environ.get("OWNER_EMAIL", "")
-    if not owner_email or email == owner_email:
+    if _owner_email_matches(email, token_claims):
         db = get_db()
         # Claim the first doc that has no authUids yet (bounded scan). In the
         # single-owner migration there is exactly one such doc.
@@ -2519,8 +2551,9 @@ def claim_workspace(req: https_fn.CallableRequest) -> dict:
             message="User must be signed in",
         )
     auth_uid = req.auth.uid
-    email = req.auth.token.get("email") if getattr(req.auth, "token", None) else None
-    return _claim_workspace_logic(auth_uid, email)
+    claims = getattr(req.auth, "token", None) or None
+    email = claims.get("email") if claims else None
+    return _claim_workspace_logic(auth_uid, email, claims)
 
 
 @https_fn.on_request()
@@ -2549,7 +2582,7 @@ def claim_workspace_http(req: https_fn.Request) -> https_fn.Response:
     try:
         auth_uid = decoded.get("uid")
         email = decoded.get("email")
-        result = _claim_workspace_logic(auth_uid, email)
+        result = _claim_workspace_logic(auth_uid, email, decoded)
         return https_fn.Response(
             json.dumps(result),
             status=200, headers=headers, mimetype='application/json',
