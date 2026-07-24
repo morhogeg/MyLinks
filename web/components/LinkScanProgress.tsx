@@ -10,6 +10,13 @@ interface LinkScanProgressProps {
     url: string;
     /** 0–100. Drives which phase is active. */
     progress: number;
+    /**
+     * Explicit active step (0..LINK_SCAN_STEPS.length-1). When set, it pins the
+     * checklist to the backend's reported `processingStage` so the phases never
+     * run ahead of the real work even as the time-ramp climbs past a floor. When
+     * omitted, the step is derived from `progress` (pre-deploy backend / share).
+     */
+    activeStep?: number;
 }
 
 function hostOf(url: string): string {
@@ -30,11 +37,12 @@ function hostOf(url: string): string {
  * The step timing is simulated (the backend reports no true progress — M6); the
  * parent owns the `progress` value.
  */
-export default function LinkScanProgress({ url, progress }: LinkScanProgressProps) {
+export default function LinkScanProgress({ url, progress, activeStep }: LinkScanProgressProps) {
     const clamped = Math.min(100, Math.max(0, progress));
     const done = clamped >= 100;
     // When complete, every step reads as done (active index past the last step).
-    const active = done ? LINK_SCAN_STEPS.length : linkScanStepIndex(clamped);
+    // Otherwise pin to the backend stage when given, else derive from progress.
+    const active = done ? LINK_SCAN_STEPS.length : activeStep ?? linkScanStepIndex(clamped);
     const host = hostOf(url);
     const [faviconOk, setFaviconOk] = useState(true);
 

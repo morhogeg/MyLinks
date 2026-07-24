@@ -1,6 +1,8 @@
 // TypeScript interfaces for SecondBrain PWA
 // These mirror the Firestore schema from the PRD
 
+import type { ProcessingStage } from './scanPhases';
+
 export type LinkStatus = 'unread' | 'archived' | 'favorite';
 
 // Async-capture lifecycle (M3). Items saved via the share sheet are
@@ -94,6 +96,12 @@ export interface Link {
   // so the in-app ramp resumes where the Share Extension left off instead of
   // restarting at 0.
   processingStartedAt?: number;
+  // Coarse per-stage marker the backend writes while status === 'processing'
+  // (deleted on completion/failure). Floors the capture-progress loaders to a
+  // real milestone and pins their active step — see lib/scanPhases.ts
+  // stageProgress. Absent on a pre-deploy backend (loaders fall back to the
+  // time-derived ramp).
+  processingStage?: ProcessingStage;
   // Async-capture (M3): populated on a `failed` card so the UI can explain what
   // went wrong and offer a retry that re-runs analysis for `url`.
   error?: string;

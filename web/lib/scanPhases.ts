@@ -30,6 +30,35 @@ export function linkScanStepIndex(progress: number): number {
     return 0;
 }
 
+/**
+ * Coarse per-stage progress the backend reports on a `processing` card
+ * (`processingStage`, present only while status === 'processing'). Unlike the
+ * simulated time ramp, these are REAL milestones — so every capture-progress
+ * surface floors its displayed % to the reported stage and pins the active step
+ * to it, never running the checklist ahead of the actual work.
+ */
+export type ProcessingStage = 'scraping' | 'analyzing' | 'connecting' | 'organizing';
+
+/**
+ * The active step + progress FLOOR for a backend `processingStage`. The floors
+ * mirror `linkScanStepIndex`'s thresholds exactly, so a card flooring its % to a
+ * stage lands on that stage's step either way. No stage yet → step 0, floor 0.
+ */
+export function stageProgress(stage: ProcessingStage | undefined): { step: number; floor: number } {
+    switch (stage) {
+        case 'scraping':
+            return { step: 1, floor: 25 };
+        case 'analyzing':
+            return { step: 2, floor: 50 };
+        case 'connecting':
+            return { step: 3, floor: 72 };
+        case 'organizing':
+            return { step: 4, floor: 92 };
+        default:
+            return { step: 0, floor: 0 };
+    }
+}
+
 /** Phase label for a 0–100 progress value; 'Done!' once complete. */
 export function linkScanLabel(progress: number): string {
     if (progress >= 100) return 'Done!';

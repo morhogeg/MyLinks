@@ -85,7 +85,7 @@ const noop = () => { };
  * - Two card views (grid / list), plus review, ask, and collections modes
  * - Deep linking to specific links via URL params
  */
-function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onFeedLoadedChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange, onFullBleedChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onFeedLoadedChange?: (loaded: boolean) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void; onFullBleedChange?: (full: boolean) => void }) {
+function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onFeedLoadedChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange, onFullBleedChange, suppressProcessingId }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onFeedLoadedChange?: (loaded: boolean) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void; onFullBleedChange?: (full: boolean) => void; suppressProcessingId?: string | null }) {
     const searchParams = useSearchParams();
     const { uid } = useAuth();
     const toast = useToast();
@@ -340,7 +340,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // cards; surface the same app-level "Analyzing… N%" banner for them. Report
     // the state up to the page, throttled to meaningful changes so it doesn't
     // fire every ramp frame.
-    const processingBanner = useProcessingBanner(links);
+    const processingBanner = useProcessingBanner(links, suppressProcessingId);
     const procSig = processingBanner
         ? `${processingBanner.active}:${Math.round(processingBanner.progress)}:${processingBanner.kind}`
         : 'null';
@@ -2702,14 +2702,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     );
 }
 
-export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onFeedLoadedChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange, onFullBleedChange }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onFeedLoadedChange?: (loaded: boolean) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void; onFullBleedChange?: (full: boolean) => void }) {
+export default function Feed({ onAskModeChange, onHideAddButton, onProcessingChange, onFeedLoadedChange, onOpenDigestSettings, onHasCardsChange, libraryFacet, onLibraryFacetApplied, onBackToInsights, headerCommand, onCapture, onTabChange, onFullBleedChange, suppressProcessingId }: { onAskModeChange?: (isAsk: boolean) => void; onHideAddButton?: (hide: boolean) => void; onProcessingChange?: (state: import('@/components/AnalyzingBanner').AnalyzingState | null) => void; onFeedLoadedChange?: (loaded: boolean) => void; onOpenDigestSettings?: () => void; onHasCardsChange?: (hasCards: boolean) => void; libraryFacet?: import('@/lib/stats').LibraryFacetRequest | null; onLibraryFacetApplied?: () => void; onBackToInsights?: () => void; headerCommand?: { action: 'search' | 'sources' | 'display'; nonce: number } | null; onCapture?: () => void; onTabChange?: (tab: BottomTab) => void; onFullBleedChange?: (full: boolean) => void; suppressProcessingId?: string | null }) {
     return (
         <Suspense fallback={
             <div className="flex items-center justify-center h-64">
                 <div className="w-8 h-8 border-2 border-text/20 border-t-text rounded-full animate-spin" />
             </div>
         }>
-            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onFeedLoadedChange={onFeedLoadedChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} libraryFacet={libraryFacet} onLibraryFacetApplied={onLibraryFacetApplied} onBackToInsights={onBackToInsights} headerCommand={headerCommand} onCapture={onCapture} onTabChange={onTabChange} onFullBleedChange={onFullBleedChange} />
+            <FeedContent onAskModeChange={onAskModeChange} onHideAddButton={onHideAddButton} onProcessingChange={onProcessingChange} onFeedLoadedChange={onFeedLoadedChange} onOpenDigestSettings={onOpenDigestSettings} onHasCardsChange={onHasCardsChange} libraryFacet={libraryFacet} onLibraryFacetApplied={onLibraryFacetApplied} onBackToInsights={onBackToInsights} headerCommand={headerCommand} onCapture={onCapture} onTabChange={onTabChange} onFullBleedChange={onFullBleedChange} suppressProcessingId={suppressProcessingId} />
         </Suspense>
     );
 }

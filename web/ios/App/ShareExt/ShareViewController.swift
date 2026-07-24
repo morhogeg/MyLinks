@@ -609,21 +609,28 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         UIView.animate(withDuration: 0.2) { self.barTrack.layoutIfNeeded() }
     }
 
-    /// Mark the save as acknowledged — green check — while the bar KEEPS the
-    /// shared-curve value. The server has only queued the item; analysis runs
-    /// 15–20s more, and the in-app banner resumes from this same number. The old
-    /// snap-to-100 here made the app's honest % look like a restart (owner bug:
-    /// "extension showed done, app was at 20%").
+    /// Terminal frame of the extension after a 2xx ack. The ack means the capture
+    /// is SAVED, not that analysis is done: /api/share only queues the item and the
+    /// backend keeps working ~15–20s more, so the in-app banner resumes from this
+    /// exact %. The visual grammar must therefore read "saved, still analyzing",
+    /// never "everything finished":
+    ///   - the ✓ attaches to the SAVE ("Saved to Machina ✓"), not a full-screen glyph;
+    ///   - the % counter stays on the live curve value, so the frame reads mid-flight;
+    ///   - the bar KEEPS its live curve width in the accent colour — never full/green.
+    /// Auto-dismiss timing is unchanged: the host share sheet is never held open for
+    /// analysis.
     private func completeScanSuccess(then: @escaping () -> Void) {
         DispatchQueue.main.async {
             self.displayLink?.invalidate()
             self.displayLink = nil
             self.sweepView.isHidden = true
             self.linkRing.alpha = 0
-            self.percentLabel.alpha = 0
-            self.checkLabel.alpha = 1
-            self.barFill.backgroundColor = Self.successGreen
-            self.phaseLabel.text = "Saved — Machina is reading it…"
+            // Keep the live % visible (the ✓ rides the copy, not the counter) and
+            // leave the bar at its accent-coloured curve width — do NOT green or fill it.
+            self.percentLabel.alpha = 1
+            self.checkLabel.alpha = 0
+            self.phaseLabel.text = "Saved to Machina ✓"
+            self.hintLabel.text = "Analyzing — progress continues in Machina"
             // Hand the app EXACTLY this % (the hint carries progress + start
             // clock) so its loader continues the ramp instead of restarting.
             self.writePendingShareHint()
@@ -682,7 +689,8 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
 
             if self.isImageFlow || self.isLinkFlow {
                 if success {
-                    // Snap the scan to 100% with the green check, then finish.
+                    // Save acknowledged — show the honest "saved, still analyzing"
+                    // frame (bar stays mid-flight), then finish.
                     self.completeScanSuccess { self.finish() }
                 } else {
                     // Stop the cosmetic scan and surface the message on the card.

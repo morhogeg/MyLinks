@@ -3,9 +3,12 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Link, Plus, X, Upload, Loader2 } from 'lucide-react';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { saveLink, getUserTags, findLinkIdByUrl, createProcessingPlaceholder, markLinkFailed, createNoteCard, enrichNoteCard } from '@/lib/storage';
-import { appCheckHeaders } from '@/lib/firebase';
+import { appCheckHeaders, db } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
+import { progressFor } from '@/lib/shareProgress';
+import { stageProgress, type ProcessingStage } from '@/lib/scanPhases';
 import { apiUrl, fetchWithTimeout as apiFetch } from '@/lib/api';
 import { trackSaveSucceeded, trackFirstSave, trackSaveFailed } from '@/lib/analytics';
 import { useVisualViewport } from '@/lib/useVisualViewport';
@@ -29,6 +32,10 @@ interface AddLinkFormProps {
     /** Publish in-flight analysis state so the page can show a persistent
      *  banner that outlives this form being collapsed/closed. */
     onAnalyzingChange?: (state: { active: boolean; progress: number; kind: 'link' | 'image' | 'video' }) => void;
+    /** Publish the card id of the plain-link capture currently owned by the open
+     *  in-dialog stepper (null when none). The feed's processing banner excludes
+     *  it so the same capture is never shown twice — see useProcessingBanner. */
+    onDialogCardChange?: (cardId: string | null) => void;
 }
 
 const formatUrl = (input: string) => {
@@ -83,7 +90,7 @@ const fetchWithTimeout = async (input: string, init: RequestInit) => {
 /**
  * Form for manually adding URLs
  */
-export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingChange, openSignal = 0 }: AddLinkFormProps) {
+export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingChange, onDialogCardChange, openSignal = 0 }: AddLinkFormProps) {
     const { uid } = useAuth();
     const toast = useToast();
     const router = useRouter();
@@ -103,6 +110,24 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
     }, [openSignal]);
     const [progress, setProgress] = useState(0);
     const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // DURABLE PLAIN-LINK DIALOG (Task 1). After /api/share acks, the dialog no
+    // longer closes: it enters a processing phase, subscribing to the placeholder
+    // card doc and driving LinkScanProgress from the SAME shared ramp
+    // (progressFor + stage floors) the bottom pill uses — so closing early hands
+    // off to the pill at the identical %/step with no restart. `status` walks
+    // processing → done | failed; null = no in-flight link dialog.
+    const [linkCard, setLinkCard] = useState<{
+        id: string;
+        startedAt: number;          // shared ramp clock (card.processingStartedAt)
+        status: 'processing' | 'done' | 'failed';
+        stage?: ProcessingStage;    // backend milestone, when present
+    } | null>(null);
+    // Wall-clock tick (1s) that advances the ramp while a link is processing.
+    const [nowTick, setNowTick] = useState(0);
+    // Monotonic guard on the in-dialog %: never let the displayed number step back
+    // (e.g. when the snapshot corrects startedAt). Reset when the session ends.
+    const lastLinkPct = useRef(0);
 
     // Mobile vs. desktop drives how the Add sheet is positioned: a keyboard-aware
     // centered card on phones, a popover anchored to the FAB on desktop.
@@ -148,7 +173,9 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
     const isNote = activeTab === 'note';
 
     useEffect(() => {
-        const animated = isLoading && (activeTab === 'image' || isVideo || isPlainLink || isNote);
+        // The plain-link path drives its own ramp from the card doc (see below),
+        // so it's excluded here — image / video / note keep this simulated ease.
+        const animated = isLoading && (activeTab === 'image' || isVideo || isNote);
         if (animated) {
             setProgress((p) => (p < 8 ? 8 : p));
             // Smaller factor = slower climb. Tuned so video reaches ~97% over a
@@ -168,7 +195,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 progressTimer.current = null;
             }
         };
-    }, [isLoading, activeTab, isVideo, isPlainLink, isNote]);
+    }, [isLoading, activeTab, isVideo, isNote]);
 
     // Publish the in-flight state up to the page so it can render a persistent
     // "Analyzing… N%" banner that survives this form collapsing/closing.
@@ -177,12 +204,134 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
     // panel is closed. On mobile the panel behaves differently; leave it as-is.
     useEffect(() => {
         const suppressed = !isMobile && isExpanded;
+        // The plain-link path never feeds this optimistic channel: while its
+        // dialog is open it renders its own stepper, and on close it hands off to
+        // the Firestore-driven pill (useProcessingBanner). Publishing here too
+        // would double the banner.
         onAnalyzingChange?.({
-            active: isLoading && !suppressed,
+            active: isLoading && !suppressed && !isPlainLink,
             progress,
             kind: activeTab === 'image' ? 'image' : isVideo ? 'video' : 'link',
         });
-    }, [isLoading, progress, activeTab, isVideo, isExpanded, isMobile, onAnalyzingChange]);
+    }, [isLoading, progress, activeTab, isVideo, isPlainLink, isExpanded, isMobile, onAnalyzingChange]);
+
+    // Publish the processing link's card id so the feed's pill excludes it while
+    // this dialog owns it (no "restart" from a duplicate banner). Cleared when the
+    // session ends or the form unmounts.
+    useEffect(() => {
+        const id = linkCard && linkCard.status === 'processing' ? linkCard.id : null;
+        onDialogCardChange?.(id);
+        return () => onDialogCardChange?.(null);
+        // Keyed on id/status only: a stage or startedAt update mustn't re-fire this.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [linkCard?.id, linkCard?.status, onDialogCardChange]);
+
+    // Drive the in-dialog stepper from the placeholder card doc: subscribe while
+    // it's processing, mirror status + processingStage, and unsubscribe the
+    // instant it resolves (or the session is dropped). ONE driver for this phase.
+    useEffect(() => {
+        if (!uid || !linkCard || linkCard.status !== 'processing') return;
+        const ref = doc(db, 'users', uid, 'links', linkCard.id);
+        const unsub = onSnapshot(
+            ref,
+            (snap) => {
+                const data = snap.data();
+                if (!data) return;
+                const startedAt =
+                    typeof data.processingStartedAt === 'number' ? data.processingStartedAt : undefined;
+                const stage = data.processingStage as ProcessingStage | undefined;
+                setLinkCard((c) => {
+                    if (!c) return c;
+                    if (data.status === 'processing') {
+                        return { ...c, stage, startedAt: startedAt ?? c.startedAt };
+                    }
+                    // Left processing: a real status = done, 'failed' = failed.
+                    return { ...c, status: data.status === 'failed' ? 'failed' : 'done' };
+                });
+            },
+            () => {
+                // Snapshot listener error — don't hang the dialog. Hand the capture
+                // to the pill (the card keeps processing in the feed).
+                setLinkCard(null);
+                setIsLoading(false);
+                setUrl('');
+            }
+        );
+        return () => unsub();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [uid, linkCard?.id, linkCard?.status]);
+
+    // Advance the ramp once a second while a link is processing (the bar's own
+    // width transition smooths the step). Date.now shares the card's clock base.
+    useEffect(() => {
+        if (!linkCard || linkCard.status !== 'processing') return;
+        const tick = () => setNowTick(Date.now());
+        tick();
+        const iv = setInterval(tick, 1000);
+        return () => clearInterval(iv);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [linkCard?.status, linkCard?.id]);
+
+    // Terminal transitions for the in-dialog link session.
+    useEffect(() => {
+        if (!linkCard) return;
+        if (linkCard.status === 'done') {
+            // Brief completed frame — the bar lands on 100 — then close + reset.
+            hapticSuccess();
+            toast.success('Saved to Machina');
+            const t = setTimeout(() => resetLinkSession(), 800);
+            return () => clearTimeout(t);
+        }
+        if (linkCard.status === 'failed') {
+            // The card survives as a retryable `failed` card in the feed.
+            toast.error("Saved your link, but analysis couldn't finish — tap the card to retry.");
+            resetLinkSession();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [linkCard?.status]);
+
+    // User closed the dialog (X / scrim / Escape / edge-swipe) while a link was
+    // still processing → hand it to the bottom pill: drop the in-dialog session +
+    // its banner suppression, leaving the card processing in the feed. The pill
+    // resumes at the same % from the shared ramp (progressFor + stage floors), so
+    // there's no restart. (The done/failed paths null `linkCard` in the same
+    // tick, so this no-ops for them.)
+    useEffect(() => {
+        if (!isExpanded && linkCard && linkCard.status === 'processing') {
+            lastLinkPct.current = 0;
+            setLinkCard(null);
+            setIsLoading(false);
+            setUrl('');
+        }
+    }, [isExpanded, linkCard]);
+
+    // End the in-dialog link session and return the form to a clean, empty state
+    // ready for a new entry (used by the done/failed terminal transitions).
+    const resetLinkSession = () => {
+        lastLinkPct.current = 0;
+        setLinkCard(null);
+        setUrl('');
+        setProgress(0);
+        setIsLoading(false);
+        setIsExpanded(false);
+    };
+
+    // In-dialog ramp for the processing link: max(time-ramp, stage floor),
+    // monotonic. Step is pinned to the backend stage when present; otherwise
+    // LinkScanProgress derives it from the %. On done the bar completes to 100.
+    let linkProgress = 0;
+    let linkActiveStep: number | undefined;
+    if (linkCard) {
+        if (linkCard.status === 'done') {
+            linkProgress = 100;
+        } else {
+            const { step, floor } = stageProgress(linkCard.stage);
+            const elapsed = Math.max(0, (nowTick || Date.now()) - linkCard.startedAt);
+            linkProgress = Math.max(progressFor(elapsed), floor, lastLinkPct.current);
+            lastLinkPct.current = linkProgress;
+            linkActiveStep = linkCard.stage ? step : undefined;
+        }
+    }
 
     const parseResponse = async (response: Response) => {
         const responseText = await response.text();
@@ -247,7 +396,12 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
             setIsLoading(true);
             setError(null);
             setProgress(0);
+            lastLinkPct.current = 0;
 
+            // Local ramp anchor until the snapshot supplies the authoritative
+            // processingStartedAt (a hair later at most; the monotonic guard keeps
+            // the correction from stepping the % backwards).
+            const startedAt = Date.now();
             let cardId: string;
             try {
                 cardId = await createProcessingPlaceholder(uid, formattedUrl);
@@ -260,6 +414,15 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 toast.error(message);
                 setIsLoading(false);
                 return;
+            }
+
+            // PLAIN links only: enter the processing phase NOW — the dialog stays
+            // open and the stepper subscribes to this card doc (see the onSnapshot
+            // effect) instead of closing the instant the enqueue acks. A YouTube
+            // LINK keeps today's flow (VideoScanProgress, close on ack → bottom
+            // pill), so it doesn't get a linkCard session.
+            if (isPlainLink) {
+                setLinkCard({ id: cardId, startedAt, status: 'processing' });
             }
 
             try {
@@ -287,6 +450,10 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                 } catch {
                     // Best-effort; the 15-min processing janitor ages it out otherwise.
                 }
+                // Drop the in-dialog session — the feed's `failed` card (with
+                // Retry) takes over — and close cleanly.
+                setLinkCard(null);
+                lastLinkPct.current = 0;
                 trackSaveFailed('network');
                 toast.error("Saved your link, but analysis couldn't start — tap the card to retry.");
                 setUrl('');
@@ -298,18 +465,25 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
 
             // Durably captured AND queued. Record the save now: even if analysis
             // later fails, the card survives as a retryable card, so this is the
-            // honest success moment. The feed is live via onSnapshot — the
-            // processing card streams in and useProcessingBanner drives the
-            // app-level "Analyzing…" banner, exactly as an iOS-shared capture does.
+            // honest success moment for analytics.
             trackSaveSucceeded('web_form');
             trackFirstSave();
-            setProgress(100);
-            hapticSuccess();
-            toast.success('Saved to Machina');
-            setUrl('');
-            setIsExpanded(false);
-            setIsLoading(false);
             onLinkAdded();
+
+            if (!isPlainLink) {
+                // Video LINK — today's behavior: close immediately; the bottom pill
+                // (useProcessingBanner) carries the rest, as before.
+                setProgress(100);
+                hapticSuccess();
+                toast.success('Saved to Machina');
+                setUrl('');
+                setIsExpanded(false);
+                setIsLoading(false);
+            }
+            // Plain link: the DIALOG STAYS OPEN — its stepper runs off the card doc
+            // until the card resolves (brief completed frame + close) or the user
+            // closes early (hand off to the pill). The success toast/haptic fire on
+            // completion, not here, so the user isn't told "Saved" mid-steps.
             return;
         }
 
@@ -565,7 +739,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                         progress={progress}
                                     />
                                 ) : isLoading && isPlainLink ? (
-                                    <LinkScanProgress url={formatUrl(url)} progress={progress} />
+                                    <LinkScanProgress url={formatUrl(url)} progress={linkProgress} activeStep={linkActiveStep} />
                                 ) : (
                                     <div className="relative">
                                         <input
