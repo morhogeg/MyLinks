@@ -4,6 +4,7 @@ from typing import List, Dict, Optional
 from firebase_admin import firestore
 from google.cloud.firestore_v1.vector import Vector
 from ai_service import GeminiService, GEMINI_ANALYSIS_MODEL, embedding_needs_repair
+from log_safe import mask_uid
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +174,7 @@ class GraphService:
                 logger.error(f"Backfill relatedLinks write failed for {doc.id}: {e}")
                 failed += 1
 
-        logger.info(f"Backfill for {uid}: embedded={embedded} updated={updated} skipped={skipped} failed={failed}")
+        logger.info(f"Backfill for {mask_uid(uid)}: embedded={embedded} updated={updated} skipped={skipped} failed={failed}")
         return {'embedded': embedded, 'updated': updated, 'skipped': skipped, 'failed': failed}
 
     def backfill_batch(self, uid: str, phase: str, cursor: Optional[str] = None,

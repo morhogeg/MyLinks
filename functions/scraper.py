@@ -6,6 +6,7 @@ for Twitter/X, Instagram, and YouTube.
 
 import re
 import socket
+import time
 import ipaddress
 import requests
 import logging
@@ -17,6 +18,33 @@ logger = logging.getLogger(__name__)
 
 class UnsafeURLError(ValueError):
     """Raised when a URL resolves to a private/internal address (SSRF guard)."""
+
+
+class ResponseTooLargeError(UnsafeURLError):
+    """Raised when a fetched response exceeds MAX_RESPONSE_BYTES.
+
+    Subclasses UnsafeURLError so every existing `except UnsafeURLError` handler
+    in the scrape paths degrades the same way it already does for a blocked host
+    (honest "couldn't read this" card) instead of surfacing a 500.
+    """
+
+
+# Hard ceiling on how many bytes a single fetch may pull into memory. Every
+# scraped page, platform API response, and post image funnels through safe_get,
+# and `requests` otherwise buffers the WHOLE body before any caller-side size
+# check runs (main._fetch_post_images tests len(resp.content) — by then the
+# allocation already happened). Cloud Functions default to 256 MiB, so one
+# user-supplied URL pointing at a large public file was enough to OOM the
+# instance; `get_article` makes that reachable without any credential at all.
+# 10 MB is far above any real article/oEmbed payload and below the 8 MB post
+# image cap's own headroom.
+MAX_RESPONSE_BYTES = 10 * 1024 * 1024
+
+# Wall-clock ceiling for one safe_get call, redirects included. `timeout` is a
+# per-socket-operation budget, so a server that drips one byte just inside it
+# holds the function open indefinitely (and a redirect chain multiplies it).
+# This bounds the whole call, including body streaming.
+MAX_TOTAL_SECONDS = 45
 
 
 def validate_public_url(url: str) -> None:
@@ -52,8 +80,49 @@ def validate_public_url(url: str) -> None:
             raise UnsafeURLError(f"URL resolves to a non-public address: {ip}")
 
 
+def _read_capped(resp: requests.Response, max_bytes: int,
+                 deadline: float) -> requests.Response:
+    """Buffer a streamed response body, aborting past `max_bytes`/`deadline`.
+
+    Reads in chunks and stops the moment either ceiling is crossed, so an
+    oversized or slow-drip body is dropped mid-transfer rather than fully
+    materialized. The collected bytes are then stashed back on the response so
+    every existing caller (`.text`, `.content`, `.json()`) keeps working exactly
+    as it did with a non-streamed fetch.
+    """
+    declared = resp.headers.get("Content-Length")
+    if declared and declared.strip().isdigit() and int(declared) > max_bytes:
+        resp.close()
+        raise ResponseTooLargeError(
+            f"Response declares {declared} bytes (cap {max_bytes})"
+        )
+
+    chunks, total = [], 0
+    try:
+        for chunk in resp.iter_content(64 * 1024):
+            if not chunk:
+                continue
+            total += len(chunk)
+            if total > max_bytes:
+                raise ResponseTooLargeError(
+                    f"Response exceeded {max_bytes} bytes"
+                )
+            if time.monotonic() > deadline:
+                raise ResponseTooLargeError("Response timed out while streaming")
+            chunks.append(chunk)
+    except ResponseTooLargeError:
+        resp.close()
+        raise
+
+    # Hand the buffered bytes back to `requests` so .text/.content/.json() work.
+    resp._content = b"".join(chunks)
+    resp._content_consumed = True
+    return resp
+
+
 def safe_get(url: str, *, headers: Optional[dict] = None,
-             timeout: int = 10, max_redirects: int = 5) -> requests.Response:
+             timeout: int = 10, max_redirects: int = 5,
+             max_bytes: int = MAX_RESPONSE_BYTES) -> requests.Response:
     """`requests.get` that re-validates the SSRF guard on every redirect hop.
 
     `validate_public_url` only checks the URL it's handed, but `requests` follows
@@ -63,22 +132,32 @@ def safe_get(url: str, *, headers: Optional[dict] = None,
     following it, preserving legitimate redirects (http→https, shorteners) while
     closing the bypass.
 
+    The body is streamed and capped at `max_bytes` (see MAX_RESPONSE_BYTES) with
+    a MAX_TOTAL_SECONDS wall-clock ceiling across the whole redirect chain, so a
+    hostile or merely huge URL can't exhaust the instance's memory or pin it open
+    — `requests` would otherwise buffer the entire body before any caller-side
+    length check could run.
+
     Residual: a TOCTOU gap remains between DNS resolution and the socket connect
     (DNS rebinding). Pinning the connection to the validated IP would close it
     fully; tracked as a follow-up.
     """
+    deadline = time.monotonic() + MAX_TOTAL_SECONDS
     current = url
     for _ in range(max_redirects + 1):
+        if time.monotonic() > deadline:
+            raise UnsafeURLError("Redirect chain exceeded the time budget")
         validate_public_url(current)
         resp = requests.get(current, headers=headers, timeout=timeout,
-                             allow_redirects=False)
+                             allow_redirects=False, stream=True)
         if resp.is_redirect or resp.is_permanent_redirect:
             location = resp.headers.get("Location")
             if not location:
-                return resp
+                return _read_capped(resp, max_bytes, deadline)
+            resp.close()  # drop the redirect body unread
             current = requests.compat.urljoin(current, location)
             continue
-        return resp
+        return _read_capped(resp, max_bytes, deadline)
     raise UnsafeURLError("Too many redirects")
 
 

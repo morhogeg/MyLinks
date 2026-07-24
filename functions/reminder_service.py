@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from db import get_db
+from log_safe import mask_uid
 from link_service import is_hebrew
 from models import ReminderStatus
 
@@ -360,7 +361,7 @@ def run_reminder_check() -> dict:
         # in-app for everyone (see below); push is an extra channel on top.
 
         report["reminders_found"] += len(user_links)
-        logger.info(f"Found {len(user_links)} reminders for user {uid}")
+        logger.info(f"Found {len(user_links)} reminders for user {mask_uid(uid)}")
 
         # Deliver at most REMINDER_PER_USER_LIMIT this tick; the rest stay pending
         # and fire on subsequent ticks (a big backlog can't flood one user with

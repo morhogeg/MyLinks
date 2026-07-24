@@ -11,6 +11,7 @@ from typing import Optional
 from google.cloud import firestore
 
 from db import get_db
+from log_safe import mask_uid
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +186,7 @@ def ensure_ingest_token(uid: str) -> str:
 
     token = secrets.token_urlsafe(24)
     user_ref.set({'ingestToken': token}, merge=True)
-    logger.info(f"Generated new ingest token for user {uid}")
+    logger.info(f"Generated new ingest token for user {mask_uid(uid)}")
     return token
 
 
