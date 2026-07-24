@@ -3,7 +3,7 @@
 
 
 import { Link, LinkStatus } from '@/lib/types';
-import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizontal, ExternalLink, Layers, Share2, RotateCcw, AlertTriangle, StickyNote, Lock } from 'lucide-react';
+import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizontal, ExternalLink, Layers, Share2, RotateCcw, AlertTriangle, StickyNote, Lock, ImageOff, Image as ImageIcon } from 'lucide-react';
 import { useState, memo } from 'react';
 import SourceByline from './SourceByline';
 import BrandOrb from './ui/BrandOrb';
@@ -420,6 +420,18 @@ function Card({
                                     className="p-1.5 rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center"
                                 >
                                     <Share2 className="w-3 h-3" />
+                                </button>
+                            )}
+                            {onToggleThumbnail && link.metadata?.thumbnailUrl && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onToggleThumbnail(link);
+                                    }}
+                                    title={link.hideThumbnail ? 'Show image' : 'Hide image'}
+                                    className="p-1.5 rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center"
+                                >
+                                    {link.hideThumbnail ? <ImageIcon className="w-3 h-3" /> : <ImageOff className="w-3 h-3" />}
                                 </button>
                             )}
                             <button

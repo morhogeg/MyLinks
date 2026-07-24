@@ -714,7 +714,15 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-24 (latest) — ASK ENDGAME (rounds 8-10): one poison card,
+- **2026-07-24 (latest) — DESKTOP HOVER TOOLBAR: add Hide/Show image button.**
+  The per-card hide-image toggle lived only in the mobile action sheet
+  (`[@media(hover:none)]`); desktop had no equivalent (flagged as a follow-up).
+  Added it to the desktop hover toolbar in `Card.tsx` (the floating pill of
+  actions) — rendered only when `onToggleThumbnail` is wired AND the card has a
+  `metadata.thumbnailUrl`, placed just before Delete. `ImageOff` (hide) /
+  `Image` (show) icon + "Hide image"/"Show image" tooltip, matching the sheet.
+  Frontend-only; tsc clean.
+- **2026-07-24 — ASK ENDGAME (rounds 8-10): one poison card,
   no model escape, rewrite insufficient → `askExcluded` flag + context
   filter; ORIGINAL schema path CI-verified restored.** Harness v5: model
   sweep — every other Gemini model 404s for this key ("no longer available
