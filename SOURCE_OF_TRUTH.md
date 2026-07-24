@@ -259,6 +259,14 @@ The multi-user auth work is **fully written but not live**:
    `APPCHECK_ENFORCE=true`, `OWNER_EMAIL` in functions env. **Rotate the Gemini
    key** (was pasted in chat 2026-06-23) and the **App Store Connect API `.p8`**
    (pasted in plaintext during CI setup).
+   ⚠️ **`OWNER_EMAIL` is no longer optional (audit S-8, fixed 2026-07-24).** The
+   legacy workspace-claim gate used to read `if not owner_email or email ==
+   owner_email` — i.e. with the var UNSET (its state today) *any* verified
+   account that called `claim_workspace` linked itself to the first `users/` doc
+   lacking `authUids`, which is the owner's whole library. It now fails CLOSED,
+   matching `_require_admin`'s stated policy. Before flipping `REQUIRE_AUTH`:
+   set `OWNER_EMAIL`, and confirm `users/{owner doc}.authUids` already contains
+   your auth uid (if it does, step 1 short-circuits and the gate never runs).
 5a. **[x] Share-doc `ownerUid` PII leak — FIXED via option (a), owner chose it
     2026-07-07.** `shared_cards`/`shared_collections` used to store `ownerUid`
     (= owner phone number) in a world-readable doc. Fix: new Admin-SDK
@@ -341,10 +349,16 @@ The multi-user auth work is **fully written but not live**:
     to Keychain; server copy to a functions-only collection; add rotation.
 13. **[x] Remaining audit mediums — landed 2026-07-09 (AUDIT.md S-2/S-3).**
     Per-uid+IP rate limits on the paid endpoints and `ask_brain` history/input
-    caps shipped. Phone-log masking (H-4 residue) is **moot**: `link_service.py`'s
-    phone lookup and `whatsapp_handler.py` were deleted with the WhatsApp removal
-    (AUDIT.md ch. 4). Residual: fail-closed-on-Firestore-outage stays an accepted
-    availability trade-off (AUDIT.md S-6).
+    caps shipped. ~~Phone-log masking (H-4 residue) is **moot**~~ — **that
+    dismissal was WRONG and is now FIXED (2026-07-24, `/security` pass).**
+    Deleting `whatsapp_handler.py` removed the *phone-lookup* logs, but the uid
+    IS the phone number, and 13 raw-`{uid}` log lines survived across
+    `digest_service.py` / `reminder_service.py` / `graph_service.py` /
+    `link_service.py` / `search.py` (which also logged the raw search query).
+    All masked via the new dependency-free `functions/log_safe.py`; an AST
+    regression scan now fails the suite on any reintroduced raw `{uid}`.
+    Residual: fail-closed-on-Firestore-outage stays an accepted availability
+    trade-off (AUDIT.md S-6).
 14. **[x] README ↔ reality (M-P5/T12) — rewritten 2026-07-09 (AUDIT.md D-17).**
     Dropped the false Graph *Visualization* / Insights Dashboard / "Works Offline" /
     Table-view / PWA claims; README now describes the real product (recall engine,
@@ -719,7 +733,80 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-24 (latest) — NEW `/security` SKILL: code-level-only hardening pass
+- **2026-07-24 (latest) — FIRST `/security` PASS ON `functions/`: 3 fixes
+  (S-7 response caps, S-8 claim gate fails closed, H-4 residue log masking),
+  +30 regression tests, 389→421 green.** First run of the new skill, target
+  `functions/`, lenses prioritised: endpoint auth → tenant isolation → SSRF.
+  Commits `733199b` (S-7), `b20f250` (S-8), `1a1b6ca` (H-4).
+  **FIXED — (1) S-7, exploitable today, no credential needed.**
+  `scraper.safe_get` (scraper.py:73) called `requests.get` without
+  `stream=True`, so the FULL body was buffered before any caller-side length
+  check could run — `main._fetch_post_images:618` tests `len(resp.content)`
+  *after* the allocation. Cloud Functions default to 256 MiB and `get_article`
+  (main.py:1988, anonymous: App Check soft + 120/hr per IP) takes an arbitrary
+  URL, so one link to a large public file OOMed the instance. `timeout` is also
+  per-socket-op, so a drip-feed server held the function open, multiplied per
+  redirect hop. Now streams with `MAX_RESPONSE_BYTES` (10 MB) + a
+  `MAX_TOTAL_SECONDS` (45s) deadline spanning the whole chain; oversized
+  `Content-Length` rejected pre-read; redirect bodies closed unread; buffered
+  bytes handed back so `.text`/`.content`/`.json()` are unchanged for all
+  callers. `ResponseTooLargeError` subclasses `UnsafeURLError` so the existing
+  scrape handlers degrade to the honest "couldn't read this" card, and
+  `get_article` maps it to 422 so an anonymous caller can't mint durable
+  `server_errors` records on demand. **(2) S-8, would have detonated AT the
+  cutover.** `_claim_workspace_logic` gated the legacy claim on `if not
+  owner_email or email == owner_email` — with `OWNER_EMAIL` unset (its state in
+  prod) the condition was vacuously true, so any verified account reaching
+  `claim_workspace`/`claim_workspace_http` linked itself to the first `users/`
+  doc without `authUids` = the owner's entire phone-keyed library. Exactly
+  inverts `_require_admin`'s stated fail-closed policy one screen earlier. New
+  `_owner_email_matches` denies on unset/blank `OWNER_EMAIL`, trims +
+  case-folds the comparison, and refuses `email_verified: false`; an ABSENT
+  `email_verified` still passes (some Apple ID tokens omit it) so the owner's
+  own claim can't brick. Both transports now forward full token claims. **(3)
+  H-4 residue** — §4 item 13 had recorded phone-log masking as "moot" after the
+  WhatsApp removal; wrong, because the uid IS the phone number. 13 raw `{uid}`
+  log lines survived in `digest_service.py` (×8), `reminder_service.py:363`,
+  `graph_service.py:176`, `link_service.py:188`, `search.py:805/841` —
+  `search.py:805` also logged the user's raw query text (now length only).
+  Masker extracted to a new dependency-free `functions/log_safe.py` (no import
+  cycle); `main._mask_uid` kept as an alias. The load-bearing test is an AST
+  scan over all 8 uid-holding modules that fails on any reintroduced raw
+  `{uid}` — verified non-vacuous against the pre-fix file (flags 8).
+  **INVESTIGATED AND DISMISSED (do not re-find these):** *client-forgeable
+  `uid` pre-cutover* — documented §3 posture, owner step, not a finding.
+  *`share_ingest` accepts a client `cardId` (main.py:2356 →
+  `process_link_background:2981`)* — the write is `users/{uid}/links/{cardId}`
+  with uid from `_authed_uid`/the ingest token, so post-cutover it can only
+  overwrite the CALLER'S OWN card; Firestore has no `..` traversal, so no
+  tenant escape. *Collection-group queries* (`reminder_service.py:262/491`,
+  `main.py:3260`) — scheduler/admin only, and each derives the uid from the doc
+  PATH, never from client input. *Prompt injection via scraped content*
+  (`ai_service.py:707`, weak `Content to analyze:` delimiter) — real injection
+  surface but no reachable impact: no tool-calling anywhere, RAG context is
+  built per-uid, so the ceiling is poisoning the user's own card text. Killed
+  per the skill rather than reported. *`AuthProvider.tsx:222/464` legacy
+  `limit(1)` first-doc reads*, which the locked ruleset denies — both are
+  correctly flag-gated (`if (REQUIRE_AUTH || !native) return;` / `if
+  (!REQUIRE_AUTH)`), so the cutover stays a config change. *XSS on `/s`,`/c`* —
+  `share_service.py` escapes every interpolation first and only then applies a
+  fixed markdown grammar; link hrefs are `https?`-anchored by regex. *CORS* —
+  `_resolve_origin` echoes only allowlisted origins, never reflects. *Staged
+  ruleset* — read as spec; every collection the code writes has a matching
+  rule, no catch-all match, so unlisted paths default-deny. No rules change was
+  needed, so `rules.test.mjs` is untouched. **Verified:** `py_compile` clean;
+  pytest **421 passed, 4 failed** — the 4 are exactly the pre-existing
+  `test_embed_trigger_backstop.py` mock failures tracked in §4 item 11b
+  (identical baseline before my changes: 389 passed / same 4). `tsc` not run —
+  `web/node_modules` is absent in this sandbox and the diff touches ZERO
+  frontend files. **Owner actions handed back:** set `OWNER_EMAIL` (now
+  REQUIRED, see §4 task 5) + confirm the owner doc's `authUids`; set
+  `ADMIN_TOKEN` + `APPCHECK_ENFORCE=true`; rotate the Gemini key and the ASC
+  `.p8`; the §4 task-2 cutover (flags → rules deploy) and the owner-machine
+  `firestore-rules-test` run; decide `get_article` gating (AUDIT.md S-4/M-10 —
+  S-7 bounds each call to 10 MB/45 s, which makes "keep anonymous" defensible,
+  but it stays an owner call).
+- **2026-07-24 — NEW `/security` SKILL: code-level-only hardening pass
   (`.claude/skills/security/SKILL.md`).** Owner wanted a dedicated session type
   for security that works *only* on what's in the repo, because the highest
   levers (§4 task 2 cutover, task 5 key hygiene) are owner console steps and a
