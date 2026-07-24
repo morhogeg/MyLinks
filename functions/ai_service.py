@@ -54,6 +54,42 @@ GEMINI_ASK_MODEL = "gemini-3.1-flash"
 EMBEDDING_MODEL = "models/gemini-embedding-001"
 EMBEDDING_DIMENSIONS = 768
 
+# Safety thresholds for the ASK (RAG) calls only. Ask answers questions about
+# the user's OWN saved content, so the configurable harm categories are set to
+# BLOCK_NONE — Gemini's safety filter false-positives on innocuous non-English
+# (Hebrew) text, and a user must not be blocked from querying their own library.
+# NOTE: this does NOT disable the non-configurable filters (e.g. the
+# PROHIBITED_CONTENT prompt block seen in prod 2026-07-24) — those are handled
+# by the headline-only context retry in the RAG paths. Analysis/vision/synthesis
+# deliberately keep the SDK defaults.
+_ASK_SAFETY_SETTINGS = [
+    {"category": c, "threshold": "BLOCK_NONE"}
+    for c in (
+        "HARM_CATEGORY_HARASSMENT",
+        "HARM_CATEGORY_HATE_SPEECH",
+        "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        "HARM_CATEGORY_DANGEROUS_CONTENT",
+    )
+]
+
+# The card fields that survive the headline-only retry after a PROMPT block.
+# Deliberately the Gemini-AUTHORED / structural fields (titles, summaries,
+# meta) — the fields dropped (recipe ingredients/steps, detailedSummary,
+# videoHighlights, user notes, takeaway) carry raw scraped or user-typed text,
+# which is what false-positives the prompt filter.
+_HEADLINE_CARD_FIELDS = (
+    "id", "title", "summary", "category", "tags", "sourceName", "url", "createdAt")
+
+
+def _headline_cards(cards: list) -> list:
+    """Strip cards down to their headline fields for the reduced-context retry
+    (see EmptyGenerationError.prompt_blocked). Pure; never raises on odd shapes."""
+    out = []
+    for c in cards or []:
+        if isinstance(c, dict):
+            out.append({k: c.get(k) for k in _HEADLINE_CARD_FIELDS if c.get(k) is not None})
+    return out
+
 
 class AnalysisError(Exception):
     """Raised when AI analysis genuinely fails so callers can surface a real
@@ -64,12 +100,35 @@ class EmptyGenerationError(AnalysisError):
     """A Gemini call SUCCEEDED at the transport level but returned no usable
     text — the model produced no answer (blocked by a safety/RECITATION filter,
     hit the token ceiling, or degenerated). Distinct from a transport failure so
-    callers can react to it specifically: the RAG answer path retries an empty
-    generation in a paraphrase-safe framing, because the biggest trigger is the
-    prompt asking the model to reproduce a source's steps/ingredients verbatim,
-    which Gemini's RECITATION filter blocks the same way on EVERY model tier (so
-    the analysis-model fallback can't rescue it). Subclasses AnalysisError so
-    every existing `except AnalysisError` handler still catches it."""
+    callers can react to it specifically, and it carries WHERE the block hit:
+
+    - ``prompt_blocked=True`` → the INPUT was rejected (prompt_feedback.
+      block_reason, e.g. PROHIBITED_CONTENT — confirmed in prod 2026-07-24 on
+      recipe asks: the raw scraped Hebrew ingredient/step text of retrieved
+      recipe cards false-positives Gemini's non-configurable prompt filter).
+      Retrying with a different output instruction or model tier CANNOT help
+      (same input, same filter); the RAG paths instead retry with headline-only
+      context (Gemini-authored titles/summaries, which are clean).
+    - ``prompt_blocked=False`` → the OUTPUT came back empty (finish_reason,
+      e.g. RECITATION when the prompt demands verbatim reproduction); the RAG
+      paths retry once in a paraphrase-safe framing.
+
+    Subclasses AnalysisError so every existing `except AnalysisError` handler
+    still catches it."""
+
+    def __init__(self, message: str, prompt_blocked: bool = False):
+        super().__init__(message)
+        self.prompt_blocked = prompt_blocked
+
+
+def _prompt_blocked(response) -> bool:
+    """True when Gemini rejected the INPUT (prompt_feedback.block_reason set) —
+    as opposed to producing an empty candidate. Never raises."""
+    try:
+        fb = getattr(response, "prompt_feedback", None)
+        return bool(fb and getattr(fb, "block_reason", None))
+    except Exception:
+        return False
 
 
 def _gen_failure_reason(response) -> str:
@@ -591,9 +650,11 @@ class GeminiService:
                 if not text:
                     # Name WHY it was empty (SAFETY / RECITATION / MAX_TOKENS)
                     # so the failure is diagnosable from the server_errors trail
-                    # instead of an opaque "empty response".
+                    # instead of an opaque "empty response" — and flag whether
+                    # the INPUT was rejected, which changes the caller's retry.
                     raise EmptyGenerationError(
-                        f"Empty response from Gemini ({_gen_failure_reason(response)})")
+                        f"Empty response from Gemini ({_gen_failure_reason(response)})",
+                        prompt_blocked=_prompt_blocked(response))
 
                 data = json.loads(text)
                 # Defensive unwrapping kept as a safety net.
@@ -776,15 +837,26 @@ If the image is an article, extract the headline and body."""
         degrade Ask to the proven tier, not hard-fail every question with an
         opaque 500. Raises AnalysisError only when BOTH models fail.
         """
+        cfg = {"response_schema": BrainAnswer, "safety_settings": _ASK_SAFETY_SETTINGS}
         try:
-            return self._generate_json([prompt], what,
-                                       config_extra={"response_schema": BrainAnswer},
+            return self._generate_json([prompt], what, config_extra=cfg,
                                        model=GEMINI_ASK_MODEL, attempts=attempts)
+        except EmptyGenerationError as e:
+            if e.prompt_blocked:
+                # The INPUT was rejected — the fallback model runs the same
+                # filter on the same input, so don't burn a call on it. Let the
+                # caller retry with reduced context instead.
+                raise
+            logger.error("Ask model %s failed for %s — falling back to %s: %s",
+                         GEMINI_ASK_MODEL, what, GEMINI_ANALYSIS_MODEL, e)
+            return self._generate_json([prompt], f"{what} (fallback model)",
+                                       config_extra=cfg,
+                                       model=GEMINI_ANALYSIS_MODEL, attempts=attempts)
         except AnalysisError as e:
             logger.error("Ask model %s failed for %s — falling back to %s: %s",
                          GEMINI_ASK_MODEL, what, GEMINI_ANALYSIS_MODEL, e)
             return self._generate_json([prompt], f"{what} (fallback model)",
-                                       config_extra={"response_schema": BrainAnswer},
+                                       config_extra=cfg,
                                        model=GEMINI_ANALYSIS_MODEL, attempts=attempts)
 
     def answer_from_context(self, question: str, cards: list, history: list = None,
@@ -820,18 +892,36 @@ If the image is an article, extract the headline and body."""
                 "ungrounded": False,
             }
 
+        # `context_cards` is whatever card rendering the model ACTUALLY accepted —
+        # downgraded to headline-only if the full deep-content prompt is blocked —
+        # so the citation re-ask below never re-sends a prompt Gemini rejected.
+        context_cards = cards
         base_prompt = _build_rag_prompt(question, cards, history, excluded_titles)
         try:
             data = self._answer_json(base_prompt + _CITED_JSON_SUFFIX, "answer", attempts)
         except EmptyGenerationError as e:
-            # The verbatim-oriented answer produced NO text on every model tier —
-            # the RECITATION/safety signature. Retry once asking the model to
-            # paraphrase instead of reproducing source blocks; this clears the
-            # filter and still answers the question. If THIS also comes back
-            # empty, let it propagate to the caller's sanitized error.
-            logger.warning("ask answer empty (%s) — retrying paraphrase-safe", e)
-            data = self._answer_json(
-                base_prompt + _CITED_JSON_PARAPHRASE_SUFFIX, "answer (paraphrase retry)", attempts)
+            if e.prompt_blocked:
+                # The INPUT was rejected (e.g. PROHIBITED_CONTENT — raw scraped
+                # card text false-positives Gemini's non-configurable prompt
+                # filter; confirmed in prod on Hebrew recipe cards 2026-07-24).
+                # A different output instruction or model tier can't help; what
+                # helps is removing the offending text. Retry with headline-only
+                # cards — Gemini-authored titles/summaries — so the user still
+                # gets a grounded (if shallower) answer instead of an error.
+                logger.warning("ask prompt blocked (%s) — retrying headline-only context", e)
+                context_cards = _headline_cards(cards)
+                headline_prompt = _build_rag_prompt(
+                    question, context_cards, history, excluded_titles)
+                data = self._answer_json(
+                    headline_prompt + _CITED_JSON_SUFFIX, "answer (reduced context)", attempts)
+            else:
+                # The OUTPUT came back empty on every tier — the RECITATION
+                # signature. Retry once asking the model to paraphrase instead
+                # of reproducing source blocks. If THIS also comes back empty,
+                # let it propagate to the caller's sanitized error.
+                logger.warning("ask answer empty (%s) — retrying paraphrase-safe", e)
+                data = self._answer_json(
+                    base_prompt + _CITED_JSON_PARAPHRASE_SUFFIX, "answer (paraphrase retry)", attempts)
         answer = data.get("answer") or ""
         cited = _valid_cited_ids(data.get("citedIds"), cards)
         if cited:
@@ -840,7 +930,7 @@ If the image is an article, extract the headline and body."""
         # No valid citation on the first pass. Re-ask ONCE with a stricter prompt
         # that demands the model name the ids it relied on. A transient failure
         # here must not sink the request — fall through to the ungrounded return.
-        retry_prompt = _build_rag_prompt(question, cards, history, excluded_titles) + _CITED_JSON_STRICT_SUFFIX
+        retry_prompt = _build_rag_prompt(question, context_cards, history, excluded_titles) + _CITED_JSON_STRICT_SUFFIX
         try:
             retry = self._answer_json(retry_prompt, "answer (citation retry)", attempts)
             retry_answer = retry.get("answer") or ""
@@ -916,6 +1006,15 @@ If the image is an article, extract the headline and body."""
             "sources — summarize and rephrase them, quoting at most short phrases, "
             "while still covering the substance the user asked for. "
         ) + marker_instruction
+        # Headline-only variant — the last resort, for when the INPUT itself is
+        # blocked (prompt_feedback.block_reason, e.g. PROHIBITED_CONTENT: raw
+        # scraped card text false-positives Gemini's non-configurable prompt
+        # filter — confirmed in prod on Hebrew recipe cards 2026-07-24). Rewriting
+        # the output instruction can't clear an input block; dropping the raw deep
+        # content (recipe blocks, detailedSummary, user notes) can, because the
+        # surviving titles/summaries are Gemini-authored and clean.
+        headline_prompt = _build_rag_prompt(
+            question, _headline_cards(cards), history, excluded_titles) + marker_instruction
 
         # Tail buffer: hold back the trailing characters that could be the start
         # of the "[[CITED: ...]]" marker so it is never streamed as visible text.
@@ -938,14 +1037,16 @@ If the image is an article, extract the headline and body."""
         # Ordered attempts, each tried ONLY while nothing has been yielded to the
         # consumer yet (text held in the tail buffer is fine; it was never
         # surfaced). After the first emitted token a restart would duplicate
-        # prose, so mid-stream failures still raise. Mirrors _answer_json: the ask
-        # tier is the ONLY user of GEMINI_ASK_MODEL, so a failure there retries on
-        # the production-proven analysis model; a further EMPTY stream (the
-        # RECITATION signature) gets one paraphrase-safe retry before giving up.
+        # prose, so mid-stream failures still raise. Mirrors the buffered path:
+        # ask tier → proven analysis tier (transport failures), then a
+        # paraphrase-safe retry (RECITATION/output blocks), then headline-only
+        # context (input blocks — a blocked PROMPT fast-fails with an empty
+        # stream, so walking the list costs little latency).
         attempts = [
             (GEMINI_ASK_MODEL, verbatim_prompt),
             (GEMINI_ANALYSIS_MODEL, verbatim_prompt),
             (GEMINI_ANALYSIS_MODEL, paraphrase_prompt),
+            (GEMINI_ANALYSIS_MODEL, headline_prompt),
         ]
         full_text = ""
         for attempt_idx, (attempt_model, attempt_prompt) in enumerate(attempts):
@@ -961,9 +1062,12 @@ If the image is an article, extract the headline and body."""
                     model=attempt_model,
                     contents=[attempt_prompt],
                     # Match the non-streaming answer path: this is a grounded,
-                    # factual answer, so keep temperature low for stability. Without
-                    # this the stream would silently run at the ~1.0 default.
-                    config={"temperature": 0.2},
+                    # factual answer, so keep temperature low for stability
+                    # (without this the stream would silently run at the ~1.0
+                    # default), and relax the configurable safety thresholds —
+                    # the user is querying their OWN saved content.
+                    config={"temperature": 0.2,
+                            "safety_settings": _ASK_SAFETY_SETTINGS},
                 )
                 for chunk in stream:
                     piece = getattr(chunk, "text", None)
