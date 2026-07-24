@@ -1,52 +1,81 @@
-"""Ask debug harness v2 — end-to-end against PRODUCTION, from CI.
+"""Ask debug harness v3 — verify the plain-mode ladder on a retrieval-like
+context.
 
-v1 (probe-only) proved: the ask model id 404'd, and the schema-mode call is
-what false-positives PROHIBITED_CONTENT on content that passes plain. The
-deployed fix (plain-mode rescue) still fails the real pasta ask, so v2 closes
-the two reproduction gaps:
- 1. calls the REAL deployed ask_brain endpoint (CI has egress; a cloud session
-    doesn't) so the true retrieval context + ladder run, then reads the fresh
-    server_errors records to see exactly which stage died;
- 2. runs mode experiments with FULL generation (not 1-token probes): a blocked
-    CANDIDATE (finish_reason on output) is invisible to input-only probes.
+v2 findings: E2E is 401 (App Check enforced); newest-25 context passes BOTH
+modes — the failing context is the RETRIEVED one (vector + keyword matches,
+including cards older than the newest 25). v3 reconstructs that context the
+way ask_brain retrieval does (vector top-12 + keyword scan + recency) and
+tests all four ladder stages against it:
+  schema full / plain full / plain paraphrase / plain headline.
 
-Public repo ⇒ stdout prints only structural findings + our own static stage
-markers. Full detail goes to the auth-gated artifact.
+Public repo ⇒ stdout prints only structural outcomes. Full detail (incl. the
+retrieved card list) goes to the auth-gated artifact.
 """
 
 import json
 import os
 import re
 import sys
-import time
-import urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from google import genai  # noqa: E402
 from google.cloud import firestore  # noqa: E402
+from google.cloud.firestore_v1.vector import Vector  # noqa: E402
+from google.cloud.firestore_v1.base_vector_query import DistanceMeasure  # noqa: E402
 
 from ai_service import (  # noqa: E402
     _build_rag_prompt,
     _CITED_JSON_SUFFIX,
+    _CITED_JSON_PARAPHRASE_SUFFIX,
     GEMINI_ANALYSIS_MODEL,
     _ASK_SAFETY_SETTINGS,
+    _headline_cards,
+    EMBEDDING_MODEL,
 )
 from models import BrainAnswer  # noqa: E402
 
 PROJECT = "secondbrain-app-94da2"
-ASK_URL = f"https://us-central1-{PROJECT}.cloudfunctions.net/ask_brain"
 QUESTION = "מתכון לפסטה"
+KEYWORDS = ("פסטה", "pasta", "מתכון", "recipe", "שווארמה")
 
 client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 report = {"question": QUESTION}
 
 
-def gen_outcome(model, prompt, config):
-    """One full generation; returns structural outcome only."""
+def slim(doc_id, d):
+    out = {
+        "id": doc_id,
+        "title": str(d.get("title", "Untitled"))[:300],
+        "summary": str(d.get("summary", ""))[:1500],
+        "category": str(d.get("category", "General"))[:60],
+        "tags": [str(t)[:60] for t in (d.get("tags") or [])[:15]],
+        "sourceName": d.get("sourceName"),
+        "url": d.get("url"),
+        "userNote": str(d.get("userNote") or "")[:800],
+    }
+    det = (d.get("detailedSummary") or "").strip()
+    if det:
+        out["detailedSummary"] = det[:3500]
+    tk = (d.get("actionableTakeaway") or "").strip()
+    if tk:
+        out["actionableTakeaway"] = tk[:600]
+    rec = d.get("recipe")
+    if isinstance(rec, dict) and (rec.get("ingredients") or rec.get("instructions")):
+        out["recipe"] = {
+            "ingredients": [str(x)[:200] for x in (rec.get("ingredients") or [])[:40]],
+            "instructions": [str(x)[:500] for x in (rec.get("instructions") or [])[:40]],
+        }
+    vh = d.get("videoHighlights")
+    if isinstance(vh, list) and vh:
+        out["videoHighlights"] = [str(x)[:200] for x in vh[:8]]
+    return out
+
+
+def gen_outcome(prompt, config):
     try:
-        resp = client.models.generate_content(model=model, contents=[prompt],
-                                              config=config)
+        resp = client.models.generate_content(
+            model=GEMINI_ANALYSIS_MODEL, contents=[prompt], config=config)
         fb = getattr(resp, "prompt_feedback", None)
         block = getattr(fb, "block_reason", None) if fb else None
         cands = getattr(resp, "candidates", None) or []
@@ -55,124 +84,84 @@ def gen_outcome(model, prompt, config):
             text = resp.text or ""
         except Exception:
             text = ""
-        return {"block_reason": str(block) if block else None,
-                "finish_reason": str(finish) if finish else None,
-                "text_len": len(text), "text": text[:2000]}
+        return {"block": str(block) if block else None,
+                "finish": str(finish) if finish else None,
+                "len": len(text), "text": text[:1500]}
     except Exception as e:
-        return {"error": f"{type(e).__name__}: {str(e)[:300]}"}
-
-
-def stage_markers(msg: str) -> list:
-    """Extract only OUR static markers from an error message — safe to print."""
-    out = []
-    if "in plain mode" in msg:
-        out.append("plain-mode")
-    for m in re.findall(r"\[stage: [^\]]{0,120}\]", msg):
-        out.append(m)
-    if "block_reason" in msg:
-        out.append("has-block_reason")
-    if "finish_reason" in msg:
-        out.append("has-finish_reason")
-    if "404" in msg:
-        out.append("has-404")
-    return out
-
-
-def fetch_server_errors(db, n=25):
-    return [{**snap.to_dict(), "_doc": snap.id} for snap in
-            db.collection("server_errors").order_by(
-                "timestamp", direction=firestore.Query.DESCENDING).limit(n).stream()]
+        return {"error": f"{type(e).__name__}: {str(e)[:200]}"}
 
 
 def main():
     db = firestore.Client(project=PROJECT)
-
-    # 1. Existing trail: which ladder stages have been dying?
-    errs = fetch_server_errors(db)
-    report["server_errors_before"] = errs
-    print(f"server_errors: {len(errs)} records")
-    for e in errs[:12]:
-        print(f"  {e.get('timestamp', '')[:19]} {e.get('fn')} {e.get('type')} "
-              f"markers={stage_markers(str(e.get('error', '')))}")
-
+    errs = [{**s.to_dict(), "_doc": s.id} for s in
+            db.collection("server_errors").order_by(
+                "timestamp", direction=firestore.Query.DESCENDING).limit(6).stream()]
+    report["server_errors"] = errs
     uid = next((e.get("uid") for e in errs
                 if str(e.get("fn", "")).startswith("ask_brain") and e.get("uid")), None)
     if not uid:
         print("FATAL: no uid")
-        json.dump(report, open("ask-debug-report.json", "w"),
-                  ensure_ascii=False, indent=1, default=str)
         return
     report["uid"] = uid
+    links = db.collection("users").document(uid).collection("links")
 
-    # 2. END-TO-END: the real deployed endpoint, real retrieval, real ladder.
-    body = json.dumps({"uid": uid, "question": QUESTION}).encode()
-    req = urllib.request.Request(
-        ASK_URL, data=body, headers={"Content-Type": "application/json"},
-        method="POST")
+    # Vector half of retrieval.
+    vec_cards = []
     try:
-        with urllib.request.urlopen(req, timeout=120) as r:
-            status, payload = r.status, r.read().decode()
-    except urllib.error.HTTPError as e:
-        status, payload = e.code, e.read().decode()
+        emb = client.models.embed_content(
+            model=EMBEDDING_MODEL, contents=[QUESTION],
+            config={"task_type": "RETRIEVAL_QUERY", "output_dimensionality": 768})
+        qv = list(emb.embeddings[0].values)
+        vq = links.find_nearest(
+            vector_field="embedding_vector", query_vector=Vector(qv),
+            distance_measure=DistanceMeasure.COSINE, limit=12)
+        vec_cards = [slim(s.id, s.to_dict() or {}) for s in vq.stream()]
+        print(f"vector retrieval: {len(vec_cards)} cards")
     except Exception as e:
-        status, payload = -1, f"{type(e).__name__}: {e}"
-    report["e2e"] = {"status": status, "body": payload[:4000]}
-    try:
-        pj = json.loads(payload)
-    except Exception:
-        pj = {}
-    if status == 200 and pj.get("success"):
-        print(f"E2E ask: 200 success — answer_len={len(pj.get('answer') or '')} "
-              f"cited={len(pj.get('citedIds') or [])} "
-              f"ungrounded={pj.get('ungrounded')} "
-              f"dropped={pj.get('droppedCardIds')}")
-    else:
-        print(f"E2E ask: status={status} markers={stage_markers(payload)}")
+        print(f"vector retrieval failed: {type(e).__name__}: {str(e)[:150]}")
 
-    # 3. Fresh trail records created by the E2E call.
-    time.sleep(3)
-    after = fetch_server_errors(db, 5)
-    report["server_errors_after"] = after
-    for e in after[:5]:
-        print(f"  post-e2e {e.get('fn')} {e.get('type')} "
-              f"markers={stage_markers(str(e.get('error', '')))}")
+    # Keyword + recency halves.
+    recent = [(s.id, s.to_dict() or {}) for s in links.order_by(
+        "createdAt", direction=firestore.Query.DESCENDING).limit(150).stream()]
+    kw_cards = [slim(i, d) for i, d in recent
+                if any(k in (str(d.get("title", "")) + " " + str(d.get("summary", ""))).lower()
+                       for k in KEYWORDS)]
+    rec_cards = [slim(i, d) for i, d in recent[:5]]
+    print(f"keyword matches: {len(kw_cards)}, recency: {len(rec_cards)}")
 
-    # 4. Mode experiments on the newest-25 context (FULL generation, not
-    #    1-token probes — a killed CANDIDATE is invisible to input probes).
-    docs = list(db.collection("users").document(uid).collection("links")
-                .order_by("createdAt", direction=firestore.Query.DESCENDING)
-                .limit(25).stream())
-    cards = []
-    for s in docs:
-        d = s.to_dict() or {}
-        c = {"id": s.id, "title": str(d.get("title", ""))[:300],
-             "summary": str(d.get("summary", ""))[:1500],
-             "category": d.get("category"), "tags": d.get("tags"),
-             "sourceName": d.get("sourceName"), "url": d.get("url")}
-        det = (d.get("detailedSummary") or "").strip()
-        if det:
-            c["detailedSummary"] = det[:3500]
-        rec = d.get("recipe")
-        if isinstance(rec, dict):
-            c["recipe"] = rec
-        cards.append(c)
-    prompt = _build_rag_prompt(QUESTION, cards[:20], None, None) + _CITED_JSON_SUFFIX
+    seen, ctx = set(), []
+    for c in vec_cards + kw_cards + rec_cards:
+        if c["id"] not in seen:
+            seen.add(c["id"])
+            ctx.append(c)
+    ctx = ctx[:20]
+    report["context_ids"] = [(c["id"], c["title"]) for c in ctx]
+    print(f"reconstructed context: {len(ctx)} cards")
 
+    base = _build_rag_prompt(QUESTION, ctx, None, None)
+    headline = _build_rag_prompt(QUESTION, _headline_cards(ctx), None, None)
     schema_cfg = {"response_mime_type": "application/json",
                   "response_schema": BrainAnswer, "temperature": 0.2,
                   "safety_settings": _ASK_SAFETY_SETTINGS}
     plain_cfg = {"temperature": 0.2, "safety_settings": _ASK_SAFETY_SETTINGS}
 
-    for name, cfg in (("schema_mode_full", schema_cfg), ("plain_mode_full", plain_cfg)):
-        out = gen_outcome(GEMINI_ANALYSIS_MODEL, prompt, cfg)
+    stages = [
+        ("schema_full", base + _CITED_JSON_SUFFIX, schema_cfg),
+        ("plain_full", base + _CITED_JSON_SUFFIX, plain_cfg),
+        ("plain_paraphrase", base + _CITED_JSON_PARAPHRASE_SUFFIX, plain_cfg),
+        ("plain_headline", headline + _CITED_JSON_SUFFIX, plain_cfg),
+    ]
+    for name, prompt, cfg in stages:
+        out = gen_outcome(prompt, cfg)
         report[name] = out
-        print(f"{name}: block={out.get('block_reason')} finish={out.get('finish_reason')} "
-              f"text_len={out.get('text_len')} err={out.get('error')}")
+        print(f"{name}: block={out.get('block')} finish={out.get('finish')} "
+              f"len={out.get('len')} err={out.get('error')}")
 
     json.dump(report, open("ask-debug-report.json", "w"),
               ensure_ascii=False, indent=1, default=str)
-    print("done — full detail in artifact")
+    print("done")
 
 
 if __name__ == "__main__":
     main()
+""" trailing marker """  # noqa
