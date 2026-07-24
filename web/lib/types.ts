@@ -18,8 +18,9 @@ export interface LinkMetadata {
   videoId?: string;
   watchUrl?: string;
   thumbnailUrl?: string;
-  // width/height of the stored cover thumbnail — lets the card banner size to the
-  // image (whole image for most shapes; extreme portraits clamp + anchor top).
+  // width/height of the stored cover thumbnail. Currently unused for layout —
+  // every card banner renders at the fixed YouTube-style height (top-anchored
+  // crop) for a uniform feed. Kept in case a future layout wants the ratio.
   thumbnailAspect?: number;
   // True when thumbnailUrl is a VIDEO poster frame (X / Instagram reel / LinkedIn
   // / Facebook video). These render at the fixed YouTube-style banner height +

@@ -249,17 +249,12 @@ function Card({
                     )}
                 </div>
             )}
-            {/* Social-post cover (X / Instagram PHOTO posts): the same image we read
-                for the summary. When we know the image's aspect (new saves) the banner
-                sizes to it — capped so a tall portrait can't dominate — so most images
-                show whole; older cards fall back to a fixed short banner. Either way the
-                crop anchors to the top, where social posts put the headline/subject.
-                Video posters are excluded here — they use the fixed banner above. */}
+            {/* Social-post cover (X / Instagram PHOTO posts): same fixed banner size
+                as the video/YouTube thumbnail above, so every card reads uniformly.
+                The crop anchors to the top, where social posts put the headline /
+                subject. Video posters are excluded here — they use the banner above. */}
             {!link.hideThumbnail && link.sourceType !== 'youtube' && !link.metadata?.thumbnailIsVideo && link.metadata?.thumbnailUrl && (
-                <div
-                    className={`relative w-full bg-black/40 overflow-hidden ${link.metadata.thumbnailAspect ? '' : 'h-28 sm:h-32'}`}
-                    style={link.metadata.thumbnailAspect ? { aspectRatio: String(link.metadata.thumbnailAspect), maxHeight: '20rem', minHeight: '7rem' } : undefined}
-                >
+                <div className="relative w-full h-28 sm:h-32 bg-black/40 overflow-hidden">
                     <img
                         src={link.metadata.thumbnailUrl}
                         alt=""

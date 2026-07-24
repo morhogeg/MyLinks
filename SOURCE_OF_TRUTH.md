@@ -714,7 +714,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-24 (latest) — ASK ROUND 5: GROUND TRUTH VIA CI PROBES → the real
+- **2026-07-24 (latest) — UNIFORM CARD THUMBNAIL HEIGHT (drop adaptive sizing).**
+  Owner: X/Instagram PHOTO covers were rendering as tall aspect-ratio banners
+  (a portrait infographic filled half the card) while video/YouTube posters used
+  the compact fixed banner — inconsistent. Frontend-only: the photo-cover banner
+  in `Card.tsx` and `SwipeDeck.tsx` now uses the SAME fixed `h-28 sm:h-32` as the
+  video banner (removed the `aspectRatio`/`maxHeight` sizing), still `object-cover
+  object-top` so tall images crop from the top (headline/subject). Every feed +
+  review card banner is now one height. `metadata.thumbnailAspect` is still written
+  by the backend but no longer used for layout (comment updated; kept for possible
+  future use). The open card (`LinkDetailModal`) still shows the full image
+  (`object-contain`) — tap-in to see the whole thing. tsc clean; frontend-only, no
+  functions deploy.
+- **2026-07-24 — ASK ROUND 5: GROUND TRUTH VIA CI PROBES → the real
   causes were (a) a 404 ask-model id and (b) a STRUCTURED-OUTPUT-mode filter
   false positive.** Blind-fix rounds stopped; built a temporary **`ask-debug`
   workflow** (push `trigger/ask-debug`; runner has GEMINI_API_KEY +
