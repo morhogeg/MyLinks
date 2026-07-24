@@ -146,9 +146,24 @@ export function suggestNewCollections(
 }
 
 /**
+ * A suggestion needs REAL topical overlap, not incidental word-sharing. The old
+ * raw term-occurrence sum let two members sharing one generic term ("sports")
+ * trip a suggestion — a Messi card surfacing "Politics". This score requires it.
+ */
+const RANK_THRESHOLD = 1.0;
+
+/**
  * Score existing collections by affinity with a card (shared tags/concepts/
  * category with the collection's members). Returns the best non-member matches,
  * strongest first — used to surface "Suggested" targets when filing a card.
+ *
+ * Tightened so weak matches return nothing (an empty Suggested section is
+ * correct). A collection qualifies only if the card shares ≥2 DISTINCT terms with
+ * its members OR the card matches the collection's own name; each shared term is
+ * weighted by how RARE it is across the loaded library (idf), so ubiquitous
+ * "sports"-tier terms can't carry a match alone; and the score is normalized by
+ * the fraction of members that share the term, so a big collection can't win on
+ * bulk. Single pass over `links`, useMemo-friendly.
  */
 export function rankCollectionsForLink(
     link: Link,
@@ -160,14 +175,27 @@ export function rankCollectionsForLink(
     if (cardTerms.size === 0 || collections.length === 0) return [];
     const memberOf = new Set(link.collectionIds ?? []);
 
-    // Aggregate each collection's vocabulary from its members once.
+    // Library-wide document frequency of each term (how many cards carry it), for
+    // idf down-weighting of generic terms. Smoothed so idf is always positive and
+    // a term in every card contributes ~1, a rare term much more.
+    const N = Math.max(1, links.length);
+    const df = new Map<string, number>();
+    for (const l of links) {
+        for (const t of linkTerms(l)) df.set(t, (df.get(t) ?? 0) + 1);
+    }
+    const idf = (t: string) => Math.log((N + 1) / ((df.get(t) ?? 0) + 1)) + 1;
+
+    // Aggregate each collection's vocabulary + size from its members once. `counts`
+    // is members-sharing-a-term (linkTerms is a Set, so ≤1 per member).
     const vocab = new Map<string, Map<string, number>>();
+    const sizes = new Map<string, number>();
     for (const l of links) {
         if (l.id === link.id) continue;
         const cids = l.collectionIds;
         if (!cids || cids.length === 0) continue;
         const terms = linkTerms(l);
         for (const cid of cids) {
+            sizes.set(cid, (sizes.get(cid) ?? 0) + 1);
             let counts = vocab.get(cid);
             if (!counts) vocab.set(cid, (counts = new Map()));
             for (const t of terms) counts.set(t, (counts.get(t) ?? 0) + 1);
@@ -178,16 +206,25 @@ export function rankCollectionsForLink(
         .filter((c) => !memberOf.has(c.id))
         .map((c) => {
             const counts = vocab.get(c.id);
+            const size = sizes.get(c.id) ?? 0;
             let score = 0;
-            if (counts) {
-                for (const t of cardTerms) score += counts.get(t) ?? 0;
+            let distinct = 0;
+            if (counts && size > 0) {
+                for (const t of cardTerms) {
+                    const shared = counts.get(t);
+                    if (!shared) continue;
+                    distinct += 1;
+                    // Fraction of members sharing the term (size-normalized) × rarity.
+                    score += (shared / size) * idf(t);
+                }
             }
             // The collection's own name matching a card term is a strong signal
-            // even for small/empty collections.
-            if (cardTerms.has(normalize(c.name))) score += 3;
-            return { c, score };
+            // even for a small/empty collection — and bypasses the ≥2 gate.
+            const nameMatch = cardTerms.has(normalize(c.name));
+            if (nameMatch) score += 2;
+            return { c, score, distinct, nameMatch };
         })
-        .filter(({ score }) => score >= 2)
+        .filter(({ score, distinct, nameMatch }) => (distinct >= 2 || nameMatch) && score >= RANK_THRESHOLD)
         .sort((a, b) => b.score - a.score)
         .slice(0, limit)
         .map(({ c }) => c);

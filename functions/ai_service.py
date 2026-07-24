@@ -266,6 +266,7 @@ Requirements for the analysis:
 5. sourceName: Extract the name of the source or publisher (e.g., CNN, The New York Times, X, Reddit, Wikipedia, YouTube, TikTok).
    - For images or screenshots that don't reveal a source, use "Screenshot".
    - **CRITICAL**: The sourceName MUST ALWAYS be in English or its original brand name.
+   - **NEVER use "Machina", "Machina AI", or any name of this assistant/app as the sourceName** — you are the analyzer, not the publisher. If the publisher cannot be determined from the content, use the site's domain name (e.g. "nytimes.com"). Never invent a publisher.
 
 6. category: Assign exactly one high-level category (e.g., Tech, Health, Philosophy, Business, Research, Science, Finance, Productivity, Design, Career). If the content is a recipe, use "Recipe".
    - **CRITICAL**: The category MUST ALWAYS be in English, even if the content is in another language.

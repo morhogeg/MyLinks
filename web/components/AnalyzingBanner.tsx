@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import BrandOrb from '@/components/ui/BrandOrb';
-import { linkScanLabel } from '@/lib/scanPhases';
+import { linkScanLabel, LINK_SCAN_STEPS } from '@/lib/scanPhases';
 
 export interface AnalyzingState {
     active: boolean;
@@ -11,6 +11,10 @@ export interface AnalyzingState {
     progress: number;
     /** What's being analyzed, for the label. */
     kind: 'link' | 'image' | 'video';
+    /** For a LINK capture, the backend `processingStage`'s step (0..4) when
+        present — pins the label to the real milestone instead of deriving it from
+        the % (which the time-ramp can push ahead). Absent → derive from progress. */
+    stageStep?: number;
 }
 
 /**
@@ -18,7 +22,7 @@ export interface AnalyzingState {
  * (LinkScanProgress / ImageScanProgress / VideoScanProgress) so the banner reads
  * as genuinely working through stages, not a static "Analyzing".
  */
-function phaseLabel(kind: AnalyzingState['kind'], pct: number): string {
+function phaseLabel(kind: AnalyzingState['kind'], pct: number, stageStep?: number): string {
     if (kind === 'image') {
         if (pct >= 95) return 'Finishing up…';
         if (pct >= 80) return 'Organizing & tagging…';
@@ -33,6 +37,8 @@ function phaseLabel(kind: AnalyzingState['kind'], pct: number): string {
         return 'Watching the video…';
     }
     // link / web article — mirror the in-dialog stepper exactly (shared source).
+    // Pin to the backend stage when reported; else derive the phase from the %.
+    if (stageStep != null && LINK_SCAN_STEPS[stageStep]) return LINK_SCAN_STEPS[stageStep] + '…';
     return linkScanLabel(pct) + '…';
 }
 
@@ -110,7 +116,7 @@ export default function AnalyzingBanner({ state }: { state: AnalyzingState | nul
                         <BrandOrb state="working" size={20} />
                     )}
                     <span className="flex-1 text-[13px] font-medium text-text truncate">
-                        {done ? 'Saved to Machina' : phaseLabel(shown.kind, pct)}
+                        {done ? 'Saved to Machina' : phaseLabel(shown.kind, pct, shown.stageStep)}
                     </span>
                     <span className="text-[13px] font-bold tabular-nums text-text-secondary">
                         {pct}%

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from './types';
 import type { AnalyzingState } from '@/components/AnalyzingBanner';
 import { progressFor, CEILING } from './shareProgress';
+import { stageProgress } from './scanPhases';
 import { lastShareHandoff } from './shareConfig';
 
 /**
@@ -35,7 +36,7 @@ function toMs(v: number | string | undefined): number | null {
     return null;
 }
 
-export function useProcessingBanner(links: Link[]): AnalyzingState | null {
+export function useProcessingBanner(links: Link[], suppressId?: string | null): AnalyzingState | null {
     const firstSeen = useRef<Map<string, number>>(new Map());
     // `now` advances once a second while a capture is in flight (down from a
     // 200 ms tick), so the banner ramp re-renders the feed ≤1×/s instead of
@@ -47,7 +48,11 @@ export function useProcessingBanner(links: Link[]): AnalyzingState | null {
     // hand-off from the optimistic banner or between successive `now` ticks.
     const lastPct = useRef(0);
 
-    const processing = links.filter((l) => l.status === 'processing');
+    // Exclude the card currently owned by the "+" dialog's in-dialog stepper —
+    // that surface is already showing it, so the pill must not double it (which
+    // read as a restart at hand-off). When the dialog closes, suppressId clears
+    // and this picks the card up mid-ramp at the same %.
+    const processing = links.filter((l) => l.status === 'processing' && l.id !== suppressId);
     const active = processing.length > 0;
 
     // A stable key for "the set of processing cards" so the bookkeeping effect
@@ -121,12 +126,24 @@ export function useProcessingBanner(links: Link[]): AnalyzingState | null {
     const startMs = matching ? Math.min(cardStartMs, matching.startMs) : cardStartMs;
     const handoffFloor = matching?.pct !== undefined ? Math.min(matching.pct, CEILING) : 0;
     const elapsed = Math.max(0, clock - startMs);
+    // Honor the backend's per-stage milestone: floor the % to the reported stage
+    // and pin the phase step to it (shared mapping — scanPhases.stageProgress), so
+    // the banner never runs ahead of the real work. Absent on a pre-deploy
+    // backend, in which case the time ramp / label carry as before.
+    const { step: stageStep, floor: stageFloor } = stageProgress(newest.processingStage);
     // Non-decreasing: clamp to the highest % shown so far this capture.
-    const progress = Math.max(progressFor(elapsed), handoffFloor, lastPct.current);
+    const progress = Math.max(progressFor(elapsed), handoffFloor, stageFloor, lastPct.current);
     lastPct.current = progress;
 
     const kind: AnalyzingState['kind'] =
         newest.sourceType === 'image' ? 'image' : newest.sourceType === 'youtube' ? 'video' : 'link';
 
-    return { active: true, progress, kind };
+    // The stage step labels the LINK phase precisely; other kinds keep their own
+    // pct-derived phrasing, so only forward it when a stage is actually present.
+    return {
+        active: true,
+        progress,
+        kind,
+        stageStep: kind === 'link' && newest.processingStage ? stageStep : undefined,
+    };
 }

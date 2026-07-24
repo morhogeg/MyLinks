@@ -248,6 +248,7 @@ def scrape_url(url: str, message_body: Optional[str] = None) -> dict:
             "title": title,
             "text": text,
             "truncated": truncated,
+            "source_name": _generic_source_name(soup, url),
         }
 
     except Exception as e:
@@ -316,6 +317,42 @@ def extract_readable_article(url: str) -> dict:
         "title": title,
         "paragraphs": paragraphs[:400],  # bound pathologically long pages
     }
+
+
+def _prettify_domain(url: str) -> str:
+    """Registrable host of a URL with a leading ``www.`` stripped.
+
+    Not title-cased: Hebrew/branded hosts must survive verbatim, so
+    ``alaxon.co.il`` stays ``alaxon.co.il`` and ``nytimes.com`` stays
+    ``nytimes.com``.
+    """
+    host = (urlparse(url).hostname or '').lower()
+    if host.startswith('www.'):
+        host = host[4:]
+    return host
+
+
+def _generic_source_name(soup, url: str) -> str:
+    """Deterministic publisher name for a generic article.
+
+    Prefer the site's own declared name (``og:site_name``, then
+    ``<meta name="application-name">``, then the ``twitter:site`` handle); when no
+    such tag exists, fall back to the prettified host so the card shows a real
+    ground truth instead of a model-invented publisher.
+    """
+    site = soup.find('meta', property='og:site_name') or soup.find('meta', attrs={'name': 'og:site_name'})
+    if site and site.get('content') and site['content'].strip():
+        return site['content'].strip()
+
+    app_name = soup.find('meta', attrs={'name': 'application-name'})
+    if app_name and app_name.get('content') and app_name['content'].strip():
+        return app_name['content'].strip()
+
+    twitter_site = soup.find('meta', attrs={'name': 'twitter:site'}) or soup.find('meta', property='twitter:site')
+    if twitter_site and twitter_site.get('content') and twitter_site['content'].strip():
+        return twitter_site['content'].strip().lstrip('@')
+
+    return _prettify_domain(url)
 
 
 def _extract_linkedin_author(html: str) -> Optional[str]:

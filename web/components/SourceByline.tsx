@@ -1,7 +1,12 @@
 'use client';
 
 import { Youtube, Image as ImageIcon, StickyNote } from 'lucide-react';
-import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle, linkedinDisplayName } from '@/lib/platform';
+import { getPlatform, platformIcon, platformColor, xHandle, instagramHandle, linkedinDisplayName, prettyHost } from '@/lib/platform';
+
+/** Machina's own hosts — the ONLY place a "Machina" source name is legitimate
+    (a card shared FROM Machina). Anywhere else it's a bad backend fallback that
+    should defer to the real publisher host. */
+const MACHINA_HOSTS = new Set(['secondbrain-app-94da2.web.app', 'my-links-sable.vercel.app']);
 
 /** The minimal slice of a card the byline reads. A full `Link` satisfies this,
     and so do denormalized card refs (e.g. digest rows) — one byline everywhere,
@@ -105,11 +110,23 @@ export default function SourceByline({
             </span>
         );
     }
-    if (link.sourceName && link.sourceName !== 'Screenshot' && link.sourceName !== 'None') {
-        // Plain publisher (Mako, CNN…): just the name, airy.
+    // Plain publisher (Mako, CNN…): just the name, airy. But reject the junk
+    // fallbacks — "Screenshot"/"None", and a "Machina"-flavored name unless the
+    // card genuinely came from a Machina host. A rejected name falls back to the
+    // link's prettified host, so an existing bad card silently reads correctly.
+    const rawName = link.sourceName?.trim();
+    let host = '';
+    try { host = new URL(link.url ?? '').hostname.replace(/^www\./, '').toLowerCase(); } catch { /* no/invalid url */ }
+    const nameRejected =
+        !rawName ||
+        rawName === 'Screenshot' ||
+        rawName === 'None' ||
+        (/machina/i.test(rawName) && !MACHINA_HOSTS.has(host));
+    const displayName = !nameRejected ? rawName : link.url ? prettyHost(link.url) : null;
+    if (displayName) {
         return (
-            <span dir="auto" className={`min-w-0 ${size === 'md' ? 'text-sm' : 'text-xs'} text-text-muted whitespace-nowrap truncate max-w-[240px]`} title={link.sourceName}>
-                {link.sourceName}
+            <span dir="auto" className={`min-w-0 ${size === 'md' ? 'text-sm' : 'text-xs'} text-text-muted whitespace-nowrap truncate max-w-[240px]`} title={displayName}>
+                {displayName}
             </span>
         );
     }

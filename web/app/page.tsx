@@ -56,6 +56,10 @@ export default function Home() {
   // one when it's active (it has true milestones); otherwise show the share one.
   const [analyzing, setAnalyzing] = useState<AnalyzingState | null>(null);
   const [processing, setProcessing] = useState<AnalyzingState | null>(null);
+  // While the "+" dialog owns a plain-link capture (its stepper is on screen),
+  // its card id is published here so the feed's processing banner excludes it —
+  // the same capture is never shown by both surfaces at once (no restart flash).
+  const [dialogCardId, setDialogCardId] = useState<string | null>(null);
   // Whether the live library has produced its first Firestore snapshot. Gates
   // the optimistic share bridge below: once the feed is authoritative, a capture
   // with no `processing` card has already resolved to a ready card, so the bridge
@@ -216,13 +220,13 @@ export default function Home() {
         {/* The feed is already live via onSnapshot, so a new save streams in on
             its own — no remount needed. (Previously keyed on refreshKey, which
             tore down listeners and wiped view/filter/search on every add.) */}
-        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onFeedLoadedChange={setFeedLoaded} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onHasCardsChange={setHasCards} libraryFacet={libraryFacet} onLibraryFacetApplied={() => setLibraryFacet(null)} onBackToInsights={() => { setSettingsSection('stats'); setIsSettingsOpen(true); }} headerCommand={headerCommand} onCapture={() => setCaptureSignal((n) => n + 1)} onTabChange={setFeedTab} onFullBleedChange={setIsFullBleed} />
+        <Feed onAskModeChange={setIsAskMode} onHideAddButton={setHideAddButton} onProcessingChange={setProcessing} onFeedLoadedChange={setFeedLoaded} onOpenDigestSettings={() => { setSettingsSection('digest'); setIsSettingsOpen(true); }} onHasCardsChange={setHasCards} libraryFacet={libraryFacet} onLibraryFacetApplied={() => setLibraryFacet(null)} onBackToInsights={() => { setSettingsSection('stats'); setIsSettingsOpen(true); }} headerCommand={headerCommand} onCapture={() => setCaptureSignal((n) => n + 1)} onTabChange={setFeedTab} onFullBleedChange={setIsFullBleed} suppressProcessingId={dialogCardId} />
       </main>
 
       {/* Add Link FAB — hidden in Ask & Collections (neither view captures links). */}
       {/* onLinkAdded is a no-op: the form resets itself and the feed is live via
           onSnapshot, so nothing extra is needed here on a successful save. */}
-      <AddLinkForm onLinkAdded={() => {}} hidden={hideAddButton} onAnalyzingChange={setAnalyzing} openSignal={captureSignal} />
+      <AddLinkForm onLinkAdded={() => {}} hidden={hideAddButton} onAnalyzingChange={setAnalyzing} onDialogCardChange={setDialogCardId} openSignal={captureSignal} />
       <AnalyzingBanner state={bannerState} />
       {/* Back-to-top only on the Home feed (the window-scrolling view) — on
           mobile it stands in for the scrolled-away Home tab. */}

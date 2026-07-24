@@ -899,6 +899,53 @@ def _apply_youtube_metadata(link_data: dict, yt_meta: dict, analysis: dict, minu
 _OMIT = object()
 
 
+# Hosts where the app itself legitimately IS the publisher (its own web pages).
+# Only on these may a "Machina"-containing sourceName survive the sanitizer.
+_MACHINA_HOSTS = ("secondbrain-app-94da2.web.app", "my-links-sable.vercel.app")
+
+
+def _prettified_host(url: str) -> str:
+    """Registrable host of a URL with a leading ``www.`` stripped, or ""."""
+    from urllib.parse import urlparse
+    try:
+        host = (urlparse(url).hostname or "").lower()
+    except Exception:
+        return ""
+    if host.startswith("www."):
+        host = host[4:]
+    return host
+
+
+def _ground_source_name(candidate, url, fallback=None):
+    """Reject an assistant/app name hallucinated as the publisher.
+
+    Gemini seeds its own name ("Machina AI") from the system prompt and emits it
+    as the publisher when the real one is unclear. Any candidate containing
+    "machina" is rejected — unless the link genuinely lives on a Machina host —
+    and replaced with the prettified URL host (or ``fallback`` when no host is
+    available, e.g. images keep "Screenshot"). A clean candidate passes through.
+    """
+    if candidate and "machina" in str(candidate).lower():
+        if _prettified_host(url) in _MACHINA_HOSTS:
+            return candidate
+        return _prettified_host(url) or fallback
+    return candidate or fallback
+
+
+def _write_stage(card_ref, stage: str) -> None:
+    """Mirror a pipeline stage onto the user-visible card doc (best-effort).
+
+    The card may not exist yet on edge paths, and a progress hint is never worth
+    failing a capture over — so a failed stage write is logged and swallowed.
+    """
+    if card_ref is None:
+        return
+    try:
+        card_ref.update({"processingStage": stage})
+    except Exception as e:
+        logger.warning(f"Stage write '{stage}' failed (non-fatal): {e}")
+
+
 def _build_link_data(*, url, title, summary, detailed_summary, source_type,
                      source_name, original_title, estimated_read_time, analysis,
                      related_links=_OMIT, confidence=_OMIT, key_entities=_OMIT):
@@ -1404,7 +1451,10 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             summary=analysis.get("summary", ""),
             detailed_summary=analysis.get("detailedSummary", ""),
             source_type="youtube" if is_youtube else "web",
-            source_name=scraped.get("source_name") or analysis.get("sourceName"),
+            source_name=_ground_source_name(
+                scraped.get("source_name") or analysis.get("sourceName"),
+                url=url,
+            ),
             original_title=scraped.get("title", ""),
             estimated_read_time=estimated_time,
             analysis=analysis,
@@ -2097,7 +2147,7 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
             summary=analysis.get("summary", ""),
             detailed_summary=analysis.get("detailedSummary", ""),
             source_type="image",
-            source_name=analysis.get("sourceName") or "Screenshot",
+            source_name=_ground_source_name(analysis.get("sourceName"), url="", fallback="Screenshot"),
             original_title="Image Upload",
             estimated_read_time=1,
             analysis=analysis,
@@ -2969,6 +3019,8 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # 1. Scrape content (only once)
         log_to_firestore(task_id, f"Scraping content for: {url}")
         ref.update({"status": "scraping"})
+        if not is_image:
+            _write_stage(card_ref, "scraping")
         scraped_raw = scrape_url(url, original_body)
         
         # Ensure scraped is a dict
@@ -2985,6 +3037,8 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         db = get_db()
         existing_tags = get_user_tags(uid)
         ai = GeminiService()
+
+        _write_stage(card_ref, "analyzing")
 
         if is_image:
             log_to_firestore(task_id, f"Downloading image bytes from: {url}")
@@ -3022,6 +3076,7 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # Rich v2 recipe (see _embedding_text_from_analysis) — fold in
         # detailedSummary/takeaway/concepts so the card is findable by its
         # details, not just its headline.
+        _write_stage(card_ref, "connecting")
         embedding_text = _embedding_text_from_analysis(analysis)
         embedding = ai.embed_text(embedding_text)
 
@@ -3058,7 +3113,11 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             summary=analysis.get("summary", "No summary available"),
             detailed_summary=analysis.get("detailedSummary"),
             source_type="youtube" if is_youtube else ("image" if is_image else "web"),
-            source_name=scraped.get("source_name") or analysis.get("sourceName") or ("Screenshot" if is_image else None),
+            source_name=_ground_source_name(
+                scraped.get("source_name") or analysis.get("sourceName"),
+                url="" if is_image else original_url,
+                fallback="Screenshot" if is_image else None,
+            ),
             original_title=scraped.get("title", "Image Upload" if is_image else ""),
             estimated_read_time=estimated_time,
             analysis=analysis,
@@ -3087,6 +3146,9 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
         # 5. Save to Firestore — flip the placeholder card to its ready state in
         # place (preserving its id) so it transitions processing → ready without
         # flicker. If the placeholder couldn't be created, fall back to a new doc.
+        # The full set() replaces the doc, so any prior processingStage is dropped
+        # from the ready card without a separate delete.
+        _write_stage(card_ref, "organizing")
         if card_ref is not None:
             card_ref.set(link_data)
             link_id = card_id
@@ -3216,6 +3278,7 @@ def run_processing_janitor() -> dict:
                 "status": LinkStatus.FAILED.value,
                 "error": "Processing timed out — tap to retry.",
                 "failedAt": now_ms,
+                "processingStage": gc_firestore.DELETE_FIELD,
             })
             report["failed_out"] += 1
         except Exception as e:

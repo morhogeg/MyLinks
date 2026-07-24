@@ -264,6 +264,130 @@ function Card({
                     <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                 </div>
             )}
+            {/* Hover action pill — pinned to the TOP of the card in ALL cases
+                (child of the relative <article>, not the content flow), so its
+                position never jumps when a photo banner is hidden/shown and it
+                overlays the top of the image on photo cards. z above the
+                thumbnail; pointer-events off until hover so it never steals the
+                image's click-to-open target. Pinned to dir="ltr" so the button
+                order is IDENTICAL on every card regardless of the card's own dir. */}
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute top-2.5 left-1/2 -translate-x-1/2 z-30 pointer-events-none group-hover:pointer-events-auto">
+                <div dir="ltr" className="flex items-center gap-1 bg-card/90 backdrop-blur-md border border-border-strong p-1 rounded-full shadow-xl">
+                    {/* Only render as a link for real http(s) URLs — never make a
+                        stored javascript:/data: value clickable. */}
+                    {!!link.url && /^https?:\/\//i.test(link.url) && (
+                        <a
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            title="Open source"
+                            className="p-1.5 rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center"
+                        >
+                            <ExternalLink className="w-3 h-3" />
+                        </a>
+                    )}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onReadStatusChange(link.id, !link.isRead);
+                        }}
+                        title={link.isRead ? 'Mark as unread' : 'Mark as read'}
+                        className={`p-1.5 rounded-full transition-all flex items-center justify-center ${link.isRead ? 'text-text bg-fill-strong' : 'text-text-muted/40 hover:text-text'
+                            }`}
+                    >
+                        {link.isRead ? (
+                            <Check className="w-3 h-3" />
+                        ) : (
+                            <Circle className="w-3 h-3 opacity-40" />
+                        )}
+                    </button>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite');
+                        }}
+                        title={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
+                        className={`p-1.5 rounded-full transition-all flex items-center justify-center ${link.status === 'favorite' ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-muted hover:text-accent'
+                            }`}
+                    >
+                        <Star className={`w-3 h-3 ${link.status === 'favorite' ? 'fill-yellow-500' : ''}`} />
+                    </button>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onStatusChange(link.id, link.status === 'archived' ? 'unread' : 'archived');
+                        }}
+                        title={link.status === 'archived' ? 'Unarchive' : 'Archive'}
+                        className="p-1.5 rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center"
+                    >
+                        <Archive className="w-3 h-3" />
+                    </button>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onUpdateReminder(link);
+                        }}
+                        title={link.reminderStatus === 'pending'
+                            ? link.reminderProfile === 'smart'
+                                ? 'Reminder active (Smart review)'
+                                : link.reminderProfile?.startsWith('spaced')
+                                    ? 'Reminder active (Spaced review)'
+                                    : 'Reminder active'
+                            : 'Remind me'}
+                        className={`p-1.5 rounded-full transition-all flex items-center justify-center relative ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-accent'
+                            }`}
+                    >
+                        <Bell className={`w-3 h-3 ${link.reminderStatus === 'pending' ? 'fill-current' : ''}`} />
+                    </button>
+                    {onAddToCollection && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onAddToCollection(link);
+                            }}
+                            title="Add to collection"
+                            className="p-1.5 rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center"
+                        >
+                            <Layers className="w-3 h-3" />
+                        </button>
+                    )}
+                    {onShare && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onShare(link);
+                            }}
+                            title="Share"
+                            className="p-1.5 rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center"
+                        >
+                            <Share2 className="w-3 h-3" />
+                        </button>
+                    )}
+                    {onToggleThumbnail && link.metadata?.thumbnailUrl && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleThumbnail(link);
+                            }}
+                            title={link.hideThumbnail ? 'Show image' : 'Hide image'}
+                            className="p-1.5 rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center"
+                        >
+                            {link.hideThumbnail ? <ImageIcon className="w-3 h-3" /> : <ImageOff className="w-3 h-3" />}
+                        </button>
+                    )}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(link.id);
+                        }}
+                        title="Delete"
+                        className="p-1.5 rounded-full text-text-muted hover:text-red-500 transition-all flex items-center justify-center"
+                    >
+                        <Trash2 className="w-3 h-3" />
+                    </button>
+                </div>
+            </div>
             <div
                 className="p-4 sm:p-5 flex flex-col h-full space-y-3 sm:space-y-4"
                 dir={isRtl ? "rtl" : "ltr"}
@@ -322,129 +446,6 @@ function Card({
                                 </div>
                             );
                         })()}
-                    </div>
-
-                    {/* Action Buttons (Absolute Center) - Fades in on hover.
-                        Pinned to dir="ltr" so the button order is IDENTICAL on
-                        every card — otherwise the card's dir (rtl for Hebrew)
-                        mirrors the row and the icons land in a different order
-                        per language. */}
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none group-hover:pointer-events-auto">
-                        <div dir="ltr" className="flex items-center gap-1 bg-card/90 backdrop-blur-md border border-border-strong p-1 rounded-full shadow-xl">
-                            {/* Only render as a link for real http(s) URLs — never make a
-                                stored javascript:/data: value clickable. */}
-                            {!!link.url && /^https?:\/\//i.test(link.url) && (
-                                <a
-                                    href={link.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={(e) => e.stopPropagation()}
-                                    title="Open source"
-                                    className="p-1.5 rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center"
-                                >
-                                    <ExternalLink className="w-3 h-3" />
-                                </a>
-                            )}
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onReadStatusChange(link.id, !link.isRead);
-                                }}
-                                title={link.isRead ? 'Mark as unread' : 'Mark as read'}
-                                className={`p-1.5 rounded-full transition-all flex items-center justify-center ${link.isRead ? 'text-text bg-fill-strong' : 'text-text-muted/40 hover:text-text'
-                                    }`}
-                            >
-                                {link.isRead ? (
-                                    <Check className="w-3 h-3" />
-                                ) : (
-                                    <Circle className="w-3 h-3 opacity-40" />
-                                )}
-                            </button>
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onStatusChange(link.id, link.status === 'favorite' ? 'unread' : 'favorite');
-                                }}
-                                title={link.status === 'favorite' ? 'Remove from favorites' : 'Add to favorites'}
-                                className={`p-1.5 rounded-full transition-all flex items-center justify-center ${link.status === 'favorite' ? 'text-yellow-500 bg-yellow-500/10' : 'text-text-muted hover:text-accent'
-                                    }`}
-                            >
-                                <Star className={`w-3 h-3 ${link.status === 'favorite' ? 'fill-yellow-500' : ''}`} />
-                            </button>
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onStatusChange(link.id, link.status === 'archived' ? 'unread' : 'archived');
-                                }}
-                                title={link.status === 'archived' ? 'Unarchive' : 'Archive'}
-                                className="p-1.5 rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center"
-                            >
-                                <Archive className="w-3 h-3" />
-                            </button>
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onUpdateReminder(link);
-                                }}
-                                title={link.reminderStatus === 'pending'
-                                    ? link.reminderProfile === 'smart'
-                                        ? 'Reminder active (Smart review)'
-                                        : link.reminderProfile?.startsWith('spaced')
-                                            ? 'Reminder active (Spaced review)'
-                                            : 'Reminder active'
-                                    : 'Remind me'}
-                                className={`p-1.5 rounded-full transition-all flex items-center justify-center relative ${link.reminderStatus === 'pending' ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-accent'
-                                    }`}
-                            >
-                                <Bell className={`w-3 h-3 ${link.reminderStatus === 'pending' ? 'fill-current' : ''}`} />
-                            </button>
-                            {onAddToCollection && (
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onAddToCollection(link);
-                                    }}
-                                    title="Add to collection"
-                                    className="p-1.5 rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center"
-                                >
-                                    <Layers className="w-3 h-3" />
-                                </button>
-                            )}
-                            {onShare && (
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onShare(link);
-                                    }}
-                                    title="Share"
-                                    className="p-1.5 rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center"
-                                >
-                                    <Share2 className="w-3 h-3" />
-                                </button>
-                            )}
-                            {onToggleThumbnail && link.metadata?.thumbnailUrl && (
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onToggleThumbnail(link);
-                                    }}
-                                    title={link.hideThumbnail ? 'Show image' : 'Hide image'}
-                                    className="p-1.5 rounded-full text-text-muted hover:text-accent transition-all flex items-center justify-center"
-                                >
-                                    {link.hideThumbnail ? <ImageIcon className="w-3 h-3" /> : <ImageOff className="w-3 h-3" />}
-                                </button>
-                            )}
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDelete(link.id);
-                                }}
-                                title="Delete"
-                                className="p-1.5 rounded-full text-text-muted hover:text-red-500 transition-all flex items-center justify-center"
-                            >
-                                <Trash2 className="w-3 h-3" />
-                            </button>
-                        </div>
                     </div>
 
                     {/* Source Tag (End) - Fades out on hover. YouTube and X use the

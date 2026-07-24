@@ -179,7 +179,14 @@ export default function AddToCollectionSheet({
                             {suggested.map((c) => (
                                 <CollectionRow key={c.id} collection={c} isMember={memberIds.has(c.id)} onToggle={toggle} />
                             ))}
-                            {sorted.length > 0 && <div className="mx-5 my-1 border-t border-border-subtle" />}
+                            {/* Own header for the A–Z remainder so it never reads as
+                                part of "Suggested" — same 11px uppercase style, muted
+                                and icon-less to sit below the accented Suggested header. */}
+                            {sorted.length > 0 && (
+                                <p className="px-5 pt-3 pb-1 mt-1 border-t border-border-subtle text-[11px] font-bold uppercase tracking-wider text-text-muted">
+                                    All collections
+                                </p>
+                            )}
                         </>
                     )}
                     {sorted.map((c) => (
