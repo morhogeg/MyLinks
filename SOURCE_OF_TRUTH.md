@@ -714,7 +714,34 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-24 (latest) — ASK STILL FAILS AFTER THE 07-21 FALLBACK FIX →
+- **2026-07-24 (latest) — ASK ROOT CAUSE CONFIRMED: Gemini PROMPT-side
+  `PROHIBITED_CONTENT` block on recipe-card context → headline-only-context
+  retry + BLOCK_NONE safety settings.** The temporary on-screen diag (previous
+  entry) surfaced the real error on the owner's device:
+  `EmptyGenerationError: Empty response from Gemini
+  (block_reason=BlockedReason.PROHIBITED_CONTENT)` — an **INPUT** rejection by
+  Gemini's **non-configurable** prompt filter, not an output refusal. That's why
+  neither the model fallback (filter is model-agnostic) nor the paraphrase
+  retry (same input) helped. Trigger: the raw scraped Hebrew recipe text
+  (ingredients/steps/detailedSummary) of retrieved recipe cards false-positives
+  the filter — ANY question that retrieves those cards fails ("פסטה שמנת ותרד",
+  "מתכון לשאוורמה?") while non-food asks work, matching owner observation. Fix
+  (`ai_service.py`): (1) `EmptyGenerationError` now carries `prompt_blocked`
+  (from `prompt_feedback.block_reason`); (2) on a prompt block, BOTH RAG paths
+  retry with **headline-only cards** (`_headline_cards`: id/title/summary/
+  category/tags/source/url/createdAt — Gemini-authored, clean) instead of the
+  pointless model/paraphrase retries; the buffered path's strict citation
+  re-ask also reuses the reduced context (never re-sends a rejected prompt);
+  stream attempt ladder is now ask-verbatim → analysis-verbatim →
+  analysis-paraphrase → analysis-headline; (3) Ask calls (only) set
+  `safety_settings: BLOCK_NONE` on the 4 configurable harm categories — the
+  user is querying their OWN library; note this does NOT affect the
+  non-configurable PROHIBITED_CONTENT filter, which is why (2) is the
+  workhorse. Trade-off: blocked asks get a shallower (headline-grounded) answer
+  instead of an error; unblocked asks are byte-identical. Tests 348→351.
+  **The temporary `(diag: …)` tail on the Ask error message (previous entry)
+  stays ONE more round** — remove it once the owner confirms recipe asks work.
+- **2026-07-24 — ASK STILL FAILS AFTER THE 07-21 FALLBACK FIX →
   RECITATION-safe retry + self-naming errors (owner screenshot: a Hebrew RECIPE
   ask, "פסטה שמנת ותרד קלאסית", returns "Machina couldn't generate an answer").**
   Traced end-to-end: the 07-21 Ask fix (ask-model→analysis-model fallback +

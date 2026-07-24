@@ -340,9 +340,49 @@ def test_stream_empty_on_both_models_raises():
     svc = _svc_with_models(models)
     with pytest.raises(AnalysisError):
         _drain(svc.answer_from_context_stream("q?", _CARDS))
-    # ASK (verbatim) → ANALYSIS (verbatim) → ANALYSIS (paraphrase-safe) before giving up.
+    # ASK (verbatim) → ANALYSIS (verbatim) → ANALYSIS (paraphrase-safe) →
+    # ANALYSIS (headline-only) before giving up.
     assert models.requested == [
-        GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL, GEMINI_ANALYSIS_MODEL]
+        GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL,
+        GEMINI_ANALYSIS_MODEL, GEMINI_ANALYSIS_MODEL]
+
+
+def test_stream_empty_thrice_then_headline_context_recovers():
+    """A PROMPT-blocked stream (empty on verbatim AND paraphrase framings)
+    falls back to headline-only context — deep card content stripped — which
+    clears the input filter and streams a real answer."""
+    deep_cards = [{
+        "id": "id1", "title": "Pasta", "summary": "A creamy pasta recipe.",
+        "recipe": {"ingredients": ["500g pasta"], "instructions": ["Boil it"]},
+        "detailedSummary": "RAW SCRAPED DETAIL", "userNote": "my private note",
+    }]
+
+    class _EmptyThriceThenReal:
+        def __init__(self, pieces):
+            self._pieces = pieces
+            self.requested = []
+            self.prompts = []
+
+        def generate_content_stream(self, model, contents, config=None):
+            self.requested.append(model)
+            self.prompts.append(contents[0])
+            if len(self.requested) <= 3:
+                return iter(())  # verbatim ×2 + paraphrase all blocked
+            return iter(_FakeChunk(p) for p in self._pieces)
+
+    models = _EmptyThriceThenReal(["Headline answer.\n", "[[CITED: id1]]"])
+    svc = _svc_with_models(models)
+    text, cited, ungrounded = _drain(svc.answer_from_context_stream("q?", deep_cards))
+    assert len(models.requested) == 4
+    assert "Headline answer." in text
+    assert cited == ["id1"]
+    # The recovering attempt carried NO raw deep content, but kept the headline.
+    assert "500g pasta" not in models.prompts[3]
+    assert "RAW SCRAPED DETAIL" not in models.prompts[3]
+    assert "my private note" not in models.prompts[3]
+    assert "A creamy pasta recipe." in models.prompts[3]
+    # …while the first (verbatim, full-context) attempt did carry it.
+    assert "500g pasta" in models.prompts[0]
 
 
 def test_stream_empty_verbatim_then_paraphrase_recovers():
@@ -483,6 +523,69 @@ def test_buffered_empty_generation_retries_paraphrase_safe():
     assert svc._calls["n"] == 3  # ask + analysis (both empty) + paraphrase retry
     assert "YOUR OWN WORDS" in prompts[2]
     assert "YOUR OWN WORDS" not in prompts[0]
+
+
+def test_buffered_prompt_block_retries_headline_only_context():
+    """A PROMPT-blocked generation (input rejected, e.g. PROHIBITED_CONTENT)
+    skips the pointless model fallback and retries once with headline-only
+    cards — deep raw content stripped — recovering a grounded answer."""
+    from ai_service import EmptyGenerationError
+    deep_cards = [{
+        "id": "id1", "title": "Pasta", "summary": "A creamy pasta recipe.",
+        "recipe": {"ingredients": ["500g pasta"], "instructions": ["Boil it"]},
+        "detailedSummary": "RAW SCRAPED DETAIL", "userNote": "my private note",
+    }]
+    svc = _svc_with_json_responses([
+        EmptyGenerationError(
+            "Empty response from Gemini (block_reason=BlockedReason.PROHIBITED_CONTENT)",
+            prompt_blocked=True),                                # ASK, full context
+        {"answer": "Grounded on headlines.", "citedIds": ["id1"]},  # headline retry
+    ])
+    seen = svc._generate_json
+    prompts = []
+
+    def _capture(contents, what, config_extra=None, model=None, attempts=None):
+        prompts.append(contents[0])
+        return seen(contents, what, config_extra=config_extra, model=model, attempts=attempts)
+
+    svc._generate_json = _capture
+    out = svc.answer_from_context("q?", deep_cards)
+    assert out == {"answer": "Grounded on headlines.", "citedIds": ["id1"], "ungrounded": False}
+    # No analysis-model fallback for a prompt block (same input, same filter):
+    # both calls are the ASK tier — full context, then headline-only.
+    assert svc._calls["models"] == [GEMINI_ASK_MODEL, GEMINI_ASK_MODEL]
+    assert "500g pasta" in prompts[0]
+    assert "500g pasta" not in prompts[1]
+    assert "RAW SCRAPED DETAIL" not in prompts[1]
+    assert "my private note" not in prompts[1]
+    assert "A creamy pasta recipe." in prompts[1]
+
+
+def test_buffered_prompt_block_uncited_reask_stays_headline_only():
+    """If the headline-only recovery answer comes back UNCITED, the strict
+    citation re-ask must reuse the headline context — never re-send the full
+    prompt Gemini already rejected."""
+    from ai_service import EmptyGenerationError
+    deep_cards = [{
+        "id": "id1", "title": "Pasta", "summary": "A creamy pasta recipe.",
+        "recipe": {"ingredients": ["500g pasta"], "instructions": ["Boil it"]},
+    }]
+    svc = _svc_with_json_responses([
+        EmptyGenerationError("blocked", prompt_blocked=True),  # full context
+        {"answer": "Uncited.", "citedIds": []},                # headline, uncited
+        {"answer": "Now cited.", "citedIds": ["id1"]},         # strict re-ask
+    ])
+    seen = svc._generate_json
+    prompts = []
+
+    def _capture(contents, what, config_extra=None, model=None, attempts=None):
+        prompts.append(contents[0])
+        return seen(contents, what, config_extra=config_extra, model=model, attempts=attempts)
+
+    svc._generate_json = _capture
+    out = svc.answer_from_context("q?", deep_cards)
+    assert out == {"answer": "Now cited.", "citedIds": ["id1"], "ungrounded": False}
+    assert "500g pasta" not in prompts[2]  # strict re-ask kept the reduced context
 
 
 def test_buffered_non_empty_failure_does_not_paraphrase_retry():
@@ -646,10 +749,11 @@ def test_stream_raises_when_both_models_fail():
     svc = _svc_with_models(models)
     with pytest.raises(AnalysisError):
         _drain(svc.answer_from_context_stream("q?", _CARDS))
-    # Every attempt errors before output: ASK, then ANALYSIS twice (verbatim +
-    # paraphrase-safe) before the failure surfaces.
+    # Every attempt errors before output: ASK, then ANALYSIS three times
+    # (verbatim + paraphrase-safe + headline-only) before the failure surfaces.
     assert models.requested == [
-        GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL, GEMINI_ANALYSIS_MODEL]
+        GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL,
+        GEMINI_ANALYSIS_MODEL, GEMINI_ANALYSIS_MODEL]
 
 
 def test_stream_no_fallback_after_tokens_emitted():
