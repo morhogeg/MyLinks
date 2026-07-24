@@ -886,6 +886,70 @@ If the image is an article, extract the headline and body."""
             remaining = remaining[:lo - 1] + remaining[lo:]
         return remaining, dropped, False
 
+    # Field-granular salvage order for a filter-blocked card: most valuable
+    # first, so a partially toxic card keeps as much substance as possible.
+    _VARIANT_FIELDS = ("summary", "recipe", "detailedSummary", "actionableTakeaway",
+                       "videoHighlights", "speakers", "userNote", "userNotes")
+
+    def _best_clean_variant(self, question: str, base_cards: list, card: dict,
+                            history: list = None, excluded_titles: list = None):
+        """Salvage the richest rendering of a filter-blocked `card` that the
+        prompt filter accepts alongside `base_cards` (greedy additive probing).
+
+        A card must NEVER silently vanish from an answer just because one of
+        its fields trips Gemini's filter (prod 2026-07-24: the answer then
+        claimed the user's own recipe didn't exist — a broken product promise).
+        Start from the bare identity (id/title/meta), then add fields back one
+        probe at a time, keeping every field the filter accepts. If even the
+        bare title is rejected, retry it under a placeholder title.
+
+        Returns (variant_card_or_None, removed_field_names); None means not
+        even the placeholder identity passes and the card must be dropped.
+        """
+        def ok(cand):
+            return not self._probe_prompt_blocked(
+                _build_rag_prompt(question, base_cards + [cand], history, excluded_titles)
+                + _CITED_JSON_SUFFIX)
+
+        removed = []
+        bare = {k: card.get(k) for k in _HEADLINE_CARD_FIELDS
+                if k != "summary" and card.get(k) is not None}
+        if not ok(bare):
+            placeholder = dict(bare)
+            placeholder["title"] = "Untitled (filtered)"
+            if not ok(placeholder):
+                return None, None
+            bare = placeholder
+            removed.append("title")
+        variant = bare
+        for f in self._VARIANT_FIELDS:
+            if not card.get(f):
+                continue
+            cand = dict(variant)
+            cand[f] = card.get(f)
+            if ok(cand):
+                variant = cand
+            else:
+                removed.append(f)
+        return variant, removed
+
+    @staticmethod
+    def _filter_note(fully_dropped: list, partially_filtered: list) -> str:
+        """Owner-visible disclosure appended to the ANSWER TEXT (post-
+        generation, so the filter can't touch it) whenever the content filter
+        forced anything out of context. The answer must never silently pretend
+        a saved card doesn't exist."""
+        notes = []
+        for c in fully_dropped:
+            t = str(c.get("title", "Untitled"))[:60]
+            notes.append(f'Your saved card "{t}" could not be included in this '
+                         "answer — its text is rejected by Google's content filter.")
+        for c, _fields in partially_filtered:
+            t = str(c.get("title", "Untitled"))[:60]
+            notes.append(f'Some details of "{t}" were withheld by Google\'s '
+                         "content filter.")
+        return ("\n\n⚠️ " + " ".join(notes)) if notes else ""
+
     def _answer_json(self, prompt: str, what: str, attempts: int) -> dict:
         """One grounded-answer generation call, with a model fallback.
 
@@ -953,60 +1017,78 @@ If the image is an article, extract the headline and body."""
             }
 
         # `context_cards` is whatever card rendering the model ACTUALLY accepted —
-        # downgraded to headline-only (or a filter-cleaned subset) if the full
+        # a filter-salvaged subset (or headline-only fallback) if the full
         # deep-content prompt is blocked — so the citation re-ask below never
-        # re-sends a prompt Gemini rejected. `dropped_ids` names any cards the
-        # filter-probe isolation had to remove (surfaced to the caller so the
-        # poison card is identifiable, not silently vanished).
+        # re-sends a prompt Gemini rejected. `dropped_ids`/`filtered_cards` name
+        # what the filter forced out (surfaced to the caller — the poison card
+        # must be identifiable, never silently vanished), and `filter_note` is
+        # the user-visible disclosure appended to the answer text.
         context_cards = cards
         dropped_ids = []
+        filtered_cards = []
+        filter_note = ""
         base_prompt = _build_rag_prompt(question, cards, history, excluded_titles)
         try:
             data = self._answer_json(base_prompt + _CITED_JSON_SUFFIX, "answer", attempts)
         except EmptyGenerationError as e:
             if e.prompt_blocked:
-                # The INPUT was rejected (e.g. PROHIBITED_CONTENT — raw scraped
-                # card text false-positives Gemini's non-configurable prompt
-                # filter; confirmed in prod on Hebrew recipe cards 2026-07-24).
-                # A different output instruction or model tier can't help; what
-                # helps is removing the offending text. Retry with headline-only
-                # cards — Gemini-authored titles/summaries — so the user still
-                # gets a grounded (if shallower) answer instead of an error.
-                logger.warning("ask prompt blocked (%s) — retrying headline-only context", e)
-                context_cards = _headline_cards(cards)
-                headline_prompt = _build_rag_prompt(
-                    question, context_cards, history, excluded_titles)
-                try:
-                    data = self._answer_json(
-                        headline_prompt + _CITED_JSON_SUFFIX, "answer (reduced context)", attempts)
-                except EmptyGenerationError as e2:
-                    if not e2.prompt_blocked:
-                        raise
-                    # Even titles/summaries are rejected (confirmed in prod
-                    # 2026-07-24) → a specific card is the poison. Isolate it
-                    # with filter probes and answer without it.
-                    clean, dropped, question_blocked = self._drop_prompt_blocked_cards(
-                        question, context_cards, history, excluded_titles)
-                    if question_blocked:
-                        raise EmptyGenerationError(
-                            f"{e2} [stage: the question/history itself is rejected "
-                            "by the prompt filter — no card subset can pass]",
-                            prompt_blocked=True)
-                    if not dropped or not clean:
-                        raise EmptyGenerationError(
-                            f"{e2} [stage: headline-only still blocked; isolation "
-                            f"dropped={len(dropped)} clean={len(clean)}]",
-                            prompt_blocked=True)
-                    dropped_ids = [c.get("id") for c in dropped]
+                # The INPUT was rejected (e.g. PROHIBITED_CONTENT — card text
+                # false-positives Gemini's non-configurable prompt filter;
+                # confirmed in prod on a Hebrew recipe card 2026-07-24, even at
+                # the title/summary layer). A different output instruction or
+                # model tier can't help; what helps is finding and excising the
+                # EXACT offending text. Probe-bisect the poison card(s), then
+                # salvage each with the richest field subset the filter accepts
+                # — every other card keeps FULL depth, the answer stays whole,
+                # and anything withheld is disclosed in the answer text.
+                logger.warning("ask prompt blocked (%s) — isolating filter-blocked cards", e)
+                clean, dropped, question_blocked = self._drop_prompt_blocked_cards(
+                    question, cards, history, excluded_titles)
+                if question_blocked:
+                    raise EmptyGenerationError(
+                        f"{e} [stage: the question/history itself is rejected "
+                        "by the prompt filter — no card subset can pass]",
+                        prompt_blocked=True)
+                if dropped:
+                    fully_dropped, partially_filtered = [], []
+                    salvaged = {}
+                    base = list(clean)
+                    for pc in dropped:
+                        variant, removed_fields = self._best_clean_variant(
+                            question, base, pc, history, excluded_titles)
+                        if variant is None:
+                            fully_dropped.append(pc)
+                        else:
+                            base.append(variant)
+                            salvaged[pc.get("id")] = variant
+                            if removed_fields:
+                                partially_filtered.append((pc, removed_fields))
+                    # Rebuild in the ORIGINAL retrieval order (it encodes
+                    # relevance — the poison card is often the most relevant).
+                    clean_ids = {c.get("id") for c in clean}
+                    context_cards = [
+                        salvaged.get(c.get("id"), c) for c in cards
+                        if c.get("id") in clean_ids or c.get("id") in salvaged]
+                    dropped_ids = [c.get("id") for c in fully_dropped]
+                    filtered_cards = [
+                        {"id": pc.get("id"), "title": pc.get("title"),
+                         "removedFields": rf} for pc, rf in partially_filtered]
+                    filter_note = self._filter_note(fully_dropped, partially_filtered)
                     logger.warning(
-                        "ask: dropped %d filter-blocked card(s): %s",
-                        len(dropped), dropped_ids)
-                    context_cards = clean
-                    clean_prompt = _build_rag_prompt(
-                        question, clean, history, excluded_titles)
+                        "ask filter salvage: %d dropped %s, %d partially filtered %s",
+                        len(dropped_ids), dropped_ids, len(filtered_cards),
+                        [(f['id'], f['removedFields']) for f in filtered_cards])
                     data = self._answer_json(
-                        clean_prompt + _CITED_JSON_SUFFIX,
-                        "answer (blocked cards dropped)", attempts)
+                        _build_rag_prompt(question, context_cards, history, excluded_titles)
+                        + _CITED_JSON_SUFFIX, "answer (filtered context)", attempts)
+                else:
+                    # Isolation found nothing provably blocked (e.g. probes
+                    # erroring during an outage) — fall back to headline-only
+                    # context, the coarse-but-safe rendering.
+                    context_cards = _headline_cards(cards)
+                    data = self._answer_json(
+                        _build_rag_prompt(question, context_cards, history, excluded_titles)
+                        + _CITED_JSON_SUFFIX, "answer (reduced context)", attempts)
             else:
                 # The OUTPUT came back empty on every tier — the RECITATION
                 # signature. Retry once asking the model to paraphrase instead
@@ -1015,11 +1097,11 @@ If the image is an article, extract the headline and body."""
                 logger.warning("ask answer empty (%s) — retrying paraphrase-safe", e)
                 data = self._answer_json(
                     base_prompt + _CITED_JSON_PARAPHRASE_SUFFIX, "answer (paraphrase retry)", attempts)
-        answer = data.get("answer") or ""
+        answer = (data.get("answer") or "") + filter_note
         cited = _valid_cited_ids(data.get("citedIds"), cards)
         if cited:
             return {"answer": answer, "citedIds": cited, "ungrounded": False,
-                    "droppedCardIds": dropped_ids}
+                    "droppedCardIds": dropped_ids, "filteredCards": filtered_cards}
 
         # No valid citation on the first pass. Re-ask ONCE with a stricter prompt
         # that demands the model name the ids it relied on. A transient failure
@@ -1027,11 +1109,11 @@ If the image is an article, extract the headline and body."""
         retry_prompt = _build_rag_prompt(question, context_cards, history, excluded_titles) + _CITED_JSON_STRICT_SUFFIX
         try:
             retry = self._answer_json(retry_prompt, "answer (citation retry)", attempts)
-            retry_answer = retry.get("answer") or ""
+            retry_answer = (retry.get("answer") or "") + filter_note
             retry_cited = _valid_cited_ids(retry.get("citedIds"), cards)
             if retry_cited:
                 return {"answer": retry_answer, "citedIds": retry_cited, "ungrounded": False,
-                        "droppedCardIds": dropped_ids}
+                        "droppedCardIds": dropped_ids, "filteredCards": filtered_cards}
         except AnalysisError as e:
             logger.warning(f"ask citation retry failed: {e}")
 
@@ -1040,7 +1122,7 @@ If the image is an article, extract the headline and body."""
         # unverifiable answer with no source chips.
         logger.warning("ask answer returned no valid citations after retry — flagging ungrounded")
         return {"answer": answer, "citedIds": [], "ungrounded": True,
-                "droppedCardIds": dropped_ids}
+                "droppedCardIds": dropped_ids, "filteredCards": filtered_cards}
 
     def answer_from_context_stream(self, question: str, cards: list, history: list = None,
                                    excluded_titles: list = None):
@@ -1149,7 +1231,10 @@ If the image is an article, extract the headline and body."""
         # (see _drop_prompt_blocked_cards) and stream from the clean subset.
         # `isolated` guards it to a single shot; a mutable list + index walk (not
         # a for-loop) lets that rescue attempt be appended mid-iteration.
+        # `pending_filter_note` is the user-visible disclosure emitted after a
+        # successful rescue (post-generation, so the filter can't touch it).
         isolated = False
+        pending_filter_note = ""
         full_text = ""
         attempt_idx = 0
         while attempt_idx < len(attempts):
@@ -1216,28 +1301,58 @@ If the image is an article, extract the headline and body."""
                     logger.error(f"Gemini answer stream failed: {e}")
                     raise AnalysisError(f"AI answer failed: {e}")
                 if is_last_attempt and not isolated:
-                    # The whole ladder produced nothing. Last resort: isolate
-                    # filter-blocked card(s) and stream from the clean subset.
-                    # During a genuine outage the probes error out as
-                    # not-blocked, nothing is dropped, and we fall through to
-                    # the raise — no wasted generation.
+                    # The whole ladder produced nothing. Last resort, mirroring
+                    # the buffered path: isolate the filter-blocked card(s),
+                    # salvage each with the richest field subset the filter
+                    # accepts (a saved card must never silently vanish from an
+                    # answer), and stream from the rebuilt context. During a
+                    # genuine outage the probes error out as not-blocked,
+                    # nothing is dropped, and we fall through to the raise.
                     isolated = True
                     clean, dropped, question_blocked = self._drop_prompt_blocked_cards(
-                        question, _headline_cards(cards), history, excluded_titles)
-                    if dropped and clean and not question_blocked:
-                        logger.warning(
-                            "ask stream: dropped %d filter-blocked card(s): %s",
-                            len(dropped), [c.get("id") for c in dropped])
-                        attempts.append((GEMINI_ANALYSIS_MODEL, _build_rag_prompt(
-                            question, clean, history, excluded_titles) + marker_instruction))
-                        attempt_idx += 1
-                        continue
+                        question, cards, history, excluded_titles)
+                    if dropped and not question_blocked:
+                        fully_dropped, partially_filtered = [], []
+                        salvaged = {}
+                        base = list(clean)
+                        for pc in dropped:
+                            variant, removed_fields = self._best_clean_variant(
+                                question, base, pc, history, excluded_titles)
+                            if variant is None:
+                                fully_dropped.append(pc)
+                            else:
+                                base.append(variant)
+                                salvaged[pc.get("id")] = variant
+                                if removed_fields:
+                                    partially_filtered.append((pc, removed_fields))
+                        clean_ids = {c.get("id") for c in clean}
+                        rescue_cards = [
+                            salvaged.get(c.get("id"), c) for c in cards
+                            if c.get("id") in clean_ids or c.get("id") in salvaged]
+                        if rescue_cards:
+                            pending_filter_note = self._filter_note(
+                                fully_dropped, partially_filtered)
+                            logger.warning(
+                                "ask stream filter salvage: %d dropped %s, %d partially filtered",
+                                len(fully_dropped),
+                                [c.get("id") for c in fully_dropped],
+                                len(partially_filtered))
+                            attempts.append((GEMINI_ANALYSIS_MODEL, _build_rag_prompt(
+                                question, rescue_cards, history, excluded_titles)
+                                + marker_instruction))
+                            attempt_idx += 1
+                            continue
                 if is_last_attempt:
                     logger.error(f"Gemini answer stream failed: {e}")
                     raise AnalysisError(f"AI answer failed: {e}")
                 logger.error("Ask stream attempt %d (model %s) produced no output — "
                              "trying next fallback: %s", attempt_idx, attempt_model, e)
                 attempt_idx += 1
+
+        # The answer streamed successfully — if the filter rescue had to withhold
+        # anything, disclose it now (appended prose, never silence).
+        if pending_filter_note:
+            yield ("token", pending_filter_note)
 
         # Parse the citation marker out of the accumulated full text, then keep
         # only ids the model actually named that we in fact supplied. If the
