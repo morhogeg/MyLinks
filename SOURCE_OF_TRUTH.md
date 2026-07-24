@@ -714,7 +714,42 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-24 (latest) — FIX OVER-BROAD LINKEDIN/FB IMAGE SUPPRESSION (restore
+- **2026-07-24 (latest) — ASK STILL FAILS AFTER THE 07-21 FALLBACK FIX →
+  RECITATION-safe retry + self-naming errors (owner screenshot: a Hebrew RECIPE
+  ask, "פסטה שמנת ותרד קלאסית", returns "Machina couldn't generate an answer").**
+  Traced end-to-end: the 07-21 Ask fix (ask-model→analysis-model fallback +
+  the distinguishable message; merge `8997f13`) **is live** — it shipped to prod
+  `ask_brain` via the whole-codebase deploy at `65cd83d6` (07-22 20:54, run
+  succeeded; every deploy since was scoped and didn't touch `ask_brain`, which
+  didn't need it). So the message in the screenshot is the NEW one, which
+  **disproves the "bad `gemini-3.1-flash` model id" theory**: the live fallback to
+  the production-proven `gemini-3.1-flash-lite` would have rescued that, and it
+  didn't. Since flash-lite works for every save but the Ask call fails on it too,
+  the failure is **specific to the Ask request shape** — and the smoking gun is
+  that the failing query is a **recipe**: the RAG prompt orders the model to
+  "reproduce the COMPLETE numbered steps… verbatim" / "the complete list, not a
+  sample", which is exactly what Gemini's **RECITATION** filter blocks — returning
+  an EMPTY response the same way on EVERY model tier (so the fallback can't help),
+  while analysis never trips it because it summarizes. Couldn't confirm the exact
+  reason from a cloud session (no prod egress; `ADMIN_TOKEN` unset so `debug_status`
+  403s; the recorded cause sits in `server_errors` unreadable from here). **Fix
+  (backend, `ai_service.py` + `main.py` unchanged):** (1) empty/blocked
+  generations now raise a new `EmptyGenerationError(AnalysisError)` whose message
+  NAMES the reason (`finish_reason=RECITATION` / `SAFETY` / `MAX_TOKENS`, via
+  `_gen_failure_reason` + a safe `_response_text` that won't throw on a blocked
+  candidate) — so the next `server_errors` record is self-diagnosing instead of
+  opaque; (2) both RAG paths (buffered/native AND streaming/web) now, on an EMPTY
+  answer across all model tiers, retry ONCE in a **paraphrase-safe framing**
+  (`_CITED_JSON_PARAPHRASE_SUFFIX`: "answer in YOUR OWN WORDS, don't reproduce full
+  ingredient/step blocks verbatim, quote only short phrases") — verbatim first for
+  quality, paraphrase only when the filter blocks it. Non-empty transport failures
+  still propagate untouched (no swallowing; ask unit still refunds). Tests
+  348→ (added buffered empty→paraphrase recovery, non-empty-doesn't-retry, stream
+  empty-both-tiers→paraphrase recovery, updated the two "both models fail" stream
+  assertions to the new 3-attempt sequence); py_compile clean. Backend changed →
+  redeploy **`ask_brain`**. If Ask STILL fails after deploy, `server_errors` now
+  names the real `finish_reason`/`block_reason` — read it and fix that exact cause.
+- **2026-07-24 — FIX OVER-BROAD LINKEDIN/FB IMAGE SUPPRESSION (restore
   video thumbnails) + menu color.** The prior "no images on LinkedIn/FB" fix was
   too blunt: it killed the poster on a legit **Facebook VIDEO** (owner: "the
   thumbnail worked and looked great yesterday, now it's gone"). Owner's rule:

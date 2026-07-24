@@ -60,6 +60,52 @@ class AnalysisError(Exception):
     error instead of silently saving a junk 'Analysis Failed' card."""
 
 
+class EmptyGenerationError(AnalysisError):
+    """A Gemini call SUCCEEDED at the transport level but returned no usable
+    text — the model produced no answer (blocked by a safety/RECITATION filter,
+    hit the token ceiling, or degenerated). Distinct from a transport failure so
+    callers can react to it specifically: the RAG answer path retries an empty
+    generation in a paraphrase-safe framing, because the biggest trigger is the
+    prompt asking the model to reproduce a source's steps/ingredients verbatim,
+    which Gemini's RECITATION filter blocks the same way on EVERY model tier (so
+    the analysis-model fallback can't rescue it). Subclasses AnalysisError so
+    every existing `except AnalysisError` handler still catches it."""
+
+
+def _gen_failure_reason(response) -> str:
+    """Best-effort human reason a Gemini generation came back empty — the
+    candidate's finish_reason (SAFETY / RECITATION / MAX_TOKENS / …) and/or the
+    prompt's block_reason — for the durable error trail. Never raises."""
+    parts = []
+    try:
+        fb = getattr(response, "prompt_feedback", None)
+        block = getattr(fb, "block_reason", None) if fb else None
+        if block:
+            parts.append(f"block_reason={block}")
+    except Exception:
+        pass
+    try:
+        cands = getattr(response, "candidates", None) or []
+        if cands:
+            fr = getattr(cands[0], "finish_reason", None)
+            if fr:
+                parts.append(f"finish_reason={fr}")
+    except Exception:
+        pass
+    return ", ".join(parts) or "no candidates / unknown reason"
+
+
+def _response_text(response) -> str:
+    """Safe extractor for ``response.text``. The SDK property can RAISE (not just
+    return empty) when a candidate carries no text part — e.g. a safety or
+    RECITATION block — so a bare ``response.text`` would throw an opaque error
+    instead of letting us report the real reason. Returns "" on any issue."""
+    try:
+        return (response.text or "") if response else ""
+    except Exception:
+        return ""
+
+
 # How many times _generate_json attempts a Gemini call before giving up.
 _MAX_GENERATE_ATTEMPTS = 3
 # Attempts for embed_text (embeddings are non-critical — see embed_text).
@@ -423,6 +469,22 @@ _CITED_JSON_STRICT_SUFFIX = (
     'Return ONLY a JSON object: {"answer": string, "citedIds": string[]}.'
 )
 
+# Fallback framing used when a first, verbatim-oriented answer came back EMPTY —
+# the classic signature of Gemini's RECITATION filter refusing to emit large
+# blocks copied near-verbatim from a source (recipe ingredient/step lists are the
+# worst offender, which is why a recipe ask can fail every time). Re-asks for the
+# SAME substance but in the model's own words, quoting only short snippets, so the
+# answer is no longer a verbatim reproduction and clears the filter. Deliberately
+# relaxes the "reproduce COMPLETE steps verbatim" rule for this one retry only.
+_CITED_JSON_PARAPHRASE_SUFFIX = (
+    "IMPORTANT: answer in YOUR OWN WORDS. Do NOT copy long passages, full "
+    "ingredient lists, or complete step-by-step blocks verbatim from the sources "
+    "— summarize and rephrase them, quoting at most short phrases. Still cover the "
+    "substance the user asked for (the key ingredients, the gist of each step), "
+    "just paraphrased. Cite the ids you relied on. "
+    'Return ONLY a JSON object: {"answer": string, "citedIds": string[]}.'
+)
+
 
 def _valid_cited_ids(cited, cards: list) -> list:
     """Filter model-supplied citation ids down to ids we actually provided.
@@ -525,10 +587,15 @@ class GeminiService:
                     contents=contents,
                     config=config,
                 )
-                if not response or not response.text:
-                    raise AnalysisError("Empty response from Gemini")
+                text = _response_text(response)
+                if not text:
+                    # Name WHY it was empty (SAFETY / RECITATION / MAX_TOKENS)
+                    # so the failure is diagnosable from the server_errors trail
+                    # instead of an opaque "empty response".
+                    raise EmptyGenerationError(
+                        f"Empty response from Gemini ({_gen_failure_reason(response)})")
 
-                data = json.loads(response.text)
+                data = json.loads(text)
                 # Defensive unwrapping kept as a safety net.
                 if isinstance(data, str):
                     try:
@@ -552,6 +619,11 @@ class GeminiService:
                 break
 
         logger.error(f"Gemini {what} failed after retries: {last_error}")
+        # Preserve an empty/blocked-generation signal through the wrap so the RAG
+        # answer path can react to it (paraphrase-safe retry) rather than seeing
+        # a generic transport failure.
+        if isinstance(last_error, EmptyGenerationError):
+            raise last_error
         raise AnalysisError(f"AI {what} failed: {last_error}")
 
     def analyze_text(self, text: str, existing_tags: list = None, content_type: str = None,
@@ -748,8 +820,18 @@ If the image is an article, extract the headline and body."""
                 "ungrounded": False,
             }
 
-        prompt = _build_rag_prompt(question, cards, history, excluded_titles) + _CITED_JSON_SUFFIX
-        data = self._answer_json(prompt, "answer", attempts)
+        base_prompt = _build_rag_prompt(question, cards, history, excluded_titles)
+        try:
+            data = self._answer_json(base_prompt + _CITED_JSON_SUFFIX, "answer", attempts)
+        except EmptyGenerationError as e:
+            # The verbatim-oriented answer produced NO text on every model tier —
+            # the RECITATION/safety signature. Retry once asking the model to
+            # paraphrase instead of reproducing source blocks; this clears the
+            # filter and still answers the question. If THIS also comes back
+            # empty, let it propagate to the caller's sanitized error.
+            logger.warning("ask answer empty (%s) — retrying paraphrase-safe", e)
+            data = self._answer_json(
+                base_prompt + _CITED_JSON_PARAPHRASE_SUFFIX, "answer (paraphrase retry)", attempts)
         answer = data.get("answer") or ""
         cited = _valid_cited_ids(data.get("citedIds"), cards)
         if cited:
@@ -815,13 +897,25 @@ If the image is an article, extract the headline and body."""
             yield ("citedIds", [])
             return
 
-        prompt = _build_rag_prompt(question, cards, history, excluded_titles) + (
+        base_prompt = _build_rag_prompt(question, cards, history, excluded_titles)
+        marker_instruction = (
             "Write the answer as plain text (no JSON). Then, on a NEW LINE after "
             "the answer, output a citation marker listing the ids (without "
             "brackets) of the sources you relied on, in exactly this format:\n"
             "[[CITED: id1, id2]]\n"
             "Output the marker exactly once, as the very last line, and nothing after it."
         )
+        verbatim_prompt = base_prompt + marker_instruction
+        # Paraphrase-safe variant — reached only if the verbatim answer streamed
+        # NOTHING on every model tier, the RECITATION signature (mirrors the
+        # buffered path's _CITED_JSON_PARAPHRASE_SUFFIX): same substance, in the
+        # model's own words, so the answer is no longer a verbatim reproduction.
+        paraphrase_prompt = base_prompt + (
+            "IMPORTANT: answer in YOUR OWN WORDS. Do NOT copy long passages, full "
+            "ingredient lists, or complete step-by-step blocks verbatim from the "
+            "sources — summarize and rephrase them, quoting at most short phrases, "
+            "while still covering the substance the user asked for. "
+        ) + marker_instruction
 
         # Tail buffer: hold back the trailing characters that could be the start
         # of the "[[CITED: ...]]" marker so it is never streamed as visible text.
@@ -841,26 +935,31 @@ If the image is an article, extract the headline and body."""
                     return len(buf) - keep
             return len(buf)
 
-        # Model fallback, mirroring _answer_json: the ask tier is the ONLY user
-        # of GEMINI_ASK_MODEL, so if it fails we retry the whole stream on the
-        # production-proven analysis model — but only while NOTHING has been
-        # yielded to the consumer yet (text held in the tail buffer is fine; it
-        # was never surfaced). After the first emitted token a restart would
-        # duplicate prose, so mid-stream failures still raise.
+        # Ordered attempts, each tried ONLY while nothing has been yielded to the
+        # consumer yet (text held in the tail buffer is fine; it was never
+        # surfaced). After the first emitted token a restart would duplicate
+        # prose, so mid-stream failures still raise. Mirrors _answer_json: the ask
+        # tier is the ONLY user of GEMINI_ASK_MODEL, so a failure there retries on
+        # the production-proven analysis model; a further EMPTY stream (the
+        # RECITATION signature) gets one paraphrase-safe retry before giving up.
+        attempts = [
+            (GEMINI_ASK_MODEL, verbatim_prompt),
+            (GEMINI_ANALYSIS_MODEL, verbatim_prompt),
+            (GEMINI_ANALYSIS_MODEL, paraphrase_prompt),
+        ]
         full_text = ""
-        for fallback_model in (None, GEMINI_ANALYSIS_MODEL):
-            # Per-attempt state: a failed first attempt must not leak partial
-            # accumulation into the fallback run.
+        for attempt_idx, (attempt_model, attempt_prompt) in enumerate(attempts):
+            is_last_attempt = attempt_idx == len(attempts) - 1
+            # Per-attempt state: a failed attempt must not leak partial
+            # accumulation into the next run.
             buffer = ""
             full_text = ""
             marker_seen = False
             emitted = False
             try:
                 stream = self.client.models.generate_content_stream(
-                    # Higher-tier ASK model (see GEMINI_ASK_MODEL) first,
-                    # matching the non-streaming answer path.
-                    model=fallback_model or GEMINI_ASK_MODEL,
-                    contents=[prompt],
+                    model=attempt_model,
+                    contents=[attempt_prompt],
                     # Match the non-streaming answer path: this is a grounded,
                     # factual answer, so keep temperature low for stability. Without
                     # this the stream would silently run at the ~1.0 default.
@@ -896,18 +995,18 @@ If the image is an article, extract the headline and body."""
                 # streaming path must match, or the user gets a blank bubble
                 # marked done and the ask unit is silently kept.
                 if not full_text.strip():
-                    raise AnalysisError("Empty answer stream")
+                    raise EmptyGenerationError(
+                        f"Empty answer stream ({_gen_failure_reason(getattr(stream, 'response', None))})")
                 # Flush any remaining buffered text that turned out not to be a marker.
                 if not marker_seen and buffer:
                     yield ("token", buffer)
-                break  # this model completed — don't try the fallback
+                break  # this attempt completed — don't try the remaining fallbacks
             except Exception as e:
-                if emitted or fallback_model is not None:
+                if emitted or is_last_attempt:
                     logger.error(f"Gemini answer stream failed: {e}")
                     raise AnalysisError(f"AI answer failed: {e}")
-                logger.error("Ask model %s stream failed before any output — "
-                             "falling back to %s: %s",
-                             GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL, e)
+                logger.error("Ask stream attempt %d (model %s) produced no output — "
+                             "trying next fallback: %s", attempt_idx, attempt_model, e)
 
         # Parse the citation marker out of the accumulated full text, then keep
         # only ids the model actually named that we in fact supplied. If the
