@@ -1,15 +1,5 @@
 # TEMPORARY debug harness for the 2026-07-24 Ask PROHIBITED_CONTENT incident.
-#
-# Cloud sessions can't reach Gemini or Firestore, but this runner can (repo
-# secrets GEMINI_API_KEY + FIREBASE_SERVICE_ACCOUNT). It reproduces the exact
-# Ask prompt from the affected user's real cards, probes Gemini's prompt
-# filter, and bisects to the precise card/field/sentence being rejected.
-#
-# Public repo ⇒ logs print ONLY structural findings (booleans/counts/short
-# ids). Full detail goes to the auth-gated `ask-debug-report` artifact.
-#
-# Trigger: push to `trigger/ask-debug` (dispatch API 403s for cloud sessions;
-# push is the control channel, same pattern as trigger/testflight).
+# Checks out the FEATURE branch so the harness runs the new ladder code.
 # DELETE this workflow once the incident is resolved.
 
 name: Ask Debug
@@ -29,6 +19,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: claude/ask-feature-onboard-we9bjh
 
       - name: Check required secrets
         env:
