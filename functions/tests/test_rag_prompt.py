@@ -340,7 +340,37 @@ def test_stream_empty_on_both_models_raises():
     svc = _svc_with_models(models)
     with pytest.raises(AnalysisError):
         _drain(svc.answer_from_context_stream("q?", _CARDS))
-    assert models.requested == [GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL]
+    # ASK (verbatim) → ANALYSIS (verbatim) → ANALYSIS (paraphrase-safe) before giving up.
+    assert models.requested == [
+        GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL, GEMINI_ANALYSIS_MODEL]
+
+
+def test_stream_empty_verbatim_then_paraphrase_recovers():
+    """An empty (RECITATION-signature) stream on both verbatim attempts gets one
+    paraphrase-safe retry, which streams a real answer — no hard failure."""
+    class _EmptyTwiceThenReal:
+        def __init__(self, pieces):
+            self._pieces = pieces
+            self.requested = []
+            self.prompts = []
+
+        def generate_content_stream(self, model, contents, config=None):
+            self.requested.append(model)
+            self.prompts.append(contents[0])
+            if len(self.requested) <= 2:
+                return iter(())  # both verbatim attempts stream nothing
+            return iter(_FakeChunk(p) for p in self._pieces)
+
+    models = _EmptyTwiceThenReal(["Paraphrased answer.\n", "[[CITED: id1]]"])
+    svc = _svc_with_models(models)
+    text, cited, ungrounded = _drain(svc.answer_from_context_stream("q?", _CARDS))
+    assert models.requested == [
+        GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL, GEMINI_ANALYSIS_MODEL]
+    assert "Paraphrased answer." in text
+    assert cited == ["id1"]
+    # The recovering attempt used the paraphrase framing, not the verbatim one.
+    assert "YOUR OWN WORDS" in models.prompts[2]
+    assert "YOUR OWN WORDS" not in models.prompts[0]
 
 
 # ── answer_from_context: retry + ungrounded flag (buffered path) ───────────
@@ -427,6 +457,47 @@ def test_answer_falls_back_to_analysis_model_when_ask_model_fails():
     out = svc.answer_from_context("q?", _CARDS)
     assert out == {"answer": "Recovered.", "citedIds": ["id1"], "ungrounded": False}
     assert svc._calls["models"] == [GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL]
+
+
+def test_buffered_empty_generation_retries_paraphrase_safe():
+    """An EMPTY generation on both model tiers (the RECITATION signature — the
+    verbatim-reproduction instruction blocked) triggers ONE paraphrase-safe
+    re-ask, which recovers a real cited answer."""
+    from ai_service import EmptyGenerationError
+    svc = _svc_with_json_responses([
+        EmptyGenerationError("Empty response from Gemini (finish_reason=RECITATION)"),  # ASK verbatim
+        EmptyGenerationError("Empty response from Gemini (finish_reason=RECITATION)"),  # ANALYSIS verbatim
+        {"answer": "Paraphrased, grounded.", "citedIds": ["id1"]},                       # paraphrase retry
+    ])
+    # Capture the prompts so we can prove the retry switched framing.
+    seen = svc._generate_json
+    prompts = []
+
+    def _capture(contents, what, config_extra=None, model=None, attempts=None):
+        prompts.append(contents[0])
+        return seen(contents, what, config_extra=config_extra, model=model, attempts=attempts)
+
+    svc._generate_json = _capture
+    out = svc.answer_from_context("q?", _CARDS)
+    assert out == {"answer": "Paraphrased, grounded.", "citedIds": ["id1"], "ungrounded": False}
+    assert svc._calls["n"] == 3  # ask + analysis (both empty) + paraphrase retry
+    assert "YOUR OWN WORDS" in prompts[2]
+    assert "YOUR OWN WORDS" not in prompts[0]
+
+
+def test_buffered_non_empty_failure_does_not_paraphrase_retry():
+    """A NON-empty transport failure (not the RECITATION signature) must NOT be
+    swallowed into a paraphrase retry — it propagates so the caller surfaces the
+    sanitized error and refunds the ask unit."""
+    import pytest
+    from ai_service import AnalysisError
+    svc = _svc_with_json_responses([
+        AnalysisError("AI answer failed: 500 backend error"),   # ASK
+        AnalysisError("AI answer failed: 500 backend error"),   # ANALYSIS fallback
+    ])
+    with pytest.raises(AnalysisError):
+        svc.answer_from_context("q?", _CARDS)
+    assert svc._calls["n"] == 2  # no third (paraphrase) attempt
 
 
 def test_answer_raises_when_both_models_fail():
@@ -575,7 +646,10 @@ def test_stream_raises_when_both_models_fail():
     svc = _svc_with_models(models)
     with pytest.raises(AnalysisError):
         _drain(svc.answer_from_context_stream("q?", _CARDS))
-    assert models.requested == [GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL]
+    # Every attempt errors before output: ASK, then ANALYSIS twice (verbatim +
+    # paraphrase-safe) before the failure surfaces.
+    assert models.requested == [
+        GEMINI_ASK_MODEL, GEMINI_ANALYSIS_MODEL, GEMINI_ANALYSIS_MODEL]
 
 
 def test_stream_no_fallback_after_tokens_emitted():
