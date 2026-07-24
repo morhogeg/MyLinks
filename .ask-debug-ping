@@ -1,1 +1,1 @@
-v6 run - rewrite poison card, verify original path
+v7 run - askExcluded flag + restored-path verify
