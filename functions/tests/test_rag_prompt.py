@@ -530,173 +530,141 @@ def test_buffered_empty_generation_retries_paraphrase_safe():
     assert "YOUR OWN WORDS" not in prompts[0]
 
 
-def test_buffered_prompt_block_retries_headline_only_context():
-    """A PROMPT-blocked generation (input rejected, e.g. PROHIBITED_CONTENT)
-    skips the pointless model fallback and retries once with headline-only
-    cards — deep raw content stripped — recovering a grounded answer."""
-    from ai_service import EmptyGenerationError
+def _svc_with_plain_ladder(schema_responses, plain_outcomes):
+    """Fake service: `_generate_json` serves `schema_responses` in order and
+    `_plain_answer` serves `plain_outcomes` (dict = success, Exception =
+    raised), recording every plain prompt."""
+    svc = _svc_with_json_responses(schema_responses)
+    state = {"i": 0, "prompts": []}
+
+    def fake_plain(prompt):
+        state["prompts"].append(prompt)
+        i = state["i"]
+        state["i"] += 1
+        out = plain_outcomes[i]
+        if isinstance(out, Exception):
+            raise out
+        return out
+
+    svc._plain_answer = fake_plain
+    svc._plain_state = state
+    return svc
+
+
+def test_buffered_block_ladder_paraphrase_stage_recovers():
+    """Plain full-depth fails (output-side kill) → the paraphrase framing is
+    tried next, in plain mode, with the SAME full context."""
+    from ai_service import AnalysisError, EmptyGenerationError
+    deep_cards = [{
+        "id": "id1", "title": "Pasta", "summary": "A creamy pasta recipe.",
+        "recipe": {"ingredients": ["500g pasta"], "instructions": ["Boil it"]},
+    }]
+    svc = _svc_with_plain_ladder(
+        [EmptyGenerationError("blocked", prompt_blocked=True)],
+        [AnalysisError("plain full failed"),
+         {"answer": "Paraphrased, grounded.", "citedIds": ["id1"]}])
+    out = svc.answer_from_context("q?", deep_cards)
+    assert out == {"answer": "Paraphrased, grounded.", "citedIds": ["id1"],
+                   "ungrounded": False, "droppedCardIds": [], "filteredCards": []}
+    prompts = svc._plain_state["prompts"]
+    assert len(prompts) == 2
+    assert "YOUR OWN WORDS" in prompts[1]      # paraphrase framing
+    assert "500g pasta" in prompts[1]          # …but still FULL context
+
+
+def test_buffered_block_ladder_headline_stage_strips_deep_content():
+    """Full and paraphrase both fail → the headline stage sends every card as
+    title+summary only (no raw deep content), still in plain mode."""
+    from ai_service import AnalysisError, EmptyGenerationError
     deep_cards = [{
         "id": "id1", "title": "Pasta", "summary": "A creamy pasta recipe.",
         "recipe": {"ingredients": ["500g pasta"], "instructions": ["Boil it"]},
         "detailedSummary": "RAW SCRAPED DETAIL", "userNote": "my private note",
     }]
-    svc = _svc_with_json_responses([
-        EmptyGenerationError(
-            "Empty response from Gemini (block_reason=BlockedReason.PROHIBITED_CONTENT)",
-            prompt_blocked=True),                                # ASK, full context
-        {"answer": "Grounded on headlines.", "citedIds": ["id1"]},  # headline retry
-    ])
-    seen = svc._generate_json
-    prompts = []
-
-    def _capture(contents, what, config_extra=None, model=None, attempts=None):
-        prompts.append(contents[0])
-        return seen(contents, what, config_extra=config_extra, model=model, attempts=attempts)
-
-    svc._generate_json = _capture
+    svc = _svc_with_plain_ladder(
+        [EmptyGenerationError("blocked", prompt_blocked=True)],
+        [AnalysisError("plain full failed"),
+         AnalysisError("plain paraphrase failed"),
+         {"answer": "Grounded on headlines.", "citedIds": ["id1"]}])
     out = svc.answer_from_context("q?", deep_cards)
-    assert out == {"answer": "Grounded on headlines.", "citedIds": ["id1"], "ungrounded": False,
-                   "droppedCardIds": [], "filteredCards": []}
-    # No analysis-model fallback for a prompt block (same input, same filter):
-    # both calls are the ASK tier — full context, then headline-only.
-    assert svc._calls["models"] == [GEMINI_ASK_MODEL, GEMINI_ASK_MODEL]
-    assert "500g pasta" in prompts[0]
-    assert "500g pasta" not in prompts[1]
-    assert "RAW SCRAPED DETAIL" not in prompts[1]
-    assert "my private note" not in prompts[1]
-    assert "A creamy pasta recipe." in prompts[1]
+    assert out["answer"] == "Grounded on headlines."
+    assert out["citedIds"] == ["id1"]
+    headline = svc._plain_state["prompts"][2]
+    assert "500g pasta" not in headline
+    assert "RAW SCRAPED DETAIL" not in headline
+    assert "my private note" not in headline
+    assert "A creamy pasta recipe." in headline   # card still present
 
 
-def test_buffered_prompt_block_uncited_reask_stays_headline_only():
-    """If the headline-only recovery answer comes back UNCITED, the strict
-    citation re-ask must reuse the headline context — never re-send the full
-    prompt Gemini already rejected."""
-    from ai_service import EmptyGenerationError
+def test_buffered_block_ladder_uncited_reask_stays_plain_and_reduced():
+    """When the ladder rescued at the headline stage and the answer is
+    UNCITED, the strict citation re-ask must stay in PLAIN mode (schema is
+    what blocked) and reuse the reduced context."""
+    from ai_service import AnalysisError, EmptyGenerationError
     deep_cards = [{
         "id": "id1", "title": "Pasta", "summary": "A creamy pasta recipe.",
         "recipe": {"ingredients": ["500g pasta"], "instructions": ["Boil it"]},
     }]
-    svc = _svc_with_json_responses([
-        EmptyGenerationError("blocked", prompt_blocked=True),  # full context
-        {"answer": "Uncited.", "citedIds": []},                # headline, uncited
-        {"answer": "Now cited.", "citedIds": ["id1"]},         # strict re-ask
-    ])
-    seen = svc._generate_json
-    prompts = []
-
-    def _capture(contents, what, config_extra=None, model=None, attempts=None):
-        prompts.append(contents[0])
-        return seen(contents, what, config_extra=config_extra, model=model, attempts=attempts)
-
-    svc._generate_json = _capture
+    svc = _svc_with_plain_ladder(
+        [EmptyGenerationError("blocked", prompt_blocked=True)],
+        [AnalysisError("plain full failed"),
+         AnalysisError("plain paraphrase failed"),
+         {"answer": "Uncited.", "citedIds": []},          # headline stage
+         {"answer": "Now cited.", "citedIds": ["id1"]}])  # plain strict re-ask
     out = svc.answer_from_context("q?", deep_cards)
-    assert out == {"answer": "Now cited.", "citedIds": ["id1"], "ungrounded": False,
-                   "droppedCardIds": [], "filteredCards": []}
-    assert "500g pasta" not in prompts[2]  # strict re-ask kept the reduced context
+    assert out["answer"] == "Now cited."
+    assert out["citedIds"] == ["id1"]
+    assert svc._calls["n"] == 1  # schema was hit exactly once, never again
+    reask = svc._plain_state["prompts"][3]
+    assert "500g pasta" not in reask  # reduced context carried into the re-ask
+
+
+def test_buffered_block_sweep_topn_recovers_with_disclosure():
+    """Full/paraphrase/headline all fail -> the sweep shrinks the context to
+    the top-ranked cards; the first PASSING generation is the answer, and the
+    cut is disclosed in the answer text."""
+    from ai_service import AnalysisError, EmptyGenerationError
+    cards = [{"id": f"id{i}", "title": f"Card {i}", "summary": f"Summary {i}."}
+             for i in range(1, 6)]  # 5 cards -> sweep has top4/top2/top1 stages
+    svc = _svc_with_plain_ladder(
+        [EmptyGenerationError("blocked", prompt_blocked=True)],
+        [AnalysisError("full"), AnalysisError("para"), AnalysisError("headline"),
+         {"answer": "From the top four.", "citedIds": ["id1"]}])  # top4 passes
+    out = svc.answer_from_context("q?", cards)
+    assert out["answer"].startswith("From the top four.")
+    assert "could not be included" in out["answer"]  # disclosure for the cut
+    assert out["citedIds"] == ["id1"]
+    top4_prompt = svc._plain_state["prompts"][3]
+    assert "Card 4" in top4_prompt
+    assert "Card 5" not in top4_prompt  # rank 5 was cut
+
+
+def test_buffered_block_ladder_exhausted_raises_with_stage():
+    """All three plain stages fail → a stage-tagged error surfaces so the
+    diag names the exhausted ladder instead of an opaque block."""
+    import pytest
+    from ai_service import AnalysisError, EmptyGenerationError
+    svc = _svc_with_plain_ladder(
+        [EmptyGenerationError("blocked", prompt_blocked=True)],
+        [AnalysisError(f"s{i}") for i in range(10)])
+    with pytest.raises(EmptyGenerationError) as exc_info:
+        svc.answer_from_context("q?", _CARDS)
+    assert "plain-mode sweep exhausted" in str(exc_info.value)
+    assert exc_info.value.prompt_blocked is True
 
 
 def test_buffered_prompt_block_rescued_by_plain_mode_first():
     """A schema-mode prompt block is FIRST retried as a plain (schema-less)
-    generation — CI probes proved the identical prompt passes that way — so
-    the answer keeps FULL context and no card is touched or disclosed."""
+    generation with the identical full-depth prompt — no card is touched."""
     from ai_service import EmptyGenerationError
-    svc = _svc_with_json_responses([
-        EmptyGenerationError("blocked", prompt_blocked=True),   # schema mode
-    ])
-    plain_prompts = []
-
-    def fake_plain(prompt):
-        plain_prompts.append(prompt)
-        return {"answer": "Full-depth plain answer.", "citedIds": ["id1"]}
-
-    svc._plain_answer = fake_plain
-    # Any probe call would mean salvage ran — it must not.
-    svc._probe_prompt_blocked = lambda prompt: (_ for _ in ()).throw(
-        AssertionError("salvage must not run when plain mode succeeds"))
+    svc = _svc_with_plain_ladder(
+        [EmptyGenerationError("blocked", prompt_blocked=True)],
+        [{"answer": "Full-depth plain answer.", "citedIds": ["id1"]}])
     out = svc.answer_from_context("q?", _CARDS)
     assert out == {"answer": "Full-depth plain answer.", "citedIds": ["id1"],
                    "ungrounded": False, "droppedCardIds": [], "filteredCards": []}
-    assert len(plain_prompts) == 1
+    assert len(svc._plain_state["prompts"]) == 1
     assert svc._calls["n"] == 1  # only the schema attempt hit _generate_json
-
-
-def test_buffered_block_salvages_poison_card_with_toxic_field_excised():
-    """When the prompt is blocked, the probe bisection finds the poison card
-    and the salvage keeps it in context with ONLY the toxic field excised —
-    the card never silently vanishes, and the withholding is disclosed in the
-    answer text."""
-    from ai_service import EmptyGenerationError
-    cards = [
-        {"id": "clean1", "title": "Fine card", "summary": "Totally fine."},
-        {"id": "poison", "title": "Pasta card", "summary": "TOXIC SUMMARY",
-         "recipe": {"ingredients": ["500g pasta"], "instructions": ["Boil it"]}},
-        {"id": "clean2", "title": "Another fine card", "summary": "Also fine."},
-    ]
-    svc = _svc_with_json_responses([
-        EmptyGenerationError("blocked", prompt_blocked=True),   # full context
-        {"answer": "Grounded, poison excised.", "citedIds": ["poison"]},
-    ])
-    svc._probe_prompt_blocked = lambda prompt: "TOXIC SUMMARY" in prompt
-    seen = svc._generate_json
-    prompts = []
-
-    def _capture(contents, what, config_extra=None, model=None, attempts=None):
-        prompts.append(contents[0])
-        return seen(contents, what, config_extra=config_extra, model=model, attempts=attempts)
-
-    svc._generate_json = _capture
-    out = svc.answer_from_context("q?", cards)
-    # The card SURVIVED (citable), only its toxic summary was excised…
-    assert out["citedIds"] == ["poison"]
-    assert out["droppedCardIds"] == []
-    assert out["filteredCards"] == [
-        {"id": "poison", "title": "Pasta card", "removedFields": ["summary"]}]
-    # …the withholding is disclosed in the answer…
-    assert out["answer"].startswith("Grounded, poison excised.")
-    assert 'Some details of "Pasta card" were withheld' in out["answer"]
-    # …and the successful generation kept the card's OTHER fields (recipe!)
-    # while excising only the toxic one.
-    final = prompts[1]
-    assert "TOXIC SUMMARY" not in final
-    assert "Pasta card" in final
-    assert "500g pasta" in final
-    assert "Fine card" in final and "Another fine card" in final
-
-
-def test_buffered_block_drops_card_only_when_nothing_salvageable():
-    """If not even the card's bare identity (or a placeholder title) passes
-    the filter, the card is dropped — and the exclusion is disclosed."""
-    from ai_service import EmptyGenerationError
-    cards = [
-        {"id": "clean1", "title": "Fine card", "summary": "Totally fine."},
-        {"id": "poison", "title": "Bad card", "summary": "Bad summary."},
-    ]
-    svc = _svc_with_json_responses([
-        EmptyGenerationError("blocked", prompt_blocked=True),   # full context
-        {"answer": "From the clean rest.", "citedIds": ["clean1"]},
-    ])
-    # The card's ID marker itself triggers → every variant (even placeholder
-    # title) still carries "[poison]" → nothing salvageable.
-    svc._probe_prompt_blocked = lambda prompt: "[poison]" in prompt
-    out = svc.answer_from_context("q?", cards)
-    assert out["droppedCardIds"] == ["poison"]
-    assert out["filteredCards"] == []
-    assert 'Your saved card "Bad card" could not be included' in out["answer"]
-
-
-def test_buffered_question_itself_blocked_raises_with_stage():
-    """If even the ZERO-card prompt is rejected, no card subset can pass —
-    fail with a stage-tagged error instead of burning probe calls."""
-    import pytest
-    from ai_service import EmptyGenerationError
-    svc = _svc_with_json_responses([
-        EmptyGenerationError("blocked", prompt_blocked=True),   # full context
-        EmptyGenerationError("blocked", prompt_blocked=True),   # headline-only
-    ])
-    svc._probe_prompt_blocked = lambda prompt: True  # everything blocked
-    with pytest.raises(EmptyGenerationError) as exc_info:
-        svc.answer_from_context("q?", _CARDS)
-    assert "question/history itself" in str(exc_info.value)
 
 
 def test_stream_block_salvages_poison_card_with_toxic_field_excised():

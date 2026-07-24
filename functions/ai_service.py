@@ -1069,75 +1069,80 @@ If the image is an article, extract the headline and body."""
         dropped_ids = []
         filtered_cards = []
         filter_note = ""
+        # True once the plain-mode ladder produced the answer — the citation
+        # re-ask must then stay in plain mode too (schema mode is what blocked).
+        used_plain_mode = False
         base_prompt = _build_rag_prompt(question, cards, history, excluded_titles)
         try:
             data = self._answer_json(base_prompt + _CITED_JSON_SUFFIX, "answer", attempts)
         except EmptyGenerationError as e:
             if e.prompt_blocked:
-                # The INPUT was rejected (PROHIBITED_CONTENT). CI probe evidence
-                # (ask-debug run #1, 2026-07-24): this false positive is tied to
-                # the STRUCTURED-OUTPUT mode — the identical prompt passes as a
-                # plain generation. First rescue: the same full-depth prompt in
-                # plain mode — full context, no cards touched.
-                logger.warning("ask prompt blocked (%s) — retrying in plain mode", e)
-                try:
-                    data = self._plain_answer(base_prompt + _CITED_JSON_SUFFIX)
-                except AnalysisError as plain_exc:
-                    # Plain mode failed too → the content itself is the problem.
-                    # Probe-bisect the poison card(s), salvage each with the
-                    # richest field subset the filter accepts — every other
-                    # card keeps FULL depth, and anything withheld is disclosed
-                    # in the answer text.
-                    logger.warning(
-                        "ask plain-mode rescue failed (%s) — isolating "
-                        "filter-blocked cards", plain_exc)
-                    clean, dropped, question_blocked = self._drop_prompt_blocked_cards(
-                        question, cards, history, excluded_titles)
-                    if question_blocked:
-                        raise EmptyGenerationError(
-                            f"{e} [stage: the question/history itself is rejected "
-                            "by the prompt filter — no card subset can pass]",
-                            prompt_blocked=True)
-                    if dropped:
-                        fully_dropped, partially_filtered = [], []
-                        salvaged = {}
-                        base = list(clean)
-                        for pc in dropped:
-                            variant, removed_fields = self._best_clean_variant(
-                                question, base, pc, history, excluded_titles)
-                            if variant is None:
-                                fully_dropped.append(pc)
-                            else:
-                                base.append(variant)
-                                salvaged[pc.get("id")] = variant
-                                if removed_fields:
-                                    partially_filtered.append((pc, removed_fields))
-                        # Rebuild in the ORIGINAL retrieval order (it encodes
-                        # relevance — the poison card is often the most relevant).
-                        clean_ids = {c.get("id") for c in clean}
-                        context_cards = [
-                            salvaged.get(c.get("id"), c) for c in cards
-                            if c.get("id") in clean_ids or c.get("id") in salvaged]
-                        dropped_ids = [c.get("id") for c in fully_dropped]
-                        filtered_cards = [
-                            {"id": pc.get("id"), "title": pc.get("title"),
-                             "removedFields": rf} for pc, rf in partially_filtered]
-                        filter_note = self._filter_note(fully_dropped, partially_filtered)
-                        logger.warning(
-                            "ask filter salvage: %d dropped %s, %d partially filtered %s",
-                            len(dropped_ids), dropped_ids, len(filtered_cards),
-                            [(f['id'], f['removedFields']) for f in filtered_cards])
-                        data = self._answer_json(
-                            _build_rag_prompt(question, context_cards, history, excluded_titles)
-                            + _CITED_JSON_SUFFIX, "answer (filtered context)", attempts)
-                    else:
-                        # Isolation found nothing provably blocked (e.g. probes
-                        # erroring during an outage) — fall back to headline-only
-                        # context, the coarse-but-safe rendering.
-                        context_cards = _headline_cards(cards)
-                        data = self._answer_json(
-                            _build_rag_prompt(question, context_cards, history, excluded_titles)
-                            + _CITED_JSON_SUFFIX, "answer (reduced context)", attempts)
+                # The INPUT was rejected (PROHIBITED_CONTENT). Evidence from the
+                # CI harness runs (#1 probes, #2 full generations, 2026-07-24):
+                # the block is MODE- and CONTENT-dependent and NON-MONOTONE —
+                # the same context can pass plain and fail schema-constrained,
+                # and 1-token probe verdicts don't predict full generations
+                # (which sank the probe-bisect salvage: its final generation
+                # went BACK to the blocked schema mode and re-blocked every
+                # time). So the rescue is a deterministic ladder that never
+                # returns to schema mode, each step a fast fail when blocked:
+                #   1. plain, full-depth context (mode workaround);
+                #   2. plain, paraphrase framing (output-side kills);
+                #   3. plain, headline-only context (input-side poison — every
+                #      card stays present as title+summary, nothing vanishes);
+                #   4. stage-tagged error.
+                # Harness runs #3-#4 (2026-07-24) proved 1-token probe verdicts
+                # DON'T predict full-generation blocking (probe-salvage rebuilt
+                # an essentially identical context that still blocked), so the
+                # only reliable test is a full generation itself. The sweep
+                # tries progressively smaller contexts — a blocked attempt
+                # fast-fails pre-generation (<1s); the first attempt that
+                # passes IS the answer. Retrieval ranks the asked-about cards
+                # first, so top-N subsets keep the cards the answer needs while
+                # shedding the lower-ranked poison.
+                logger.warning("ask prompt blocked (%s) — plain-mode context sweep", e)
+                headline_all = _headline_cards(cards)
+                sweep = [
+                    ("plain full", cards, _CITED_JSON_SUFFIX),
+                    ("plain paraphrase", cards, _CITED_JSON_PARAPHRASE_SUFFIX),
+                    ("plain headline", headline_all, _CITED_JSON_SUFFIX),
+                ]
+                for n in (8, 4, 2, 1):
+                    if len(cards) > n:
+                        sweep.append((f"plain top{n}", cards[:n], _CITED_JSON_SUFFIX))
+                        if n == 4:
+                            sweep.append(("plain headline top4",
+                                          headline_all[:4], _CITED_JSON_SUFFIX))
+                if len(cards) > 1:
+                    # Last resort: the top-ranked card ITSELF may be the poison.
+                    sweep.append(("plain skip-first", cards[1:6], _CITED_JSON_SUFFIX))
+                data = None
+                last_exc = None
+                for stage_name, stage_cards, stage_suffix in sweep:
+                    try:
+                        data = self._plain_answer(_build_rag_prompt(
+                            question, stage_cards, history, excluded_titles) + stage_suffix)
+                        context_cards = stage_cards
+                        used_plain_mode = True
+                        logger.warning("ask rescued at sweep stage: %s (%d cards)",
+                                       stage_name, len(stage_cards))
+                        break
+                    except AnalysisError as stage_exc:
+                        last_exc = stage_exc
+                        logger.warning("ask sweep stage '%s' failed: %s",
+                                       stage_name, stage_exc)
+                if data is None:
+                    raise EmptyGenerationError(
+                        f"{e} [stage: plain-mode sweep exhausted — "
+                        f"last: {str(last_exc)[:120]}]",
+                        prompt_blocked=True)
+                if len(context_cards) < len(cards):
+                    # Cards were cut to clear the filter — never silently:
+                    # disclose it in the answer (appended post-generation, so
+                    # the filter can't touch it).
+                    filter_note = ("\n\n⚠️ Some of your saved cards could not be "
+                                   "included in this answer — Google's content "
+                                   "filter rejected their text.")
             else:
                 # The OUTPUT came back empty on every tier — the RECITATION
                 # signature. Retry once asking the model to paraphrase instead
@@ -1157,7 +1162,8 @@ If the image is an article, extract the headline and body."""
         # here must not sink the request — fall through to the ungrounded return.
         retry_prompt = _build_rag_prompt(question, context_cards, history, excluded_titles) + _CITED_JSON_STRICT_SUFFIX
         try:
-            retry = self._answer_json(retry_prompt, "answer (citation retry)", attempts)
+            retry = (self._plain_answer(retry_prompt) if used_plain_mode
+                     else self._answer_json(retry_prompt, "answer (citation retry)", attempts))
             retry_answer = (retry.get("answer") or "") + filter_note
             retry_cited = _valid_cited_ids(retry.get("citedIds"), cards)
             if retry_cited:

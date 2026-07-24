@@ -714,7 +714,42 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-24 (latest) — UNIFORM CARD THUMBNAIL HEIGHT (drop adaptive sizing).**
+- **2026-07-24 (latest) — ASK ROUND 7: probes proven unreliable → context-
+  shrinking sweep of REAL generations; CI-verified on the failing context
+  BEFORE deploy.** Harness v4 ran the actual `answer_from_context` on the
+  retrieval-reconstructed failing context: the probe-salvage rebuilt an
+  essentially identical context (bisect "found" offenders, per-field probes
+  passed everything) and the final plain generation still blocked —
+  **1-token probe verdicts do not predict full-generation blocking; probes
+  are dead as a mechanism**. Replaced with a deterministic sweep of actual
+  plain-mode generation attempts over shrinking contexts: full → paraphrase →
+  headline → top8 → top4 → headline-top4 → top2 → top1 → skip-first; blocked
+  attempts fast-fail (<1s), the first pass IS the answer, cuts are disclosed
+  in the answer text. **Harness verification (run #30094889945): `LADDER OK`
+  on the reconstructed pasta context — answer produced (ungrounded-flagged,
+  citations didn't survive plain fallback), no exception.** Deployed to
+  `ask_brain`. Cleanup owed: diag tail, ask-debug workflow/script/branches.
+- **2026-07-24 — ASK ROUND 6: the buffered rescue re-entered the
+  BLOCKED schema mode → deterministic plain-mode ladder.** Harness v2
+  (run #30093796121) added: E2E from CI is 401 (App Check enforced — the
+  fresh error records are the owner's own retries); the newest-25 context now
+  passes BOTH modes, so the poison arrives via RETRIEVAL (semantic matches
+  include cards older than the newest 25); and the 12:35Z failure record is a
+  RAW schema-mode block from the FINAL rescue stage — exposing a real bug in
+  round-5's ladder: after the plain rescue failed, the probe-salvage's final
+  generation went BACK to schema mode (the blocked mode), guaranteeing
+  re-block; and 1-token probe verdicts don't predict full generations (the
+  filter is non-monotone), so probe-driven salvage is unreliable in the
+  buffered path. Fix: the buffered prompt-blocked branch is now a
+  deterministic ladder that NEVER returns to schema mode — plain full-depth →
+  plain paraphrase (output-side kills) → plain headline-only (input poison;
+  all cards stay present as title+summary) → stage-tagged error; the strict
+  citation re-ask stays plain when the ladder produced the answer. Probe
+  salvage remains only in the stream path (there it's mode-consistent: plain
+  probes, plain generation). Harness v3 verifies the ladder stages against a
+  retrieval-reconstructed context (vector top-12 + keyword + recency) before
+  deploy. Tests 356→355 (buffered salvage tests replaced by ladder tests).
+- **2026-07-24 — UNIFORM CARD THUMBNAIL HEIGHT (drop adaptive sizing).**
   Owner: X/Instagram PHOTO covers were rendering as tall aspect-ratio banners
   (a portrait infographic filled half the card) while video/YouTube posters used
   the compact fixed banner — inconsistent. Frontend-only: the photo-cover banner
