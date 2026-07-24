@@ -33,6 +33,7 @@ from typing import Optional, List
 from google.cloud import firestore
 
 from db import get_db
+from log_safe import mask_uid
 
 logger = logging.getLogger(__name__)
 
@@ -314,7 +315,7 @@ def _write_inapp_synthesis(uid: str, synth: dict, cards: List[dict], week_id: st
         get_db().collection("users").document(uid).collection("syntheses").document(week_id).set(doc)
         return True
     except Exception as e:
-        logger.error(f"Failed to write in-app synthesis for {uid}: {e}")
+        logger.error(f"Failed to write in-app synthesis for {mask_uid(uid)}: {e}")
         return False
 
 
@@ -350,7 +351,7 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
                 return result
         except Exception as e:
             # Fail open: a read error shouldn't block the primary surface.
-            logger.warning(f"Synthesis dedupe check failed for {uid}: {e}")
+            logger.warning(f"Synthesis dedupe check failed for {mask_uid(uid)}: {e}")
 
     cards = synthesis_window_cards(links)
     if len(cards) < SYNTHESIS_MIN_CARDS and not force:
@@ -363,7 +364,7 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
     try:
         synth = GeminiService().synthesize_week(cards)
     except AnalysisError as e:
-        logger.error(f"Synthesis generation failed for {uid}: {e}")
+        logger.error(f"Synthesis generation failed for {mask_uid(uid)}: {e}")
         result["skipped"] = "synthesis_failed"
         return result
 
@@ -390,7 +391,7 @@ def build_and_send_synthesis(uid: str, user_data: dict, links: List[dict], force
             if push_result.get("sent"):
                 result["channels"].append("push")
         except Exception as e:
-            logger.error(f"Synthesis push send failed for {uid}: {e}")
+            logger.error(f"Synthesis push send failed for {mask_uid(uid)}: {e}")
 
     result["sent"] = True
     get_db().collection("users").document(uid).set(
@@ -458,7 +459,7 @@ def _write_inapp_digest(uid: str, cards: List[dict], mode: str, frequency: str, 
         col = get_db().collection("users").document(uid).collection("digests")
         col.document(digest_id).set(doc)
     except Exception as e:
-        logger.error(f"Failed to write in-app digest for {uid}: {e}")
+        logger.error(f"Failed to write in-app digest for {mask_uid(uid)}: {e}")
         return None
 
     _prune_old_digests(uid)
@@ -477,7 +478,7 @@ def _prune_old_digests(uid: str, keep: int = DIGEST_RETENTION) -> None:
         for doc in stale:
             doc.reference.delete()
     except Exception as e:
-        logger.warning(f"Digest retention cleanup failed for {uid}: {e}")
+        logger.warning(f"Digest retention cleanup failed for {mask_uid(uid)}: {e}")
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -553,9 +554,9 @@ def build_and_send_digest(uid: str, user_data: dict, force: bool = False) -> dic
                 if push_result.get("sent"):
                     result["channels"].append("push")
             except Exception as e:
-                logger.error(f"Digest push send failed for {uid}: {e}")
+                logger.error(f"Digest push send failed for {mask_uid(uid)}: {e}")
         else:
-            logger.info(f"Digest: user {uid} has push channel but no device tokens")
+            logger.info(f"Digest: user {mask_uid(uid)} has push channel but no device tokens")
 
     if delivered_any:
         result["sent"] = True

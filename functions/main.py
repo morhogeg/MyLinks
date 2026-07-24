@@ -16,7 +16,6 @@ import os
 import re
 import json
 import hmac
-import hashlib
 import html as _html
 import logging
 import requests
@@ -42,6 +41,7 @@ options.set_global_options(max_instances=20)
 
 # Internal modules
 from db import get_db, ensure_app
+from log_safe import mask_uid
 from models import LinkStatus, ReminderStatus
 from ai_service import GeminiService, AnalysisError
 from link_service import (
@@ -272,18 +272,11 @@ def _authed_uid(req, headers: dict = None, body_uid: str = None):
     return None, _error_response("Authentication required", 401, headers)
 
 
-def _mask_uid(uid) -> str:
-    """A non-PII, log-safe tag for a uid.
-
-    The data-doc uid IS the user's E.164 phone number, so logging it in plaintext
-    (Cloud Logging) leaks PII. This returns a short, stable, non-reversible tag
-    (`uid#<8 hex>`) that still lets operators correlate a user's log lines within
-    a session without exposing the number.
-    """
-    if not uid:
-        return "uid#none"
-    digest = hashlib.sha256(str(uid).encode("utf-8")).hexdigest()[:8]
-    return f"uid#{digest}"
+# The masker now lives in `log_safe` so the service modules (digest, reminder,
+# graph, search, link) can share ONE implementation without importing main.py —
+# they were logging raw uids, i.e. phone numbers (AUDIT.md H-4 residue). Kept
+# under the original private name so main.py's call sites read unchanged.
+_mask_uid = mask_uid
 
 
 def _require_admin(req, headers: dict = None):

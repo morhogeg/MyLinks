@@ -17,6 +17,7 @@ from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
 from google import genai
 
 from db import get_db
+from log_safe import mask_uid
 from ai_service import embedding_needs_repair, collect_notes_text
 from rate_limit import check_rate_limit
 
@@ -802,7 +803,7 @@ def sync_link_embedding(event: firestore_fn.Event[firestore_fn.Change[firestore_
 
 def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dict]:
     """Core search logic separated from Firebase transport."""
-    logger.info(f"Searching for '{query_text}' for user {uid}")
+    logger.info(f"Searching ({len(query_text)} chars) for user {mask_uid(uid)}")
 
     service = EmbeddingService()
     
@@ -838,7 +839,7 @@ def perform_search_logic(uid: str, query_text: str, limit: int = 10) -> List[dic
     has_any_embeddings = any("embedding_vector" in d.to_dict() for d in sample_docs)
 
     if not has_any_embeddings:
-        logger.warning(f"No embeddings found for user {uid}. Use Settings → Connections → Rebuild (or the backfill_related_links admin endpoint) to generate embeddings for existing links.")
+        logger.warning(f"No embeddings found for user {mask_uid(uid)}. Use Settings → Connections → Rebuild (or the backfill_related_links admin endpoint) to generate embeddings for existing links.")
         # Don't fail the search, just return empty results with a helpful message
         return []
 
