@@ -714,7 +714,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-24 (latest) — ASK ROUND 5: GROUND TRUTH VIA CI PROBES → the real
+- **2026-07-24 (latest) — ASK ROUND 6: the buffered rescue re-entered the
+  BLOCKED schema mode → deterministic plain-mode ladder.** Harness v2
+  (run #30093796121) added: E2E from CI is 401 (App Check enforced — the
+  fresh error records are the owner's own retries); the newest-25 context now
+  passes BOTH modes, so the poison arrives via RETRIEVAL (semantic matches
+  include cards older than the newest 25); and the 12:35Z failure record is a
+  RAW schema-mode block from the FINAL rescue stage — exposing a real bug in
+  round-5's ladder: after the plain rescue failed, the probe-salvage's final
+  generation went BACK to schema mode (the blocked mode), guaranteeing
+  re-block; and 1-token probe verdicts don't predict full generations (the
+  filter is non-monotone), so probe-driven salvage is unreliable in the
+  buffered path. Fix: the buffered prompt-blocked branch is now a
+  deterministic ladder that NEVER returns to schema mode — plain full-depth →
+  plain paraphrase (output-side kills) → plain headline-only (input poison;
+  all cards stay present as title+summary) → stage-tagged error; the strict
+  citation re-ask stays plain when the ladder produced the answer. Probe
+  salvage remains only in the stream path (there it's mode-consistent: plain
+  probes, plain generation). Harness v3 verifies the ladder stages against a
+  retrieval-reconstructed context (vector top-12 + keyword + recency) before
+  deploy. Tests 356→355 (buffered salvage tests replaced by ladder tests).
+- **2026-07-24 — ASK ROUND 5: GROUND TRUTH VIA CI PROBES → the real
   causes were (a) a 404 ask-model id and (b) a STRUCTURED-OUTPUT-mode filter
   false positive.** Blind-fix rounds stopped; built a temporary **`ask-debug`
   workflow** (push `trigger/ask-debug`; runner has GEMINI_API_KEY +
