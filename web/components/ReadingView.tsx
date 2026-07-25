@@ -7,6 +7,7 @@ import { getDirection } from '@/lib/rtl';
 import { appCheckHeaders } from '@/lib/firebase';
 import { apiUrl, fetchWithTimeout } from '@/lib/api';
 import { Button } from './ui/Button';
+import { isHttpUrl } from '@/lib/url';
 
 interface Paragraph {
     type: 'p' | 'h2' | 'h3' | 'li' | 'blockquote';
@@ -204,7 +205,7 @@ export default function ReadingView({ link, onClose }: ReadingViewProps) {
                         </Button>
                     )}
 
-                    {!!link.url && /^https?:\/\//.test(link.url) && (
+                    {isHttpUrl(link.url) && (
                         <a href={link.url} target="_blank" rel="noopener noreferrer" title="Open original" aria-label="Open original" className="p-2 rounded-xl bg-card border border-border-subtle text-text-secondary hover:text-accent hover:border-accent/40 transition-colors">
                             <ExternalLink className="w-4 h-4" />
                         </a>
@@ -240,7 +241,7 @@ export default function ReadingView({ link, onClose }: ReadingViewProps) {
                             </div>
                             <h3 className="text-lg font-medium text-text mb-1.5">Reader unavailable</h3>
                             <p className="text-text-secondary text-sm max-w-md mx-auto mb-5">{error}</p>
-                            {!!link.url && /^https?:\/\//.test(link.url) && (
+                            {isHttpUrl(link.url) && (
                                 <a href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent-hover transition-colors">
                                     <ExternalLink className="w-4 h-4" /> Open original
                                 </a>

@@ -475,6 +475,60 @@ def pin_quoted_title_cards(question: str, cards: List[dict]):
     return pin_title_phrases(extract_quoted_phrases(question), cards)
 
 
+def pin_cards_by_ids(ids: List[str], cards: List[dict]):
+    """Move the cards with these ids to the FRONT, in `ids` order; everything
+    else keeps its relative order.
+
+    Used for the cards the previous turns actually CITED. Unlike title pinning
+    this needs no matching heuristics — the client sends the ids it rendered as
+    source chips, so "the thing we were just talking about" is an exact set,
+    not an inference. Pure."""
+    if not ids or not cards:
+        return cards
+    by_id = {}
+    for c in cards:
+        cid = c.get("id")
+        if cid is not None and cid not in by_id:
+            by_id[cid] = c
+    # Dedupe the ids themselves: a repeated id must not duplicate its card.
+    # (_sanitize_context_ids already dedupes, but this helper is used on raw
+    # lists too and a duplicated card would waste the deep-content window.)
+    seen_ids, pinned = set(), []
+    for i in ids:
+        if i in by_id and i not in seen_ids:
+            seen_ids.add(i)
+            pinned.append(by_id[i])
+    if not pinned:
+        return cards
+    pinned_ids = {c.get("id") for c in pinned}
+    return pinned + [c for c in cards if c.get("id") not in pinned_ids]
+
+
+def cards_by_ids(uid: str, ids: List[str]) -> List[dict]:
+    """Fetch specific cards by document id, normalized like every other
+    retrieval path. Order follows `ids`; missing/deleted docs are skipped, and
+    mid-flight captures are skipped the same way keyword_scan_cards skips them
+    (there is nothing in a `processing` doc to ground an answer in)."""
+    if not ids:
+        return []
+    db = get_db()
+    links_ref = db.collection("users").document(uid).collection("links")
+    out = []
+    for doc_id in ids:
+        try:
+            snap = links_ref.document(doc_id).get()
+        except Exception as e:
+            logger.error(f"cards_by_ids failed for one doc: {e}")
+            continue
+        if not snap.exists:
+            continue
+        data = snap.to_dict() or {}
+        if data.get("status") in ("processing", "failed"):
+            continue
+        out.append(normalize_card_for_search(data, snap.id))
+    return out
+
+
 def missing_title_phrases(phrases: List[str], cards: List[dict]) -> List[str]:
     """The (raw) title phrases that match NO card title in `cards`.
 
@@ -536,6 +590,265 @@ def is_exclusion_question(question: str) -> bool:
     """True when the question EXPLICITLY excludes already-known sources.
     Quoted spans (card titles) are ignored — only the user's own words vote."""
     return bool(_EXCLUSION_RE.search(_strip_quoted(question)))
+
+
+# ── Conversational follow-ups: which text to RETRIEVE for ───────────────────
+# Ask retrieves for the current question's text alone; the conversation history
+# only ever reaches the answer prompt. That breaks on a follow-up carrying no
+# topic of its own — "in Hebrew", "shorter", "why?" — because embedding two
+# meta words returns topically arbitrary cards. The model then sees the real
+# subject in the history but a context set that has nothing to do with it, and
+# honestly reports the library has nothing on the topic it JUST answered with a
+# cited source (owner report 2026-07-25: an English answer about a saved maple
+# cake recipe, then "בעברית" → "the information I have doesn't include content
+# on מתכון לעוגת מייפל עסיסית", sources listed = unrelated cards).
+#
+# Fix: on such a turn, retrieve for the last question that DID carry a topic.
+# Deliberately narrow — the meta vocabulary below is a CLOSED list, so any
+# question with one real content word (including a genuine topic switch) is
+# untouched and its retrieval query stays byte-identical to before.
+_META_FOLLOWUP_TOKENS = {
+    # Language / translation ("in Hebrew", "translate it to English")
+    "translate", "translated", "translation", "language",
+    "hebrew", "english", "arabic", "spanish", "french", "russian",
+    "עברית", "בעברית", "אנגלית", "באנגלית", "תרגם", "תרגמי", "תרגום", "בשפה",
+    # Length / form ("shorter", "in bullets", "summarize that")
+    "shorter", "short", "briefly", "brief", "concise", "longer", "expand",
+    "elaborate", "detail", "details", "summarize", "summarise", "summary",
+    "tldr", "rephrase", "reword", "rewrite", "simplify", "simpler", "bullets",
+    "bullet", "points", "list", "steps",
+    "קצר", "בקצרה", "תקצר", "ארוך", "הרחב", "הרחיב", "פרט", "בפירוט",
+    "סכם", "סיכום", "תמצת", "נקודות", "רשימה", "פשוט",
+    # Continuation / politeness ("go on", "again", "please", "thanks")
+    "explain", "continue", "again", "repeat", "more", "less", "please",
+    "thanks", "thank", "ok", "okay", "sure", "yeah", "yep",
+    "הסבר", "תסביר", "המשך", "תמשיך", "שוב", "בבקשה", "תודה", "אוקיי", "יותר",
+}
+
+
+def is_context_free_followup(question: str) -> bool:
+    """True when the question carries no topic of its own — every content token
+    is meta (a language, a length, a "go on"), or there are no content tokens
+    at all ("why?", "and?"). Such text can only be understood against the turn
+    before it, so retrieving for it is retrieving for noise. Pure."""
+    tokens = keyword_query_tokens(question)
+    if not tokens:
+        return True
+    return tokens <= _META_FOLLOWUP_TOKENS
+
+
+# The OTHER kind of follow-up that can't be retrieved for on its own: one that
+# names its subject only by pointing at it. "מי פירסם את זה?" ("who published
+# this?") has real content words — `מי`, `פירסם` — so the meta-vocabulary gate
+# above passes it through as topical, and it then embeds as "who published" and
+# matches nothing (owner report 2026-07-25, one turn after an answer that cited
+# the card: "the information about Claude's certification program did not appear
+# in your saved sources", flagged ungrounded). The subject is in the PREVIOUS
+# turn; only the pointer is here.
+#
+# Most of these pointers are already `_RANK_STOPWORDS`, so they're invisible to
+# token-based tests — they have to be matched on the raw text.
+_ANAPHOR_TOKENS = {
+    "this", "that", "these", "those", "it", "its", "they", "them", "their",
+    "he", "she", "him", "her", "his", "hers", "theirs",
+    "זה", "זו", "זאת", "אלה", "אלו", "הזה", "הזו", "הזאת", "ההוא", "כזה",
+    "אותו", "אותה", "אותם", "אותן", "שלו", "שלה", "שלהם", "שלהן",
+}
+# A referential follow-up is SHORT — it borrows its subject instead of stating
+# one. Past this many content tokens the question carries a topic of its own
+# ("show me that recipe with the tomatoes") and must retrieve for itself.
+_MAX_REFERENTIAL_TOKENS = 4
+
+
+def is_referential_followup(question: str) -> bool:
+    """True when the question points at its subject instead of naming it —
+    "who published this?", "מי פירסם את זה?", "is it worth my time?".
+
+    Deliberately conservative, since a false positive drags an earlier topic
+    into retrieval: the question must contain a standalone pointer word, stay
+    short, quote no card title (a quoted title IS the subject, stated), and not
+    be a recency question (which is what "this week"/"this month" are). Pure."""
+    text = (question or "").lower()
+    if not text.strip():
+        return False
+    words = set(w for w in re.split(r"[\W_]+", text, flags=re.UNICODE) if w)
+    if not (words & _ANAPHOR_TOKENS):
+        return False
+    if extract_quoted_phrases(question):
+        return False
+    if is_recency_question(question):
+        return False
+    return len(keyword_query_tokens(question)) <= _MAX_REFERENTIAL_TOKENS
+
+
+def _last_topical_user_turn(history) -> Optional[str]:
+    """The most recent user turn that stated a subject of its own — the thing a
+    follow-up is really asking about. Skips turns that are themselves
+    follow-ups, so a chain of them still resolves to the real question."""
+    for item in reversed(history):
+        if not isinstance(item, dict) or item.get("role") != "user":
+            continue
+        prior = str(item.get("content") or "").strip()
+        if prior and not is_context_free_followup(prior) and not is_referential_followup(prior):
+            return prior
+    return None
+
+
+def followup_retrieval_query(question: str, history) -> str:
+    """The text ask_brain should RETRIEVE for this turn.
+
+    Almost always the question itself. It changes only for a follow-up that
+    can't stand alone, in one of two ways:
+
+      - CONTEXT-FREE ("in Hebrew", "shorter") — the question is provably pure
+        noise for retrieval, so the prior topical question REPLACES it.
+      - REFERENTIAL ("who published this?") — the question may still carry real
+        words, so the prior question is PREPENDED and the question kept. The
+        combined text retrieves a superset of what the question alone would, so
+        a misfire costs some precision and can never lose what was asked for.
+
+    Never changes what the MODEL is asked (the raw question and the history
+    still go to the prompt); this steers retrieval only. Pure — `history` is the
+    already-sanitized [{role, content}] list. Fails open: malformed history, or
+    a conversation with no topical question in it, gives back `question`."""
+    return resolve_followup(question, history)["query"]
+
+
+def resolve_followup(question: str, history) -> dict:
+    """Everything ask_brain needs to know about this turn's dependence on the
+    conversation: `{"query", "subject", "restate"}`.
+
+    - `query` — the text to RETRIEVE for (see followup_retrieval_query).
+    - `subject` — the earlier question this turn is really about, or None when
+      the turn stands on its own. The prompt names it so the model answers
+      about THAT rather than picking a different source.
+    - `restate` — True for a context-free follow-up ("in Hebrew", "shorter"),
+      which asks for the SAME answer in another form. This matters because the
+      prompt's standing "follow-ups must add value — never restate an earlier
+      answer in different words" rule is the exact opposite of what such a turn
+      wants, and must be suspended for it. Pure."""
+    plain = {"query": question, "subject": None, "restate": False}
+    if not isinstance(history, list) or not history:
+        return plain
+    context_free = is_context_free_followup(question)
+    referential = not context_free and is_referential_followup(question)
+    if not (context_free or referential):
+        return plain
+    prior = _last_topical_user_turn(history)
+    if not prior:
+        return plain
+    return {
+        "query": prior if context_free else f"{prior} {question}",
+        "subject": prior,
+        "restate": context_free,
+    }
+
+
+# ── Which language the USER has been writing in ────────────────────────────
+# Ask answers in the language of the current question (prompt rule in
+# ai_service._build_rag_prompt, judged from the user's own words with quoted
+# card titles ignored — a Hebrew title inside an English question used to flip
+# the model). That is right for a TYPED question and wrong for a tapped
+# suggestion chip: the chip's wording is the APP's English boilerplate, not the
+# user's, so a Hebrew conversation flipped to English mid-thread the moment the
+# user tapped one (owner report 2026-07-25: a Hebrew question about a Pardes
+# Hanna café answered in Hebrew, then the chip 'Give me more detail on "<Hebrew
+# title>"' answered entirely in English).
+#
+# So for a generated question the answer language comes from the conversation
+# instead. Detection is by SCRIPT: chips are ASCII boilerplate once their quoted
+# titles are stripped, so they can never fake a Hebrew signal, and a single
+# non-Latin turn from the user is a deliberate statement of preference. Latin
+# scripts are indistinguishable this way (English vs Spanish vs French), so
+# those return None and the prompt keeps judging from the question — no
+# regression for the all-English case, which is every conversation today.
+_SCRIPT_RANGES = (
+    ("Hebrew", ((0x0590, 0x05FF), (0xFB1D, 0xFB4F))),
+    ("Arabic", ((0x0600, 0x06FF), (0x0750, 0x077F), (0x08A0, 0x08FF))),
+    ("Russian", ((0x0400, 0x04FF),)),
+    ("Greek", ((0x0370, 0x03FF),)),
+    ("Hindi", ((0x0900, 0x097F),)),
+    ("Thai", ((0x0E00, 0x0E7F),)),
+    ("Korean", ((0xAC00, 0xD7AF), (0x1100, 0x11FF))),
+    ("Japanese", ((0x3040, 0x309F), (0x30A0, 0x30FF))),
+    ("Chinese", ((0x4E00, 0x9FFF),)),
+)
+
+# A turn votes for a script only when it's genuinely written in it, not when a
+# stray character survives: at least this many letters AND this share of them.
+_SCRIPT_MIN_CHARS = 2
+_SCRIPT_MIN_SHARE = 0.3
+
+
+def dominant_script_language(text: str) -> Optional[str]:
+    """The non-Latin language `text` is written in, or None.
+
+    Counts letters by Unicode block over the user's OWN words (quoted card
+    titles stripped — a Hebrew title inside an English sentence is not the
+    sentence's language) and returns the winner when it carries a real share of
+    them. Latin-script text returns None on purpose: script can't tell English
+    from Spanish, and guessing would be worse than the prompt's own judgement.
+    Pure."""
+    words = _strip_quoted(text or "")
+    letters = 0
+    counts = {}
+    for ch in words:
+        if not ch.isalpha():
+            continue
+        letters += 1
+        cp = ord(ch)
+        for name, ranges in _SCRIPT_RANGES:
+            if any(lo <= cp <= hi for lo, hi in ranges):
+                counts[name] = counts.get(name, 0) + 1
+                break
+    if not letters or not counts:
+        return None
+    name, n = max(counts.items(), key=lambda kv: kv[1])
+    if n < _SCRIPT_MIN_CHARS or n / letters < _SCRIPT_MIN_SHARE:
+        return None
+    return name
+
+
+def conversation_language(history, marked: bool = False) -> Optional[str]:
+    """The non-Latin language the USER has been writing in this conversation,
+    or None when they've written Latin script (or nothing detectable).
+
+    Only turns the user TYPED get a vote, when the client says which those are
+    (`generated: true` marks a chip — its wording is Machina's, not theirs).
+    `marked` tells us the client sends those flags at all: a conversation where
+    the user has only ever typed carries no flag to observe, and treating that
+    as an old client would ignore a language switch they just made in their own
+    words. The caller sets it from the CURRENT turn's explicit `generated`
+    field, which only a marking client sends.
+    Newest voting turn wins, so typing English after a Hebrew opener switches
+    the thread properly. Assistant turns never vote either: the answer's
+    language is the thing being decided, and letting it vote would lock in its
+    own first guess.
+
+    FALLBACK for clients that don't send the marker (older TestFlight builds,
+    chats persisted before it existed): no turn is marked, so every user turn
+    votes and Latin turns are SKIPPED rather than ending the scan — the turns
+    between a Hebrew opener and the chip being answered are usually earlier
+    English chips, and letting those end it would reinstate the bug on the
+    second tap. Pure — `history` is the already-sanitized [{role, content,
+    generated?}] list; fails open on anything else."""
+    if not isinstance(history, list):
+        return None
+    users = [i for i in history if isinstance(i, dict) and i.get("role") == "user"]
+    typed = [i for i in users if not i.get("generated")]
+    # Marked client: the newest TYPED turn is the user's current language, full
+    # stop — including when it's Latin (that's them switching to English).
+    if marked or any(i.get("generated") for i in users):
+        for item in reversed(typed):
+            content = str(item.get("content") or "").strip()
+            if content:
+                return dominant_script_language(content)
+        return None
+    for item in reversed(users):
+        lang = dominant_script_language(str(item.get("content") or ""))
+        if lang:
+            return lang
+    return None
 
 
 def demote_cards_by_titles(titles: List[str], cards: List[dict]):

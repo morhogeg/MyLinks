@@ -17,6 +17,7 @@ import { useVisualViewport } from '@/lib/useVisualViewport';
 import { getRelatedCards } from '@/lib/related';
 import { getNotes, makeNote, touchNote } from '@/lib/notes';
 import { hapticSuccess, hapticMedium } from '@/lib/haptics';
+import { isHttpUrl } from '@/lib/url';
 
 // Sentinel `editingNoteId` for the composer when adding a brand-new note (as
 // opposed to editing an existing one, keyed by its real id).
@@ -240,7 +241,7 @@ export default function LinkDetailModal({
     };
     const startAddNote = () => { setNoteDraft(''); noteActionRef.current = null; setEditingNoteId(NEW_NOTE_ID); };
     const startEditNote = (n: UserNote) => { setNoteDraft(n.text); noteActionRef.current = null; setEditingNoteId(n.id); };
-    const hasValidImage = !!link.url && /^https?:\/\//.test(link.url);
+    const hasValidImage = isHttpUrl(link.url);
 
     // Scroll back to the top when the card changes. Opening a related card reuses
     // this same scroll container, so without this it would open scrolled down to
@@ -349,7 +350,7 @@ export default function LinkDetailModal({
     // author (@handle from the URL) in the X grey, everything else muted.
     const isYouTube = getPlatform(link.url) === 'youtube' || link.sourceType === 'youtube';
     // Reading mode is for text articles — not videos or screenshots.
-    const canRead = !!link.url && /^https?:\/\//.test(link.url) && !isYouTube && link.sourceType !== 'image';
+    const canRead = isHttpUrl(link.url) && !isYouTube && link.sourceType !== 'image';
     // The source byline is rendered by the shared <SourceByline> — don't
     // reintroduce per-view platform/author derivation here.
 
@@ -575,7 +576,7 @@ export default function LinkDetailModal({
                     >
                         <Trash2 className="w-[18px] h-[18px]" />
                     </button>
-                    {!!link.url && /^https?:\/\//.test(link.url) && (
+                    {isHttpUrl(link.url) && (
                         <a
                             href={link.url}
                             target="_blank"
@@ -614,7 +615,7 @@ export default function LinkDetailModal({
                                     onClick={() => {
                                         // Guard the scheme (never open a stored javascript:/data: URL)
                                         // and pass noopener so the opened page can't reach window.opener.
-                                        if (/^https?:\/\//i.test(link.url)) {
+                                        if (isHttpUrl(link.url)) {
                                             window.open(link.url, '_blank', 'noopener,noreferrer');
                                         }
                                     }}

@@ -224,6 +224,16 @@ The multi-user auth work is **fully written but not live**:
    Flagged decision: `get_article` stays anonymous-callable
    (App Check + rate limit only) — keep or gate deliberately. Closes audit
    blockers B-1/B-2/B-3. Full checklist: `NATIVE_AUTH_SETUP.md` §6.
+   ⚠️ **Cutover-day breakage found + fixed 2026-07-25 (`/security web`, audit
+   S-9).** `firestore.rules.locked` denied ALL writes on `users/{uid}/digests`,
+   but the per-digest **Delete** action is a direct client `deleteDoc`
+   (`lib/digest.ts:61`) — so at the cutover that button would have become a
+   silent no-op. The rule now allows `delete` for the owner and keeps
+   `create, update` denied; 4 cases added to `firestore-rules-test`. **Step (4)
+   of the checklist above is now load-bearing** — the cloud sandbox cannot
+   download the emulator JAR, so this rule change has never run against a live
+   emulator. Run `cd firestore-rules-test && npm test` on your machine BEFORE
+   step (5).
 3. **[x] New-user path** *(code done 2026-07-03; goes live with the task-2
    cutover — flag-gated behind `REQUIRE_AUTH`).* `claim_workspace` now falls
    back to creating a fresh `users/{authUid}` workspace (authUids/email/
@@ -345,6 +355,40 @@ The multi-user auth work is **fully written but not live**:
     (`SimpleNamespace` lacks `_get_attributes` — firebase_functions version
     drift). 389 real tests pass. Fix the mocks (or pin the lib) so a red run
     means something again.
+11c. **[ ] Web traffic shares ONE per-IP rate-limit bucket (audit S-12) — found
+    2026-07-25 (`/security web`), fix belongs in `functions/`.** `/api/chat` is
+    deliberately not a rewrite, so `web/app/api/chat/route.ts:50` is a Vercel
+    serverless function that fetches the Cloud Function's direct URL
+    **server-side**. `rate_limit.client_ip` takes the LAST `X-Forwarded-For` hop
+    by design (`rate_limit.py:74-87`) = Vercel's egress IP, not the user's, and
+    `main.py:1496` gates on the 60/hr **fail-CLOSED** `chat` IP bucket *before*
+    the per-uid bucket at `:1522`. Net effect: **60 Ask questions an hour across
+    the entire desktop-web user base**, and one script locks out every web user.
+    Same topology for the `vercel.json` rewrites (`analyze` 30/hr, `image`
+    30/hr, `share` 120/hr, `article` 120/hr — `article` has no uid bucket at
+    all), though those add a Firebase Hosting hop that couldn't be verified from
+    the cloud sandbox, so only the `/api/chat` chain is asserted. Fix options:
+    consult the per-uid bucket first for authenticated callers and treat the IP
+    bucket as anonymous-only, or have the proxy pass a signed client-IP header.
+    Take it in the next `/security functions` pass.
+11d. **[ ] Dependency + CSP posture (audit S-13/S-14) — reviewed 2026-07-25, no
+    reachable exposure.** `npm audit` in `web/`: 1 critical / 18 high / 1
+    moderate, all triaged as unreachable — `next@16.2.10`'s nine advisories need
+    middleware (none exists), Server Actions (none), the image optimizer
+    (`images.unoptimized: true`, nothing imports `next/image`) or a dynamic
+    rewrite destination (all static); the **critical** `websocket-driver` comes
+    via `firebase → @firebase/database → faye-websocket`, the Node-only RTDB
+    transport a Firestore-only browser app never loads; postcss/sharp are
+    build-time inside Next; the eslint/minimatch chain and `tar` are
+    devDependencies. **Clearing the Next advisories needs ≥16.3.0** — the
+    vulnerable range runs to `16.3.0-preview.7`, so `npm audit fix` (which lands
+    16.2.11 for the postcss/sharp transitives) does NOT cover them. Owner call:
+    a deliberate upgrade with `next build` + device QA, same stance AUDIT.md S-5
+    took on postcss. S-14: the CSP on both surfaces allows `'unsafe-eval'` and
+    `'unsafe-inline'` in `script-src`; `'unsafe-inline'` is load-bearing (the
+    `layout.tsx:56` theme bootstrap + Next hydration), `'unsafe-eval'` has no
+    identifiable consumer but removing it needs a live check against the
+    Firebase JS SDK + reCAPTCHA v3 on a real deploy.
 12. **[ ] Ingest token hardening (audit H-1).** Move from App Group UserDefaults
     to Keychain; server copy to a functions-only collection; add rotation.
 13. **[x] Remaining audit mediums — landed 2026-07-09 (AUDIT.md S-2/S-3).**
@@ -379,6 +423,11 @@ The multi-user auth work is **fully written but not live**:
     QA list in the §9 entry.
 18. **[ ] Test harness (T3).** Add scraper fixtures, `ai_service` schema-contract
     tests, `search.py` tests; wire into CI/SessionStart (AUDIT.md N-2a tracks this).
+    **`web/` still has NO JavaScript test runner** — which is why the two web
+    invariants from the 2026-07-25 `/security` pass (S-10 sign-out purge, S-11
+    URL-scheme guard) had to land as source scans in
+    `functions/tests/test_web_client_hygiene.py`. That works and runs in CI, but
+    a real web runner (vitest) is the right home for them.
 19. **[~] Cost guardrails — CODE HALF SHIPPED 2026-07-14 (production-readiness
     sprint, see `docs/PRODUCTION_READINESS_2026-07-14.md`).** Per-user monthly
     quotas live in code (`functions/quota.py`: 150 saves / **1000 asks** per
@@ -772,6 +821,287 @@ exact-match, capped.
   get the identical `h-28 sm:h-32` + `object-cover object-top` treatment as photo
   posts, so the feed reads uniformly. `ListCard` renders no thumbnails — no
   change needed. Verified: tsc 0, `next build` 0, eslint clean.
+- **2026-07-25 — ✅ ASK CONVERSATION-CONTEXT WORK CONFIRMED BY OWNER
+  ("everything works perfectly").** Closes the five-round arc below. Verified
+  live across the six QA cases: restate follow-up (`בעברית, בקצרה`) stays on the
+  same card; referential (`מי פירסם את זה?`) names the publisher; an English chip
+  in a Hebrew thread answers in Hebrew; typing English switches the thread and
+  keeps it there; a pointerless follow-up (`who published`) still sees the card;
+  and `what else besides this?` returns OTHER cards. Live on **web** (all five
+  rounds — the round-3 client half rode the same push to Vercel), **TestFlight
+  build 1185**, and functions through run **#45**.
+  **Open risks are unchanged and still real — do not read this as "Ask is
+  done":** (a) round 4's subject-anchoring is a PROMPT INSTRUCTION, not an
+  enforceable guarantee (see that entry for the deterministic fallback —
+  narrowing restate-turn context to `contextIds` — and why it wasn't taken yet);
+  (b) the `contextIds` guarantee covers the last **2** answers only, so a
+  follow-up reaching further back falls through to the heuristics; (c) no
+  production log access from a cloud session, which is what made rounds 1-4 slow
+  — all five were diagnosed from code + local repro, with owner screenshots as
+  the only instrumentation.
+
+- **2026-07-25 — ASK, ROUND 5: SELF-REVIEW OF ROUNDS 1-4 (owner:
+  *"review this feature again to find more bugs, since u already said it is
+  fixed"*).** Fair — four rounds, four "fixed" claims. This round found and
+  fixed problems the owner had NOT hit yet.
+  **(1) REGRESSION I introduced in round 3 — "what else" was answered with the
+  card you're trying to move past.** `what else besides this?` is BOTH a
+  referential follow-up and an exclusion, so round 3's front-pin put the
+  just-discussed cards at the head of context while the exclusion demote pushed
+  them to the back — the pin ran later and won. Worse, when EVERY card in
+  context is already-discussed the demote has nothing to reorder, so gating the
+  order wasn't enough. Fixed two ways: the `contextIds` merge moved from step
+  1g-2 to **1e-2, BEFORE the exclusion and anchor steps**, so the existing
+  machinery gets the last word in both directions; and a new `wants_new_sources`
+  flag (explicit exclusion question or `hints.excludeTitles`) **suppresses the
+  front-pin outright** for those turns. Bonus from the same insight: on an
+  exclusion turn the cited card TITLES now join `excluded_titles`, so "what else
+  besides this?" knows exactly what "this" is instead of recovering it from
+  quoted text.
+  **(2) PRECEDENCE, previously undefined.** When the resolved question quotes a
+  card title AND the client sends different `contextIds`, which leads? Now
+  stated and tested: the quoted anchor wins (it is the most specific statement
+  of subject there is) and the cited card stays in context. In practice they are
+  the same card; this pins down the drift case.
+  **(3) THE STREAMING PATH WAS UNTESTED.** Every endpoint test used the buffered
+  JSON branch (what native asks for), while the WEB client streams — and
+  generation is the one place the two diverge. Wiring was correct, but nothing
+  would have caught a dropped `followup`/`answer_language`/`contextIds` on the
+  browser path. Three streaming tests added.
+  **(4) A PROMPT INSTRUCTION POINTING THE WRONG WAY.** Round 2's LANGUAGE
+  OVERRIDE said it takes precedence over "the language rule **below**" — it
+  renders directly *underneath* that rule, so the model was sent looking the
+  wrong way (and finds the CONTINUATION block there). Now "directly above".
+  **Also verified, no change needed:** the `answer_language`/`followup` params I
+  inserted mid-signature never displaced `max_drops` (only one call site each,
+  grep + AST checked); a 34-case EN/HE corpus of realistic questions produced
+  **zero** false positives and zero misses across `resolve_followup`; the
+  rendered prompt blocks were eyeballed for escaping damage (guillemets/quotes
+  clean). Suite **504 passed / 4 failed** — the same `test_embed_trigger_backstop`
+  drift (§4 item 11b). Backend-only, no `web/` diff → no TestFlight build.
+  **SHIPPED:** `27d0f57` → functions run **#45 green**, `ask_brain` updated.
+  **STILL THE WEAKEST LINK (say so plainly):** round 4's subject-anchoring is a
+  PROMPT INSTRUCTION, not an enforceable guarantee — the blocks are tested for
+  rendering, but `gemini-3.1-flash-lite` obeying them is not. If a restate
+  follow-up ever wanders again, the deterministic fix is to NARROW the context
+  for restate turns to just the previously-cited cards (`contextIds` already
+  gives the exact set), so there is nothing else to wander to. Deliberately not
+  done yet: it would blank the context on a restate turn for any client that
+  doesn't send `contextIds` (< build 1185, or an answer with no citations).
+  **ALSO OPEN:** this session had NO production log access (no `gcloud`, no
+  Firebase creds in the cloud container), so all five rounds were diagnosed by
+  reading code and reproducing locally. Round 4 was only pinnable because the
+  prompt rule explained every symptom exactly; a more ambiguous failure would
+  have been guesswork. Worth wiring a way to read `ask_brain` logs from a
+  session before the next debugging round.
+
+- **2026-07-25 — ASK, ROUND 4: THE PROMPT WAS TELLING THE MODEL TO
+  CHANGE THE SUBJECT.** Owner: *"Terrible."* Screenshot — an English answer
+  about a saved Breaking Bad clip (YouTube, "Action City"), then the typed
+  follow-up `בעברית, בקצרה` ("in Hebrew, briefly") → fluent, correctly brief
+  **Hebrew about an unrelated Operation Entebbe / C-130 article.** Language
+  right, brevity right, subject completely wrong, and NOT flagged ungrounded.
+  **This one was never retrieval.** Round 1 classifies `בעברית, בקצרה` as
+  context-free (verified — both tokens are in the meta vocabulary) and resolves
+  the query to the Breaking Bad question, so the right card was in context. The
+  fault is a rule that has been in the RAG prompt for weeks:
+  *"FOLLOW-UPS MUST ADD VALUE: … bring NEW information from the sources — never
+  restate an earlier answer in different words."* A translate/shorten request is
+  **precisely** "restate an earlier answer in different words". The model was
+  obeying instructions: it went and found new information, from a different
+  source. Every symptom follows — no "not in your sources" complaint, no
+  ungrounded flag, a genuinely good answer about the wrong thing.
+  **Fix:** `search.resolve_followup` (which `followup_retrieval_query` is now a
+  thin wrapper over) returns `{query, subject, restate}`; `ask_brain` passes it
+  to `_build_rag_prompt`, which renders a **CONTINUATION** block naming the
+  subject outright ("its subject is the earlier question: «…» — switching to a
+  different source because this question's own words matched one is WRONG") and,
+  for a restate request, a **RESTATE REQUEST** block suspending the add-value
+  rule for that turn only ("saying the same thing again in the form asked for is
+  the goal; hunting for new information here is a failure"). Referential
+  follow-ups ("who published this?") get the subject named but KEEP the
+  add-value rule — they want the same subject and genuinely new detail.
+  Threaded through both RAG paths and all 8 `_build_rag_prompt` call sites
+  (grep-verified), including the filter-salvage and headline-rescue retries.
+  **LESSON — rounds 1–3 all assumed a wrong answer meant wrong retrieval.**
+  Retrieval was right here and the prompt overrode it. When an answer is fluent,
+  correctly formatted, and about the wrong thing, suspect the instructions
+  before the context. Backend-only, so it reaches any installed build on deploy.
+  Verified: **8 new tests** (`test_rag_prompt.py` renders/omits both blocks incl.
+  the both-overrides-at-once case; `test_ask_followup_context.py` asserts the
+  endpoint classifies restate vs referential vs ordinary), suite **498 passed /
+  4 failed** — the same `test_embed_trigger_backstop` drift (§4 item 11b).
+  **SHIPPED:** `06e5c94` → functions run **#44 green**, `ask_brain` updated.
+  Backend-only, so it applies to build 1185 AND every earlier build.
+  **Owner device QA:** after any answer, `בעברית, בקצרה` (or "shorter" /
+  "in English") must restate THAT answer's source — same card, new form — not
+  find a different one.
+
+- **2026-07-25 — ASK, ROUND 3: THE CONVERSATION GUARANTEE (stop
+  guessing the subject — the client already knows it).** Owner, after round 2:
+  *"I'm not supposed to find all the issues."* Correct — rounds 1 and 2 were
+  both heuristics over prose, and each shipped with a known hole I'd described
+  rather than closed. Root cause of the whole class: `history` reaches the
+  backend as TEXT ONLY, so `ask_brain` had to re-derive "what are we talking
+  about" from wording — while the client held the exact answer all along, in
+  `ChatMessage.sources[].id` (the source chips already on screen).
+  **The structural fix — `contextIds`.** The client now sends the card ids cited
+  by the last `RECENT_ANSWERS_FOR_CONTEXT` (2) answers; `_sanitize_context_ids`
+  clamps them (strings, deduped, ≤6, length-capped) and new step **1g-2** in
+  `ask_brain` guarantees those cards are in context: **pinned to the FRONT** on a
+  detected follow-up (that's the subject, and the deep-content window lives at
+  the head), **appended at the BACK** otherwise (present and referenceable,
+  never crowding a genuine new topic). `search.cards_by_ids` fetches only the
+  ones retrieval missed — ≤6 doc reads, and 0 when retrieval already had them.
+  This is not an inference, so **no phrasing can defeat it**: it holds for the
+  follow-ups round 1 and 2 classify AND for ones neither can ("who published",
+  bare — the hole I flagged at the end of round 2, now covered and tested).
+  Placed BEFORE the privacy strip and the `askExcluded` filter, so a cited card
+  still can't smuggle private/poison content into the prompt; `cards_by_ids`
+  reads under `users/{uid}/links`, so tenant isolation holds against forged ids.
+  **Language, finished properly.** The chip signal was inferred from `hints`
+  presence; the client now states it — `generated: true` on the request AND on
+  each history turn (`ChatMessage.generated`, threaded through `send()` and
+  preserved by retry). `conversation_language(history, marked=)` therefore votes
+  only on turns the user TYPED, which **removes the round-1 trade-off**: start in
+  Hebrew, type English, tap a chip → English, because the last thing they typed
+  in their own words wins. `marked` comes from the current turn's explicit flag —
+  a conversation where the user has only typed carries no flag to observe, and
+  without that distinction a marking client is misread as a legacy one (caught by
+  a test, not by inspection). Legacy builds and pre-existing chats keep the
+  hints inference + skip-Latin fallback, both still tested.
+  **This round is NOT backend-only** — `web/lib/types.ts` + `AskBrain.tsx`
+  changed, so it needs a TestFlight build to reach the phone (rounds 1–2 did
+  not). Verified: **21 new tests** (`pin_cards_by_ids` incl. a duplicate-id case
+  that caught a real bug in my first draft — a repeated id duplicated its card;
+  marked/unmarked language modes; endpoint tests for front-pin, back-append,
+  no-double-fetch, malformed ids, and the unclassifiable follow-up), suite
+  **490 passed / 4 failed** (the same `test_embed_trigger_backstop` drift, §4
+  item 11b), `tsc` 0, `next build` 0.
+  **SHIPPED:** merge `9c1d3f4` → functions run **#43 green** (`ask_brain`
+  updated), Vercel on the same push, **TestFlight run #185 green → build 1185**
+  (archive signed, entitlement tripwire passed, uploaded 14:14Z).
+  **Install 1185** — rounds 1–2 were backend-only and are already live on any
+  build, but `contextIds` + the typed/generated markers are CLIENT-side and only
+  reach the phone here. **Owner device QA on 1185, in a Hebrew thread:** (a) a
+  content-free follow-up ("בעברית", "בקצרה") answers about the same card; (b)
+  "מי פירסם את זה?" names the publisher instead of "not in your sources"; (c) a
+  bare follow-up with no pointer at all ("who published") still sees the card —
+  that one is the `contextIds` guarantee, not a heuristic; (d) tapping an
+  English chip answers in Hebrew, but typing an English question switches the
+  thread to English and keeps it there.
+
+- **2026-07-25 — ASK, ROUND 2: "WHO PUBLISHED THIS?" COULDN'T SEE THE
+  CARD IT WAS POINTING AT.** Owner device QA on the round-1 deploy, two
+  screenshots: a chip opened a thread (`Key points from "Anthropic Introduces
+  Three-Tiered Claude Certification Program"`, answered in English, LinkedIn
+  card cited), then the typed Hebrew `מי פירסם את זה?` ("who published this?")
+  → **"the information about Claude's certification program did not appear in
+  your saved sources"**, flagged ungrounded. Language was CORRECT (Hebrew in →
+  Hebrew out — the round-1 fixes held); retrieval was not. **The round-1
+  `is_context_free_followup` gate could never catch this:** it fires only when
+  every content token is meta, and this question has real ones — `keyword_query_tokens`
+  returns `{מי, פירסם}` — so it read as topical and embedded as "who published",
+  which matches nothing. The subject lives in the previous turn; only the
+  POINTER (`זה`) is in this one, and most pointers are already `_RANK_STOPWORDS`
+  so they are invisible to any token-based test. Fix: `search.is_referential_followup`
+  matches a standalone pointer word (EN + HE) on the RAW text, guarded four ways
+  because a false positive drags an old topic into retrieval — must be short
+  (≤4 content tokens, so "show me that recipe with the tomatoes" retrieves for
+  itself), must quote no card title (a quoted title IS the subject, stated), and
+  must not be a recency question (`this week`/`this month` are pointers
+  grammatically, time-anchored in meaning). **The two follow-up kinds are
+  treated differently on purpose:** context-free REPLACES the query (the
+  question is provably noise), referential PREPENDS the prior question and keeps
+  the question, so the combined text retrieves a superset — a misfire costs
+  precision and can never lose what was asked for. Bonus: the prior question's
+  quoted title now flows into `anchor_phrases_for`, so the card is pinned to the
+  front of context, not merely retrieved. Verified: **9 new tests** (`test_ask_retrieval.py`
+  classifier + query cases incl. the recency and long-question guards,
+  `test_ask_followup_context.py` endpoint repro), suite **476 passed / 4 failed**
+  — the same `test_embed_trigger_backstop` drift (§4 item 11b); all three new
+  behavioural tests confirmed to FAIL with the fix reverted.
+  **Deploy scope: `ask_brain`.**
+
+- **2026-07-25 — ASK: A TAPPED CHIP NO LONGER FLIPS THE THREAD'S
+  LANGUAGE.** Owner screenshot: `אני צריך בית קפה בפרדס חנה` → answered in
+  Hebrew; the next turn was the suggestion chip `Give me more detail on "5
+  מקומות מומלצים בפרדס חנה"` → answered **entirely in English**. Not a
+  regression — it's Round 6 (2026-07-14) working as specified: the prompt rule
+  judges the answer's language from the question's own words with quoted card
+  titles ignored, so a chip reads as an English question. That rule is right
+  for TYPED text and wrong for a chip, whose wording is *Machina's* English
+  boilerplate and expresses no preference from the user at all. Owner's call:
+  chips stay English, the continuation stays in the language the user started
+  in. Fix (backend only, so shipped native builds get it on deploy):
+  (1) `search.dominant_script_language` + `conversation_language` (pure) — the
+  non-Latin language the USER has written in this thread, counted by Unicode
+  block over their own words with quoted titles stripped (so a Hebrew title
+  inside an English chip can't fake a Hebrew signal), newest matching turn
+  wins, **Latin turns are skipped rather than ending the scan** (turns between
+  the Hebrew opener and this chip are usually earlier English chips — ending
+  there reinstates the bug on the second tap), assistant turns never vote.
+  (2) `_build_rag_prompt` gained `answer_language`, rendering a LANGUAGE
+  OVERRIDE clause that explicitly takes precedence over the Round-6 rule
+  (which stays, unchanged, for every typed question); threaded through both RAG
+  paths and all 8 call sites including the filter-salvage/sweep retries.
+  (3) `ask_brain` sets it **only when `hints` is present** — `hints` is
+  machine-generated chip intent and is never attached to typed text, making it
+  the reliable "the app composed this question" marker already on the wire from
+  both platforms. Latin-script conversations return None, so every all-English
+  thread (i.e. every thread today) is byte-identical. No frontend change needed:
+  the bubble's direction already follows the answer's ACTUAL prose
+  (`getDominantDirection`, Round 6b), so a Hebrew answer renders RTL by itself.
+  **Known trade-off:** start in Hebrew, later type English, then tap a chip →
+  still Hebrew; the next typed turn switches it back (typed questions are never
+  pinned). Verified: **20 new tests** across `test_ask_retrieval.py` (script +
+  conversation-language helpers), `test_rag_prompt.py` (override rendering,
+  absent by default), `test_ask_followup_context.py` (endpoint wiring: chip in a
+  Hebrew thread pinned, typed question never pinned, English thread and
+  thread-opening chip untouched); suite **464 passed / 4 failed** — the same
+  pre-existing `test_embed_trigger_backstop` drift (§4 item 11b); the new
+  endpoint test was confirmed to FAIL with the fix reverted.
+  **SHIPPED:** merge `e3e7e12` → "Deploy Cloud Functions" run **#42 green**,
+  `ask_brain(us-central1)` updated 13:02Z (scoped via the merge commit's
+  `Deploy-Functions: ask_brain` trailer). Backend-only, so **no TestFlight build
+  was needed** — the shipped native app picks both fixes up from the deployed
+  function. Vercel redeployed on the same push (no `web/` diff, so no user-visible
+  desktop change). **Owner device QA open:** in a Hebrew thread, (a) a
+  content-free follow-up ("בעברית", "בקצרה") should now answer about the same
+  card instead of "no content on that", and (b) tapping an English chip should
+  answer in Hebrew — chips themselves stay English by design.
+
+- **2026-07-25 — ASK: A FOLLOW-UP WITH NO TOPIC OF ITS OWN RETRIEVED
+  FOR NOISE.** Owner screenshot: Ask answered `Why is "מתכון לעוגת מייפל עסיסית"
+  worth my time?` in English, with the recipe card cited on screen; the next
+  turn — `בעברית` ("in Hebrew") — replied that **the library has no content on
+  that recipe**, listing unrelated politics/parenting/Italy cards as its
+  sources. Root cause: `ask_brain` retrieves for the CURRENT question text
+  alone (history only ever reached the answer prompt, `_build_rag_prompt`), so
+  the turn embedded two meta words and got topically arbitrary neighbours;
+  the model saw the real subject in history but a context set unrelated to it
+  and — correctly, per its grounding rules — said it had nothing. It fires for
+  every content-free follow-up, in any language: "shorter", "in English",
+  "why?", "expand". Fix (backend only, no client change, so already-shipped
+  TestFlight builds get it on deploy): new pure helpers in `search.py` —
+  `is_context_free_followup` (every content token is meta — a language, a
+  length, a "go on" — or there are none) and `followup_retrieval_query`
+  (returns the last user turn that DID carry a topic, walking past chained meta
+  turns, never an assistant turn, failing open on malformed history).
+  `ask_brain` now derives `retrieval_query` once and feeds it to every
+  retrieval-steering call (vector search, rerank, keyword scan, recency,
+  exclusion, anchor pinning); **generation is untouched** — the model still
+  gets the raw `question` + `history`, so "answer in Hebrew" still means answer
+  in Hebrew. The meta vocabulary is a CLOSED list (EN + HE), so any question
+  with one real content word — including a topic switch — retrieves
+  byte-identically to before; that's the safety property, tested. Covers the
+  streaming and JSON paths alike (retrieval precedes the branch). Verified:
+  **13 new tests** (`test_ask_retrieval.py` pure-helper cases +
+  `test_ask_followup_context.py` endpoint wiring), suite **448 passed / 4
+  failed** — the 4 are the pre-existing `test_embed_trigger_backstop`
+  `firebase_functions` drift (§4 item 11b), unchanged by this diff; the new
+  endpoint test was confirmed to FAIL with the fix reverted. Backend-only diff,
+  so no `tsc` surface. **Deploy scope: `ask_brain`.**
 
 - **2026-07-25 — LINKEDIN BYLINE, ROUND 2: MY OWN SLUG PARSER WAS
   WRITING THE POST TEXT (regression from the entry below — same session).**
@@ -858,6 +1188,166 @@ exact-match, capped.
   launch:** set `MONTHLY_ASK_QUOTA` to a real per-tier value in the functions
   env — 1000/user/month across a public user base is a genuine cost exposure,
   and this default is a single-user stopgap, not a pricing decision.
+- **2026-07-25 — `/security` PASS ON `web/`: 3 fixes (S-9 digest-delete
+  denied by the locked ruleset, S-10 local data survives sign-out AND account
+  deletion, S-11 two unguarded `link.url` sinks), +10 regression tests, 504→510
+  green.** Second run of the skill, target `web/` only (`web/ios/` excluded —
+  the one open native item, task 12 ingest-token→Keychain, needs device
+  verification, AUDIT.md M11). Lenses in the order requested: client XSS →
+  secrets/PII in the bundle → client auth gating → client writes vs the locked
+  ruleset → dependencies.
+  **FIXED — (1) S-9, would have detonated AT the cutover.** The per-digest
+  **Delete** action (`DigestCard` → `Feed.tsx:1257`/`:1278` `onDeleteDigest` →
+  `lib/digest.ts:61`) is a direct client `deleteDoc` on
+  `users/{uid}/digests/{id}`, but `firestore.rules.locked` had `allow write: if
+  false` on that collection — and `write` covers delete. The rule predates the
+  delete action (shipped in the 2026-07-2x Collections/Digest round), so the two
+  drifted. Post-cutover the delete is rejected, the call site `void`s the
+  promise so nothing surfaces, `onSnapshot` never fires and the row just stays —
+  a silently dead button, with the unhandled rejection quietly landing in
+  `client_errors`. Now `allow delete: if owns(uid)` with `create, update: if
+  false`: the user may remove a digest from their own history, but can never
+  forge one or tamper with the curated cards inside it. `syntheses` deliberately
+  stays fully write-denied (the recap card is dismissed via localStorage, there
+  is no client delete path) — with a test pinning that asymmetry.
+  **(2) S-10, live today on both surfaces.** `lib/firebase.ts:47-50` initializes
+  Firestore with `persistentLocalCache()`, so IndexedDB mirrors every document
+  the app has read — the whole library: card titles, summaries, URLs, chats,
+  collections. `signOutUser()` called `signOut(auth)` and nothing else, and
+  `deleteAccount()` funnels through the same function, so: signing out on a
+  shared browser left the full library recoverable from IndexedDB by the next
+  person at that profile (the exact threat the in-app privacy vault exists for),
+  and **"Delete my account" wiped the server while leaving a complete local copy
+  behind indefinitely**. localStorage also held `machina_welcome_done:<uid>` —
+  and the uid IS the phone number. New `web/lib/localData.ts`
+  `purgeLocalUserData()`: `terminate(db)` + `clearIndexedDbPersistence(db)`,
+  then localStorage/sessionStorage cleared down to a **two-key device-preference
+  allowlist** (`theme`, `reader-font-size`) — an allowlist, so a key added by a
+  future feature is purged by default rather than silently forgotten. Wired into
+  `signOutUser()`, the single choke point both flows already pass through,
+  followed by a `location.reload()` — required, because `terminate()`
+  permanently closes the Firestore instance. **(3) S-11, defence in depth.**
+  `Card.tsx:180` (the processing/failed placeholder card's footer link) rendered
+  `href={link.url}` raw and `CardActionSheet.tsx:95` passed `link.url` straight
+  to `window.open()`, while five sibling sites already guarded with
+  `/^https?:\/\//i` — `Card.tsx:277` even carries the comment explaining why. A
+  stored `javascript:` value in either sink runs in the app's own origin with
+  the live Firestore session. Post-cutover the reach is self-XSS only (you can
+  only write your own card docs), so this is consistency + depth, not an open
+  door. All seven sites now go through one exported `isHttpUrl()` in
+  `web/lib/url.ts`.
+  **REPORTED, NOT FIXED (new §4 items 11c/11d):** *S-12, the Vercel surface
+  collapses every web caller into ONE per-IP rate-limit bucket* — traced
+  end-to-end for Ask: `/api/chat` is deliberately not a rewrite, so
+  `app/api/chat/route.ts:50` is a Vercel serverless function that fetches the
+  Cloud Function's direct URL **server-side**; the backend takes the LAST
+  `X-Forwarded-For` hop by design (`rate_limit.py:74-87`), which is Vercel's
+  egress IP, and `main.py:1496` gates on the 60/hr fail-CLOSED `chat` IP bucket
+  *before* the per-uid bucket at `:1522` is consulted. So 60 questions an hour
+  across the entire desktop-web user base, and one script locks out every web
+  user. Same topology for the `vercel.json` rewrites (analyze 30/hr, image
+  30/hr, share 120/hr, article 120/hr), but those add a Firebase Hosting hop I
+  could not verify from here, so only the `/api/chat` chain is asserted. Fix
+  belongs in `functions/` → next `/security functions` pass. *S-13, deps:* 1
+  critical / 18 high / 1 moderate, **none reachable** — `next@16.2.10`'s nine
+  advisories all need middleware (none), Server Actions (none), the image
+  optimizer (`images.unoptimized: true`, nothing imports `next/image`) or a
+  dynamic rewrite destination (all static); the **critical** `websocket-driver`
+  arrives via `firebase → @firebase/database → faye-websocket`, the Node-only
+  RTDB transport this Firestore app never loads; postcss/sharp are build-time
+  inside Next; the eslint/minimatch chain and `tar` are devDependencies.
+  Clearing the Next advisories needs ≥16.3.0 (the range runs to
+  `16.3.0-preview.7`, so `npm audit fix` landing 16.2.11 does NOT cover them) —
+  a deliberate upgrade with `next build` + device QA, same stance as AUDIT.md
+  S-5 took on postcss. *S-14:* CSP allows `'unsafe-eval'`/`'unsafe-inline'` in
+  `script-src` on both surfaces; `'unsafe-inline'` is load-bearing (the
+  `layout.tsx:56` theme bootstrap + Next hydration), `'unsafe-eval'` I couldn't
+  tie to a consumer but can't remove without a live check.
+  **INVESTIGATED AND DISMISSED (do not re-find these):** *`dangerouslySetInnerHTML`*
+  — exactly one site, `app/layout.tsx:56-60`, a static string literal (the
+  render-blocking theme bootstrap); no `innerHTML`/`insertAdjacentHTML`/
+  `document.write`/`eval`/`new Function` anywhere in `web/`. *Both markdown
+  stacks (A-7)* — `SimpleMarkdown.tsx` only ever builds React elements (no href,
+  no raw HTML), and `AskBrain.tsx:106-127` runs react-markdown 9.1 with
+  `remark-gfm`/`remark-breaks` and **no `rehype-raw`**, so model HTML is
+  escaped; the custom `a` renderer gets an href already through react-markdown's
+  default `urlTransform` and sets `rel="noopener noreferrer"`. A-7 is a visual-QA
+  task, not a security one. *`ReadingView` rendering scraped articles* —
+  `/api/article` returns structured `paragraphs[]` and `:138-154` renders
+  `p.text` as React text nodes per block type; no HTML path exists. *Secrets in
+  the bundle* — all eleven `NEXT_PUBLIC_*` vars are non-secret by design; a scan
+  for AIza/PEM/`sk-`/`SG.`/Twilio-SID/`ghp_` patterns over `web/` found nothing;
+  `.env*` gitignored. *uid (= phone number) in error reports / analytics* —
+  `errorReporter.ts:118` and `analytics.ts:105` use the uid only as the document
+  PATH, which the locked ruleset restricts to the owner; neither doc body
+  carries it, analytics props pass an 8-key allowlist with a 40-char cap, error
+  reports carry message/stack/`pathname+search` (no hash). The real residue was
+  localStorage → that became S-10. *AuthProvider both branches* — the two legacy
+  `limit(1)` first-doc reads are still correctly flag-gated (`:218` `if
+  (REQUIRE_AUTH || !native) return;`, `:462` `if (!REQUIRE_AUTH)`); the live
+  path is the `authUids array-contains` LIST at `:421`, which is precisely what
+  `firestore.rules.locked:45` is written to prove. `publicRoutes.tsx` exempts
+  only `/privacy`+`/terms` (no auth context used); `/s`,`/c` are server-rendered
+  by `share_page` and aren't Next routes. *Missing bearer on `/api/article`
+  (`ReadingView.tsx:55`)* — every other `/api/*` call site sends `authHeaders()`;
+  this one matches `get_article`'s documented anonymous contract
+  (`main.py:1982-1999` never reads a bearer), so it is correct today and only
+  becomes a code change if the owner gates it (AUDIT.md S-4 / M10). *Every other
+  client write vs the locked ruleset* — enumerated: `users/{uid}` updates
+  (timezone/aiConsentAt/pushPromptedAt/onboarded/`settings.*`/privacyLock/
+  authUids) satisfy `:50`; links/chats/collections/analytics_events/client_errors
+  are `owns(uid)`; nothing writes `shared_*` directly (publish/unpublish go via
+  `/api/publish-share`); nothing writes `syntheses`. `digests` was the ONLY
+  mismatch. *`lib/privacyLock.ts`* — PBKDF2-SHA256 ×100k with a per-user 16-byte
+  salt, PIN never stored; the file correctly states it's a privacy screen, not a
+  security boundary, so no throttling and a non-constant-time compare don't
+  matter (the data is reachable through the user's own session anyway). *Stored
+  `javascript:` URLs at save time* — `AddLinkForm.tsx:41-48` prefixes `https://`
+  when the input isn't http(s); every `target="_blank"` carries
+  `rel="noopener noreferrer"` and all three `window.open` sites pass
+  `noopener,noreferrer`. *Security headers* — HSTS, nosniff, `X-Frame-Options:
+  DENY`, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`,
+  Referrer-Policy and Permissions-Policy are set on BOTH surfaces (`vercel.json`
+  and `firebase.json` `/**`, which covers the `/s`,`/c` share pages). Residual =
+  S-14.
+  **Verified:** `tsc --noEmit` exit 0 (before AND after — `npm ci` run first, so
+  unlike the last pass the frontend gate actually ran); `eslint .` unchanged at
+  4 errors / 9 warnings, none in any file I touched (all pre-existing drift in
+  SettingsModal/StatsView/useScrollAwayBar/BrandOrb since the D-16 zero-error
+  sweep — not security, not mine); `py_compile` clean; pytest **510 passed, 4
+  failed** — the 4 are exactly the pre-existing `test_embed_trigger_backstop.py`
+  mock failures tracked in §4 item 11b (504 on `main` after the parallel Ask
+  session's rounds 3–5 landed, + my 6 = 510; all gates re-run AFTER merging
+  `origin/main`, which had advanced 10 commits — the only conflict was the two
+  sessions both prepending to §9, resolved by keeping both entries). **`cd
+  firestore-rules-test && npm test` COULD NOT RUN HERE** — the emulator JAR
+  download is blocked by the sandbox egress policy (`storage.googleapis.com:443`
+  → 403 at the agent proxy), exactly as §4 task 2 records, so the S-9 rule change
+  and its 4 new cases are unverified against a live emulator and MUST be run on
+  the owner machine before the rules deploy. **Regression tests:** 4 rules cases
+  in `firestore-rules-test/rules.test.mjs` (owner CAN delete a digest, stranger/
+  anon cannot, create+update still denied, syntheses delete still denied) and 6
+  source-scan invariants in `functions/tests/test_web_client_hygiene.py` —
+  `web/` has no JS test runner (§4 item 18), so these live in the pytest suite
+  that CI already runs, mirroring the H-4 AST-scan precedent; verified
+  non-vacuous by stashing the fix (3 of them fail against the pre-fix tree).
+  **Owner actions handed back:** run the rules suite before the cutover deploy;
+  device-QA the new sign-out/delete-account reload on TestFlight; decide the
+  Next ≥16.3.0 upgrade; plus the unchanged §4 task-2 cutover, §4 task-5 env +
+  key rotation, and the AUDIT.md S-4/M10 `get_article` gating call.
+  **SHIPPED:** feature `088a45b`, merge **`a933e65`** → Vercel (auto).
+  TestFlight run **#186 green → build 1186** (archive + entitlement check +
+  upload all clean). **Cloud Functions run #46 green** — and that deploy was
+  INCIDENTAL, worth knowing for next time: the workflow's path filter is
+  `functions/**` with no skip mechanism, so adding a *test file* under
+  `functions/tests/` fires a full reconcile deploy. It was a safe no-op here
+  (prod was already current from run #45; the deploy step took 1m53s), but
+  anyone landing a functions-adjacent test should expect it. No hosting deploy
+  (`firebase.json` unchanged). **Only S-10 + S-11 are live** — S-9 is a change to
+  the STAGED `firestore.rules.locked`, so it takes effect only at the §4 task-2
+  rules deploy, and the live `allow read, write: if true` rules are unaffected
+  by this ship.
+
 - **2026-07-25 — ASK: STALE GLYPHS + THE TEXT STOPS ANIMATING (device
   report, build 1181).** Owner on iPhone: "Thinking it through ends with a weird
   character" (screenshot showed trailing debris after the ellipsis) and "the

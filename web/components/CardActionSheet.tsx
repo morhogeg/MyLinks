@@ -8,6 +8,7 @@ import { IconButton } from './ui/Button';
 import { useScrollLock } from '@/lib/useScrollLock';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 import { cardThumbnailUrl } from '@/lib/cardThumbnail';
+import { isHttpUrl } from '@/lib/url';
 
 interface CardActionSheetProps {
     link: Link;
@@ -89,12 +90,15 @@ export default function CardActionSheet({
         danger?: boolean;
         active?: boolean;
     }[] = [
-        {
+        // Only offer "Open source" for a real http(s) URL — never hand a stored
+        // javascript:/data: value to window.open(), which would run it in the
+        // app's own origin.
+        ...(isHttpUrl(link.url) ? [{
             key: 'source',
             label: 'Open source',
             icon: <ExternalLink className="w-5 h-5" />,
             onClick: () => window.open(link.url, '_blank', 'noopener,noreferrer'),
-        },
+        }] : []),
         {
             key: 'read',
             label: link.isRead ? 'Mark as unread' : 'Mark as read',
