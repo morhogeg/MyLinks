@@ -44,7 +44,14 @@ _QUOTA_KINDS = {
     },
     "asks": {
         "env": "MONTHLY_ASK_QUOTA",
-        "default": 100,
+        # Raised 100 → 1000 (2026-07-25): the owner hit the cap on their own
+        # device mid-TestFlight and Ask — the hero surface — was dead until the
+        # 1st. 100/month is a sane PUBLIC tier but far too tight for the single
+        # pre-launch user who is also the tester. Still a real ceiling (~33/day),
+        # so a runaway client or a leaked App Check token can't spend without
+        # bound. Revisit before public launch: set MONTHLY_ASK_QUOTA per tier in
+        # the functions env rather than shipping a per-tier default here.
+        "default": 1000,
         "message": "Monthly question limit reached — resets on the 1st.",
     },
 }

@@ -65,6 +65,8 @@ from search import (
     anchor_phrases_for, is_exclusion_question, demote_cards_by_titles,
     is_recency_question, recent_cards, category_cards,
     private_collection_ids, strip_private_cards, apply_distance_threshold,
+    resolve_followup, conversation_language,
+    pin_cards_by_ids, cards_by_ids,
 )
 from rate_limit import check_rate_limit, client_ip
 # Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
@@ -359,6 +361,11 @@ _RATE_LIMITS = {
 # surface. Enforced by _sanitize_history / _sanitize_tags below.
 MAX_HISTORY_ITEMS = 6            # ai_service._build_rag_prompt uses the last 6 turns
 MAX_HISTORY_CONTENT_LENGTH = 4000
+# Cards the recent answers cited, sent by the client so a follow-up can be
+# grounded in what was actually on screen. Each one is a Firestore read, so the
+# count is bounded; a couple of answers' worth of citations is the useful window.
+MAX_CONTEXT_IDS = 6
+MAX_CONTEXT_ID_LENGTH = 200
 MAX_TAGS = 50
 MAX_TAG_LENGTH = 60
 
@@ -405,8 +412,41 @@ def _sanitize_history(history) -> list:
         content = item.get("content")
         if not isinstance(content, str):
             content = "" if content is None else str(content)
-        cleaned.append({"role": role, "content": content[:MAX_HISTORY_CONTENT_LENGTH]})
+        turn = {"role": role, "content": content[:MAX_HISTORY_CONTENT_LENGTH]}
+        # Chip-composed turns are marked so the answer-language decision can
+        # ignore them (their wording is Machina's boilerplate, not the user's —
+        # see search.conversation_language). Absent on older clients, which the
+        # helper falls back for.
+        if item.get("generated"):
+            turn["generated"] = True
+        cleaned.append(turn)
     return cleaned
+
+
+def _sanitize_context_ids(value) -> list:
+    """Clamp the client's `contextIds` — the card ids the recent answers in this
+    conversation actually CITED, i.e. what "this"/"it"/"that" refers to.
+
+    These become Firestore document reads and steer the model's context, so
+    they are clamped like every other client input: strings only, deduped,
+    length-capped (Firestore ids are short), and bounded in count. Anything
+    malformed is dropped rather than errored — context ids only ever improve a
+    request, and a request without them still answers.
+    """
+    if not isinstance(value, list):
+        return []
+    out, seen = [], set()
+    for item in value[:MAX_CONTEXT_IDS * 2]:
+        if not isinstance(item, str):
+            continue
+        cid = item.strip()[:MAX_CONTEXT_ID_LENGTH]
+        if not cid or cid in seen:
+            continue
+        seen.add(cid)
+        out.append(cid)
+        if len(out) >= MAX_CONTEXT_IDS:
+            break
+    return out
 
 
 def _sanitize_hints(hints) -> dict:
@@ -923,6 +963,25 @@ def _ground_source_name(candidate, url, fallback=None):
             return candidate
         return _prettified_host(url) or fallback
     return candidate or fallback
+
+
+def _pick_source_name(scraped_name, model_name, url):
+    """Choose the publisher name, preferring deterministic extraction.
+
+    For LinkedIn the model's guess is NEVER used. Company-page posts carry no
+    author in their meta tags — their og:title is the post's own opening line —
+    so Gemini fills the gap with that sentence and it lands in the byline
+    ("Introducing Three New Certifica…" instead of "Claude for Business").
+    The scraper already falls back to the URL slug, which is authoritative for
+    who posted, so if it produced nothing there is genuinely no author to show
+    and an empty byline beats a sentence masquerading as a publisher.
+    """
+    if scraped_name:
+        return scraped_name
+    host = _prettified_host(url)
+    if host == "linkedin.com" or host.endswith(".linkedin.com"):
+        return None
+    return model_name
 
 
 def _write_stage(card_ref, stage: str) -> None:
@@ -1445,7 +1504,7 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             detailed_summary=analysis.get("detailedSummary", ""),
             source_type="youtube" if is_youtube else "web",
             source_name=_ground_source_name(
-                scraped.get("source_name") or analysis.get("sourceName"),
+                _pick_source_name(scraped.get("source_name"), analysis.get("sourceName"), url),
                 url=url,
             ),
             original_title=scraped.get("title", ""),
@@ -1530,6 +1589,15 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         # Structured chip intent (anchor/category/concept/recency/exclusions) —
         # optional, clamped. See _sanitize_hints for why chips send this.
         hints = _sanitize_hints(data.get('hints'))
+        # The cards the recent answers cited — what a follow-up's "this"/"it"
+        # actually refers to. Structured truth from the client, so the backend
+        # doesn't have to infer the subject from prose.
+        context_ids = _sanitize_context_ids(data.get('contextIds'))
+        # Did the APP compose this question (a tapped chip) or did the user type
+        # it? Explicit from newer clients; `hints` is the legacy signal, since
+        # chips have always carried structured intent and typed text never does.
+        client_marks_turns = bool(data.get('generated'))
+        question_generated = client_marks_turns or bool(hints)
         # Opt-in token streaming (SSE). Only honored for POST so the JSON path is
         # 100% unchanged when not explicitly requested.
         want_stream = bool(data.get('stream')) and req.method == 'POST'
@@ -1547,6 +1615,49 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             return q
         charged = (uid, "asks")
 
+        # 0. What this turn is actually ABOUT. Normally the question itself;
+        #    for a follow-up that carries no topic of its own ("in Hebrew",
+        #    "shorter", "why?") it becomes the last user turn that did, so
+        #    retrieval doesn't embed two meta words and hand the model a
+        #    context set unrelated to the subject it just answered (see
+        #    search.followup_retrieval_query). Steers RETRIEVAL ONLY — the
+        #    model is still asked the raw `question`, with `history`.
+        followup = resolve_followup(question, history)
+        retrieval_query = followup["query"]
+        # A resolved subject means this turn borrowed it from an earlier one —
+        # the signal step 1g-2 uses to decide whether the previously-cited cards
+        # are the headline or just background. `followup` also travels to the
+        # prompt, which must NAME that subject: the standing "follow-ups must
+        # add value" rule otherwise reads as "go find a different source", and
+        # for a restate request ("in Hebrew, briefly") that rule is suspended
+        # outright.
+        is_followup = bool(followup["subject"])
+        # Does this turn want sources it has NOT seen? "What else … besides
+        # this" is a follow-up AND a request to move past what was just shown,
+        # so the cited cards must not be promoted for it. Demoting them later
+        # isn't enough: when every card in context is already-discussed the
+        # demote has nothing to reorder, and whatever was pinned stays pinned.
+        wants_new_sources = (bool(hints.get("excludeTitles"))
+                             or is_exclusion_question(retrieval_query))
+        if is_followup:
+            logger.info("ask_brain: follow-up (restate=%s) — resolved against the conversation",
+                        followup["restate"])
+
+        # 0b. A conversation must not change language because the user tapped a
+        #     suggestion. Chip questions are Machina's own English boilerplate
+        #     around a card title, so judging language from their wording (the
+        #     normal rule) flipped a Hebrew thread to English mid-conversation.
+        #     `hints` is the chip marker — it is machine-generated intent, only
+        #     ever attached to a question the app composed, never to typed
+        #     text — so on those turns the answer language comes from what the
+        #     USER has written here instead. None (all-Latin conversations, or
+        #     a chip that opens a thread) leaves the prompt rule untouched.
+        answer_language = (conversation_language(history, marked=client_marks_turns)
+                           if question_generated else None)
+        if answer_language:
+            logger.info("ask_brain: generated question — answering in %s (conversation language)",
+                        answer_language)
+
         # 1. Retrieve the most relevant saved cards (reuses the vector search
         #    that already powers the search bar). Degrade gracefully: if
         #    retrieval fails, answer_from_context returns a friendly "nothing
@@ -1563,7 +1674,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         # answer, which gaslights a user with hundreds of saves.
         retrieval_errors = 0
         try:
-            candidates = perform_search_logic(uid, question, limit=30)
+            candidates = perform_search_logic(uid, retrieval_query, limit=30)
             # Quality-gate the nearest-neighbour output exactly like the
             # search bar does: find_nearest always returns `limit` results no
             # matter how far away, so for an off-library question ungated
@@ -1571,7 +1682,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             # then pressures the model to cite one. Gated, the model honestly
             # says the library has nothing on it.
             candidates = apply_distance_threshold(candidates)
-            cards = rerank_candidates(question, candidates, top_k=10)
+            cards = rerank_candidates(retrieval_query, candidates, top_k=10)
         except Exception as e:
             logger.error(f"ask_brain retrieval failed: {e}")
             retrieval_errors += 1
@@ -1584,7 +1695,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #     (same one the search bar's hybrid path uses).
         try:
             have = {c.get("id") for c in cards}
-            cards = cards + keyword_scan_cards(uid, question, exclude_ids=have, limit=5)
+            cards = cards + keyword_scan_cards(uid, retrieval_query, exclude_ids=have, limit=5)
         except Exception as e:
             logger.error(f"ask_brain keyword fallback failed: {e}")
             retrieval_errors += 1
@@ -1612,7 +1723,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #     Chips assert this explicitly (hints.recency); typed questions
         #     are matched by phrasing.
         try:
-            if hints.get("recency") or is_recency_question(question):
+            if hints.get("recency") or is_recency_question(retrieval_query):
                 recents = recent_cards(uid, limit=12)
                 recent_ids = {c.get("id") for c in recents}
                 cards = recents + [c for c in cards if c.get("id") not in recent_ids]
@@ -1632,6 +1743,38 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             except Exception as e:
                 logger.error(f"ask_brain category retrieval failed: {e}")
 
+        # 1e-2. CONVERSATION GUARANTEE: the cards the recent answers actually
+        #     CITED are in context for the next turn. Everything above infers
+        #     the subject from the question's prose, which is exactly what a
+        #     follow-up doesn't state — the owner hit this twice (a "בעברית"
+        #     that was told the library holds nothing on the recipe just cited,
+        #     and a "מי פירסם את זה?" told the same about a LinkedIn card).
+        #     `contextIds` is not an inference: it's the ids the client rendered
+        #     as source chips, so no phrasing can defeat it.
+        #     On a detected follow-up (the retrieval query was resolved against
+        #     an earlier turn) they're PINNED to the front — that's what the
+        #     question is about, and the deep-content window lives there. On any
+        #     other turn they're appended at the BACK: present and referenceable
+        #     if the answer needs them, never crowding a genuine new topic.
+        #     Runs BEFORE the exclusion and anchor steps ON PURPOSE. A turn can
+        #     be a follow-up AND a "what else … besides this" — pinning after
+        #     the exclusion demote would put the very cards the user is trying
+        #     to move past back at the front. Ordering it here lets the existing
+        #     machinery have the last word in both directions.
+        #     Bounded (MAX_CONTEXT_IDS) and best-effort — a failure here leaves
+        #     the retrieval above exactly as it was.
+        if context_ids:
+            try:
+                have = {c.get("id") for c in cards}
+                missing = [i for i in context_ids if i not in have]
+                fetched = cards_by_ids(uid, missing) if missing else []
+                if is_followup and not wants_new_sources:
+                    cards = pin_cards_by_ids(context_ids, fetched + cards)
+                else:
+                    cards = cards + fetched
+            except Exception as e:
+                logger.error(f"ask_brain context-id merge failed: {e}")
+
         # 1f. Exclusions ("What else did I save on X?"): the already-discussed
         #     cards must not dominate the answer again. Chips name them
         #     explicitly (hints.excludeTitles); typed "besides X" questions
@@ -1639,9 +1782,16 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #     the BACK of context (still referenceable, never the headline)
         #     and the prompt gets an explicit already-discussed list.
         excluded_titles = list(hints.get("excludeTitles") or [])
-        if excluded_titles or is_exclusion_question(question):
-            if is_exclusion_question(question):
-                excluded_titles += extract_quoted_phrases(question)
+        if wants_new_sources:
+            if is_exclusion_question(retrieval_query):
+                excluded_titles += extract_quoted_phrases(retrieval_query)
+            # The cards the recent answers cited ARE the already-discussed set,
+            # known exactly — better than recovering it from quoted titles, and
+            # the reason "what else besides this?" can now name what "this" is.
+            if context_ids:
+                wanted = set(context_ids)
+                excluded_titles += [str(c.get("title") or "") for c in cards
+                                    if c.get("id") in wanted and c.get("title")]
             try:
                 cards, _ = demote_cards_by_titles(excluded_titles, cards)
             except Exception as e:
@@ -1656,7 +1806,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #     none matched would let one silently vanish).
         try:
             anchors = anchor_phrases_for(
-                question, hints.get("anchorTitles"), excluded_titles)
+                retrieval_query, hints.get("anchorTitles"), excluded_titles)
             if anchors:
                 for phrase in missing_title_phrases(anchors, cards):
                     have = {c.get("id") for c in cards}
@@ -1787,7 +1937,8 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             def _event_stream():
                 try:
                     for kind, payload in ai.answer_from_context_stream(
-                            question, slim, history, excluded_titles=excluded_titles):
+                            question, slim, history, excluded_titles=excluded_titles,
+                            answer_language=answer_language, followup=followup):
                         if kind == "token":
                             yield "data: " + json.dumps(
                                 {"type": "token", "text": payload}
@@ -1841,7 +1992,9 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
 
         # Synchronous path: 2 Gemini attempts (stay under the 60s budget, report 3.6).
         result = ai.answer_from_context(question, slim, history, attempts=2,
-                                        excluded_titles=excluded_titles)
+                                        excluded_titles=excluded_titles,
+                                        answer_language=answer_language,
+                                        followup=followup)
 
         # If the answer only succeeded after filter-probe isolation excluded or
         # partially filtered card(s) (Gemini's prompt filter rejects their text
@@ -3148,7 +3301,11 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             detailed_summary=analysis.get("detailedSummary"),
             source_type="youtube" if is_youtube else ("image" if is_image else "web"),
             source_name=_ground_source_name(
-                scraped.get("source_name") or analysis.get("sourceName"),
+                _pick_source_name(
+                    scraped.get("source_name"),
+                    analysis.get("sourceName"),
+                    "" if is_image else original_url,
+                ),
                 url="" if is_image else original_url,
                 fallback="Screenshot" if is_image else None,
             ),

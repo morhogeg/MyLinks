@@ -430,8 +430,12 @@ The multi-user auth work is **fully written but not live**:
     a real web runner (vitest) is the right home for them.
 19. **[~] Cost guardrails — CODE HALF SHIPPED 2026-07-14 (production-readiness
     sprint, see `docs/PRODUCTION_READINESS_2026-07-14.md`).** Per-user monthly
-    quotas live in code (`functions/quota.py`: 150 saves / 100 asks per month,
-    env-tunable `MONTHLY_SAVE_QUOTA`/`MONTHLY_ASK_QUOTA`, friendly 429s, refund
+    quotas live in code (`functions/quota.py`: 150 saves / **1000 asks** per
+    month — the ask default was raised from 100 on 2026-07-25 after the owner hit
+    it mid-TestFlight and lost Ask until the 1st; ⚠️ **set `MONTHLY_ASK_QUOTA`
+    back to a public-tier value in the functions env before launch, don't ship
+    1000 to real users** — env-tunable `MONTHLY_SAVE_QUOTA`/`MONTHLY_ASK_QUOTA`,
+    friendly 429s, refund
     on failed analyses), plus `max_instances` caps on every function, paid rate
     buckets fail closed, scheduler scans reworked (reminders via a bounded
     collection-group query + new composite index; digests 15-min cadence,
@@ -791,9 +795,376 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-25 (latest) — `/security` PASS ON `web/`: 3 fixes (S-9 digest-delete
+- **2026-07-25 (latest) — ✅ ASK CONVERSATION-CONTEXT WORK CONFIRMED BY OWNER
+  ("everything works perfectly").** Closes the five-round arc below. Verified
+  live across the six QA cases: restate follow-up (`בעברית, בקצרה`) stays on the
+  same card; referential (`מי פירסם את זה?`) names the publisher; an English chip
+  in a Hebrew thread answers in Hebrew; typing English switches the thread and
+  keeps it there; a pointerless follow-up (`who published`) still sees the card;
+  and `what else besides this?` returns OTHER cards. Live on **web** (all five
+  rounds — the round-3 client half rode the same push to Vercel), **TestFlight
+  build 1185**, and functions through run **#45**.
+  **Open risks are unchanged and still real — do not read this as "Ask is
+  done":** (a) round 4's subject-anchoring is a PROMPT INSTRUCTION, not an
+  enforceable guarantee (see that entry for the deterministic fallback —
+  narrowing restate-turn context to `contextIds` — and why it wasn't taken yet);
+  (b) the `contextIds` guarantee covers the last **2** answers only, so a
+  follow-up reaching further back falls through to the heuristics; (c) no
+  production log access from a cloud session, which is what made rounds 1-4 slow
+  — all five were diagnosed from code + local repro, with owner screenshots as
+  the only instrumentation.
+
+- **2026-07-25 — ASK, ROUND 5: SELF-REVIEW OF ROUNDS 1-4 (owner:
+  *"review this feature again to find more bugs, since u already said it is
+  fixed"*).** Fair — four rounds, four "fixed" claims. This round found and
+  fixed problems the owner had NOT hit yet.
+  **(1) REGRESSION I introduced in round 3 — "what else" was answered with the
+  card you're trying to move past.** `what else besides this?` is BOTH a
+  referential follow-up and an exclusion, so round 3's front-pin put the
+  just-discussed cards at the head of context while the exclusion demote pushed
+  them to the back — the pin ran later and won. Worse, when EVERY card in
+  context is already-discussed the demote has nothing to reorder, so gating the
+  order wasn't enough. Fixed two ways: the `contextIds` merge moved from step
+  1g-2 to **1e-2, BEFORE the exclusion and anchor steps**, so the existing
+  machinery gets the last word in both directions; and a new `wants_new_sources`
+  flag (explicit exclusion question or `hints.excludeTitles`) **suppresses the
+  front-pin outright** for those turns. Bonus from the same insight: on an
+  exclusion turn the cited card TITLES now join `excluded_titles`, so "what else
+  besides this?" knows exactly what "this" is instead of recovering it from
+  quoted text.
+  **(2) PRECEDENCE, previously undefined.** When the resolved question quotes a
+  card title AND the client sends different `contextIds`, which leads? Now
+  stated and tested: the quoted anchor wins (it is the most specific statement
+  of subject there is) and the cited card stays in context. In practice they are
+  the same card; this pins down the drift case.
+  **(3) THE STREAMING PATH WAS UNTESTED.** Every endpoint test used the buffered
+  JSON branch (what native asks for), while the WEB client streams — and
+  generation is the one place the two diverge. Wiring was correct, but nothing
+  would have caught a dropped `followup`/`answer_language`/`contextIds` on the
+  browser path. Three streaming tests added.
+  **(4) A PROMPT INSTRUCTION POINTING THE WRONG WAY.** Round 2's LANGUAGE
+  OVERRIDE said it takes precedence over "the language rule **below**" — it
+  renders directly *underneath* that rule, so the model was sent looking the
+  wrong way (and finds the CONTINUATION block there). Now "directly above".
+  **Also verified, no change needed:** the `answer_language`/`followup` params I
+  inserted mid-signature never displaced `max_drops` (only one call site each,
+  grep + AST checked); a 34-case EN/HE corpus of realistic questions produced
+  **zero** false positives and zero misses across `resolve_followup`; the
+  rendered prompt blocks were eyeballed for escaping damage (guillemets/quotes
+  clean). Suite **504 passed / 4 failed** — the same `test_embed_trigger_backstop`
+  drift (§4 item 11b). Backend-only, no `web/` diff → no TestFlight build.
+  **SHIPPED:** `27d0f57` → functions run **#45 green**, `ask_brain` updated.
+  **STILL THE WEAKEST LINK (say so plainly):** round 4's subject-anchoring is a
+  PROMPT INSTRUCTION, not an enforceable guarantee — the blocks are tested for
+  rendering, but `gemini-3.1-flash-lite` obeying them is not. If a restate
+  follow-up ever wanders again, the deterministic fix is to NARROW the context
+  for restate turns to just the previously-cited cards (`contextIds` already
+  gives the exact set), so there is nothing else to wander to. Deliberately not
+  done yet: it would blank the context on a restate turn for any client that
+  doesn't send `contextIds` (< build 1185, or an answer with no citations).
+  **ALSO OPEN:** this session had NO production log access (no `gcloud`, no
+  Firebase creds in the cloud container), so all five rounds were diagnosed by
+  reading code and reproducing locally. Round 4 was only pinnable because the
+  prompt rule explained every symptom exactly; a more ambiguous failure would
+  have been guesswork. Worth wiring a way to read `ask_brain` logs from a
+  session before the next debugging round.
+
+- **2026-07-25 — ASK, ROUND 4: THE PROMPT WAS TELLING THE MODEL TO
+  CHANGE THE SUBJECT.** Owner: *"Terrible."* Screenshot — an English answer
+  about a saved Breaking Bad clip (YouTube, "Action City"), then the typed
+  follow-up `בעברית, בקצרה` ("in Hebrew, briefly") → fluent, correctly brief
+  **Hebrew about an unrelated Operation Entebbe / C-130 article.** Language
+  right, brevity right, subject completely wrong, and NOT flagged ungrounded.
+  **This one was never retrieval.** Round 1 classifies `בעברית, בקצרה` as
+  context-free (verified — both tokens are in the meta vocabulary) and resolves
+  the query to the Breaking Bad question, so the right card was in context. The
+  fault is a rule that has been in the RAG prompt for weeks:
+  *"FOLLOW-UPS MUST ADD VALUE: … bring NEW information from the sources — never
+  restate an earlier answer in different words."* A translate/shorten request is
+  **precisely** "restate an earlier answer in different words". The model was
+  obeying instructions: it went and found new information, from a different
+  source. Every symptom follows — no "not in your sources" complaint, no
+  ungrounded flag, a genuinely good answer about the wrong thing.
+  **Fix:** `search.resolve_followup` (which `followup_retrieval_query` is now a
+  thin wrapper over) returns `{query, subject, restate}`; `ask_brain` passes it
+  to `_build_rag_prompt`, which renders a **CONTINUATION** block naming the
+  subject outright ("its subject is the earlier question: «…» — switching to a
+  different source because this question's own words matched one is WRONG") and,
+  for a restate request, a **RESTATE REQUEST** block suspending the add-value
+  rule for that turn only ("saying the same thing again in the form asked for is
+  the goal; hunting for new information here is a failure"). Referential
+  follow-ups ("who published this?") get the subject named but KEEP the
+  add-value rule — they want the same subject and genuinely new detail.
+  Threaded through both RAG paths and all 8 `_build_rag_prompt` call sites
+  (grep-verified), including the filter-salvage and headline-rescue retries.
+  **LESSON — rounds 1–3 all assumed a wrong answer meant wrong retrieval.**
+  Retrieval was right here and the prompt overrode it. When an answer is fluent,
+  correctly formatted, and about the wrong thing, suspect the instructions
+  before the context. Backend-only, so it reaches any installed build on deploy.
+  Verified: **8 new tests** (`test_rag_prompt.py` renders/omits both blocks incl.
+  the both-overrides-at-once case; `test_ask_followup_context.py` asserts the
+  endpoint classifies restate vs referential vs ordinary), suite **498 passed /
+  4 failed** — the same `test_embed_trigger_backstop` drift (§4 item 11b).
+  **SHIPPED:** `06e5c94` → functions run **#44 green**, `ask_brain` updated.
+  Backend-only, so it applies to build 1185 AND every earlier build.
+  **Owner device QA:** after any answer, `בעברית, בקצרה` (or "shorter" /
+  "in English") must restate THAT answer's source — same card, new form — not
+  find a different one.
+
+- **2026-07-25 — ASK, ROUND 3: THE CONVERSATION GUARANTEE (stop
+  guessing the subject — the client already knows it).** Owner, after round 2:
+  *"I'm not supposed to find all the issues."* Correct — rounds 1 and 2 were
+  both heuristics over prose, and each shipped with a known hole I'd described
+  rather than closed. Root cause of the whole class: `history` reaches the
+  backend as TEXT ONLY, so `ask_brain` had to re-derive "what are we talking
+  about" from wording — while the client held the exact answer all along, in
+  `ChatMessage.sources[].id` (the source chips already on screen).
+  **The structural fix — `contextIds`.** The client now sends the card ids cited
+  by the last `RECENT_ANSWERS_FOR_CONTEXT` (2) answers; `_sanitize_context_ids`
+  clamps them (strings, deduped, ≤6, length-capped) and new step **1g-2** in
+  `ask_brain` guarantees those cards are in context: **pinned to the FRONT** on a
+  detected follow-up (that's the subject, and the deep-content window lives at
+  the head), **appended at the BACK** otherwise (present and referenceable,
+  never crowding a genuine new topic). `search.cards_by_ids` fetches only the
+  ones retrieval missed — ≤6 doc reads, and 0 when retrieval already had them.
+  This is not an inference, so **no phrasing can defeat it**: it holds for the
+  follow-ups round 1 and 2 classify AND for ones neither can ("who published",
+  bare — the hole I flagged at the end of round 2, now covered and tested).
+  Placed BEFORE the privacy strip and the `askExcluded` filter, so a cited card
+  still can't smuggle private/poison content into the prompt; `cards_by_ids`
+  reads under `users/{uid}/links`, so tenant isolation holds against forged ids.
+  **Language, finished properly.** The chip signal was inferred from `hints`
+  presence; the client now states it — `generated: true` on the request AND on
+  each history turn (`ChatMessage.generated`, threaded through `send()` and
+  preserved by retry). `conversation_language(history, marked=)` therefore votes
+  only on turns the user TYPED, which **removes the round-1 trade-off**: start in
+  Hebrew, type English, tap a chip → English, because the last thing they typed
+  in their own words wins. `marked` comes from the current turn's explicit flag —
+  a conversation where the user has only typed carries no flag to observe, and
+  without that distinction a marking client is misread as a legacy one (caught by
+  a test, not by inspection). Legacy builds and pre-existing chats keep the
+  hints inference + skip-Latin fallback, both still tested.
+  **This round is NOT backend-only** — `web/lib/types.ts` + `AskBrain.tsx`
+  changed, so it needs a TestFlight build to reach the phone (rounds 1–2 did
+  not). Verified: **21 new tests** (`pin_cards_by_ids` incl. a duplicate-id case
+  that caught a real bug in my first draft — a repeated id duplicated its card;
+  marked/unmarked language modes; endpoint tests for front-pin, back-append,
+  no-double-fetch, malformed ids, and the unclassifiable follow-up), suite
+  **490 passed / 4 failed** (the same `test_embed_trigger_backstop` drift, §4
+  item 11b), `tsc` 0, `next build` 0.
+  **SHIPPED:** merge `9c1d3f4` → functions run **#43 green** (`ask_brain`
+  updated), Vercel on the same push, **TestFlight run #185 green → build 1185**
+  (archive signed, entitlement tripwire passed, uploaded 14:14Z).
+  **Install 1185** — rounds 1–2 were backend-only and are already live on any
+  build, but `contextIds` + the typed/generated markers are CLIENT-side and only
+  reach the phone here. **Owner device QA on 1185, in a Hebrew thread:** (a) a
+  content-free follow-up ("בעברית", "בקצרה") answers about the same card; (b)
+  "מי פירסם את זה?" names the publisher instead of "not in your sources"; (c) a
+  bare follow-up with no pointer at all ("who published") still sees the card —
+  that one is the `contextIds` guarantee, not a heuristic; (d) tapping an
+  English chip answers in Hebrew, but typing an English question switches the
+  thread to English and keeps it there.
+
+- **2026-07-25 — ASK, ROUND 2: "WHO PUBLISHED THIS?" COULDN'T SEE THE
+  CARD IT WAS POINTING AT.** Owner device QA on the round-1 deploy, two
+  screenshots: a chip opened a thread (`Key points from "Anthropic Introduces
+  Three-Tiered Claude Certification Program"`, answered in English, LinkedIn
+  card cited), then the typed Hebrew `מי פירסם את זה?` ("who published this?")
+  → **"the information about Claude's certification program did not appear in
+  your saved sources"**, flagged ungrounded. Language was CORRECT (Hebrew in →
+  Hebrew out — the round-1 fixes held); retrieval was not. **The round-1
+  `is_context_free_followup` gate could never catch this:** it fires only when
+  every content token is meta, and this question has real ones — `keyword_query_tokens`
+  returns `{מי, פירסם}` — so it read as topical and embedded as "who published",
+  which matches nothing. The subject lives in the previous turn; only the
+  POINTER (`זה`) is in this one, and most pointers are already `_RANK_STOPWORDS`
+  so they are invisible to any token-based test. Fix: `search.is_referential_followup`
+  matches a standalone pointer word (EN + HE) on the RAW text, guarded four ways
+  because a false positive drags an old topic into retrieval — must be short
+  (≤4 content tokens, so "show me that recipe with the tomatoes" retrieves for
+  itself), must quote no card title (a quoted title IS the subject, stated), and
+  must not be a recency question (`this week`/`this month` are pointers
+  grammatically, time-anchored in meaning). **The two follow-up kinds are
+  treated differently on purpose:** context-free REPLACES the query (the
+  question is provably noise), referential PREPENDS the prior question and keeps
+  the question, so the combined text retrieves a superset — a misfire costs
+  precision and can never lose what was asked for. Bonus: the prior question's
+  quoted title now flows into `anchor_phrases_for`, so the card is pinned to the
+  front of context, not merely retrieved. Verified: **9 new tests** (`test_ask_retrieval.py`
+  classifier + query cases incl. the recency and long-question guards,
+  `test_ask_followup_context.py` endpoint repro), suite **476 passed / 4 failed**
+  — the same `test_embed_trigger_backstop` drift (§4 item 11b); all three new
+  behavioural tests confirmed to FAIL with the fix reverted.
+  **Deploy scope: `ask_brain`.**
+
+- **2026-07-25 — ASK: A TAPPED CHIP NO LONGER FLIPS THE THREAD'S
+  LANGUAGE.** Owner screenshot: `אני צריך בית קפה בפרדס חנה` → answered in
+  Hebrew; the next turn was the suggestion chip `Give me more detail on "5
+  מקומות מומלצים בפרדס חנה"` → answered **entirely in English**. Not a
+  regression — it's Round 6 (2026-07-14) working as specified: the prompt rule
+  judges the answer's language from the question's own words with quoted card
+  titles ignored, so a chip reads as an English question. That rule is right
+  for TYPED text and wrong for a chip, whose wording is *Machina's* English
+  boilerplate and expresses no preference from the user at all. Owner's call:
+  chips stay English, the continuation stays in the language the user started
+  in. Fix (backend only, so shipped native builds get it on deploy):
+  (1) `search.dominant_script_language` + `conversation_language` (pure) — the
+  non-Latin language the USER has written in this thread, counted by Unicode
+  block over their own words with quoted titles stripped (so a Hebrew title
+  inside an English chip can't fake a Hebrew signal), newest matching turn
+  wins, **Latin turns are skipped rather than ending the scan** (turns between
+  the Hebrew opener and this chip are usually earlier English chips — ending
+  there reinstates the bug on the second tap), assistant turns never vote.
+  (2) `_build_rag_prompt` gained `answer_language`, rendering a LANGUAGE
+  OVERRIDE clause that explicitly takes precedence over the Round-6 rule
+  (which stays, unchanged, for every typed question); threaded through both RAG
+  paths and all 8 call sites including the filter-salvage/sweep retries.
+  (3) `ask_brain` sets it **only when `hints` is present** — `hints` is
+  machine-generated chip intent and is never attached to typed text, making it
+  the reliable "the app composed this question" marker already on the wire from
+  both platforms. Latin-script conversations return None, so every all-English
+  thread (i.e. every thread today) is byte-identical. No frontend change needed:
+  the bubble's direction already follows the answer's ACTUAL prose
+  (`getDominantDirection`, Round 6b), so a Hebrew answer renders RTL by itself.
+  **Known trade-off:** start in Hebrew, later type English, then tap a chip →
+  still Hebrew; the next typed turn switches it back (typed questions are never
+  pinned). Verified: **20 new tests** across `test_ask_retrieval.py` (script +
+  conversation-language helpers), `test_rag_prompt.py` (override rendering,
+  absent by default), `test_ask_followup_context.py` (endpoint wiring: chip in a
+  Hebrew thread pinned, typed question never pinned, English thread and
+  thread-opening chip untouched); suite **464 passed / 4 failed** — the same
+  pre-existing `test_embed_trigger_backstop` drift (§4 item 11b); the new
+  endpoint test was confirmed to FAIL with the fix reverted.
+  **SHIPPED:** merge `e3e7e12` → "Deploy Cloud Functions" run **#42 green**,
+  `ask_brain(us-central1)` updated 13:02Z (scoped via the merge commit's
+  `Deploy-Functions: ask_brain` trailer). Backend-only, so **no TestFlight build
+  was needed** — the shipped native app picks both fixes up from the deployed
+  function. Vercel redeployed on the same push (no `web/` diff, so no user-visible
+  desktop change). **Owner device QA open:** in a Hebrew thread, (a) a
+  content-free follow-up ("בעברית", "בקצרה") should now answer about the same
+  card instead of "no content on that", and (b) tapping an English chip should
+  answer in Hebrew — chips themselves stay English by design.
+
+- **2026-07-25 — ASK: A FOLLOW-UP WITH NO TOPIC OF ITS OWN RETRIEVED
+  FOR NOISE.** Owner screenshot: Ask answered `Why is "מתכון לעוגת מייפל עסיסית"
+  worth my time?` in English, with the recipe card cited on screen; the next
+  turn — `בעברית` ("in Hebrew") — replied that **the library has no content on
+  that recipe**, listing unrelated politics/parenting/Italy cards as its
+  sources. Root cause: `ask_brain` retrieves for the CURRENT question text
+  alone (history only ever reached the answer prompt, `_build_rag_prompt`), so
+  the turn embedded two meta words and got topically arbitrary neighbours;
+  the model saw the real subject in history but a context set unrelated to it
+  and — correctly, per its grounding rules — said it had nothing. It fires for
+  every content-free follow-up, in any language: "shorter", "in English",
+  "why?", "expand". Fix (backend only, no client change, so already-shipped
+  TestFlight builds get it on deploy): new pure helpers in `search.py` —
+  `is_context_free_followup` (every content token is meta — a language, a
+  length, a "go on" — or there are none) and `followup_retrieval_query`
+  (returns the last user turn that DID carry a topic, walking past chained meta
+  turns, never an assistant turn, failing open on malformed history).
+  `ask_brain` now derives `retrieval_query` once and feeds it to every
+  retrieval-steering call (vector search, rerank, keyword scan, recency,
+  exclusion, anchor pinning); **generation is untouched** — the model still
+  gets the raw `question` + `history`, so "answer in Hebrew" still means answer
+  in Hebrew. The meta vocabulary is a CLOSED list (EN + HE), so any question
+  with one real content word — including a topic switch — retrieves
+  byte-identically to before; that's the safety property, tested. Covers the
+  streaming and JSON paths alike (retrieval precedes the branch). Verified:
+  **13 new tests** (`test_ask_retrieval.py` pure-helper cases +
+  `test_ask_followup_context.py` endpoint wiring), suite **448 passed / 4
+  failed** — the 4 are the pre-existing `test_embed_trigger_backstop`
+  `firebase_functions` drift (§4 item 11b), unchanged by this diff; the new
+  endpoint test was confirmed to FAIL with the fix reverted. Backend-only diff,
+  so no `tsc` surface. **Deploy scope: `ask_brain`.**
+
+- **2026-07-25 — LINKEDIN BYLINE, ROUND 2: MY OWN SLUG PARSER WAS
+  WRITING THE POST TEXT (regression from the entry below — same session).**
+  Owner sent a feed screenshot: a card saved **24 min AFTER** the round-1
+  functions deploy still showed post text ("Claude Opus 5 Is Now Available in
+  …"). Deploy #40's log confirms `process_link_background` updated at 11:16:20Z
+  and the card was created ~11:40Z, so the new code WAS live — the round-1
+  diagnosis (blame the model) was wrong for this card.
+  **The tell was the capitalisation.** "Is Now Available **in**" — Title Case
+  with a lowercase "in" is the fingerprint of `_LINKEDIN_SMALL_WORDS`, which
+  only *my* new slug parser applies. Gemini and LinkedIn's own og:title can't
+  produce it. **Root cause:** `/posts/` URLs are
+  `<authorSlug>_<post-slug>-activity-<id>`; I took `seg.split('_')[0]`, which is
+  correct ONLY when the underscore exists. Real share-sheet URLs often have no
+  underscore, so the whole segment is the post's words and the parser
+  title-cased them into a "name". Worse, **LinkedIn blocks the Cloud Functions
+  scraper**, so `html` is usually empty → the meta path fails → the slug
+  fallback is the PRIMARY path in production. My round-1 tests only used
+  well-formed URLs, so they all passed while prod broke immediately.
+  **Fix (both ends, mirrored):** `/posts/` now REQUIRES the underscore and bails
+  otherwise — an empty byline beats the post's words; plus sanity caps of
+  **≤6 tokens and ≤60 chars**. The cap is 6, deliberately not fewer: real orgs
+  reach it ("European Bank for Reconstruction and Development"), covered by a
+  test so nobody tightens it later. `/in/` and `/company/` slugs are profile
+  identifiers, never post text, so they keep working.
+  Verified: 4 new regression tests (17 in `test_linkedin_author.py`), backend
+  **440 passed / 4 failed** — the 4 are still the pre-existing
+  `test_embed_trigger_backstop.py` drift (§4 item 11b). tsc 0, `next build` 0,
+  5-case client parser check. **LESSON for the next session:** the round-1
+  entry's claim that "the slug is authoritative" is only true when an underscore
+  separates author from post text; do not reintroduce a bare `split('_')[0]`.
+
+- **2026-07-25 — LINKEDIN BYLINE: POST TEXT WAS BECOMING THE
+  PUBLISHER.** Owner: a "Claude for Business" company post showed its source as
+  "Introducing Three New Certifica…" — the post's own opening line. The chain:
+  `scraper._extract_linkedin_author` only matched `"<Author> on LinkedIn: …"`,
+  which is the **personal-profile** title format; **company-page posts don't use
+  it** (their og:title IS the post text), so it returned None → `main.py`'s
+  `scraped.get("source_name") or analysis.get("sourceName")` fell through to
+  **Gemini's guess**, which echoed the post line → `_ground_source_name` only
+  rejects "machina" so it passed → frontend `linkedinDisplayName` trusted any
+  name that wasn't literally "linkedin"/"none", so the reliable URL-slug
+  fallback never ran. Fixed at both ends, because the backend fix only helps NEW
+  cards:
+  (1) **`scraper.linkedin_author_from_url`** (new, exported) recovers the poster
+  from the slug — `/posts/<slug>_…`, `/in/`, `/company/` — with joining words
+  kept lowercase so `claude-for-business` → "Claude for Business", not "Claude
+  For Business". `_extract_linkedin_author(html, url)` now tries meta first,
+  then the slug, and **never returns post text**.
+  (2) **`main._pick_source_name`** (new) — for LinkedIn hosts the model's guess
+  is NEVER used. An empty byline beats a sentence masquerading as a publisher.
+  Wired into both `_build_link_data` call sites (sync + background).
+  (3) **`web/lib/platform.tsx`** — `linkedinAuthor` gets the same small-word
+  casing; `linkedinDisplayName` now screens the stored name through
+  `looksLikeAuthorName` (>60 chars, >8 words, trailing `:`/`…`, or a newline =
+  not a name) and prefers the slug, **so already-saved bad cards read correctly
+  with no re-scrape**. Guard against over-rejection: a long genuine org name
+  with no slug to fall back on is still shown.
+  Verified: **13 new tests** in `functions/tests/test_linkedin_author.py`,
+  backend suite **435 passed / 4 failed** — the 4 are the pre-existing
+  `test_embed_trigger_backstop.py` `firebase_functions` drift already tracked as
+  §4 item 11b, NOT this change. tsc 0, `next build` 0, plus a 7-case display
+  check covering the reported card. **Full functions deploy** (shared modules
+  `main.py`/`scraper.py` changed — no `Deploy-Functions:` trailer, deliberate).
+
+- **2026-07-25 — ASK MONTHLY QUOTA 100 → 1000 (unblock the owner).**
+  Owner hit "Monthly question limit reached — resets on the 1st." on device
+  (TestFlight) with 6 days left in the month, killing Ask — the hero surface —
+  for testing. Root cause is not a bug: `quota.py`'s `asks` default is 100/month
+  (shipped with the 2026-07-14 cost guardrails, §4 item 19), which is a
+  reasonable PUBLIC tier but far too tight for the single pre-launch user who is
+  also the tester. The intended knob is the `MONTHLY_ASK_QUOTA` functions env
+  var, but that's owner console work, so the CODE default moved instead:
+  `quota.py:48` 100 → 1000 (~33/day). Deliberately NOT set to 0 (unlimited) —
+  0 disables metering entirely and would drop the cost ceiling the guardrails
+  sprint added; 1000 still bounds a runaway client or a leaked App Check token.
+  Unblocks immediately on deploy: the over-cap branch does NOT increment
+  (`quota.py:140-144`), so the owner's counter is pinned at exactly 100 and
+  100 + 1 ≤ 1000 passes on the next ask. `saves` left at 150 — it wasn't the
+  blocker; say the word if it bites next. Tests: `test_limit_for_defaults`
+  updated + a new `test_env_still_overrides_the_raised_ask_default` pinning that
+  the env var can still tighten it back down (422 pass / same 4 known-red
+  `test_embed_trigger_backstop` mocks, §4 item 11b). **⛔ OWNER, before public
+  launch:** set `MONTHLY_ASK_QUOTA` to a real per-tier value in the functions
+  env — 1000/user/month across a public user base is a genuine cost exposure,
+  and this default is a single-user stopgap, not a pricing decision.
+- **2026-07-25 — `/security` PASS ON `web/`: 3 fixes (S-9 digest-delete
   denied by the locked ruleset, S-10 local data survives sign-out AND account
-  deletion, S-11 two unguarded `link.url` sinks), +10 regression tests, 421→427
+  deletion, S-11 two unguarded `link.url` sinks), +10 regression tests, 504→510
   green.** Second run of the skill, target `web/` only (`web/ios/` excluded —
   the one open native item, task 12 ingest-token→Keychain, needs device
   verification, AUDIT.md M11). Lenses in the order requested: client XSS →
@@ -917,9 +1288,12 @@ exact-match, capped.
   unlike the last pass the frontend gate actually ran); `eslint .` unchanged at
   4 errors / 9 warnings, none in any file I touched (all pre-existing drift in
   SettingsModal/StatsView/useScrollAwayBar/BrandOrb since the D-16 zero-error
-  sweep — not security, not mine); `py_compile` clean; pytest **427 passed, 4
+  sweep — not security, not mine); `py_compile` clean; pytest **510 passed, 4
   failed** — the 4 are exactly the pre-existing `test_embed_trigger_backstop.py`
-  mock failures tracked in §4 item 11b (baseline 421 + my 6 = 427). **`cd
+  mock failures tracked in §4 item 11b (504 on `main` after the parallel Ask
+  session's rounds 3–5 landed, + my 6 = 510; all gates re-run AFTER merging
+  `origin/main`, which had advanced 10 commits — the only conflict was the two
+  sessions both prepending to §9, resolved by keeping both entries). **`cd
   firestore-rules-test && npm test` COULD NOT RUN HERE** — the emulator JAR
   download is blocked by the sandbox egress policy (`storage.googleapis.com:443`
   → 403 at the agent proxy), exactly as §4 task 2 records, so the S-9 rule change
@@ -966,7 +1340,47 @@ exact-match, capped.
   42%, still driven off the animation's `currentTime`. Measured (Chromium,
   `setCPUThrottlingRate`, effective opacity incl. ancestors, after a forced
   layout flush): **label 1.000 at 1× AND 8× CPU** (never dips), orb exactly
-  0.220 at swap on both. Verified tsc 0, `next build` 0, eslint clean.
+  0.220 at swap on both. Verified tsc 0, `next build` 0, eslint clean. Commit
+  `c6d39be` → Vercel (auto).
+  **NEW §2 GOTCHA — a cancelled TestFlight run can't be re-triggered on the same
+  SHA.** Run **#182 was `cancelled`, not failed**: job `conclusion: cancelled`,
+  60s wall time, `runner_id: 0`, empty runner name, and log download 404s — it
+  never got a `macos-26` runner. Nothing to do with the diff (#181 built the
+  same config an hour earlier); treat it as transient runner allocation.
+  Recovery is awkward from a cloud session because **all three obvious paths are
+  blocked**: the rerun API 403s ("Resource not accessible by integration", same
+  as `workflow_dispatch`), deleting the remote trigger branch fails through the
+  git proxy ("remote end hung up"), and re-pushing the SAME SHA is a no-op
+  ("Everything up-to-date") so no `push` event fires. The workflow only listens
+  on `workflow_dispatch` + `push: branches: [trigger/testflight]`, so **the only
+  programmatic recovery is to advance main's SHA** (any real commit — a docs
+  update works) and push the trigger branch again. Retriggered as `eaf9b7c` →
+  run **#183**.
+  **BOOT SCREEN → ORB (owner request, same session).** The auth-resolving screen
+  (`app/page.tsx`, shown while `loading`) used a generic
+  `border-t-purple-500 animate-spin` ring under the pulsing app icon. Replaced
+  with **`listening` @ 64** — the same orb as Ask's empty state, so Machina's
+  "here and ready" face greets you on launch and when Ask is waiting. Compared
+  against `working` @64 (too sparse/scattered under the icon) and a 64→44 CSS
+  downscale (loses dot detail) before picking. Added an `sr-only role="status"`
+  "Starting Machina…" the ring never had. **Caveat, by design:** the iOS build is
+  `output: 'export'`, so this markup paints BEFORE hydration and the canvas is
+  blank for that window (a CSS ring was not). The icon's `animate-pulse` carries
+  the screen, and the canvas reserves its 64px box so nothing shifts when it
+  starts painting — but if boot ever feels dead on a cold launch, that's why,
+  and the ring is the fallback. Feed's `Suspense` fallback ring and the button
+  spinners are still deliberately NOT orbs. Commit `ad9c7db` → run **#184 green
+  → build 1184**.
+  **TestFlight builds from this session, newest first:** **1184** (`ad9c7db`) =
+  everything + the boot orb; **1183** (`eaf9b7c`) = label stops animating
+  (stale-glyph + blink fix); 1181 (`64c0514`) = plateau/clock-driven dip;
+  1180 (`72de50a`) = orbs + sidebar glyph, pre-fix. **Owner device QA still
+  open on 1184:** (a) confirm "Thinking it through…" no longer trails debris —
+  NOT reproducible in this container (Chromium only, and this is a WebKit
+  repaint bug), so it is unverified by construction; (b) whether three orb
+  swaps in a ~6s window still reads as fidgety, fallback = two beats
+  (`searching` for 1+2, `shaping` for the write); (c) whether the boot orb's
+  pre-hydration blank window is noticeable on a cold launch.
 
 - **2026-07-25 — ASK PHRASE-SWAP HICCUP FIXED (device report).** Owner
   on iPhone: "a constant hiccup in the phrase change, mainly on the text — it

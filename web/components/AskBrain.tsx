@@ -160,6 +160,12 @@ function CopyButton({ text, sources }: { text: string; sources?: ChatSource[] })
  *  status matches what's actually happening from the user's point of view.
  *  Tapping a chip the SYSTEM suggested about a specific card must not read
  *  "Searching your library…" (we suggested it; there's nothing to find). */
+/** How many recent ANSWERS contribute their cited card ids as conversation
+ *  context. Two covers "the thing we're discussing" plus the one before it
+ *  (a compare/what-else thread) without dragging a whole session forward; the
+ *  server clamps the total again (MAX_CONTEXT_IDS). */
+const RECENT_ANSWERS_FOR_CONTEXT = 2;
+
 export type AskOrigin =
     | 'free'      // typed question → genuine library search
     | 'card'      // a chip about one specific card we suggested
@@ -675,7 +681,13 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
      *  `hints` is the structured intent a CHIP carries (anchor/category/
      *  concept/recency/exclusions — see AskHints); free-typed questions and
      *  retries send none. */
-    const send = async (text: string, base?: ChatMessage[], origin: AskOrigin = 'free', hints?: AskHints) => {
+    const send = async (
+        text: string,
+        base?: ChatMessage[],
+        origin: AskOrigin = 'free',
+        hints?: AskHints,
+        generatedOverride?: boolean,
+    ) => {
         const question = text.trim();
         if (!question || isThinking || !uid) return;
         setAskOrigin(origin);
@@ -690,12 +702,39 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
         // Torn down for real — a detached stream is stale but NOT cancelled.
         const isCancelled = () => cancelledGensRef.current.has(gen);
 
+        // Did the app compose this question, or did the user type it? Only a
+        // typed turn states a language preference, so the backend needs to tell
+        // them apart (retry passes the original message's flag through).
+        const generated = generatedOverride ?? origin !== 'free';
+
         // History = the conversation so far (before this turn), trimmed server-side.
         const baseMsgs = base ?? messages;
-        const history = baseMsgs.map(m => ({ role: m.role, content: m.content }));
+        const history = baseMsgs.map(m => ({
+            role: m.role,
+            content: m.content,
+            ...(m.generated ? { generated: true } : {}),
+        }));
+        // The cards the recent answers CITED — what a follow-up's "this"/"it"
+        // refers to. The backend can't recover this from the prose, and without
+        // it a follow-up gets told the library has nothing on the card that is
+        // literally on screen above it. Newest answers first, so the freshest
+        // subject wins the server's cap.
+        const contextIds = [...new Set(
+            [...baseMsgs]
+                .reverse()
+                .filter(m => m.role === 'assistant')
+                .slice(0, RECENT_ANSWERS_FOR_CONTEXT)
+                .flatMap(m => (m.sources ?? []).map(sc => sc.id))
+                .filter(Boolean),
+        )];
         // The chip's structured intent rides on the persisted user message so a
         // retry can re-send it instead of silently degrading to prose-only.
-        const withUser: ChatMessage[] = [...baseMsgs, { role: 'user', content: question, ...(hints ? { hints } : {}) }];
+        const withUser: ChatMessage[] = [...baseMsgs, {
+            role: 'user',
+            content: question,
+            ...(hints ? { hints } : {}),
+            ...(generated ? { generated: true } : {}),
+        }];
 
         // Persist the question RIGHT NOW instead of waiting for the answer: if
         // the user peeks at the sidebar before the reply lands, this chat must
@@ -781,7 +820,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                     ...(await appCheckHeaders()),
                     ...(await authHeaders()),
                 },
-                body: JSON.stringify({ uid, question, history, stream: wantStream, ...(hints ? { hints } : {}) }),
+                body: JSON.stringify({
+                    uid, question, history, stream: wantStream,
+                    ...(hints ? { hints } : {}),
+                    ...(generated ? { generated: true } : {}),
+                    ...(contextIds.length ? { contextIds } : {}),
+                }),
                 signal: controller.signal,
             }, 30_000);
 
@@ -987,7 +1031,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
             if (messages[i].role === 'user') { userIdx = i; break; }
         }
         if (userIdx < 0) return;
-        send(messages[userIdx].content, messages.slice(0, userIdx), 'free', messages[userIdx].hints);
+        send(messages[userIdx].content, messages.slice(0, userIdx), 'free',
+             messages[userIdx].hints, messages[userIdx].generated);
     };
 
     // Library is empty — nothing to ask yet.
