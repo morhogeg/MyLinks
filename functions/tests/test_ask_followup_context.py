@@ -18,7 +18,13 @@ in isolation instead of as part of a conversation":
   - `מי פירסם את זה?` ("who published this?") one turn after an answer that
     cited a LinkedIn card — real content words, so the meta-vocabulary gate
     passed it through, and it retrieved for "who published" and reported the
-    card was not in the library.
+    card was not in the library;
+  - `בעברית, בקצרה` after an answer about a Breaking Bad clip, which came back
+    in fluent, brief Hebrew — about an unrelated Operation Entebbe card. That
+    one was NOT retrieval: the prompt's standing "follow-ups must add value —
+    never restate an earlier answer in different words" rule reads as an
+    instruction to go find a different source, and a restate request is exactly
+    what it forbids. The model obeyed. Hence `followup` reaching the prompt.
 
 conftest installs the offline fakes so `import main` works with plain pytest;
 Firestore, the embedding API, and Gemini are all stubbed at the main boundary.
@@ -107,7 +113,8 @@ def seen(monkeypatch):
         def answer_from_context(self, question, cards, history=None, **kwargs):
             calls["asked"].append({"question": question, "history": history,
                                    "cardIds": [c["id"] for c in cards],
-                                   "answerLanguage": kwargs.get("answer_language")})
+                                   "answerLanguage": kwargs.get("answer_language"),
+                                   "followup": kwargs.get("followup")})
             return {"answer": "…", "citedIds": [c["id"] for c in cards]}
 
     monkeypatch.setattr(main, "GeminiService", _FakeGemini)
@@ -325,3 +332,29 @@ def test_marked_typed_turns_let_the_user_switch_language(seen):
     ]
     _ask(_CHIP, history, generated=True)
     assert seen["asked"][0]["answerLanguage"] is None
+
+
+# ── The prompt is told what the follow-up is about ─────────────────────────
+
+def test_a_restate_followup_reaches_the_prompt_as_one(seen):
+    # Retrieval was never the whole story here: the prompt's standing
+    # "follow-ups must add value" rule reads as "find a different source", so
+    # the model must be told this turn wants the SAME source restated.
+    _ask("בעברית, בקצרה", _HISTORY)
+    f = seen["asked"][0]["followup"]
+    assert f["subject"] == _ASKED
+    assert f["restate"] is True
+
+
+def test_a_referential_followup_is_not_marked_restate(seen):
+    _ask("מי פירסם את זה?", _HISTORY)
+    f = seen["asked"][0]["followup"]
+    assert f["subject"] == _ASKED
+    assert f["restate"] is False
+
+
+def test_an_ordinary_question_carries_no_subject(seen):
+    _ask("What did I save about Italy?", _HISTORY)
+    f = seen["asked"][0]["followup"]
+    assert f["subject"] is None
+    assert f["restate"] is False

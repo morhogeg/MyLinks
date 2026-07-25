@@ -439,7 +439,8 @@ def _rag_card_block(c: dict) -> str:
 
 def _build_rag_prompt(question: str, cards: list, history: list = None,
                       excluded_titles: list = None,
-                      answer_language: str = None) -> str:
+                      answer_language: str = None,
+                      followup: dict = None) -> str:
     """Shared grounding prompt for both RAG answer paths (streaming and
     non-streaming).
 
@@ -455,6 +456,11 @@ def _build_rag_prompt(question: str, cards: list, history: list = None,
     English boilerplate rather than the user's own — see
     search.conversation_language. Unset for every typed question, so the rule
     below is what runs in the ordinary case.
+
+    `followup` is `search.resolve_followup`'s verdict — `{"subject", "restate"}`
+    — for a turn that borrows its subject from the conversation. It names that
+    subject in the prompt, and for a RESTATE request it suspends the
+    add-value rule (see the block that renders it).
     """
     sources_text = "\n\n".join(_rag_card_block(c) for c in cards)
 
@@ -484,6 +490,33 @@ def _build_rag_prompt(question: str, cards: list, history: list = None,
     # ours, not theirs — the conversation's language is the real preference and
     # must survive the tap. Stated as an override so the rule below still reads
     # correctly for every typed question.
+    # A follow-up that borrows its subject ("in Hebrew, briefly", "who
+    # published this?") must be answered about THAT subject. Naming it is not
+    # belt-and-braces: without it the standing "follow-ups must add value —
+    # never restate an earlier answer in different words" rule reads as an
+    # instruction to go find a DIFFERENT source, which is exactly what the model
+    # did (owner report 2026-07-25: an English answer about a saved Breaking Bad
+    # clip, then "בעברית, בקצרה" — correct Hebrew, correct brevity, and a
+    # summary of an unrelated Operation Entebbe card). Retrieval was fine; the
+    # prompt asked for that. So a restate request suspends the rule outright.
+    continuation = ""
+    if followup and followup.get("subject"):
+        subject = str(followup["subject"])[:400]
+        continuation = (
+            f"\n- CONTINUATION — this question does not name its own subject; it continues "
+            f"the exchange above. Its subject is the earlier question: \u00ab{subject}\u00bb. "
+            f"Answer about THAT subject, from the sources for it. Switching to a different "
+            f"source because this question's own words matched one is WRONG."
+        )
+        if followup.get("restate"):
+            continuation += (
+                "\n- RESTATE REQUEST — the user is asking for the SAME answer in a different "
+                "form (another language, shorter, longer, simpler). The \"FOLLOW-UPS MUST ADD "
+                "VALUE\" rule above does NOT apply to this turn: say the same thing again in "
+                "the form asked for, about the same source. Hunting for \"new information\" or "
+                "a different source here is a failure, not an improvement."
+            )
+
     language_override = ""
     if answer_language:
         language_override = (
@@ -512,7 +545,7 @@ Rules:
 - Questions about recent saves ("this week", "latest", "recap") → judge by each source's saved: date against today's date; only present sources actually in that window as recent, and mention when each was saved.
 - Don't announce a count of items (e.g. "three sources") — just give the list. If you do state a number, it MUST exactly match the number of items you list.
 - CRITICAL — match the user's language: write your ENTIRE answer in the same language as the User question, NOT the language of the sources. Judge the question's language from the user's OWN words, IGNORING any quoted card titles inside it — 'Give me more detail on "<Hebrew title>"' is an ENGLISH question and must be answered entirely in English (you may quote the title itself as-is). If the question is in English, answer in English even when every source is in Hebrew; if the question is in Hebrew, answer in Hebrew. The sources' language must not influence your answer's language.{language_override}
-- Only cite sources you actually used.
+- Only cite sources you actually used.{continuation}
 
 Saved sources:
 {sources_text}
@@ -870,6 +903,7 @@ If the image is an article, extract the headline and body."""
     def _drop_prompt_blocked_cards(self, question: str, cards: list,
                                    history: list = None, excluded_titles: list = None,
                                    answer_language: str = None,
+                                   followup: dict = None,
                                    max_drops: int = 3):
         """Isolate the card(s) whose text trips Gemini's non-configurable
         prompt filter, via probe bisection (see _probe_prompt_blocked).
@@ -890,7 +924,7 @@ If the image is an article, extract the headline and body."""
         def blocked(subset):
             return self._probe_prompt_blocked(
                 _build_rag_prompt(question, subset, history, excluded_titles,
-                                  answer_language)
+                                  answer_language, followup)
                 + _CITED_JSON_SUFFIX)
 
         if blocked([]):
@@ -920,7 +954,8 @@ If the image is an article, extract the headline and body."""
 
     def _best_clean_variant(self, question: str, base_cards: list, card: dict,
                             history: list = None, excluded_titles: list = None,
-                            answer_language: str = None):
+                            answer_language: str = None,
+                            followup: dict = None):
         """Salvage the richest rendering of a filter-blocked `card` that the
         prompt filter accepts alongside `base_cards` (greedy additive probing).
 
@@ -937,7 +972,7 @@ If the image is an article, extract the headline and body."""
         def ok(cand):
             return not self._probe_prompt_blocked(
                 _build_rag_prompt(question, base_cards + [cand], history,
-                                  excluded_titles, answer_language)
+                                  excluded_titles, answer_language, followup)
                 + _CITED_JSON_SUFFIX)
 
         removed = []
@@ -1056,7 +1091,8 @@ If the image is an article, extract the headline and body."""
     def answer_from_context(self, question: str, cards: list, history: list = None,
                             attempts: int = _MAX_GENERATE_ATTEMPTS,
                             excluded_titles: list = None,
-                            answer_language: str = None) -> dict:
+                            answer_language: str = None,
+                            followup: dict = None) -> dict:
         """Answer a user question grounded ONLY in their saved cards (RAG).
 
         `cards` is a list of dicts with id/title/summary/category/tags. Returns
@@ -1102,7 +1138,7 @@ If the image is an article, extract the headline and body."""
         # re-ask must then stay in plain mode too (schema mode is what blocked).
         used_plain_mode = False
         base_prompt = _build_rag_prompt(question, cards, history, excluded_titles,
-                                        answer_language)
+                                        answer_language, followup)
         try:
             data = self._answer_json(base_prompt + _CITED_JSON_SUFFIX, "answer", attempts)
         except EmptyGenerationError as e:
@@ -1152,7 +1188,7 @@ If the image is an article, extract the headline and body."""
                     try:
                         data = self._plain_answer(_build_rag_prompt(
                             question, stage_cards, history, excluded_titles,
-                            answer_language) + stage_suffix)
+                            answer_language, followup) + stage_suffix)
                         context_cards = stage_cards
                         used_plain_mode = True
                         logger.warning("ask rescued at sweep stage: %s (%d cards)",
@@ -1192,7 +1228,7 @@ If the image is an article, extract the headline and body."""
         # that demands the model name the ids it relied on. A transient failure
         # here must not sink the request — fall through to the ungrounded return.
         retry_prompt = _build_rag_prompt(question, context_cards, history, excluded_titles,
-                                         answer_language) + _CITED_JSON_STRICT_SUFFIX
+                                         answer_language, followup) + _CITED_JSON_STRICT_SUFFIX
         try:
             retry = (self._plain_answer(retry_prompt) if used_plain_mode
                      else self._answer_json(retry_prompt, "answer (citation retry)", attempts))
@@ -1213,7 +1249,8 @@ If the image is an article, extract the headline and body."""
 
     def answer_from_context_stream(self, question: str, cards: list, history: list = None,
                                    excluded_titles: list = None,
-                                   answer_language: str = None):
+                                   answer_language: str = None,
+                                   followup: dict = None):
         """Streaming variant of `answer_from_context` (RAG over saved cards).
 
         Yields ("token", text) tuples as the answer streams in, then a final
@@ -1254,7 +1291,7 @@ If the image is an article, extract the headline and body."""
             return
 
         base_prompt = _build_rag_prompt(question, cards, history, excluded_titles,
-                                        answer_language)
+                                        answer_language, followup)
         marker_instruction = (
             "Write the answer as plain text (no JSON). Then, on a NEW LINE after "
             "the answer, output a citation marker listing the ids (without "
@@ -1282,7 +1319,7 @@ If the image is an article, extract the headline and body."""
         # surviving titles/summaries are Gemini-authored and clean.
         headline_prompt = _build_rag_prompt(
             question, _headline_cards(cards), history, excluded_titles,
-            answer_language) + marker_instruction
+            answer_language, followup) + marker_instruction
 
         # Tail buffer: hold back the trailing characters that could be the start
         # of the "[[CITED: ...]]" marker so it is never streamed as visible text.
@@ -1400,7 +1437,8 @@ If the image is an article, extract the headline and body."""
                     # nothing is dropped, and we fall through to the raise.
                     isolated = True
                     clean, dropped, question_blocked = self._drop_prompt_blocked_cards(
-                        question, cards, history, excluded_titles, answer_language)
+                        question, cards, history, excluded_titles, answer_language,
+                        followup)
                     if dropped and not question_blocked:
                         fully_dropped, partially_filtered = [], []
                         salvaged = {}
@@ -1408,7 +1446,7 @@ If the image is an article, extract the headline and body."""
                         for pc in dropped:
                             variant, removed_fields = self._best_clean_variant(
                                 question, base, pc, history, excluded_titles,
-                                answer_language)
+                                answer_language, followup)
                             if variant is None:
                                 fully_dropped.append(pc)
                             else:
@@ -1430,7 +1468,7 @@ If the image is an article, extract the headline and body."""
                                 len(partially_filtered))
                             attempts.append((GEMINI_ANALYSIS_MODEL, _build_rag_prompt(
                                 question, rescue_cards, history, excluded_titles,
-                                answer_language)
+                                answer_language, followup)
                                 + marker_instruction))
                             attempt_idx += 1
                             continue

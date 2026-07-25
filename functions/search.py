@@ -711,16 +711,37 @@ def followup_retrieval_query(question: str, history) -> str:
     still go to the prompt); this steers retrieval only. Pure — `history` is the
     already-sanitized [{role, content}] list. Fails open: malformed history, or
     a conversation with no topical question in it, gives back `question`."""
+    return resolve_followup(question, history)["query"]
+
+
+def resolve_followup(question: str, history) -> dict:
+    """Everything ask_brain needs to know about this turn's dependence on the
+    conversation: `{"query", "subject", "restate"}`.
+
+    - `query` — the text to RETRIEVE for (see followup_retrieval_query).
+    - `subject` — the earlier question this turn is really about, or None when
+      the turn stands on its own. The prompt names it so the model answers
+      about THAT rather than picking a different source.
+    - `restate` — True for a context-free follow-up ("in Hebrew", "shorter"),
+      which asks for the SAME answer in another form. This matters because the
+      prompt's standing "follow-ups must add value — never restate an earlier
+      answer in different words" rule is the exact opposite of what such a turn
+      wants, and must be suspended for it. Pure."""
+    plain = {"query": question, "subject": None, "restate": False}
     if not isinstance(history, list) or not history:
-        return question
+        return plain
     context_free = is_context_free_followup(question)
     referential = not context_free and is_referential_followup(question)
     if not (context_free or referential):
-        return question
+        return plain
     prior = _last_topical_user_turn(history)
     if not prior:
-        return question
-    return prior if context_free else f"{prior} {question}"
+        return plain
+    return {
+        "query": prior if context_free else f"{prior} {question}",
+        "subject": prior,
+        "restate": context_free,
+    }
 
 
 # ── Which language the USER has been writing in ────────────────────────────

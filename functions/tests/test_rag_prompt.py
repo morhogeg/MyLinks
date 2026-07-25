@@ -964,3 +964,54 @@ def test_language_override_reaches_the_streaming_prompt_too():
     for kwargs in ({}, {"history": [{"role": "user", "content": "שאלה"}]}):
         prompt = _build_rag_prompt(_HE_CHIP, _HE_CARDS, answer_language="Arabic", **kwargs)
         assert "write your ENTIRE answer in Arabic" in prompt
+
+
+# ── Continuation / restate override (the rule that sent the model away) ────
+
+_BB = 'What\'s the gist of "Breaking Bad: Walter White\'s Birthday Breakfast"?'
+
+
+def test_prompt_has_no_continuation_block_by_default():
+    prompt = _build_rag_prompt("What did I save about Italy?", _HE_CARDS)
+    assert "CONTINUATION" not in prompt
+    assert "RESTATE REQUEST" not in prompt
+    # The add-value rule is untouched for every ordinary turn.
+    assert "FOLLOW-UPS MUST ADD VALUE" in prompt
+
+
+def test_restate_followup_suspends_the_add_value_rule():
+    # "בעברית, בקצרה" asks for the SAME answer in another form — which the
+    # standing rule calls a failure ("never restate an earlier answer in
+    # different words"), so the model went and summarised a different card.
+    prompt = _build_rag_prompt(
+        "בעברית, בקצרה", _HE_CARDS,
+        followup={"subject": _BB, "restate": True})
+    assert "CONTINUATION" in prompt
+    assert _BB in prompt                      # the subject is named outright
+    assert "RESTATE REQUEST" in prompt
+    assert "does NOT apply to this turn" in prompt
+
+
+def test_referential_followup_names_the_subject_without_suspending_the_rule():
+    # "who published this?" wants the same SUBJECT but genuinely new detail —
+    # the add-value rule still applies here.
+    prompt = _build_rag_prompt(
+        "מי פירסם את זה?", _HE_CARDS,
+        followup={"subject": _BB, "restate": False})
+    assert "CONTINUATION" in prompt
+    assert _BB in prompt
+    assert "RESTATE REQUEST" not in prompt
+
+
+def test_continuation_is_skipped_when_there_is_no_subject():
+    for f in ({}, {"subject": None, "restate": True}, {"subject": "", "restate": True}):
+        assert "CONTINUATION" not in _build_rag_prompt("q", _HE_CARDS, followup=f)
+
+
+def test_continuation_survives_the_headline_and_language_paths():
+    # Both overrides can apply to the same turn, and both must render.
+    prompt = _build_rag_prompt(
+        "בעברית, בקצרה", _HE_CARDS, answer_language="Hebrew",
+        followup={"subject": _BB, "restate": True})
+    assert "write your ENTIRE answer in Hebrew" in prompt
+    assert "RESTATE REQUEST" in prompt

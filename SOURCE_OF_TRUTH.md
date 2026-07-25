@@ -746,7 +746,45 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-25 (latest) — ASK, ROUND 3: THE CONVERSATION GUARANTEE (stop
+- **2026-07-25 (latest) — ASK, ROUND 4: THE PROMPT WAS TELLING THE MODEL TO
+  CHANGE THE SUBJECT.** Owner: *"Terrible."* Screenshot — an English answer
+  about a saved Breaking Bad clip (YouTube, "Action City"), then the typed
+  follow-up `בעברית, בקצרה` ("in Hebrew, briefly") → fluent, correctly brief
+  **Hebrew about an unrelated Operation Entebbe / C-130 article.** Language
+  right, brevity right, subject completely wrong, and NOT flagged ungrounded.
+  **This one was never retrieval.** Round 1 classifies `בעברית, בקצרה` as
+  context-free (verified — both tokens are in the meta vocabulary) and resolves
+  the query to the Breaking Bad question, so the right card was in context. The
+  fault is a rule that has been in the RAG prompt for weeks:
+  *"FOLLOW-UPS MUST ADD VALUE: … bring NEW information from the sources — never
+  restate an earlier answer in different words."* A translate/shorten request is
+  **precisely** "restate an earlier answer in different words". The model was
+  obeying instructions: it went and found new information, from a different
+  source. Every symptom follows — no "not in your sources" complaint, no
+  ungrounded flag, a genuinely good answer about the wrong thing.
+  **Fix:** `search.resolve_followup` (which `followup_retrieval_query` is now a
+  thin wrapper over) returns `{query, subject, restate}`; `ask_brain` passes it
+  to `_build_rag_prompt`, which renders a **CONTINUATION** block naming the
+  subject outright ("its subject is the earlier question: «…» — switching to a
+  different source because this question's own words matched one is WRONG") and,
+  for a restate request, a **RESTATE REQUEST** block suspending the add-value
+  rule for that turn only ("saying the same thing again in the form asked for is
+  the goal; hunting for new information here is a failure"). Referential
+  follow-ups ("who published this?") get the subject named but KEEP the
+  add-value rule — they want the same subject and genuinely new detail.
+  Threaded through both RAG paths and all 8 `_build_rag_prompt` call sites
+  (grep-verified), including the filter-salvage and headline-rescue retries.
+  **LESSON — rounds 1–3 all assumed a wrong answer meant wrong retrieval.**
+  Retrieval was right here and the prompt overrode it. When an answer is fluent,
+  correctly formatted, and about the wrong thing, suspect the instructions
+  before the context. Backend-only, so it reaches any installed build on deploy.
+  Verified: **8 new tests** (`test_rag_prompt.py` renders/omits both blocks incl.
+  the both-overrides-at-once case; `test_ask_followup_context.py` asserts the
+  endpoint classifies restate vs referential vs ordinary), suite **498 passed /
+  4 failed** — the same `test_embed_trigger_backstop` drift (§4 item 11b).
+  **Deploy scope: `ask_brain`.**
+
+- **2026-07-25 — ASK, ROUND 3: THE CONVERSATION GUARANTEE (stop
   guessing the subject — the client already knows it).** Owner, after round 2:
   *"I'm not supposed to find all the issues."* Correct — rounds 1 and 2 were
   both heuristics over prose, and each shipped with a known hole I'd described

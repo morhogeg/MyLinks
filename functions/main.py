@@ -65,7 +65,7 @@ from search import (
     anchor_phrases_for, is_exclusion_question, demote_cards_by_titles,
     is_recency_question, recent_cards, category_cards,
     private_collection_ids, strip_private_cards, apply_distance_threshold,
-    followup_retrieval_query, conversation_language,
+    resolve_followup, conversation_language,
     pin_cards_by_ids, cards_by_ids,
 )
 from rate_limit import check_rate_limit, client_ip
@@ -1622,13 +1622,19 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #    context set unrelated to the subject it just answered (see
         #    search.followup_retrieval_query). Steers RETRIEVAL ONLY — the
         #    model is still asked the raw `question`, with `history`.
-        retrieval_query = followup_retrieval_query(question, history)
-        # A resolved query means this turn borrowed its subject from an earlier
-        # one — the signal step 1g-2 uses to decide whether the previously-cited
-        # cards are the headline or just background.
-        is_followup = retrieval_query != question
+        followup = resolve_followup(question, history)
+        retrieval_query = followup["query"]
+        # A resolved subject means this turn borrowed it from an earlier one —
+        # the signal step 1g-2 uses to decide whether the previously-cited cards
+        # are the headline or just background. `followup` also travels to the
+        # prompt, which must NAME that subject: the standing "follow-ups must
+        # add value" rule otherwise reads as "go find a different source", and
+        # for a restate request ("in Hebrew, briefly") that rule is suspended
+        # outright.
+        is_followup = bool(followup["subject"])
         if is_followup:
-            logger.info("ask_brain: follow-up — resolved the retrieval query against the conversation")
+            logger.info("ask_brain: follow-up (restate=%s) — resolved against the conversation",
+                        followup["restate"])
 
         # 0b. A conversation must not change language because the user tapped a
         #     suggestion. Chip questions are Machina's own English boilerplate
@@ -1913,7 +1919,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                 try:
                     for kind, payload in ai.answer_from_context_stream(
                             question, slim, history, excluded_titles=excluded_titles,
-                            answer_language=answer_language):
+                            answer_language=answer_language, followup=followup):
                         if kind == "token":
                             yield "data: " + json.dumps(
                                 {"type": "token", "text": payload}
@@ -1968,7 +1974,8 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         # Synchronous path: 2 Gemini attempts (stay under the 60s budget, report 3.6).
         result = ai.answer_from_context(question, slim, history, attempts=2,
                                         excluded_titles=excluded_titles,
-                                        answer_language=answer_language)
+                                        answer_language=answer_language,
+                                        followup=followup)
 
         # If the answer only succeeded after filter-probe isolation excluded or
         # partially filtered card(s) (Gemini's prompt filter rejects their text
