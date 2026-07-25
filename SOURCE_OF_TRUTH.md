@@ -772,7 +772,21 @@ exact-match, capped.
   42%, still driven off the animation's `currentTime`. Measured (Chromium,
   `setCPUThrottlingRate`, effective opacity incl. ancestors, after a forced
   layout flush): **label 1.000 at 1× AND 8× CPU** (never dips), orb exactly
-  0.220 at swap on both. Verified tsc 0, `next build` 0, eslint clean.
+  0.220 at swap on both. Verified tsc 0, `next build` 0, eslint clean. Commit
+  `c6d39be` → Vercel (auto).
+  **NEW §2 GOTCHA — a cancelled TestFlight run can't be re-triggered on the same
+  SHA.** Run **#182 was `cancelled`, not failed**: job `conclusion: cancelled`,
+  60s wall time, `runner_id: 0`, empty runner name, and log download 404s — it
+  never got a `macos-26` runner. Nothing to do with the diff (#181 built the
+  same config an hour earlier); treat it as transient runner allocation.
+  Recovery is awkward from a cloud session because **all three obvious paths are
+  blocked**: the rerun API 403s ("Resource not accessible by integration", same
+  as `workflow_dispatch`), deleting the remote trigger branch fails through the
+  git proxy ("remote end hung up"), and re-pushing the SAME SHA is a no-op
+  ("Everything up-to-date") so no `push` event fires. The workflow only listens
+  on `workflow_dispatch` + `push: branches: [trigger/testflight]`, so **the only
+  programmatic recovery is to advance main's SHA** (any real commit — a docs
+  update works) and push the trigger branch again.
 
 - **2026-07-25 — ASK PHRASE-SWAP HICCUP FIXED (device report).** Owner
   on iPhone: "a constant hiccup in the phrase change, mainly on the text — it
