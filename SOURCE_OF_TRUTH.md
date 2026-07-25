@@ -224,6 +224,16 @@ The multi-user auth work is **fully written but not live**:
    Flagged decision: `get_article` stays anonymous-callable
    (App Check + rate limit only) — keep or gate deliberately. Closes audit
    blockers B-1/B-2/B-3. Full checklist: `NATIVE_AUTH_SETUP.md` §6.
+   ⚠️ **Cutover-day breakage found + fixed 2026-07-25 (`/security web`, audit
+   S-9).** `firestore.rules.locked` denied ALL writes on `users/{uid}/digests`,
+   but the per-digest **Delete** action is a direct client `deleteDoc`
+   (`lib/digest.ts:61`) — so at the cutover that button would have become a
+   silent no-op. The rule now allows `delete` for the owner and keeps
+   `create, update` denied; 4 cases added to `firestore-rules-test`. **Step (4)
+   of the checklist above is now load-bearing** — the cloud sandbox cannot
+   download the emulator JAR, so this rule change has never run against a live
+   emulator. Run `cd firestore-rules-test && npm test` on your machine BEFORE
+   step (5).
 3. **[x] New-user path** *(code done 2026-07-03; goes live with the task-2
    cutover — flag-gated behind `REQUIRE_AUTH`).* `claim_workspace` now falls
    back to creating a fresh `users/{authUid}` workspace (authUids/email/
@@ -345,6 +355,40 @@ The multi-user auth work is **fully written but not live**:
     (`SimpleNamespace` lacks `_get_attributes` — firebase_functions version
     drift). 389 real tests pass. Fix the mocks (or pin the lib) so a red run
     means something again.
+11c. **[ ] Web traffic shares ONE per-IP rate-limit bucket (audit S-12) — found
+    2026-07-25 (`/security web`), fix belongs in `functions/`.** `/api/chat` is
+    deliberately not a rewrite, so `web/app/api/chat/route.ts:50` is a Vercel
+    serverless function that fetches the Cloud Function's direct URL
+    **server-side**. `rate_limit.client_ip` takes the LAST `X-Forwarded-For` hop
+    by design (`rate_limit.py:74-87`) = Vercel's egress IP, not the user's, and
+    `main.py:1496` gates on the 60/hr **fail-CLOSED** `chat` IP bucket *before*
+    the per-uid bucket at `:1522`. Net effect: **60 Ask questions an hour across
+    the entire desktop-web user base**, and one script locks out every web user.
+    Same topology for the `vercel.json` rewrites (`analyze` 30/hr, `image`
+    30/hr, `share` 120/hr, `article` 120/hr — `article` has no uid bucket at
+    all), though those add a Firebase Hosting hop that couldn't be verified from
+    the cloud sandbox, so only the `/api/chat` chain is asserted. Fix options:
+    consult the per-uid bucket first for authenticated callers and treat the IP
+    bucket as anonymous-only, or have the proxy pass a signed client-IP header.
+    Take it in the next `/security functions` pass.
+11d. **[ ] Dependency + CSP posture (audit S-13/S-14) — reviewed 2026-07-25, no
+    reachable exposure.** `npm audit` in `web/`: 1 critical / 18 high / 1
+    moderate, all triaged as unreachable — `next@16.2.10`'s nine advisories need
+    middleware (none exists), Server Actions (none), the image optimizer
+    (`images.unoptimized: true`, nothing imports `next/image`) or a dynamic
+    rewrite destination (all static); the **critical** `websocket-driver` comes
+    via `firebase → @firebase/database → faye-websocket`, the Node-only RTDB
+    transport a Firestore-only browser app never loads; postcss/sharp are
+    build-time inside Next; the eslint/minimatch chain and `tar` are
+    devDependencies. **Clearing the Next advisories needs ≥16.3.0** — the
+    vulnerable range runs to `16.3.0-preview.7`, so `npm audit fix` (which lands
+    16.2.11 for the postcss/sharp transitives) does NOT cover them. Owner call:
+    a deliberate upgrade with `next build` + device QA, same stance AUDIT.md S-5
+    took on postcss. S-14: the CSP on both surfaces allows `'unsafe-eval'` and
+    `'unsafe-inline'` in `script-src`; `'unsafe-inline'` is load-bearing (the
+    `layout.tsx:56` theme bootstrap + Next hydration), `'unsafe-eval'` has no
+    identifiable consumer but removing it needs a live check against the
+    Firebase JS SDK + reCAPTCHA v3 on a real deploy.
 12. **[ ] Ingest token hardening (audit H-1).** Move from App Group UserDefaults
     to Keychain; server copy to a functions-only collection; add rotation.
 13. **[x] Remaining audit mediums — landed 2026-07-09 (AUDIT.md S-2/S-3).**
@@ -379,6 +423,11 @@ The multi-user auth work is **fully written but not live**:
     QA list in the §9 entry.
 18. **[ ] Test harness (T3).** Add scraper fixtures, `ai_service` schema-contract
     tests, `search.py` tests; wire into CI/SessionStart (AUDIT.md N-2a tracks this).
+    **`web/` still has NO JavaScript test runner** — which is why the two web
+    invariants from the 2026-07-25 `/security` pass (S-10 sign-out purge, S-11
+    URL-scheme guard) had to land as source scans in
+    `functions/tests/test_web_client_hygiene.py`. That works and runs in CI, but
+    a real web runner (vitest) is the right home for them.
 19. **[~] Cost guardrails — CODE HALF SHIPPED 2026-07-14 (production-readiness
     sprint, see `docs/PRODUCTION_READINESS_2026-07-14.md`).** Per-user monthly
     quotas live in code (`functions/quota.py`: 150 saves / **1000 asks** per
@@ -1113,6 +1162,154 @@ exact-match, capped.
   launch:** set `MONTHLY_ASK_QUOTA` to a real per-tier value in the functions
   env — 1000/user/month across a public user base is a genuine cost exposure,
   and this default is a single-user stopgap, not a pricing decision.
+- **2026-07-25 — `/security` PASS ON `web/`: 3 fixes (S-9 digest-delete
+  denied by the locked ruleset, S-10 local data survives sign-out AND account
+  deletion, S-11 two unguarded `link.url` sinks), +10 regression tests, 504→510
+  green.** Second run of the skill, target `web/` only (`web/ios/` excluded —
+  the one open native item, task 12 ingest-token→Keychain, needs device
+  verification, AUDIT.md M11). Lenses in the order requested: client XSS →
+  secrets/PII in the bundle → client auth gating → client writes vs the locked
+  ruleset → dependencies.
+  **FIXED — (1) S-9, would have detonated AT the cutover.** The per-digest
+  **Delete** action (`DigestCard` → `Feed.tsx:1257`/`:1278` `onDeleteDigest` →
+  `lib/digest.ts:61`) is a direct client `deleteDoc` on
+  `users/{uid}/digests/{id}`, but `firestore.rules.locked` had `allow write: if
+  false` on that collection — and `write` covers delete. The rule predates the
+  delete action (shipped in the 2026-07-2x Collections/Digest round), so the two
+  drifted. Post-cutover the delete is rejected, the call site `void`s the
+  promise so nothing surfaces, `onSnapshot` never fires and the row just stays —
+  a silently dead button, with the unhandled rejection quietly landing in
+  `client_errors`. Now `allow delete: if owns(uid)` with `create, update: if
+  false`: the user may remove a digest from their own history, but can never
+  forge one or tamper with the curated cards inside it. `syntheses` deliberately
+  stays fully write-denied (the recap card is dismissed via localStorage, there
+  is no client delete path) — with a test pinning that asymmetry.
+  **(2) S-10, live today on both surfaces.** `lib/firebase.ts:47-50` initializes
+  Firestore with `persistentLocalCache()`, so IndexedDB mirrors every document
+  the app has read — the whole library: card titles, summaries, URLs, chats,
+  collections. `signOutUser()` called `signOut(auth)` and nothing else, and
+  `deleteAccount()` funnels through the same function, so: signing out on a
+  shared browser left the full library recoverable from IndexedDB by the next
+  person at that profile (the exact threat the in-app privacy vault exists for),
+  and **"Delete my account" wiped the server while leaving a complete local copy
+  behind indefinitely**. localStorage also held `machina_welcome_done:<uid>` —
+  and the uid IS the phone number. New `web/lib/localData.ts`
+  `purgeLocalUserData()`: `terminate(db)` + `clearIndexedDbPersistence(db)`,
+  then localStorage/sessionStorage cleared down to a **two-key device-preference
+  allowlist** (`theme`, `reader-font-size`) — an allowlist, so a key added by a
+  future feature is purged by default rather than silently forgotten. Wired into
+  `signOutUser()`, the single choke point both flows already pass through,
+  followed by a `location.reload()` — required, because `terminate()`
+  permanently closes the Firestore instance. **(3) S-11, defence in depth.**
+  `Card.tsx:180` (the processing/failed placeholder card's footer link) rendered
+  `href={link.url}` raw and `CardActionSheet.tsx:95` passed `link.url` straight
+  to `window.open()`, while five sibling sites already guarded with
+  `/^https?:\/\//i` — `Card.tsx:277` even carries the comment explaining why. A
+  stored `javascript:` value in either sink runs in the app's own origin with
+  the live Firestore session. Post-cutover the reach is self-XSS only (you can
+  only write your own card docs), so this is consistency + depth, not an open
+  door. All seven sites now go through one exported `isHttpUrl()` in
+  `web/lib/url.ts`.
+  **REPORTED, NOT FIXED (new §4 items 11c/11d):** *S-12, the Vercel surface
+  collapses every web caller into ONE per-IP rate-limit bucket* — traced
+  end-to-end for Ask: `/api/chat` is deliberately not a rewrite, so
+  `app/api/chat/route.ts:50` is a Vercel serverless function that fetches the
+  Cloud Function's direct URL **server-side**; the backend takes the LAST
+  `X-Forwarded-For` hop by design (`rate_limit.py:74-87`), which is Vercel's
+  egress IP, and `main.py:1496` gates on the 60/hr fail-CLOSED `chat` IP bucket
+  *before* the per-uid bucket at `:1522` is consulted. So 60 questions an hour
+  across the entire desktop-web user base, and one script locks out every web
+  user. Same topology for the `vercel.json` rewrites (analyze 30/hr, image
+  30/hr, share 120/hr, article 120/hr), but those add a Firebase Hosting hop I
+  could not verify from here, so only the `/api/chat` chain is asserted. Fix
+  belongs in `functions/` → next `/security functions` pass. *S-13, deps:* 1
+  critical / 18 high / 1 moderate, **none reachable** — `next@16.2.10`'s nine
+  advisories all need middleware (none), Server Actions (none), the image
+  optimizer (`images.unoptimized: true`, nothing imports `next/image`) or a
+  dynamic rewrite destination (all static); the **critical** `websocket-driver`
+  arrives via `firebase → @firebase/database → faye-websocket`, the Node-only
+  RTDB transport this Firestore app never loads; postcss/sharp are build-time
+  inside Next; the eslint/minimatch chain and `tar` are devDependencies.
+  Clearing the Next advisories needs ≥16.3.0 (the range runs to
+  `16.3.0-preview.7`, so `npm audit fix` landing 16.2.11 does NOT cover them) —
+  a deliberate upgrade with `next build` + device QA, same stance as AUDIT.md
+  S-5 took on postcss. *S-14:* CSP allows `'unsafe-eval'`/`'unsafe-inline'` in
+  `script-src` on both surfaces; `'unsafe-inline'` is load-bearing (the
+  `layout.tsx:56` theme bootstrap + Next hydration), `'unsafe-eval'` I couldn't
+  tie to a consumer but can't remove without a live check.
+  **INVESTIGATED AND DISMISSED (do not re-find these):** *`dangerouslySetInnerHTML`*
+  — exactly one site, `app/layout.tsx:56-60`, a static string literal (the
+  render-blocking theme bootstrap); no `innerHTML`/`insertAdjacentHTML`/
+  `document.write`/`eval`/`new Function` anywhere in `web/`. *Both markdown
+  stacks (A-7)* — `SimpleMarkdown.tsx` only ever builds React elements (no href,
+  no raw HTML), and `AskBrain.tsx:106-127` runs react-markdown 9.1 with
+  `remark-gfm`/`remark-breaks` and **no `rehype-raw`**, so model HTML is
+  escaped; the custom `a` renderer gets an href already through react-markdown's
+  default `urlTransform` and sets `rel="noopener noreferrer"`. A-7 is a visual-QA
+  task, not a security one. *`ReadingView` rendering scraped articles* —
+  `/api/article` returns structured `paragraphs[]` and `:138-154` renders
+  `p.text` as React text nodes per block type; no HTML path exists. *Secrets in
+  the bundle* — all eleven `NEXT_PUBLIC_*` vars are non-secret by design; a scan
+  for AIza/PEM/`sk-`/`SG.`/Twilio-SID/`ghp_` patterns over `web/` found nothing;
+  `.env*` gitignored. *uid (= phone number) in error reports / analytics* —
+  `errorReporter.ts:118` and `analytics.ts:105` use the uid only as the document
+  PATH, which the locked ruleset restricts to the owner; neither doc body
+  carries it, analytics props pass an 8-key allowlist with a 40-char cap, error
+  reports carry message/stack/`pathname+search` (no hash). The real residue was
+  localStorage → that became S-10. *AuthProvider both branches* — the two legacy
+  `limit(1)` first-doc reads are still correctly flag-gated (`:218` `if
+  (REQUIRE_AUTH || !native) return;`, `:462` `if (!REQUIRE_AUTH)`); the live
+  path is the `authUids array-contains` LIST at `:421`, which is precisely what
+  `firestore.rules.locked:45` is written to prove. `publicRoutes.tsx` exempts
+  only `/privacy`+`/terms` (no auth context used); `/s`,`/c` are server-rendered
+  by `share_page` and aren't Next routes. *Missing bearer on `/api/article`
+  (`ReadingView.tsx:55`)* — every other `/api/*` call site sends `authHeaders()`;
+  this one matches `get_article`'s documented anonymous contract
+  (`main.py:1982-1999` never reads a bearer), so it is correct today and only
+  becomes a code change if the owner gates it (AUDIT.md S-4 / M10). *Every other
+  client write vs the locked ruleset* — enumerated: `users/{uid}` updates
+  (timezone/aiConsentAt/pushPromptedAt/onboarded/`settings.*`/privacyLock/
+  authUids) satisfy `:50`; links/chats/collections/analytics_events/client_errors
+  are `owns(uid)`; nothing writes `shared_*` directly (publish/unpublish go via
+  `/api/publish-share`); nothing writes `syntheses`. `digests` was the ONLY
+  mismatch. *`lib/privacyLock.ts`* — PBKDF2-SHA256 ×100k with a per-user 16-byte
+  salt, PIN never stored; the file correctly states it's a privacy screen, not a
+  security boundary, so no throttling and a non-constant-time compare don't
+  matter (the data is reachable through the user's own session anyway). *Stored
+  `javascript:` URLs at save time* — `AddLinkForm.tsx:41-48` prefixes `https://`
+  when the input isn't http(s); every `target="_blank"` carries
+  `rel="noopener noreferrer"` and all three `window.open` sites pass
+  `noopener,noreferrer`. *Security headers* — HSTS, nosniff, `X-Frame-Options:
+  DENY`, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`,
+  Referrer-Policy and Permissions-Policy are set on BOTH surfaces (`vercel.json`
+  and `firebase.json` `/**`, which covers the `/s`,`/c` share pages). Residual =
+  S-14.
+  **Verified:** `tsc --noEmit` exit 0 (before AND after — `npm ci` run first, so
+  unlike the last pass the frontend gate actually ran); `eslint .` unchanged at
+  4 errors / 9 warnings, none in any file I touched (all pre-existing drift in
+  SettingsModal/StatsView/useScrollAwayBar/BrandOrb since the D-16 zero-error
+  sweep — not security, not mine); `py_compile` clean; pytest **510 passed, 4
+  failed** — the 4 are exactly the pre-existing `test_embed_trigger_backstop.py`
+  mock failures tracked in §4 item 11b (504 on `main` after the parallel Ask
+  session's rounds 3–5 landed, + my 6 = 510; all gates re-run AFTER merging
+  `origin/main`, which had advanced 10 commits — the only conflict was the two
+  sessions both prepending to §9, resolved by keeping both entries). **`cd
+  firestore-rules-test && npm test` COULD NOT RUN HERE** — the emulator JAR
+  download is blocked by the sandbox egress policy (`storage.googleapis.com:443`
+  → 403 at the agent proxy), exactly as §4 task 2 records, so the S-9 rule change
+  and its 4 new cases are unverified against a live emulator and MUST be run on
+  the owner machine before the rules deploy. **Regression tests:** 4 rules cases
+  in `firestore-rules-test/rules.test.mjs` (owner CAN delete a digest, stranger/
+  anon cannot, create+update still denied, syntheses delete still denied) and 6
+  source-scan invariants in `functions/tests/test_web_client_hygiene.py` —
+  `web/` has no JS test runner (§4 item 18), so these live in the pytest suite
+  that CI already runs, mirroring the H-4 AST-scan precedent; verified
+  non-vacuous by stashing the fix (3 of them fail against the pre-fix tree).
+  **Owner actions handed back:** run the rules suite before the cutover deploy;
+  device-QA the new sign-out/delete-account reload on TestFlight; decide the
+  Next ≥16.3.0 upgrade; plus the unchanged §4 task-2 cutover, §4 task-5 env +
+  key rotation, and the AUDIT.md S-4/M10 `get_article` gating call.
+
 - **2026-07-25 — ASK: STALE GLYPHS + THE TEXT STOPS ANIMATING (device
   report, build 1181).** Owner on iPhone: "Thinking it through ends with a weird
   character" (screenshot showed trailing debris after the ellipsis) and "the

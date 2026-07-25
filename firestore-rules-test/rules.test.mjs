@@ -209,14 +209,14 @@ test('stranger and anon cannot read syntheses', async () => {
   await assertFails(getDoc(doc(anonDb(), 'users', OWNER_DOC, 'syntheses', '2026-W27')));
 });
 
-// ── digests: client read-only (in-app Digest section) ────────────────────────
+// ── digests: read + delete for the owner, content written by functions ───────
 
 test('owner can read digests (Digest section subscription)', async () => {
   await assertSucceeds(getDoc(doc(ownerDb(), 'users', OWNER_DOC, 'digests', '2026-W27')));
   await assertSucceeds(getDocs(collection(ownerDb(), 'users', OWNER_DOC, 'digests')));
 });
 
-test('nobody can write digests from the client (Cloud Functions only)', async () => {
+test('nobody can create or update digests from the client (Cloud Functions only)', async () => {
   await assertFails(
     setDoc(doc(ownerDb(), 'users', OWNER_DOC, 'digests', '2026-07-06'), { id: '2026-07-06' }),
   );
@@ -225,9 +225,28 @@ test('nobody can write digests from the client (Cloud Functions only)', async ()
   );
 });
 
+// The per-digest "Delete" action in DigestCard (lib/digest.ts deleteDigest →
+// Feed.tsx onDeleteDigest) is a direct client deleteDoc. The ruleset denied ALL
+// writes on digests until 2026-07-25, so this action would have started failing
+// silently at the cutover — regression guard for audit S-9.
+test('owner CAN delete their own digest (DigestCard delete action)', async () => {
+  await assertSucceeds(deleteDoc(doc(ownerDb(), 'users', OWNER_DOC, 'digests', '2026-W27')));
+});
+
+test('stranger and anon cannot delete the owner digest', async () => {
+  await assertFails(deleteDoc(doc(strangerDb(), 'users', OWNER_DOC, 'digests', '2026-W27')));
+  await assertFails(deleteDoc(doc(anonDb(), 'users', OWNER_DOC, 'digests', '2026-W27')));
+});
+
 test('stranger and anon cannot read digests', async () => {
   await assertFails(getDoc(doc(strangerDb(), 'users', OWNER_DOC, 'digests', '2026-W27')));
   await assertFails(getDoc(doc(anonDb(), 'users', OWNER_DOC, 'digests', '2026-W27')));
+});
+
+// Syntheses stay fully write-denied: unlike digests, the client has no delete
+// action for them (Feed dismisses the recap card via localStorage).
+test('owner cannot delete a synthesis (no client delete path exists)', async () => {
+  await assertFails(deleteDoc(doc(ownerDb(), 'users', OWNER_DOC, 'syntheses', '2026-W27')));
 });
 
 // ── shared_cards / shared_collections: public read, Admin-SDK-only write ──────
