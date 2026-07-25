@@ -767,6 +767,110 @@ exact-match, capped.
   launch:** set `MONTHLY_ASK_QUOTA` to a real per-tier value in the functions
   env — 1000/user/month across a public user base is a genuine cost exposure,
   and this default is a single-user stopgap, not a pricing decision.
+- **2026-07-25 — ASK: STALE GLYPHS + THE TEXT STOPS ANIMATING (device
+  report, build 1181).** Owner on iPhone: "Thinking it through ends with a weird
+  character" (screenshot showed trailing debris after the ellipsis) and "the
+  transition is better but not good enough". Both had ONE cause and one fix.
+  **The "character" is not a character** — `grep | cat -A` confirms the literal
+  is `Thinking it through` + a single `M-bM-^@M-&` (U+2026), nothing else. They
+  were **stale pixels**: in the `followup` sequence the previous phrase is
+  `Re-reading the sources…` (23 ch) and the next is `Thinking it through…`
+  (20 ch), and the leftovers sat exactly where the longer string's tail had
+  been. Mutating text inside an element with a **running opacity animation**
+  puts it in a composited layer that is promoted then demoted around the
+  change; WebKit's partial invalidation doesn't reliably cover the old text's
+  full extent when the new string is shorter. **Not reproducible in this
+  container** — only Chromium is installed at `/opt/pw-browsers` and Chromium
+  doesn't exhibit it — so this fix is BY CONSTRUCTION, not by reproduction;
+  confirm on device.
+  **Fix — the label no longer animates at all.** `OrbStatus` now dips ONLY the
+  orb (its own `<span ref>`, `inline-flex shrink-0`); the label is a **sibling**
+  of that span, so no ancestor of the text is ever animated and it stays on the
+  ordinary repaint path. The label also carries `key={shown.label}` so React
+  replaces the element rather than mutating a text node. Both still change in
+  one `setShown` → one commit → same frame, so the round-2 desync cannot return.
+  This simultaneously answers "not good enough": dipping the whole row took the
+  status line to 12% for ~70ms, which on a line you're *reading* is a blink, not
+  a transition. Status text is now replaced outright (the iOS pattern) — what
+  needed masking was only the orb's shape morph. Dip retuned for an orb-only
+  target: **220ms, floor 0.22** (was 260ms/0.12), plateau 30%→58%, retarget at
+  42%, still driven off the animation's `currentTime`. Measured (Chromium,
+  `setCPUThrottlingRate`, effective opacity incl. ancestors, after a forced
+  layout flush): **label 1.000 at 1× AND 8× CPU** (never dips), orb exactly
+  0.220 at swap on both. Verified tsc 0, `next build` 0, eslint clean. Commit
+  `c6d39be` → Vercel (auto).
+  **NEW §2 GOTCHA — a cancelled TestFlight run can't be re-triggered on the same
+  SHA.** Run **#182 was `cancelled`, not failed**: job `conclusion: cancelled`,
+  60s wall time, `runner_id: 0`, empty runner name, and log download 404s — it
+  never got a `macos-26` runner. Nothing to do with the diff (#181 built the
+  same config an hour earlier); treat it as transient runner allocation.
+  Recovery is awkward from a cloud session because **all three obvious paths are
+  blocked**: the rerun API 403s ("Resource not accessible by integration", same
+  as `workflow_dispatch`), deleting the remote trigger branch fails through the
+  git proxy ("remote end hung up"), and re-pushing the SAME SHA is a no-op
+  ("Everything up-to-date") so no `push` event fires. The workflow only listens
+  on `workflow_dispatch` + `push: branches: [trigger/testflight]`, so **the only
+  programmatic recovery is to advance main's SHA** (any real commit — a docs
+  update works) and push the trigger branch again. Retriggered as `eaf9b7c` →
+  run **#183**.
+  **BOOT SCREEN → ORB (owner request, same session).** The auth-resolving screen
+  (`app/page.tsx`, shown while `loading`) used a generic
+  `border-t-purple-500 animate-spin` ring under the pulsing app icon. Replaced
+  with **`listening` @ 64** — the same orb as Ask's empty state, so Machina's
+  "here and ready" face greets you on launch and when Ask is waiting. Compared
+  against `working` @64 (too sparse/scattered under the icon) and a 64→44 CSS
+  downscale (loses dot detail) before picking. Added an `sr-only role="status"`
+  "Starting Machina…" the ring never had. **Caveat, by design:** the iOS build is
+  `output: 'export'`, so this markup paints BEFORE hydration and the canvas is
+  blank for that window (a CSS ring was not). The icon's `animate-pulse` carries
+  the screen, and the canvas reserves its 64px box so nothing shifts when it
+  starts painting — but if boot ever feels dead on a cold launch, that's why,
+  and the ring is the fallback. Feed's `Suspense` fallback ring and the button
+  spinners are still deliberately NOT orbs. Commit `ad9c7db` → run **#184 green
+  → build 1184**.
+  **TestFlight builds from this session, newest first:** **1184** (`ad9c7db`) =
+  everything + the boot orb; **1183** (`eaf9b7c`) = label stops animating
+  (stale-glyph + blink fix); 1181 (`64c0514`) = plateau/clock-driven dip;
+  1180 (`72de50a`) = orbs + sidebar glyph, pre-fix. **Owner device QA still
+  open on 1184:** (a) confirm "Thinking it through…" no longer trails debris —
+  NOT reproducible in this container (Chromium only, and this is a WebKit
+  repaint bug), so it is unverified by construction; (b) whether three orb
+  swaps in a ~6s window still reads as fidgety, fallback = two beats
+  (`searching` for 1+2, `shaping` for the write); (c) whether the boot orb's
+  pre-hydration blank window is noticeable on a cold launch.
+
+- **2026-07-25 — ASK PHRASE-SWAP HICCUP FIXED (device report).** Owner
+  on iPhone: "a constant hiccup in the phrase change, mainly on the text — it
+  takes a sec for the words to fully change." **Measured, not guessed** (headless
+  Chromium + `Emulation.setCPUThrottlingRate`, reading opacity after a forced
+  layout flush = when the words have actually landed): the shipped dip put the
+  text swap at **0.335 opacity at 1×/4× CPU but 0.555 at 8×** — on a loaded
+  phone the words finished changing while the row was MORE THAN HALF VISIBLE.
+  Load-dependent, which is exactly why it showed on device and not on desktop.
+  Root cause is a knife-edge trough: a single-instant trough needs the new
+  content to *finish painting* on one exact frame, and it doesn't (React commit,
+  then layout, then paint). Two fixes:
+  (1) **`OrbStatus`** — the point trough becomes a **held plateau**: 260ms total
+  (was 400), floor **0.12** (was 0.32), held 30%→58%, exchange at 42%
+  (mid-plateau, ±36ms of slop absorbed). The swap is driven off the animation's
+  own **`currentTime` via rAF** instead of a wall-clock `setTimeout`, so it
+  self-corrects against the compositor. Result: **0.120 at 1×, 4× AND 8× CPU** —
+  flat under load. The shorter dip also directly answers "takes a sec".
+  (2) **`BrandOrb`** — `state` was in the render-loop effect's deps, so every
+  phrase change **reallocated the canvas backing store, rebuilt the recolor
+  Proxy + IntersectionObserver and restarted rAF**, landing at the exact instant
+  the phrase swapped. The active preset now lives in a `presetRef` read
+  per-frame and the loop effect keys on `[size, speed]` only, so a state change
+  is a pointer swap. Side effect: `speed`/`rate` is now applied inside `paint`,
+  so callers pass raw seconds — check this if a future orb animates at the wrong
+  rate. Verified: tsc 0, `next build` 0 (placeholder Firebase env, see the
+  2026-07-24 orb entry's gotcha). Feature `6e50569`, merge **`64c0514`** →
+  Vercel (auto); TestFlight run **#181 green → build 1181**. No functions or
+  hosting deploy. **Device QA on 1181:** confirm the hiccup is gone, and judge
+  whether three swaps in a ~6s window still reads as fidgety — the fallback
+  remains collapsing Ask to two beats (`searching` for 1+2, `shaping` for the
+  write).
+
 - **2026-07-24 — FIRST `/security` PASS ON `functions/`: 3 fixes
   (S-7 response caps, S-8 claim gate fails closed, H-4 residue log masking),
   +30 regression tests, 389→421 green.** First run of the new skill, target
@@ -878,7 +982,16 @@ exact-match, capped.
   light+dark. **Watch on device:** whether three orb swaps in a ~6s window reads
   as fidgety — if so, collapse Ask to two states (`searching` for beats 1+2,
   `shaping` for the write). New §4 item 18c: native share-extension orb is still
-  single-state `working`.
+  single-state `working`. Feature `e28bc4b`, merge **`72de50a`** → Vercel
+  (auto); TestFlight run **#180 green → build 1180**. No functions/hosting
+  deploy (neither `functions/**` nor `firebase.json` changed). **Gotcha for
+  cloud sessions:** `web/.env.local` is gitignored, so a fresh container has no
+  `NEXT_PUBLIC_FIREBASE_*` vars and `next build` dies prerendering `/_not-found`
+  with `auth/invalid-api-key` — nothing to do with the diff. Re-run with
+  placeholder values to get a real signal (`NEXT_PUBLIC_FIREBASE_API_KEY=AIza…`
+  + the other five); Vercel has the real ones. Also beware `npx next build |
+  tail` — `$?`/the background-task exit code is `tail`'s, not the build's, so a
+  failed build reports success.
 
 - **2026-07-24 — NEW `/security` SKILL: code-level-only hardening pass
   (`.claude/skills/security/SKILL.md`).** Owner wanted a dedicated session type
