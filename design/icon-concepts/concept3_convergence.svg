@@ -1,0 +1,73 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg3" cx="50%" cy="30%" r="86%">
+      <stop offset="0%"   stop-color="#2E1758"/>
+      <stop offset="44%"  stop-color="#170B31"/>
+      <stop offset="100%" stop-color="#07040F"/>
+    </radialGradient>
+    <radialGradient id="vign3" cx="50%" cy="50%" r="72%">
+      <stop offset="0%"   stop-color="#000000" stop-opacity="0"/>
+      <stop offset="66%"  stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.60"/>
+    </radialGradient>
+    <radialGradient id="aura3" gradientUnits="userSpaceOnUse" cx="512.0" cy="610.0" r="360">
+      <stop offset="0%"   stop-color="#EFA4FF" stop-opacity="0.42"/>
+      <stop offset="46%"  stop-color="#8B4CF6" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#8B4CF6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="arm" gradientUnits="userSpaceOnUse" cx="512.0" cy="610.0" r="340">
+      <stop offset="0%"   stop-color="#FFFFFF"/>
+      <stop offset="42%"  stop-color="#EFDCFF"/>
+      <stop offset="100%" stop-color="#A971F5"/>
+    </radialGradient>
+    <radialGradient id="node" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#FFFFFF"/>
+      <stop offset="52%"  stop-color="#F0DEFF"/>
+      <stop offset="100%" stop-color="#B888FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="core3" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#FFFFFF"/>
+      <stop offset="30%"  stop-color="#FFFFFF" stop-opacity="0.92"/>
+      <stop offset="64%"  stop-color="#E7B6FF" stop-opacity="0.36"/>
+      <stop offset="100%" stop-color="#C77DFF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft3" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="16"/>
+    </filter>
+    <filter id="coreglow3" x="-220%" y="-220%" width="540%" height="540%">
+      <feGaussianBlur stdDeviation="14" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#bg3)"/>
+  <rect width="1024" height="1024" fill="url(#vign3)"/>
+  <circle cx="512.0" cy="610.0" r="360" fill="url(#aura3)"/>
+
+  <g fill="none" filter="url(#soft3)" opacity="0.5">
+        <path d="M241.3 500.6 L512.0 610.0" stroke="url(#arm)" stroke-width="26" stroke-linecap="round" opacity="0.40"/>
+    <path d="M335.3 348.0 L512.0 610.0" stroke="url(#arm)" stroke-width="34" stroke-linecap="round" opacity="0.66"/>
+    <path d="M512.0 280.0 L512.0 610.0" stroke="url(#arm)" stroke-width="40" stroke-linecap="round" opacity="1.00"/>
+    <path d="M688.7 348.0 L512.0 610.0" stroke="url(#arm)" stroke-width="34" stroke-linecap="round" opacity="0.66"/>
+    <path d="M782.7 500.6 L512.0 610.0" stroke="url(#arm)" stroke-width="26" stroke-linecap="round" opacity="0.40"/>
+  </g>
+  <g fill="none">
+        <path d="M241.3 500.6 L512.0 610.0" stroke="url(#arm)" stroke-width="26" stroke-linecap="round" opacity="0.40"/>
+    <path d="M335.3 348.0 L512.0 610.0" stroke="url(#arm)" stroke-width="34" stroke-linecap="round" opacity="0.66"/>
+    <path d="M512.0 280.0 L512.0 610.0" stroke="url(#arm)" stroke-width="40" stroke-linecap="round" opacity="1.00"/>
+    <path d="M688.7 348.0 L512.0 610.0" stroke="url(#arm)" stroke-width="34" stroke-linecap="round" opacity="0.66"/>
+    <path d="M782.7 500.6 L512.0 610.0" stroke="url(#arm)" stroke-width="26" stroke-linecap="round" opacity="0.40"/>
+  </g>
+  <g>
+        <circle cx="241.3" cy="500.6" r="18.7" fill="url(#node)" opacity="0.62"/>
+    <circle cx="335.3" cy="348.0" r="24.5" fill="url(#node)" opacity="0.88"/>
+    <circle cx="512.0" cy="280.0" r="28.8" fill="url(#node)" opacity="1.00"/>
+    <circle cx="688.7" cy="348.0" r="24.5" fill="url(#node)" opacity="0.88"/>
+    <circle cx="782.7" cy="500.6" r="18.7" fill="url(#node)" opacity="0.62"/>
+  </g>
+
+  <g filter="url(#coreglow3)">
+    <circle cx="512.0" cy="610.0" r="66" fill="url(#core3)"/>
+    <circle cx="512.0" cy="610.0" r="19" fill="#FFFFFF"/>
+  </g>
+</svg>
