@@ -61,3 +61,54 @@ function launchAt(u) {
            clipH: ARM_H + (HALF - ARM_H) * g,
            dotR: R_HI * strike, dotOp: strike };
 }
+
+/* ── One motion per verb ───────────────────────────────────────────────────
+   lib/scanPhases.ts states the rule as "one verb → one orb, app-wide": the
+   SHAPE says what kind of work is running, and it repeats deliberately when two
+   adjacent phases do the same kind of work. A single mark keeps that rule by
+   varying MOTION instead of shape. Reference render: verb_motions.gif.
+
+     listening  REST    locked, a very slow breathe        at ease, ready
+     working    PULSE   tight fast pumping                 in flight, on the wire
+     searching  SWEEP   wide slow sweep, point faint       scanning
+     solving    STEP    ratchets, one tick per candidate   weighing candidates
+     shaping    HOLD    locked, the point breathes         producing the output
+
+   TRACE is NOT in this table. It stays reserved for arrival — Ask opening, app
+   launch — and is never looped. */
+
+function restAt(t) {                                   // listening
+  return { spread: 0, dotR: R_HI + 2 * Math.sin(2 * Math.PI * t), dotOp: 1, clipH: HALF };
+}
+
+function pulseAt(t) {                                  // working / fetching
+  return { spread: 18 + 10 * Math.sin(6 * Math.PI * t), dotR: 38, dotOp: .82, clipH: HALF };
+}
+
+function sweepAt(t) {                                  // searching
+  const amp = 11 * sstep(0, .12, t) * (1 - sstep(.88, 1, t));
+  return { spread: SPREAD + amp * Math.sin(4 * Math.PI * t),
+           dotR: R_LO, dotOp: OP_LO, clipH: HALF };
+}
+
+function stepAt(t) {                                   // solving
+  if (t < .8) {
+    const k = Math.min(4, Math.floor(t / .16)), f = (t - k * .16) / .16;
+    const a = 84 - 16 * k, b = 84 - 16 * (k + 1);
+    return { spread: a + (b - a) * sstep(0, .4, f),
+             dotR: 20 + 6 * k, dotOp: .42 + .1 * k, clipH: HALF };
+  }
+  const e = sstep(0, 1, (t - .8) / .2);
+  return { spread: 4 * (1 - e), dotR: 44 + 8 * e, dotOp: .82 + .18 * e, clipH: HALF };
+}
+
+function holdAt(t) {                                   // shaping
+  const amp = 3.2 * sstep(0, .15, t) * (1 - sstep(.85, 1, t));
+  return { spread: 0, dotR: R_HI + amp * Math.sin(2 * Math.PI * t), dotOp: 1, clipH: HALF };
+}
+
+/* Drop-in for scanPhases' orb-state strings, so callers keep passing a verb. */
+const VERB_MOTION = {
+  listening: restAt, working: pulseAt, searching: sweepAt,
+  solving: stepAt, shaping: holdAt,
+};
