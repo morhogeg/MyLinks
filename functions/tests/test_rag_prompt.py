@@ -931,3 +931,36 @@ def test_stream_answer_uses_ask_model():
     svc = _svc_with_stream(["Body.\n", "[[CITED: id1]]"])
     _drain(svc.answer_from_context_stream("q?", _CARDS))
     assert svc.client.models.used_model == GEMINI_ASK_MODEL
+
+
+# ── answer_language override (conversation language on chip questions) ─────
+
+_HE_CARDS = [{"id": "a", "title": "5 מקומות מומלצים בפרדס חנה", "summary": "Cafés."}]
+_HE_CHIP = 'Give me more detail on "5 מקומות מומלצים בפרדס חנה"'
+
+
+def test_prompt_has_no_language_override_by_default():
+    # Every typed question: the judge-from-the-question rule is what runs, and
+    # the prompt must be byte-identical to before this option existed.
+    prompt = _build_rag_prompt(_HE_CHIP, _HE_CARDS)
+    assert "LANGUAGE OVERRIDE" not in prompt
+    assert "CRITICAL — match the user's language" in prompt
+
+
+def test_prompt_pins_the_answer_language_when_asked():
+    prompt = _build_rag_prompt(_HE_CHIP, _HE_CARDS, answer_language="Hebrew")
+    assert "LANGUAGE OVERRIDE" in prompt
+    assert "write your ENTIRE answer in Hebrew" in prompt
+    # It must be stated as taking precedence — the older rule is still in the
+    # prompt right above it and would otherwise say "answer in English".
+    assert "takes PRECEDENCE" in prompt
+    # And the original rule stays for everything it still governs.
+    assert "CRITICAL — match the user's language" in prompt
+
+
+def test_language_override_reaches_the_streaming_prompt_too():
+    # Both RAG paths share _build_rag_prompt, so the override cannot apply to
+    # only one of them — web streams, native gets buffered JSON.
+    for kwargs in ({}, {"history": [{"role": "user", "content": "שאלה"}]}):
+        prompt = _build_rag_prompt(_HE_CHIP, _HE_CARDS, answer_language="Arabic", **kwargs)
+        assert "write your ENTIRE answer in Arabic" in prompt

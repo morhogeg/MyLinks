@@ -19,6 +19,10 @@ from search import (
     demote_cards_by_titles,
     keyword_match_score,
     keyword_query_tokens,
+    is_context_free_followup,
+    followup_retrieval_query,
+    dominant_script_language,
+    conversation_language,
 )
 
 
@@ -334,3 +338,168 @@ def test_keyword_score_matches_concept_only_cards():
             "concepts": ["Resilience", "Team Spirit"]}
     tokens = keyword_query_tokens("What else did I save on Resilience?")
     assert keyword_match_score(card, tokens) > 0
+
+
+# ── Context-free follow-ups (is_context_free_followup) ─────────────────────
+
+def test_followup_meta_questions_carry_no_topic():
+    # The owner-reported turn: an answer in English, then one Hebrew word
+    # meaning "in Hebrew". Retrieving for it returns topically random cards.
+    assert is_context_free_followup("בעברית") is True
+    assert is_context_free_followup("in English please") is True
+    assert is_context_free_followup("shorter") is True
+    assert is_context_free_followup("summarize that in bullets") is True
+    assert is_context_free_followup("בקצרה בבקשה") is True
+
+
+def test_followup_bare_stopword_questions_carry_no_topic():
+    # No content tokens at all — only understandable against the turn before.
+    assert is_context_free_followup("why?") is True
+    assert is_context_free_followup("and?") is True
+    assert is_context_free_followup("") is True
+
+
+def test_followup_one_real_word_is_enough_to_stay_a_topic():
+    # The gate is a CLOSED meta vocabulary: a single content word — including
+    # a topic switch, or a meta word next to a real one — keeps the question
+    # its own, so its retrieval is untouched.
+    assert is_context_free_followup("more on the maple cake") is False
+    assert is_context_free_followup("what about the Italy trip?") is False
+    assert is_context_free_followup("summarize the parenting article") is False
+    assert is_context_free_followup(
+        'Walk me through the steps in "Pan con Tomate Recipe"') is False
+    assert is_context_free_followup("מה שמור לי על חינוך") is False
+
+
+# ── Which text Ask retrieves for (followup_retrieval_query) ────────────────
+
+_ASKED = 'Why is "מתכון לעוגת מייפל עסיסית" worth my time?'
+
+
+def test_retrieval_query_falls_back_to_the_prior_topical_question():
+    # The reported bug: "בעברית" retrieved for itself, so the model was handed
+    # unrelated cards and said the library has nothing on the very recipe it
+    # had just answered about — with the card cited on screen.
+    history = [
+        {"role": "user", "content": _ASKED},
+        {"role": "assistant", "content": "The maple cake is worth your time because…"},
+    ]
+    assert followup_retrieval_query("בעברית", history) == _ASKED
+
+
+def test_retrieval_query_walks_past_a_chain_of_meta_turns():
+    history = [
+        {"role": "user", "content": _ASKED},
+        {"role": "assistant", "content": "…"},
+        {"role": "user", "content": "בעברית"},
+        {"role": "assistant", "content": "…"},
+    ]
+    assert followup_retrieval_query("shorter", history) == _ASKED
+
+
+def test_retrieval_query_never_uses_an_assistant_turn():
+    # An answer is not a query — embedding it would retrieve for the model's
+    # own prose, not the user's subject.
+    history = [{"role": "assistant", "content": "The maple cake is worth your time…"}]
+    assert followup_retrieval_query("בעברית", history) == "בעברית"
+
+
+def test_retrieval_query_is_unchanged_for_a_normal_question():
+    # The safety property: anything with a topic of its own retrieves EXACTLY
+    # as before, history or not — first turns, topic switches, chip questions.
+    history = [
+        {"role": "user", "content": _ASKED},
+        {"role": "assistant", "content": "…"},
+    ]
+    for q in ("What did I save about Italy?", _ASKED, "recap my recent saves"):
+        assert followup_retrieval_query(q, history) == q
+        assert followup_retrieval_query(q, []) == q
+        assert followup_retrieval_query(q, None) == q
+
+
+def test_retrieval_query_fails_open_on_missing_or_malformed_history():
+    assert followup_retrieval_query("בעברית", None) == "בעברית"
+    assert followup_retrieval_query("בעברית", []) == "בעברית"
+    assert followup_retrieval_query("בעברית", "not a list") == "בעברית"
+    assert followup_retrieval_query("בעברית", [None, 7, "x"]) == "בעברית"
+    # A conversation with no topical user turn has nothing better to offer.
+    assert followup_retrieval_query(
+        "בעברית", [{"role": "user", "content": "shorter"}]) == "בעברית"
+    assert followup_retrieval_query(
+        "בעברית", [{"role": "user", "content": "   "}]) == "בעברית"
+
+
+# ── Conversation language (dominant_script_language / conversation_language) ─
+
+def test_script_detection_reads_the_users_own_words():
+    assert dominant_script_language("אני צריך בית קפה בפרדס חנה") == "Hebrew"
+    assert dominant_script_language("I need a café in Pardes Hanna") is None
+    assert dominant_script_language("") is None
+    assert dominant_script_language(None) is None
+
+
+def test_script_detection_ignores_quoted_card_titles():
+    # The chip that caused the report: English boilerplate wrapped around a
+    # Hebrew card title. The title is the CARD's language, not the user's, so
+    # this must NOT read as Hebrew — otherwise every chip would look Hebrew.
+    assert dominant_script_language(
+        'Give me more detail on "5 מקומות מומלצים בפרדס חנה"') is None
+
+
+def test_script_detection_needs_a_real_share_not_a_stray_character():
+    assert dominant_script_language("The Hebrew word for yes is כן") is None
+    # …but a genuinely Hebrew sentence with an English brand name still counts.
+    assert dominant_script_language("מה שמור לי על Netflix ועל טלוויזיה") == "Hebrew"
+
+
+def test_script_detection_covers_other_non_latin_scripts():
+    assert dominant_script_language("ما هي أفضل المقاهي") == "Arabic"
+    assert dominant_script_language("Что я сохранил на этой неделе") == "Russian"
+
+
+def test_conversation_language_is_what_the_user_wrote():
+    history = [
+        {"role": "user", "content": "אני צריך בית קפה בפרדס חנה"},
+        {"role": "assistant", "content": "בפרדס חנה מומלץ לבקר ב\"קפה בחורשה\""},
+    ]
+    assert conversation_language(history) == "Hebrew"
+
+
+def test_conversation_language_survives_intervening_english_chips():
+    # The second tap in a row: the newest user turn is the PREVIOUS chip's
+    # English boilerplate. Ending the scan there would put the thread back
+    # into English, which is the bug.
+    history = [
+        {"role": "user", "content": "אני צריך בית קפה בפרדס חנה"},
+        {"role": "assistant", "content": "…"},
+        {"role": "user", "content": 'Give me more detail on "5 מקומות מומלצים בפרדס חנה"'},
+        {"role": "assistant", "content": "…"},
+    ]
+    assert conversation_language(history) == "Hebrew"
+
+
+def test_conversation_language_is_none_for_an_english_conversation():
+    # Latin script can't identify a language, and guessing would be worse than
+    # the prompt's own judgement — so the existing rule stays in charge.
+    history = [
+        {"role": "user", "content": "What did I save about coffee?"},
+        {"role": "assistant", "content": "You saved…"},
+    ]
+    assert conversation_language(history) is None
+
+
+def test_conversation_language_never_votes_with_the_assistant():
+    # An answer that disobeyed the language rule must not lock the thread into
+    # its own mistake.
+    history = [
+        {"role": "user", "content": "What did I save about coffee?"},
+        {"role": "assistant", "content": "שמרת כמה מקומות בפרדס חנה"},
+    ]
+    assert conversation_language(history) is None
+
+
+def test_conversation_language_fails_open():
+    assert conversation_language(None) is None
+    assert conversation_language([]) is None
+    assert conversation_language("not a list") is None
+    assert conversation_language([None, 7, {"role": "user"}]) is None

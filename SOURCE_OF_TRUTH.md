@@ -746,7 +746,79 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-25 (latest) — LINKEDIN BYLINE, ROUND 2: MY OWN SLUG PARSER WAS
+- **2026-07-25 (latest) — ASK: A TAPPED CHIP NO LONGER FLIPS THE THREAD'S
+  LANGUAGE.** Owner screenshot: `אני צריך בית קפה בפרדס חנה` → answered in
+  Hebrew; the next turn was the suggestion chip `Give me more detail on "5
+  מקומות מומלצים בפרדס חנה"` → answered **entirely in English**. Not a
+  regression — it's Round 6 (2026-07-14) working as specified: the prompt rule
+  judges the answer's language from the question's own words with quoted card
+  titles ignored, so a chip reads as an English question. That rule is right
+  for TYPED text and wrong for a chip, whose wording is *Machina's* English
+  boilerplate and expresses no preference from the user at all. Owner's call:
+  chips stay English, the continuation stays in the language the user started
+  in. Fix (backend only, so shipped native builds get it on deploy):
+  (1) `search.dominant_script_language` + `conversation_language` (pure) — the
+  non-Latin language the USER has written in this thread, counted by Unicode
+  block over their own words with quoted titles stripped (so a Hebrew title
+  inside an English chip can't fake a Hebrew signal), newest matching turn
+  wins, **Latin turns are skipped rather than ending the scan** (turns between
+  the Hebrew opener and this chip are usually earlier English chips — ending
+  there reinstates the bug on the second tap), assistant turns never vote.
+  (2) `_build_rag_prompt` gained `answer_language`, rendering a LANGUAGE
+  OVERRIDE clause that explicitly takes precedence over the Round-6 rule
+  (which stays, unchanged, for every typed question); threaded through both RAG
+  paths and all 8 call sites including the filter-salvage/sweep retries.
+  (3) `ask_brain` sets it **only when `hints` is present** — `hints` is
+  machine-generated chip intent and is never attached to typed text, making it
+  the reliable "the app composed this question" marker already on the wire from
+  both platforms. Latin-script conversations return None, so every all-English
+  thread (i.e. every thread today) is byte-identical. No frontend change needed:
+  the bubble's direction already follows the answer's ACTUAL prose
+  (`getDominantDirection`, Round 6b), so a Hebrew answer renders RTL by itself.
+  **Known trade-off:** start in Hebrew, later type English, then tap a chip →
+  still Hebrew; the next typed turn switches it back (typed questions are never
+  pinned). Verified: **20 new tests** across `test_ask_retrieval.py` (script +
+  conversation-language helpers), `test_rag_prompt.py` (override rendering,
+  absent by default), `test_ask_followup_context.py` (endpoint wiring: chip in a
+  Hebrew thread pinned, typed question never pinned, English thread and
+  thread-opening chip untouched); suite **464 passed / 4 failed** — the same
+  pre-existing `test_embed_trigger_backstop` drift (§4 item 11b); the new
+  endpoint test was confirmed to FAIL with the fix reverted.
+  **Deploy scope: `ask_brain`.**
+
+- **2026-07-25 — ASK: A FOLLOW-UP WITH NO TOPIC OF ITS OWN RETRIEVED
+  FOR NOISE.** Owner screenshot: Ask answered `Why is "מתכון לעוגת מייפל עסיסית"
+  worth my time?` in English, with the recipe card cited on screen; the next
+  turn — `בעברית` ("in Hebrew") — replied that **the library has no content on
+  that recipe**, listing unrelated politics/parenting/Italy cards as its
+  sources. Root cause: `ask_brain` retrieves for the CURRENT question text
+  alone (history only ever reached the answer prompt, `_build_rag_prompt`), so
+  the turn embedded two meta words and got topically arbitrary neighbours;
+  the model saw the real subject in history but a context set unrelated to it
+  and — correctly, per its grounding rules — said it had nothing. It fires for
+  every content-free follow-up, in any language: "shorter", "in English",
+  "why?", "expand". Fix (backend only, no client change, so already-shipped
+  TestFlight builds get it on deploy): new pure helpers in `search.py` —
+  `is_context_free_followup` (every content token is meta — a language, a
+  length, a "go on" — or there are none) and `followup_retrieval_query`
+  (returns the last user turn that DID carry a topic, walking past chained meta
+  turns, never an assistant turn, failing open on malformed history).
+  `ask_brain` now derives `retrieval_query` once and feeds it to every
+  retrieval-steering call (vector search, rerank, keyword scan, recency,
+  exclusion, anchor pinning); **generation is untouched** — the model still
+  gets the raw `question` + `history`, so "answer in Hebrew" still means answer
+  in Hebrew. The meta vocabulary is a CLOSED list (EN + HE), so any question
+  with one real content word — including a topic switch — retrieves
+  byte-identically to before; that's the safety property, tested. Covers the
+  streaming and JSON paths alike (retrieval precedes the branch). Verified:
+  **13 new tests** (`test_ask_retrieval.py` pure-helper cases +
+  `test_ask_followup_context.py` endpoint wiring), suite **448 passed / 4
+  failed** — the 4 are the pre-existing `test_embed_trigger_backstop`
+  `firebase_functions` drift (§4 item 11b), unchanged by this diff; the new
+  endpoint test was confirmed to FAIL with the fix reverted. Backend-only diff,
+  so no `tsc` surface. **Deploy scope: `ask_brain`.**
+
+- **2026-07-25 — LINKEDIN BYLINE, ROUND 2: MY OWN SLUG PARSER WAS
   WRITING THE POST TEXT (regression from the entry below — same session).**
   Owner sent a feed screenshot: a card saved **24 min AFTER** the round-1
   functions deploy still showed post text ("Claude Opus 5 Is Now Available in

@@ -538,6 +538,164 @@ def is_exclusion_question(question: str) -> bool:
     return bool(_EXCLUSION_RE.search(_strip_quoted(question)))
 
 
+# ── Conversational follow-ups: which text to RETRIEVE for ───────────────────
+# Ask retrieves for the current question's text alone; the conversation history
+# only ever reaches the answer prompt. That breaks on a follow-up carrying no
+# topic of its own — "in Hebrew", "shorter", "why?" — because embedding two
+# meta words returns topically arbitrary cards. The model then sees the real
+# subject in the history but a context set that has nothing to do with it, and
+# honestly reports the library has nothing on the topic it JUST answered with a
+# cited source (owner report 2026-07-25: an English answer about a saved maple
+# cake recipe, then "בעברית" → "the information I have doesn't include content
+# on מתכון לעוגת מייפל עסיסית", sources listed = unrelated cards).
+#
+# Fix: on such a turn, retrieve for the last question that DID carry a topic.
+# Deliberately narrow — the meta vocabulary below is a CLOSED list, so any
+# question with one real content word (including a genuine topic switch) is
+# untouched and its retrieval query stays byte-identical to before.
+_META_FOLLOWUP_TOKENS = {
+    # Language / translation ("in Hebrew", "translate it to English")
+    "translate", "translated", "translation", "language",
+    "hebrew", "english", "arabic", "spanish", "french", "russian",
+    "עברית", "בעברית", "אנגלית", "באנגלית", "תרגם", "תרגמי", "תרגום", "בשפה",
+    # Length / form ("shorter", "in bullets", "summarize that")
+    "shorter", "short", "briefly", "brief", "concise", "longer", "expand",
+    "elaborate", "detail", "details", "summarize", "summarise", "summary",
+    "tldr", "rephrase", "reword", "rewrite", "simplify", "simpler", "bullets",
+    "bullet", "points", "list", "steps",
+    "קצר", "בקצרה", "תקצר", "ארוך", "הרחב", "הרחיב", "פרט", "בפירוט",
+    "סכם", "סיכום", "תמצת", "נקודות", "רשימה", "פשוט",
+    # Continuation / politeness ("go on", "again", "please", "thanks")
+    "explain", "continue", "again", "repeat", "more", "less", "please",
+    "thanks", "thank", "ok", "okay", "sure", "yeah", "yep",
+    "הסבר", "תסביר", "המשך", "תמשיך", "שוב", "בבקשה", "תודה", "אוקיי", "יותר",
+}
+
+
+def is_context_free_followup(question: str) -> bool:
+    """True when the question carries no topic of its own — every content token
+    is meta (a language, a length, a "go on"), or there are no content tokens
+    at all ("why?", "and?"). Such text can only be understood against the turn
+    before it, so retrieving for it is retrieving for noise. Pure."""
+    tokens = keyword_query_tokens(question)
+    if not tokens:
+        return True
+    return tokens <= _META_FOLLOWUP_TOKENS
+
+
+def followup_retrieval_query(question: str, history) -> str:
+    """The text ask_brain should RETRIEVE for this turn.
+
+    Almost always the question itself — swapped for the most recent user turn
+    that carried a topic only when the question is a context-free follow-up and
+    such a turn exists. Never changes what the MODEL is asked (the raw question
+    and the history still go to the prompt); this steers retrieval only. Pure —
+    `history` is the already-sanitized [{role, content}] list. Fails open: any
+    malformed history, or a conversation with no topical question in it, gives
+    back `question` unchanged."""
+    if not isinstance(history, list) or not history:
+        return question
+    if not is_context_free_followup(question):
+        return question
+    for item in reversed(history):
+        if not isinstance(item, dict) or item.get("role") != "user":
+            continue
+        prior = str(item.get("content") or "").strip()
+        if prior and not is_context_free_followup(prior):
+            return prior
+    return question
+
+
+# ── Which language the USER has been writing in ────────────────────────────
+# Ask answers in the language of the current question (prompt rule in
+# ai_service._build_rag_prompt, judged from the user's own words with quoted
+# card titles ignored — a Hebrew title inside an English question used to flip
+# the model). That is right for a TYPED question and wrong for a tapped
+# suggestion chip: the chip's wording is the APP's English boilerplate, not the
+# user's, so a Hebrew conversation flipped to English mid-thread the moment the
+# user tapped one (owner report 2026-07-25: a Hebrew question about a Pardes
+# Hanna café answered in Hebrew, then the chip 'Give me more detail on "<Hebrew
+# title>"' answered entirely in English).
+#
+# So for a generated question the answer language comes from the conversation
+# instead. Detection is by SCRIPT: chips are ASCII boilerplate once their quoted
+# titles are stripped, so they can never fake a Hebrew signal, and a single
+# non-Latin turn from the user is a deliberate statement of preference. Latin
+# scripts are indistinguishable this way (English vs Spanish vs French), so
+# those return None and the prompt keeps judging from the question — no
+# regression for the all-English case, which is every conversation today.
+_SCRIPT_RANGES = (
+    ("Hebrew", ((0x0590, 0x05FF), (0xFB1D, 0xFB4F))),
+    ("Arabic", ((0x0600, 0x06FF), (0x0750, 0x077F), (0x08A0, 0x08FF))),
+    ("Russian", ((0x0400, 0x04FF),)),
+    ("Greek", ((0x0370, 0x03FF),)),
+    ("Hindi", ((0x0900, 0x097F),)),
+    ("Thai", ((0x0E00, 0x0E7F),)),
+    ("Korean", ((0xAC00, 0xD7AF), (0x1100, 0x11FF))),
+    ("Japanese", ((0x3040, 0x309F), (0x30A0, 0x30FF))),
+    ("Chinese", ((0x4E00, 0x9FFF),)),
+)
+
+# A turn votes for a script only when it's genuinely written in it, not when a
+# stray character survives: at least this many letters AND this share of them.
+_SCRIPT_MIN_CHARS = 2
+_SCRIPT_MIN_SHARE = 0.3
+
+
+def dominant_script_language(text: str) -> Optional[str]:
+    """The non-Latin language `text` is written in, or None.
+
+    Counts letters by Unicode block over the user's OWN words (quoted card
+    titles stripped — a Hebrew title inside an English sentence is not the
+    sentence's language) and returns the winner when it carries a real share of
+    them. Latin-script text returns None on purpose: script can't tell English
+    from Spanish, and guessing would be worse than the prompt's own judgement.
+    Pure."""
+    words = _strip_quoted(text or "")
+    letters = 0
+    counts = {}
+    for ch in words:
+        if not ch.isalpha():
+            continue
+        letters += 1
+        cp = ord(ch)
+        for name, ranges in _SCRIPT_RANGES:
+            if any(lo <= cp <= hi for lo, hi in ranges):
+                counts[name] = counts.get(name, 0) + 1
+                break
+    if not letters or not counts:
+        return None
+    name, n = max(counts.items(), key=lambda kv: kv[1])
+    if n < _SCRIPT_MIN_CHARS or n / letters < _SCRIPT_MIN_SHARE:
+        return None
+    return name
+
+
+def conversation_language(history) -> Optional[str]:
+    """The non-Latin language the USER has been writing in this conversation,
+    or None when they've written Latin script (or nothing detectable).
+
+    Newest matching user turn wins, and Latin turns are SKIPPED rather than
+    ending the scan — the turns between a Hebrew opener and the chip being
+    answered are usually earlier English chips, and letting those end it would
+    reinstate the bug on the second tap. The cost is that a user who starts in
+    Hebrew and later types English still reads as Hebrew here; that only ever
+    reaches the prompt for a generated question (a typed one is judged from its
+    own words), so their next typed turn switches the thread back. Assistant
+    turns never vote — the answer's language is the thing being decided, and
+    letting it vote would lock in its own first guess. Pure — `history` is the
+    already-sanitized [{role, content}] list; fails open on anything else."""
+    if not isinstance(history, list):
+        return None
+    for item in reversed(history):
+        if not isinstance(item, dict) or item.get("role") != "user":
+            continue
+        lang = dominant_script_language(str(item.get("content") or ""))
+        if lang:
+            return lang
+    return None
+
+
 def demote_cards_by_titles(titles: List[str], cards: List[dict]):
     """Move cards whose title matches any of `titles` to the BACK of the list
     (otherwise stable). They stay in context — the model may reference them
