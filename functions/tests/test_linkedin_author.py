@@ -44,6 +44,45 @@ def test_slug_drops_trailing_id_hash():
     assert scraper.linkedin_author_from_url(url) == "Omri Zerachovitz"
 
 
+def test_posts_url_without_an_underscore_is_refused():
+    """Regression, 2026-07-25: this shipped and put post text in the byline.
+
+    `/posts/<authorSlug>_<post-slug>-activity-<id>` — the author is ONLY the
+    part before the underscore. Without one the segment is the post's own
+    words, and the slug parser happily title-cased them into a "name"
+    ("Claude Opus 5 Is Now Available in Perplexity Activity …"), which then
+    became the source. LinkedIn blocks the scraper, so the meta path is usually
+    empty and this fallback runs first — it has to fail closed.
+    """
+    url = ("https://www.linkedin.com/posts/"
+           "claude-opus-5-is-now-available-in-perplexity-activity-7350000000-abcd")
+    assert scraper.linkedin_author_from_url(url) is None
+
+
+def test_author_slug_before_underscore_still_wins():
+    url = ("https://www.linkedin.com/posts/anthropicresearch_"
+           "claude-opus-5-is-now-available-in-perplexity-activity-7350000000-abcd")
+    assert scraper.linkedin_author_from_url(url) == "Anthropicresearch"
+
+
+def test_sentence_length_slug_is_refused_on_profile_urls():
+    """The token cap catches sentence-shaped slugs on /in/ and /company/ too.
+
+    The cap is 6 tokens, not fewer: real organisations reach that length
+    ("European Bank for Reconstruction and Development"), so it only rejects
+    what is unambiguously a sentence.
+    """
+    url = ("https://www.linkedin.com/company/"
+           "introducing-three-new-certifications-for-the-claude-partner-network/")
+    assert scraper.linkedin_author_from_url(url) is None
+
+
+def test_six_token_organisation_name_still_passes():
+    url = "https://www.linkedin.com/company/european-bank-for-reconstruction-and-development/"
+    assert (scraper.linkedin_author_from_url(url)
+            == "European Bank for Reconstruction and Development")
+
+
 def test_slug_ignores_non_linkedin_hosts():
     assert scraper.linkedin_author_from_url("https://example.com/posts/foo-bar") is None
 

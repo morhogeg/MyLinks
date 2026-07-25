@@ -461,18 +461,30 @@ def linkedin_author_from_url(url: str) -> Optional[str]:
         parts = [p for p in parsed.path.split('/') if p]
         if len(parts) < 2 or parts[0] not in ('posts', 'in', 'company'):
             return None
-        tokens = parts[1].split('_')[0].split('-')
+        seg = parts[1]
+        if parts[0] == 'posts':
+            # Canonical form is "<authorSlug>_<post-slug>-activity-<id>". The
+            # author is ONLY the part before the underscore — without one there
+            # is nothing here but the post's own words, and reconstructing a
+            # "name" from those is how post text became the byline. Bail instead.
+            if '_' not in seg:
+                return None
+            seg = seg.split('_')[0]
+        tokens = seg.split('-')
         # Drop the trailing LinkedIn id hash (tokens containing a digit).
         while len(tokens) > 1 and any(ch.isdigit() for ch in tokens[-1]):
             tokens.pop()
         words = [t for t in tokens if t]
-        if not words:
+        # A person or company slug is short. Anything longer is a sentence.
+        if not words or len(words) > 6:
             return None
         name = ' '.join(
             t.lower() if i > 0 and t.lower() in _LINKEDIN_SMALL_WORDS else t[:1].upper() + t[1:]
             for i, t in enumerate(words)
         ).strip()
-        return name or None
+        if not name or len(name) > 60:
+            return None
+        return name
     except Exception:
         return None
 
