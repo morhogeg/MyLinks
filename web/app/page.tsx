@@ -11,7 +11,6 @@ import OnboardingTour, { ONBOARDING_STORAGE_KEY } from "@/components/OnboardingT
 import { Settings, Search, Globe, SlidersHorizontal } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { IconButton } from "@/components/ui/Button";
-import BrandOrb from "@/components/ui/BrandOrb";
 import { useHeaderFade } from "@/lib/useHeaderFade";
 import { useSharedCaptureBanner } from "@/lib/useSharedCaptureBanner";
 import type { LibraryFacetRequest } from "@/lib/stats";
@@ -108,17 +107,18 @@ export default function Home() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
+        {/* The pulsing icon carries this screen on its own — deliberately no
+            orb and no ring. An orb here was tried and removed: the iOS build is
+            a static export, so a canvas can't paint until React hydrates, which
+            left it blank for the first part of the very window it was meant to
+            fill and then popped in. It also costs the orb its meaning — an orb
+            signals Machina doing intelligent work (searching, relating,
+            writing), and booting isn't that. The pulse is CSS, so it's alive on
+            the first painted frame. */}
+        <div className="flex flex-col items-center">
           <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg shadow-purple-500/20 animate-pulse ring-1 ring-white/15">
             <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
           </div>
-          {/* The same orb that greets you in Ask's empty state — Machina's
-              "here and ready" face, rather than a generic ring. NOTE: the iOS
-              build is a static export, so this markup paints before hydration
-              and the canvas is blank for that window; the icon's CSS pulse
-              carries the screen until then, and the canvas reserves its 64px
-              box either way so nothing shifts when it starts painting. */}
-          <BrandOrb state="listening" size={64} />
           <span className="sr-only" role="status">Starting Machina…</span>
         </div>
       </div>

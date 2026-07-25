@@ -795,7 +795,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-25 (latest) — SUGGESTED-COLLECTION SHEET HEIGHT + SCREENSHOT CARDS
+- **2026-07-25 (latest) — BOOT SCREEN: ORB REMOVED AGAIN (reversal, same
+  session — do not re-add).** The `listening` @64 orb added to `app/page.tsx`'s
+  auth-resolving screen earlier today is **out**; the screen is now the pulsing
+  app icon alone (no orb, no ring). Owner asked whether it was needed after
+  seeing it on device (build 1187) and the answer was no, for two reasons:
+  (1) **it can't do the job it was added for.** The iOS build is
+  `output: 'export'`, so this markup paints BEFORE hydration and a `<canvas>`
+  has nothing until React + `thinking-orbs` load — the orb was blank for the
+  first part of the very 2–3s window it was meant to fill, then popped in,
+  drawing attention to the load instead of covering it. The icon's
+  `animate-pulse` is CSS and is alive on the first painted frame.
+  (2) **it cost the orb its meaning.** An orb signals Machina doing intelligent
+  work (searching → relating → writing); booting is not that, and spending the
+  vocabulary on "the app is starting" reads as a generic spinner and weakens it
+  in Ask and capture where it earns its place. §4 item 18c (native share-extension
+  orb) is unaffected. `sr-only role="status"` "Starting Machina…" kept.
+  **If you are tempted to put an indicator back here, read this first:** the
+  pre-hydration gap applies to ANY canvas/JS-driven indicator on this screen —
+  only CSS survives it.
+
+- **2026-07-25 — SUGGESTED-COLLECTION SHEET HEIGHT + SCREENSHOT CARDS
   GET THEIR IMAGE (2 owner device fixes).** *(Owner also confirmed the LinkedIn
   round-2 fix works on device: "Claude for Business" and "Perplexity Ai" now
   read correctly in the suggestion sheet.)*
