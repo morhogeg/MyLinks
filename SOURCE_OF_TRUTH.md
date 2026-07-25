@@ -746,7 +746,34 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-25 (latest) — LINKEDIN BYLINE, ROUND 2: MY OWN SLUG PARSER WAS
+- **2026-07-25 (latest) — SUGGESTED-COLLECTION SHEET HEIGHT + SCREENSHOT CARDS
+  GET THEIR IMAGE (2 owner device fixes).** *(Owner also confirmed the LinkedIn
+  round-2 fix works on device: "Claude for Business" and "Perplexity Ai" now
+  read correctly in the suggestion sheet.)*
+  (1) **`SuggestionPreviewSheet` grew into the notch.** It is `items-end` with
+  `max-h-full`, so a long card list (12–27 rows) pushed the sheet to the FULL
+  viewport height and its grab handle + "SUGGESTED"/name header rendered *under*
+  the status bar, colliding with the clock and the TestFlight back-link. Now
+  `max-h-[calc(100%-env(safe-area-inset-top)-1.5rem)]` (mobile only;
+  `sm:max-h-[80vh]` unchanged), so the rounded tip always stops an inset +
+  1.5rem short of the top. Verified with a before/after render at a simulated
+  59px inset.
+  (2) **Screenshot cards showed no image in the feed.** Both card banners and
+  BOTH hide/show toggles (hover toolbar + `CardActionSheet`) gated on
+  `link.metadata?.thumbnailUrl`, which **screenshot captures never have** — the
+  capture itself IS the image, stored at `link.url` (that's why the detail modal
+  showed it but the closed card didn't, and why the ⋯ → Hide image item was
+  missing for them). New **`web/lib/cardThumbnail.ts` → `cardThumbnailUrl(link)`**
+  is now the single answer to "what image does this card show": `link.url` for
+  `sourceType === 'image'` (scheme-guarded, never a stored `javascript:`/`data:`
+  URL), else `metadata.thumbnailUrl`. Wired into `Card.tsx` (banner + toolbar
+  toggle), `CardActionSheet.tsx` (menu item) and `SuggestionPreviewSheet.tsx`
+  (row thumb), so a banner and its toggle can never disagree again. Screenshots
+  get the identical `h-28 sm:h-32` + `object-cover object-top` treatment as photo
+  posts, so the feed reads uniformly. `ListCard` renders no thumbnails — no
+  change needed. Verified: tsc 0, `next build` 0, eslint clean.
+
+- **2026-07-25 — LINKEDIN BYLINE, ROUND 2: MY OWN SLUG PARSER WAS
   WRITING THE POST TEXT (regression from the entry below — same session).**
   Owner sent a feed screenshot: a card saved **24 min AFTER** the round-1
   functions deploy still showed post text ("Claude Opus 5 Is Now Available in

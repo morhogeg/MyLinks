@@ -6,6 +6,7 @@ import { Link, LinkStatus } from '@/lib/types';
 import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizontal, ExternalLink, Layers, Share2, RotateCcw, AlertTriangle, StickyNote, Lock, ImageOff, Image as ImageIcon } from 'lucide-react';
 import { useState, memo } from 'react';
 import SourceByline from './SourceByline';
+import { cardThumbnailUrl } from '@/lib/cardThumbnail';
 import BrandOrb from './ui/BrandOrb';
 import { useNow } from '@/lib/useNow';
 import SimpleMarkdown from './SimpleMarkdown';
@@ -86,6 +87,8 @@ function Card({
     // Cap the stagger so long feeds still finish assembling quickly (M-P4: tighter
     // per-card delay for a snappier entrance).
     const enterDelay = `${Math.min(index, 10) * 16}ms`;
+    // Screenshot captures have no scraped thumbnail — their own url IS the image.
+    const thumbnailUrl = cardThumbnailUrl(link);
 
     // The source byline (branded platforms, screenshot/note, or plain publisher)
     // is one shared component now — see SourceByline. Do NOT reintroduce a
@@ -249,14 +252,16 @@ function Card({
                     )}
                 </div>
             )}
-            {/* Social-post cover (X / Instagram PHOTO posts): same fixed banner size
-                as the video/YouTube thumbnail above, so every card reads uniformly.
-                The crop anchors to the top, where social posts put the headline /
-                subject. Video posters are excluded here — they use the banner above. */}
-            {!link.hideThumbnail && link.sourceType !== 'youtube' && !link.metadata?.thumbnailIsVideo && link.metadata?.thumbnailUrl && (
+            {/* Social-post cover (X / Instagram PHOTO posts) AND screenshot captures:
+                same fixed banner size as the video/YouTube thumbnail above, so every
+                card reads uniformly. The crop anchors to the top, where social posts
+                and screenshots put the headline / subject. Video posters are excluded
+                here — they use the banner above. A screenshot's image is its own
+                `url`, not a scraped thumbnail — see `cardThumbnailUrl`. */}
+            {!link.hideThumbnail && link.sourceType !== 'youtube' && !link.metadata?.thumbnailIsVideo && thumbnailUrl && (
                 <div className="relative w-full h-28 sm:h-32 bg-black/40 overflow-hidden">
                     <img
-                        src={link.metadata.thumbnailUrl}
+                        src={thumbnailUrl}
                         alt=""
                         loading="lazy"
                         className="w-full h-full object-cover object-top transition-transform duration-300 [@media(hover:hover)]:group-hover:scale-[1.03]"
@@ -364,7 +369,7 @@ function Card({
                             <Share2 className="w-3 h-3" />
                         </button>
                     )}
-                    {onToggleThumbnail && link.metadata?.thumbnailUrl && (
+                    {onToggleThumbnail && thumbnailUrl && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();

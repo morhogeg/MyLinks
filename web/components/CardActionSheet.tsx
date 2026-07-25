@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom';
 import { IconButton } from './ui/Button';
 import { useScrollLock } from '@/lib/useScrollLock';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
+import { cardThumbnailUrl } from '@/lib/cardThumbnail';
 
 interface CardActionSheetProps {
     link: Link;
@@ -141,7 +142,7 @@ export default function CardActionSheet({
             active: !!link.isPrivate,
             onClick: () => onTogglePrivate(link),
         }] : []),
-        ...(onToggleThumbnail && link.metadata?.thumbnailUrl ? [{
+        ...(onToggleThumbnail && cardThumbnailUrl(link) ? [{
             key: 'thumbnail',
             label: link.hideThumbnail ? 'Show image' : 'Hide image',
             icon: link.hideThumbnail ? <ImageIcon className="w-5 h-5" /> : <ImageOff className="w-5 h-5" />,

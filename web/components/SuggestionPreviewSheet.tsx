@@ -10,6 +10,7 @@ import { useScrollLock } from '@/lib/useScrollLock';
 import { useVisualViewport } from '@/lib/useVisualViewport';
 import { useSheetDrag, useIsMobile } from '@/lib/useSheetDrag';
 import { hapticMedium, hapticLight } from '@/lib/haptics';
+import { cardThumbnailUrl } from '@/lib/cardThumbnail';
 
 interface SuggestionPreviewSheetProps {
     suggestion: CollectionSuggestion;
@@ -99,7 +100,11 @@ export default function SuggestionPreviewSheet({
                 role="dialog"
                 aria-modal="true"
                 aria-label={`Preview suggested collection ${suggestion.name}`}
-                className="relative w-full sm:max-w-md bg-card border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up overflow-hidden safe-pb max-h-full sm:max-h-[80vh] flex flex-col"
+                // `items-end` + a long card list used to let this grow to the FULL
+                // viewport, putting the grab handle and "SUGGESTED" header under the
+                // status bar / notch. Stop it an inset + 1.5rem short of the top so
+                // the rounded tip always reads as a sheet with the clock above it.
+                className="relative w-full sm:max-w-md bg-card border-t sm:border border-border-strong rounded-t-3xl sm:rounded-3xl shadow-2xl animate-slide-up overflow-hidden safe-pb max-h-[calc(100%-env(safe-area-inset-top)-1.5rem)] sm:max-h-[80vh] flex flex-col"
             >
                 {/* Grab handle + header — the drag-to-dismiss zone on mobile. */}
                 <div {...handleProps}>
@@ -135,7 +140,9 @@ export default function SuggestionPreviewSheet({
                     </p>
                     {shown.map((link) => {
                         const dir = getDirection(link.title, link.language);
-                        const thumb = link.metadata?.thumbnailUrl;
+                        // Shared with the feed card, so a screenshot row shows its
+                        // capture here too instead of an empty slot.
+                        const thumb = cardThumbnailUrl(link);
                         return (
                             // The row opens the card so the user can read it in full
                             // before deciding to keep it; the ✕ removes it (and stops
