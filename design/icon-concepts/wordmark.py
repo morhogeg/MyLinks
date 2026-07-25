@@ -10,10 +10,23 @@ import math, os, re
 
 from marks import m_outline, solve_vY
 
-CAP, W = 422.0, 62.0          # cap height and stroke weight, matching Apex
+# The wordmark is cut LIGHTER than the icon's M (62). In a lockup the mark
+# carries the weight and the wordmark stays quiet; at 62 the two competed.
+CAP, W = 422.0, 42.0
 # Set WIDE. The airiness is what makes this read as a mark rather than as a
 # word, and it is the single thing that has to hold at every size it appears.
 TRACK, SPACE = 240.0, 150.0
+
+
+def set_weight(w):
+    """Redefine the stroke weight for subsequent layout calls.
+
+    Advances stay put: in a lockup the mark should carry the weight and the
+    wordmark should stay quiet, so a lighter cut here reads airier rather than
+    narrower — which is the point.
+    """
+    global W
+    W = float(w)
 
 
 def _rect(x, y, w, h):

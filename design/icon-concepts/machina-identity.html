@@ -203,11 +203,8 @@
      weight fights the mark, where wide tracking stays quiet under it. The drawn
      one earns its keep in the top bar instead, where it has to hold its own
      against a 40px tile. */
-  .wordmark {
-    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 11px; letter-spacing: .46em; text-transform: uppercase;
-    color: #E6E6F0; text-indent: .46em; opacity: 0;
-  }
+  .wordmark { width: 152px; opacity: 0; }
+  .wordmark svg { display: block; width: 100%; height: auto; fill: #E9E9F2; }
   .topbar {
     width: min(520px, 100%); height: 68px; display: flex; align-items: center;
     gap: 12px; padding: 0 18px; margin-top: 26px;
@@ -215,10 +212,10 @@
   }
   /* Bare glyph, no tile: a rounded container in the header reads as a shrunken
      app icon rather than as the brand mark. */
-  .topbar .glyph { width: 34px; flex: 0 0 34px; }
+  .topbar .glyph { width: 32px; flex: 0 0 32px; display: flex; }
   .topbar .glyph svg { display: block; width: 100%; height: auto; fill: var(--mark); }
   .topbar .stack { display: grid; gap: 4px; }
-  .topbar .wm { width: 178px; }
+  .topbar .wm { width: 168px; }
   .topbar .wm svg { display: block; width: 100%; height: auto; fill: var(--text); }
   .topbar .tag { font-size: 11px; color: var(--muted); }
   .phonecol { display: grid; gap: 13px; justify-items: center; }
@@ -413,7 +410,7 @@
       <div class="phone">
         <div class="splash" id="splash">
           <div id="splashMark"></div>
-        <div class="wordmark" id="wordmark">Machina</div>
+        <div class="wordmark" id="wordmark"><svg viewBox="0 0 3455 422" role="img" aria-label="Machina"><path d="M 0.0 422.0 L 0.0 0.0 L 44.2 0.0 L 194.0 322.4 L 343.8 0.0 L 388.0 0.0 L 388.0 422.0 L 346.0 422.0 L 346.0 95.0 L 194.0 422.0 L 42.0 95.0 L 42.0 422.0 Z M 765.3 0.0 L 810.7 0.0 L 661.4 422.0 L 616.0 422.0 Z M 765.3 0.0 L 810.7 0.0 L 960.0 422.0 L 914.6 422.0 Z M 715.1 253.2 L 860.9 253.2 L 875.8 295.2 L 700.2 295.2 Z M 1482.0 385.9 A 186.0 211.0 0 1 1 1482.0 36.1 L 1458.5 70.9 A 144.0 169.0 0 1 0 1458.5 351.1 Z M 1743.0 0.0 L 1785.0 0.0 L 1785.0 422.0 L 1743.0 422.0 Z M 2001.0 0.0 L 2043.0 0.0 L 2043.0 422.0 L 2001.0 422.0 Z M 1785.0 190.0 L 2001.0 190.0 L 2001.0 232.0 L 1785.0 232.0 Z M 2283.0 0.0 L 2325.0 0.0 L 2325.0 422.0 L 2283.0 422.0 Z M 2565.0 0.0 L 2607.0 0.0 L 2607.0 422.0 L 2565.0 422.0 Z M 2841.0 0.0 L 2883.0 0.0 L 2883.0 422.0 L 2841.0 422.0 Z M 2565.0 0.0 L 2615.2 0.0 L 2883.0 422.0 L 2832.8 422.0 Z M 3260.3 0.0 L 3305.7 0.0 L 3156.4 422.0 L 3111.0 422.0 Z M 3260.3 0.0 L 3305.7 0.0 L 3455.0 422.0 L 3409.6 422.0 Z M 3210.1 253.2 L 3355.9 253.2 L 3370.8 295.2 L 3195.2 295.2 Z"/></svg></div>
         </div>
         <div class="appshell" id="appshell">
           <div class="skelbar"></div>
@@ -427,10 +424,7 @@
         <p class="note" style="margin-top:10px">The drawn wordmark replaces the purple gradient type in the header at <span class="mono" style="font-size:13px">app/page.tsx:159</span>.</p>
         <div class="topbar">
           <div class="glyph"><svg viewBox="288 292 448 416" role="img" aria-label="Machina"><path d="M296.0 300.0 L396.0 300.0 L396.0 358.0 L354.0 358.0 L354.0 642.0 L396.0 642.0 L396.0 700.0 L296.0 700.0 Z"/><path d="M728.0 300.0 L628.0 300.0 L628.0 358.0 L670.0 358.0 L670.0 642.0 L628.0 642.0 L628.0 700.0 L728.0 700.0 Z"/><path d="M460.0 500.0 A52.0 52.0 0 1 0 564.0 500.0 A52.0 52.0 0 1 0 460.0 500.0 Z"/></svg></div>
-          <div class="stack">
-            <div class="wm"><svg viewBox="0 0 3485 422" role="img" aria-label="Machina"><path d="M 0.0 422.0 L 0.0 0.0 L 65.2 0.0 L 194.0 275.6 L 322.8 0.0 L 388.0 0.0 L 388.0 422.0 L 326.0 422.0 L 326.0 139.6 L 194.0 422.0 L 62.0 139.6 L 62.0 422.0 Z M 754.5 0.0 L 821.5 0.0 L 683.0 422.0 L 616.0 422.0 Z M 754.5 0.0 L 821.5 0.0 L 960.0 422.0 L 893.0 422.0 Z M 732.4 253.2 L 843.6 253.2 L 864.0 315.2 L 712.0 315.2 Z M 1482.0 385.9 A 186.0 211.0 0 1 1 1482.0 36.1 L 1447.3 87.5 A 124.0 149.0 0 1 0 1447.3 334.5 Z M 1753.0 0.0 L 1815.0 0.0 L 1815.0 422.0 L 1753.0 422.0 Z M 1991.0 0.0 L 2053.0 0.0 L 2053.0 422.0 L 1991.0 422.0 Z M 1815.0 180.0 L 1991.0 180.0 L 1991.0 242.0 L 1815.0 242.0 Z M 2293.0 0.0 L 2355.0 0.0 L 2355.0 422.0 L 2293.0 422.0 Z M 2595.0 0.0 L 2657.0 0.0 L 2657.0 422.0 L 2595.0 422.0 Z M 2851.0 0.0 L 2913.0 0.0 L 2913.0 422.0 L 2851.0 422.0 Z M 2595.0 0.0 L 2667.5 0.0 L 2913.0 422.0 L 2840.5 422.0 Z M 3279.5 0.0 L 3346.5 0.0 L 3208.0 422.0 L 3141.0 422.0 Z M 3279.5 0.0 L 3346.5 0.0 L 3485.0 422.0 L 3418.0 422.0 Z M 3257.4 253.2 L 3368.6 253.2 L 3389.0 315.2 L 3237.0 315.2 Z"/></svg></div>
-            <div class="tag">Capture. Connect. Recall.</div>
-          </div>
+          <div class="wm"><svg viewBox="0 0 3455 422" role="img" aria-label="Machina"><path d="M 0.0 422.0 L 0.0 0.0 L 44.2 0.0 L 194.0 322.4 L 343.8 0.0 L 388.0 0.0 L 388.0 422.0 L 346.0 422.0 L 346.0 95.0 L 194.0 422.0 L 42.0 95.0 L 42.0 422.0 Z M 765.3 0.0 L 810.7 0.0 L 661.4 422.0 L 616.0 422.0 Z M 765.3 0.0 L 810.7 0.0 L 960.0 422.0 L 914.6 422.0 Z M 715.1 253.2 L 860.9 253.2 L 875.8 295.2 L 700.2 295.2 Z M 1482.0 385.9 A 186.0 211.0 0 1 1 1482.0 36.1 L 1458.5 70.9 A 144.0 169.0 0 1 0 1458.5 351.1 Z M 1743.0 0.0 L 1785.0 0.0 L 1785.0 422.0 L 1743.0 422.0 Z M 2001.0 0.0 L 2043.0 0.0 L 2043.0 422.0 L 2001.0 422.0 Z M 1785.0 190.0 L 2001.0 190.0 L 2001.0 232.0 L 1785.0 232.0 Z M 2283.0 0.0 L 2325.0 0.0 L 2325.0 422.0 L 2283.0 422.0 Z M 2565.0 0.0 L 2607.0 0.0 L 2607.0 422.0 L 2565.0 422.0 Z M 2841.0 0.0 L 2883.0 0.0 L 2883.0 422.0 L 2841.0 422.0 Z M 2565.0 0.0 L 2615.2 0.0 L 2883.0 422.0 L 2832.8 422.0 Z M 3260.3 0.0 L 3305.7 0.0 L 3156.4 422.0 L 3111.0 422.0 Z M 3260.3 0.0 L 3305.7 0.0 L 3455.0 422.0 L 3409.6 422.0 Z M 3210.1 253.2 L 3355.9 253.2 L 3370.8 295.2 L 3195.2 295.2 Z"/></svg></div>
         </div>
       </div>
       <div class="launchnote">
