@@ -360,6 +360,12 @@ export interface ChatMessage {
   // The structured chip intent this USER question was sent with, persisted so
   // a retry re-sends the same intent instead of silently degrading to prose.
   hints?: AskHints;
+  // True when the APP composed this user question (a tapped suggestion chip)
+  // rather than the user typing it. Sent with the history so the backend can
+  // keep the conversation in the language the USER writes in — a chip's English
+  // wording is ours and says nothing about their preference. See
+  // functions/search.py `conversation_language`.
+  generated?: boolean;
 }
 
 /** A saved conversation in the Ask history sidebar (users/{uid}/chats/{id}). */

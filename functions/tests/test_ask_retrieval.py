@@ -24,6 +24,7 @@ from search import (
     followup_retrieval_query,
     dominant_script_language,
     conversation_language,
+    pin_cards_by_ids,
 )
 
 
@@ -569,3 +570,72 @@ def test_referential_without_history_is_untouched():
     assert followup_retrieval_query(
         "Who published this?",
         [{"role": "user", "content": "shorter"}]) == "Who published this?"
+
+
+# ── pin_cards_by_ids (the previously-cited cards, exactly) ─────────────────
+
+def _idcards():
+    return [{"id": "a", "title": "A"}, {"id": "b", "title": "B"}, {"id": "c", "title": "C"}]
+
+
+def test_pin_by_ids_moves_cited_cards_to_the_front_in_id_order():
+    out = pin_cards_by_ids(["c", "a"], _idcards())
+    assert [c["id"] for c in out] == ["c", "a", "b"]
+
+
+def test_pin_by_ids_ignores_ids_that_are_not_in_context():
+    out = pin_cards_by_ids(["zz", "b"], _idcards())
+    assert [c["id"] for c in out] == ["b", "a", "c"]
+
+
+def test_pin_by_ids_is_a_no_op_when_nothing_matches():
+    cards = _idcards()
+    assert pin_cards_by_ids(["zz"], cards) == cards
+    assert pin_cards_by_ids([], cards) == cards
+    assert pin_cards_by_ids(["a"], []) == []
+
+
+def test_pin_by_ids_never_duplicates_or_drops_a_card():
+    out = pin_cards_by_ids(["a", "a", "b"], _idcards())
+    assert [c["id"] for c in out] == ["a", "b", "c"]
+
+
+# ── conversation_language with explicit typed/generated markers ────────────
+
+def test_language_follows_the_newest_TYPED_turn_when_marked():
+    # The trade-off the marker removes: start in Hebrew, switch to typing
+    # English, then tap a chip — the thread is English now, and saying Hebrew
+    # would be overriding a choice the user just made in their own words.
+    history = [
+        {"role": "user", "content": "אני צריך בית קפה בפרדס חנה"},
+        {"role": "assistant", "content": "…"},
+        {"role": "user", "content": 'Give me more detail on "X"', "generated": True},
+        {"role": "assistant", "content": "…"},
+        {"role": "user", "content": "Actually, what did I save about coffee?"},
+        {"role": "assistant", "content": "…"},
+    ]
+    assert conversation_language(history) is None
+
+
+def test_marked_chips_never_outvote_the_typed_turn():
+    history = [
+        {"role": "user", "content": "אני צריך בית קפה בפרדס חנה"},
+        {"role": "assistant", "content": "…"},
+        {"role": "user", "content": 'Give me more detail on "X"', "generated": True},
+        {"role": "assistant", "content": "…"},
+        {"role": "user", "content": 'Key points from "Y"', "generated": True},
+        {"role": "assistant", "content": "…"},
+    ]
+    assert conversation_language(history) == "Hebrew"
+
+
+def test_unmarked_history_still_uses_the_skip_latin_fallback():
+    # Older builds and chats persisted before the marker existed send no flags;
+    # the original heuristic must still hold for them.
+    history = [
+        {"role": "user", "content": "אני צריך בית קפה בפרדס חנה"},
+        {"role": "assistant", "content": "…"},
+        {"role": "user", "content": 'Give me more detail on "X"'},
+        {"role": "assistant", "content": "…"},
+    ]
+    assert conversation_language(history) == "Hebrew"
