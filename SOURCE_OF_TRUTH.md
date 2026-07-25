@@ -786,7 +786,19 @@ exact-match, capped.
   marked/unmarked language modes; endpoint tests for front-pin, back-append,
   no-double-fetch, malformed ids, and the unclassifiable follow-up), suite
   **490 passed / 4 failed** (the same `test_embed_trigger_backstop` drift, §4
-  item 11b), `tsc` 0, `next build` 0. **Deploy scope: `ask_brain` + web + iOS.**
+  item 11b), `tsc` 0, `next build` 0.
+  **SHIPPED:** merge `9c1d3f4` → functions run **#43 green** (`ask_brain`
+  updated), Vercel on the same push, **TestFlight run #185 green → build 1185**
+  (archive signed, entitlement tripwire passed, uploaded 14:14Z).
+  **Install 1185** — rounds 1–2 were backend-only and are already live on any
+  build, but `contextIds` + the typed/generated markers are CLIENT-side and only
+  reach the phone here. **Owner device QA on 1185, in a Hebrew thread:** (a) a
+  content-free follow-up ("בעברית", "בקצרה") answers about the same card; (b)
+  "מי פירסם את זה?" names the publisher instead of "not in your sources"; (c) a
+  bare follow-up with no pointer at all ("who published") still sees the card —
+  that one is the `contextIds` guarantee, not a heuristic; (d) tapping an
+  English chip answers in Hebrew, but typing an English question switches the
+  thread to English and keeps it there.
 
 - **2026-07-25 — ASK, ROUND 2: "WHO PUBLISHED THIS?" COULDN'T SEE THE
   CARD IT WAS POINTING AT.** Owner device QA on the round-1 deploy, two
