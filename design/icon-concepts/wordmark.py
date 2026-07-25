@@ -11,7 +11,9 @@ import math, os, re
 from marks import m_outline, solve_vY
 
 CAP, W = 422.0, 62.0          # cap height and stroke weight, matching Apex
-TRACK, SPACE = 44.0, 124.0    # letterspacing and word space
+# Set WIDE. The airiness is what makes this read as a mark rather than as a
+# word, and it is the single thing that has to hold at every size it appears.
+TRACK, SPACE = 240.0, 150.0
 
 
 def _rect(x, y, w, h):
@@ -112,12 +114,18 @@ KERN = {("M", "A"): -12, ("A", "C"): -8, ("C", "H"): 0,
         ("N", "A"): -12, ("A", "I"): -20}
 
 
-def wordmark(text="MACHINA AI"):
-    """Lay the string out and return (subpaths, total width)."""
+def wordmark(text="MACHINA AI", track=None):
+    """Lay the string out and return (subpaths, total width).
+
+    `track` overrides the default letterspacing. The wordmark is set WIDE:
+    the airiness is the thing that makes it read as a mark rather than as a
+    word, and it has to match at every size it appears.
+    """
+    tr = TRACK if track is None else track
     out, x, prev = [], 0.0, None
     for i, ch in enumerate(text):
         if ch == " ":
-            x += SPACE
+            x += SPACE + tr
             prev = None
             continue
         if prev:
@@ -125,7 +133,7 @@ def wordmark(text="MACHINA AI"):
         subs, w = GLYPHS[ch]()
         for d in subs:
             out.append(_translate(d, x))
-        x += w + (TRACK if i < len(text) - 1 else 0)
+        x += w + (tr if i < len(text) - 1 else 0)
         prev = ch
     return out, x
 

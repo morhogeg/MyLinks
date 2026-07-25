@@ -46,6 +46,8 @@ h2:first-child{margin-top:0}
 .tile{width:40px;height:40px;border-radius:14px;display:grid;place-items:center;
   box-shadow:0 6px 16px rgba(0,0,0,.18)}
 .tile svg{width:100%;height:100%}
+.glyph{width:34px;flex:0 0 34px;display:grid}
+.glyph svg{display:block;width:100%;height:auto}
 .stack{display:grid;gap:4px}
 .tag{font-size:11px;font-weight:500;letter-spacing:.02em}
 .today{--bd:#22222C;background:#0E0E13}
@@ -66,10 +68,13 @@ h2:first-child{margin-top:0}
 """
 
 
-def bar(kind, w_html, mark_svg):
+def bar(kind, w_html, mark_svg, tile=True):
+    badge = (f'<div class="tile"><svg viewBox="0 0 1024 1024">{mark_svg}</svg></div>'
+             if tile else
+             f'<div class="glyph"><svg viewBox="288 292 448 416">{mark_svg}</svg></div>')
     return f"""<div class="bar {kind}"><div class="glow"></div>
       <div class="brand">
-        <div class="tile"><svg viewBox="0 0 1024 1024">{mark_svg}</svg></div>
+        {badge}
         <div class="stack">{w_html}<div class="tag">Capture. Connect. Recall.</div></div>
       </div></div>"""
 
@@ -92,9 +97,9 @@ def main():
     <div class="row" style="flex-direction:column;gap:20px">
       <div class="col" style="justify-items:start">{bar('today', today_h1, MARK)}
         <div class="cap">today · purple gradient type</div></div>
-      <div class="col" style="justify-items:start">{bar('prop', word(112), MARK)}
+      <div class="col" style="justify-items:start">{bar('prop', word(112), MARK, tile=False)}
         <div class="cap">proposed · apex wordmark, lumen</div></div>
-      <div class="col" style="justify-items:start">{bar('lightbar', word(112, '#22222A'), MARK_D)}
+      <div class="col" style="justify-items:start">{bar('lightbar', word(112, '#22222A'), MARK_D, tile=False)}
         <div class="cap">proposed · light theme</div></div>
     </div>"""
 
