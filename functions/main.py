@@ -66,6 +66,7 @@ from search import (
     is_recency_question, recent_cards, category_cards,
     private_collection_ids, strip_private_cards, apply_distance_threshold,
     followup_retrieval_query, conversation_language,
+    pin_cards_by_ids, cards_by_ids,
 )
 from rate_limit import check_rate_limit, client_ip
 # Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
@@ -360,6 +361,11 @@ _RATE_LIMITS = {
 # surface. Enforced by _sanitize_history / _sanitize_tags below.
 MAX_HISTORY_ITEMS = 6            # ai_service._build_rag_prompt uses the last 6 turns
 MAX_HISTORY_CONTENT_LENGTH = 4000
+# Cards the recent answers cited, sent by the client so a follow-up can be
+# grounded in what was actually on screen. Each one is a Firestore read, so the
+# count is bounded; a couple of answers' worth of citations is the useful window.
+MAX_CONTEXT_IDS = 6
+MAX_CONTEXT_ID_LENGTH = 200
 MAX_TAGS = 50
 MAX_TAG_LENGTH = 60
 
@@ -406,8 +412,41 @@ def _sanitize_history(history) -> list:
         content = item.get("content")
         if not isinstance(content, str):
             content = "" if content is None else str(content)
-        cleaned.append({"role": role, "content": content[:MAX_HISTORY_CONTENT_LENGTH]})
+        turn = {"role": role, "content": content[:MAX_HISTORY_CONTENT_LENGTH]}
+        # Chip-composed turns are marked so the answer-language decision can
+        # ignore them (their wording is Machina's boilerplate, not the user's —
+        # see search.conversation_language). Absent on older clients, which the
+        # helper falls back for.
+        if item.get("generated"):
+            turn["generated"] = True
+        cleaned.append(turn)
     return cleaned
+
+
+def _sanitize_context_ids(value) -> list:
+    """Clamp the client's `contextIds` — the card ids the recent answers in this
+    conversation actually CITED, i.e. what "this"/"it"/"that" refers to.
+
+    These become Firestore document reads and steer the model's context, so
+    they are clamped like every other client input: strings only, deduped,
+    length-capped (Firestore ids are short), and bounded in count. Anything
+    malformed is dropped rather than errored — context ids only ever improve a
+    request, and a request without them still answers.
+    """
+    if not isinstance(value, list):
+        return []
+    out, seen = [], set()
+    for item in value[:MAX_CONTEXT_IDS * 2]:
+        if not isinstance(item, str):
+            continue
+        cid = item.strip()[:MAX_CONTEXT_ID_LENGTH]
+        if not cid or cid in seen:
+            continue
+        seen.add(cid)
+        out.append(cid)
+        if len(out) >= MAX_CONTEXT_IDS:
+            break
+    return out
 
 
 def _sanitize_hints(hints) -> dict:
@@ -1550,6 +1589,15 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         # Structured chip intent (anchor/category/concept/recency/exclusions) —
         # optional, clamped. See _sanitize_hints for why chips send this.
         hints = _sanitize_hints(data.get('hints'))
+        # The cards the recent answers cited — what a follow-up's "this"/"it"
+        # actually refers to. Structured truth from the client, so the backend
+        # doesn't have to infer the subject from prose.
+        context_ids = _sanitize_context_ids(data.get('contextIds'))
+        # Did the APP compose this question (a tapped chip) or did the user type
+        # it? Explicit from newer clients; `hints` is the legacy signal, since
+        # chips have always carried structured intent and typed text never does.
+        client_marks_turns = bool(data.get('generated'))
+        question_generated = client_marks_turns or bool(hints)
         # Opt-in token streaming (SSE). Only honored for POST so the JSON path is
         # 100% unchanged when not explicitly requested.
         want_stream = bool(data.get('stream')) and req.method == 'POST'
@@ -1575,8 +1623,12 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #    search.followup_retrieval_query). Steers RETRIEVAL ONLY — the
         #    model is still asked the raw `question`, with `history`.
         retrieval_query = followup_retrieval_query(question, history)
-        if retrieval_query != question:
-            logger.info("ask_brain: context-free follow-up — retrieving for the prior question")
+        # A resolved query means this turn borrowed its subject from an earlier
+        # one — the signal step 1g-2 uses to decide whether the previously-cited
+        # cards are the headline or just background.
+        is_followup = retrieval_query != question
+        if is_followup:
+            logger.info("ask_brain: follow-up — resolved the retrieval query against the conversation")
 
         # 0b. A conversation must not change language because the user tapped a
         #     suggestion. Chip questions are Machina's own English boilerplate
@@ -1587,7 +1639,8 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #     text — so on those turns the answer language comes from what the
         #     USER has written here instead. None (all-Latin conversations, or
         #     a chip that opens a thread) leaves the prompt rule untouched.
-        answer_language = conversation_language(history) if hints else None
+        answer_language = (conversation_language(history, marked=client_marks_turns)
+                           if question_generated else None)
         if answer_language:
             logger.info("ask_brain: generated question — answering in %s (conversation language)",
                         answer_language)
@@ -1710,6 +1763,33 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                 cards, _ = pin_title_phrases(anchors, cards)
         except Exception as e:
             logger.error(f"ask_brain anchor pinning failed: {e}")
+
+        # 1g-2. CONVERSATION GUARANTEE: the cards the recent answers actually
+        #     CITED are in context for the next turn. Everything above infers
+        #     the subject from the question's prose, which is exactly what a
+        #     follow-up doesn't state — the owner hit this twice (a "בעברית"
+        #     that was told the library holds nothing on the recipe just cited,
+        #     and a "מי פירסם את זה?" told the same about a LinkedIn card).
+        #     `contextIds` is not an inference: it's the ids the client rendered
+        #     as source chips, so no phrasing can defeat it.
+        #     On a detected follow-up (the retrieval query was resolved against
+        #     an earlier turn) they're PINNED to the front — that's what the
+        #     question is about, and the deep-content window lives there. On any
+        #     other turn they're appended at the BACK: present and referenceable
+        #     if the answer needs them, never crowding a genuine new topic.
+        #     Bounded (MAX_CONTEXT_IDS) and best-effort — a failure here leaves
+        #     the retrieval above exactly as it was.
+        if context_ids:
+            try:
+                have = {c.get("id") for c in cards}
+                missing = [i for i in context_ids if i not in have]
+                fetched = cards_by_ids(uid, missing) if missing else []
+                if is_followup:
+                    cards = pin_cards_by_ids(context_ids, fetched + cards)
+                else:
+                    cards = cards + fetched
+            except Exception as e:
+                logger.error(f"ask_brain context-id merge failed: {e}")
 
         # 1h. PRIVACY: strip effectively-private cards (own isPrivate flag or
         #     membership in a private collection) from the assembled context.

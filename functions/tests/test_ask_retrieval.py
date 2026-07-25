@@ -20,9 +20,11 @@ from search import (
     keyword_match_score,
     keyword_query_tokens,
     is_context_free_followup,
+    is_referential_followup,
     followup_retrieval_query,
     dominant_script_language,
     conversation_language,
+    pin_cards_by_ids,
 )
 
 
@@ -503,3 +505,137 @@ def test_conversation_language_fails_open():
     assert conversation_language([]) is None
     assert conversation_language("not a list") is None
     assert conversation_language([None, 7, {"role": "user"}]) is None
+
+
+# ── Referential follow-ups (is_referential_followup) ───────────────────────
+
+def test_referential_followups_point_instead_of_naming():
+    # The owner-reported miss: real content words ("מי", "פירסם") so the
+    # meta-vocabulary gate passes it through, but the SUBJECT is only "זה".
+    assert is_referential_followup("מי פירסם את זה?") is True
+    assert is_referential_followup("Who published this?") is True
+    assert is_referential_followup("When was it published?") is True
+    assert is_referential_followup("Is it worth my time?") is True
+    assert is_referential_followup("What else did I save on this topic?") is True
+
+
+def test_referential_ignores_a_question_that_states_its_subject():
+    assert is_referential_followup("What did I save about longevity?") is False
+    assert is_referential_followup("") is False
+    # Long enough to carry a topic even though it points ("that recipe").
+    assert is_referential_followup(
+        "Show me that recipe with the tomatoes and the fresh bread") is False
+    # A quoted title IS the subject, stated — nothing to resolve.
+    assert is_referential_followup('Key points from "Some Card Title"') is False
+
+
+def test_referential_does_not_swallow_recency_questions():
+    # "this week"/"this month" are pointers grammatically but time-anchored in
+    # meaning; routing them to the previous topic would break recency retrieval.
+    for q in ("Catch me up on this week's saves",
+              "What did I save this month?",
+              "What did I save this week?"):
+        assert is_referential_followup(q) is False, q
+
+
+def test_referential_query_keeps_the_question_and_adds_the_subject():
+    # PREPENDED, not replaced: unlike a context-free follow-up, these can still
+    # carry real words, so the combined text retrieves a superset — a misfire
+    # costs precision, never what was actually asked for.
+    prior = 'Key points from "Anthropic Introduces Three-Tiered Claude Certification Program"'
+    history = [
+        {"role": "user", "content": prior},
+        {"role": "assistant", "content": "The new certification program establishes…"},
+    ]
+    out = followup_retrieval_query("מי פירסם את זה?", history)
+    assert out.startswith(prior)
+    assert "מי פירסם את זה?" in out
+
+
+def test_referential_chain_resolves_past_earlier_followups():
+    prior = "What do my saves say about longevity?"
+    history = [
+        {"role": "user", "content": prior},
+        {"role": "assistant", "content": "…"},
+        {"role": "user", "content": "Who published this?"},
+        {"role": "assistant", "content": "…"},
+    ]
+    assert followup_retrieval_query("When was it published?", history).startswith(prior)
+
+
+def test_referential_without_history_is_untouched():
+    assert followup_retrieval_query("Who published this?", []) == "Who published this?"
+    assert followup_retrieval_query("Who published this?", None) == "Who published this?"
+    # No topical turn to resolve against → unchanged rather than guessing.
+    assert followup_retrieval_query(
+        "Who published this?",
+        [{"role": "user", "content": "shorter"}]) == "Who published this?"
+
+
+# ── pin_cards_by_ids (the previously-cited cards, exactly) ─────────────────
+
+def _idcards():
+    return [{"id": "a", "title": "A"}, {"id": "b", "title": "B"}, {"id": "c", "title": "C"}]
+
+
+def test_pin_by_ids_moves_cited_cards_to_the_front_in_id_order():
+    out = pin_cards_by_ids(["c", "a"], _idcards())
+    assert [c["id"] for c in out] == ["c", "a", "b"]
+
+
+def test_pin_by_ids_ignores_ids_that_are_not_in_context():
+    out = pin_cards_by_ids(["zz", "b"], _idcards())
+    assert [c["id"] for c in out] == ["b", "a", "c"]
+
+
+def test_pin_by_ids_is_a_no_op_when_nothing_matches():
+    cards = _idcards()
+    assert pin_cards_by_ids(["zz"], cards) == cards
+    assert pin_cards_by_ids([], cards) == cards
+    assert pin_cards_by_ids(["a"], []) == []
+
+
+def test_pin_by_ids_never_duplicates_or_drops_a_card():
+    out = pin_cards_by_ids(["a", "a", "b"], _idcards())
+    assert [c["id"] for c in out] == ["a", "b", "c"]
+
+
+# ── conversation_language with explicit typed/generated markers ────────────
+
+def test_language_follows_the_newest_TYPED_turn_when_marked():
+    # The trade-off the marker removes: start in Hebrew, switch to typing
+    # English, then tap a chip — the thread is English now, and saying Hebrew
+    # would be overriding a choice the user just made in their own words.
+    history = [
+        {"role": "user", "content": "אני צריך בית קפה בפרדס חנה"},
+        {"role": "assistant", "content": "…"},
+        {"role": "user", "content": 'Give me more detail on "X"', "generated": True},
+        {"role": "assistant", "content": "…"},
+        {"role": "user", "content": "Actually, what did I save about coffee?"},
+        {"role": "assistant", "content": "…"},
+    ]
+    assert conversation_language(history) is None
+
+
+def test_marked_chips_never_outvote_the_typed_turn():
+    history = [
+        {"role": "user", "content": "אני צריך בית קפה בפרדס חנה"},
+        {"role": "assistant", "content": "…"},
+        {"role": "user", "content": 'Give me more detail on "X"', "generated": True},
+        {"role": "assistant", "content": "…"},
+        {"role": "user", "content": 'Key points from "Y"', "generated": True},
+        {"role": "assistant", "content": "…"},
+    ]
+    assert conversation_language(history) == "Hebrew"
+
+
+def test_unmarked_history_still_uses_the_skip_latin_fallback():
+    # Older builds and chats persisted before the marker existed send no flags;
+    # the original heuristic must still hold for them.
+    history = [
+        {"role": "user", "content": "אני צריך בית קפה בפרדס חנה"},
+        {"role": "assistant", "content": "…"},
+        {"role": "user", "content": 'Give me more detail on "X"'},
+        {"role": "assistant", "content": "…"},
+    ]
+    assert conversation_language(history) == "Hebrew"

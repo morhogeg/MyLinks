@@ -14,7 +14,11 @@ in isolation instead of as part of a conversation":
     topically random cards, and the model said the library holds nothing on the
     recipe it had just cited on screen;
   - a Hebrew thread about a Pardes Hanna café that flipped to English the
-    moment a suggestion chip (Machina's own English boilerplate) was tapped.
+    moment a suggestion chip (Machina's own English boilerplate) was tapped;
+  - `מי פירסם את זה?` ("who published this?") one turn after an answer that
+    cited a LinkedIn card — real content words, so the meta-vocabulary gate
+    passed it through, and it retrieved for "who published" and reported the
+    card was not in the library.
 
 conftest installs the offline fakes so `import main` works with plain pytest;
 Firestore, the embedding API, and Gemini are all stubbed at the main boundary.
@@ -35,6 +39,12 @@ _HISTORY = [
 
 _RECIPE_CARD = {"id": "cake", "title": "מתכון לעוגת מייפל עסיסית",
                 "category": "Food", "summary": "A moist maple cake."}
+# A card retrieval will NOT return for the follow-up — it only comes back
+# because the client said the last answer cited it.
+_CITED_CARD = {"id": "linkedin", "title": "Anthropic Introduces Three-Tiered "
+               "Claude Certification Program", "category": "Tech",
+               "summary": "Three certification tracks.", "sourceName": "Claude for Business"}
+_LIBRARY = {c["id"]: c for c in (_RECIPE_CARD, _CITED_CARD)}
 
 
 class _Resp:
@@ -61,7 +71,7 @@ class _Req:
 @pytest.fixture
 def seen(monkeypatch):
     """Stub every outward call ask_brain makes and record what retrieval saw."""
-    calls = {"search": [], "rerank": [], "keyword": [], "asked": []}
+    calls = {"search": [], "rerank": [], "keyword": [], "asked": [], "byIds": []}
 
     monkeypatch.setattr(main.https_fn, "Response", _Resp)
     monkeypatch.setattr(main, "check_rate_limit", lambda *a, **k: True)
@@ -87,6 +97,12 @@ def seen(monkeypatch):
     monkeypatch.setattr(main, "apply_distance_threshold", lambda r, **k: r)
     monkeypatch.setattr(main, "private_collection_ids", lambda uid: set())
 
+    def fake_by_ids(uid, ids):
+        calls["byIds"].append(list(ids))
+        return [_LIBRARY[i] for i in ids if i in _LIBRARY]
+
+    monkeypatch.setattr(main, "cards_by_ids", fake_by_ids)
+
     class _FakeGemini:
         def answer_from_context(self, question, cards, history=None, **kwargs):
             calls["asked"].append({"question": question, "history": history,
@@ -98,10 +114,14 @@ def seen(monkeypatch):
     return calls
 
 
-def _ask(question, history=None, hints=None):
+def _ask(question, history=None, hints=None, context_ids=None, generated=None):
     body = {"uid": "user1", "question": question, "history": history or []}
     if hints:
         body["hints"] = hints
+    if context_ids is not None:
+        body["contextIds"] = context_ids
+    if generated is not None:
+        body["generated"] = generated
     return main.ask_brain(_Req(json_body=body))
 
 
@@ -193,4 +213,115 @@ def test_a_chip_that_opens_a_conversation_is_not_pinned(seen):
     # Nothing has been established yet — the chip's own language is all there
     # is, exactly as before.
     _ask(_CHIP, [], hints=_CHIP_HINTS)
+    assert seen["asked"][0]["answerLanguage"] is None
+
+
+# ── Referential follow-ups reach the card they point at ────────────────────
+
+_KEY_POINTS = ('Key points from "Anthropic Introduces Three-Tiered Claude '
+               'Certification Program"')
+_LINKEDIN_HISTORY = [
+    {"role": "user", "content": _KEY_POINTS},
+    {"role": "assistant", "content": "The new certification program establishes…"},
+]
+
+
+def test_who_published_this_retrieves_for_the_card_being_discussed(seen):
+    resp = _ask("מי פירסם את זה?", _LINKEDIN_HISTORY)
+
+    assert resp.status == 200
+    # The subject is prepended and the question kept, so retrieval sees the
+    # card's title (which also pins it) without losing the user's words.
+    for got in (seen["search"][0], seen["rerank"][0]):
+        assert got.startswith(_KEY_POINTS)
+        assert "מי פירסם את זה?" in got
+    # The card is in context, so the answer can name the publisher instead of
+    # claiming the library has nothing on it.
+    assert json.loads(resp.body)["citedIds"] == ["cake"]
+
+
+def test_a_question_that_states_its_subject_is_still_untouched(seen):
+    # The guard on the rescue above: stating a topic keeps retrieval exactly
+    # where it was, conversation or not.
+    _ask("What did I save about Italy?", _LINKEDIN_HISTORY)
+    assert seen["search"] == ["What did I save about Italy?"]
+
+
+# ── The conversation guarantee: previously-cited cards are always reachable ─
+#
+# Everything above infers the subject from the question's prose, which is the
+# one thing a follow-up doesn't state. `contextIds` is not an inference — it is
+# the exact set of ids the client rendered as source chips — so it holds even
+# for follow-ups no heuristic can classify.
+
+_PLAIN_FOLLOWUP_HISTORY = [
+    {"role": "user", "content": "What did I save about Claude certifications?"},
+    {"role": "assistant", "content": "Three tracks…"},
+]
+
+
+def test_cited_cards_are_pinned_to_the_front_of_a_followup(seen):
+    resp = _ask("בעברית", _HISTORY, context_ids=["linkedin"])
+
+    assert resp.status == 200
+    # Retrieval never returned it; it is here purely because it was cited.
+    assert seen["byIds"] == [["linkedin"]]
+    # Pinned FIRST — a follow-up is about what was just discussed, and the
+    # deep-content window (which carries recipe steps, highlights, detail)
+    # only covers the head of the list.
+    assert seen["asked"][0]["cardIds"][0] == "linkedin"
+
+
+def test_the_guarantee_holds_for_a_followup_no_heuristic_can_classify(seen):
+    # "Who published" with no pointer word and no meta vocabulary — it reads as
+    # a topical question, so the query is NOT resolved against the conversation.
+    # The ids still put the discussed card in context, which is the whole point
+    # of sending them: no phrasing can defeat an exact set.
+    resp = _ask("who published", _PLAIN_FOLLOWUP_HISTORY, context_ids=["linkedin"])
+
+    assert resp.status == 200
+    assert seen["search"] == ["who published"]          # query untouched
+    assert "linkedin" in seen["asked"][0]["cardIds"]    # card present anyway
+
+
+def test_a_new_topic_keeps_cited_cards_at_the_back(seen):
+    # Not a follow-up: the discussed card stays available but must not crowd
+    # out the cards the new question actually retrieved.
+    _ask("What did I save about Italy?", _HISTORY, context_ids=["linkedin"])
+    ids = seen["asked"][0]["cardIds"]
+    assert ids[0] == "cake"
+    assert ids[-1] == "linkedin"
+
+
+def test_a_cited_card_already_retrieved_is_not_fetched_twice(seen):
+    # It's already in context — no extra Firestore read, no duplicate card.
+    _ask("בעברית", _HISTORY, context_ids=["cake"])
+    assert seen["byIds"] == []
+    assert seen["asked"][0]["cardIds"] == ["cake"]
+
+
+def test_malformed_context_ids_are_dropped_not_errored(seen):
+    for bad in ("not a list", [None, 7, ""], [{"id": "x"}]):
+        resp = _ask("בעברית", _HISTORY, context_ids=bad)
+        assert resp.status == 200
+    assert seen["byIds"] == []
+
+
+def test_the_explicit_generated_flag_pins_the_language(seen):
+    # Newer clients say outright that the app composed the question, instead of
+    # the backend inferring it from the presence of chip hints.
+    _ask(_CHIP, _HE_HISTORY, generated=True)
+    assert seen["asked"][0]["answerLanguage"] == "Hebrew"
+
+
+def test_marked_typed_turns_let_the_user_switch_language(seen):
+    # With per-turn markers the backend can see that the user's LAST typed turn
+    # was English, so a chip after it must not drag the thread back to Hebrew.
+    history = [
+        {"role": "user", "content": "אני צריך בית קפה בפרדס חנה"},
+        {"role": "assistant", "content": "…"},
+        {"role": "user", "content": "Actually, what did I save about coffee?"},
+        {"role": "assistant", "content": "…"},
+    ]
+    _ask(_CHIP, history, generated=True)
     assert seen["asked"][0]["answerLanguage"] is None

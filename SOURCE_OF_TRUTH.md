@@ -746,7 +746,81 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-25 (latest) — ASK: A TAPPED CHIP NO LONGER FLIPS THE THREAD'S
+- **2026-07-25 (latest) — ASK, ROUND 3: THE CONVERSATION GUARANTEE (stop
+  guessing the subject — the client already knows it).** Owner, after round 2:
+  *"I'm not supposed to find all the issues."* Correct — rounds 1 and 2 were
+  both heuristics over prose, and each shipped with a known hole I'd described
+  rather than closed. Root cause of the whole class: `history` reaches the
+  backend as TEXT ONLY, so `ask_brain` had to re-derive "what are we talking
+  about" from wording — while the client held the exact answer all along, in
+  `ChatMessage.sources[].id` (the source chips already on screen).
+  **The structural fix — `contextIds`.** The client now sends the card ids cited
+  by the last `RECENT_ANSWERS_FOR_CONTEXT` (2) answers; `_sanitize_context_ids`
+  clamps them (strings, deduped, ≤6, length-capped) and new step **1g-2** in
+  `ask_brain` guarantees those cards are in context: **pinned to the FRONT** on a
+  detected follow-up (that's the subject, and the deep-content window lives at
+  the head), **appended at the BACK** otherwise (present and referenceable,
+  never crowding a genuine new topic). `search.cards_by_ids` fetches only the
+  ones retrieval missed — ≤6 doc reads, and 0 when retrieval already had them.
+  This is not an inference, so **no phrasing can defeat it**: it holds for the
+  follow-ups round 1 and 2 classify AND for ones neither can ("who published",
+  bare — the hole I flagged at the end of round 2, now covered and tested).
+  Placed BEFORE the privacy strip and the `askExcluded` filter, so a cited card
+  still can't smuggle private/poison content into the prompt; `cards_by_ids`
+  reads under `users/{uid}/links`, so tenant isolation holds against forged ids.
+  **Language, finished properly.** The chip signal was inferred from `hints`
+  presence; the client now states it — `generated: true` on the request AND on
+  each history turn (`ChatMessage.generated`, threaded through `send()` and
+  preserved by retry). `conversation_language(history, marked=)` therefore votes
+  only on turns the user TYPED, which **removes the round-1 trade-off**: start in
+  Hebrew, type English, tap a chip → English, because the last thing they typed
+  in their own words wins. `marked` comes from the current turn's explicit flag —
+  a conversation where the user has only typed carries no flag to observe, and
+  without that distinction a marking client is misread as a legacy one (caught by
+  a test, not by inspection). Legacy builds and pre-existing chats keep the
+  hints inference + skip-Latin fallback, both still tested.
+  **This round is NOT backend-only** — `web/lib/types.ts` + `AskBrain.tsx`
+  changed, so it needs a TestFlight build to reach the phone (rounds 1–2 did
+  not). Verified: **21 new tests** (`pin_cards_by_ids` incl. a duplicate-id case
+  that caught a real bug in my first draft — a repeated id duplicated its card;
+  marked/unmarked language modes; endpoint tests for front-pin, back-append,
+  no-double-fetch, malformed ids, and the unclassifiable follow-up), suite
+  **490 passed / 4 failed** (the same `test_embed_trigger_backstop` drift, §4
+  item 11b), `tsc` 0, `next build` 0. **Deploy scope: `ask_brain` + web + iOS.**
+
+- **2026-07-25 — ASK, ROUND 2: "WHO PUBLISHED THIS?" COULDN'T SEE THE
+  CARD IT WAS POINTING AT.** Owner device QA on the round-1 deploy, two
+  screenshots: a chip opened a thread (`Key points from "Anthropic Introduces
+  Three-Tiered Claude Certification Program"`, answered in English, LinkedIn
+  card cited), then the typed Hebrew `מי פירסם את זה?` ("who published this?")
+  → **"the information about Claude's certification program did not appear in
+  your saved sources"**, flagged ungrounded. Language was CORRECT (Hebrew in →
+  Hebrew out — the round-1 fixes held); retrieval was not. **The round-1
+  `is_context_free_followup` gate could never catch this:** it fires only when
+  every content token is meta, and this question has real ones — `keyword_query_tokens`
+  returns `{מי, פירסם}` — so it read as topical and embedded as "who published",
+  which matches nothing. The subject lives in the previous turn; only the
+  POINTER (`זה`) is in this one, and most pointers are already `_RANK_STOPWORDS`
+  so they are invisible to any token-based test. Fix: `search.is_referential_followup`
+  matches a standalone pointer word (EN + HE) on the RAW text, guarded four ways
+  because a false positive drags an old topic into retrieval — must be short
+  (≤4 content tokens, so "show me that recipe with the tomatoes" retrieves for
+  itself), must quote no card title (a quoted title IS the subject, stated), and
+  must not be a recency question (`this week`/`this month` are pointers
+  grammatically, time-anchored in meaning). **The two follow-up kinds are
+  treated differently on purpose:** context-free REPLACES the query (the
+  question is provably noise), referential PREPENDS the prior question and keeps
+  the question, so the combined text retrieves a superset — a misfire costs
+  precision and can never lose what was asked for. Bonus: the prior question's
+  quoted title now flows into `anchor_phrases_for`, so the card is pinned to the
+  front of context, not merely retrieved. Verified: **9 new tests** (`test_ask_retrieval.py`
+  classifier + query cases incl. the recency and long-question guards,
+  `test_ask_followup_context.py` endpoint repro), suite **476 passed / 4 failed**
+  — the same `test_embed_trigger_backstop` drift (§4 item 11b); all three new
+  behavioural tests confirmed to FAIL with the fix reverted.
+  **Deploy scope: `ask_brain`.**
+
+- **2026-07-25 — ASK: A TAPPED CHIP NO LONGER FLIPS THE THREAD'S
   LANGUAGE.** Owner screenshot: `אני צריך בית קפה בפרדס חנה` → answered in
   Hebrew; the next turn was the suggestion chip `Give me more detail on "5
   מקומות מומלצים בפרדס חנה"` → answered **entirely in English**. Not a
