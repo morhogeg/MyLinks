@@ -76,12 +76,20 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // Curated digests (in-app Digest section). Written by Cloud Functions
-      // (Admin SDK, bypasses rules); the client only reads to render the
+      // Curated digests (in-app Digest section). CONTENT is written by Cloud
+      // Functions (Admin SDK, bypasses rules); the client reads to render the
       // digest history (lib/digest.ts).
+      //
+      // DELETE is the one client write allowed here: the per-digest "Delete"
+      // action in DigestCard removes a digest from the user's own history
+      // (lib/digest.ts deleteDigest → Feed.tsx). It is a destructive action on
+      // the caller's own data, so it needs no content validation — but create
+      // and update stay denied, so a client can never forge a digest or tamper
+      // with the curated cards inside one.
       match /digests/{digestId} {
         allow read: if owns(uid);
-        allow write: if false;
+        allow delete: if owns(uid);
+        allow create, update: if false;
       }
 
       // Self-hosted product analytics (lib/analytics.ts). The client appends

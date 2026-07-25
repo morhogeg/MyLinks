@@ -149,7 +149,20 @@ export async function completeRedirectSignIn(): Promise<User | null> {
     }
 }
 
-/** Sign the current user out (clears native plugin state too, when present). */
+/**
+ * Sign the current user out (clears native plugin state too, when present) and
+ * destroy every local copy of their data.
+ *
+ * The purge is not optional housekeeping: Firestore's `persistentLocalCache`
+ * keeps an IndexedDB mirror of the whole library that neither Firebase sign-out
+ * nor server-side account deletion touches, so without it a sign-out on a
+ * shared browser — and every "Delete my account" — left the full library
+ * readable on the device (see lib/localData.ts).
+ *
+ * Terminating Firestore makes `db` permanently unusable in this document, so
+ * the page is reloaded straight after. That lands on the LoginScreen, which is
+ * where both callers were headed anyway.
+ */
 export async function signOutUser(): Promise<void> {
     if (isNativeApp()) {
         try {
@@ -160,6 +173,10 @@ export async function signOutUser(): Promise<void> {
         }
     }
     await signOut(auth);
+
+    const { purgeLocalUserData } = await import('@/lib/localData');
+    await purgeLocalUserData();
+    if (typeof window !== 'undefined') window.location.reload();
 }
 
 /** Subscribe to auth state; returns the unsubscribe function. */

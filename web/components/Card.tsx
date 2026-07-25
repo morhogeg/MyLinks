@@ -13,6 +13,7 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import CardActionSheet from './CardActionSheet';
 import { hasHebrew } from '@/lib/rtl';
+import { isHttpUrl } from '@/lib/url';
 import { getNotes } from '@/lib/notes';
 
 interface CardProps {
@@ -177,16 +178,26 @@ function Card({
                     )}
 
                     <div className="flex items-center gap-2 pt-2 mt-auto border-t border-border-subtle">
-                        <a
-                            href={link.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={link.url}
-                            className="text-[11px] text-text-muted/70 truncate min-w-0 hover:text-accent transition-colors flex items-center gap-1"
-                        >
-                            <ExternalLink className="w-3 h-3 shrink-0" />
-                            <span className="truncate">{host}</span>
-                        </a>
+                        {/* Same http(s)-only rule as the ready card's toolbar link
+                            below — a stored javascript:/data: value must never
+                            become clickable, not even on the placeholder. */}
+                        {isHttpUrl(link.url) ? (
+                            <a
+                                href={link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={link.url}
+                                className="text-[11px] text-text-muted/70 truncate min-w-0 hover:text-accent transition-colors flex items-center gap-1"
+                            >
+                                <ExternalLink className="w-3 h-3 shrink-0" />
+                                <span className="truncate">{host}</span>
+                            </a>
+                        ) : (
+                            <span className="text-[11px] text-text-muted/70 truncate min-w-0 flex items-center gap-1">
+                                <ExternalLink className="w-3 h-3 shrink-0" />
+                                <span className="truncate">{host}</span>
+                            </span>
+                        )}
                         {failed && (
                             <div className="flex items-center gap-1.5 ms-auto shrink-0">
                                 {onRetry && (
@@ -275,7 +286,7 @@ function Card({
                 <div dir="ltr" className="flex items-center gap-1 bg-card/90 backdrop-blur-md border border-border-strong p-1 rounded-full shadow-xl">
                     {/* Only render as a link for real http(s) URLs — never make a
                         stored javascript:/data: value clickable. */}
-                    {!!link.url && /^https?:\/\//i.test(link.url) && (
+                    {isHttpUrl(link.url) && (
                         <a
                             href={link.url}
                             target="_blank"
