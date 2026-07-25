@@ -746,7 +746,48 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-25 (latest) — ASK, ROUND 4: THE PROMPT WAS TELLING THE MODEL TO
+- **2026-07-25 (latest) — ASK, ROUND 5: SELF-REVIEW OF ROUNDS 1-4 (owner:
+  *"review this feature again to find more bugs, since u already said it is
+  fixed"*).** Fair — four rounds, four "fixed" claims. This round found and
+  fixed problems the owner had NOT hit yet.
+  **(1) REGRESSION I introduced in round 3 — "what else" was answered with the
+  card you're trying to move past.** `what else besides this?` is BOTH a
+  referential follow-up and an exclusion, so round 3's front-pin put the
+  just-discussed cards at the head of context while the exclusion demote pushed
+  them to the back — the pin ran later and won. Worse, when EVERY card in
+  context is already-discussed the demote has nothing to reorder, so gating the
+  order wasn't enough. Fixed two ways: the `contextIds` merge moved from step
+  1g-2 to **1e-2, BEFORE the exclusion and anchor steps**, so the existing
+  machinery gets the last word in both directions; and a new `wants_new_sources`
+  flag (explicit exclusion question or `hints.excludeTitles`) **suppresses the
+  front-pin outright** for those turns. Bonus from the same insight: on an
+  exclusion turn the cited card TITLES now join `excluded_titles`, so "what else
+  besides this?" knows exactly what "this" is instead of recovering it from
+  quoted text.
+  **(2) PRECEDENCE, previously undefined.** When the resolved question quotes a
+  card title AND the client sends different `contextIds`, which leads? Now
+  stated and tested: the quoted anchor wins (it is the most specific statement
+  of subject there is) and the cited card stays in context. In practice they are
+  the same card; this pins down the drift case.
+  **(3) THE STREAMING PATH WAS UNTESTED.** Every endpoint test used the buffered
+  JSON branch (what native asks for), while the WEB client streams — and
+  generation is the one place the two diverge. Wiring was correct, but nothing
+  would have caught a dropped `followup`/`answer_language`/`contextIds` on the
+  browser path. Three streaming tests added.
+  **(4) A PROMPT INSTRUCTION POINTING THE WRONG WAY.** Round 2's LANGUAGE
+  OVERRIDE said it takes precedence over "the language rule **below**" — it
+  renders directly *underneath* that rule, so the model was sent looking the
+  wrong way (and finds the CONTINUATION block there). Now "directly above".
+  **Also verified, no change needed:** the `answer_language`/`followup` params I
+  inserted mid-signature never displaced `max_drops` (only one call site each,
+  grep + AST checked); a 34-case EN/HE corpus of realistic questions produced
+  **zero** false positives and zero misses across `resolve_followup`; the
+  rendered prompt blocks were eyeballed for escaping damage (guillemets/quotes
+  clean). Suite **504 passed / 4 failed** — the same `test_embed_trigger_backstop`
+  drift (§4 item 11b). Backend-only, no `web/` diff → no TestFlight build.
+  **Deploy scope: `ask_brain`.**
+
+- **2026-07-25 — ASK, ROUND 4: THE PROMPT WAS TELLING THE MODEL TO
   CHANGE THE SUBJECT.** Owner: *"Terrible."* Screenshot — an English answer
   about a saved Breaking Bad clip (YouTube, "Action City"), then the typed
   follow-up `בעברית, בקצרה` ("in Hebrew, briefly") → fluent, correctly brief

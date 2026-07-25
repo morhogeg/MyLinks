@@ -110,6 +110,15 @@ def seen(monkeypatch):
     monkeypatch.setattr(main, "cards_by_ids", fake_by_ids)
 
     class _FakeGemini:
+        def answer_from_context_stream(self, question, cards, history=None, **kwargs):
+            calls["asked"].append({"question": question, "history": history,
+                                   "cardIds": [c["id"] for c in cards],
+                                   "answerLanguage": kwargs.get("answer_language"),
+                                   "followup": kwargs.get("followup"),
+                                   "stream": True})
+            yield ("token", "…")
+            yield ("citedIds", [c["id"] for c in cards])
+
         def answer_from_context(self, question, cards, history=None, **kwargs):
             calls["asked"].append({"question": question, "history": history,
                                    "cardIds": [c["id"] for c in cards],
@@ -267,8 +276,16 @@ _PLAIN_FOLLOWUP_HISTORY = [
 ]
 
 
+# A conversation whose prior question names no card title, so nothing competes
+# with the cited card for the front of the context.
+_UNQUOTED_HISTORY = [
+    {"role": "user", "content": "What did I save about Claude certifications?"},
+    {"role": "assistant", "content": "Three tracks…"},
+]
+
+
 def test_cited_cards_are_pinned_to_the_front_of_a_followup(seen):
-    resp = _ask("בעברית", _HISTORY, context_ids=["linkedin"])
+    resp = _ask("בעברית", _UNQUOTED_HISTORY, context_ids=["linkedin"])
 
     assert resp.status == 200
     # Retrieval never returned it; it is here purely because it was cited.
@@ -277,6 +294,18 @@ def test_cited_cards_are_pinned_to_the_front_of_a_followup(seen):
     # deep-content window (which carries recipe steps, highlights, detail)
     # only covers the head of the list.
     assert seen["asked"][0]["cardIds"][0] == "linkedin"
+
+
+def test_an_explicitly_quoted_title_outranks_the_cited_card(seen):
+    # Precedence, stated: when the resolved question NAMES a card ("…gist of
+    # \"X\"?") that title is the most specific statement of subject there is, so
+    # it leads — but the cited card is still in context, which is the guarantee.
+    # In practice these are the same card; this pins down what happens when the
+    # conversation drifted and they aren't.
+    _ask("בעברית", _HISTORY, context_ids=["linkedin"])
+    ids = seen["asked"][0]["cardIds"]
+    assert ids[0] == "cake"          # the quoted anchor from the prior question
+    assert "linkedin" in ids         # the cited card is still reachable
 
 
 def test_the_guarantee_holds_for_a_followup_no_heuristic_can_classify(seen):
@@ -358,3 +387,62 @@ def test_an_ordinary_question_carries_no_subject(seen):
     f = seen["asked"][0]["followup"]
     assert f["subject"] is None
     assert f["restate"] is False
+
+
+# ── "What else" must not be answered with what was just discussed ──────────
+
+def test_what_else_does_not_pin_the_just_discussed_cards(seen):
+    # A follow-up AND an exclusion at once. Round 3's front-pin and the
+    # exclusion demote pull in opposite directions; the exclusion has to win,
+    # or "what else" re-presents the card the user is trying to move past.
+    _ask("what else besides this?", _HISTORY, context_ids=["linkedin"])
+    ids = seen["asked"][0]["cardIds"]
+    assert ids[0] != "linkedin", "just-discussed card must not headline a what-else answer"
+
+
+def test_what_else_chip_hints_still_win_over_the_pin(seen):
+    # The chip states the exclusion explicitly; same requirement.
+    _ask("what else?", _HISTORY, context_ids=["linkedin"],
+         hints={"excludeTitles": ["Anthropic Introduces Three-Tiered Claude Certification Program"]})
+    ids = seen["asked"][0]["cardIds"]
+    assert ids[0] != "linkedin"
+
+
+# ── The streaming path (what the WEB client uses) gets the same treatment ──
+#
+# Native asks for buffered JSON (SSE is unreliable in WKWebView), so every test
+# above exercises the JSON branch only. The browser streams — and generation is
+# the one place the two paths diverge, so each new prompt input has to be
+# checked on both or the web could silently lose it.
+
+def _ask_streaming(question, history=None, context_ids=None, generated=None):
+    body = {"uid": "user1", "question": question, "history": history or [],
+            "stream": True}
+    if context_ids is not None:
+        body["contextIds"] = context_ids
+    if generated is not None:
+        body["generated"] = generated
+    resp = main.ask_brain(_Req(json_body=body))
+    # Drain the generator so the stubbed stream actually runs.
+    body_iter = resp.body
+    if hasattr(body_iter, "__iter__") and not isinstance(body_iter, (str, bytes)):
+        list(body_iter)
+    return resp
+
+
+def test_streaming_gets_the_same_followup_and_language_inputs(seen):
+    _ask_streaming("בעברית, בקצרה", _HISTORY)
+    asked = seen["asked"][0]
+    assert asked["stream"] is True
+    assert asked["followup"]["subject"] == _ASKED
+    assert asked["followup"]["restate"] is True
+
+
+def test_streaming_gets_the_pinned_context_cards(seen):
+    _ask_streaming("בעברית", _UNQUOTED_HISTORY, context_ids=["linkedin"])
+    assert seen["asked"][0]["cardIds"][0] == "linkedin"
+
+
+def test_streaming_pins_the_conversation_language_for_a_chip(seen):
+    _ask_streaming(_CHIP, _HE_HISTORY, generated=True)
+    assert seen["asked"][0]["answerLanguage"] == "Hebrew"

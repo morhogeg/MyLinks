@@ -1632,6 +1632,13 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         # for a restate request ("in Hebrew, briefly") that rule is suspended
         # outright.
         is_followup = bool(followup["subject"])
+        # Does this turn want sources it has NOT seen? "What else … besides
+        # this" is a follow-up AND a request to move past what was just shown,
+        # so the cited cards must not be promoted for it. Demoting them later
+        # isn't enough: when every card in context is already-discussed the
+        # demote has nothing to reorder, and whatever was pinned stays pinned.
+        wants_new_sources = (bool(hints.get("excludeTitles"))
+                             or is_exclusion_question(retrieval_query))
         if is_followup:
             logger.info("ask_brain: follow-up (restate=%s) — resolved against the conversation",
                         followup["restate"])
@@ -1736,6 +1743,38 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             except Exception as e:
                 logger.error(f"ask_brain category retrieval failed: {e}")
 
+        # 1e-2. CONVERSATION GUARANTEE: the cards the recent answers actually
+        #     CITED are in context for the next turn. Everything above infers
+        #     the subject from the question's prose, which is exactly what a
+        #     follow-up doesn't state — the owner hit this twice (a "בעברית"
+        #     that was told the library holds nothing on the recipe just cited,
+        #     and a "מי פירסם את זה?" told the same about a LinkedIn card).
+        #     `contextIds` is not an inference: it's the ids the client rendered
+        #     as source chips, so no phrasing can defeat it.
+        #     On a detected follow-up (the retrieval query was resolved against
+        #     an earlier turn) they're PINNED to the front — that's what the
+        #     question is about, and the deep-content window lives there. On any
+        #     other turn they're appended at the BACK: present and referenceable
+        #     if the answer needs them, never crowding a genuine new topic.
+        #     Runs BEFORE the exclusion and anchor steps ON PURPOSE. A turn can
+        #     be a follow-up AND a "what else … besides this" — pinning after
+        #     the exclusion demote would put the very cards the user is trying
+        #     to move past back at the front. Ordering it here lets the existing
+        #     machinery have the last word in both directions.
+        #     Bounded (MAX_CONTEXT_IDS) and best-effort — a failure here leaves
+        #     the retrieval above exactly as it was.
+        if context_ids:
+            try:
+                have = {c.get("id") for c in cards}
+                missing = [i for i in context_ids if i not in have]
+                fetched = cards_by_ids(uid, missing) if missing else []
+                if is_followup and not wants_new_sources:
+                    cards = pin_cards_by_ids(context_ids, fetched + cards)
+                else:
+                    cards = cards + fetched
+            except Exception as e:
+                logger.error(f"ask_brain context-id merge failed: {e}")
+
         # 1f. Exclusions ("What else did I save on X?"): the already-discussed
         #     cards must not dominate the answer again. Chips name them
         #     explicitly (hints.excludeTitles); typed "besides X" questions
@@ -1743,9 +1782,16 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #     the BACK of context (still referenceable, never the headline)
         #     and the prompt gets an explicit already-discussed list.
         excluded_titles = list(hints.get("excludeTitles") or [])
-        if excluded_titles or is_exclusion_question(retrieval_query):
+        if wants_new_sources:
             if is_exclusion_question(retrieval_query):
                 excluded_titles += extract_quoted_phrases(retrieval_query)
+            # The cards the recent answers cited ARE the already-discussed set,
+            # known exactly — better than recovering it from quoted titles, and
+            # the reason "what else besides this?" can now name what "this" is.
+            if context_ids:
+                wanted = set(context_ids)
+                excluded_titles += [str(c.get("title") or "") for c in cards
+                                    if c.get("id") in wanted and c.get("title")]
             try:
                 cards, _ = demote_cards_by_titles(excluded_titles, cards)
             except Exception as e:
@@ -1769,33 +1815,6 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                 cards, _ = pin_title_phrases(anchors, cards)
         except Exception as e:
             logger.error(f"ask_brain anchor pinning failed: {e}")
-
-        # 1g-2. CONVERSATION GUARANTEE: the cards the recent answers actually
-        #     CITED are in context for the next turn. Everything above infers
-        #     the subject from the question's prose, which is exactly what a
-        #     follow-up doesn't state — the owner hit this twice (a "בעברית"
-        #     that was told the library holds nothing on the recipe just cited,
-        #     and a "מי פירסם את זה?" told the same about a LinkedIn card).
-        #     `contextIds` is not an inference: it's the ids the client rendered
-        #     as source chips, so no phrasing can defeat it.
-        #     On a detected follow-up (the retrieval query was resolved against
-        #     an earlier turn) they're PINNED to the front — that's what the
-        #     question is about, and the deep-content window lives there. On any
-        #     other turn they're appended at the BACK: present and referenceable
-        #     if the answer needs them, never crowding a genuine new topic.
-        #     Bounded (MAX_CONTEXT_IDS) and best-effort — a failure here leaves
-        #     the retrieval above exactly as it was.
-        if context_ids:
-            try:
-                have = {c.get("id") for c in cards}
-                missing = [i for i in context_ids if i not in have]
-                fetched = cards_by_ids(uid, missing) if missing else []
-                if is_followup:
-                    cards = pin_cards_by_ids(context_ids, fetched + cards)
-                else:
-                    cards = cards + fetched
-            except Exception as e:
-                logger.error(f"ask_brain context-id merge failed: {e}")
 
         # 1h. PRIVACY: strip effectively-private cards (own isPrivate flag or
         #     membership in a private collection) from the assembled context.
