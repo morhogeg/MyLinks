@@ -1309,6 +1309,18 @@ exact-match, capped.
   device-QA the new sign-out/delete-account reload on TestFlight; decide the
   Next ≥16.3.0 upgrade; plus the unchanged §4 task-2 cutover, §4 task-5 env +
   key rotation, and the AUDIT.md S-4/M10 `get_article` gating call.
+  **SHIPPED:** feature `088a45b`, merge **`a933e65`** → Vercel (auto).
+  TestFlight run **#186 green → build 1186** (archive + entitlement check +
+  upload all clean). **Cloud Functions run #46 green** — and that deploy was
+  INCIDENTAL, worth knowing for next time: the workflow's path filter is
+  `functions/**` with no skip mechanism, so adding a *test file* under
+  `functions/tests/` fires a full reconcile deploy. It was a safe no-op here
+  (prod was already current from run #45; the deploy step took 1m53s), but
+  anyone landing a functions-adjacent test should expect it. No hosting deploy
+  (`firebase.json` unchanged). **Only S-10 + S-11 are live** — S-9 is a change to
+  the STAGED `firestore.rules.locked`, so it takes effect only at the §4 task-2
+  rules deploy, and the live `allow read, write: if true` rules are unaffected
+  by this ship.
 
 - **2026-07-25 — ASK: STALE GLYPHS + THE TEXT STOPS ANIMATING (device
   report, build 1181).** Owner on iPhone: "Thinking it through ends with a weird
