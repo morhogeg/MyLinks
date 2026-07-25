@@ -1,0 +1,563 @@
+<title>Machina AI — Citation, running</title>
+
+<style>
+  /* ── Tokens ─────────────────────────────────────────────────────────────
+     The two themes ARE the two palettes: dark is Lumen (graphite + light),
+     light is Monolith (porcelain + graphite). The page demonstrates the
+     decision rather than describing it. */
+  :root {
+    --ground:#EFEDE7; --panel:#FAF9F5; --sunk:#E7E4DC;
+    --line:#DCD8CD;   --line-2:#C9C4B7;
+    --text:#22222A;   --muted:#6D6A61;  --dim:#918D82;
+    --mark:#24242A;   --glow:rgba(90,88,80,.22);
+    --tile-a:#FCFBF8; --tile-b:#DFDCD3;
+    --sel:#22222A;    --sel-ink:#F7F5EF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:#0C0C11; --panel:#121218; --sunk:#0E0E13;
+      --line:#22222C;   --line-2:#32323F;
+      --text:#E6E6F0;   --muted:#8B8B9C;  --dim:#63636F;
+      --mark:#FFFFFF;   --glow:rgba(174,184,206,.34);
+      --tile-a:#26262F; --tile-b:#0A0A0E;
+      --sel:#E6E6F0;    --sel-ink:#101016;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#0C0C11; --panel:#121218; --sunk:#0E0E13;
+    --line:#22222C;   --line-2:#32323F;
+    --text:#E6E6F0;   --muted:#8B8B9C;  --dim:#63636F;
+    --mark:#FFFFFF;   --glow:rgba(174,184,206,.34);
+    --tile-a:#26262F; --tile-b:#0A0A0E;
+    --sel:#E6E6F0;    --sel-ink:#101016;
+  }
+  :root[data-theme="light"] {
+    --ground:#EFEDE7; --panel:#FAF9F5; --sunk:#E7E4DC;
+    --line:#DCD8CD;   --line-2:#C9C4B7;
+    --text:#22222A;   --muted:#6D6A61;  --dim:#918D82;
+    --mark:#24242A;   --glow:rgba(90,88,80,.22);
+    --tile-a:#FCFBF8; --tile-b:#DFDCD3;
+    --sel:#22222A;    --sel-ink:#F7F5EF;
+  }
+
+  /* Instrument vernacular: mono for anything the machine would print,
+     system sans for anything a person wrote. */
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--ground);
+    color: var(--text);
+    font: 400 15.5px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: -.005em;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 0 24px 96px; }
+
+  /* ── Type ─────────────────────────────────────────────────────────────── */
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11.5px; letter-spacing: .17em; text-transform: uppercase;
+    color: var(--dim);
+  }
+  h1 {
+    font-size: clamp(30px, 5vw, 46px); font-weight: 600; letter-spacing: -.028em;
+    line-height: 1.08; text-wrap: balance; margin-top: 14px;
+  }
+  h2 {
+    font-size: clamp(20px, 2.6vw, 25px); font-weight: 600; letter-spacing: -.022em;
+    text-wrap: balance;
+  }
+  h3 { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+  p { max-width: 66ch; }
+  .lead { font-size: 17.5px; color: var(--muted); margin-top: 18px; max-width: 60ch; }
+  .note { font-size: 14px; color: var(--muted); }
+  strong { font-weight: 600; color: var(--text); }
+
+  /* ── Structure ────────────────────────────────────────────────────────── */
+  header { padding: 72px 0 60px; }
+  .themebar {
+    display: flex; align-items: center; gap: 10px; margin-top: 30px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--dim);
+  }
+  .swatch { width: 11px; height: 11px; border-radius: 2px; background: var(--mark); }
+
+  section { padding: 54px 0; border-top: 1px solid var(--line); }
+  .sechead { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  .sechead .eyebrow { flex: 0 0 auto; }
+  .sechead p { margin-top: 12px; flex: 1 1 100%; color: var(--muted); }
+
+  /* Reticle corners — the motif the TRACE study turned up, used as the page's
+     own framing device rather than as ornament. */
+  .panel {
+    position: relative; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 3px; padding: 30px;
+  }
+  .panel::before, .panel::after {
+    content: ""; position: absolute; width: 11px; height: 11px; pointer-events: none;
+    border: 1px solid var(--line-2);
+  }
+  .panel::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+  .panel::after  { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+
+  .grid { display: grid; gap: 26px; margin-top: 30px; }
+  @media (min-width: 800px) { .split { grid-template-columns: 1fr 1fr; } }
+
+  /* ── Icon tiles ───────────────────────────────────────────────────────── */
+  .tile {
+    background: radial-gradient(120% 110% at 50% 34%, var(--tile-a), var(--tile-b));
+    clip-path: url(#squircle);
+    display: grid; place-items: center;
+    aspect-ratio: 1;
+  }
+  .tile svg { width: 100%; height: 100%; display: block; color: var(--mark); }
+  .hero-tile { width: min(340px, 78vw); }
+
+  .sizes { display: flex; align-items: flex-end; gap: 22px; flex-wrap: wrap; margin-top: 26px; }
+  .size { display: grid; gap: 9px; justify-items: center; }
+  .size .cap {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 10.5px; letter-spacing: .1em; color: var(--dim); font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Controls ─────────────────────────────────────────────────────────── */
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 24px; }
+  button {
+    font: inherit; font-size: 13px; letter-spacing: .01em;
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--line-2); border-radius: 2px;
+    padding: 8px 15px; cursor: pointer;
+    transition: color .15s, border-color .15s, background .15s;
+  }
+  button:hover { color: var(--text); border-color: var(--text); }
+  button[aria-pressed="true"] { background: var(--sel); border-color: var(--sel); color: var(--sel-ink); }
+  button:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; }
+
+  /* ── Indicator bench ──────────────────────────────────────────────────── */
+  .bench { display: grid; gap: 28px; align-items: center; }
+  @media (min-width: 700px) { .bench { grid-template-columns: 220px 1fr; } }
+  .stage {
+    background: var(--sunk); border: 1px solid var(--line);
+    border-radius: 3px; display: grid; place-items: center; aspect-ratio: 1;
+  }
+  .stage svg { width: 62%; height: 62%; color: var(--mark); }
+  .readout { display: grid; gap: 14px; }
+  .phase {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px; letter-spacing: .15em; text-transform: uppercase; color: var(--text);
+  }
+  .meaning { color: var(--muted); font-size: 14.5px; }
+  .telemetry {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px; color: var(--dim); font-variant-numeric: tabular-nums;
+    display: flex; gap: 18px; flex-wrap: wrap;
+  }
+
+  /* ── Ask chat ─────────────────────────────────────────────────────────── */
+  .chat {
+    background: var(--sunk); border: 1px solid var(--line); border-radius: 3px;
+    padding: 22px; min-height: 330px; display: flex; flex-direction: column; gap: 20px;
+  }
+  .chat-hd {
+    display: flex; align-items: center; gap: 9px; padding-bottom: 15px;
+    border-bottom: 1px solid var(--line);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim);
+  }
+  .chat-hd b { color: var(--text); font-weight: 600; letter-spacing: .02em; font-size: 12.5px; }
+  .bubble { align-self: flex-end; background: var(--panel); border: 1px solid var(--line);
+    padding: 11px 15px; border-radius: 15px 15px 4px 15px; max-width: 78%; font-size: 15px; }
+  .think { display: flex; align-items: center; gap: 13px; min-height: 46px; }
+  .think svg { width: 42px; height: 42px; flex: 0 0 42px; color: var(--mark); }
+  .think .st { color: var(--muted); font-size: 15px; }
+  .answer { font-size: 15px; line-height: 1.62; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 9px; margin-top: 15px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 12px; font-size: 13px; color: var(--muted);
+  }
+  .chip b {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color: var(--text); font-weight: 700; letter-spacing: -.06em;
+  }
+  [hidden] { display: none !important; }
+
+  .findings { display: grid; gap: 18px; margin-top: 26px; }
+  @media (min-width: 760px) { .findings { grid-template-columns: repeat(3, 1fr); } }
+  .finding { border-top: 1px solid var(--line-2); padding-top: 15px; }
+  .finding .eyebrow { display: block; margin-bottom: 8px; }
+  .finding p { font-size: 14px; color: var(--muted); }
+
+  footer { border-top: 1px solid var(--line); padding-top: 26px; margin-top: 40px; }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs><clipPath id="squircle" clipPathUnits="objectBoundingBox"><path id="sqpath" d=""/></clipPath></defs>
+</svg>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Machina AI · identity · running prototype</div>
+    <h1>Citation</h1>
+    <p class="lead">
+      Brackets enclosing a struck point. The mark, and the Ask indicator built from
+      it — both live on this page, not screenshots of them.
+    </p>
+    <div class="themebar">
+      <span class="swatch"></span>
+      <span id="paletteName">Lumen</span>
+      <span style="color:var(--line-2)">/</span>
+      <span>switch your theme to see the other palette</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="sechead">
+      <span class="eyebrow">01 — the mark</span>
+      <p>
+        The same geometry at every size. Nothing is a bitmap here: the brackets are
+        computed from one set of constants, so what survives at 38&nbsp;px is the
+        structure, not a detail applied on top of it.
+      </p>
+    </div>
+    <div class="grid split">
+      <div>
+        <div class="tile hero-tile" id="heroTile"></div>
+        <div class="sizes" id="sizes"></div>
+      </div>
+      <div class="panel">
+        <h3>Why brackets</h3>
+        <p class="note" style="margin-top:12px">
+          Machina's differentiator isn't answers, it's <strong>cited</strong> answers,
+          and brackets are the universal mark of a reference.
+        </p>
+        <p class="note" style="margin-top:14px">
+          The name comes from the Machine in <em>Person of Interest</em> — a system of
+          total capture that surfaces exactly one relevant thing. The show renders the
+          Machine's attention as bracket frames snapping onto a subject, so the mark is
+          also the namesake's own visual signature.
+        </p>
+        <p class="note" style="margin-top:14px">
+          It is the only mark in the exploration that says something true about the
+          product at notification size.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sechead">
+      <span class="eyebrow">02 — the indicator</span>
+      <p>
+        The mark's job in the app is to replace the Ask thinking orb. The motion has to
+        depict the operation rather than signal "busy" — so pick a motion and watch what
+        each one asserts.
+      </p>
+    </div>
+
+    <div class="panel">
+      <div class="bench">
+        <div class="stage" id="stage"></div>
+        <div class="readout">
+          <div class="phase" id="phase">searching</div>
+          <div class="meaning" id="meaning">Brackets sweep, the point stays faint.</div>
+          <div class="telemetry">
+            <span>spread <span id="tSpread">58.0</span></span>
+            <span>point <span id="tDot">16.0</span></span>
+            <span>alpha <span id="tOp">0.45</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="controls" role="group" aria-label="Motion">
+        <button data-motion="clamp" aria-pressed="true">Clamp</button>
+        <button data-motion="step" aria-pressed="false">Step</button>
+        <button data-motion="trace" aria-pressed="false">Trace</button>
+        <button id="pause" aria-pressed="false">Pause</button>
+      </div>
+    </div>
+
+    <div class="findings">
+      <div class="finding">
+        <span class="eyebrow">Clamp</span>
+        <p>Narrowing in. The calm default — the brackets never stop being brackets.</p>
+      </div>
+      <div class="finding">
+        <span class="eyebrow">Step</span>
+        <p>Ratchets one tick per candidate. The only motion that can be made honest: bind
+           the ticks to sources actually retrieved and it reports instead of mimes.</p>
+      </div>
+      <div class="finding">
+        <span class="eyebrow">Trace</span>
+        <p>The reticle assembles. Its first frames are four loose corner ticks — the
+           namesake's targeting frame, arrived at by accident. Best as the entry.</p>
+      </div>
+    </div>
+
+    <p class="note" style="margin-top:26px">
+      Rotation was tested and cut: at 90° the brackets become a top-and-bottom frame and
+      mid-sweep they read as loose diagonals, so the mark stops being a citation for most
+      of its loop.
+    </p>
+  </section>
+
+  <section>
+    <div class="sechead">
+      <span class="eyebrow">03 — in situ</span>
+      <p>
+        Isolated tiles flatter a motion design. Here it is at the size it would really
+        ship, running the beats <code style="font-family:ui-monospace,Menlo,monospace;font-size:13px">AskBrain.tsx</code>
+        already has — and handing off to a source chip built from the same bracket.
+      </p>
+    </div>
+    <div class="chat" id="chat">
+      <div class="chat-hd"><b>Ask Machina</b><span>·</span><span>Library</span></div>
+      <div class="bubble">What did I save about spaced repetition?</div>
+      <div class="think" id="think">
+        <div id="thinkMark"></div>
+        <div class="st" id="status">Searching your library…</div>
+      </div>
+      <div class="answer" id="answer" hidden>
+        You saved three pieces on it. The through-line is that recall beats re-reading —
+        testing yourself is what moves something into long-term memory, and the spacing
+        only decides how efficiently.
+        <div><span class="chip"><b>[&#8202;&bull;&#8202;]</b> Make It Stick — ch. 2</span></div>
+      </div>
+    </div>
+    <div class="controls"><button id="replay">Replay</button></div>
+  </section>
+
+  <footer>
+    <p class="note">
+      Geometry, motion and both palettes are generated in
+      <code style="font-family:ui-monospace,Menlo,monospace;font-size:13px">design/icon-concepts/</code>
+      on <code style="font-family:ui-monospace,Menlo,monospace;font-size:13px">claude/logo-design-feedback-uhl1sk</code>.
+      The JavaScript on this page uses the same constants as the Python that produced the
+      static studies, so it doubles as the spec for the React component.
+    </p>
+  </footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ── Geometry ─────────────────────────────────────────────────────────────
+     The identical constants used by nonletter.py / anim2.py. */
+  const TOP = 300, BOT = 700, W = 58, ARM = 100;
+  const LX = 296, RX = 728, CX = 512, CY = 500;
+
+  const bracketPaths = (spread) => {
+    const lx = LX - spread, rx = RX + spread;
+    return [
+      `M${lx} ${TOP} L${lx+ARM} ${TOP} L${lx+ARM} ${TOP+W} L${lx+W} ${TOP+W} ` +
+      `L${lx+W} ${BOT-W} L${lx+ARM} ${BOT-W} L${lx+ARM} ${BOT} L${lx} ${BOT} Z`,
+      `M${rx} ${TOP} L${rx-ARM} ${TOP} L${rx-ARM} ${TOP+W} L${rx-W} ${TOP+W} ` +
+      `L${rx-W} ${BOT-W} L${rx-ARM} ${BOT-W} L${rx-ARM} ${BOT} L${rx} ${BOT} Z`
+    ];
+  };
+
+  /* A true iOS-style superellipse, |u|^n + |v|^n = 1, in 0..1 space so one
+     clip path serves every tile size. */
+  (() => {
+    const n = 5, N = 120, pts = [];
+    for (let i = 0; i <= N; i++) {
+      const th = (i / N) * 2 * Math.PI;
+      const c = Math.cos(th), s = Math.sin(th);
+      const u = Math.sign(c) * Math.pow(Math.abs(c), 2 / n);
+      const v = Math.sign(s) * Math.pow(Math.abs(s), 2 / n);
+      pts.push(`${(0.5 + u / 2).toFixed(5)} ${(0.5 + v / 2).toFixed(5)}`);
+    }
+    document.getElementById("sqpath").setAttribute("d", "M" + pts.join(" L") + " Z");
+  })();
+
+  /* ── Mark rendering ───────────────────────────────────────────────────── */
+  let uid = 0;
+  function makeMark(host, { glow = true } = {}) {
+    const id = "m" + (uid++);
+    host.innerHTML =
+      `<svg viewBox="0 0 1024 1024" role="img" aria-label="Machina citation mark">
+         <defs><clipPath id="clip${id}">
+           <rect id="ct${id}" x="0" y="${TOP}" width="1024" height="200"/>
+           <rect id="cb${id}" x="0" y="${BOT-200}" width="1024" height="200"/>
+         </clipPath></defs>
+         <g id="g${id}"${glow ? ' style="filter:drop-shadow(0 0 13px var(--glow))"' : ""}>
+           <g id="bk${id}" clip-path="url(#clip${id})">
+             <path id="pl${id}" fill="currentColor"/><path id="pr${id}" fill="currentColor"/>
+           </g>
+           <circle id="dt${id}" cx="${CX}" cy="${CY}" r="52" fill="currentColor"/>
+         </g>
+       </svg>`;
+    const $ = (p) => document.getElementById(p + id);
+    const el = { pl: $("pl"), pr: $("pr"), dt: $("dt"), ct: $("ct"), cb: $("cb"), g: $("g") };
+    return (s) => {
+      const [l, r] = bracketPaths(s.spread || 0);
+      el.pl.setAttribute("d", l); el.pr.setAttribute("d", r);
+      el.dt.setAttribute("r", (s.dotR ?? 52).toFixed(1));
+      el.dt.setAttribute("opacity", (s.dotOp ?? 1).toFixed(3));
+      const h = s.clipH ?? 200;
+      el.ct.setAttribute("height", h.toFixed(1));
+      el.cb.setAttribute("y", (BOT - h).toFixed(1));
+      el.cb.setAttribute("height", h.toFixed(1));
+      el.g.setAttribute("opacity", (s.alpha ?? 1).toFixed(3));
+    };
+  }
+
+  const LOCKED = { spread: 0, dotR: 52, dotOp: 1, clipH: 200, alpha: 1 };
+
+  /* Static marks: hero tile plus the four delivered sizes. */
+  makeMark(document.getElementById("heroTile"))(LOCKED);
+  const SIZES = [[120, "60pt @2x"], [80, "40pt @2x"], [58, "29pt @2x"], [38, "notif"]];
+  const sizeHost = document.getElementById("sizes");
+  SIZES.forEach(([px, cap]) => {
+    const wrap = document.createElement("div"); wrap.className = "size";
+    const tile = document.createElement("div");
+    tile.className = "tile"; tile.style.width = px + "px";
+    const label = document.createElement("div");
+    label.className = "cap"; label.textContent = cap;
+    wrap.append(tile, label); sizeHost.append(wrap);
+    makeMark(tile, { glow: px > 60 })(LOCKED);
+  });
+
+  /* ── Motions ──────────────────────────────────────────────────────────────
+     t is 0..1 across one loop. Mirrors anim2.py, with one correction the
+     in-situ test forced: the searching point sat at r16/0.34 and vanished at
+     inline size, so its floor is raised here. */
+  const ease = (t) => { t = Math.min(1, Math.max(0, t));
+    return t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3)/2; };
+  const half = (BOT - TOP) / 2;
+
+  const MOTIONS = {
+    clamp: (t) => {
+      if (t < .33) return { spread: 58 + 11*Math.sin(t*6*2*Math.PI), dotR: 21, dotOp: .46,
+        phase: "searching", meaning: "Brackets sweep, the point stays faint." };
+      if (t < .56) { const e = ease((t-.33)/.23);
+        return { spread: 58*(1-e), dotR: 21+31*e, dotOp: .46+.54*e,
+          phase: "locking on", meaning: "They pull in and settle on the source." }; }
+      if (t < .90) { const p = .5+.5*Math.sin((t-.56)/.34*2*Math.PI);
+        return { spread: 0, dotR: 50+5*p, dotOp: 1,
+          phase: "answering", meaning: "Held. Only the point breathes." }; }
+      const e = ease((t-.90)/.10);
+      return { spread: 58*e, dotR: 52-31*e, dotOp: 1-.54*e,
+        phase: "release", meaning: "Back into the loop." };
+    },
+    step: (t) => {
+      if (t < .70) {
+        const k = Math.min(4, Math.floor(t/.14)), f = (t - k*.14)/.14;
+        const a = 90 - 18*k, b = 90 - 18*(k+1);
+        return { spread: a + (b-a)*ease(f/.34), dotR: 19+6*k, dotOp: .40+.11*k,
+          phase: `reviewing · ${k+1} of 5`,
+          meaning: "One tick per candidate. Bind these to real retrievals." };
+      }
+      if (t < .82) { const e = ease((t-.70)/.12);
+        return { spread: 0, dotR: 43+9*e, dotOp: .84+.16*e,
+          phase: "locking on", meaning: "The last candidate resolves." }; }
+      const p = .5+.5*Math.sin((t-.82)/.18*2*Math.PI);
+      return { spread: 0, dotR: 50+5*p, dotOp: 1,
+        phase: "answering", meaning: "Held. Only the point breathes." };
+    },
+    trace: (t) => {
+      if (t < .38) return { spread: 0, clipH: W + (half-W)*ease(t/.38), dotR: 0, dotOp: 0,
+        phase: "acquiring", meaning: "Corner ticks first — the reticle assembles." };
+      if (t < .54) { const e = ease((t-.38)/.16);
+        return { spread: 0, clipH: half, dotR: 52*e, dotOp: e,
+          phase: "strike", meaning: "The point lands inside the frame." }; }
+      if (t < .86) { const p = .5+.5*Math.sin((t-.54)/.32*2*Math.PI);
+        return { spread: 0, clipH: half, dotR: 50+5*p, dotOp: 1,
+          phase: "answering", meaning: "Held. Only the point breathes." }; }
+      return { spread: 0, clipH: half, dotR: 52, dotOp: 1, alpha: 1-ease((t-.86)/.14),
+        phase: "release", meaning: "Back into the loop." };
+    }
+  };
+
+  /* ── Bench ────────────────────────────────────────────────────────────── */
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+  const drawStage = makeMark(document.getElementById("stage"));
+  const elPhase = document.getElementById("phase"), elMean = document.getElementById("meaning");
+  const tS = document.getElementById("tSpread"), tD = document.getElementById("tDot"),
+        tO = document.getElementById("tOp");
+  const CYCLE = 3600;
+  let motion = "clamp", paused = false, t0 = performance.now();
+
+  function paint(s) {
+    drawStage(s);
+    elPhase.textContent = s.phase;
+    elMean.textContent = s.meaning;
+    tS.textContent = (s.spread ?? 0).toFixed(1);
+    tD.textContent = (s.dotR ?? 52).toFixed(1);
+    tO.textContent = (s.dotOp ?? 1).toFixed(2);
+  }
+
+  function frame(now) {
+    if (!paused && !reduced.matches) {
+      paint(MOTIONS[motion](((now - t0) % CYCLE) / CYCLE));
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function restState() {
+    const s = MOTIONS[motion](.75);
+    paint({ ...s, phase: "locked", meaning: "Reduced motion: the mark rests locked on." });
+  }
+
+  document.querySelectorAll("[data-motion]").forEach((b) => {
+    b.addEventListener("click", () => {
+      document.querySelectorAll("[data-motion]").forEach((o) =>
+        o.setAttribute("aria-pressed", String(o === b)));
+      motion = b.dataset.motion; t0 = performance.now();
+      if (reduced.matches) restState();
+    });
+  });
+  const pauseBtn = document.getElementById("pause");
+  pauseBtn.addEventListener("click", () => {
+    paused = !paused;
+    pauseBtn.setAttribute("aria-pressed", String(paused));
+    pauseBtn.textContent = paused ? "Resume" : "Pause";
+  });
+
+  if (reduced.matches) restState(); else requestAnimationFrame(frame);
+  reduced.addEventListener("change", () => { if (reduced.matches) restState(); });
+
+  /* ── In situ ──────────────────────────────────────────────────────────────
+     THINKING_STAGES.free with its real timings: 0 / 1600 / 4200 ms. */
+  const drawChat = makeMark(document.getElementById("thinkMark"));
+  const think = document.getElementById("think"), answer = document.getElementById("answer"),
+        status = document.getElementById("status");
+  const BEATS = [[0, "Searching your library…"], [1600, "Reviewing relevant cards…"],
+                 [4200, "Writing your answer…"]];
+  const REVEAL = 6400;
+  let chatStart = performance.now(), timers = [];
+
+  function chatFrame(now) {
+    const el = now - chatStart;
+    if (el < REVEAL) {
+      drawChat(reduced.matches ? LOCKED : MOTIONS.clamp((el % CYCLE) / CYCLE));
+    }
+    requestAnimationFrame(chatFrame);
+  }
+
+  function runChat() {
+    timers.forEach(clearTimeout); timers = [];
+    chatStart = performance.now();
+    think.hidden = false; answer.hidden = true;
+    BEATS.forEach(([at, text]) => {
+      timers.push(setTimeout(() => { status.textContent = text; }, at));
+    });
+    timers.push(setTimeout(() => { think.hidden = true; answer.hidden = false; }, REVEAL));
+  }
+  document.getElementById("replay").addEventListener("click", runChat);
+  runChat();
+  requestAnimationFrame(chatFrame);
+
+  /* Palette label follows whichever theme is actually showing. */
+  const namePalette = () => {
+    const set = document.documentElement.dataset.theme;
+    const dark = set ? set === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    document.getElementById("paletteName").textContent = dark
+      ? "Lumen — graphite + light" : "Monolith — porcelain + graphite";
+  };
+  namePalette();
+  new MutationObserver(namePalette).observe(document.documentElement,
+    { attributes: true, attributeFilter: ["data-theme"] });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", namePalette);
+})();
+</script>
