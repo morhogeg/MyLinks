@@ -65,6 +65,7 @@ from search import (
     anchor_phrases_for, is_exclusion_question, demote_cards_by_titles,
     is_recency_question, recent_cards, category_cards,
     private_collection_ids, strip_private_cards, apply_distance_threshold,
+    followup_retrieval_query,
 )
 from rate_limit import check_rate_limit, client_ip
 # Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
@@ -1566,6 +1567,17 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             return q
         charged = (uid, "asks")
 
+        # 0. What this turn is actually ABOUT. Normally the question itself;
+        #    for a follow-up that carries no topic of its own ("in Hebrew",
+        #    "shorter", "why?") it becomes the last user turn that did, so
+        #    retrieval doesn't embed two meta words and hand the model a
+        #    context set unrelated to the subject it just answered (see
+        #    search.followup_retrieval_query). Steers RETRIEVAL ONLY — the
+        #    model is still asked the raw `question`, with `history`.
+        retrieval_query = followup_retrieval_query(question, history)
+        if retrieval_query != question:
+            logger.info("ask_brain: context-free follow-up — retrieving for the prior question")
+
         # 1. Retrieve the most relevant saved cards (reuses the vector search
         #    that already powers the search bar). Degrade gracefully: if
         #    retrieval fails, answer_from_context returns a friendly "nothing
@@ -1582,7 +1594,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         # answer, which gaslights a user with hundreds of saves.
         retrieval_errors = 0
         try:
-            candidates = perform_search_logic(uid, question, limit=30)
+            candidates = perform_search_logic(uid, retrieval_query, limit=30)
             # Quality-gate the nearest-neighbour output exactly like the
             # search bar does: find_nearest always returns `limit` results no
             # matter how far away, so for an off-library question ungated
@@ -1590,7 +1602,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             # then pressures the model to cite one. Gated, the model honestly
             # says the library has nothing on it.
             candidates = apply_distance_threshold(candidates)
-            cards = rerank_candidates(question, candidates, top_k=10)
+            cards = rerank_candidates(retrieval_query, candidates, top_k=10)
         except Exception as e:
             logger.error(f"ask_brain retrieval failed: {e}")
             retrieval_errors += 1
@@ -1603,7 +1615,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #     (same one the search bar's hybrid path uses).
         try:
             have = {c.get("id") for c in cards}
-            cards = cards + keyword_scan_cards(uid, question, exclude_ids=have, limit=5)
+            cards = cards + keyword_scan_cards(uid, retrieval_query, exclude_ids=have, limit=5)
         except Exception as e:
             logger.error(f"ask_brain keyword fallback failed: {e}")
             retrieval_errors += 1
@@ -1631,7 +1643,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #     Chips assert this explicitly (hints.recency); typed questions
         #     are matched by phrasing.
         try:
-            if hints.get("recency") or is_recency_question(question):
+            if hints.get("recency") or is_recency_question(retrieval_query):
                 recents = recent_cards(uid, limit=12)
                 recent_ids = {c.get("id") for c in recents}
                 cards = recents + [c for c in cards if c.get("id") not in recent_ids]
@@ -1658,9 +1670,9 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #     the BACK of context (still referenceable, never the headline)
         #     and the prompt gets an explicit already-discussed list.
         excluded_titles = list(hints.get("excludeTitles") or [])
-        if excluded_titles or is_exclusion_question(question):
-            if is_exclusion_question(question):
-                excluded_titles += extract_quoted_phrases(question)
+        if excluded_titles or is_exclusion_question(retrieval_query):
+            if is_exclusion_question(retrieval_query):
+                excluded_titles += extract_quoted_phrases(retrieval_query)
             try:
                 cards, _ = demote_cards_by_titles(excluded_titles, cards)
             except Exception as e:
@@ -1675,7 +1687,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         #     none matched would let one silently vanish).
         try:
             anchors = anchor_phrases_for(
-                question, hints.get("anchorTitles"), excluded_titles)
+                retrieval_query, hints.get("anchorTitles"), excluded_titles)
             if anchors:
                 for phrase in missing_title_phrases(anchors, cards):
                     have = {c.get("id") for c in cards}

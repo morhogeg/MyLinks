@@ -19,6 +19,8 @@ from search import (
     demote_cards_by_titles,
     keyword_match_score,
     keyword_query_tokens,
+    is_context_free_followup,
+    followup_retrieval_query,
 )
 
 
@@ -334,3 +336,92 @@ def test_keyword_score_matches_concept_only_cards():
             "concepts": ["Resilience", "Team Spirit"]}
     tokens = keyword_query_tokens("What else did I save on Resilience?")
     assert keyword_match_score(card, tokens) > 0
+
+
+# ── Context-free follow-ups (is_context_free_followup) ─────────────────────
+
+def test_followup_meta_questions_carry_no_topic():
+    # The owner-reported turn: an answer in English, then one Hebrew word
+    # meaning "in Hebrew". Retrieving for it returns topically random cards.
+    assert is_context_free_followup("בעברית") is True
+    assert is_context_free_followup("in English please") is True
+    assert is_context_free_followup("shorter") is True
+    assert is_context_free_followup("summarize that in bullets") is True
+    assert is_context_free_followup("בקצרה בבקשה") is True
+
+
+def test_followup_bare_stopword_questions_carry_no_topic():
+    # No content tokens at all — only understandable against the turn before.
+    assert is_context_free_followup("why?") is True
+    assert is_context_free_followup("and?") is True
+    assert is_context_free_followup("") is True
+
+
+def test_followup_one_real_word_is_enough_to_stay_a_topic():
+    # The gate is a CLOSED meta vocabulary: a single content word — including
+    # a topic switch, or a meta word next to a real one — keeps the question
+    # its own, so its retrieval is untouched.
+    assert is_context_free_followup("more on the maple cake") is False
+    assert is_context_free_followup("what about the Italy trip?") is False
+    assert is_context_free_followup("summarize the parenting article") is False
+    assert is_context_free_followup(
+        'Walk me through the steps in "Pan con Tomate Recipe"') is False
+    assert is_context_free_followup("מה שמור לי על חינוך") is False
+
+
+# ── Which text Ask retrieves for (followup_retrieval_query) ────────────────
+
+_ASKED = 'Why is "מתכון לעוגת מייפל עסיסית" worth my time?'
+
+
+def test_retrieval_query_falls_back_to_the_prior_topical_question():
+    # The reported bug: "בעברית" retrieved for itself, so the model was handed
+    # unrelated cards and said the library has nothing on the very recipe it
+    # had just answered about — with the card cited on screen.
+    history = [
+        {"role": "user", "content": _ASKED},
+        {"role": "assistant", "content": "The maple cake is worth your time because…"},
+    ]
+    assert followup_retrieval_query("בעברית", history) == _ASKED
+
+
+def test_retrieval_query_walks_past_a_chain_of_meta_turns():
+    history = [
+        {"role": "user", "content": _ASKED},
+        {"role": "assistant", "content": "…"},
+        {"role": "user", "content": "בעברית"},
+        {"role": "assistant", "content": "…"},
+    ]
+    assert followup_retrieval_query("shorter", history) == _ASKED
+
+
+def test_retrieval_query_never_uses_an_assistant_turn():
+    # An answer is not a query — embedding it would retrieve for the model's
+    # own prose, not the user's subject.
+    history = [{"role": "assistant", "content": "The maple cake is worth your time…"}]
+    assert followup_retrieval_query("בעברית", history) == "בעברית"
+
+
+def test_retrieval_query_is_unchanged_for_a_normal_question():
+    # The safety property: anything with a topic of its own retrieves EXACTLY
+    # as before, history or not — first turns, topic switches, chip questions.
+    history = [
+        {"role": "user", "content": _ASKED},
+        {"role": "assistant", "content": "…"},
+    ]
+    for q in ("What did I save about Italy?", _ASKED, "recap my recent saves"):
+        assert followup_retrieval_query(q, history) == q
+        assert followup_retrieval_query(q, []) == q
+        assert followup_retrieval_query(q, None) == q
+
+
+def test_retrieval_query_fails_open_on_missing_or_malformed_history():
+    assert followup_retrieval_query("בעברית", None) == "בעברית"
+    assert followup_retrieval_query("בעברית", []) == "בעברית"
+    assert followup_retrieval_query("בעברית", "not a list") == "בעברית"
+    assert followup_retrieval_query("בעברית", [None, 7, "x"]) == "בעברית"
+    # A conversation with no topical user turn has nothing better to offer.
+    assert followup_retrieval_query(
+        "בעברית", [{"role": "user", "content": "shorter"}]) == "בעברית"
+    assert followup_retrieval_query(
+        "בעברית", [{"role": "user", "content": "   "}]) == "בעברית"

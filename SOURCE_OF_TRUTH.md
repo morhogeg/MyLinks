@@ -746,7 +746,39 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-25 (latest) — LINKEDIN BYLINE: POST TEXT WAS BECOMING THE
+- **2026-07-25 (latest) — ASK: A FOLLOW-UP WITH NO TOPIC OF ITS OWN RETRIEVED
+  FOR NOISE.** Owner screenshot: Ask answered `Why is "מתכון לעוגת מייפל עסיסית"
+  worth my time?` in English, with the recipe card cited on screen; the next
+  turn — `בעברית` ("in Hebrew") — replied that **the library has no content on
+  that recipe**, listing unrelated politics/parenting/Italy cards as its
+  sources. Root cause: `ask_brain` retrieves for the CURRENT question text
+  alone (history only ever reached the answer prompt, `_build_rag_prompt`), so
+  the turn embedded two meta words and got topically arbitrary neighbours;
+  the model saw the real subject in history but a context set unrelated to it
+  and — correctly, per its grounding rules — said it had nothing. It fires for
+  every content-free follow-up, in any language: "shorter", "in English",
+  "why?", "expand". Fix (backend only, no client change, so already-shipped
+  TestFlight builds get it on deploy): new pure helpers in `search.py` —
+  `is_context_free_followup` (every content token is meta — a language, a
+  length, a "go on" — or there are none) and `followup_retrieval_query`
+  (returns the last user turn that DID carry a topic, walking past chained meta
+  turns, never an assistant turn, failing open on malformed history).
+  `ask_brain` now derives `retrieval_query` once and feeds it to every
+  retrieval-steering call (vector search, rerank, keyword scan, recency,
+  exclusion, anchor pinning); **generation is untouched** — the model still
+  gets the raw `question` + `history`, so "answer in Hebrew" still means answer
+  in Hebrew. The meta vocabulary is a CLOSED list (EN + HE), so any question
+  with one real content word — including a topic switch — retrieves
+  byte-identically to before; that's the safety property, tested. Covers the
+  streaming and JSON paths alike (retrieval precedes the branch). Verified:
+  **13 new tests** (`test_ask_retrieval.py` pure-helper cases +
+  `test_ask_followup_context.py` endpoint wiring), suite **448 passed / 4
+  failed** — the 4 are the pre-existing `test_embed_trigger_backstop`
+  `firebase_functions` drift (§4 item 11b), unchanged by this diff; the new
+  endpoint test was confirmed to FAIL with the fix reverted. Backend-only diff,
+  so no `tsc` surface. **Deploy scope: `ask_brain`.**
+
+- **2026-07-25 — LINKEDIN BYLINE: POST TEXT WAS BECOMING THE
   PUBLISHER.** Owner: a "Claude for Business" company post showed its source as
   "Introducing Three New Certifica…" — the post's own opening line. The chain:
   `scraper._extract_linkedin_author` only matched `"<Author> on LinkedIn: …"`,

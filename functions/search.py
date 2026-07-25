@@ -538,6 +538,74 @@ def is_exclusion_question(question: str) -> bool:
     return bool(_EXCLUSION_RE.search(_strip_quoted(question)))
 
 
+# ── Conversational follow-ups: which text to RETRIEVE for ───────────────────
+# Ask retrieves for the current question's text alone; the conversation history
+# only ever reaches the answer prompt. That breaks on a follow-up carrying no
+# topic of its own — "in Hebrew", "shorter", "why?" — because embedding two
+# meta words returns topically arbitrary cards. The model then sees the real
+# subject in the history but a context set that has nothing to do with it, and
+# honestly reports the library has nothing on the topic it JUST answered with a
+# cited source (owner report 2026-07-25: an English answer about a saved maple
+# cake recipe, then "בעברית" → "the information I have doesn't include content
+# on מתכון לעוגת מייפל עסיסית", sources listed = unrelated cards).
+#
+# Fix: on such a turn, retrieve for the last question that DID carry a topic.
+# Deliberately narrow — the meta vocabulary below is a CLOSED list, so any
+# question with one real content word (including a genuine topic switch) is
+# untouched and its retrieval query stays byte-identical to before.
+_META_FOLLOWUP_TOKENS = {
+    # Language / translation ("in Hebrew", "translate it to English")
+    "translate", "translated", "translation", "language",
+    "hebrew", "english", "arabic", "spanish", "french", "russian",
+    "עברית", "בעברית", "אנגלית", "באנגלית", "תרגם", "תרגמי", "תרגום", "בשפה",
+    # Length / form ("shorter", "in bullets", "summarize that")
+    "shorter", "short", "briefly", "brief", "concise", "longer", "expand",
+    "elaborate", "detail", "details", "summarize", "summarise", "summary",
+    "tldr", "rephrase", "reword", "rewrite", "simplify", "simpler", "bullets",
+    "bullet", "points", "list", "steps",
+    "קצר", "בקצרה", "תקצר", "ארוך", "הרחב", "הרחיב", "פרט", "בפירוט",
+    "סכם", "סיכום", "תמצת", "נקודות", "רשימה", "פשוט",
+    # Continuation / politeness ("go on", "again", "please", "thanks")
+    "explain", "continue", "again", "repeat", "more", "less", "please",
+    "thanks", "thank", "ok", "okay", "sure", "yeah", "yep",
+    "הסבר", "תסביר", "המשך", "תמשיך", "שוב", "בבקשה", "תודה", "אוקיי", "יותר",
+}
+
+
+def is_context_free_followup(question: str) -> bool:
+    """True when the question carries no topic of its own — every content token
+    is meta (a language, a length, a "go on"), or there are no content tokens
+    at all ("why?", "and?"). Such text can only be understood against the turn
+    before it, so retrieving for it is retrieving for noise. Pure."""
+    tokens = keyword_query_tokens(question)
+    if not tokens:
+        return True
+    return tokens <= _META_FOLLOWUP_TOKENS
+
+
+def followup_retrieval_query(question: str, history) -> str:
+    """The text ask_brain should RETRIEVE for this turn.
+
+    Almost always the question itself — swapped for the most recent user turn
+    that carried a topic only when the question is a context-free follow-up and
+    such a turn exists. Never changes what the MODEL is asked (the raw question
+    and the history still go to the prompt); this steers retrieval only. Pure —
+    `history` is the already-sanitized [{role, content}] list. Fails open: any
+    malformed history, or a conversation with no topical question in it, gives
+    back `question` unchanged."""
+    if not isinstance(history, list) or not history:
+        return question
+    if not is_context_free_followup(question):
+        return question
+    for item in reversed(history):
+        if not isinstance(item, dict) or item.get("role") != "user":
+            continue
+        prior = str(item.get("content") or "").strip()
+        if prior and not is_context_free_followup(prior):
+            return prior
+    return question
+
+
 def demote_cards_by_titles(titles: List[str], cards: List[dict]):
     """Move cards whose title matches any of `titles` to the BACK of the list
     (otherwise stable). They stay in context — the model may reference them
