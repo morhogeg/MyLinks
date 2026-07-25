@@ -199,8 +199,28 @@
   }
   .splash svg { width: 104px; height: 104px; color: #FFFFFF;
                 filter: drop-shadow(0 0 16px rgba(174,184,206,.34)); }
-  .wordmark { width: 148px; opacity: 0; }
-  .wordmark svg { display: block; width: 100%; height: auto; }
+  /* Launch keeps the letterspaced setting: at ~20px tall the drawn wordmark's
+     weight fights the mark, where wide tracking stays quiet under it. The drawn
+     one earns its keep in the top bar instead, where it has to hold its own
+     against a 40px tile. */
+  .wordmark {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px; letter-spacing: .46em; text-transform: uppercase;
+    color: #E6E6F0; text-indent: .46em; opacity: 0;
+  }
+  .topbar {
+    width: min(520px, 100%); height: 68px; display: flex; align-items: center;
+    gap: 12px; padding: 0 18px; margin-top: 26px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 3px;
+  }
+  .topbar .tile { width: 40px; height: 40px; border-radius: 14px; flex: 0 0 40px;
+    background: radial-gradient(120% 110% at 50% 34%, var(--tile-a), var(--tile-b));
+    display: grid; place-items: center; }
+  .topbar .tile svg { width: 100%; height: 100%; color: var(--mark); }
+  .topbar .stack { display: grid; gap: 4px; }
+  .topbar .wm { width: 112px; }
+  .topbar .wm svg { display: block; width: 100%; height: auto; fill: var(--text); }
+  .topbar .tag { font-size: 11px; color: var(--muted); }
   .phonecol { display: grid; gap: 13px; justify-items: center; }
   .phonecap {
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -393,7 +413,7 @@
       <div class="phone">
         <div class="splash" id="splash">
           <div id="splashMark"></div>
-          <div class="wordmark" id="wordmark"><svg viewBox="0 0 2942 422" role="img" aria-label="Machina AI"><path d="M 0.0 422.0 L 0.0 0.0 L 65.2 0.0 L 194.0 275.6 L 322.8 0.0 L 388.0 0.0 L 388.0 422.0 L 326.0 422.0 L 326.0 139.6 L 194.0 422.0 L 62.0 139.6 L 62.0 422.0 Z M 420.0 422.0 L 487.0 422.0 L 625.5 0.0 L 558.5 0.0 Z M 764.0 422.0 L 697.0 422.0 L 558.5 0.0 L 625.5 0.0 Z M 536.4 253.2 L 647.6 253.2 L 668.0 315.2 L 516.0 315.2 Z M 1090.0 385.9 A 186.0 211.0 0 1 1 1090.0 36.1 L 1055.3 87.5 A 124.0 149.0 0 1 0 1055.3 334.5 Z M 1200.0 0.0 L 1262.0 0.0 L 1262.0 422.0 L 1200.0 422.0 Z M 1438.0 0.0 L 1500.0 0.0 L 1500.0 422.0 L 1438.0 422.0 Z M 1262.0 180.0 L 1438.0 180.0 L 1438.0 242.0 L 1262.0 242.0 Z M 1544.0 0.0 L 1606.0 0.0 L 1606.0 422.0 L 1544.0 422.0 Z M 1650.0 0.0 L 1712.0 0.0 L 1712.0 422.0 L 1650.0 422.0 Z M 1906.0 0.0 L 1968.0 0.0 L 1968.0 422.0 L 1906.0 422.0 Z M 1650.0 0.0 L 1722.5 0.0 L 1968.0 422.0 L 1895.5 422.0 Z M 2000.0 422.0 L 2067.0 422.0 L 2205.5 0.0 L 2138.5 0.0 Z M 2344.0 422.0 L 2277.0 422.0 L 2138.5 0.0 L 2205.5 0.0 Z M 2116.4 253.2 L 2227.6 253.2 L 2248.0 315.2 L 2096.0 315.2 Z M 2512.0 422.0 L 2579.0 422.0 L 2717.5 0.0 L 2650.5 0.0 Z M 2856.0 422.0 L 2789.0 422.0 L 2650.5 0.0 L 2717.5 0.0 Z M 2628.4 253.2 L 2739.6 253.2 L 2760.0 315.2 L 2608.0 315.2 Z M 2880.0 0.0 L 2942.0 0.0 L 2942.0 422.0 L 2880.0 422.0 Z" fill="#E9E9F2"/></svg></div>
+        <div class="wordmark" id="wordmark">Machina</div>
         </div>
         <div class="appshell" id="appshell">
           <div class="skelbar"></div>
@@ -401,6 +421,17 @@
         </div>
       </div>
       <div class="phonecap">First frame · animated</div>
+      </div>
+      <div style="grid-column:1/-1">
+        <h3>In the app</h3>
+        <p class="note" style="margin-top:10px">The drawn wordmark replaces the purple gradient type in the header at <span class="mono" style="font-size:13px">app/page.tsx:159</span>.</p>
+        <div class="topbar">
+          <div class="tile" id="barTile"></div>
+          <div class="stack">
+            <div class="wm"><svg viewBox="0 0 2309 422" role="img" aria-label="Machina"><path d="M 0.0 422.0 L 0.0 0.0 L 65.2 0.0 L 194.0 275.6 L 322.8 0.0 L 388.0 0.0 L 388.0 422.0 L 326.0 422.0 L 326.0 139.6 L 194.0 422.0 L 62.0 139.6 L 62.0 422.0 Z M 558.5 0.0 L 625.5 0.0 L 487.0 422.0 L 420.0 422.0 Z M 558.5 0.0 L 625.5 0.0 L 764.0 422.0 L 697.0 422.0 Z M 536.4 253.2 L 647.6 253.2 L 668.0 315.2 L 516.0 315.2 Z M 1090.0 385.9 A 186.0 211.0 0 1 1 1090.0 36.1 L 1055.3 87.5 A 124.0 149.0 0 1 0 1055.3 334.5 Z M 1165.0 0.0 L 1227.0 0.0 L 1227.0 422.0 L 1165.0 422.0 Z M 1403.0 0.0 L 1465.0 0.0 L 1465.0 422.0 L 1403.0 422.0 Z M 1227.0 180.0 L 1403.0 180.0 L 1403.0 242.0 L 1227.0 242.0 Z M 1509.0 0.0 L 1571.0 0.0 L 1571.0 422.0 L 1509.0 422.0 Z M 1615.0 0.0 L 1677.0 0.0 L 1677.0 422.0 L 1615.0 422.0 Z M 1871.0 0.0 L 1933.0 0.0 L 1933.0 422.0 L 1871.0 422.0 Z M 1615.0 0.0 L 1687.5 0.0 L 1933.0 422.0 L 1860.5 422.0 Z M 2103.5 0.0 L 2170.5 0.0 L 2032.0 422.0 L 1965.0 422.0 Z M 2103.5 0.0 L 2170.5 0.0 L 2309.0 422.0 L 2242.0 422.0 Z M 2081.4 253.2 L 2192.6 253.2 L 2213.0 315.2 L 2061.0 315.2 Z"/></svg></div>
+            <div class="tag">Capture. Connect. Recall.</div>
+          </div>
+        </div>
       </div>
       <div class="launchnote">
         <h3>What happens</h3>
@@ -675,6 +706,7 @@
 
   /* ── Launch sequence ──────────────────────────────────────────────────── */
   makeMark(document.getElementById("splashTile"), { glow: false })(LOCKED);
+  makeMark(document.getElementById("barTile"), { glow: false })(LOCKED);
   const drawSplash = makeMark(document.getElementById("splashMark"), { glow: false });
   const splash = document.getElementById("splash"), shell = document.getElementById("appshell"),
         wordmark = document.getElementById("wordmark");

@@ -55,8 +55,11 @@ def g_A(width=344.0):
     """Legs meeting in a flat-cut apex — the M's truncated apex, mirrored."""
     t = _diag_thickness(width / 2)
     cx = width / 2
-    left = [(0, CAP), (t, CAP), (cx + t / 2, 0), (cx - t / 2, 0)]
-    right = [(width, CAP), (width - t, CAP), (cx - t / 2, 0), (cx + t / 2, 0)]
+    # BOTH legs must wind the same way. They overlap across the whole flat
+    # apex, and under the default nonzero fill rule opposite windings cancel
+    # there — which punches a hole clean through the top of every A.
+    left = [(cx - t / 2, 0), (cx + t / 2, 0), (t, CAP), (0, CAP)]
+    right = [(cx - t / 2, 0), (cx + t / 2, 0), (width, CAP), (width - t, CAP)]
 
     def x_in(y):
         """Inner edge of the left leg at height y — the legs splay downward, so
@@ -88,10 +91,15 @@ def g_C(width=372.0):
 
     o0, o1 = p(r_out, ry_out, a0), p(r_out, ry_out, a1)
     i1, i0 = p(r_in, ry_in, a1), p(r_in, ry_in, a0)
+    # C's advance must not bound its full circle: the aperture means there is
+    # no ink on the right at mid-height, and its terminals stop ~80 units short
+    # of `width`. Charging the full circle opens a word-break-sized hole before
+    # H, which is what made MACHINA read as MAC HINA.
+    advance = max(px for px, _ in (p(r_out, ry_out, a) for a in (a0, a1))) + W / 2
     return [f"M{o0[0]:.1f} {o0[1]:.1f} "
             f"A{r_out:.1f} {ry_out:.1f} 0 1 1 {o1[0]:.1f} {o1[1]:.1f} "
             f"L{i1[0]:.1f} {i1[1]:.1f} "
-            f"A{r_in:.1f} {ry_in:.1f} 0 1 0 {i0[0]:.1f} {i0[1]:.1f} Z"], width
+            f"A{r_in:.1f} {ry_in:.1f} 0 1 0 {i0[0]:.1f} {i0[1]:.1f} Z"], advance
 
 
 GLYPHS = {"M": g_M, "A": g_A, "C": g_C, "H": g_H, "I": g_I, "N": g_N}
@@ -100,7 +108,7 @@ GLYPHS = {"M": g_M, "A": g_A, "C": g_C, "H": g_H, "I": g_I, "N": g_N}
 # Optical corrections. Metric spacing alone leaves a hole after the round C and
 # under A's splayed leg, because both letters' advances bound geometry that
 # isn't there at the height where the eye reads the gap.
-KERN = {("M", "A"): -12, ("A", "C"): -8, ("C", "H"): -16,
+KERN = {("M", "A"): -12, ("A", "C"): -8, ("C", "H"): 0,
         ("N", "A"): -12, ("A", "I"): -20}
 
 
