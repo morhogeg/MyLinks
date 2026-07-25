@@ -381,8 +381,12 @@ The multi-user auth work is **fully written but not live**:
     tests, `search.py` tests; wire into CI/SessionStart (AUDIT.md N-2a tracks this).
 19. **[~] Cost guardrails — CODE HALF SHIPPED 2026-07-14 (production-readiness
     sprint, see `docs/PRODUCTION_READINESS_2026-07-14.md`).** Per-user monthly
-    quotas live in code (`functions/quota.py`: 150 saves / 100 asks per month,
-    env-tunable `MONTHLY_SAVE_QUOTA`/`MONTHLY_ASK_QUOTA`, friendly 429s, refund
+    quotas live in code (`functions/quota.py`: 150 saves / **1000 asks** per
+    month — the ask default was raised from 100 on 2026-07-25 after the owner hit
+    it mid-TestFlight and lost Ask until the 1st; ⚠️ **set `MONTHLY_ASK_QUOTA`
+    back to a public-tier value in the functions env before launch, don't ship
+    1000 to real users** — env-tunable `MONTHLY_SAVE_QUOTA`/`MONTHLY_ASK_QUOTA`,
+    friendly 429s, refund
     on failed analyses), plus `max_instances` caps on every function, paid rate
     buckets fail closed, scheduler scans reworked (reminders via a bounded
     collection-group query + new composite index; digests 15-min cadence,
@@ -775,6 +779,27 @@ exact-match, capped.
   check covering the reported card. **Full functions deploy** (shared modules
   `main.py`/`scraper.py` changed — no `Deploy-Functions:` trailer, deliberate).
 
+- **2026-07-25 — ASK MONTHLY QUOTA 100 → 1000 (unblock the owner).**
+  Owner hit "Monthly question limit reached — resets on the 1st." on device
+  (TestFlight) with 6 days left in the month, killing Ask — the hero surface —
+  for testing. Root cause is not a bug: `quota.py`'s `asks` default is 100/month
+  (shipped with the 2026-07-14 cost guardrails, §4 item 19), which is a
+  reasonable PUBLIC tier but far too tight for the single pre-launch user who is
+  also the tester. The intended knob is the `MONTHLY_ASK_QUOTA` functions env
+  var, but that's owner console work, so the CODE default moved instead:
+  `quota.py:48` 100 → 1000 (~33/day). Deliberately NOT set to 0 (unlimited) —
+  0 disables metering entirely and would drop the cost ceiling the guardrails
+  sprint added; 1000 still bounds a runaway client or a leaked App Check token.
+  Unblocks immediately on deploy: the over-cap branch does NOT increment
+  (`quota.py:140-144`), so the owner's counter is pinned at exactly 100 and
+  100 + 1 ≤ 1000 passes on the next ask. `saves` left at 150 — it wasn't the
+  blocker; say the word if it bites next. Tests: `test_limit_for_defaults`
+  updated + a new `test_env_still_overrides_the_raised_ask_default` pinning that
+  the env var can still tighten it back down (422 pass / same 4 known-red
+  `test_embed_trigger_backstop` mocks, §4 item 11b). **⛔ OWNER, before public
+  launch:** set `MONTHLY_ASK_QUOTA` to a real per-tier value in the functions
+  env — 1000/user/month across a public user base is a genuine cost exposure,
+  and this default is a single-user stopgap, not a pricing decision.
 - **2026-07-25 — ASK: STALE GLYPHS + THE TEXT STOPS ANIMATING (device
   report, build 1181).** Owner on iPhone: "Thinking it through ends with a weird
   character" (screenshot showed trailing debris after the ellipsis) and "the
