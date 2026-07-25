@@ -606,6 +606,96 @@ def followup_retrieval_query(question: str, history) -> str:
     return question
 
 
+# ── Which language the USER has been writing in ────────────────────────────
+# Ask answers in the language of the current question (prompt rule in
+# ai_service._build_rag_prompt, judged from the user's own words with quoted
+# card titles ignored — a Hebrew title inside an English question used to flip
+# the model). That is right for a TYPED question and wrong for a tapped
+# suggestion chip: the chip's wording is the APP's English boilerplate, not the
+# user's, so a Hebrew conversation flipped to English mid-thread the moment the
+# user tapped one (owner report 2026-07-25: a Hebrew question about a Pardes
+# Hanna café answered in Hebrew, then the chip 'Give me more detail on "<Hebrew
+# title>"' answered entirely in English).
+#
+# So for a generated question the answer language comes from the conversation
+# instead. Detection is by SCRIPT: chips are ASCII boilerplate once their quoted
+# titles are stripped, so they can never fake a Hebrew signal, and a single
+# non-Latin turn from the user is a deliberate statement of preference. Latin
+# scripts are indistinguishable this way (English vs Spanish vs French), so
+# those return None and the prompt keeps judging from the question — no
+# regression for the all-English case, which is every conversation today.
+_SCRIPT_RANGES = (
+    ("Hebrew", ((0x0590, 0x05FF), (0xFB1D, 0xFB4F))),
+    ("Arabic", ((0x0600, 0x06FF), (0x0750, 0x077F), (0x08A0, 0x08FF))),
+    ("Russian", ((0x0400, 0x04FF),)),
+    ("Greek", ((0x0370, 0x03FF),)),
+    ("Hindi", ((0x0900, 0x097F),)),
+    ("Thai", ((0x0E00, 0x0E7F),)),
+    ("Korean", ((0xAC00, 0xD7AF), (0x1100, 0x11FF))),
+    ("Japanese", ((0x3040, 0x309F), (0x30A0, 0x30FF))),
+    ("Chinese", ((0x4E00, 0x9FFF),)),
+)
+
+# A turn votes for a script only when it's genuinely written in it, not when a
+# stray character survives: at least this many letters AND this share of them.
+_SCRIPT_MIN_CHARS = 2
+_SCRIPT_MIN_SHARE = 0.3
+
+
+def dominant_script_language(text: str) -> Optional[str]:
+    """The non-Latin language `text` is written in, or None.
+
+    Counts letters by Unicode block over the user's OWN words (quoted card
+    titles stripped — a Hebrew title inside an English sentence is not the
+    sentence's language) and returns the winner when it carries a real share of
+    them. Latin-script text returns None on purpose: script can't tell English
+    from Spanish, and guessing would be worse than the prompt's own judgement.
+    Pure."""
+    words = _strip_quoted(text or "")
+    letters = 0
+    counts = {}
+    for ch in words:
+        if not ch.isalpha():
+            continue
+        letters += 1
+        cp = ord(ch)
+        for name, ranges in _SCRIPT_RANGES:
+            if any(lo <= cp <= hi for lo, hi in ranges):
+                counts[name] = counts.get(name, 0) + 1
+                break
+    if not letters or not counts:
+        return None
+    name, n = max(counts.items(), key=lambda kv: kv[1])
+    if n < _SCRIPT_MIN_CHARS or n / letters < _SCRIPT_MIN_SHARE:
+        return None
+    return name
+
+
+def conversation_language(history) -> Optional[str]:
+    """The non-Latin language the USER has been writing in this conversation,
+    or None when they've written Latin script (or nothing detectable).
+
+    Newest matching user turn wins, and Latin turns are SKIPPED rather than
+    ending the scan — the turns between a Hebrew opener and the chip being
+    answered are usually earlier English chips, and letting those end it would
+    reinstate the bug on the second tap. The cost is that a user who starts in
+    Hebrew and later types English still reads as Hebrew here; that only ever
+    reaches the prompt for a generated question (a typed one is judged from its
+    own words), so their next typed turn switches the thread back. Assistant
+    turns never vote — the answer's language is the thing being decided, and
+    letting it vote would lock in its own first guess. Pure — `history` is the
+    already-sanitized [{role, content}] list; fails open on anything else."""
+    if not isinstance(history, list):
+        return None
+    for item in reversed(history):
+        if not isinstance(item, dict) or item.get("role") != "user":
+            continue
+        lang = dominant_script_language(str(item.get("content") or ""))
+        if lang:
+            return lang
+    return None
+
+
 def demote_cards_by_titles(titles: List[str], cards: List[dict]):
     """Move cards whose title matches any of `titles` to the BACK of the list
     (otherwise stable). They stay in context — the model may reference them

@@ -21,6 +21,8 @@ from search import (
     keyword_query_tokens,
     is_context_free_followup,
     followup_retrieval_query,
+    dominant_script_language,
+    conversation_language,
 )
 
 
@@ -425,3 +427,79 @@ def test_retrieval_query_fails_open_on_missing_or_malformed_history():
         "בעברית", [{"role": "user", "content": "shorter"}]) == "בעברית"
     assert followup_retrieval_query(
         "בעברית", [{"role": "user", "content": "   "}]) == "בעברית"
+
+
+# ── Conversation language (dominant_script_language / conversation_language) ─
+
+def test_script_detection_reads_the_users_own_words():
+    assert dominant_script_language("אני צריך בית קפה בפרדס חנה") == "Hebrew"
+    assert dominant_script_language("I need a café in Pardes Hanna") is None
+    assert dominant_script_language("") is None
+    assert dominant_script_language(None) is None
+
+
+def test_script_detection_ignores_quoted_card_titles():
+    # The chip that caused the report: English boilerplate wrapped around a
+    # Hebrew card title. The title is the CARD's language, not the user's, so
+    # this must NOT read as Hebrew — otherwise every chip would look Hebrew.
+    assert dominant_script_language(
+        'Give me more detail on "5 מקומות מומלצים בפרדס חנה"') is None
+
+
+def test_script_detection_needs_a_real_share_not_a_stray_character():
+    assert dominant_script_language("The Hebrew word for yes is כן") is None
+    # …but a genuinely Hebrew sentence with an English brand name still counts.
+    assert dominant_script_language("מה שמור לי על Netflix ועל טלוויזיה") == "Hebrew"
+
+
+def test_script_detection_covers_other_non_latin_scripts():
+    assert dominant_script_language("ما هي أفضل المقاهي") == "Arabic"
+    assert dominant_script_language("Что я сохранил на этой неделе") == "Russian"
+
+
+def test_conversation_language_is_what_the_user_wrote():
+    history = [
+        {"role": "user", "content": "אני צריך בית קפה בפרדס חנה"},
+        {"role": "assistant", "content": "בפרדס חנה מומלץ לבקר ב\"קפה בחורשה\""},
+    ]
+    assert conversation_language(history) == "Hebrew"
+
+
+def test_conversation_language_survives_intervening_english_chips():
+    # The second tap in a row: the newest user turn is the PREVIOUS chip's
+    # English boilerplate. Ending the scan there would put the thread back
+    # into English, which is the bug.
+    history = [
+        {"role": "user", "content": "אני צריך בית קפה בפרדס חנה"},
+        {"role": "assistant", "content": "…"},
+        {"role": "user", "content": 'Give me more detail on "5 מקומות מומלצים בפרדס חנה"'},
+        {"role": "assistant", "content": "…"},
+    ]
+    assert conversation_language(history) == "Hebrew"
+
+
+def test_conversation_language_is_none_for_an_english_conversation():
+    # Latin script can't identify a language, and guessing would be worse than
+    # the prompt's own judgement — so the existing rule stays in charge.
+    history = [
+        {"role": "user", "content": "What did I save about coffee?"},
+        {"role": "assistant", "content": "You saved…"},
+    ]
+    assert conversation_language(history) is None
+
+
+def test_conversation_language_never_votes_with_the_assistant():
+    # An answer that disobeyed the language rule must not lock the thread into
+    # its own mistake.
+    history = [
+        {"role": "user", "content": "What did I save about coffee?"},
+        {"role": "assistant", "content": "שמרת כמה מקומות בפרדס חנה"},
+    ]
+    assert conversation_language(history) is None
+
+
+def test_conversation_language_fails_open():
+    assert conversation_language(None) is None
+    assert conversation_language([]) is None
+    assert conversation_language("not a list") is None
+    assert conversation_language([None, 7, {"role": "user"}]) is None

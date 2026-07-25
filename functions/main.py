@@ -65,7 +65,7 @@ from search import (
     anchor_phrases_for, is_exclusion_question, demote_cards_by_titles,
     is_recency_question, recent_cards, category_cards,
     private_collection_ids, strip_private_cards, apply_distance_threshold,
-    followup_retrieval_query,
+    followup_retrieval_query, conversation_language,
 )
 from rate_limit import check_rate_limit, client_ip
 # Monthly per-user soft quotas (report 3.2). Imports only db + stdlib (no cycle).
@@ -1578,6 +1578,20 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
         if retrieval_query != question:
             logger.info("ask_brain: context-free follow-up — retrieving for the prior question")
 
+        # 0b. A conversation must not change language because the user tapped a
+        #     suggestion. Chip questions are Machina's own English boilerplate
+        #     around a card title, so judging language from their wording (the
+        #     normal rule) flipped a Hebrew thread to English mid-conversation.
+        #     `hints` is the chip marker — it is machine-generated intent, only
+        #     ever attached to a question the app composed, never to typed
+        #     text — so on those turns the answer language comes from what the
+        #     USER has written here instead. None (all-Latin conversations, or
+        #     a chip that opens a thread) leaves the prompt rule untouched.
+        answer_language = conversation_language(history) if hints else None
+        if answer_language:
+            logger.info("ask_brain: generated question — answering in %s (conversation language)",
+                        answer_language)
+
         # 1. Retrieve the most relevant saved cards (reuses the vector search
         #    that already powers the search bar). Degrade gracefully: if
         #    retrieval fails, answer_from_context returns a friendly "nothing
@@ -1818,7 +1832,8 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
             def _event_stream():
                 try:
                     for kind, payload in ai.answer_from_context_stream(
-                            question, slim, history, excluded_titles=excluded_titles):
+                            question, slim, history, excluded_titles=excluded_titles,
+                            answer_language=answer_language):
                         if kind == "token":
                             yield "data: " + json.dumps(
                                 {"type": "token", "text": payload}
@@ -1872,7 +1887,8 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
 
         # Synchronous path: 2 Gemini attempts (stay under the 60s budget, report 3.6).
         result = ai.answer_from_context(question, slim, history, attempts=2,
-                                        excluded_titles=excluded_titles)
+                                        excluded_titles=excluded_titles,
+                                        answer_language=answer_language)
 
         # If the answer only succeeded after filter-probe isolation excluded or
         # partially filtered card(s) (Gemini's prompt filter rejects their text

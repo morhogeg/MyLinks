@@ -1,14 +1,20 @@
-"""What `ask_brain` actually RETRIEVES for on a conversational follow-up.
+"""How `ask_brain` carries CONVERSATION context into a follow-up turn — what it
+retrieves for, and which language it answers in.
 
-`search.followup_retrieval_query` is unit-tested as a pure function in
-test_ask_retrieval.py; these tests cover the WIRING — that the endpoint feeds
-that text to every retrieval-steering call (vector search, rerank, keyword
-scan) while still asking the MODEL the raw question plus history.
+The pure helpers (`search.followup_retrieval_query`, `conversation_language`)
+are unit-tested in test_ask_retrieval.py; these tests cover the WIRING at the
+endpoint — that the right text reaches every retrieval-steering call and the
+right language reaches the prompt, while the MODEL is still asked the raw
+question plus history.
 
-The owner-reported failure (2026-07-25): an English answer about a saved maple
-cake recipe, then the follow-up "בעברית" ("in Hebrew"). Retrieval embedded
-those two meta words, returned topically random cards, and the model said the
-library holds nothing on the recipe it had just cited on screen.
+Two owner-reported failures, both from 2026-07-25 and both "the turn was read
+in isolation instead of as part of a conversation":
+  - an English answer about a saved maple cake recipe, then the follow-up
+    "בעברית" ("in Hebrew") — retrieval embedded those two meta words, returned
+    topically random cards, and the model said the library holds nothing on the
+    recipe it had just cited on screen;
+  - a Hebrew thread about a Pardes Hanna café that flipped to English the
+    moment a suggestion chip (Machina's own English boilerplate) was tapped.
 
 conftest installs the offline fakes so `import main` works with plain pytest;
 Firestore, the embedding API, and Gemini are all stubbed at the main boundary.
@@ -84,17 +90,19 @@ def seen(monkeypatch):
     class _FakeGemini:
         def answer_from_context(self, question, cards, history=None, **kwargs):
             calls["asked"].append({"question": question, "history": history,
-                                   "cardIds": [c["id"] for c in cards]})
+                                   "cardIds": [c["id"] for c in cards],
+                                   "answerLanguage": kwargs.get("answer_language")})
             return {"answer": "…", "citedIds": [c["id"] for c in cards]}
 
     monkeypatch.setattr(main, "GeminiService", _FakeGemini)
     return calls
 
 
-def _ask(question, history=None):
-    return main.ask_brain(_Req(json_body={
-        "uid": "user1", "question": question, "history": history or [],
-    }))
+def _ask(question, history=None, hints=None):
+    body = {"uid": "user1", "question": question, "history": history or []}
+    if hints:
+        body["hints"] = hints
+    return main.ask_brain(_Req(json_body=body))
 
 
 def test_context_free_followup_retrieves_for_the_prior_question(seen):
@@ -135,3 +143,54 @@ def test_first_question_of_a_conversation_is_untouched(seen):
     _ask(_ASKED, [])
     assert seen["search"] == [_ASKED]
     assert seen["asked"][0]["question"] == _ASKED
+
+
+# ── Answer language: a tapped chip must not change the thread's language ────
+#
+# Owner report (2026-07-25): a Hebrew question about a Pardes Hanna café was
+# answered in Hebrew, then the chip 'Give me more detail on "<Hebrew title>"'
+# — Machina's own English boilerplate — answered entirely in English.
+
+_HE_ASKED = "אני צריך בית קפה בפרדס חנה"
+_HE_HISTORY = [
+    {"role": "user", "content": _HE_ASKED},
+    {"role": "assistant", "content": 'בפרדס חנה מומלץ לבקר ב"קפה בחורשה"'},
+]
+_CHIP = 'Give me more detail on "5 מקומות מומלצים בפרדס חנה"'
+# Chips always carry their structured intent; typed questions never do, which
+# is what makes `hints` a reliable "the app composed this" marker.
+_CHIP_HINTS = {"anchorTitles": ["5 מקומות מומלצים בפרדס חנה"]}
+
+
+def test_chip_in_a_hebrew_thread_is_answered_in_hebrew(seen):
+    resp = _ask(_CHIP, _HE_HISTORY, hints=_CHIP_HINTS)
+
+    assert resp.status == 200
+    assert seen["asked"][0]["answerLanguage"] == "Hebrew"
+    # The chip's own wording still goes to the model verbatim — only the
+    # language is pinned, not the request.
+    assert seen["asked"][0]["question"] == _CHIP
+
+
+def test_a_typed_english_question_is_never_pinned(seen):
+    # No hints = the user typed it, so their words are a real language choice
+    # and the existing judge-from-the-question rule must stay in charge —
+    # including switching a Hebrew thread to English.
+    _ask("Give me more detail on that", _HE_HISTORY)
+    assert seen["asked"][0]["answerLanguage"] is None
+
+
+def test_chip_in_an_english_thread_is_not_pinned(seen):
+    history = [
+        {"role": "user", "content": "What did I save about coffee?"},
+        {"role": "assistant", "content": "You saved…"},
+    ]
+    _ask(_CHIP, history, hints=_CHIP_HINTS)
+    assert seen["asked"][0]["answerLanguage"] is None
+
+
+def test_a_chip_that_opens_a_conversation_is_not_pinned(seen):
+    # Nothing has been established yet — the chip's own language is all there
+    # is, exactly as before.
+    _ask(_CHIP, [], hints=_CHIP_HINTS)
+    assert seen["asked"][0]["answerLanguage"] is None
