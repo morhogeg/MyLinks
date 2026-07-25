@@ -746,7 +746,38 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-25 (latest) — LINKEDIN BYLINE: POST TEXT WAS BECOMING THE
+- **2026-07-25 (latest) — LINKEDIN BYLINE, ROUND 2: MY OWN SLUG PARSER WAS
+  WRITING THE POST TEXT (regression from the entry below — same session).**
+  Owner sent a feed screenshot: a card saved **24 min AFTER** the round-1
+  functions deploy still showed post text ("Claude Opus 5 Is Now Available in
+  …"). Deploy #40's log confirms `process_link_background` updated at 11:16:20Z
+  and the card was created ~11:40Z, so the new code WAS live — the round-1
+  diagnosis (blame the model) was wrong for this card.
+  **The tell was the capitalisation.** "Is Now Available **in**" — Title Case
+  with a lowercase "in" is the fingerprint of `_LINKEDIN_SMALL_WORDS`, which
+  only *my* new slug parser applies. Gemini and LinkedIn's own og:title can't
+  produce it. **Root cause:** `/posts/` URLs are
+  `<authorSlug>_<post-slug>-activity-<id>`; I took `seg.split('_')[0]`, which is
+  correct ONLY when the underscore exists. Real share-sheet URLs often have no
+  underscore, so the whole segment is the post's words and the parser
+  title-cased them into a "name". Worse, **LinkedIn blocks the Cloud Functions
+  scraper**, so `html` is usually empty → the meta path fails → the slug
+  fallback is the PRIMARY path in production. My round-1 tests only used
+  well-formed URLs, so they all passed while prod broke immediately.
+  **Fix (both ends, mirrored):** `/posts/` now REQUIRES the underscore and bails
+  otherwise — an empty byline beats the post's words; plus sanity caps of
+  **≤6 tokens and ≤60 chars**. The cap is 6, deliberately not fewer: real orgs
+  reach it ("European Bank for Reconstruction and Development"), covered by a
+  test so nobody tightens it later. `/in/` and `/company/` slugs are profile
+  identifiers, never post text, so they keep working.
+  Verified: 4 new regression tests (17 in `test_linkedin_author.py`), backend
+  **440 passed / 4 failed** — the 4 are still the pre-existing
+  `test_embed_trigger_backstop.py` drift (§4 item 11b). tsc 0, `next build` 0,
+  5-case client parser check. **LESSON for the next session:** the round-1
+  entry's claim that "the slug is authoritative" is only true when an underscore
+  separates author from post text; do not reintroduce a bare `split('_')[0]`.
+
+- **2026-07-25 — LINKEDIN BYLINE: POST TEXT WAS BECOMING THE
   PUBLISHER.** Owner: a "Claude for Business" company post showed its source as
   "Introducing Three New Certifica…" — the post's own opening line. The chain:
   `scraper._extract_linkedin_author` only matched `"<Author> on LinkedIn: …"`,

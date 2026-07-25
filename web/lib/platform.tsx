@@ -165,9 +165,19 @@ export function linkedinAuthor(url?: string): string | null {
         if (!(host === 'linkedin.com' || host.endsWith('.linkedin.com'))) return null;
         const parts = u.pathname.split('/').filter(Boolean);
         if (!(parts[0] === 'posts' || parts[0] === 'in' || parts[0] === 'company') || !parts[1]) return null;
-        const tokens = parts[1].split('_')[0].split('-');
+        let seg = parts[1];
+        if (parts[0] === 'posts') {
+            // "<authorSlug>_<post-slug>-activity-<id>" — the author is ONLY the
+            // part before the underscore. Without one this segment is the post's
+            // own words, and turning those into a "name" is the bug this guards.
+            if (!seg.includes('_')) return null;
+            seg = seg.split('_')[0];
+        }
+        const tokens = seg.split('-');
         // Drop the trailing LinkedIn id hash (tokens containing a digit).
         while (tokens.length > 1 && /\d/.test(tokens[tokens.length - 1])) tokens.pop();
+        // A person or company slug is short; anything longer is a sentence.
+        if (tokens.filter(Boolean).length > 6) return null;
         const name = tokens
             .filter(Boolean)
             // Title case, but leave interior joining words lowercase so
@@ -178,7 +188,7 @@ export function linkedinAuthor(url?: string): string | null {
                 : t.charAt(0).toUpperCase() + t.slice(1)))
             .join(' ')
             .trim();
-        return name || null;
+        return name && name.length <= 60 ? name : null;
     } catch {
         return null;
     }
