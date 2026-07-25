@@ -746,7 +746,26 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-25 (latest) — ASK, ROUND 5: SELF-REVIEW OF ROUNDS 1-4 (owner:
+- **2026-07-25 (latest) — ✅ ASK CONVERSATION-CONTEXT WORK CONFIRMED BY OWNER
+  ("everything works perfectly").** Closes the five-round arc below. Verified
+  live across the six QA cases: restate follow-up (`בעברית, בקצרה`) stays on the
+  same card; referential (`מי פירסם את זה?`) names the publisher; an English chip
+  in a Hebrew thread answers in Hebrew; typing English switches the thread and
+  keeps it there; a pointerless follow-up (`who published`) still sees the card;
+  and `what else besides this?` returns OTHER cards. Live on **web** (all five
+  rounds — the round-3 client half rode the same push to Vercel), **TestFlight
+  build 1185**, and functions through run **#45**.
+  **Open risks are unchanged and still real — do not read this as "Ask is
+  done":** (a) round 4's subject-anchoring is a PROMPT INSTRUCTION, not an
+  enforceable guarantee (see that entry for the deterministic fallback —
+  narrowing restate-turn context to `contextIds` — and why it wasn't taken yet);
+  (b) the `contextIds` guarantee covers the last **2** answers only, so a
+  follow-up reaching further back falls through to the heuristics; (c) no
+  production log access from a cloud session, which is what made rounds 1-4 slow
+  — all five were diagnosed from code + local repro, with owner screenshots as
+  the only instrumentation.
+
+- **2026-07-25 — ASK, ROUND 5: SELF-REVIEW OF ROUNDS 1-4 (owner:
   *"review this feature again to find more bugs, since u already said it is
   fixed"*).** Fair — four rounds, four "fixed" claims. This round found and
   fixed problems the owner had NOT hit yet.
