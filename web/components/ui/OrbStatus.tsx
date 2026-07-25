@@ -11,29 +11,38 @@ import BrandOrb from './BrandOrb';
  * banner): the orb's shape is a second, wordless read on what's happening, so
  * both it and the copy have to change as a single event.
  *
- * The motion: the wrapper dips to a HELD PLATEAU at 12% — down over 78ms, held
- * for 73ms, back up over 109ms on `--ease-modal`. The orb and the label are
- * exchanged in the same render partway through the hold.
+ * The motion: ONLY THE ORB dips — to a held plateau at 22%, down over 66ms,
+ * held 62ms, back up over 92ms on `--ease-modal`. The label does not animate at
+ * all; it is replaced outright on the same frame the orb's canvas is retargeted,
+ * because both come from one `setShown` and therefore one commit.
  *
- * Why a plateau and not a single trough: a knife-edge trough demands the new
- * content *finish painting* on one exact frame. It doesn't — the React commit
- * lands, then layout and paint follow — and measured under a running canvas
- * loop the words were completing at ~45% opacity, i.e. visibly. The hold gives
- * the paint a window (±36ms) in which the row is too faint to read, so a late
- * frame costs nothing. The swap is also scheduled off the animation's OWN
- * `currentTime` rather than a wall-clock timer, so it self-corrects instead of
- * drifting against the compositor.
+ * Why the label is deliberately NOT animated — two reasons, both from device
+ * reports:
  *
- * Why one wrapper and not two fades: animating the orb and the text separately
- * desyncs their opacity envelopes even when both are told to swap on the same
- * instant — the text leaves early and the orb visibly lags behind it. One
- * element on one animation makes that drift structurally impossible.
+ * 1. **Flicker.** Dipping the whole row took the status line to near-nothing
+ *    for ~70ms. On a line you are actively reading, that reads as a blink, not
+ *    a transition. Status text is better replaced outright (the iOS pattern);
+ *    what needs masking is the orb's shape morph, not the words.
+ * 2. **Stale glyphs.** Mutating text inside an element with a running opacity
+ *    animation puts it in a composited layer that is promoted and demoted
+ *    around the change. WebKit's partial invalidation does not reliably cover
+ *    the old text's full extent, so a shorter new phrase left fragments of the
+ *    longer old one behind ("Thinking it through…" trailing debris from
+ *    "Re-reading the sources…"). Keeping the label outside every animated
+ *    element keeps it on the ordinary, correct repaint path; the `key` on it
+ *    additionally forces element replacement rather than a text-node mutation.
+ *
+ * The swap is scheduled off the animation's OWN `currentTime` rather than a
+ * wall-clock timer, so it self-corrects instead of drifting against the
+ * compositor, and the plateau gives the paint a window (±31ms) rather than
+ * demanding one exact frame.
  */
 
-const DIP_MS = 260;
-/** Opacity floor — deep enough that a frame of slop is not legible. */
-const DIP_FLOOR = 0.12;
-/** The hold: content is exchanged inside this window. */
+const DIP_MS = 220;
+/** Opacity floor for the ORB — soft enough to mask a shape change, high
+ *  enough that it reads as a dip rather than the orb blinking out. */
+const DIP_FLOOR = 0.22;
+/** The hold: the orb is retargeted inside this window. */
 const HOLD_FROM = 0.30;
 const HOLD_TO = 0.58;
 const SWAP_AT = DIP_MS * 0.42; // mid-plateau
@@ -50,10 +59,12 @@ interface OrbStatusProps {
      */
     stageKey: string | number;
     size?: OrbSize;
-    /** Classes for the wrapper that holds the orb + label. */
+    /** Classes for the static wrapper that holds the orb + label. */
     className?: string;
     labelClassName?: string;
 }
+
+/** Matches the fallback in `--ease-modal`. */
 
 export default function OrbStatus({
     orb,
@@ -64,7 +75,8 @@ export default function OrbStatus({
     labelClassName = 'text-[13px] text-text-muted',
 }: OrbStatusProps) {
     const [shown, setShown] = useState({ orb, label, key: stageKey });
-    const ref = useRef<HTMLDivElement>(null);
+    /** The dip targets the orb alone — never an ancestor of the label. */
+    const ref = useRef<HTMLSpanElement>(null);
 
     useEffect(() => {
         if (stageKey === shown.key) return;
@@ -106,9 +118,15 @@ export default function OrbStatus({
     }, [stageKey, orb, label, shown.key]);
 
     return (
-        <div ref={ref} className={className}>
-            <BrandOrb state={shown.orb} size={size} />
-            <span className={labelClassName}>{shown.label}</span>
+        <div className={className}>
+            {/* Only this span is animated. The label is a sibling, so it never
+                joins a composited layer — see the stale-glyph note above. */}
+            <span ref={ref} className="inline-flex shrink-0">
+                <BrandOrb state={shown.orb} size={size} />
+            </span>
+            {/* Keyed so React replaces the element instead of mutating a text
+                node, forcing a clean paint of the whole line. */}
+            <span key={shown.label} className={labelClassName}>{shown.label}</span>
         </div>
     );
 }

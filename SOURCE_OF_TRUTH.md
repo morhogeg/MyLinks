@@ -742,7 +742,39 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-25 (latest) — ASK PHRASE-SWAP HICCUP FIXED (device report).** Owner
+- **2026-07-25 (latest) — ASK: STALE GLYPHS + THE TEXT STOPS ANIMATING (device
+  report, build 1181).** Owner on iPhone: "Thinking it through ends with a weird
+  character" (screenshot showed trailing debris after the ellipsis) and "the
+  transition is better but not good enough". Both had ONE cause and one fix.
+  **The "character" is not a character** — `grep | cat -A` confirms the literal
+  is `Thinking it through` + a single `M-bM-^@M-&` (U+2026), nothing else. They
+  were **stale pixels**: in the `followup` sequence the previous phrase is
+  `Re-reading the sources…` (23 ch) and the next is `Thinking it through…`
+  (20 ch), and the leftovers sat exactly where the longer string's tail had
+  been. Mutating text inside an element with a **running opacity animation**
+  puts it in a composited layer that is promoted then demoted around the
+  change; WebKit's partial invalidation doesn't reliably cover the old text's
+  full extent when the new string is shorter. **Not reproducible in this
+  container** — only Chromium is installed at `/opt/pw-browsers` and Chromium
+  doesn't exhibit it — so this fix is BY CONSTRUCTION, not by reproduction;
+  confirm on device.
+  **Fix — the label no longer animates at all.** `OrbStatus` now dips ONLY the
+  orb (its own `<span ref>`, `inline-flex shrink-0`); the label is a **sibling**
+  of that span, so no ancestor of the text is ever animated and it stays on the
+  ordinary repaint path. The label also carries `key={shown.label}` so React
+  replaces the element rather than mutating a text node. Both still change in
+  one `setShown` → one commit → same frame, so the round-2 desync cannot return.
+  This simultaneously answers "not good enough": dipping the whole row took the
+  status line to 12% for ~70ms, which on a line you're *reading* is a blink, not
+  a transition. Status text is now replaced outright (the iOS pattern) — what
+  needed masking was only the orb's shape morph. Dip retuned for an orb-only
+  target: **220ms, floor 0.22** (was 260ms/0.12), plateau 30%→58%, retarget at
+  42%, still driven off the animation's `currentTime`. Measured (Chromium,
+  `setCPUThrottlingRate`, effective opacity incl. ancestors, after a forced
+  layout flush): **label 1.000 at 1× AND 8× CPU** (never dips), orb exactly
+  0.220 at swap on both. Verified tsc 0, `next build` 0, eslint clean.
+
+- **2026-07-25 — ASK PHRASE-SWAP HICCUP FIXED (device report).** Owner
   on iPhone: "a constant hiccup in the phrase change, mainly on the text — it
   takes a sec for the words to fully change." **Measured, not guessed** (headless
   Chromium + `Emulation.setCPUThrottlingRate`, reading opacity after a forced
