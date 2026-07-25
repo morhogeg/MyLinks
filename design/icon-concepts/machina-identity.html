@@ -186,9 +186,9 @@
      a launch screen is a shipped asset, so themeing it here would misrepresent
      what actually ships. */
   .launchrow { display: grid; gap: 34px; margin-top: 30px; justify-items: start; }
-  @media (min-width: 760px) { .launchrow { grid-template-columns: auto 1fr; align-items: center; } }
+  @media (min-width: 860px) { .launchrow { grid-template-columns: auto auto 1fr; align-items: center; } }
   .phone {
-    width: min(292px, 74vw); aspect-ratio: 9 / 19.5; position: relative;
+    width: min(244px, 62vw); aspect-ratio: 9 / 19.5; position: relative;
     background: #08080C; border: 1px solid var(--line-2); border-radius: 36px;
     overflow: hidden; box-shadow: 0 24px 64px -26px rgba(0,0,0,.6);
   }
@@ -199,11 +199,26 @@
   }
   .splash svg { width: 104px; height: 104px; color: #FFFFFF;
                 filter: drop-shadow(0 0 16px rgba(174,184,206,.34)); }
-  .wordmark {
+  .wordmark { width: 148px; opacity: 0; }
+  .wordmark svg { display: block; width: 100%; height: auto; }
+  .phonecol { display: grid; gap: 13px; justify-items: center; }
+  .phonecap {
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 11px; letter-spacing: .46em; text-transform: uppercase;
-    color: #E6E6F0; text-indent: .46em; opacity: 0;
+    font-size: 10.5px; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--dim); text-align: center;
   }
+  /* The native splash is a static image — no animation is possible before the
+     web view boots — so it is mocked at the real proportion: a ~29%-of-width
+     tile on a plain ground, exactly the structure that ships today. */
+  .staticsplash {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    background: radial-gradient(120% 90% at 50% 42%, #1B1B23, #08080C 72%);
+  }
+  .splashtile { width: 29%; aspect-ratio: 1; clip-path: url(#squircle);
+    /* lifted off the ground: the tile and the splash are both graphite, and
+       at the real 29% size it disappears if they share a value */
+    background: radial-gradient(120% 110% at 50% 34%, #34343F, #14141B); }
+  .splashtile svg { width: 100%; height: 100%; color: #FFFFFF; }
   .appshell {
     position: absolute; inset: 0; padding: 52px 15px 15px;
     display: grid; gap: 11px; align-content: start; opacity: 0;
@@ -368,15 +383,24 @@
       </p>
     </div>
     <div class="launchrow">
+      <div class="phonecol">
+        <div class="phone">
+          <div class="staticsplash"><div class="splashtile" id="splashTile"></div></div>
+        </div>
+        <div class="phonecap">Native splash · static</div>
+      </div>
+      <div class="phonecol">
       <div class="phone">
         <div class="splash" id="splash">
           <div id="splashMark"></div>
-          <div class="wordmark" id="wordmark">Machina</div>
+          <div class="wordmark" id="wordmark"><svg viewBox="0 0 2942 422" role="img" aria-label="Machina AI"><path d="M 0.0 422.0 L 0.0 0.0 L 65.2 0.0 L 194.0 275.6 L 322.8 0.0 L 388.0 0.0 L 388.0 422.0 L 326.0 422.0 L 326.0 139.6 L 194.0 422.0 L 62.0 139.6 L 62.0 422.0 Z M 420.0 422.0 L 487.0 422.0 L 625.5 0.0 L 558.5 0.0 Z M 764.0 422.0 L 697.0 422.0 L 558.5 0.0 L 625.5 0.0 Z M 536.4 253.2 L 647.6 253.2 L 668.0 315.2 L 516.0 315.2 Z M 1090.0 385.9 A 186.0 211.0 0 1 1 1090.0 36.1 L 1055.3 87.5 A 124.0 149.0 0 1 0 1055.3 334.5 Z M 1200.0 0.0 L 1262.0 0.0 L 1262.0 422.0 L 1200.0 422.0 Z M 1438.0 0.0 L 1500.0 0.0 L 1500.0 422.0 L 1438.0 422.0 Z M 1262.0 180.0 L 1438.0 180.0 L 1438.0 242.0 L 1262.0 242.0 Z M 1544.0 0.0 L 1606.0 0.0 L 1606.0 422.0 L 1544.0 422.0 Z M 1650.0 0.0 L 1712.0 0.0 L 1712.0 422.0 L 1650.0 422.0 Z M 1906.0 0.0 L 1968.0 0.0 L 1968.0 422.0 L 1906.0 422.0 Z M 1650.0 0.0 L 1722.5 0.0 L 1968.0 422.0 L 1895.5 422.0 Z M 2000.0 422.0 L 2067.0 422.0 L 2205.5 0.0 L 2138.5 0.0 Z M 2344.0 422.0 L 2277.0 422.0 L 2138.5 0.0 L 2205.5 0.0 Z M 2116.4 253.2 L 2227.6 253.2 L 2248.0 315.2 L 2096.0 315.2 Z M 2512.0 422.0 L 2579.0 422.0 L 2717.5 0.0 L 2650.5 0.0 Z M 2856.0 422.0 L 2789.0 422.0 L 2650.5 0.0 L 2717.5 0.0 Z M 2628.4 253.2 L 2739.6 253.2 L 2760.0 315.2 L 2608.0 315.2 Z M 2880.0 0.0 L 2942.0 0.0 L 2942.0 422.0 L 2880.0 422.0 Z" fill="#E9E9F2"/></svg></div>
         </div>
         <div class="appshell" id="appshell">
           <div class="skelbar"></div>
           <div class="skel"></div><div class="skel"></div><div class="skel"></div>
         </div>
+      </div>
+      <div class="phonecap">First frame · animated</div>
       </div>
       <div class="launchnote">
         <h3>What happens</h3>
@@ -650,6 +674,7 @@
   requestAnimationFrame(chatFrame);
 
   /* ── Launch sequence ──────────────────────────────────────────────────── */
+  makeMark(document.getElementById("splashTile"), { glow: false })(LOCKED);
   const drawSplash = makeMark(document.getElementById("splashMark"), { glow: false });
   const splash = document.getElementById("splash"), shell = document.getElementById("appshell"),
         wordmark = document.getElementById("wordmark");
