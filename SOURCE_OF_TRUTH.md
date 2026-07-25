@@ -784,7 +784,15 @@ exact-match, capped.
   thread-opening chip untouched); suite **464 passed / 4 failed** — the same
   pre-existing `test_embed_trigger_backstop` drift (§4 item 11b); the new
   endpoint test was confirmed to FAIL with the fix reverted.
-  **Deploy scope: `ask_brain`.**
+  **SHIPPED:** merge `e3e7e12` → "Deploy Cloud Functions" run **#42 green**,
+  `ask_brain(us-central1)` updated 13:02Z (scoped via the merge commit's
+  `Deploy-Functions: ask_brain` trailer). Backend-only, so **no TestFlight build
+  was needed** — the shipped native app picks both fixes up from the deployed
+  function. Vercel redeployed on the same push (no `web/` diff, so no user-visible
+  desktop change). **Owner device QA open:** in a Hebrew thread, (a) a
+  content-free follow-up ("בעברית", "בקצרה") should now answer about the same
+  card instead of "no content on that", and (b) tapping an English chip should
+  answer in Hebrew — chips themselves stay English by design.
 
 - **2026-07-25 — ASK: A FOLLOW-UP WITH NO TOPIC OF ITS OWN RETRIEVED
   FOR NOISE.** Owner screenshot: Ask answered `Why is "מתכון לעוגת מייפל עסיסית"
