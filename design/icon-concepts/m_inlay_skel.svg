@@ -1,0 +1,7 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs><mask id="sk"><rect width="1024" height="1024" fill="#000"/>
+    <path d="M282.0 709.0 L282.0 299.0 L385.5 299.0 L512.0 517.5 L638.5 299.0 L742.0 299.0 L742.0 709.0 L646.0 709.0 L646.0 477.6 L512.0 709.0 L378.0 477.6 L378.0 709.0 Z" fill="#FFFFFF" /></mask></defs>
+  <rect width="1024" height="1024" fill="#FFFFFF"/>
+  <path d="M282.0 709.0 L282.0 299.0 L385.5 299.0 L512.0 517.5 L638.5 299.0 L742.0 299.0 L742.0 709.0 L646.0 709.0 L646.0 477.6 L512.0 709.0 L378.0 477.6 L378.0 709.0 Z" fill="#101014" />
+  <g mask="url(#sk)"><path d="M330.0 665.0 L330.0 299.0 L512.0 613.2 L694.0 299.0 L694.0 665.0" fill="none" stroke="#FFFFFF" stroke-width="28.0" stroke-linecap="round" stroke-linejoin="round" /></g>
+</svg>
