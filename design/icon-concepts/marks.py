@@ -197,6 +197,8 @@ DESIGNS = [current(), apex(), thread(), inlay()]
 def emit(mk, paint, extra="", widen=0.0):
     """Render one mark painted with `paint` (a fill for outlines, a stroke for
     monolines) so every kind drops into the same treatment pipeline."""
+    if mk["kind"] == "multi":          # marks assembled from several shapes
+        return "".join(f'<path d="{d}" fill="{paint}" {extra}/>' for d in mk["paths"])
     if mk["kind"] in ("fill", "seam"):
         return f'<path d="{mk["d"]}" fill="{paint}" {extra}/>'
     return (f'<path d="{mk["d"]}" fill="none" stroke="{paint}" '
