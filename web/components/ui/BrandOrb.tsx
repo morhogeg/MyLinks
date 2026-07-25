@@ -62,6 +62,16 @@ function recolor(ctx: CanvasRenderingContext2D): CanvasRenderingContext2D {
 export default function BrandOrb({ state = 'working', size = 64, speed = 1, className = '', ...rest }: BrandOrbProps) {
     const ref = useRef<HTMLCanvasElement>(null);
 
+    // The active preset lives in a ref so a `state` change is a pointer swap the
+    // next frame picks up — NOT a teardown. Keeping `state` in the render-loop
+    // effect's deps reallocated the canvas backing store, rebuilt the Proxy and
+    // the IntersectionObserver and restarted rAF on every change; in Ask that
+    // landed at the exact instant the phrase swapped, delaying its paint.
+    const presetRef = useRef(resolvePreset(state, size));
+    useEffect(() => {
+        presetRef.current = resolvePreset(state, size);
+    }, [state, size]);
+
     useEffect(() => {
         const canvas = ref.current;
         if (!canvas) return;
@@ -73,15 +83,15 @@ export default function BrandOrb({ state = 'working', size = 64, speed = 1, clas
         if (!raw) return;
         const ctx = recolor(raw);
 
-        const { mode, speed: baseSpeed, opts } = resolvePreset(state, size);
-        const draw = MODE_DRAWS[mode];
-        const rate = baseSpeed * speed;
+        // Read the preset per frame, so changing `state` retargets this same
+        // loop instead of replacing it.
         // Always paint with the library's dark-ink shading; colour is ours anyway,
         // so the orb looks identical on light and dark grounds.
         const paint = (t: number) => {
+            const { mode, speed: baseSpeed, opts } = presetRef.current;
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             ctx.clearRect(0, 0, size, size);
-            draw(ctx, size, t, true, opts);
+            MODE_DRAWS[mode](ctx, size, t * baseSpeed * speed, true, opts);
         };
 
         const reduce = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -93,13 +103,13 @@ export default function BrandOrb({ state = 'working', size = 64, speed = 1, clas
         let rafId = 0;
         let running = false;
         const frame = () => {
-            paint(performance.now() / 1000 * rate);
+            paint(performance.now() / 1000);
             if (running) rafId = requestAnimationFrame(frame);
         };
         const start = () => { if (!running) { running = true; rafId = requestAnimationFrame(frame); } };
         const stop = () => { running = false; cancelAnimationFrame(rafId); };
 
-        paint(performance.now() / 1000 * rate);
+        paint(performance.now() / 1000);
 
         const io = typeof IntersectionObserver !== 'undefined'
             ? new IntersectionObserver(([e]) => {
@@ -116,7 +126,7 @@ export default function BrandOrb({ state = 'working', size = 64, speed = 1, clas
             io?.disconnect();
             document.removeEventListener('visibilitychange', onVis);
         };
-    }, [state, size, speed]);
+    }, [size, speed]);
 
     return (
         <canvas
