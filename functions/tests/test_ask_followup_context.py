@@ -14,7 +14,11 @@ in isolation instead of as part of a conversation":
     topically random cards, and the model said the library holds nothing on the
     recipe it had just cited on screen;
   - a Hebrew thread about a Pardes Hanna café that flipped to English the
-    moment a suggestion chip (Machina's own English boilerplate) was tapped.
+    moment a suggestion chip (Machina's own English boilerplate) was tapped;
+  - `מי פירסם את זה?` ("who published this?") one turn after an answer that
+    cited a LinkedIn card — real content words, so the meta-vocabulary gate
+    passed it through, and it retrieved for "who published" and reported the
+    card was not in the library.
 
 conftest installs the offline fakes so `import main` works with plain pytest;
 Firestore, the embedding API, and Gemini are all stubbed at the main boundary.
@@ -194,3 +198,34 @@ def test_a_chip_that_opens_a_conversation_is_not_pinned(seen):
     # is, exactly as before.
     _ask(_CHIP, [], hints=_CHIP_HINTS)
     assert seen["asked"][0]["answerLanguage"] is None
+
+
+# ── Referential follow-ups reach the card they point at ────────────────────
+
+_KEY_POINTS = ('Key points from "Anthropic Introduces Three-Tiered Claude '
+               'Certification Program"')
+_LINKEDIN_HISTORY = [
+    {"role": "user", "content": _KEY_POINTS},
+    {"role": "assistant", "content": "The new certification program establishes…"},
+]
+
+
+def test_who_published_this_retrieves_for_the_card_being_discussed(seen):
+    resp = _ask("מי פירסם את זה?", _LINKEDIN_HISTORY)
+
+    assert resp.status == 200
+    # The subject is prepended and the question kept, so retrieval sees the
+    # card's title (which also pins it) without losing the user's words.
+    for got in (seen["search"][0], seen["rerank"][0]):
+        assert got.startswith(_KEY_POINTS)
+        assert "מי פירסם את זה?" in got
+    # The card is in context, so the answer can name the publisher instead of
+    # claiming the library has nothing on it.
+    assert json.loads(resp.body)["citedIds"] == ["cake"]
+
+
+def test_a_question_that_states_its_subject_is_still_untouched(seen):
+    # The guard on the rescue above: stating a topic keeps retrieval exactly
+    # where it was, conversation or not.
+    _ask("What did I save about Italy?", _LINKEDIN_HISTORY)
+    assert seen["search"] == ["What did I save about Italy?"]

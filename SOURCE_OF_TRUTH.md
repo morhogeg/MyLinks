@@ -746,7 +746,39 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-25 (latest) — ASK: A TAPPED CHIP NO LONGER FLIPS THE THREAD'S
+- **2026-07-25 (latest) — ASK, ROUND 2: "WHO PUBLISHED THIS?" COULDN'T SEE THE
+  CARD IT WAS POINTING AT.** Owner device QA on the round-1 deploy, two
+  screenshots: a chip opened a thread (`Key points from "Anthropic Introduces
+  Three-Tiered Claude Certification Program"`, answered in English, LinkedIn
+  card cited), then the typed Hebrew `מי פירסם את זה?` ("who published this?")
+  → **"the information about Claude's certification program did not appear in
+  your saved sources"**, flagged ungrounded. Language was CORRECT (Hebrew in →
+  Hebrew out — the round-1 fixes held); retrieval was not. **The round-1
+  `is_context_free_followup` gate could never catch this:** it fires only when
+  every content token is meta, and this question has real ones — `keyword_query_tokens`
+  returns `{מי, פירסם}` — so it read as topical and embedded as "who published",
+  which matches nothing. The subject lives in the previous turn; only the
+  POINTER (`זה`) is in this one, and most pointers are already `_RANK_STOPWORDS`
+  so they are invisible to any token-based test. Fix: `search.is_referential_followup`
+  matches a standalone pointer word (EN + HE) on the RAW text, guarded four ways
+  because a false positive drags an old topic into retrieval — must be short
+  (≤4 content tokens, so "show me that recipe with the tomatoes" retrieves for
+  itself), must quote no card title (a quoted title IS the subject, stated), and
+  must not be a recency question (`this week`/`this month` are pointers
+  grammatically, time-anchored in meaning). **The two follow-up kinds are
+  treated differently on purpose:** context-free REPLACES the query (the
+  question is provably noise), referential PREPENDS the prior question and keeps
+  the question, so the combined text retrieves a superset — a misfire costs
+  precision and can never lose what was asked for. Bonus: the prior question's
+  quoted title now flows into `anchor_phrases_for`, so the card is pinned to the
+  front of context, not merely retrieved. Verified: **9 new tests** (`test_ask_retrieval.py`
+  classifier + query cases incl. the recency and long-question guards,
+  `test_ask_followup_context.py` endpoint repro), suite **476 passed / 4 failed**
+  — the same `test_embed_trigger_backstop` drift (§4 item 11b); all three new
+  behavioural tests confirmed to FAIL with the fix reverted.
+  **Deploy scope: `ask_brain`.**
+
+- **2026-07-25 — ASK: A TAPPED CHIP NO LONGER FLIPS THE THREAD'S
   LANGUAGE.** Owner screenshot: `אני צריך בית קפה בפרדס חנה` → answered in
   Hebrew; the next turn was the suggestion chip `Give me more detail on "5
   מקומות מומלצים בפרדס חנה"` → answered **entirely in English**. Not a
