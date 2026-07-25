@@ -742,7 +742,34 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-24 (latest) — FIRST `/security` PASS ON `functions/`: 3 fixes
+- **2026-07-25 (latest) — ASK PHRASE-SWAP HICCUP FIXED (device report).** Owner
+  on iPhone: "a constant hiccup in the phrase change, mainly on the text — it
+  takes a sec for the words to fully change." **Measured, not guessed** (headless
+  Chromium + `Emulation.setCPUThrottlingRate`, reading opacity after a forced
+  layout flush = when the words have actually landed): the shipped dip put the
+  text swap at **0.335 opacity at 1×/4× CPU but 0.555 at 8×** — on a loaded
+  phone the words finished changing while the row was MORE THAN HALF VISIBLE.
+  Load-dependent, which is exactly why it showed on device and not on desktop.
+  Root cause is a knife-edge trough: a single-instant trough needs the new
+  content to *finish painting* on one exact frame, and it doesn't (React commit,
+  then layout, then paint). Two fixes:
+  (1) **`OrbStatus`** — the point trough becomes a **held plateau**: 260ms total
+  (was 400), floor **0.12** (was 0.32), held 30%→58%, exchange at 42%
+  (mid-plateau, ±36ms of slop absorbed). The swap is driven off the animation's
+  own **`currentTime` via rAF** instead of a wall-clock `setTimeout`, so it
+  self-corrects against the compositor. Result: **0.120 at 1×, 4× AND 8× CPU** —
+  flat under load. The shorter dip also directly answers "takes a sec".
+  (2) **`BrandOrb`** — `state` was in the render-loop effect's deps, so every
+  phrase change **reallocated the canvas backing store, rebuilt the recolor
+  Proxy + IntersectionObserver and restarted rAF**, landing at the exact instant
+  the phrase swapped. The active preset now lives in a `presetRef` read
+  per-frame and the loop effect keys on `[size, speed]` only, so a state change
+  is a pointer swap. Side effect: `speed`/`rate` is now applied inside `paint`,
+  so callers pass raw seconds — check this if a future orb animates at the wrong
+  rate. Verified: tsc 0, `next build` 0 (placeholder Firebase env, see the
+  2026-07-24 orb entry's gotcha).
+
+- **2026-07-24 — FIRST `/security` PASS ON `functions/`: 3 fixes
   (S-7 response caps, S-8 claim gate fails closed, H-4 residue log masking),
   +30 regression tests, 389→421 green.** First run of the new skill, target
   `functions/`, lenses prioritised: endpoint auth → tenant isolation → SSRF.
