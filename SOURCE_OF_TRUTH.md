@@ -742,7 +742,40 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-25 (latest) — ASK: STALE GLYPHS + THE TEXT STOPS ANIMATING (device
+- **2026-07-25 (latest) — LINKEDIN BYLINE: POST TEXT WAS BECOMING THE
+  PUBLISHER.** Owner: a "Claude for Business" company post showed its source as
+  "Introducing Three New Certifica…" — the post's own opening line. The chain:
+  `scraper._extract_linkedin_author` only matched `"<Author> on LinkedIn: …"`,
+  which is the **personal-profile** title format; **company-page posts don't use
+  it** (their og:title IS the post text), so it returned None → `main.py`'s
+  `scraped.get("source_name") or analysis.get("sourceName")` fell through to
+  **Gemini's guess**, which echoed the post line → `_ground_source_name` only
+  rejects "machina" so it passed → frontend `linkedinDisplayName` trusted any
+  name that wasn't literally "linkedin"/"none", so the reliable URL-slug
+  fallback never ran. Fixed at both ends, because the backend fix only helps NEW
+  cards:
+  (1) **`scraper.linkedin_author_from_url`** (new, exported) recovers the poster
+  from the slug — `/posts/<slug>_…`, `/in/`, `/company/` — with joining words
+  kept lowercase so `claude-for-business` → "Claude for Business", not "Claude
+  For Business". `_extract_linkedin_author(html, url)` now tries meta first,
+  then the slug, and **never returns post text**.
+  (2) **`main._pick_source_name`** (new) — for LinkedIn hosts the model's guess
+  is NEVER used. An empty byline beats a sentence masquerading as a publisher.
+  Wired into both `_build_link_data` call sites (sync + background).
+  (3) **`web/lib/platform.tsx`** — `linkedinAuthor` gets the same small-word
+  casing; `linkedinDisplayName` now screens the stored name through
+  `looksLikeAuthorName` (>60 chars, >8 words, trailing `:`/`…`, or a newline =
+  not a name) and prefers the slug, **so already-saved bad cards read correctly
+  with no re-scrape**. Guard against over-rejection: a long genuine org name
+  with no slug to fall back on is still shown.
+  Verified: **13 new tests** in `functions/tests/test_linkedin_author.py`,
+  backend suite **435 passed / 4 failed** — the 4 are the pre-existing
+  `test_embed_trigger_backstop.py` `firebase_functions` drift already tracked as
+  §4 item 11b, NOT this change. tsc 0, `next build` 0, plus a 7-case display
+  check covering the reported card. **Full functions deploy** (shared modules
+  `main.py`/`scraper.py` changed — no `Deploy-Functions:` trailer, deliberate).
+
+- **2026-07-25 — ASK: STALE GLYPHS + THE TEXT STOPS ANIMATING (device
   report, build 1181).** Owner on iPhone: "Thinking it through ends with a weird
   character" (screenshot showed trailing debris after the ellipsis) and "the
   transition is better but not good enough". Both had ONE cause and one fix.

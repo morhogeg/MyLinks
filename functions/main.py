@@ -925,6 +925,25 @@ def _ground_source_name(candidate, url, fallback=None):
     return candidate or fallback
 
 
+def _pick_source_name(scraped_name, model_name, url):
+    """Choose the publisher name, preferring deterministic extraction.
+
+    For LinkedIn the model's guess is NEVER used. Company-page posts carry no
+    author in their meta tags — their og:title is the post's own opening line —
+    so Gemini fills the gap with that sentence and it lands in the byline
+    ("Introducing Three New Certifica…" instead of "Claude for Business").
+    The scraper already falls back to the URL slug, which is authoritative for
+    who posted, so if it produced nothing there is genuinely no author to show
+    and an empty byline beats a sentence masquerading as a publisher.
+    """
+    if scraped_name:
+        return scraped_name
+    host = _prettified_host(url)
+    if host == "linkedin.com" or host.endswith(".linkedin.com"):
+        return None
+    return model_name
+
+
 def _write_stage(card_ref, stage: str) -> None:
     """Mirror a pipeline stage onto the user-visible card doc (best-effort).
 
@@ -1445,7 +1464,7 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
             detailed_summary=analysis.get("detailedSummary", ""),
             source_type="youtube" if is_youtube else "web",
             source_name=_ground_source_name(
-                scraped.get("source_name") or analysis.get("sourceName"),
+                _pick_source_name(scraped.get("source_name"), analysis.get("sourceName"), url),
                 url=url,
             ),
             original_title=scraped.get("title", ""),
@@ -3148,7 +3167,11 @@ def process_link_background(event: firestore_fn.Event[firestore_fn.DocumentSnaps
             detailed_summary=analysis.get("detailedSummary"),
             source_type="youtube" if is_youtube else ("image" if is_image else "web"),
             source_name=_ground_source_name(
-                scraped.get("source_name") or analysis.get("sourceName"),
+                _pick_source_name(
+                    scraped.get("source_name"),
+                    analysis.get("sourceName"),
+                    "" if is_image else original_url,
+                ),
                 url="" if is_image else original_url,
                 fallback="Screenshot" if is_image else None,
             ),

@@ -129,6 +129,27 @@ export function instagramHandle(sourceName?: string | null): string | null {
     return m ? m[1] : null;
 }
 
+/** Joining words a company/person slug keeps lowercase when title-cased. */
+const LINKEDIN_SMALL_WORDS = new Set([
+    'a', 'an', 'and', 'at', 'by', 'de', 'for', 'in', 'la', 'of', 'on', 'or', 'the', 'to', 'with',
+]);
+
+/**
+ * Does a stored `sourceName` read like a person/company, or like post text?
+ *
+ * LinkedIn company posts don't carry the "<Author> on LinkedIn:" title that the
+ * scraper keys on, so the backend used to fall through to the model's guess —
+ * which echoes the post's opening line ("Introducing Three New Certifica…").
+ * Cards saved before that was fixed still carry the bad value, so the byline
+ * screens it here too and falls back to the URL slug, which is authoritative
+ * for who posted.
+ */
+function looksLikeAuthorName(name: string): boolean {
+    if (name.length > 60 || /[\n\r]/.test(name)) return false;
+    if (/[:：]\s*$/.test(name) || /(…|\.\.\.)$/.test(name)) return false;
+    return name.split(/\s+/).filter(Boolean).length <= 8;
+}
+
 /**
  * Extract the author/profile name from a LinkedIn URL
  * (linkedin.com/posts/<slug>_…, /in/<slug>, /company/<slug>). LinkedIn stores
@@ -149,7 +170,12 @@ export function linkedinAuthor(url?: string): string | null {
         while (tokens.length > 1 && /\d/.test(tokens[tokens.length - 1])) tokens.pop();
         const name = tokens
             .filter(Boolean)
-            .map((t) => t.charAt(0).toUpperCase() + t.slice(1))
+            // Title case, but leave interior joining words lowercase so
+            // "claude-for-business" reads "Claude for Business", not
+            // "Claude For Business". The first token is always capitalised.
+            .map((t, i) => (i > 0 && LINKEDIN_SMALL_WORDS.has(t.toLowerCase())
+                ? t.toLowerCase()
+                : t.charAt(0).toUpperCase() + t.slice(1)))
             .join(' ')
             .trim();
         return name || null;
@@ -163,12 +189,17 @@ export function linkedinAuthor(url?: string): string | null {
  * backend captured a real one, otherwise the name recovered from the URL slug.
  */
 export function linkedinDisplayName(url?: string, sourceName?: string | null): string | null {
+    const fromUrl = linkedinAuthor(url);
     if (sourceName) {
         const s = sourceName.trim();
         const lower = s.toLowerCase();
-        if (s && lower !== 'linkedin' && lower !== 'none' && lower !== 'screenshot') return s;
+        const junk = !s || lower === 'linkedin' || lower === 'none' || lower === 'screenshot';
+        // Only trust a stored name that actually reads like one. Post text
+        // loses to the URL slug; with no slug to fall back on we still show it
+        // rather than nothing.
+        if (!junk && (looksLikeAuthorName(s) || !fromUrl)) return s;
     }
-    return linkedinAuthor(url);
+    return fromUrl;
 }
 
 /** Inline style for an *active* platform filter chip, tinted in its brand color. */

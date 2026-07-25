@@ -434,11 +434,61 @@ def _generic_source_name(soup, url: str) -> str:
     return _prettify_domain(url)
 
 
-def _extract_linkedin_author(html: str) -> Optional[str]:
-    """Pull the post author's display name from LinkedIn meta tags.
+# Joining words a LinkedIn slug keeps lowercase when title-cased, so
+# "claude-for-business" reads "Claude for Business", not "Claude For Business".
+_LINKEDIN_SMALL_WORDS = {
+    'a', 'an', 'and', 'at', 'by', 'de', 'for', 'in', 'la', 'of', 'on', 'or', 'the', 'to', 'with',
+}
 
-    LinkedIn post previews title as "<Author> on LinkedIn: …", which gives us
-    the real name (e.g. "Mark Manson") that the URL slug can't always recover.
+
+def linkedin_author_from_url(url: str) -> Optional[str]:
+    """Recover the poster's name from a LinkedIn URL slug.
+
+    `/posts/<slug>_…`, `/in/<slug>` and `/company/<slug>` all carry the poster's
+    public identifier, e.g. "claude-for-business" → "Claude for Business". This
+    is deterministic and works for company pages, whose post previews do NOT use
+    the "<Author> on LinkedIn:" title the meta path keys on. Mirrors
+    `linkedinAuthor` in web/lib/platform.tsx.
+    """
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        host = parsed.hostname or ''
+        if host.startswith('www.'):
+            host = host[4:]
+        if not (host == 'linkedin.com' or host.endswith('.linkedin.com')):
+            return None
+        parts = [p for p in parsed.path.split('/') if p]
+        if len(parts) < 2 or parts[0] not in ('posts', 'in', 'company'):
+            return None
+        tokens = parts[1].split('_')[0].split('-')
+        # Drop the trailing LinkedIn id hash (tokens containing a digit).
+        while len(tokens) > 1 and any(ch.isdigit() for ch in tokens[-1]):
+            tokens.pop()
+        words = [t for t in tokens if t]
+        if not words:
+            return None
+        name = ' '.join(
+            t.lower() if i > 0 and t.lower() in _LINKEDIN_SMALL_WORDS else t[:1].upper() + t[1:]
+            for i, t in enumerate(words)
+        ).strip()
+        return name or None
+    except Exception:
+        return None
+
+
+def _extract_linkedin_author(html: str, url: str = '') -> Optional[str]:
+    """Pull the post author's display name for a LinkedIn URL.
+
+    Personal-profile posts preview as "<Author> on LinkedIn: …", which gives the
+    real name (e.g. "Mark Manson"). **Company-page posts do not** — their
+    og:title is the post's own opening line, which is exactly how post text used
+    to leak into `sourceName`. So the meta path is tried first, then the URL
+    slug, which is authoritative for who posted and covers company pages.
+
+    Never returns post text: if neither path yields a name we return None and
+    let the caller fall back to a host/site name — anything is better than
+    labelling the publisher with a sentence from the post.
     """
     import html as html_lib
 
@@ -461,7 +511,8 @@ def _extract_linkedin_author(html: str) -> Optional[str]:
             author = m.group(1).strip(' :-|')
             if author and author.lower() != 'linkedin':
                 return author
-    return None
+
+    return linkedin_author_from_url(url) if url else None
 
 
 def _scrape_linkedin_url(url: str) -> dict:
@@ -492,7 +543,7 @@ def _scrape_linkedin_url(url: str) -> dict:
             "html": html,
             "title": title,
             "text": text or html[:5000],
-            "source_name": _extract_linkedin_author(html),
+            "source_name": _extract_linkedin_author(html, url),
             # Poster ONLY for actual VIDEO posts: LinkedIn serves a generic
             # "Posted on LinkedIn" branding og:image even for plain TEXT posts, so
             # we can't blindly trust og:image. Gating on og:type=video / og:video
