@@ -217,6 +217,13 @@ def test_limit_for_defaults(monkeypatch):
     monkeypatch.delenv("MONTHLY_SAVE_QUOTA", raising=False)
     monkeypatch.delenv("MONTHLY_ASK_QUOTA", raising=False)
     assert quota._limit_for("saves") == 150
+    assert quota._limit_for("asks") == 1000
+
+
+def test_env_still_overrides_the_raised_ask_default(monkeypatch):
+    """The raised default must stay a DEFAULT — setting MONTHLY_ASK_QUOTA in the
+    functions env is how the cap gets tightened again for a public tier."""
+    monkeypatch.setenv("MONTHLY_ASK_QUOTA", "100")
     assert quota._limit_for("asks") == 100
 
 
