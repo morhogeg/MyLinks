@@ -767,7 +767,12 @@ exact-match, capped.
   is a pointer swap. Side effect: `speed`/`rate` is now applied inside `paint`,
   so callers pass raw seconds — check this if a future orb animates at the wrong
   rate. Verified: tsc 0, `next build` 0 (placeholder Firebase env, see the
-  2026-07-24 orb entry's gotcha).
+  2026-07-24 orb entry's gotcha). Feature `6e50569`, merge **`64c0514`** →
+  Vercel (auto); TestFlight run **#181 green → build 1181**. No functions or
+  hosting deploy. **Device QA on 1181:** confirm the hiccup is gone, and judge
+  whether three swaps in a ~6s window still reads as fidgety — the fallback
+  remains collapsing Ask to two beats (`searching` for 1+2, `shaping` for the
+  write).
 
 - **2026-07-24 — FIRST `/security` PASS ON `functions/`: 3 fixes
   (S-7 response caps, S-8 claim gate fails closed, H-4 residue log masking),
