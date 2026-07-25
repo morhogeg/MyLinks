@@ -785,7 +785,21 @@ exact-match, capped.
   rendered prompt blocks were eyeballed for escaping damage (guillemets/quotes
   clean). Suite **504 passed / 4 failed** — the same `test_embed_trigger_backstop`
   drift (§4 item 11b). Backend-only, no `web/` diff → no TestFlight build.
-  **Deploy scope: `ask_brain`.**
+  **SHIPPED:** `27d0f57` → functions run **#45 green**, `ask_brain` updated.
+  **STILL THE WEAKEST LINK (say so plainly):** round 4's subject-anchoring is a
+  PROMPT INSTRUCTION, not an enforceable guarantee — the blocks are tested for
+  rendering, but `gemini-3.1-flash-lite` obeying them is not. If a restate
+  follow-up ever wanders again, the deterministic fix is to NARROW the context
+  for restate turns to just the previously-cited cards (`contextIds` already
+  gives the exact set), so there is nothing else to wander to. Deliberately not
+  done yet: it would blank the context on a restate turn for any client that
+  doesn't send `contextIds` (< build 1185, or an answer with no citations).
+  **ALSO OPEN:** this session had NO production log access (no `gcloud`, no
+  Firebase creds in the cloud container), so all five rounds were diagnosed by
+  reading code and reproducing locally. Round 4 was only pinnable because the
+  prompt rule explained every symptom exactly; a more ambiguous failure would
+  have been guesswork. Worth wiring a way to read `ask_brain` logs from a
+  session before the next debugging round.
 
 - **2026-07-25 — ASK, ROUND 4: THE PROMPT WAS TELLING THE MODEL TO
   CHANGE THE SUBJECT.** Owner: *"Terrible."* Screenshot — an English answer
