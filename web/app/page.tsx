@@ -11,6 +11,7 @@ import OnboardingTour, { ONBOARDING_STORAGE_KEY } from "@/components/OnboardingT
 import { Settings, Search, Globe, SlidersHorizontal } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { IconButton } from "@/components/ui/Button";
+import BrandOrb from "@/components/ui/BrandOrb";
 import { useHeaderFade } from "@/lib/useHeaderFade";
 import { useSharedCaptureBanner } from "@/lib/useSharedCaptureBanner";
 import type { LibraryFacetRequest } from "@/lib/stats";
@@ -111,7 +112,14 @@ export default function Home() {
           <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg shadow-purple-500/20 animate-pulse ring-1 ring-white/15">
             <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
           </div>
-          <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+          {/* The same orb that greets you in Ask's empty state — Machina's
+              "here and ready" face, rather than a generic ring. NOTE: the iOS
+              build is a static export, so this markup paints before hydration
+              and the canvas is blank for that window; the icon's CSS pulse
+              carries the screen until then, and the canvas reserves its 64px
+              box either way so nothing shifts when it starts painting. */}
+          <BrandOrb state="listening" size={64} />
+          <span className="sr-only" role="status">Starting Machina…</span>
         </div>
       </div>
     );

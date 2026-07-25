@@ -786,7 +786,22 @@ exact-match, capped.
   ("Everything up-to-date") so no `push` event fires. The workflow only listens
   on `workflow_dispatch` + `push: branches: [trigger/testflight]`, so **the only
   programmatic recovery is to advance main's SHA** (any real commit — a docs
-  update works) and push the trigger branch again.
+  update works) and push the trigger branch again. Retriggered as `eaf9b7c` →
+  run **#183**.
+  **BOOT SCREEN → ORB (owner request, same session).** The auth-resolving screen
+  (`app/page.tsx`, shown while `loading`) used a generic
+  `border-t-purple-500 animate-spin` ring under the pulsing app icon. Replaced
+  with **`listening` @ 64** — the same orb as Ask's empty state, so Machina's
+  "here and ready" face greets you on launch and when Ask is waiting. Compared
+  against `working` @64 (too sparse/scattered under the icon) and a 64→44 CSS
+  downscale (loses dot detail) before picking. Added an `sr-only role="status"`
+  "Starting Machina…" the ring never had. **Caveat, by design:** the iOS build is
+  `output: 'export'`, so this markup paints BEFORE hydration and the canvas is
+  blank for that window (a CSS ring was not). The icon's `animate-pulse` carries
+  the screen, and the canvas reserves its 64px box so nothing shifts when it
+  starts painting — but if boot ever feels dead on a cold launch, that's why,
+  and the ring is the fallback. Feed's `Suspense` fallback ring and the button
+  spinners are still deliberately NOT orbs.
 
 - **2026-07-25 — ASK PHRASE-SWAP HICCUP FIXED (device report).** Owner
   on iPhone: "a constant hiccup in the phrase change, mainly on the text — it
