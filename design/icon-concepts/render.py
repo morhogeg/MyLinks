@@ -1,11 +1,44 @@
 """Render the concept SVGs through Chromium, mask to the iOS squircle, and
-build the comparison sheets."""
-import os, subprocess, glob
+build the comparison sheets.
+
+Requires `pip install pillow numpy`. Chromium must be present but is NOT
+version-pinned — see resolve_chrome() below.
+
+Every other script in this directory imports HERE / CHROME / rasterize / tile /
+font from here, so this is the single place any of that has to be fixed.
+"""
+import os, shutil, subprocess, glob
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CHROME = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"
+
+
+def resolve_chrome():
+    """Find a Chromium binary without pinning its build number.
+
+    The playwright cache directory carries the build in its name
+    (chromium-1194/, chromium_headless_shell-1194/), so a hardcoded path breaks
+    the moment the image is rebuilt — which would take every render script in
+    this directory down with it.
+    """
+    for pattern in ("/opt/pw-browsers/chromium-*/chrome-linux/chrome",
+                    "/opt/pw-browsers/chromium_headless_shell-*/chrome-linux/headless_shell"):
+        hits = sorted(glob.glob(pattern))
+        if hits:
+            return hits[-1]                       # highest build present
+    for name in ("chromium", "chromium-browser", "google-chrome", "chrome"):
+        found = shutil.which(name)
+        if found:
+            return found
+    raise RuntimeError(
+        "No Chromium found. These scripts render through a real browser because "
+        "cairosvg silently drops SVG filters, which every treatment here depends "
+        "on. Set PLAYWRIGHT_BROWSERS_PATH or install chromium."
+    )
+
+
+CHROME = resolve_chrome()
 
 CONCEPTS = [
     ("current.svg",              "CURRENT"),
