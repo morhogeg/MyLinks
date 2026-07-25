@@ -782,7 +782,11 @@ exact-match, capped.
   the both-overrides-at-once case; `test_ask_followup_context.py` asserts the
   endpoint classifies restate vs referential vs ordinary), suite **498 passed /
   4 failed** — the same `test_embed_trigger_backstop` drift (§4 item 11b).
-  **Deploy scope: `ask_brain`.**
+  **SHIPPED:** `06e5c94` → functions run **#44 green**, `ask_brain` updated.
+  Backend-only, so it applies to build 1185 AND every earlier build.
+  **Owner device QA:** after any answer, `בעברית, בקצרה` (or "shorter" /
+  "in English") must restate THAT answer's source — same card, new form — not
+  find a different one.
 
 - **2026-07-25 — ASK, ROUND 3: THE CONVERSATION GUARANTEE (stop
   guessing the subject — the client already knows it).** Owner, after round 2:
