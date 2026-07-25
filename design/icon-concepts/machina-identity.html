@@ -181,6 +181,37 @@
   }
   [hidden] { display: none !important; }
 
+  /* ── Launch screen ────────────────────────────────────────────────────────
+     The phone keeps its own fixed dark palette rather than following the page:
+     a launch screen is a shipped asset, so themeing it here would misrepresent
+     what actually ships. */
+  .launchrow { display: grid; gap: 34px; margin-top: 30px; justify-items: start; }
+  @media (min-width: 760px) { .launchrow { grid-template-columns: auto 1fr; align-items: center; } }
+  .phone {
+    width: min(292px, 74vw); aspect-ratio: 9 / 19.5; position: relative;
+    background: #08080C; border: 1px solid var(--line-2); border-radius: 36px;
+    overflow: hidden; box-shadow: 0 24px 64px -26px rgba(0,0,0,.6);
+  }
+  .splash {
+    position: absolute; inset: 0; display: grid; place-content: center;
+    justify-items: center; gap: 26px;
+    background: radial-gradient(120% 90% at 50% 42%, #1B1B23, #08080C 72%);
+  }
+  .splash svg { width: 104px; height: 104px; color: #FFFFFF;
+                filter: drop-shadow(0 0 16px rgba(174,184,206,.34)); }
+  .wordmark {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px; letter-spacing: .46em; text-transform: uppercase;
+    color: #E6E6F0; text-indent: .46em; opacity: 0;
+  }
+  .appshell {
+    position: absolute; inset: 0; padding: 52px 15px 15px;
+    display: grid; gap: 11px; align-content: start; opacity: 0;
+  }
+  .skelbar { height: 15px; width: 58%; border-radius: 4px; background: #1D1D26; }
+  .skel { height: 74px; border-radius: 9px; background: #131319; border: 1px solid #21212B; }
+  .launchnote { max-width: 42ch; }
+
   .findings { display: grid; gap: 18px; margin-top: 26px; }
   @media (min-width: 760px) { .findings { grid-template-columns: repeat(3, 1fr); } }
   .finding { border-top: 1px solid var(--line-2); padding-top: 15px; }
@@ -326,6 +357,44 @@
     <div class="controls"><button id="replay">Replay</button></div>
   </section>
 
+  <section>
+    <div class="sechead">
+      <span class="eyebrow">04 — launch</span>
+      <p>
+        The same assembly, but resolving all the way to the locked mark: on launch it's an
+        arrival, not a prelude to waiting. The splash is deliberately fixed to the dark
+        palette whichever theme you're in — a launch screen is a shipped asset, not a
+        themed surface.
+      </p>
+    </div>
+    <div class="launchrow">
+      <div class="phone">
+        <div class="splash" id="splash">
+          <div id="splashMark"></div>
+          <div class="wordmark" id="wordmark">Machina</div>
+        </div>
+        <div class="appshell" id="appshell">
+          <div class="skelbar"></div>
+          <div class="skel"></div><div class="skel"></div><div class="skel"></div>
+        </div>
+      </div>
+      <div class="launchnote">
+        <h3>What happens</h3>
+        <p class="note" style="margin-top:10px">
+          Four corner ticks strike first — the reticle, before it's a letter or a logo.
+          The arms join. The brackets close. The point lands. Only then does the wordmark
+          arrive, and the mark hands off to the feed.
+        </p>
+        <p class="note" style="margin-top:14px">
+          It reuses the Ask entry exactly, at a different scale and with a different ending,
+          so the first thing you ever see the app do is the thing it does every time you
+          ask it something.
+        </p>
+        <div class="controls"><button id="relaunch">Replay launch</button></div>
+      </div>
+    </div>
+  </section>
+
   <footer>
     <p class="note">
       Geometry, motion and both palettes are generated in
@@ -422,52 +491,79 @@
      t is 0..1 across one loop. Mirrors anim2.py, with one correction the
      in-situ test forced: the searching point sat at r16/0.34 and vanished at
      inline size, so its floor is raised here. */
-  const ease = (t) => { t = Math.min(1, Math.max(0, t));
-    return t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3)/2; };
-  const half = (BOT - TOP) / 2;
+  /* C1-continuous around the whole loop: every oscillation's AMPLITUDE ramps in
+     and out with smoothstep, so each phase hands over at the same value AND the
+     same velocity, wrap included. The first pass jumped 58→58±sin, 52→50 and
+     50→52 at those three seams, and swept at ~5Hz — jitter, not looking around. */
+  const c01 = (x) => Math.min(1, Math.max(0, x));
+  const sstep = (a, b, x) => { const t = c01((x-a)/(b-a)); return t*t*(3-2*t); };
+  const quint = (x) => x < .5 ? 16*x**5 : 1 - Math.pow(-2*x + 2, 5)/2;
+  const SPREAD = 58, R_LO = 21, R_HI = 52, OP_LO = .46;
+  const HALF = (BOT - TOP) / 2, ARM_H = W;
+  const LOCK0 = .30, LOCK1 = .58, REL0 = .90;
 
   const MOTIONS = {
     clamp: (t) => {
-      if (t < .33) return { spread: 58 + 11*Math.sin(t*6*2*Math.PI), dotR: 21, dotOp: .46,
-        phase: "searching", meaning: "Brackets sweep, the point stays faint." };
-      if (t < .56) { const e = ease((t-.33)/.23);
-        return { spread: 58*(1-e), dotR: 21+31*e, dotOp: .46+.54*e,
+      if (t < LOCK0) { const u = t/LOCK0;
+        const amp = 11 * sstep(0,.18,u) * (1 - sstep(.74,1,u));
+        return { spread: SPREAD + amp*Math.sin(4*Math.PI*u), dotR: R_LO, dotOp: OP_LO,
+          phase: "searching", meaning: "Brackets sweep, the point stays faint." }; }
+      if (t < LOCK1) { const e = quint((t-LOCK0)/(LOCK1-LOCK0));
+        return { spread: SPREAD*(1-e), dotR: R_LO+(R_HI-R_LO)*e, dotOp: OP_LO+(1-OP_LO)*e,
           phase: "locking on", meaning: "They pull in and settle on the source." }; }
-      if (t < .90) { const p = .5+.5*Math.sin((t-.56)/.34*2*Math.PI);
-        return { spread: 0, dotR: 50+5*p, dotOp: 1,
+      if (t < REL0) { const u = (t-LOCK1)/(REL0-LOCK1);
+        const amp = 3.2 * sstep(0,.18,u) * (1 - sstep(.82,1,u));
+        return { spread: 0, dotR: R_HI + amp*Math.sin(2*Math.PI*u), dotOp: 1,
           phase: "answering", meaning: "Held. Only the point breathes." }; }
-      const e = ease((t-.90)/.10);
-      return { spread: 58*e, dotR: 52-31*e, dotOp: 1-.54*e,
+      const e = sstep(0,1,(t-REL0)/(1-REL0));
+      return { spread: SPREAD*e, dotR: R_HI-(R_HI-R_LO)*e, dotOp: 1-(1-OP_LO)*e,
         phase: "release", meaning: "Back into the loop." };
     },
     step: (t) => {
       if (t < .70) {
         const k = Math.min(4, Math.floor(t/.14)), f = (t - k*.14)/.14;
         const a = 90 - 18*k, b = 90 - 18*(k+1);
-        return { spread: a + (b-a)*ease(f/.34), dotR: 19+6*k, dotOp: .40+.11*k,
+        return { spread: a + (b-a)*sstep(0,.42,f), dotR: 19+6*k, dotOp: .40+.11*k,
           phase: `reviewing · ${k+1} of 5`,
           meaning: "One tick per candidate. Bind these to real retrievals." };
       }
-      if (t < .82) { const e = ease((t-.70)/.12);
+      if (t < .84) { const e = quint((t-.70)/.14);
         return { spread: 0, dotR: 43+9*e, dotOp: .84+.16*e,
           phase: "locking on", meaning: "The last candidate resolves." }; }
-      const p = .5+.5*Math.sin((t-.82)/.18*2*Math.PI);
-      return { spread: 0, dotR: 50+5*p, dotOp: 1,
+      const u = (t-.84)/.16;
+      const amp = 3.2 * sstep(0,.2,u) * (1 - sstep(.8,1,u));
+      return { spread: 0, dotR: R_HI + amp*Math.sin(2*Math.PI*u), dotOp: 1,
         phase: "answering", meaning: "Held. Only the point breathes." };
     },
     trace: (t) => {
-      if (t < .38) return { spread: 0, clipH: W + (half-W)*ease(t/.38), dotR: 0, dotOp: 0,
+      if (t < .40) return { spread: 0, clipH: ARM_H + (HALF-ARM_H)*sstep(0,1,t/.40),
+        dotR: 0, dotOp: 0,
         phase: "acquiring", meaning: "Corner ticks first — the reticle assembles." };
-      if (t < .54) { const e = ease((t-.38)/.16);
-        return { spread: 0, clipH: half, dotR: 52*e, dotOp: e,
+      if (t < .56) { const e = sstep(0,1,(t-.40)/.16);
+        return { spread: 0, clipH: HALF, dotR: R_HI*e, dotOp: e,
           phase: "strike", meaning: "The point lands inside the frame." }; }
-      if (t < .86) { const p = .5+.5*Math.sin((t-.54)/.32*2*Math.PI);
-        return { spread: 0, clipH: half, dotR: 50+5*p, dotOp: 1,
+      if (t < .88) { const u = (t-.56)/.32;
+        const amp = 3.2 * sstep(0,.2,u) * (1 - sstep(.8,1,u));
+        return { spread: 0, clipH: HALF, dotR: R_HI + amp*Math.sin(2*Math.PI*u), dotOp: 1,
           phase: "answering", meaning: "Held. Only the point breathes." }; }
-      return { spread: 0, clipH: half, dotR: 52, dotOp: 1, alpha: 1-ease((t-.86)/.14),
+      return { spread: 0, clipH: HALF, dotR: R_HI, dotOp: 1,
+        alpha: 1 - sstep(0,1,(t-.88)/.12),
         phase: "release", meaning: "Back into the loop." };
     }
   };
+
+  /* The arrival, played once — ends exactly on clamp(0), so the loop picks it
+     up with no seam. This is what runs when Ask opens. */
+  const traceEntry = (u) => {
+    const g = sstep(0,.82,u), lit = sstep(.5,1,u);
+    return { spread: SPREAD, clipH: ARM_H + (HALF-ARM_H)*g, dotR: R_LO*lit, dotOp: OP_LO*lit };
+  };
+  /* Same assembly, resolving to the LOCKED mark: an arrival, not a prelude. */
+  const launchAt = (u) => ({
+    spread: SPREAD * (1 - sstep(.30,.70,u)),
+    clipH: ARM_H + (HALF-ARM_H)*sstep(0,.46,u),
+    dotR: R_HI * sstep(.44,.68,u), dotOp: sstep(.44,.68,u)
+  });
 
   /* ── Bench ────────────────────────────────────────────────────────────── */
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
@@ -527,10 +623,15 @@
   const REVEAL = 6400;
   let chatStart = performance.now(), timers = [];
 
+  /* Ask opens with the trace entry — the reticle assembling — and only then
+     hands to the clamp loop. Trace ends on clamp(0), so there is no seam. */
+  const ENTRY_MS = 950;
   function chatFrame(now) {
     const el = now - chatStart;
     if (el < REVEAL) {
-      drawChat(reduced.matches ? LOCKED : MOTIONS.clamp((el % CYCLE) / CYCLE));
+      drawChat(reduced.matches ? LOCKED
+        : el < ENTRY_MS ? traceEntry(el / ENTRY_MS)
+        : MOTIONS.clamp(((el - ENTRY_MS) % CYCLE) / CYCLE));
     }
     requestAnimationFrame(chatFrame);
   }
@@ -547,6 +648,32 @@
   document.getElementById("replay").addEventListener("click", runChat);
   runChat();
   requestAnimationFrame(chatFrame);
+
+  /* ── Launch sequence ──────────────────────────────────────────────────── */
+  const drawSplash = makeMark(document.getElementById("splashMark"), { glow: false });
+  const splash = document.getElementById("splash"), shell = document.getElementById("appshell"),
+        wordmark = document.getElementById("wordmark");
+  const ASSEMBLE = 1300, WORD = 1900, HANDOFF = 2600, DONE = 3300;
+  let launchT0 = performance.now();
+
+  function launchFrame(now) {
+    const el = now - launchT0;
+    if (reduced.matches) {
+      drawSplash(LOCKED); wordmark.style.opacity = "1";
+      splash.style.opacity = "1"; shell.style.opacity = "0";
+    } else {
+      drawSplash(el < ASSEMBLE ? launchAt(el / ASSEMBLE) : LOCKED);
+      wordmark.style.opacity = sstep(ASSEMBLE, WORD, el).toFixed(3);
+      const out = sstep(HANDOFF, DONE, el);
+      splash.style.opacity = (1 - out).toFixed(3);
+      shell.style.opacity = out.toFixed(3);
+    }
+    requestAnimationFrame(launchFrame);
+  }
+  document.getElementById("relaunch").addEventListener("click", () => {
+    launchT0 = performance.now();
+  });
+  requestAnimationFrame(launchFrame);
 
   /* Palette label follows whichever theme is actually showing. */
   const namePalette = () => {

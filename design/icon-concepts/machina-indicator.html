@@ -225,6 +225,34 @@
 
   <section>
     <div class="sechead">
+      <span class="eyebrow">Where trace lives</span>
+      <p class="note">
+        Trace was never a loop — it's the <strong>arrival</strong>, played once. The reticle
+        assembles from four corner ticks, then hands the brackets to the cycle above at
+        exactly its first frame, so there's no seam between them. It runs when Ask opens,
+        and again — larger, and resolving all the way to the locked mark — on the launch
+        screen.
+      </p>
+    </div>
+    <div class="panel">
+      <div class="bench">
+        <div class="stage" id="entryStage"></div>
+        <div class="readout">
+          <div class="phase" id="entryPhase">Entry</div>
+          <div class="says">
+            Corner ticks, then the arms join, then the point lights to its searching floor —
+            and the loop takes it from there.
+          </div>
+          <div class="controls" style="margin-top:2px">
+            <button id="entryPlay">Replay entry</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sechead">
       <span class="eyebrow">At the size it ships</span>
       <p class="note">
         42&nbsp;px inline, beside the status line, running in sync with the bench above.
@@ -272,49 +300,86 @@
     const id = "k" + (uid++);
     host.innerHTML =
       `<svg viewBox="0 0 1024 1024" role="img" aria-label="Ask indicator">
+         <defs><clipPath id="c${id}">
+           <rect id="t${id}" x="0" y="${TOP}" width="1024" height="200"/>
+           <rect id="b${id}" x="0" y="${BOT-200}" width="1024" height="200"/>
+         </clipPath></defs>
          <g${glow ? ' style="filter:drop-shadow(0 0 12px var(--glow))"' : ""}>
-           <path id="l${id}" fill="currentColor"/><path id="r${id}" fill="currentColor"/>
+           <g clip-path="url(#c${id})">
+             <path id="l${id}" fill="currentColor"/><path id="r${id}" fill="currentColor"/>
+           </g>
            <circle id="d${id}" cx="${CX}" cy="${CY}" r="21" fill="currentColor"/>
          </g></svg>`;
-    const l = document.getElementById("l" + id), r = document.getElementById("r" + id),
-          d = document.getElementById("d" + id);
+    const g = (p) => document.getElementById(p + id);
+    const l = g("l"), r = g("r"), d = g("d"), ct = g("t"), cb = g("b");
     return (s) => {
       const [a, b] = paths(s.spread);
       l.setAttribute("d", a); r.setAttribute("d", b);
       d.setAttribute("r", s.dotR.toFixed(1));
       d.setAttribute("opacity", s.dotOp.toFixed(3));
+      const h = s.clipH ?? 200;
+      ct.setAttribute("height", h.toFixed(1));
+      cb.setAttribute("y", (BOT - h).toFixed(1));
+      cb.setAttribute("height", h.toFixed(1));
     };
   }
 
-  const ease = (t) => { t = Math.min(1, Math.max(0, t));
-    return t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3)/2; };
+  /* ── Motion ───────────────────────────────────────────────────────────────
+     C1-continuous around the whole loop. Every oscillation's AMPLITUDE ramps
+     in and out with smoothstep, so each phase hands over at the same value AND
+     the same velocity — including the wrap from release back into search. The
+     earlier version jumped 58→58±sin, 52→50 and 50→52 at those three seams,
+     and swept at ~5Hz, which read as jitter rather than as looking around. */
+  const c01 = (x) => Math.min(1, Math.max(0, x));
+  const sstep = (a, b, x) => { const t = c01((x-a)/(b-a)); return t*t*(3-2*t); };
+  const quint = (x) => x < .5 ? 16*x**5 : 1 - Math.pow(-2*x + 2, 5)/2;
+  const SPREAD = 58, R_LO = 21, R_HI = 52, OP_LO = .46, HALF = 200, ARM_H = 58;
+  const LOCK0 = .30, LOCK1 = .58, REL0 = .90;
 
   /* Phase table drives the motion, the labels, the cards and the timeline
      widths from one source, so they can never disagree. */
   const PHASES = [
-    { key: "searching", at: 0,   to: .33, name: "Searching",
+    { key: "searching", at: 0,     to: LOCK0, name: "Searching",
       says: "The brackets sweep. Nothing is locked yet.",
-      copy: "Searching your library…", rep: .16 },
-    { key: "locking",   at: .33, to: .56, name: "Locking on",
+      copy: "Searching your library…", rep: .15 },
+    { key: "locking",   at: LOCK0, to: LOCK1, name: "Locking on",
       says: "They pull in and settle onto the sources.",
       copy: "Reviewing relevant cards…", rep: .46 },
-    { key: "answering", at: .56, to: .90, name: "Answering",
+    { key: "answering", at: LOCK1, to: REL0,  name: "Answering",
       says: "Held. Only the point breathes.",
-      copy: "Writing your answer…", rep: .72 },
-    { key: "release",   at: .90, to: 1,   name: "Release",
+      copy: "Writing your answer…", rep: .74 },
+    { key: "release",   at: REL0,  to: 1,     name: "Release",
       says: "It lets go, and the loop begins again.",
       copy: "—", rep: .96 }
   ];
 
   function at(t) {
-    if (t < .33) return { spread: 58 + 11*Math.sin(t*6*2*Math.PI), dotR: 21, dotOp: .46 };
-    if (t < .56) { const e = ease((t-.33)/.23);
-      return { spread: 58*(1-e), dotR: 21+31*e, dotOp: .46+.54*e }; }
-    if (t < .90) { const p = .5+.5*Math.sin((t-.56)/.34*2*Math.PI);
-      return { spread: 0, dotR: 50+5*p, dotOp: 1 }; }
-    const e = ease((t-.90)/.10);
-    return { spread: 58*e, dotR: 52-31*e, dotOp: 1-.54*e };
+    if (t < LOCK0) {
+      const u = t / LOCK0;
+      const amp = 11 * sstep(0, .18, u) * (1 - sstep(.74, 1, u));
+      return { spread: SPREAD + amp*Math.sin(4*Math.PI*u), dotR: R_LO, dotOp: OP_LO, clipH: HALF };
+    }
+    if (t < LOCK1) {
+      const e = quint((t - LOCK0) / (LOCK1 - LOCK0));
+      return { spread: SPREAD*(1-e), dotR: R_LO + (R_HI-R_LO)*e,
+               dotOp: OP_LO + (1-OP_LO)*e, clipH: HALF };
+    }
+    if (t < REL0) {
+      const u = (t - LOCK1) / (REL0 - LOCK1);
+      const amp = 3.2 * sstep(0, .18, u) * (1 - sstep(.82, 1, u));
+      return { spread: 0, dotR: R_HI + amp*Math.sin(2*Math.PI*u), dotOp: 1, clipH: HALF };
+    }
+    const e = sstep(0, 1, (t - REL0) / (1 - REL0));
+    return { spread: SPREAD*e, dotR: R_HI - (R_HI-R_LO)*e,
+             dotOp: 1 - (1-OP_LO)*e, clipH: HALF };
   }
+
+  /* The arrival, played once. It ends exactly on at(0) — brackets drawn, held
+     wide, point at its searching floor — so the loop picks it up with no seam. */
+  const traceEntry = (u) => {
+    const g = sstep(0, .82, u), lit = sstep(.5, 1, u);
+    return { spread: SPREAD, clipH: ARM_H + (HALF-ARM_H)*g, dotR: R_LO*lit, dotOp: OP_LO*lit };
+  };
   const phaseAt = (t) => PHASES.find((p) => t < p.to) || PHASES[3];
 
   /* ── Build the timeline segments and the state cards from PHASES ──────── */
@@ -396,6 +461,26 @@
 
   $("play").addEventListener("click", () => pause(playing));
   $("restart").addEventListener("click", () => { setT(0); pause(false); });
+
+  /* Entry demo: trace once, then straight into the loop, to show the handoff. */
+  const drawEntry = mark(document.getElementById("entryStage"), true);
+  const ENTRY_MS = 950;
+  let entryT0 = performance.now();
+  (function entryTick(now) {
+    const el = now - entryT0;
+    if (reduced.matches) {
+      drawEntry(at(.74));
+      $("entryPhase").textContent = "Entry";
+    } else if (el < ENTRY_MS) {
+      drawEntry(traceEntry(el / ENTRY_MS));
+      $("entryPhase").textContent = "Assembling";
+    } else {
+      drawEntry(at(((el - ENTRY_MS) / CYCLE) % 1));
+      $("entryPhase").textContent = "Handed to the loop";
+    }
+    requestAnimationFrame(entryTick);
+  })(performance.now());
+  $("entryPlay").addEventListener("click", () => { entryT0 = performance.now(); });
 
   pause(!playing);
   render();
