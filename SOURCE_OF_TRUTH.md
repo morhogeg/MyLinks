@@ -801,7 +801,18 @@ exact-match, capped.
   the screen, and the canvas reserves its 64px box so nothing shifts when it
   starts painting — but if boot ever feels dead on a cold launch, that's why,
   and the ring is the fallback. Feed's `Suspense` fallback ring and the button
-  spinners are still deliberately NOT orbs.
+  spinners are still deliberately NOT orbs. Commit `ad9c7db` → run **#184 green
+  → build 1184**.
+  **TestFlight builds from this session, newest first:** **1184** (`ad9c7db`) =
+  everything + the boot orb; **1183** (`eaf9b7c`) = label stops animating
+  (stale-glyph + blink fix); 1181 (`64c0514`) = plateau/clock-driven dip;
+  1180 (`72de50a`) = orbs + sidebar glyph, pre-fix. **Owner device QA still
+  open on 1184:** (a) confirm "Thinking it through…" no longer trails debris —
+  NOT reproducible in this container (Chromium only, and this is a WebKit
+  repaint bug), so it is unverified by construction; (b) whether three orb
+  swaps in a ~6s window still reads as fidgety, fallback = two beats
+  (`searching` for 1+2, `shaping` for the write); (c) whether the boot orb's
+  pre-hydration blank window is noticeable on a cold launch.
 
 - **2026-07-25 — ASK PHRASE-SWAP HICCUP FIXED (device report).** Owner
   on iPhone: "a constant hiccup in the phrase change, mainly on the text — it
