@@ -10,8 +10,15 @@
   --text-muted: #666666;
   --foreground: #E5E5E5;
   --border: rgba(255, 255, 255, 0.05);
-  --accent: #A855F7;
-  /* Purple-500 */
+  /* Lumen (dark): --accent is no longer a hue — it is the neutral EMPHASIS
+     token, porcelain on the graphite ground. Affordance comes from contrast:
+     the primary CTA is the highest-contrast element on its screen. Values are
+     ported from design/icon-concepts (ask_idle.py --cta/--cta-ink, the
+     cit_lumen.svg body gradient, the identity page --glow). */
+  --accent: #E9E9F2;
+  /* Ink for content sitting ON an accent surface (dark text on porcelain). */
+  --accent-ink: #101016;
+  --accent-hover: #FFFFFF;
 
   /* Surface fill / inset / strong-border tokens (theme-aware materials).
      The app was built dark-first with hardcoded white/black alphas
@@ -41,13 +48,14 @@
     0 0 24px -6px var(--accent-ring);
   /* A top-light sheen overlaid on --card for a sense of surface/material. */
   --surface-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 45%);
-  /* Brand gradient — the purple→pink already used by the logo lockup. */
-  --accent-gradient: linear-gradient(135deg, #A855F7, #EC4899);
-  /* Discrete stops of the brand gradient — the working ring + Aurora orb need
-     real color stops (a gradient value can't be sampled). */
-  --accent-2: #EC4899; /* pink (gradient end) */
-  --accent-3: #C4B5FD; /* lilac — lighter for the dark ground */
-  --accent-ring: rgba(168, 85, 247, 0.35);
+  /* Brand gradient — the icon body's lit-solid ramp (cit_lumen.svg): brightest
+     at the top-start, falling to the shadowed porcelain. No hue. */
+  --accent-gradient: linear-gradient(135deg, #FFFFFF, #CBD2E0);
+  /* Discrete stops of the brand gradient (some surfaces need real color stops —
+     a gradient value can't be sampled). */
+  --accent-2: #CBD2E0; /* gradient end */
+  --accent-3: #F2F5FA; /* lighter — for the dark ground */
+  --accent-ring: rgba(174, 184, 206, 0.34); /* identity --glow (dark) */
   /* Inactive bottom-tab ink. Dark = the muted grey that looked right; light
      overrides to the darker secondary so the labels read vividly, not washed
      out (theme is class-based via .light, so this can't be a Tailwind dark:). */
@@ -69,8 +77,10 @@
   --text-muted: #9CA3AF;
   --foreground: #111827;
   --border: rgba(0, 0, 0, 0.05);
-  --accent: #8B5CF6;
-  /* Purple-600 */
+  /* Monolith (light): graphite emphasis on the porcelain ground. */
+  --accent: #22222A;
+  --accent-ink: #F7F7F9;
+  --accent-hover: #34343F;
 
   /* Light-theme materials: dark alphas over the light card/bg so fills, insets
      and hairlines stay visible (white alphas would vanish on white). */
@@ -92,10 +102,11 @@
     0 2px 6px -2px rgba(16, 24, 40, 0.08),
     0 16px 32px -14px rgba(16, 24, 40, 0.20);
   --surface-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 45%);
-  --accent-gradient: linear-gradient(135deg, #8B5CF6, #EC4899);
-  --accent-2: #EC4899; /* pink */
-  --accent-3: #C084FC; /* lilac */
-  --accent-ring: rgba(139, 92, 246, 0.3);
+  /* Graphite ramp — the splash tile's gradient (machina-identity.html §04). */
+  --accent-gradient: linear-gradient(135deg, #34343F, #14141B);
+  --accent-2: #14141B; /* gradient end */
+  --accent-3: #55555F; /* lighter graphite */
+  --accent-ring: rgba(90, 88, 80, 0.22); /* identity --glow (light) */
   /* Light mode: darker, vivid inactive tabs (see the :root note). */
   --tabbar-inactive: var(--text-secondary);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -116,6 +127,8 @@
   --color-fill-strong: var(--fill-strong);
   --color-surface-inset: var(--surface-inset);
   --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-hover: var(--accent-hover);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -331,8 +344,8 @@ html {
   animation: progress-indeterminate 1.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
-/* Inline "working" marks are now BrandOrb (thinking-orbs in our palette),
-   rendered to a <canvas> — see components/ui/BrandOrb.tsx. No CSS ring. */
+/* Inline "working" marks are now CitationMark (motion.js ported verbatim) —
+   see components/ui/CitationMark.tsx. No CSS ring. */
 
 /* Scale-up: used by ConfirmDialog (was referenced but never defined). */
 @keyframes scale-up {
@@ -453,7 +466,7 @@ textarea,
 button,
 select,
 a {
-  -webkit-tap-highlight-color: rgba(168, 85, 247, 0.2);
+  -webkit-tap-highlight-color: rgba(140, 145, 160, 0.2);
 }
 
 /* Prevent zoom on input focus (iOS) */

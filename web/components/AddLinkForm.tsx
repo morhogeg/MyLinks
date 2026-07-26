@@ -839,7 +839,7 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                                 <button
                                     type="submit"
                                     disabled={activeTab === 'link' ? !url.trim() : activeTab === 'note' ? !note.trim() : !imageFile}
-                                    className="w-full py-4 bg-accent text-white font-bold rounded-xl hover:bg-accent-hover active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-accent/20"
+                                    className="w-full py-4 bg-accent text-accent-ink font-bold rounded-xl hover:bg-accent-hover active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-accent/20"
                                 >
                                     Save
                                 </button>

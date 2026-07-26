@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { OrbState, OrbSize } from 'thinking-orbs';
-import BrandOrb from './BrandOrb';
+import CitationMark, { type OrbState, type OrbSize } from './CitationMark';
 
 /**
  * OrbStatus — a Thinking Orb and its status line, exchanged as ONE gesture.
@@ -122,7 +121,7 @@ export default function OrbStatus({
             {/* Only this span is animated. The label is a sibling, so it never
                 joins a composited layer — see the stale-glyph note above. */}
             <span ref={ref} className="inline-flex shrink-0">
-                <BrandOrb state={shown.orb} size={size} />
+                <CitationMark state={shown.orb} size={size} />
             </span>
             {/* Keyed so React replaces the element instead of mutating a text
                 node, forcing a clean paint of the whole line. */}

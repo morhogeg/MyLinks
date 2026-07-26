@@ -61,7 +61,7 @@ export default function BottomTabBar({
                     data-tour="add"
                     aria-label="Add to Machina"
                     onClick={() => { hapticMedium(); onCapture(); }}
-                    className="w-[40px] h-[40px] shrink-0 rounded-full bg-[image:var(--accent-gradient)] text-white flex items-center justify-center shadow-lg shadow-accent/40 active:scale-95 transition-transform"
+                    className="w-[40px] h-[40px] shrink-0 rounded-full bg-[image:var(--accent-gradient)] text-accent-ink flex items-center justify-center shadow-lg shadow-accent/40 active:scale-95 transition-transform"
                 >
                     <Plus className="w-[20px] h-[20px]" strokeWidth={2.4} />
                 </button>

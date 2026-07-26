@@ -82,7 +82,7 @@ export default function ConfirmDialog({
             >
                 {/* Header */}
                 <div className="flex items-start gap-4 mb-4">
-                    <div className={`mt-1 p-2 rounded-xl flex-shrink-0 ${variant === 'danger' ? 'bg-red-500/10 text-red-400' : 'bg-purple-500/10 text-purple-400'
+                    <div className={`mt-1 p-2 rounded-xl flex-shrink-0 ${variant === 'danger' ? 'bg-red-500/10 text-red-400' : 'bg-accent/10 text-accent'
                         }`}>
                         <AlertTriangle className="w-6 h-6" />
                     </div>
@@ -115,7 +115,7 @@ export default function ConfirmDialog({
                         onClick={handleConfirm}
                         className={`flex-1 px-4 py-2.5 rounded-xl font-medium transition-colors ${variant === 'danger'
                                 ? 'bg-red-500 text-white hover:bg-red-600'
-                                : 'bg-accent text-white hover:bg-accent-hover'
+                                : 'bg-accent text-accent-ink hover:bg-accent-hover'
                             }`}
                     >
                         {confirmLabel}

@@ -6,9 +6,10 @@
   --text-sec: #b8b8c4;
   --text-muted: #7b7b8a;
   --border: #2c2c38;
-  --accent: #8b5cf6;
-  --accent-2: #ec4899;
-  --gradient: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%);
+  /* Lumen: neutral emphasis — porcelain on the dark popup, no hue. */
+  --accent: #e9e9f2;
+  --accent-2: #cbd2e0;
+  --gradient: linear-gradient(135deg, #ffffff 0%, #cbd2e0 100%);
   --ok: #34d399;
   --err: #f87171;
 }
@@ -139,7 +140,7 @@ button:active { transform: translateY(0.5px); }
   padding: 9px 12px;
   border: none;
   background: var(--gradient);
-  color: #fff;
+  color: #101016;
 }
 .primary:hover { filter: brightness(1.08); }
 

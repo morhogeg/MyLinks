@@ -159,7 +159,7 @@ export default function TagInput({
                         onMouseEnter={() => setSelectedIndex(index)}
                         disabled={isSelected}
                         className={`w-full text-left flex items-center justify-between rounded-lg transition-colors ${rowClass}
-                            ${index === selectedIndex ? 'bg-accent text-white' : ''}
+                            ${index === selectedIndex ? 'bg-accent text-accent-ink' : ''}
                             ${isSelected
                                 ? 'bg-accent/10 text-accent font-semibold cursor-default opacity-80'
                                 : index !== selectedIndex ? 'text-text hover:bg-fill-strong' : ''}`}

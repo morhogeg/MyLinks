@@ -189,7 +189,7 @@ export default function DataExport() {
     if (native) {
         return (
             <List>
-                <RowShell tile={<Download className="w-[16px] h-[16px]" />} tileClass="bg-teal-600">
+                <RowShell tile={<Download className="w-[16px] h-[16px]" />} tileClass="bg-teal-600 text-white">
                     <RowText title="Export my data" sub="Available on the Machina web app." />
                 </RowShell>
             </List>
@@ -200,7 +200,7 @@ export default function DataExport() {
         <List>
             <RowShell
                 tile={<Download className="w-[16px] h-[16px]" />}
-                tileClass="bg-teal-600"
+                tileClass="bg-teal-600 text-white"
                 onClick={busy ? undefined : handleExport}
             >
                 <RowText

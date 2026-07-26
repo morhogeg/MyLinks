@@ -76,7 +76,7 @@ export default function DigestView({
                     {onOpenDigestSettings && (
                         <button
                             onClick={onOpenDigestSettings}
-                            className="mt-5 inline-flex items-center gap-2 px-4 h-10 rounded-full bg-accent text-white text-sm font-bold hover:bg-accent-hover active:scale-95 transition-all cursor-pointer"
+                            className="mt-5 inline-flex items-center gap-2 px-4 h-10 rounded-full bg-accent text-accent-ink text-sm font-bold hover:bg-accent-hover active:scale-95 transition-all cursor-pointer"
                         >
                             Set up your digest
                         </button>

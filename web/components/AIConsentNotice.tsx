@@ -30,11 +30,11 @@ export default function AIConsentNotice({ onAccept }: { onAccept: () => void }) 
         >
             <div className="w-full max-w-sm flex flex-col items-center animate-slide-up">
                 {/* Brand mark — same lockup as LoginScreen/Onboarding. */}
-                <div className="w-16 h-16 rounded-3xl overflow-hidden shadow-lg shadow-purple-500/20 ring-1 ring-white/15">
+                <div className="w-16 h-16 rounded-3xl overflow-hidden shadow-lg shadow-accent/20 ring-1 ring-white/15">
                     <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
                 </div>
 
-                <h1 className="mt-6 text-2xl font-extrabold tracking-tight text-center bg-[image:var(--accent-gradient)] bg-clip-text text-transparent">
+                <h1 className="mt-6 text-2xl font-extrabold tracking-tight text-center text-text">
                     Machina uses AI
                 </h1>
                 <p className="mt-2 text-sm text-text-secondary text-center leading-relaxed">

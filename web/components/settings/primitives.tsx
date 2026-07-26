@@ -7,7 +7,7 @@ import { hapticSelection } from '@/lib/haptics';
 
 /* ============================ PRIMITIVES ============================ */
 
-const TILE_BASE = 'w-[29px] h-[29px] rounded-[7px] flex items-center justify-center text-white shrink-0';
+const TILE_BASE = 'w-[29px] h-[29px] rounded-[7px] flex items-center justify-center shrink-0';
 
 export function LargeTitle({ children }: { children: ReactNode }) {
     return <h1 className="text-[28px] font-extrabold tracking-[-0.024em] text-text px-1 mb-2 leading-tight">{children}</h1>;
@@ -53,7 +53,7 @@ export function RowShell({
     const cls = `w-full flex items-center gap-3 px-[14px] min-h-[46px] text-left ${onClick ? 'hover:bg-card-hover transition-colors cursor-pointer' : ''} ${className || ''}`;
     const inner = (
         <>
-            {tile && <span className={`${TILE_BASE} ${tileClass || 'bg-accent'}`}>{tile}</span>}
+            {tile && <span className={`${TILE_BASE} ${tileClass || 'bg-accent text-accent-ink'}`}>{tile}</span>}
             {children}
         </>
     );
@@ -85,7 +85,7 @@ export function NavRow({ tile, tileClass, title, value, onClick }: { tile?: Reac
 
 export function ExternalRow({ title, onClick }: { title: string; onClick: () => void }) {
     return (
-        <RowShell tile={<ShieldCheck className="w-[16px] h-[16px]" />} tileClass="bg-slate-500" onClick={onClick}>
+        <RowShell tile={<ShieldCheck className="w-[16px] h-[16px]" />} tileClass="bg-slate-500 text-white" onClick={onClick}>
             <RowText title={title} />
             <ExternalLink className="ml-auto w-[15px] h-[15px] text-text-muted/60 shrink-0" />
         </RowShell>
@@ -147,7 +147,7 @@ export function Segmented<T extends string>({ value, options, onChange, iconOnly
                         onClick={() => onChange(o.value)}
                         aria-label={iconOnly ? o.label : undefined}
                         title={iconOnly ? o.label : undefined}
-                        className={`inline-flex items-center justify-center gap-1.5 h-9 rounded-xl text-[13px] font-semibold transition-colors cursor-pointer ${iconOnly ? 'w-10' : 'flex-1'} ${active ? 'bg-accent text-white shadow-sm' : 'text-text-secondary hover:text-text'}`}
+                        className={`inline-flex items-center justify-center gap-1.5 h-9 rounded-xl text-[13px] font-semibold transition-colors cursor-pointer ${iconOnly ? 'w-10' : 'flex-1'} ${active ? 'bg-accent text-accent-ink shadow-sm' : 'text-text-secondary hover:text-text'}`}
                     >
                         {o.icon}
                         {!iconOnly && o.label}

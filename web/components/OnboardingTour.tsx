@@ -98,7 +98,7 @@ function CaptureMock({ native }: { native: boolean }) {
                 {/* Machina — the highlighted, "chosen" target. */}
                 <div className="flex flex-col items-center gap-1.5 w-14 shrink-0">
                     <div className="relative w-11 h-11 rounded-[14px] bg-[image:var(--accent-gradient)] flex items-center justify-center ring-2 ring-accent shadow-lg shadow-accent/25">
-                        <Sparkles className="w-5 h-5 text-white" />
+                        <Sparkles className="w-5 h-5 text-accent-ink" />
                         <span className="absolute -top-1 -end-1 w-3.5 h-3.5 rounded-full bg-accent ring-2 ring-card" />
                     </div>
                     <span className="text-[9px] font-bold text-accent truncate w-full text-center">Machina</span>
@@ -118,7 +118,7 @@ function StructuredCardMock() {
         <div className="w-full rounded-2xl bg-card border border-border-subtle shadow-xl overflow-hidden" aria-hidden>
             {/* Thumbnail band */}
             <div className="h-16 bg-[image:var(--accent-gradient)] opacity-90 flex items-center justify-center">
-                <FileText className="w-6 h-6 text-white/90" />
+                <FileText className="w-6 h-6 text-accent-ink/90" />
             </div>
             <div className="p-3.5">
                 <div className="flex items-center gap-1.5 mb-1.5">
@@ -153,7 +153,7 @@ function AskMock() {
     return (
         <div className="w-full flex flex-col gap-2.5" aria-hidden>
             {/* Question */}
-            <div className="self-end max-w-[80%] rounded-2xl rounded-ee-md bg-accent text-white px-3.5 py-2 shadow-sm shadow-accent/20">
+            <div className="self-end max-w-[80%] rounded-2xl rounded-ee-md bg-accent text-accent-ink px-3.5 py-2 shadow-sm shadow-accent/20">
                 <p className="text-[12px] font-medium leading-snug">What have I saved about staying focused?</p>
             </div>
             {/* Answer */}
@@ -446,7 +446,7 @@ export default function OnboardingTour({
                         )}
                         <button
                             onClick={next}
-                            className="flex-1 inline-flex items-center justify-center gap-1.5 h-12 rounded-full bg-accent text-white text-[15px] font-bold shadow-lg shadow-accent/25 hover:bg-accent-hover active:scale-[0.98] transition-all cursor-pointer"
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 h-12 rounded-full bg-accent text-accent-ink text-[15px] font-bold shadow-lg shadow-accent/25 hover:bg-accent-hover active:scale-[0.98] transition-all cursor-pointer"
                         >
                             {isLast ? (
                                 <>

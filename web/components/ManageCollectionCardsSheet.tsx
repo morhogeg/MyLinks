@@ -154,7 +154,7 @@ export default function ManageCollectionCardsSheet({
                         <button
                             onClick={commitAndClose}
                             aria-label={dirty ? 'Save changes' : 'Done'}
-                            className="px-4 h-9 rounded-full bg-accent text-white text-sm font-semibold hover:bg-accent-hover transition-colors"
+                            className="px-4 h-9 rounded-full bg-accent text-accent-ink text-sm font-semibold hover:bg-accent-hover transition-colors"
                         >
                             {dirty ? 'Save' : 'Done'}
                         </button>
@@ -202,7 +202,7 @@ export default function ManageCollectionCardsSheet({
                                 </span>
                                 <span
                                     className={`flex items-center justify-center w-6 h-6 rounded-full border shrink-0 transition-colors ${
-                                        isMember ? 'bg-accent border-accent text-white' : 'border-border-strong text-transparent'
+                                        isMember ? 'bg-accent border-accent text-accent-ink' : 'border-border-strong text-transparent'
                                     }`}
                                 >
                                     <Check className="w-3.5 h-3.5" />

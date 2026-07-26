@@ -411,7 +411,7 @@ export default function LinkDetailModal({
                 <button
                     onPointerDown={() => { noteActionRef.current = 'save'; }}
                     onClick={saveNote}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-accent-ink text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
                 >
                     <Check className="w-3.5 h-3.5" /> {isRtl ? 'שמור הערה' : 'Save note'}
                 </button>
@@ -778,7 +778,7 @@ export default function LinkDetailModal({
                             <div className="flex gap-2 mt-3">
                                 <button
                                     onClick={saveNoteCard}
-                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-white text-sm font-bold hover:bg-accent-hover active:scale-95 transition-all"
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-accent-ink text-sm font-bold hover:bg-accent-hover active:scale-95 transition-all"
                                 >
                                     <Check className="w-4 h-4" /> Save
                                 </button>
@@ -808,7 +808,7 @@ export default function LinkDetailModal({
                             <div className="flex gap-2 mt-2">
                                 <button
                                     onClick={saveTitle}
-                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-accent-ink text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
                                 >
                                     <Check className="w-3.5 h-3.5" /> Save
                                 </button>
@@ -886,7 +886,7 @@ export default function LinkDetailModal({
                                                 <div className="flex gap-2 mt-2">
                                                     <button
                                                         onClick={saveSummary}
-                                                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
+                                                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-accent-ink text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
                                                     >
                                                         <Check className="w-3.5 h-3.5" /> Save
                                                     </button>

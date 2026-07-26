@@ -32,7 +32,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
                         </p>
                         <button
                             onClick={() => (reset ? reset() : window.location.reload())}
-                            className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-white font-medium hover:bg-accent/90 transition-colors cursor-pointer"
+                            className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-accent-ink font-medium hover:bg-accent/90 transition-colors cursor-pointer"
                         >
                             Reload
                         </button>

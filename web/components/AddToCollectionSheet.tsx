@@ -212,7 +212,7 @@ export default function AddToCollectionSheet({
                             <button
                                 onClick={handleCreate}
                                 disabled={!newName.trim() || busy}
-                                className="px-4 h-9 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent-hover transition-colors disabled:opacity-40"
+                                className="px-4 h-9 rounded-xl bg-accent text-accent-ink text-sm font-semibold hover:bg-accent-hover transition-colors disabled:opacity-40"
                             >
                                 Create
                             </button>
@@ -258,7 +258,7 @@ function CollectionRow({
             <span
                 className={`flex items-center justify-center w-6 h-6 rounded-full border transition-colors ${
                     isMember
-                        ? 'bg-accent border-accent text-white'
+                        ? 'bg-accent border-accent text-accent-ink'
                         : 'border-border-strong text-transparent'
                 }`}
             >

@@ -431,7 +431,7 @@ export default function ReminderModal({ uid, link, isOpen, onClose, onUpdate }: 
                     <button
                         onClick={handleSave}
                         disabled={!canSave}
-                        className="flex-1 px-4 py-2.5 rounded-xl bg-accent text-white font-semibold hover:bg-accent-hover transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-accent text-accent-ink font-semibold hover:bg-accent-hover transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
                     >
                         {saving ? (
                             <>

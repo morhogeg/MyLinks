@@ -10,6 +10,7 @@ import ScrollToTop from "@/components/ScrollToTop";
 import OnboardingTour, { ONBOARDING_STORAGE_KEY } from "@/components/OnboardingTour";
 import { Settings, Search, Globe, SlidersHorizontal } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
+import { CitationGlyph, Wordmark } from "@/components/ui/Wordmark";
 import { IconButton } from "@/components/ui/Button";
 import { useHeaderFade } from "@/lib/useHeaderFade";
 import { useSharedCaptureBanner } from "@/lib/useSharedCaptureBanner";
@@ -116,7 +117,7 @@ export default function Home() {
             writing), and booting isn't that. The pulse is CSS, so it's alive on
             the first painted frame. */}
         <div className="flex flex-col items-center">
-          <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg shadow-purple-500/20 animate-pulse ring-1 ring-white/15">
+          <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg shadow-accent/20 animate-pulse ring-1 ring-white/15">
             <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
           </div>
           <span className="sr-only" role="status">Starting Machina…</span>
@@ -148,26 +149,14 @@ export default function Home() {
         className="sticky top-0 z-50 bg-background/70 backdrop-blur-xl border-b border-border-subtle h-[52px] sm:h-[68px] flex items-center"
         style={{ paddingTop: 'env(safe-area-inset-top)', boxSizing: 'content-box' }}
       >
-        {/* hairline accent glow under the bar */}
-        <div className="absolute inset-x-0 bottom-0 h-px bg-[image:var(--accent-gradient)] opacity-30" />
         <div className="w-full max-w-[2200px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 flex items-center justify-between">
-          {/* Brand */}
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-2xl overflow-hidden shadow-lg shadow-black/10 ring-1 ring-black/5 dark:ring-white/10">
-              {/* The exact app icon, so the in-app mark matches the home-screen icon. */}
-              <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
-            </div>
-            <div className="leading-none">
-              <h1 className="text-lg sm:text-xl font-extrabold tracking-tight bg-[image:var(--accent-gradient)] bg-clip-text text-transparent">
-                Machina AI
-              </h1>
-              {/* Tagline is decorative — desktop keeps it, mobile drops it so the
-                  most-used screen's header is one clean line. */}
-              <p className="hidden sm:block mt-1 text-[10px] sm:text-[11px] font-medium text-text-muted tracking-wide">
-                Capture. Connect. Recall.
-              </p>
-            </div>
-          </div>
+          {/* Brand — the BARE Citation glyph + the drawn wordmark, centred on
+              one axis. No tile behind the mark (a rounded container here reads
+              as a shrunken app icon rather than as the brand mark), no tagline. */}
+          <h1 className="flex items-center gap-3 sm:gap-3.5 text-text">
+            <CitationGlyph className="w-7 sm:w-8 h-auto shrink-0" />
+            <Wordmark className="w-[150px] sm:w-[168px] h-auto" />
+          </h1>
 
           {/* Controls — one cohesive cluster */}
           <div className="flex items-center gap-2">

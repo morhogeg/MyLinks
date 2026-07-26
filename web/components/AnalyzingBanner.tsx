@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
-import type { OrbState } from 'thinking-orbs';
+import type { OrbState } from '@/components/ui/CitationMark';
 import OrbStatus from '@/components/ui/OrbStatus';
 import { linkScanLabel, linkScanOrb, LINK_SCAN_STEPS, LINK_SCAN_ORBS } from '@/lib/scanPhases';
 

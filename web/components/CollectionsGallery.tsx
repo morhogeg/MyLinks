@@ -222,7 +222,7 @@ export default function CollectionsGallery({
                             </span>
                         )}
                         {s.thumbnails.length > 0 && <div className="absolute inset-0 bg-gradient-to-t from-card/90 to-transparent" />}
-                        <span className="absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/85 text-[9px] font-bold uppercase tracking-wide text-white">
+                        <span className="absolute top-2 start-2 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/85 text-[9px] font-bold uppercase tracking-wide text-accent-ink">
                             <Sparkles className="w-2.5 h-2.5" /> Suggested
                         </span>
                         {onDismissSuggestion && (
@@ -244,7 +244,7 @@ export default function CollectionsGallery({
                         </p>
                         <button
                             onClick={(e) => { e.stopPropagation(); onCreateSuggestion?.(s); }}
-                            className="mt-2.5 self-start inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-accent text-white text-xs font-bold hover:bg-accent-hover active:scale-[0.97] transition-all"
+                            className="mt-2.5 self-start inline-flex items-center gap-1.5 px-3 h-8 rounded-full bg-accent text-accent-ink text-xs font-bold hover:bg-accent-hover active:scale-[0.97] transition-all"
                         >
                             <Plus className="w-3.5 h-3.5" /> Create
                         </button>
@@ -267,7 +267,7 @@ export default function CollectionsGallery({
                     {onCreate && (
                         <button
                             onClick={onCreate}
-                            className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-white font-semibold hover:bg-accent-hover transition-colors"
+                            className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-accent-ink font-semibold hover:bg-accent-hover transition-colors"
                         >
                             <Plus className="w-4 h-4" /> New collection
                         </button>

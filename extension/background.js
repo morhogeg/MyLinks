@@ -33,7 +33,7 @@ async function setBadge(text, color) {
   }
 }
 
-const badgeSaved = () => setBadge("✓", "#7c3aed"); // ✓ purple
+const badgeSaved = () => setBadge("✓", "#22222A"); // ✓ graphite
 const badgeDuplicate = () => setBadge("✓", "#64748b"); // ✓ muted (already saved)
 const badgeError = () => setBadge("✗", "#ef4444"); // ✗ red
 

@@ -272,7 +272,7 @@ export default function CollectionFormModal({
                     <button
                         onClick={handleSave}
                         disabled={!name.trim() || busy}
-                        className="flex-1 px-4 py-2.5 rounded-xl bg-accent text-white font-semibold hover:bg-accent-hover transition-colors disabled:opacity-40"
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-accent text-accent-ink font-semibold hover:bg-accent-hover transition-colors disabled:opacity-40"
                     >
                         {isEdit ? 'Save' : 'Create'}
                     </button>
