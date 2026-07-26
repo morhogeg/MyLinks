@@ -1,0 +1,490 @@
+<title>Machina AI — the Ask indicator, running</title>
+
+<style>
+  /* Same token system as the identity page: dark is Lumen, light is Monolith.
+     One family, two documents. */
+  :root {
+    --ground:#EFEDE7; --panel:#FAF9F5; --sunk:#E7E4DC;
+    --line:#DCD8CD;   --line-2:#C9C4B7;
+    --text:#22222A;   --muted:#6D6A61;  --dim:#918D82;
+    --mark:#24242A;   --glow:rgba(90,88,80,.22);
+    --stage-a:#FBFAF7; --stage-b:#E4E1D8;
+    --sel:#22222A;    --sel-ink:#F7F5EF;
+    --track:#DCD8CD;  --track-on:#22222A;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:#0C0C11; --panel:#121218; --sunk:#0A0A0E;
+      --line:#22222C;   --line-2:#32323F;
+      --text:#E6E6F0;   --muted:#8B8B9C;  --dim:#63636F;
+      --mark:#FFFFFF;   --glow:rgba(174,184,206,.34);
+      --stage-a:#17171E; --stage-b:#0A0A0E;
+      --sel:#E6E6F0;    --sel-ink:#101016;
+      --track:#26262F;  --track-on:#E6E6F0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#0C0C11; --panel:#121218; --sunk:#0A0A0E;
+    --line:#22222C;   --line-2:#32323F;
+    --text:#E6E6F0;   --muted:#8B8B9C;  --dim:#63636F;
+    --mark:#FFFFFF;   --glow:rgba(174,184,206,.34);
+    --stage-a:#17171E; --stage-b:#0A0A0E;
+    --sel:#E6E6F0;    --sel-ink:#101016;
+    --track:#26262F;  --track-on:#E6E6F0;
+  }
+  :root[data-theme="light"] {
+    --ground:#EFEDE7; --panel:#FAF9F5; --sunk:#E7E4DC;
+    --line:#DCD8CD;   --line-2:#C9C4B7;
+    --text:#22222A;   --muted:#6D6A61;  --dim:#918D82;
+    --mark:#24242A;   --glow:rgba(90,88,80,.22);
+    --stage-a:#FBFAF7; --stage-b:#E4E1D8;
+    --sel:#22222A;    --sel-ink:#F7F5EF;
+    --track:#DCD8CD;  --track-on:#22222A;
+  }
+
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--ground); color: var(--text);
+    font: 400 15.5px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: -.005em;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 22px 88px; }
+
+  .mono, .eyebrow, .tel, .cap, .seg b {
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .eyebrow { font-size: 11.5px; letter-spacing: .17em; text-transform: uppercase; color: var(--dim); }
+  h1 { font-size: clamp(28px, 4.6vw, 42px); font-weight: 600; letter-spacing: -.028em;
+       line-height: 1.09; text-wrap: balance; margin-top: 13px; }
+  h2 { font-size: 17px; font-weight: 600; letter-spacing: -.015em; }
+  p { max-width: 64ch; }
+  .lead { font-size: 17px; color: var(--muted); margin-top: 16px; max-width: 58ch; }
+  .note { font-size: 13.5px; color: var(--muted); }
+
+  header { padding: 64px 0 46px; }
+  section { padding: 42px 0; border-top: 1px solid var(--line); }
+  .sechead { display: grid; gap: 10px; margin-bottom: 26px; }
+
+  .panel {
+    position: relative; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 3px; padding: 26px;
+  }
+  .panel::before, .panel::after {
+    content: ""; position: absolute; width: 10px; height: 10px;
+    border: 1px solid var(--line-2); pointer-events: none;
+  }
+  .panel::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+  .panel::after  { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+
+  /* ── Bench ────────────────────────────────────────────────────────────── */
+  .bench { display: grid; gap: 26px; align-items: center; }
+  @media (min-width: 720px) { .bench { grid-template-columns: 260px 1fr; } }
+  .stage {
+    background: radial-gradient(120% 110% at 50% 36%, var(--stage-a), var(--stage-b));
+    border: 1px solid var(--line); border-radius: 3px;
+    display: grid; place-items: center; aspect-ratio: 1;
+  }
+  .stage svg { width: 66%; height: 66%; color: var(--mark); }
+  .readout { display: grid; gap: 12px; }
+  .phase { font-size: 22px; font-weight: 600; letter-spacing: -.02em; }
+  .says { color: var(--muted); font-size: 15px; }
+  .copy {
+    display: inline-block; margin-top: 2px; padding: 6px 11px; border-radius: 7px;
+    background: var(--sunk); border: 1px solid var(--line);
+    font-size: 13.5px; color: var(--text);
+  }
+  .tel { font-size: 11.5px; color: var(--dim); font-variant-numeric: tabular-nums;
+         display: flex; gap: 16px; flex-wrap: wrap; }
+
+  /* ── Timeline ─────────────────────────────────────────────────────────── */
+  .timeline { margin-top: 26px; }
+  .track {
+    position: relative; height: 46px; display: flex; gap: 2px;
+    cursor: ew-resize; touch-action: none; user-select: none;
+  }
+  .track:focus-visible { outline: 2px solid var(--mark); outline-offset: 3px; }
+  .seg {
+    position: relative; background: var(--track); border-radius: 2px;
+    display: grid; align-content: center; padding-left: 9px; overflow: hidden;
+    transition: background .18s;
+  }
+  .seg b { font-size: 9.5px; letter-spacing: .11em; text-transform: uppercase;
+           color: var(--muted); font-weight: 500; white-space: nowrap; }
+  .seg.on { background: color-mix(in srgb, var(--track-on) 16%, var(--track)); }
+  .seg.on b { color: var(--text); }
+  .head {
+    position: absolute; top: -5px; bottom: -5px; width: 2px;
+    background: var(--track-on); pointer-events: none; border-radius: 2px;
+  }
+  .head::after {
+    content: ""; position: absolute; top: -4px; left: -3px;
+    width: 8px; height: 8px; border-radius: 50%; background: var(--track-on);
+  }
+  .scale { display: flex; justify-content: space-between; margin-top: 8px; }
+  .scale span { font-size: 10.5px; color: var(--dim); font-variant-numeric: tabular-nums;
+                font-family: ui-monospace, Menlo, Consolas, monospace; }
+
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
+  button {
+    font: inherit; font-size: 13px; background: transparent; color: var(--muted);
+    border: 1px solid var(--line-2); border-radius: 2px; padding: 8px 15px;
+    cursor: pointer; transition: color .15s, border-color .15s, background .15s;
+  }
+  button:hover { color: var(--text); border-color: var(--text); }
+  button[aria-pressed="true"] { background: var(--sel); border-color: var(--sel); color: var(--sel-ink); }
+  button:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; }
+
+  /* ── State cards ──────────────────────────────────────────────────────── */
+  /* minmax(0,1fr) — plain 1fr is minmax(auto,1fr), so a card with longer
+     unbreakable copy widens its column and its square frame grows with it,
+     knocking the captions out of alignment across the row. */
+  .states { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (min-width: 760px) { .states { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .state {
+    display: grid; gap: 11px; padding: 0; background: none; border: 0;
+    text-align: left; cursor: pointer;
+    /* Cards stretch to the tallest in the row; without this the leftover
+       height is dealt out across the card's own auto rows, so the card with a
+       one-line caption grows its square frame and drops its label. */
+    align-content: start;
+  }
+  .state .frame {
+    background: radial-gradient(120% 110% at 50% 36%, var(--stage-a), var(--stage-b));
+    border: 1px solid var(--line); border-radius: 3px; aspect-ratio: 1;
+    display: grid; place-items: center; transition: border-color .18s, box-shadow .18s;
+  }
+  .state .frame svg { width: 66%; height: 66%; color: var(--mark); }
+  .state[aria-current="true"] .frame {
+    border-color: var(--mark); box-shadow: 0 0 0 1px var(--mark);
+  }
+  .state h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase;
+              font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--muted); }
+  .state[aria-current="true"] h2 { color: var(--text); }
+  .state p { font-size: 13px; color: var(--muted); }
+
+  /* ── Actual size ──────────────────────────────────────────────────────── */
+  .actual { display: flex; align-items: center; gap: 14px; padding: 20px 22px;
+            background: var(--sunk); border: 1px solid var(--line); border-radius: 3px; }
+  .actual svg { width: 42px; height: 42px; flex: 0 0 42px; color: var(--mark); }
+  .actual .st { color: var(--muted); font-size: 15px; }
+
+  footer { border-top: 1px solid var(--line); padding-top: 24px; margin-top: 34px; }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Machina AI · Ask indicator · running</div>
+    <h1>Four states, one bracket</h1>
+    <p class="lead">
+      The thinking indicator doesn't signal "busy" — it depicts the operation.
+      Scrub the timeline to hold any moment.
+    </p>
+  </header>
+
+  <section style="border-top:0; padding-top:0">
+    <div class="panel">
+      <div class="bench">
+        <div class="stage" id="stage"></div>
+        <div class="readout">
+          <div class="phase" id="phase">Searching</div>
+          <div class="says" id="says">The brackets sweep. Nothing is locked yet.</div>
+          <div><span class="copy" id="copy">Searching your library…</span></div>
+          <div class="tel">
+            <span>spread <span id="tS">58.0</span></span>
+            <span>point r <span id="tD">21.0</span></span>
+            <span>alpha <span id="tO">0.46</span></span>
+            <span>t <span id="tT">0.00</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline">
+        <div class="track" id="track" tabindex="0" role="slider"
+             aria-label="Cycle position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="head" id="head" style="left:0"></div>
+        </div>
+        <div class="scale"><span>0.0s</span><span>1.8s</span><span>3.6s</span></div>
+      </div>
+
+      <div class="controls">
+        <button id="play" aria-pressed="true">Pause</button>
+        <button id="restart">Restart</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sechead">
+      <span class="eyebrow">The states</span>
+      <p class="note">Each frozen at its representative moment. The live one is outlined —
+        click any card to jump the playhead there.</p>
+    </div>
+    <div class="states" id="states"></div>
+  </section>
+
+  <section>
+    <div class="sechead">
+      <span class="eyebrow">Where trace lives</span>
+      <p class="note">
+        Trace was never a loop — it's the <strong>arrival</strong>, played once. The reticle
+        assembles from four corner ticks, then hands the brackets to the cycle above at
+        exactly its first frame, so there's no seam between them. It runs when Ask opens,
+        and again — larger, and resolving all the way to the locked mark — on the launch
+        screen.
+      </p>
+    </div>
+    <div class="panel">
+      <div class="bench">
+        <div class="stage" id="entryStage"></div>
+        <div class="readout">
+          <div class="phase" id="entryPhase">Entry</div>
+          <div class="says">
+            Corner ticks, then the arms join, then the point lights to its searching floor —
+            and the loop takes it from there.
+          </div>
+          <div class="controls" style="margin-top:2px">
+            <button id="entryPlay">Replay entry</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sechead">
+      <span class="eyebrow">At the size it ships</span>
+      <p class="note">
+        42&nbsp;px inline, beside the status line, running in sync with the bench above.
+        This is the view that forced a correction: the searching point was set at r16 /
+        0.34 alpha and simply disappeared here, so its floor is raised to r21 / 0.46.
+      </p>
+    </div>
+    <div class="actual">
+      <div id="inline"></div>
+      <div class="st" id="inlineCopy">Searching your library…</div>
+    </div>
+  </section>
+
+  <footer>
+    <p class="note">
+      Geometry and easing are the same constants as
+      <span class="mono" style="font-size:13px">design/icon-concepts/nonletter.py</span> and
+      <span class="mono" style="font-size:13px">anim2.py</span>, so this page is the spec for
+      the React component, not an illustration of it. Reduced motion rests the mark locked on;
+      scrubbing still works.
+    </p>
+  </footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* Identical constants to nonletter.py. */
+  const TOP = 300, BOT = 700, W = 58, ARM = 100, LX = 296, RX = 728, CX = 512, CY = 500;
+  const CYCLE = 3600;
+
+  const paths = (spread) => {
+    const lx = LX - spread, rx = RX + spread;
+    return [
+      `M${lx} ${TOP} L${lx+ARM} ${TOP} L${lx+ARM} ${TOP+W} L${lx+W} ${TOP+W} ` +
+      `L${lx+W} ${BOT-W} L${lx+ARM} ${BOT-W} L${lx+ARM} ${BOT} L${lx} ${BOT} Z`,
+      `M${rx} ${TOP} L${rx-ARM} ${TOP} L${rx-ARM} ${TOP+W} L${rx-W} ${TOP+W} ` +
+      `L${rx-W} ${BOT-W} L${rx-ARM} ${BOT-W} L${rx-ARM} ${BOT} L${rx} ${BOT} Z`
+    ];
+  };
+
+  let uid = 0;
+  function mark(host, glow) {
+    const id = "k" + (uid++);
+    host.innerHTML =
+      `<svg viewBox="0 0 1024 1024" role="img" aria-label="Ask indicator">
+         <defs><clipPath id="c${id}">
+           <rect id="t${id}" x="0" y="${TOP}" width="1024" height="200"/>
+           <rect id="b${id}" x="0" y="${BOT-200}" width="1024" height="200"/>
+         </clipPath></defs>
+         <g${glow ? ' style="filter:drop-shadow(0 0 12px var(--glow))"' : ""}>
+           <g clip-path="url(#c${id})">
+             <path id="l${id}" fill="currentColor"/><path id="r${id}" fill="currentColor"/>
+           </g>
+           <circle id="d${id}" cx="${CX}" cy="${CY}" r="21" fill="currentColor"/>
+         </g></svg>`;
+    const g = (p) => document.getElementById(p + id);
+    const l = g("l"), r = g("r"), d = g("d"), ct = g("t"), cb = g("b");
+    return (s) => {
+      const [a, b] = paths(s.spread);
+      l.setAttribute("d", a); r.setAttribute("d", b);
+      d.setAttribute("r", s.dotR.toFixed(1));
+      d.setAttribute("opacity", s.dotOp.toFixed(3));
+      const h = s.clipH ?? 200;
+      ct.setAttribute("height", h.toFixed(1));
+      cb.setAttribute("y", (BOT - h).toFixed(1));
+      cb.setAttribute("height", h.toFixed(1));
+    };
+  }
+
+  /* ── Motion ───────────────────────────────────────────────────────────────
+     C1-continuous around the whole loop. Every oscillation's AMPLITUDE ramps
+     in and out with smoothstep, so each phase hands over at the same value AND
+     the same velocity — including the wrap from release back into search. The
+     earlier version jumped 58→58±sin, 52→50 and 50→52 at those three seams,
+     and swept at ~5Hz, which read as jitter rather than as looking around. */
+  const c01 = (x) => Math.min(1, Math.max(0, x));
+  const sstep = (a, b, x) => { const t = c01((x-a)/(b-a)); return t*t*(3-2*t); };
+  const quint = (x) => x < .5 ? 16*x**5 : 1 - Math.pow(-2*x + 2, 5)/2;
+  const SPREAD = 58, R_LO = 21, R_HI = 52, OP_LO = .46, HALF = 200, ARM_H = 58;
+  const LOCK0 = .30, LOCK1 = .58, REL0 = .90;
+
+  /* Phase table drives the motion, the labels, the cards and the timeline
+     widths from one source, so they can never disagree. */
+  const PHASES = [
+    { key: "searching", at: 0,     to: LOCK0, name: "Searching",
+      says: "The brackets sweep. Nothing is locked yet.",
+      copy: "Searching your library…", rep: .15 },
+    { key: "locking",   at: LOCK0, to: LOCK1, name: "Locking on",
+      says: "They pull in and settle onto the sources.",
+      copy: "Reviewing relevant cards…", rep: .46 },
+    { key: "answering", at: LOCK1, to: REL0,  name: "Answering",
+      says: "Held. Only the point breathes.",
+      copy: "Writing your answer…", rep: .74 },
+    { key: "release",   at: REL0,  to: 1,     name: "Release",
+      says: "It lets go, and the loop begins again.",
+      copy: "—", rep: .96 }
+  ];
+
+  function at(t) {
+    if (t < LOCK0) {
+      const u = t / LOCK0;
+      const amp = 11 * sstep(0, .18, u) * (1 - sstep(.74, 1, u));
+      return { spread: SPREAD + amp*Math.sin(4*Math.PI*u), dotR: R_LO, dotOp: OP_LO, clipH: HALF };
+    }
+    if (t < LOCK1) {
+      const e = quint((t - LOCK0) / (LOCK1 - LOCK0));
+      return { spread: SPREAD*(1-e), dotR: R_LO + (R_HI-R_LO)*e,
+               dotOp: OP_LO + (1-OP_LO)*e, clipH: HALF };
+    }
+    if (t < REL0) {
+      const u = (t - LOCK1) / (REL0 - LOCK1);
+      const amp = 3.2 * sstep(0, .18, u) * (1 - sstep(.82, 1, u));
+      return { spread: 0, dotR: R_HI + amp*Math.sin(2*Math.PI*u), dotOp: 1, clipH: HALF };
+    }
+    const e = sstep(0, 1, (t - REL0) / (1 - REL0));
+    return { spread: SPREAD*e, dotR: R_HI - (R_HI-R_LO)*e,
+             dotOp: 1 - (1-OP_LO)*e, clipH: HALF };
+  }
+
+  /* The arrival, played once. It ends exactly on at(0) — brackets drawn, held
+     wide, point at its searching floor — so the loop picks it up with no seam. */
+  const traceEntry = (u) => {
+    const g = sstep(0, .82, u), lit = sstep(.5, 1, u);
+    return { spread: SPREAD, clipH: ARM_H + (HALF-ARM_H)*g, dotR: R_LO*lit, dotOp: OP_LO*lit };
+  };
+  const phaseAt = (t) => PHASES.find((p) => t < p.to) || PHASES[3];
+
+  /* ── Build the timeline segments and the state cards from PHASES ──────── */
+  const track = document.getElementById("track"), head = document.getElementById("head");
+  const segs = PHASES.map((p) => {
+    const el = document.createElement("div");
+    el.className = "seg"; el.style.flex = String(p.to - p.at);
+    el.innerHTML = `<b>${p.name}</b>`;
+    track.append(el); return el;
+  });
+
+  const cards = PHASES.map((p) => {
+    const btn = document.createElement("button");
+    btn.className = "state"; btn.type = "button";
+    btn.innerHTML = `<div class="frame"></div><h2>${p.name}</h2><p>${p.says}</p>`;
+    btn.addEventListener("click", () => { setT(p.rep); pause(true); });
+    document.getElementById("states").append(btn);
+    mark(btn.querySelector(".frame"), true)(at(p.rep));
+    return btn;
+  });
+
+  /* ── Wiring ───────────────────────────────────────────────────────────── */
+  const drawStage = mark(document.getElementById("stage"), true);
+  const drawInline = mark(document.getElementById("inline"), false);
+  const $ = (id) => document.getElementById(id);
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+  let t = 0, playing = !reduced.matches, last = performance.now();
+
+  function render() {
+    const s = at(t), p = phaseAt(t);
+    drawStage(s); drawInline(s);
+    $("phase").textContent = p.name;
+    $("says").textContent = p.says;
+    $("copy").textContent = p.copy;
+    $("inlineCopy").textContent = p.copy === "—" ? "Searching your library…" : p.copy;
+    $("tS").textContent = s.spread.toFixed(1);
+    $("tD").textContent = s.dotR.toFixed(1);
+    $("tO").textContent = s.dotOp.toFixed(2);
+    $("tT").textContent = t.toFixed(2);
+    head.style.left = (t * 100).toFixed(2) + "%";
+    track.setAttribute("aria-valuenow", Math.round(t * 100));
+    track.setAttribute("aria-valuetext", p.name);
+    segs.forEach((el, i) => el.classList.toggle("on", PHASES[i] === p));
+    cards.forEach((el, i) => el.setAttribute("aria-current", String(PHASES[i] === p)));
+  }
+
+  const setT = (v) => { t = Math.min(.9999, Math.max(0, v)); render(); };
+
+  function pause(on) {
+    playing = !on;
+    const b = $("play");
+    b.textContent = playing ? "Pause" : "Play";
+    b.setAttribute("aria-pressed", String(playing));
+  }
+
+  function tick(now) {
+    const dt = now - last; last = now;
+    if (playing) { t = (t + dt / CYCLE) % 1; render(); }
+    requestAnimationFrame(tick);
+  }
+
+  /* Scrub: pointer anywhere on the track, plus arrow keys for the keyboard. */
+  const fromEvent = (e) => {
+    const r = track.getBoundingClientRect();
+    setT((e.clientX - r.left) / r.width);
+  };
+  track.addEventListener("pointerdown", (e) => {
+    track.setPointerCapture(e.pointerId); pause(true); fromEvent(e);
+  });
+  track.addEventListener("pointermove", (e) => {
+    if (track.hasPointerCapture(e.pointerId)) fromEvent(e);
+  });
+  track.addEventListener("keydown", (e) => {
+    const step = e.shiftKey ? .1 : .02;
+    if (e.key === "ArrowRight") { pause(true); setT((t + step) % 1); e.preventDefault(); }
+    if (e.key === "ArrowLeft")  { pause(true); setT((t - step + 1) % 1); e.preventDefault(); }
+    if (e.key === " ")          { pause(playing); e.preventDefault(); }
+  });
+
+  $("play").addEventListener("click", () => pause(playing));
+  $("restart").addEventListener("click", () => { setT(0); pause(false); });
+
+  /* Entry demo: trace once, then straight into the loop, to show the handoff. */
+  const drawEntry = mark(document.getElementById("entryStage"), true);
+  const ENTRY_MS = 950;
+  let entryT0 = performance.now();
+  (function entryTick(now) {
+    const el = now - entryT0;
+    if (reduced.matches) {
+      drawEntry(at(.74));
+      $("entryPhase").textContent = "Entry";
+    } else if (el < ENTRY_MS) {
+      drawEntry(traceEntry(el / ENTRY_MS));
+      $("entryPhase").textContent = "Assembling";
+    } else {
+      drawEntry(at(((el - ENTRY_MS) / CYCLE) % 1));
+      $("entryPhase").textContent = "Handed to the loop";
+    }
+    requestAnimationFrame(entryTick);
+  })(performance.now());
+  $("entryPlay").addEventListener("click", () => { entryT0 = performance.now(); });
+
+  pause(!playing);
+  render();
+  requestAnimationFrame(tick);
+  reduced.addEventListener("change", () => { if (reduced.matches) { setT(.72); pause(true); } });
+})();
+</script>

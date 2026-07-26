@@ -1,0 +1,57 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="36%" r="84%">
+      <stop offset="0%"   stop-color="#282833"/>
+      <stop offset="42%"  stop-color="#16161D"/>
+      <stop offset="100%" stop-color="#07070A"/>
+    </radialGradient>
+    <radialGradient id="vign" cx="50%" cy="50%" r="70%">
+      <stop offset="0%"   stop-color="#000000" stop-opacity="0"/>
+      <stop offset="66%"  stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.60"/>
+    </radialGradient>
+    <radialGradient id="aura" gradientUnits="userSpaceOnUse" cx="512" cy="500" r="400">
+      <stop offset="0%"   stop-color="#FFFFFF" stop-opacity="0.11"/>
+      <stop offset="46%"  stop-color="#CBD2E2" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#CBD2E2" stop-opacity="0"/>
+    </radialGradient>
+    <!-- a lit solid, not an emitter: brightest along the top, falling away -->
+    <linearGradient id="body" gradientUnits="userSpaceOnUse" x1="0" y1="286" x2="0" y2="742">
+      <stop offset="0%"   stop-color="#FFFFFF"/>
+      <stop offset="42%"  stop-color="#F2F5FA"/>
+      <stop offset="100%" stop-color="#CBD2E0"/>
+    </linearGradient>
+    <filter id="contact" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="9"/></filter>
+    <filter id="edgeSoft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2"/></filter>
+
+    <!-- a band hugging the top edge: the shape minus itself pushed down -->
+    <mask id="topEdge">
+      <path d="M615.9 504.5 L779.8 616.4 A292.0 292.0 0 0 1 570.2 786.1 L567.9 587.7 Z" fill="#FFFFFF" /><path d="M560.0 592.2 L545.1 790.1 A292.0 292.0 0 0 1 293.3 693.5 L464.0 592.2 Z" fill="#FFFFFF" /><path d="M456.1 587.7 L277.3 673.7 A292.0 292.0 0 0 1 235.1 407.3 L408.1 504.5 Z" fill="#FFFFFF" /><path d="M408.1 495.5 L244.2 383.6 A292.0 292.0 0 0 1 453.8 213.9 L456.1 412.3 Z" fill="#FFFFFF" /><path d="M464.0 407.8 L478.9 209.9 A292.0 292.0 0 0 1 730.7 306.5 L560.0 407.8 Z" fill="#FFFFFF" /><path d="M567.9 412.3 L746.7 326.3 A292.0 292.0 0 0 1 788.9 592.7 L615.9 495.5 Z" fill="#FFFFFF" />
+      <path d="M615.9 504.5 L779.8 616.4 A292.0 292.0 0 0 1 570.2 786.1 L567.9 587.7 Z" fill="#000000" transform="translate(0,8)"/><path d="M560.0 592.2 L545.1 790.1 A292.0 292.0 0 0 1 293.3 693.5 L464.0 592.2 Z" fill="#000000" transform="translate(0,8)"/><path d="M456.1 587.7 L277.3 673.7 A292.0 292.0 0 0 1 235.1 407.3 L408.1 504.5 Z" fill="#000000" transform="translate(0,8)"/><path d="M408.1 495.5 L244.2 383.6 A292.0 292.0 0 0 1 453.8 213.9 L456.1 412.3 Z" fill="#000000" transform="translate(0,8)"/><path d="M464.0 407.8 L478.9 209.9 A292.0 292.0 0 0 1 730.7 306.5 L560.0 407.8 Z" fill="#000000" transform="translate(0,8)"/><path d="M567.9 412.3 L746.7 326.3 A292.0 292.0 0 0 1 788.9 592.7 L615.9 495.5 Z" fill="#000000" transform="translate(0,8)"/>
+    </mask>
+    <!-- and the mirror of it along the bottom -->
+    <mask id="botEdge">
+      <path d="M615.9 504.5 L779.8 616.4 A292.0 292.0 0 0 1 570.2 786.1 L567.9 587.7 Z" fill="#FFFFFF" /><path d="M560.0 592.2 L545.1 790.1 A292.0 292.0 0 0 1 293.3 693.5 L464.0 592.2 Z" fill="#FFFFFF" /><path d="M456.1 587.7 L277.3 673.7 A292.0 292.0 0 0 1 235.1 407.3 L408.1 504.5 Z" fill="#FFFFFF" /><path d="M408.1 495.5 L244.2 383.6 A292.0 292.0 0 0 1 453.8 213.9 L456.1 412.3 Z" fill="#FFFFFF" /><path d="M464.0 407.8 L478.9 209.9 A292.0 292.0 0 0 1 730.7 306.5 L560.0 407.8 Z" fill="#FFFFFF" /><path d="M567.9 412.3 L746.7 326.3 A292.0 292.0 0 0 1 788.9 592.7 L615.9 495.5 Z" fill="#FFFFFF" />
+      <path d="M615.9 504.5 L779.8 616.4 A292.0 292.0 0 0 1 570.2 786.1 L567.9 587.7 Z" fill="#000000" transform="translate(0,-10)"/><path d="M560.0 592.2 L545.1 790.1 A292.0 292.0 0 0 1 293.3 693.5 L464.0 592.2 Z" fill="#000000" transform="translate(0,-10)"/><path d="M456.1 587.7 L277.3 673.7 A292.0 292.0 0 0 1 235.1 407.3 L408.1 504.5 Z" fill="#000000" transform="translate(0,-10)"/><path d="M408.1 495.5 L244.2 383.6 A292.0 292.0 0 0 1 453.8 213.9 L456.1 412.3 Z" fill="#000000" transform="translate(0,-10)"/><path d="M464.0 407.8 L478.9 209.9 A292.0 292.0 0 0 1 730.7 306.5 L560.0 407.8 Z" fill="#000000" transform="translate(0,-10)"/><path d="M567.9 412.3 L746.7 326.3 A292.0 292.0 0 0 1 788.9 592.7 L615.9 495.5 Z" fill="#000000" transform="translate(0,-10)"/>
+    </mask>
+    <mask id="body"><path d="M615.9 504.5 L779.8 616.4 A292.0 292.0 0 0 1 570.2 786.1 L567.9 587.7 Z" fill="#FFFFFF" /><path d="M560.0 592.2 L545.1 790.1 A292.0 292.0 0 0 1 293.3 693.5 L464.0 592.2 Z" fill="#FFFFFF" /><path d="M456.1 587.7 L277.3 673.7 A292.0 292.0 0 0 1 235.1 407.3 L408.1 504.5 Z" fill="#FFFFFF" /><path d="M408.1 495.5 L244.2 383.6 A292.0 292.0 0 0 1 453.8 213.9 L456.1 412.3 Z" fill="#FFFFFF" /><path d="M464.0 407.8 L478.9 209.9 A292.0 292.0 0 0 1 730.7 306.5 L560.0 407.8 Z" fill="#FFFFFF" /><path d="M567.9 412.3 L746.7 326.3 A292.0 292.0 0 0 1 788.9 592.7 L615.9 495.5 Z" fill="#FFFFFF" /></mask>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#vign)"/>
+  <circle cx="512" cy="500" r="400" fill="url(#aura)"/>
+
+  <!-- tight contact glow, under the crisp shape so the corners stay corners -->
+  <g filter="url(#contact)" opacity="0.42">
+    <path d="M615.9 504.5 L779.8 616.4 A292.0 292.0 0 0 1 570.2 786.1 L567.9 587.7 Z" fill="#B8C0D2" /><path d="M560.0 592.2 L545.1 790.1 A292.0 292.0 0 0 1 293.3 693.5 L464.0 592.2 Z" fill="#B8C0D2" /><path d="M456.1 587.7 L277.3 673.7 A292.0 292.0 0 0 1 235.1 407.3 L408.1 504.5 Z" fill="#B8C0D2" /><path d="M408.1 495.5 L244.2 383.6 A292.0 292.0 0 0 1 453.8 213.9 L456.1 412.3 Z" fill="#B8C0D2" /><path d="M464.0 407.8 L478.9 209.9 A292.0 292.0 0 0 1 730.7 306.5 L560.0 407.8 Z" fill="#B8C0D2" /><path d="M567.9 412.3 L746.7 326.3 A292.0 292.0 0 0 1 788.9 592.7 L615.9 495.5 Z" fill="#B8C0D2" />
+  </g>
+
+  <path d="M615.9 504.5 L779.8 616.4 A292.0 292.0 0 0 1 570.2 786.1 L567.9 587.7 Z" fill="url(#body)" /><path d="M560.0 592.2 L545.1 790.1 A292.0 292.0 0 0 1 293.3 693.5 L464.0 592.2 Z" fill="url(#body)" /><path d="M456.1 587.7 L277.3 673.7 A292.0 292.0 0 0 1 235.1 407.3 L408.1 504.5 Z" fill="url(#body)" /><path d="M408.1 495.5 L244.2 383.6 A292.0 292.0 0 0 1 453.8 213.9 L456.1 412.3 Z" fill="url(#body)" /><path d="M464.0 407.8 L478.9 209.9 A292.0 292.0 0 0 1 730.7 306.5 L560.0 407.8 Z" fill="url(#body)" /><path d="M567.9 412.3 L746.7 326.3 A292.0 292.0 0 0 1 788.9 592.7 L615.9 495.5 Z" fill="url(#body)" />
+
+  <g filter="url(#edgeSoft)">
+    <rect width="1024" height="1024" fill="#FFFFFF" mask="url(#topEdge)" opacity="0.85"/>
+    <rect width="1024" height="1024" fill="#7A8296" mask="url(#botEdge)" opacity="0.26"/>
+  </g>
+</svg>
