@@ -153,9 +153,11 @@ export default function Home() {
           {/* Brand — the BARE Citation glyph + the drawn wordmark, centred on
               one axis. No tile behind the mark (a rounded container here reads
               as a shrunken app icon rather than as the brand mark), no tagline. */}
-          <h1 className="flex items-center gap-3 sm:gap-3.5 text-text">
-            <CitationGlyph className="w-7 sm:w-8 h-auto shrink-0" />
-            <Wordmark className="w-[150px] sm:w-[168px] h-auto" />
+          <h1 className="flex items-center gap-2 sm:gap-2.5 text-text">
+            {/* Sized to the previous lockup's footprint (text-lg/text-xl type),
+                keeping the mock's glyph:wordmark ratio (32:168). */}
+            <CitationGlyph className="w-5 sm:w-6 h-auto shrink-0" />
+            <Wordmark className="w-[104px] sm:w-[122px] h-auto" />
           </h1>
 
           {/* Controls — one cohesive cluster */}
