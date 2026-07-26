@@ -194,7 +194,7 @@ export default function SuggestionPreviewSheet({
                     <button
                         onClick={handleCreate}
                         disabled={shown.length === 0}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 h-11 rounded-full bg-accent text-white text-sm font-bold hover:bg-accent-hover active:scale-[0.99] transition-all disabled:opacity-40 disabled:pointer-events-none"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 h-11 rounded-full bg-accent text-accent-ink text-sm font-bold hover:bg-accent-hover active:scale-[0.99] transition-all disabled:opacity-40 disabled:pointer-events-none"
                     >
                         <Plus className="w-4 h-4" /> Create collection
                     </button>

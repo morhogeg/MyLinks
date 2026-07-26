@@ -38,7 +38,7 @@ export default function ProfileAvatar({
     return (
         <div
             aria-hidden="true"
-            className={`rounded-full flex items-center justify-center bg-[image:var(--accent-gradient)] text-white font-bold ring-1 ring-white/15 ${className}`}
+            className={`rounded-full flex items-center justify-center bg-[image:var(--accent-gradient)] text-accent-ink font-bold ring-1 ring-white/15 ${className}`}
             style={{ ...dimension, fontSize: Math.round(size * 0.42) }}
         >
             {initial}

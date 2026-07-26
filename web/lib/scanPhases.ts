@@ -1,4 +1,4 @@
-import type { OrbState } from 'thinking-orbs';
+import type { OrbState } from '@/components/ui/CitationMark';
 
 /**
  * Single source of truth for the link-save processing phases.

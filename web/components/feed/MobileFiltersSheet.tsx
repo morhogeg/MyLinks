@@ -121,7 +121,7 @@ export default function MobileFiltersSheet({
                                 <button
                                     onClick={() => setSelectedCategory(new Set())}
                                     className={`px-3.5 py-1.5 rounded-full text-[13px] font-semibold border transition-colors ${selectedCategory.size === 0
-                                        ? 'bg-accent text-white border-accent shadow-sm'
+                                        ? 'bg-accent text-accent-ink border-accent shadow-sm'
                                         : 'bg-card border-border-subtle text-text-secondary hover:border-text-muted/40 hover:text-text'
                                         }`}
                                 >
@@ -207,7 +207,7 @@ export default function MobileFiltersSheet({
                         )}
                         <button
                             onClick={onClose}
-                            className="ms-auto px-6 h-10 rounded-full bg-accent text-white font-semibold text-sm shadow-sm hover:bg-accent-hover transition-colors"
+                            className="ms-auto px-6 h-10 rounded-full bg-accent text-accent-ink font-semibold text-sm shadow-sm hover:bg-accent-hover transition-colors"
                         >
                             Done
                         </button>

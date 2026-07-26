@@ -193,7 +193,7 @@ export default function ShareCollectionSheet({
                             <button
                                 onClick={doPublish}
                                 disabled={!uid || busy !== null || count === 0}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-accent text-white font-semibold hover:bg-accent-hover transition-colors disabled:opacity-40"
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-accent text-accent-ink font-semibold hover:bg-accent-hover transition-colors disabled:opacity-40"
                             >
                                 <Globe className="w-4 h-4" />
                                 {busy === 'publish' ? 'Creating…' : 'Create share link'}
@@ -249,7 +249,7 @@ export default function ShareCollectionSheet({
                             <div className="grid grid-cols-2 gap-3">
                                 <button
                                     onClick={doShare}
-                                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-accent text-white font-semibold hover:bg-accent-hover transition-colors"
+                                    className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-accent text-accent-ink font-semibold hover:bg-accent-hover transition-colors"
                                 >
                                     <Share2 className="w-4 h-4" />
                                     Share link

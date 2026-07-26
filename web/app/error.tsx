@@ -27,7 +27,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
                 </p>
                 <button
                     onClick={() => reset()}
-                    className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-white font-medium hover:bg-accent/90 transition-colors cursor-pointer"
+                    className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-accent-ink font-medium hover:bg-accent/90 transition-colors cursor-pointer"
                 >
                     <RefreshCw className="w-4 h-4" />
                     Reload

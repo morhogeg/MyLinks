@@ -69,7 +69,7 @@ export default function PushNudge({ uid, onDone }: { uid: string; onDone: () => 
                     <button
                         onClick={enable}
                         disabled={busy}
-                        className="h-9 px-3.5 rounded-full bg-accent text-white text-[13px] font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50"
+                        className="h-9 px-3.5 rounded-full bg-accent text-accent-ink text-[13px] font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50"
                     >
                         {busy ? 'Turning on…' : 'Turn on'}
                     </button>

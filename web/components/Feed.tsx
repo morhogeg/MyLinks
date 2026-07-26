@@ -33,7 +33,7 @@ import { useScrollAwayBar } from '@/lib/useScrollAwayBar';
 import MobileTagExplorerDrawer from './feed/MobileTagExplorerDrawer';
 import Card from './Card';
 import ListCard from './ListCard';
-import BrandOrb from './ui/BrandOrb';
+import CitationMark from './ui/CitationMark';
 import Masonry from './Masonry';
 import ReminderModal from './ReminderModal';
 import SwipeDeck from './SwipeDeck';
@@ -1362,7 +1362,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                         <p className="mt-1.5 text-sm text-text-muted">Add cards to build out this collection.</p>
                         <button
                             onClick={() => setManageCardsCollection(openCol)}
-                            className="mt-5 inline-flex items-center gap-2 px-4 h-11 rounded-full bg-accent text-white text-sm font-bold shadow-sm shadow-accent/20 hover:bg-accent-hover transition-colors"
+                            className="mt-5 inline-flex items-center gap-2 px-4 h-11 rounded-full bg-accent text-accent-ink text-sm font-bold shadow-sm shadow-accent/20 hover:bg-accent-hover transition-colors"
                         >
                             <Plus className="w-4 h-4" /> Add cards
                         </button>
@@ -1555,7 +1555,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     disabled={selectedIds.size === 0}
                                     title="Archive selected"
                                     aria-label="Archive selected"
-                                    className="h-8 w-8 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="h-8 w-8 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-accent-ink transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                 >
                                     <Archive className="w-4 h-4" />
                                 </button>
@@ -1636,7 +1636,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             aria-label="Search"
                             title="Search"
                             className={`${ctrlBase} w-9 px-0 border ${searchQuery
-                                ? 'bg-accent text-white border-accent shadow-sm'
+                                ? 'bg-accent text-accent-ink border-accent shadow-sm'
                                 : ctrlIdle}`}
                         >
                             <Search className="w-4 h-4" />
@@ -1649,7 +1649,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             aria-label="Filters — status, categories, tags"
                             title="Filters"
                             className={`${ctrlBase} px-3.5 border relative ${activeMobileFilters > 0
-                                ? 'bg-accent text-white border-accent shadow-sm'
+                                ? 'bg-accent text-accent-ink border-accent shadow-sm'
                                 : ctrlIdle}`}
                         >
                             <Filter className="w-4 h-4" />
@@ -1667,7 +1667,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             aria-label="Sources"
                             title="Sources"
                             className={`${ctrlBase} px-3.5 border ${selectedSources.size > 0
-                                ? 'bg-accent text-white border-accent shadow-sm'
+                                ? 'bg-accent text-accent-ink border-accent shadow-sm'
                                 : ctrlIdle}`}
                         >
                             <Globe className="w-4 h-4" />
@@ -1751,7 +1751,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                         aria-pressed={active}
                                         aria-label={vm.hint}
                                         className={`h-7 inline-flex items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${active
-                                            ? 'bg-accent text-white shadow-sm px-2 sm:px-3'
+                                            ? 'bg-accent text-accent-ink shadow-sm px-2 sm:px-3'
                                             : 'w-7 text-text-muted hover:text-text hover:bg-card-hover'
                                             }`}
                                     >
@@ -1787,7 +1787,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             onClick={() => setIsTagExplorerOpen(!isTagExplorerOpen)}
                             title="Filter by tags"
                             className={`${ctrlBase} px-3.5 ${selectedTags.size > 0
-                                ? 'bg-accent text-white border border-accent shadow-sm'
+                                ? 'bg-accent text-accent-ink border border-accent shadow-sm'
                                 : ctrlIdle
                                 }`}
                         >
@@ -1805,7 +1805,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     onClick={handleBulkArchive}
                                     disabled={selectedIds.size === 0}
                                     title="Archive selected"
-                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-accent-ink transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                 >
                                     <Archive className="w-4 h-4" />
                                 </button>
@@ -2172,7 +2172,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             {/* Same sentence as Ask's first drafting beat, so it
                                 gets the same orb — a library search looks like a
                                 library search wherever it happens. */}
-                            <BrandOrb state="searching" size={20} />
+                            <CitationMark state="searching" size={20} />
                             <span className="text-text-muted font-medium">Searching your library…</span>
                         </div>
                     )}
@@ -2296,7 +2296,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             <h3 className="text-base font-bold text-text">{empty.title}</h3>
                             {searchingLibrary && (
                                 <div className="flex items-center justify-center gap-2 text-accent mt-2">
-                                    <BrandOrb state="searching" size={20} />
+                                    <CitationMark state="searching" size={20} />
                                     <span className="text-sm font-medium">Searching your library…</span>
                                 </div>
                             )}
@@ -2313,11 +2313,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 <button
                                     onClick={handleSeedExample}
                                     disabled={seedingExample}
-                                    className="mt-5 inline-flex items-center gap-2 px-4 h-11 rounded-full bg-accent text-white text-sm font-bold shadow-sm shadow-accent/20 hover:bg-accent-hover active:scale-95 transition-all disabled:opacity-60 disabled:pointer-events-none"
+                                    className="mt-5 inline-flex items-center gap-2 px-4 h-11 rounded-full bg-accent text-accent-ink text-sm font-bold shadow-sm shadow-accent/20 hover:bg-accent-hover active:scale-95 transition-all disabled:opacity-60 disabled:pointer-events-none"
                                 >
                                     {seedingExample ? (
                                         <>
-                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            <div className="w-4 h-4 border-2 border-accent-ink/30 border-t-accent-ink rounded-full animate-spin" />
                                             Adding…
                                         </>
                                     ) : (
@@ -2337,7 +2337,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                         setSelectedCollections(new Set());
                                         setSearchQuery('');
                                     }}
-                                    className="mt-5 inline-flex items-center gap-2 px-4 h-10 rounded-full bg-accent text-white text-sm font-bold hover:bg-accent-hover active:scale-95 transition-all"
+                                    className="mt-5 inline-flex items-center gap-2 px-4 h-10 rounded-full bg-accent text-accent-ink text-sm font-bold hover:bg-accent-hover active:scale-95 transition-all"
                                 >
                                     <X className="w-4 h-4" />
                                     Clear filters

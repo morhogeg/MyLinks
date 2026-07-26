@@ -540,6 +540,23 @@ The multi-user auth work is **fully written but not live**:
     the in-app save stepper (WKWebView conic-gradient + CSS mask), and the native
     share-sheet scanner (CAGradientLayer `.conic`) — none device-verified this
     session.
+20b. **[x] Machina identity build-out — shipped 2026-07-26.** The Citation mark
+    (brackets enclosing a struck point) + Lumen palette from
+    `design/icon-concepts/` (branch `claude/logo-design-feedback-uhl1sk`,
+    merged in) implemented app-wide: icon set at every delivered size, Lumen
+    graphite iOS splash (tile @29% + letterspaced wordmark baked into the
+    image; storyboard bg fixed dark — no more white cold-launch flash), drawn
+    MACHINA wordmark in the header/login (`components/ui/Wordmark.tsx`),
+    full achromatic sweep (`--accent` = neutral emphasis: porcelain on dark /
+    graphite on light, new `--accent-ink`/`--accent-hover` tokens; destructive
+    red + platform/collection colors deliberately kept), `CitationMark`
+    replaces `thinking-orbs` everywhere (motion.js ported verbatim, verb →
+    motion), bracket glyph on Ask citation chips. **Still open (owner/QA):**
+    (1) on-device light+dark QA; (2) whether 20px needs a reduced drawing
+    (crisp in 2x renders, check 1x devices); (3) iOS 26 Icon Composer layered
+    variant (needs a Mac); (4) the NATIVE share-extension indicator
+    (`ShareViewController.swift`) still draws the old ring — not in this
+    session's spec scope, swap to the mark in a follow-up (§4 item 18c).
 
 ### 🟢 P3 — product roadmap (post-launch)
 
@@ -795,7 +812,50 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-25 (latest) — BOOT SCREEN: ORB REMOVED AGAIN (reversal, same
+- **2026-07-26 (latest) — MACHINA IDENTITY BUILT: CITATION MARK, LUMEN PALETTE,
+  ACHROMATIC SWEEP (§4 item 20b).** First implementation of the identity
+  designed on `claude/logo-design-feedback-uhl1sk` (mockups in
+  `design/icon-concepts/` are the spec; numbers ported, not re-derived).
+  **(1) Icons:** every asset regenerated from `cit_lumen.svg` through the
+  spec's own Chromium pipeline (web/public, web/assets, favicon, extension,
+  iOS AppIcon) — 29pt legibility sheet checked. **(2) Splash:** all six
+  `Splash.imageset` PNGs recomposed on the Lumen graphite ground (tile @29%
+  screen width + letterspaced MACHINA baked as image); storyboard background
+  changed from `systemBackgroundColor` (white — the cold-launch flash) to
+  fixed `#08080C`. **(3) Wordmark:** new `components/ui/Wordmark.tsx`
+  (`CitationGlyph` + drawn `Wordmark`, both currentColor); header brand is now
+  bare glyph + drawn wordmark on one axis, tile + gradient type + tagline
+  removed; login uses the wordmark; consent/onboarding headlines de-gradiented.
+  **(4) Achromatic sweep:** `--accent` is a neutral emphasis token (dark
+  `#E9E9F2` porcelain / light `#22222A` graphite, from `ask_idle.py`); NEW
+  TOKENS `--accent-ink` (ink on accent surfaces — every `bg-accent text-white`
+  call site swapped, ~50) and `--accent-hover` (previously the
+  `hover:bg-accent-hover` classes silently generated nothing);
+  `--accent-gradient/-2/-3/-ring` neutralised in both blocks; header hairline
+  glow removed; settings tiles carry explicit ink; extension popup/badge
+  neutralised; REMIND swipe hint purple→gray. Destructive red, platform
+  colors, and user collection colors deliberately survive. **(5) Indicators:**
+  `thinking-orbs` dependency REMOVED; new `components/ui/CitationMark.tsx`
+  ports `motion.js` verbatim (C1-continuous; verb→motion: listening=STATIC,
+  working=PULSE, searching=SWEEP, solving=STEP, shaping=HOLD; tight viewBox
+  `288 292 448 416`; reduced-motion rests locked; IO/visibility pausing kept).
+  `OrbStatus` keeps its dip choreography + both WebKit fixes, only the visual
+  changed. Ask idle hero is the STATIC mark at **38px** (not the orb's 64 — the
+  mark is solid ink) with the launch assembly played once at Ask open.
+  **Boot screen deliberately kept CSS-only** (pulsing new icon) — the §9
+  2026-07-25 pre-hydration rule stands; TRACE was NOT added there (owner
+  approved this deviation from the build prompt). **(6) Citation chips:** Ask
+  source chips lead with the bracket glyph (platform label text + its color
+  kept). Verified: tsc 0, `next build` 0 (with the documented placeholder
+  `NEXT_PUBLIC_FIREBASE_*` gotcha), eslint clean on touched files (4
+  pre-existing errors elsewhere untouched), light+dark render-checked against
+  `ask_idle_mock.png`/`loaders_mock.png`/`topbar_compare.png`/
+  `ask_in_situ_answer.png` via a temporary public harness (removed before
+  commit). **Open:** on-device QA; 20px-at-1x judgement; Icon Composer layered
+  variant (Mac); native share-extension indicator still the old ring (spec
+  scope excluded it — follow-up with §4 18c).
+
+- **2026-07-25 — BOOT SCREEN: ORB REMOVED AGAIN (reversal, same
   session — do not re-add).** The `listening` @64 orb added to `app/page.tsx`'s
   auth-resolving screen earlier today is **out**; the screen is now the pulsing
   app icon alone (no orb, no ring). Owner asked whether it was needed after

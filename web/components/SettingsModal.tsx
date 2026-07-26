@@ -360,7 +360,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                             {showBack && (
                                 <button
                                     onClick={leaveSubscreen}
-                                    className="h-10 px-6 rounded-full text-sm font-semibold bg-accent text-white hover:bg-accent/90 transition-colors shadow-lg shadow-accent/20 cursor-pointer"
+                                    className="h-10 px-6 rounded-full text-sm font-semibold bg-accent text-accent-ink hover:bg-accent/90 transition-colors shadow-lg shadow-accent/20 cursor-pointer"
                                 >
                                     Done
                                 </button>

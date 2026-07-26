@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, FileText, Plus, MessagesSquare, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X } from 'lucide-react';
-import type { OrbState } from 'thinking-orbs';
+import { ArrowUp, Plus, MessagesSquare, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X } from 'lucide-react';
+import type { OrbState } from '@/components/ui/CitationMark';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { getDominantDirection } from '@/lib/rtl';
-import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS, xHandle, linkedinDisplayName } from '@/lib/platform';
+import { getPlatform, platformColor, PLATFORM_LABELS, xHandle, linkedinDisplayName } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl, isNativeApp, fetchWithTimeout } from '@/lib/api';
@@ -22,7 +22,8 @@ import ConfirmDialog from './ConfirmDialog';
 import ChatHistorySidebar from './ChatHistorySidebar';
 import MobileSubheader from './MobileSubheader';
 import { IconButton } from './ui/Button';
-import BrandOrb from './ui/BrandOrb';
+import CitationMark from './ui/CitationMark';
+import { CitationGlyph } from './ui/Wordmark';
 import OrbStatus from './ui/OrbStatus';
 import SidebarIcon from './ui/SidebarIcon';
 import { lockBodyScroll, unlockBodyScroll } from '@/lib/useScrollLock';
@@ -1111,9 +1112,13 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
             >
                 {isEmpty ? (
                     <div className="h-full flex flex-col items-center justify-center text-center px-4">
-                        {/* Hero orb — Thinking Orbs in our palette. 'listening' =
-                            idle, waiting for your question. */}
-                        <BrandOrb state="listening" size={64} className="mb-5" aria-label="Machina is ready" />
+                        {/* Hero mark — the Citation mark at REST. 'listening' is
+                            STATIC by decision: motion means work is happening, and
+                            an invitation screen has none. 38px, NOT the orb's
+                            nominal 64: the orb was an airy dot cloud filling ~80%
+                            of its box; the mark is solid ink filling all of its
+                            own. `entry` plays the arrival once at Ask open. */}
+                        <CitationMark state="listening" size={38} entry glow className="mb-4" aria-label="Machina is ready" />
                         <h2 className="text-xl font-semibold text-text mb-1.5">What do you want to recall?</h2>
                         <p className="text-text-muted text-sm max-w-xs mb-6 leading-relaxed">
                             {/* totalLinks is the loaded feed WINDOW (caps at 150) — beyond
@@ -1175,7 +1180,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                         className={
                                             m.role === 'user'
                                                 // User message: a compact accent pill.
-                                                ? 'px-4 py-2.5 rounded-2xl rounded-br-md bg-accent text-white text-[15px] leading-relaxed'
+                                                ? 'px-4 py-2.5 rounded-2xl rounded-br-md bg-accent text-accent-ink text-[15px] leading-relaxed'
                                                 : m.error
                                                     // Errors keep a subtle container so they stand out.
                                                     ? 'px-4 py-3 rounded-2xl rounded-bl-md text-[15px] leading-relaxed bg-red-500/10 border border-red-500/20 text-text whitespace-pre-wrap'
@@ -1229,11 +1234,11 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                                         const tag = sourceTag(s);
                                                         return (
                                                             <>
-                                                                <span
-                                                                    className="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-lg bg-accent/10 text-accent group-hover:bg-accent/15 transition-colors"
-                                                                    style={tag?.platform ? platformActiveStyle(tag.platform) : undefined}
-                                                                >
-                                                                    {tag?.platform ? platformIcon(tag.platform, 'w-3.5 h-3.5') : <FileText className="w-3.5 h-3.5" />}
+                                                                {/* The bracket glyph marks every cited source — the
+                                                                    thing that was searching is visibly the thing that
+                                                                    found this (ask_in_situ_answer.png). */}
+                                                                <span className="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-lg bg-accent/10 text-accent group-hover:bg-accent/15 transition-colors">
+                                                                    <CitationGlyph className="w-3.5 h-auto" />
                                                                 </span>
                                                                 <span className="min-w-0 flex flex-col">
                                                                     {tag && (

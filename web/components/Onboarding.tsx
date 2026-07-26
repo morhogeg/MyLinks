@@ -39,11 +39,11 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
             <div className="w-full max-w-sm flex flex-col items-center animate-slide-up">
                 {/* Brand mark — same lockup as LoginScreen so the handoff from
                     sign-in feels like one continuous flow. */}
-                <div className="w-16 h-16 rounded-3xl overflow-hidden shadow-lg shadow-purple-500/20 ring-1 ring-white/15">
+                <div className="w-16 h-16 rounded-3xl overflow-hidden shadow-lg shadow-accent/20 ring-1 ring-white/15">
                     <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
                 </div>
 
-                <h1 className="mt-6 text-2xl font-extrabold tracking-tight text-center bg-[image:var(--accent-gradient)] bg-clip-text text-transparent">
+                <h1 className="mt-6 text-2xl font-extrabold tracking-tight text-center text-text">
                     Save your first thing
                 </h1>
                 <p className="mt-2 text-sm text-text-secondary text-center leading-relaxed">
@@ -136,7 +136,7 @@ function StepRow({
                 sequence, the glyph hints at the action. */}
             <div className="relative shrink-0 w-9 h-9 rounded-xl bg-accent/12 text-accent flex items-center justify-center ring-1 ring-accent/20">
                 {icon}
-                <span className="absolute -top-1.5 -start-1.5 w-4 h-4 rounded-full bg-accent text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-background tabular-nums">
+                <span className="absolute -top-1.5 -start-1.5 w-4 h-4 rounded-full bg-accent text-accent-ink text-[10px] font-bold flex items-center justify-center ring-2 ring-background tabular-nums">
                     {n}
                 </span>
             </div>

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Check, Globe } from 'lucide-react';
 import { LINK_SCAN_STEPS, LINK_SCAN_ORBS, linkScanStepIndex } from '@/lib/scanPhases';
-import BrandOrb from '@/components/ui/BrandOrb';
+import CitationMark from '@/components/ui/CitationMark';
 
 interface LinkScanProgressProps {
     /** The URL being analyzed (used to show the host + favicon). */
@@ -28,7 +28,7 @@ function hostOf(url: string): string {
 }
 
 /**
- * "Reading your link" — a compact, honest stepper. One `BrandOrb` (Thinking Orbs
+ * "Reading your link" — a compact, honest stepper. One `CitationMark` (the Citation mark
  * in our palette) rides the active phase; finished phases collapse to an airy
  * accent checkmark (no circle); upcoming phases show a hollow dot. The phases
  * come from the shared `scanPhases` source, so this and the persistent
@@ -76,7 +76,7 @@ export default function LinkScanProgress({ url, progress, activeStep }: LinkScan
                                     // so the shape says what kind of work is running.
                                     // No dip needed here: the orb doesn't swap in
                                     // place, it moves down to the next row.
-                                    <BrandOrb state={LINK_SCAN_ORBS[i]} size={20} />
+                                    <CitationMark state={LINK_SCAN_ORBS[i]} size={20} />
                                 ) : state === 'done' ? (
                                     <Check className="w-[15px] h-[15px] text-accent animate-fade-in" strokeWidth={3} />
                                 ) : (

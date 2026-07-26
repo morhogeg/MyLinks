@@ -380,7 +380,7 @@ export default function SwipeDeck({
                     ) : onExit && (
                         <button
                             onClick={onExit}
-                            className="inline-flex items-center gap-2 h-10 px-5 rounded-full bg-accent text-white transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold"
+                            className="inline-flex items-center gap-2 h-10 px-5 rounded-full bg-accent text-accent-ink transition-opacity hover:opacity-90 cursor-pointer text-sm font-semibold"
                         >
                             Done
                         </button>
@@ -437,7 +437,7 @@ export default function SwipeDeck({
                                 <>
                                     <HintBadge label="KEEP" color="34,197,94" icon={<Star className="w-4 h-4" />} opacity={rightHint} pos="left" />
                                     <HintBadge label="ARCHIVE" color="59,130,246" icon={<Archive className="w-4 h-4" />} opacity={leftHint} pos="right" />
-                                    <HintBadge label="REMIND" color="168,85,247" icon={<Bell className="w-4 h-4" />} opacity={upHint} pos="top" />
+                                    <HintBadge label="REMIND" color="107,114,128" icon={<Bell className="w-4 h-4" />} opacity={upHint} pos="top" />
                                 </>
                             )}
                         </div>
@@ -454,7 +454,7 @@ export default function SwipeDeck({
                 <DeckAction label="← Archive" onClick={() => fling('left')} buttonClassName="text-blue-500 hover:bg-blue-500 hover:text-white border-blue-500/30">
                     <Archive className="w-6 h-6" />
                 </DeckAction>
-                <DeckAction label="↑ Remind" onClick={() => fling('up')} buttonClassName="text-accent hover:bg-accent hover:text-white border-accent/30">
+                <DeckAction label="↑ Remind" onClick={() => fling('up')} buttonClassName="text-accent hover:bg-accent hover:text-accent-ink border-accent/30">
                     <Bell className="w-6 h-6" />
                 </DeckAction>
                 <DeckAction label="Keep →" onClick={() => fling('right')} buttonClassName="text-green-500 hover:bg-green-500 hover:text-white border-green-500/30">

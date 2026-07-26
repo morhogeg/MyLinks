@@ -173,7 +173,7 @@ function ListCard({
 
                 {isSelectionMode && (
                     <span
-                        className={`shrink-0 self-center w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'bg-accent border-accent text-white' : 'border-text-muted/40 text-transparent'
+                        className={`shrink-0 self-center w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'bg-accent border-accent text-accent-ink' : 'border-text-muted/40 text-transparent'
                             }`}
                     >
                         <Check className="w-3 h-3" />

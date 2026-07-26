@@ -7,7 +7,7 @@ import { Archive, Star, Clock, Trash2, Bell, Pencil, Circle, Check, MoreHorizont
 import { useState, memo } from 'react';
 import SourceByline from './SourceByline';
 import { cardThumbnailUrl } from '@/lib/cardThumbnail';
-import BrandOrb from './ui/BrandOrb';
+import CitationMark from './ui/CitationMark';
 import { useNow } from '@/lib/useNow';
 import SimpleMarkdown from './SimpleMarkdown';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -157,7 +157,7 @@ function Card({
                         {failed ? (
                             <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
                         ) : (
-                            <BrandOrb state="working" size={20} />
+                            <CitationMark state="working" size={20} />
                         )}
                         <span className={`text-[10px] uppercase font-black tracking-widest ${failed ? 'text-red-400' : 'text-accent'}`}>
                             {failed ? 'Couldn’t analyze' : 'Saving…'}
@@ -206,7 +206,7 @@ function Card({
                                 {onRetry && (
                                     <button
                                         onClick={(e) => { e.stopPropagation(); onRetry(link); }}
-                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-accent text-white text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-accent text-accent-ink text-xs font-bold hover:bg-accent-hover active:scale-95 transition-all"
                                     >
                                         <RotateCcw className="w-3 h-3" /> Retry
                                     </button>

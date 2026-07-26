@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Wordmark } from '@/components/ui/Wordmark';
 
 /**
  * Branded sign-in gate (web). Shown when no user is signed in, and — in the
@@ -46,11 +47,11 @@ export default function LoginScreen({
         <div className="min-h-screen bg-background text-text flex items-center justify-center px-6">
             <div className="w-full max-w-sm flex flex-col items-center text-center">
                 {/* Brand mark */}
-                <div className="w-16 h-16 rounded-3xl overflow-hidden shadow-lg shadow-purple-500/20 ring-1 ring-white/15">
+                <div className="w-16 h-16 rounded-3xl overflow-hidden shadow-lg shadow-accent/20 ring-1 ring-white/15">
                     <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
                 </div>
-                <h1 className="mt-6 text-2xl font-extrabold tracking-tight bg-[image:var(--accent-gradient)] bg-clip-text text-transparent">
-                    Machina AI
+                <h1 className="mt-6 text-text">
+                    <Wordmark className="w-[190px] h-auto" />
                 </h1>
                 <p className="mt-1.5 text-[13px] font-medium text-text-muted tracking-wide">
                     Capture. Connect. Recall.
@@ -69,7 +70,7 @@ export default function LoginScreen({
                                 </p>
                                 <button
                                     onClick={onRetry}
-                                    className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-full bg-accent text-white px-5 py-2.5 text-sm font-semibold shadow-sm shadow-accent/20 hover:bg-accent-hover transition-colors"
+                                    className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-full bg-accent text-accent-ink px-5 py-2.5 text-sm font-semibold shadow-sm shadow-accent/20 hover:bg-accent-hover transition-colors"
                                 >
                                     Try again
                                 </button>

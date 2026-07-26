@@ -70,16 +70,16 @@ export function MainView({
 
             <SectionHeader>Your library</SectionHeader>
             <List>
-                <NavRow tile={<BarChart3 className="w-[17px] h-[17px]" />} tileClass="bg-violet-500" title="Insights" onClick={() => go('stats')} />
+                <NavRow tile={<BarChart3 className="w-[17px] h-[17px]" />} tileClass="bg-accent text-accent-ink" title="Insights" onClick={() => go('stats')} />
             </List>
 
             <SectionHeader>Notifications</SectionHeader>
             <List>
-                <RowShell tile={<Bell className="w-[17px] h-[17px]" />} tileClass="bg-accent">
+                <RowShell tile={<Bell className="w-[17px] h-[17px]" />} tileClass="bg-accent text-accent-ink">
                     <RowText title="Push notifications" />
                     <Toggle on={settings.push_enabled} onChange={togglePush} />
                 </RowShell>
-                <NavRow tile={<Clock className="w-[17px] h-[17px]" />} tileClass="bg-pink-500" title="Reminders & Digest" value={remindersOrDigest ? 'On' : 'Off'} onClick={() => go('resurfacing')} />
+                <NavRow tile={<Clock className="w-[17px] h-[17px]" />} tileClass="bg-pink-500 text-white" title="Reminders & Digest" value={remindersOrDigest ? 'On' : 'Off'} onClick={() => go('resurfacing')} />
             </List>
             {pushNote && <p className="text-[12px] text-amber-500 leading-snug px-2 pt-1.5">{pushNote}</p>}
 
@@ -89,8 +89,8 @@ export function MainView({
                 <>
                     <SectionHeader>Private collections</SectionHeader>
                     <List>
-                        <NavRow tile={<Lock className="w-[16px] h-[16px]" />} tileClass="bg-slate-600" title="Change PIN" onClick={onChangePin} />
-                        <NavRow tile={<Lock className="w-[16px] h-[16px]" />} tileClass="bg-red-500" title="Turn off PIN" onClick={onDisablePin} />
+                        <NavRow tile={<Lock className="w-[16px] h-[16px]" />} tileClass="bg-slate-600 text-white" title="Change PIN" onClick={onChangePin} />
+                        <NavRow tile={<Lock className="w-[16px] h-[16px]" />} tileClass="bg-red-500 text-white" title="Turn off PIN" onClick={onDisablePin} />
                     </List>
                     <Footnote>One PIN protects every private collection. Turning it off leaves collections marked Private visible to anyone using this device.</Footnote>
                 </>
@@ -113,7 +113,7 @@ export function MainView({
             <SectionHeader>Advanced</SectionHeader>
             <List>
                 {onReplayTour && (
-                    <NavRow tile={<Compass className="w-[16px] h-[16px]" />} tileClass="bg-slate-500" title="Take the tour again" onClick={onReplayTour} />
+                    <NavRow tile={<Compass className="w-[16px] h-[16px]" />} tileClass="bg-slate-500 text-white" title="Take the tour again" onClick={onReplayTour} />
                 )}
             </List>
         </>
