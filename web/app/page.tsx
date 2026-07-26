@@ -70,9 +70,13 @@ function BootScreen({ exiting = false }: { exiting?: boolean }) {
           <span className={`absolute -inset-[45%] rounded-full ${exiting ? '' : 'animate-boot-halo'}`}
             style={{ background: 'radial-gradient(closest-side, rgba(174,184,206,0.20), rgba(174,184,206,0) 72%)' }}
           />
+          {/* On exit the glow LIFTS OFF the mark: scaling an element that
+              carries a drop-shadow filter re-rasterizes the glow every frame
+              (the residual shake). The bare mark push-through is a plain
+              composited transform — silky. */}
           <span
             className={`relative w-[min(30vw,117px)] text-white ${exiting ? 'animate-boot-exit-mark' : 'animate-boot-glow'}`}
-            style={{ filter: 'drop-shadow(0 0 18px rgba(174,184,206,0.34))' }}
+            style={{ filter: exiting ? undefined : 'drop-shadow(0 0 18px rgba(174,184,206,0.34))' }}
           >
             <svg viewBox="288 292 448 416" className="w-full h-auto" fill="currentColor">
               <path className={exiting ? undefined : 'animate-boot-bkt-l'} d="M296 300 L396 300 L396 358 L354 358 L354 642 L396 642 L396 700 L296 700 Z" />
@@ -331,7 +335,7 @@ export default function Home() {
           begins when the effect advances the phase to 'exit'. Inert
           (pointer-events-none) so nothing is blocked during the beat. */}
       {bootPhase !== 'done' && (
-        <div className="fixed inset-0 z-[100] pointer-events-none">
+        <div className="fixed inset-0 z-[100] pointer-events-none overflow-hidden">
           <BootScreen exiting={bootPhase === 'exit'} />
         </div>
       )}

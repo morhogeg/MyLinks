@@ -357,18 +357,27 @@ html {
   }
 }
 
+/* The X-style push-through: the mark accelerates straight past the viewer —
+   brackets fly off the screen edges — while the frame dissolves to reveal the
+   app behind it. The scaled element carries NO filter during the zoom (see
+   BootScreen): a plain transform stays on the compositor and cannot shake. */
 @keyframes boot-exit-mark {
+  from {
+    transform: scale(1);
+  }
+
   to {
-    transform: scale(1.42);
+    transform: scale(13);
   }
 }
 
 .animate-boot-exit {
-  animation: boot-exit 0.46s var(--ease-modal) 0.16s forwards;
+  animation: boot-exit 0.34s ease-out 0.2s forwards;
 }
 
 .animate-boot-exit-mark {
-  animation: boot-exit-mark 0.62s var(--ease-modal) forwards;
+  will-change: transform;
+  animation: boot-exit-mark 0.58s cubic-bezier(0.55, 0, 0.85, 0.4) forwards;
 }
 
 /* The launch ARRIVAL, staged (identity §04): brackets close in, the point
