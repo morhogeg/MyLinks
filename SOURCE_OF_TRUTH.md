@@ -812,6 +812,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — IDENTITY ROUND 15: X-STYLE PUSH-THROUGH EXIT.** The residual
+  success-beat shake shared the round-14 root cause: the exit scaled the mark
+  while it still carried the drop-shadow filter → glow re-rasterized through
+  the zoom. Now the glow lifts off at exit (filter removed on the exiting
+  instance) and the bare mark accelerates straight past the viewer — scale
+  1→13, `cubic-bezier(.55,0,.85,.4)`, 0.58s, `will-change: transform` — while
+  the frame dissolves (fade .34s @ .2s delay) to reveal the app; the exit
+  overlay clips the overshoot (`overflow-hidden`). Pure composited transform:
+  cannot shake. Feature `7f8a830`, merge `cee4798` → Vercel; TestFlight run
+  #203 → build 1203 (supersedes 1202).
+
 - **2026-07-26 — IDENTITY ROUND 14: LIGHT-BREATHE WAIT, DEEPER GROUND, BASELINE
   FIX.** (1) The waiting "shake" (owner) was the dot's scale-breathe animating
   UNDER the mark's drop-shadow filter — WebKit re-rasterized the glow every
