@@ -55,7 +55,10 @@ h2{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;letter-spacing:.16e
 
 .body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
  text-align:center;padding:0 18px}
-.hero{color:var(--ink);margin-bottom:18px}
+/* 38px, not the orb's nominal 64. The orb is an airy dot cloud that only
+   fills ~80% of its box; the mark is solid ink filling all of its own, so
+   matching the number would out-weigh what it replaces by half again. */
+.hero{color:var(--ink);margin-bottom:16px}
 .q{font-size:19px;font-weight:600;color:var(--ink);letter-spacing:-.02em;margin-bottom:6px}
 .sub2{font-size:12.5px;color:var(--mut);line-height:1.5;max-width:230px;margin-bottom:20px}
 .chips{display:flex;flex-wrap:wrap;justify-content:center;gap:7px}
@@ -67,13 +70,15 @@ h2{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;letter-spacing:.16e
 .field{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--ln);
  border-radius:16px;padding:9px 9px 9px 14px}
 .ph{flex:1;font-size:13.5px;color:var(--mut)}
+/* Affordance from CONTRAST, not hue: the send button is the highest-contrast
+   element on the screen, which is what makes it read as the thing you press. */
 .send{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;
- background:var(--accent);color:#fff;font-size:15px}
+ background:var(--cta);color:var(--cta-ink);font-size:15px;font-weight:600}
 
-.light{--ink:#22222A;--mut:#8A8A96;--ln:#E4E2DE;--card:#FFFFFF;--accent:#A855F7;
- background:#F7F7F9}
-.dark{--ink:#E9E9F2;--mut:#82828F;--ln:#22222C;--card:#14141A;--accent:#8B5CF6;
- background:#0C0C11}
+.light{--ink:#22222A;--mut:#8A8A96;--ln:#E4E2DE;--card:#FFFFFF;
+ --cta:#22222A;--cta-ink:#F7F7F9;background:#F7F7F9}
+.dark{--ink:#E9E9F2;--mut:#82828F;--ln:#22222C;--card:#14141A;
+ --cta:#E9E9F2;--cta-ink:#101016;background:#0C0C11}
 """
 
 SIDEBAR = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">'
@@ -86,7 +91,7 @@ def phone(theme, glow):
       <div class="sub"><span class="chev">‹</span><span class="lead">{SIDEBAR}</span>
         <span class="subttl">Ask Machina</span></div>
       <div class="body">
-        <div class="hero">{mark(58, glow)}</div>
+        <div class="hero">{mark(38, glow)}</div>
         <div class="q">What do you want to recall?</div>
         <div class="sub2">Answers come only from your 105 saves — with sources you can open.</div>
         <div class="chips">{chips}</div>
