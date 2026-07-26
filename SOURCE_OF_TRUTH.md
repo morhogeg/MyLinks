@@ -812,6 +812,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — IDENTITY ROUND 16: PRE-JUMP GLITCH FRAME KILLED.** Owner:
+  jitter right before the push-through. Two stacked causes at that instant:
+  (1) the success overlay mounts one frame before the exit class lands, and a
+  fresh mount RESTARTED every entrance animation from its from{} state
+  (brackets flung out, dot gone) — a one-frame disassembled flash. New
+  `settled` prop on BootScreen renders the finished frame with no entrances;
+  the overlay passes it from its first frame. (2) the exit removed the glow
+  filter, which popped off visibly; the zoom now animates a WRAPPER of the
+  filtered span, so WebKit rasterizes the glowing mark once and scales the
+  texture — glow rides the zoom, zero per-frame re-rasters, high-scale soften
+  reads as motion blur. Feature `b3392a7`, merge `64b4aa1` → Vercel;
+  TestFlight run #204 → build 1204 (supersedes 1203).
+
 - **2026-07-26 — IDENTITY ROUND 15: X-STYLE PUSH-THROUGH EXIT.** The residual
   success-beat shake shared the round-14 root cause: the exit scaled the mark
   while it still carried the drop-shadow filter → glow re-rasterized through
