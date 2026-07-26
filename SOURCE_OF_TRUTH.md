@@ -812,6 +812,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — IDENTITY ROUND 12: THE NAME ARRIVES + SMALLER HEADER
+  WORDMARK.** Owner: the mockup showed the icon first, then MACHINA appearing
+  letterspaced. Now faithful to the §04 sequence: the static native splash is
+  **tile-only** again (the `.staticsplash` mock), and MACHINA **fades in on
+  the boot screen** (0.6s fade, 0.55s after first paint — pure CSS keyframes
+  `boot-word-in`, so it runs pre-hydration; the exiting overlay skips the
+  entrance so the name doesn't re-fade during the success beat; reduced-motion
+  shows it instantly). Header wordmark trimmed 104/122px → 94/110px. Feature
+  `1834f62`, merge `694de81` → Vercel; TestFlight run #200 → build 1200
+  (supersedes 1199).
+
 - **2026-07-26 — IDENTITY ROUND 11: THE LUXURY BOOT FRAME (owner: "the mockup
   was luxury and this looks meh" + the writing seems off).** Three restorations
   to match the §04 prototype faithfully: (1) the **radial graphite ground is
