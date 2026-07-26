@@ -822,8 +822,13 @@ exact-match, capped.
   stays out of the launch-critical surface. No data, no flags, both platforms.
   Files: `settings/{StoryView.tsx,types.ts,MainView.tsx}`, `SettingsModal.tsx`.
   Owner may reuse the text for the App Store description (`docs/APP_STORE.md`
-  §2) — not done, deliberate. Feature `a8e073b`, merge `22130ff` → Vercel;
-  TestFlight run #209 → build 1209.
+  §2) — not done, deliberate. Feature `a8e073b`, merge `22130ff` → Vercel
+  (live). TestFlight run #209 (build 1209) **failed at upload with the same
+  90382 daily-limit error as #207/#208** — archive/entitlements/URL-scheme
+  checks all green, so no code action needed. The story section rides the
+  already-scheduled 2026-07-27 ~17:20Z re-trigger (see the tour-redo entry
+  below): one new build from main HEAD carries tour redo + story. A fallback
+  check at ~18:30Z re-triggers only if that run didn't happen.
 
 - **2026-07-26 — ADD-SHEET ICON + SETTINGS TILE TOKENS.** Owner design pass from
   device screenshots. (1) The Add-to-Machina header glyph now follows the active
