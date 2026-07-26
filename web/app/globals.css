@@ -371,18 +371,108 @@ html {
   animation: boot-exit-mark 0.62s var(--ease-modal) forwards;
 }
 
-/* The launch sequence's arrival beat (identity §04: mark first, then the
-   letterspaced name fades in under it). Pure CSS, so it runs pre-hydration —
-   the native splash shows the icon alone, and MACHINA arrives here. */
-@keyframes boot-word-in {
+/* The launch ARRIVAL, staged (identity §04): brackets close in, the point
+   strikes, the glow blooms, then MACHINA fades in as its letterspacing
+   breathes open, and the point settles into a slow quiet breath. All pure
+   CSS with fill-mode `both` (the from{} state holds through each delay), so
+   the whole sequence runs from the first painted frame, pre-hydration. */
+@keyframes boot-bkt-l {
+  from {
+    transform: translateX(-92px);
+    opacity: 0;
+  }
+
   to {
+    transform: translateX(0);
     opacity: 1;
   }
 }
 
+@keyframes boot-bkt-r {
+  from {
+    transform: translateX(92px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes boot-dot-strike {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes boot-dot-breathe {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes boot-glow {
+  from {
+    filter: drop-shadow(0 0 0px rgba(174, 184, 206, 0));
+  }
+
+  to {
+    filter: drop-shadow(0 0 18px rgba(174, 184, 206, 0.34));
+  }
+}
+
+@keyframes boot-word-in {
+  from {
+    opacity: 0;
+    letter-spacing: 0.30em;
+  }
+
+  to {
+    opacity: 1;
+    letter-spacing: 0.46em;
+  }
+}
+
+.animate-boot-bkt-l {
+  animation: boot-bkt-l 0.55s var(--ease-modal) 0.14s both;
+}
+
+.animate-boot-bkt-r {
+  animation: boot-bkt-r 0.55s var(--ease-modal) 0.14s both;
+}
+
+.boot-dot {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.animate-boot-dot {
+  /* The strike lands with the spring's overshoot; the breathe takes over
+     once the mark is settled — motion quiet enough to feel like waiting. */
+  animation:
+    boot-dot-strike 0.36s var(--ease-spring) 0.6s both,
+    boot-dot-breathe 3.4s ease-in-out 1.8s infinite;
+}
+
+.animate-boot-glow {
+  animation: boot-glow 0.7s ease-out 0.55s both;
+}
+
 .animate-boot-word {
-  opacity: 0;
-  animation: boot-word-in 0.6s ease-out 0.55s forwards;
+  animation: boot-word-in 0.7s ease-out 1.05s both;
 }
 
 /* Scale-up: used by ConfirmDialog (was referenced but never defined). */
@@ -539,6 +629,10 @@ a {
   .animate-boot-exit,
   .animate-boot-exit-mark,
   .animate-boot-word,
+  .animate-boot-bkt-l,
+  .animate-boot-bkt-r,
+  .animate-boot-dot,
+  .animate-boot-glow,
   .animate-fade-in {
     animation-duration: 0.01ms !important;
     animation-delay: 0ms !important;
