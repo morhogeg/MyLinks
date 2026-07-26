@@ -812,6 +812,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — IDENTITY ROUND 17: THE JITTER WAS ARCHITECTURAL — PERSISTENT
+  BOOT OVERLAY.** Rounds 15-16 patched animation symptoms; the real cause: at
+  auth-resolve the boot early-return UNMOUNTED, a copy REMOUNTED as an
+  overlay, and the whole app tree mounted — all in one commit. DOM swap →
+  animation restarts + fresh compositor layers + main-thread jank exactly at
+  exit start. Restructure: `BootScreen` is now a persistent overlay SIBLING
+  of the app tree (fragment slots) — the SAME element from the pre-hydration
+  first paint through the exit, never remounted; entrance classes stay put
+  (completed, fill-mode holds); exit only ADDS classes; the zoom wrapper
+  carries `will-change: transform` from mount (layer pre-promoted); and the
+  exit is deferred 180ms after auth-resolve so the app's first paint settles
+  beneath the opaque overlay before the zoom starts. `settled` prop removed.
+  Feature `745c55c`, merge `a22da6a` → Vercel; TestFlight run #205 → build
+  1205 (supersedes 1204).
+
 - **2026-07-26 — IDENTITY ROUND 16: PRE-JUMP GLITCH FRAME KILLED.** Owner:
   jitter right before the push-through. Two stacked causes at that instant:
   (1) the success overlay mounts one frame before the exit class lands, and a
