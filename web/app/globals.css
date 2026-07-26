@@ -359,16 +359,16 @@ html {
 
 @keyframes boot-exit-mark {
   to {
-    transform: scale(1.14);
+    transform: scale(1.42);
   }
 }
 
 .animate-boot-exit {
-  animation: boot-exit 0.44s var(--ease-modal) 0.1s forwards;
+  animation: boot-exit 0.46s var(--ease-modal) 0.16s forwards;
 }
 
 .animate-boot-exit-mark {
-  animation: boot-exit-mark 0.5s var(--ease-modal) forwards;
+  animation: boot-exit-mark 0.62s var(--ease-modal) forwards;
 }
 
 /* Scale-up: used by ConfirmDialog (was referenced but never defined). */

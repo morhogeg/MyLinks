@@ -146,11 +146,13 @@ const TRACE_MS = 950;      // trace entry length (identity ENTRY_MS)
 
 /* The tight viewBox fits the RESTING mark exactly — right for static and
    near-static slots (≤20px, hero, chips), where the ink must fill the slot.
-   The ROAM viewBox is the full artboard width: motions swing the brackets up
-   to ~90 units past rest, and against the tight box they clip at the edge —
-   the resting ink sits smaller in its slot (the prototype's own proportion,
-   ~18px ink in the 42px chat slot) and buys the motion its travel. */
-const VIEWBOX_ROAM = '0 292 1024 416';
+   The ROAM viewBox is the motion's exact travel envelope: motions swing the
+   brackets up to ~90 units past rest (clamp sweep peaks at spread 69 →
+   lx 227), and against the tight box they clip at the edge. Trimmed to the
+   envelope — not the full artboard — so the slot carries no dead margin and
+   the mark sits close to its label. */
+const VIEWBOX_ROAM = '224 292 576 416';
+const ROAM_W = 576;
 
 const bracketPaths = (spread: number): [string, string] => {
     const lx = LX - spread, rx = RX + spread;
@@ -297,7 +299,7 @@ export default function CitationMark({
     }, [id, size, speed, entryMode, state === 'listening']);
 
     const [l0, r0] = bracketPaths(LOCKED.spread);
-    const h = Math.round(size * 416 / (roam ? 1024 : 448));
+    const h = Math.round(size * 416 / (roam ? ROAM_W : 448));
     return (
         <svg
             ref={svgRef}
