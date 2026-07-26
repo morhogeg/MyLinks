@@ -822,7 +822,11 @@ exact-match, capped.
   export) collapsed into the token default; only "Turn off PIN" keeps
   destructive red. Files: `AddLinkForm.tsx`, `globals.css`,
   `settings/{primitives,MainView,DataExport}.tsx`. Feature `5ef4b8d`, merge
-  `3c7aee6` → Vercel; TestFlight run #206 → build 1206.
+  `3c7aee6` → Vercel; TestFlight run #206 → build 1206. **Round 2 (device QA):**
+  final tour slide — sparkle removed from the app-icon mock, title "Your
+  Machina is ready" (drop "second brain" — also on LoginScreen), body recap
+  now spans all four pillars (capture / understand / cited recall / resurface)
+  per platform (`OnboardingTour.tsx`, `LoginScreen.tsx`).
 
 - **2026-07-26 — IDENTITY ROUND 17: THE JITTER WAS ARCHITECTURAL — PERSISTENT
   BOOT OVERLAY.** Rounds 15-16 patched animation symptoms; the real cause: at

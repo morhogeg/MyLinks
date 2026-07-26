@@ -220,7 +220,6 @@ function ReadyMock() {
             <div className="relative w-20 h-20 rounded-3xl overflow-hidden shadow-xl shadow-accent/25 ring-1 ring-white/15">
                 <img src="/app-icon.png" alt="" className="w-full h-full object-cover" />
             </div>
-            <Sparkles className="absolute -top-1 -end-1 w-6 h-6 text-accent drop-shadow" />
         </div>
     );
 }
@@ -260,10 +259,10 @@ function buildSteps(native: boolean): Step[] {
         {
             icon: <Sparkles className="w-4 h-4" />,
             eyebrow: 'You’re set',
-            title: 'Your second brain is ready',
+            title: 'Your Machina is ready',
             body: native
-                ? 'Save your first thing and watch Machina go to work. Tip: add Machina to your share sheet so you can capture from any app.'
-                : 'Save your first thing and watch Machina go to work. The + button is always one tap away.',
+                ? 'Capture from any app, and every save is read, tagged, and connected — ready to answer your questions with citations, and to resurface when it matters. Save your first thing to see it work.'
+                : 'Clip from any page, and every save is read, tagged, and connected — ready to answer your questions with citations, and to resurface when it matters. Save your first thing to see it work.',
             visual: <ReadyMock />,
         },
     ];
