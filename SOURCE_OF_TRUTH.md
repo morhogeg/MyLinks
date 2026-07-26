@@ -812,6 +812,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — IDENTITY ROUND 7: ASK THINKING ROW — TRACE+CLAMP, RIGHT-SIZED
+  (owner: mark next to phrases "way too big", animations "underwhelming vs the
+  mockup").** One root cause for both: the 42px slot used the tight
+  resting-ink viewBox, so the resting mark blew up to ~40px AND the brackets
+  clipped against the viewBox edge the moment a motion spread them. New `roam`
+  prop on `CitationMark` (full-artboard viewBox `0 292 1024 416`): the resting
+  ink sits at ~18px in the 42px slot — the prototype's own proportion — and
+  the motion gets its travel. The row now runs the identity prototype's chat
+  loop exactly: `entry="trace"` (reticle assembly, 950ms) handing off
+  seamlessly into the continuous CLAMP cycle (search → lock-on → answer →
+  release; new `state="clamp"` motion), while phrases keep their own beats and
+  OrbStatus's dip masks each exchange (unchanged). Scanner/banner/≥20px slots
+  keep the tight fit per loaders_mock. Also settled with the owner: the Ask
+  citation chips KEEP the bracket glyph (the §6 payoff — the thing that was
+  searching is the thing that found this); the platform name still shows as
+  the chip's small text label, so nothing was lost vs the old FileText icon.
+  Commit `16946c8` (landed directly on main, branch synced) → Vercel;
+  TestFlight run #195 → build 1195 (supersedes 1194).
+
 - **2026-07-26 — IDENTITY ROUND 6: BOOT SCREEN GOES BARE ON A FIXED DARK
   GROUND (owner: "let's have the logo right on the page, not within that
   container… maybe always have our dark background for boot").** Exactly the
