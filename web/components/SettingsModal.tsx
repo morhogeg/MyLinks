@@ -15,6 +15,7 @@ import type { View } from './settings/types';
 import { MainView } from './settings/MainView';
 import { AccountView } from './settings/AccountSection';
 import { StatsView } from './settings/StatsView';
+import { StoryView } from './settings/StoryView';
 import {
     DIGEST_MODES, DAYS, COUNT_OPTIONS, formatTime,
     ResurfacingView, StyleView, ScheduleView, PickerView,
@@ -50,6 +51,7 @@ const VIEW_TITLE: Record<View, string> = {
     style: 'Digest style',
     schedule: 'Schedule',
     cards: 'Cards per digest',
+    story: 'Our story',
 };
 
 const FREQUENCY_NOTE: Record<string, string> = {
@@ -288,6 +290,8 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                         )}
 
                         {view === 'stats' && <StatsView uid={uid} onOpenFacet={onOpenLibraryFacet} restoreScroll={initialSection === 'stats'} />}
+
+                        {view === 'story' && <StoryView />}
 
                         {view === 'resurfacing' && (
                             <ResurfacingView

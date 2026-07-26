@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3 } from 'lucide-react';
+import { Bell, Sun, Moon, Monitor, Clock, Compass, Lock, BarChart3, Heart } from 'lucide-react';
 import { policyUrl, openExternal } from '@/lib/share';
 import ProfileAvatar from '../ProfileAvatar';
 import DataExport from './DataExport';
@@ -115,6 +115,11 @@ export function MainView({
                 {onReplayTour && (
                     <NavRow tile={<Compass className="w-[16px] h-[16px]" />} title="Take the tour again" onClick={onReplayTour} />
                 )}
+            </List>
+
+            <SectionHeader>About</SectionHeader>
+            <List>
+                <NavRow tile={<Heart className="w-[16px] h-[16px]" />} title="The story behind Machina" onClick={() => go('story')} />
             </List>
         </>
     );
