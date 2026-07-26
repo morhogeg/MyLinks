@@ -229,7 +229,19 @@ function ThinkingIndicator({ origin }: { origin: AskOrigin }) {
     return (
         <div className="flex justify-start">
             <div className="px-1 py-1 inline-flex items-center">
-                <OrbStatus orb={stages[stage].orb} label={stages[stage].phrase} stageKey={stage} />
+                {/* 42px, the identity prototype's .think size — at the 20px inline
+                    size the SWEEP/HOLD amplitudes (±11 / ±3.2 units of a 448-unit
+                    viewBox) are sub-pixel, so the verbs all read as static. The
+                    phrase-exchange choreography is OrbStatus's: only the mark
+                    dips; the label is replaced outright, never animated. */}
+                <OrbStatus
+                    orb={stages[stage].orb}
+                    label={stages[stage].phrase}
+                    stageKey={stage}
+                    size={42}
+                    className="inline-flex items-center gap-[13px]"
+                    labelClassName="text-[15px] text-text-muted"
+                />
             </div>
         </div>
     );

@@ -9,10 +9,13 @@ interface CategoryColorStyle {
 }
 
 const categoryColorStyles: Record<string, CategoryColorStyle> = {
+    /* Was the old brand purple (#A855F7). The identity is achromatic now, so
+       this slot is graphite — the key stays 'purple' because collections
+       persist it in Firestore, and name-hash fallbacks land here too. */
     purple: {
-        backgroundColor: 'rgba(168, 85, 247, 0.1)',
-        color: 'rgb(168, 85, 247)',
-        borderColor: 'rgba(168, 85, 247, 0.2)',
+        backgroundColor: 'rgba(100, 116, 139, 0.12)',
+        color: 'rgb(100, 116, 139)',
+        borderColor: 'rgba(100, 116, 139, 0.22)',
     },
     blue: {
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
