@@ -20,6 +20,10 @@ import {
     MessageCircle,
     Bookmark,
     MoreHorizontal,
+    Layers,
+    Lock,
+    Image as ImageIcon,
+    StickyNote,
 } from 'lucide-react';
 import { isNativeApp } from '@/lib/api';
 import { hapticSelection, hapticLight } from '@/lib/haptics';
@@ -36,7 +40,8 @@ import { useVisualViewport } from '@/lib/useVisualViewport';
  * never go stale as the real UI evolves.
  *
  * Design goals: showcase the real differentiators (capture anywhere → AI reads
- * everything → ask your knowledge → it comes back to you), stay to ~5 steps,
+ * everything → ask your knowledge → organize into collections → it comes back
+ * to you), stay to ~5 steps,
  * keep a persistent Skip and a progress indicator on every step, and finish on
  * an actionable CTA. It is never an obstacle: it shows once, animates fast
  * (`--ease-modal`), supports swipe + keyboard, and ticks a light haptic on each
@@ -107,6 +112,19 @@ function CaptureMock({ native }: { native: boolean }) {
                 <ShareTile icon={<Mail className="w-5 h-5" />} label="Mail" />
                 <ShareTile icon={<Bookmark className="w-5 h-5" />} label="Saved" />
                 <ShareTile icon={<MoreHorizontal className="w-5 h-5" />} label="More" />
+            </div>
+            {/* What Machina captures — the three first-class save types. */}
+            <div className="flex items-center justify-center gap-1.5 mt-3 pt-3 border-t border-border-subtle">
+                {[
+                    { icon: <Link2 className="w-3 h-3" />, label: 'Links' },
+                    { icon: <ImageIcon className="w-3 h-3" />, label: 'Images' },
+                    { icon: <StickyNote className="w-3 h-3" />, label: 'Notes' },
+                ].map((t) => (
+                    <span key={t.label} className="inline-flex items-center gap-1 rounded-full bg-fill-subtle text-text-secondary text-[10px] font-medium px-2 py-1">
+                        <span className="text-accent">{t.icon}</span>
+                        {t.label}
+                    </span>
+                ))}
             </div>
         </div>
     );
@@ -179,6 +197,33 @@ function AskMock() {
     );
 }
 
+/** A mini collections shelf — one shared-feeling stack, one PIN-locked. */
+function CollectionsMock() {
+    return (
+        <div className="w-full grid grid-cols-2 gap-2.5" aria-hidden>
+            {[
+                { name: 'Deep work', count: '12 saves', locked: false },
+                { name: 'Career moves', count: '8 saves', locked: true },
+            ].map((c) => (
+                <div key={c.name} className="rounded-2xl bg-card border border-border-subtle shadow-xl p-3">
+                    {/* Cover band — stacked-cards feel. */}
+                    <div className="relative h-14 rounded-xl bg-fill-subtle overflow-hidden mb-2.5">
+                        <div className="absolute inset-x-3 top-2 h-14 rounded-lg bg-[image:var(--accent-gradient)] opacity-25" />
+                        <div className="absolute inset-x-1.5 top-4 h-14 rounded-lg bg-[image:var(--accent-gradient)] opacity-60" />
+                        {c.locked && (
+                            <span className="absolute top-1.5 end-1.5 w-5 h-5 rounded-full bg-accent text-accent-ink flex items-center justify-center shadow">
+                                <Lock className="w-2.5 h-2.5" />
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-[12px] font-bold text-text truncate">{c.name}</p>
+                    <p className="text-[10px] text-text-muted">{c.locked ? `${c.count} · Private` : c.count}</p>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 /** A "comes back to you" digest with a resurfaced item and a reminder. */
 function ResurfaceMock() {
     return (
@@ -229,25 +274,32 @@ function buildSteps(native: boolean): Step[] {
         {
             icon: native ? <Share className="w-4 h-4" /> : <Puzzle className="w-4 h-4" />,
             eyebrow: 'Capture',
-            title: 'Save from anywhere',
+            title: 'Save anything, from anywhere',
             body: native
-                ? 'Share any link, screenshot, or post to Machina straight from the iOS share sheet — no copy-paste, no switching apps.'
-                : 'Clip any page with the Machina button in your browser toolbar — no copy-paste, no switching tabs.',
+                ? 'Links, screenshots, images, or a quick note — share them to Machina from any app, or capture right here. No copy-paste, no switching apps.'
+                : 'Links, images, or a quick note — clip any page with the Machina button in your browser, or capture right here. No copy-paste, no switching tabs.',
             visual: <CaptureMock native={native} />,
         },
         {
             icon: <Wand2 className="w-4 h-4" />,
             eyebrow: 'Understand',
             title: 'Every save gets understood',
-            body: 'Machina reads the whole thing and turns it into a clean card — a summary, smart tags, and links to everything it connects to.',
+            body: 'Machina reads the whole thing and files a clean card — a summary, smart tags, and connections to everything related you’ve saved.',
             visual: <StructuredCardMock />,
         },
         {
             icon: <MessageCircleQuestion className="w-4 h-4" />,
             eyebrow: 'Recall',
             title: 'Ask your own knowledge',
-            body: 'Ask a question in plain words and get a real answer — drawn only from what you’ve saved, with citations back to the source.',
+            body: 'Ask in plain words and get a real answer — drawn only from what you’ve saved, with citations back to the exact source.',
             visual: <AskMock />,
+        },
+        {
+            icon: <Layers className="w-4 h-4" />,
+            eyebrow: 'Organize',
+            title: 'Collect what belongs together',
+            body: 'Group saves into collections for every project or theme — and put the personal ones behind a PIN, visible only to you.',
+            visual: <CollectionsMock />,
         },
         {
             icon: <Bell className="w-4 h-4" />,

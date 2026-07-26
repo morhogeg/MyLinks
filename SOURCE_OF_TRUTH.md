@@ -826,7 +826,13 @@ exact-match, capped.
   final tour slide — sparkle removed from the app-icon mock, title "Your
   Machina is ready" (drop "second brain" — also on LoginScreen), body recap
   now spans all four pillars (capture / understand / cited recall / resurface)
-  per platform (`OnboardingTour.tsx`, `LoginScreen.tsx`).
+  per platform (`OnboardingTour.tsx`, `LoginScreen.tsx`). **Round 3 (owner:
+  "redo the whole tour"):** tour is now a 6-step arc — new **Organize** slide
+  (CollectionsMock: two collection tiles, one PIN-locked "Private") between
+  Recall and Resurface; CaptureMock gains a Links/Images/Notes chip strip;
+  capture copy now names all three save types per platform; Understand/Recall
+  copy tightened. Mocks stay theme-token-only. Owner should QA the new slide
+  on device in light + dark.
 
 - **2026-07-26 — IDENTITY ROUND 17: THE JITTER WAS ARCHITECTURAL — PERSISTENT
   BOOT OVERLAY.** Rounds 15-16 patched animation symptoms; the real cause: at
