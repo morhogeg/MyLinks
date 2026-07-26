@@ -27,13 +27,18 @@ export function CitationGlyph({ className = '' }: { className?: string }) {
     );
 }
 
-/** The drawn MACHINA wordmark (stroke 42, tracking 240). */
+/** The drawn MACHINA wordmark (stroke 42, tracking 240). The hairline outline
+ *  (+6 units per edge) exists purely for tiny sizes: at the header's ~11px cap
+ *  height the baseline row of every letter otherwise antialiases away. At
+ *  larger sizes it adds an imperceptible ~0.1px of weight. */
 export function Wordmark({ className = '' }: { className?: string }) {
     return (
         <svg
             viewBox="0 -8 3455 438"
             className={className}
             fill="currentColor"
+            stroke="currentColor"
+            strokeWidth="12"
             role="img"
             aria-label="Machina"
         >
