@@ -821,7 +821,8 @@ exact-match, capped.
   glyph. All one-off tile colors (pink Reminders, slate PIN/tour/shields, teal
   export) collapsed into the token default; only "Turn off PIN" keeps
   destructive red. Files: `AddLinkForm.tsx`, `globals.css`,
-  `settings/{primitives,MainView,DataExport}.tsx`.
+  `settings/{primitives,MainView,DataExport}.tsx`. Feature `5ef4b8d`, merge
+  `3c7aee6` → Vercel; TestFlight run #206 → build 1206.
 
 - **2026-07-26 — IDENTITY ROUND 17: THE JITTER WAS ARCHITECTURAL — PERSISTENT
   BOOT OVERLAY.** Rounds 15-16 patched animation symptoms; the real cause: at
