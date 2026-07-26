@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import CitationMark, { type OrbState, type OrbSize } from './CitationMark';
+import CitationMark, { type MarkMotion, type OrbSize } from './CitationMark';
 
 /**
  * OrbStatus — a Thinking Orb and its status line, exchanged as ONE gesture.
@@ -49,7 +49,7 @@ const EASE_IN = 'cubic-bezier(0.4, 0, 1, 1)';
 const EASE_MODAL_FALLBACK = 'cubic-bezier(0.32, 0.72, 0, 1)';
 
 interface OrbStatusProps {
-    orb: OrbState;
+    orb: MarkMotion;
     label: string;
     /**
      * Identifies the current beat — a change here triggers the dip-and-exchange.
@@ -58,6 +58,10 @@ interface OrbStatusProps {
      */
     stageKey: string | number;
     size?: OrbSize;
+    /** Forwarded to CitationMark: one-shot arrival on mount. */
+    entry?: 'launch' | 'trace';
+    /** Forwarded to CitationMark: roomy viewBox so moving brackets don't clip. */
+    roam?: boolean;
     /** Classes for the static wrapper that holds the orb + label. */
     className?: string;
     labelClassName?: string;
@@ -70,6 +74,8 @@ export default function OrbStatus({
     label,
     stageKey,
     size = 20,
+    entry,
+    roam = false,
     className = 'inline-flex items-center gap-2.5',
     labelClassName = 'text-[13px] text-text-muted',
 }: OrbStatusProps) {
@@ -121,7 +127,7 @@ export default function OrbStatus({
             {/* Only this span is animated. The label is a sibling, so it never
                 joins a composited layer — see the stale-glyph note above. */}
             <span ref={ref} className="inline-flex shrink-0">
-                <CitationMark state={shown.orb} size={size} />
+                <CitationMark state={shown.orb} size={size} entry={entry} roam={roam} />
             </span>
             {/* Keyed so React replaces the element instead of mutating a text
                 node, forcing a clean paint of the whole line. */}

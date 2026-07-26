@@ -32,6 +32,10 @@ import { useEffect, useRef } from 'react';
  */
 
 export type OrbState = 'listening' | 'working' | 'searching' | 'solving' | 'shaping';
+/** A motion the mark can run: a scanPhases verb, or the full CLAMP cycle
+ *  (search → lock-on → answer → release) — the identity prototype's chat loop,
+ *  used by Ask's thinking row. */
+export type MarkMotion = OrbState | 'clamp';
 export type OrbSize = number;
 
 /* ── Geometry — nonletter.py:citation() ─────────────────────────────────── */
@@ -130,14 +134,23 @@ function holdAt(t: number): MarkFrame { // shaping
 }
 
 /* Drop-in for scanPhases' orb-state strings, so callers keep passing a verb. */
-const VERB_MOTION: Record<OrbState, (t: number) => MarkFrame> = {
+const VERB_MOTION: Record<MarkMotion, (t: number) => MarkFrame> = {
     listening: restAt, working: pulseAt, searching: sweepAt,
-    solving: stepAt, shaping: holdAt,
+    solving: stepAt, shaping: holdAt, clamp: clampAt,
 };
 
 const LOCKED = restAt();
-const CYCLE = 3600;   // ms per loop — the identity prototype's cadence
-const ENTRY_MS = 1300; // launch assembly length (machina-identity.html ASSEMBLE)
+const CYCLE = 3600;        // ms per loop — the identity prototype's cadence
+const LAUNCH_MS = 1300;    // launch assembly length (identity ASSEMBLE)
+const TRACE_MS = 950;      // trace entry length (identity ENTRY_MS)
+
+/* The tight viewBox fits the RESTING mark exactly — right for static and
+   near-static slots (≤20px, hero, chips), where the ink must fill the slot.
+   The ROAM viewBox is the full artboard width: motions swing the brackets up
+   to ~90 units past rest, and against the tight box they clip at the edge —
+   the resting ink sits smaller in its slot (the prototype's own proportion,
+   ~18px ink in the 42px chat slot) and buys the motion its travel. */
+const VIEWBOX_ROAM = '0 292 1024 416';
 
 const bracketPaths = (spread: number): [string, string] => {
     const lx = LX - spread, rx = RX + spread;
@@ -150,15 +163,19 @@ const bracketPaths = (spread: number): [string, string] => {
 };
 
 interface CitationMarkProps {
-    /** Which verb's motion. @default 'working' */
-    state?: OrbState;
-    /** CSS px of the slot (the mark fills it — tight viewBox). @default 64 */
+    /** Which motion. @default 'working' */
+    state?: MarkMotion;
+    /** CSS px of the slot (width). @default 64 */
     size?: OrbSize;
     /** Speed multiplier on the loop. @default 1 */
     speed?: number;
-    /** Play the arrival once on mount, then hand to the verb's motion.
-     *  Reserved for Ask opening — never looped. */
-    entry?: boolean;
+    /** Play an arrival once on mount, then hand to `state`'s motion — never
+     *  looped. 'launch' resolves to the locked mark (the Ask hero);
+     *  'trace' ends on clamp(0) so the clamp loop picks it up seamlessly
+     *  (the thinking row). `true` = 'launch' (back-compat). */
+    entry?: boolean | 'launch' | 'trace';
+    /** Use the roomy artboard viewBox so moving brackets never clip. */
+    roam?: boolean;
     /** Soft brand glow behind the ink — hero sizes only. */
     glow?: boolean;
     className?: string;
@@ -168,9 +185,10 @@ interface CitationMarkProps {
 let uid = 0;
 
 export default function CitationMark({
-    state = 'working', size = 64, speed = 1, entry = false, glow = false,
+    state = 'working', size = 64, speed = 1, entry = false, roam = false, glow = false,
     className = '', ...rest
 }: CitationMarkProps) {
+    const entryMode: 'launch' | 'trace' | null = entry === true ? 'launch' : entry || null;
     const idRef = useRef<string | null>(null);
     if (idRef.current === null) idRef.current = `cm${uid++}`;
     const id = idRef.current;
@@ -210,17 +228,22 @@ export default function CitationMark({
             return;
         }
 
-        const entryStart = entry ? performance.now() : 0;
+        const entryDur = entryMode === 'trace' ? TRACE_MS : LAUNCH_MS;
+        const entryFn = entryMode === 'trace' ? traceEntry : launchAt;
+        const entryStart = entryMode ? performance.now() : 0;
         let loopStart = performance.now();
 
         const frameAt = (now: number): MarkFrame | null => {
-            if (entry) {
+            if (entryMode) {
                 const el = now - entryStart;
-                if (el < ENTRY_MS) return launchAt(el / ENTRY_MS);
+                if (el < entryDur) return entryFn(el / entryDur);
             }
             const verb = stateRef.current;
             if (verb === 'listening') return restAt();
-            return VERB_MOTION[verb](((now - loopStart) * speed % CYCLE) / CYCLE);
+            // With an entry, the loop's t=0 is the entry's END — trace ends
+            // exactly on clamp(0), so the handoff is seamless.
+            const base = entryMode ? entryStart + entryDur : loopStart;
+            return VERB_MOTION[verb](((now - base) * speed % CYCLE) / CYCLE);
         };
 
         let rafId = 0;
@@ -230,7 +253,7 @@ export default function CitationMark({
             paint(frameAt(now) ?? LOCKED);
             // Idle + entry finished → nothing left to animate; park the loop
             // (a static screen must not burn frames).
-            if (stateRef.current === 'listening' && (!entry || now - entryStart >= ENTRY_MS)) {
+            if (stateRef.current === 'listening' && (!entryMode || now - entryStart >= entryDur)) {
                 running = false;
                 return;
             }
@@ -248,7 +271,7 @@ export default function CitationMark({
         paint(frameAt(performance.now()) ?? LOCKED);
         // `listening` with no entry never animates — one painted frame is the
         // whole job. Everything else runs the loop while visible.
-        const isStatic = stateRef.current === 'listening' && !entry;
+        const isStatic = stateRef.current === 'listening' && !entryMode;
 
         const io = !isStatic && typeof IntersectionObserver !== 'undefined'
             ? new IntersectionObserver(([e]) => {
@@ -271,18 +294,19 @@ export default function CitationMark({
         // between static-listening and a working verb needs the loop's gating
         // recomputed, so re-run when the *kind* changes.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id, size, speed, entry, state === 'listening']);
+    }, [id, size, speed, entryMode, state === 'listening']);
 
     const [l0, r0] = bracketPaths(LOCKED.spread);
+    const h = Math.round(size * 416 / (roam ? 1024 : 448));
     return (
         <svg
             ref={svgRef}
-            viewBox={VIEWBOX}
+            viewBox={roam ? VIEWBOX_ROAM : VIEWBOX}
             width={size}
-            height={Math.round(size * 416 / 448)}
+            height={h}
             style={{
                 width: size,
-                height: Math.round(size * 416 / 448),
+                height: h,
                 filter: glow ? `drop-shadow(0 0 ${Math.round(size * 0.22)}px var(--accent-ring))` : undefined,
             }}
             className={`shrink-0 ${className}`}
