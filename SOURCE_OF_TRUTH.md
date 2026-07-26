@@ -812,6 +812,20 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — IDENTITY ROUND 4: ICON PRESENCE (owner: mark too small next
+  to neighbor icons).** The home-screen icon's ink covered 42% of the tile
+  width vs ~50-60% for X/Claude/Gemini/Slack. Owner asked about "opening up
+  the brackets"; rendered comparison showed opening them loosens the grip on
+  the point without reading bigger, so the WHOLE mark is scaled ×1.16 inside
+  the tile instead (ink → 49%) — a composition change confined to the icon
+  asset. `design/icon-concepts/cit_lumen_icon.svg` is the shipped icon
+  composition; `cit_lumen.svg` stays the 1× reference; the in-app mark is
+  untouched. Splash tile art re-framed to match, `app-icon.png` regenerated at
+  512 (boot tile) with the new framing. 29pt + notification sizes re-checked.
+  Feature `bbccbd0`, merge `ca033d2` → Vercel; TestFlight run/build stamped
+  below. Note: runs #190 (round 2, build 1190) and #191 (round 3 boot-screen
+  wordmark, build 1191) both completed green earlier this session.
+
 - **2026-07-26 — IDENTITY ROUND 3: THE NAME AT LAUNCH.** Owner: *"where is the
   Machina name at launch?? I loved it so much!"* It only lived on the native
   splash image, which lasts <1s — the launch surface you actually watch is the
