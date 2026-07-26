@@ -812,6 +812,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — IDENTITY ROUND 14: LIGHT-BREATHE WAIT, DEEPER GROUND, BASELINE
+  FIX.** (1) The waiting "shake" (owner) was the dot's scale-breathe animating
+  UNDER the mark's drop-shadow filter — WebKit re-rasterized the glow every
+  frame. The ink now rests after the strike; a soft halo BEHIND the mark
+  breathes in opacity instead (sibling of the filtered element — cannot
+  jitter). (2) Launch ground a full step darker: radial #131319→#050507
+  (splash PNGs + storyboard follow). (3) The header wordmark's bottom-row
+  clipping returned at the smaller size (fractional svg height at 84px width):
+  sized by INTEGER HEIGHT now (h-[11px]/[13px] w-auto) + a hairline stroke
+  bump on the drawn paths (strokeWidth 12, ~0.1px/edge) so the baseline row
+  keeps pixel coverage at tiny sizes. Feature `39cd424`, merge `7353d13` →
+  Vercel; TestFlight run #202 → build 1202 (supersedes 1201).
+
 - **2026-07-26 — IDENTITY ROUND 13: THE STAGED ARRIVAL (owner: boot still
   underwhelming — "make it amazing", keep the letterspaced look).** The §04
   prototype's arrival choreography now runs in PURE CSS (fill-mode `both` →
