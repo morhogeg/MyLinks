@@ -812,7 +812,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-26 (latest) — MACHINA IDENTITY BUILT: CITATION MARK, LUMEN PALETTE,
+- **2026-07-26 — IDENTITY ROUND 2 (owner device QA on build 1189).** Three
+  fixes, feature `91e9bc4`, merge `81f9db2` → Vercel (auto);
+  TestFlight run #190 → build 1190. (1) **Header lockup was oversized** — glyph+wordmark reduced
+  to the previous brand's footprint (glyph w-5/sm:w-6, wordmark 104/122px),
+  keeping the mock's 32:168 ratio. (2) **Ask beats looked static** — the owner
+  could only see the entry + STEP. Root cause: the beats ran at OrbStatus's
+  default 20px, where SWEEP's ±11-unit and HOLD's ±3.2-unit amplitudes (of a
+  448-unit viewBox) are sub-pixel. The thinking row now runs at **42px with
+  15px status text — the identity prototype's own .think size** — where every
+  verb motion resolves. The phrase-exchange rule is unchanged (and was never
+  broken): only the mark dips, the label swaps outright, per OrbStatus's
+  header comment. LinkScanProgress/AnalyzingBanner stay 20px — their active
+  step/label carries the change there. (3) **Collections still purple** — the
+  `purple` slot in `lib/colors.ts` (collection washes/glyphs, category badges,
+  and the name-hash fallback — the exact old brand #A855F7) is now graphite
+  (slate 100,116,139); the key name stays `purple` because collections persist
+  it in Firestore. Launch-screen pulse kept — owner approved it as-is.
+
+- **2026-07-26 — MACHINA IDENTITY BUILT: CITATION MARK, LUMEN PALETTE,
   ACHROMATIC SWEEP (§4 item 20b).** Feature `1f713c2`, merge `cccaff4` → Vercel
   (auto); TestFlight run #189 → build 1189. First implementation of the identity
   designed on `claude/logo-design-feedback-uhl1sk` (mockups in
