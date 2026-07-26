@@ -40,7 +40,12 @@ function pickBanner(...states: (AnalyzingState | null)[]): AnalyzingState | null
  * frame dissolves into the app (CSS keyframes, reduced-motion collapses it).
  * Sizes follow the prototype's phone mock: mark ~43% width, wordmark 4.5%.
  */
-function BootScreen({ exiting = false }: { exiting?: boolean }) {
+function BootScreen({ exiting = false, settled = false }: { exiting?: boolean; settled?: boolean }) {
+  // The success overlay mounts one frame BEFORE the exit class lands. A fresh
+  // mount restarts every entrance animation from its from{} state (brackets
+  // flung out, dot gone) — one visible glitch frame right before the jump.
+  // `settled` renders the finished frame with no entrances at all.
+  const quiet = exiting || settled;
   return (
     <div
       className={`min-h-screen flex items-center justify-center ${exiting ? 'animate-boot-exit' : ''}`}
@@ -67,22 +72,27 @@ function BootScreen({ exiting = false }: { exiting?: boolean }) {
               drop-shadow filter animates — a scaling child there forces WebKit
               to re-rasterize the glow every frame, which read as shaking on
               device. Opacity on a sibling can't jitter. */}
-          <span className={`absolute -inset-[45%] rounded-full ${exiting ? '' : 'animate-boot-halo'}`}
+          <span className={`absolute -inset-[45%] rounded-full ${quiet ? '' : 'animate-boot-halo'}`}
             style={{ background: 'radial-gradient(closest-side, rgba(174,184,206,0.20), rgba(174,184,206,0) 72%)' }}
           />
-          {/* On exit the glow LIFTS OFF the mark: scaling an element that
-              carries a drop-shadow filter re-rasterizes the glow every frame
-              (the residual shake). The bare mark push-through is a plain
-              composited transform — silky. */}
-          <span
-            className={`relative w-[min(30vw,117px)] text-white ${exiting ? 'animate-boot-exit-mark' : 'animate-boot-glow'}`}
-            style={{ filter: exiting ? undefined : 'drop-shadow(0 0 18px rgba(174,184,206,0.34))' }}
-          >
-            <svg viewBox="288 292 448 416" className="w-full h-auto" fill="currentColor">
-              <path className={exiting ? undefined : 'animate-boot-bkt-l'} d="M296 300 L396 300 L396 358 L354 358 L354 642 L396 642 L396 700 L296 700 Z" />
-              <path className={exiting ? undefined : 'animate-boot-bkt-r'} d="M728 300 L628 300 L628 358 L670 358 L670 642 L628 642 L628 700 L728 700 Z" />
-              <circle className={`boot-dot ${exiting ? '' : 'animate-boot-dot'}`} cx="512" cy="500" r="52" />
-            </svg>
+          {/* The push-through zooms THIS wrapper, not the filtered span inside
+              it: WebKit rasterizes the glowing mark once into the wrapper's
+              composited layer and scales the texture, so the glow rides the
+              zoom without a single re-raster (the slight soften at high scale
+              reads as motion blur). Scaling the filtered element itself
+              re-rasterized the glow per frame — the shake; removing the filter
+              at exit made the glow pop off — the flicker. */}
+          <span className={`relative inline-flex ${exiting ? 'animate-boot-exit-mark' : ''}`}>
+            <span
+              className={`relative w-[min(30vw,117px)] text-white ${quiet ? '' : 'animate-boot-glow'}`}
+              style={{ filter: 'drop-shadow(0 0 18px rgba(174,184,206,0.34))' }}
+            >
+              <svg viewBox="288 292 448 416" className="w-full h-auto" fill="currentColor">
+                <path className={quiet ? undefined : 'animate-boot-bkt-l'} d="M296 300 L396 300 L396 358 L354 358 L354 642 L396 642 L396 700 L296 700 Z" />
+                <path className={quiet ? undefined : 'animate-boot-bkt-r'} d="M728 300 L628 300 L628 358 L670 358 L670 642 L628 642 L628 700 L728 700 Z" />
+                <circle className={`boot-dot ${quiet ? '' : 'animate-boot-dot'}`} cx="512" cy="500" r="52" />
+              </svg>
+            </span>
           </span>
         </span>
         {/* The launch wordmark stays the letterspaced setting (settled):
@@ -96,7 +106,7 @@ function BootScreen({ exiting = false }: { exiting?: boolean }) {
             during the success beat. */}
         <span
           aria-hidden
-          className={`mt-[min(10.7vw,42px)] uppercase tracking-[0.46em] indent-[0.46em] text-[min(4.5vw,17px)] ${exiting ? '' : 'animate-boot-word'}`}
+          className={`mt-[min(10.7vw,42px)] uppercase tracking-[0.46em] indent-[0.46em] text-[min(4.5vw,17px)] ${quiet ? '' : 'animate-boot-word'}`}
           style={{ color: '#E6E6F0', fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace' }}
         >
           Machina
@@ -336,7 +346,7 @@ export default function Home() {
           (pointer-events-none) so nothing is blocked during the beat. */}
       {bootPhase !== 'done' && (
         <div className="fixed inset-0 z-[100] pointer-events-none overflow-hidden">
-          <BootScreen exiting={bootPhase === 'exit'} />
+          <BootScreen settled exiting={bootPhase === 'exit'} />
         </div>
       )}
     </div>
