@@ -812,6 +812,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — IDENTITY ROUND 3: THE NAME AT LAUNCH.** Owner: *"where is the
+  Machina name at launch?? I loved it so much!"* It only lived on the native
+  splash image, which lasts <1s — the launch surface you actually watch is the
+  boot screen (auth-resolving state in `app/page.tsx`), which was icon-only.
+  The boot screen now mirrors the splash: tile at 29% of screen width +
+  letterspaced MACHINA below (font-mono, tracking .46em, matching indent),
+  same proportions, pulse stays the only motion. Still 100% CSS/static markup
+  (the §9 pre-hydration rule holds). `app-icon.png` bumped 128→512 so the
+  bigger tile stays crisp at 3x. Feature `aee46f3`, merge `e0440a1` → Vercel;
+  TestFlight run #191 → build 1191 (supersedes 1190, which was still building).
+
 - **2026-07-26 — IDENTITY ROUND 2 (owner device QA on build 1189).** Three
   fixes, feature `91e9bc4`, merge `81f9db2` → Vercel (auto);
   TestFlight run #190 → build 1190. (1) **Header lockup was oversized** — glyph+wordmark reduced
