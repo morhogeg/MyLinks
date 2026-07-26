@@ -108,18 +108,28 @@ export default function Home() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        {/* The pulsing icon carries this screen on its own — deliberately no
-            orb and no ring. An orb here was tried and removed: the iOS build is
-            a static export, so a canvas can't paint until React hydrates, which
+        {/* The pulsing icon + letterspaced MACHINA carry this screen — no orb,
+            no canvas. An orb here was tried and removed: the iOS build is a
+            static export, so a canvas can't paint until React hydrates, which
             left it blank for the first part of the very window it was meant to
-            fill and then popped in. It also costs the orb its meaning — an orb
-            signals Machina doing intelligent work (searching, relating,
-            writing), and booting isn't that. The pulse is CSS, so it's alive on
-            the first painted frame. */}
+            fill and then popped in. Everything here is CSS/static markup, alive
+            on the first painted frame. The layout mirrors the native splash
+            (tile at 29% of screen width, wordmark below at the same
+            proportions), so splash → boot reads as one continuous frame with
+            the pulse as the only motion. */}
         <div className="flex flex-col items-center">
-          <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg shadow-accent/20 animate-pulse ring-1 ring-white/15">
-            <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
+          <div className="w-[min(29vw,113px)] aspect-square rounded-[22%] overflow-hidden shadow-lg shadow-accent/20 animate-pulse ring-1 ring-white/15">
+            <img src="/app-icon.png" alt="" className="w-full h-full object-cover" />
           </div>
+          {/* The launch wordmark stays the letterspaced setting (settled):
+              mono, tracking .46em, with a matching text-indent so the run of
+              letterspace after the final A doesn't off-centre it. */}
+          <span
+            aria-hidden
+            className="mt-[min(10.7vw,42px)] font-mono uppercase text-text tracking-[0.46em] indent-[0.46em] text-[min(4.5vw,17px)] font-medium"
+          >
+            Machina
+          </span>
           <span className="sr-only" role="status">Starting Machina…</span>
         </div>
       </div>
