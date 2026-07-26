@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Link, Plus, X, Upload, Loader2 } from 'lucide-react';
+import { Link, Plus, X, Upload, Loader2, Image as ImageIcon, StickyNote } from 'lucide-react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { saveLink, getUserTags, findLinkIdByUrl, createProcessingPlaceholder, markLinkFailed, createNoteCard, enrichNoteCard } from '@/lib/storage';
 import { appCheckHeaders, db } from '@/lib/firebase';
@@ -684,7 +684,11 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
 
                         <div className="mb-6">
                             <h3 className="text-xl font-bold text-text mb-1 flex items-center gap-2">
-                                <Link className="w-5 h-5 text-accent" />
+                                {activeTab === 'image'
+                                    ? <ImageIcon className="w-5 h-5 text-accent" />
+                                    : activeTab === 'note'
+                                        ? <StickyNote className="w-5 h-5 text-accent" />
+                                        : <Link className="w-5 h-5 text-accent" />}
                                 Add to Machina
                             </h3>
                             <p className="text-sm text-text-secondary">

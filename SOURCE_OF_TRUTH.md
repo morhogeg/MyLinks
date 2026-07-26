@@ -812,6 +812,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — ADD-SHEET ICON + SETTINGS TILE TOKENS.** Owner design pass from
+  device screenshots. (1) The Add-to-Machina header glyph now follows the active
+  tab (Link chain / ImageIcon / StickyNote — the app's canonical card glyphs).
+  (2) New theme tokens `--tile`/`--tile-ink` (`bg-tile text-tile-ink`) for the
+  settings icon tiles: light keeps the graphite-accent look, dark switches from
+  the glaring porcelain `--accent` to a quiet graphite (#3A3A44) with a light
+  glyph. All one-off tile colors (pink Reminders, slate PIN/tour/shields, teal
+  export) collapsed into the token default; only "Turn off PIN" keeps
+  destructive red. Files: `AddLinkForm.tsx`, `globals.css`,
+  `settings/{primitives,MainView,DataExport}.tsx`.
+
 - **2026-07-26 — IDENTITY ROUND 17: THE JITTER WAS ARCHITECTURAL — PERSISTENT
   BOOT OVERLAY.** Rounds 15-16 patched animation symptoms; the real cause: at
   auth-resolve the boot early-return UNMOUNTED, a copy REMOUNTED as an
