@@ -66,10 +66,14 @@ function BootScreen({ exiting = false }: { exiting?: boolean }) {
             ui-monospace — SF Mono on device, the face the prototype rendered
             in — at the mock's delicate normal weight, tracking .46em, with a
             matching text-indent so the run of letterspace after the final A
-            doesn't off-centre it. No glow on the type. */}
+            doesn't off-centre it. No glow on the type. Per the §04 sequence,
+            the name ARRIVES: the native splash shows the icon alone, and
+            MACHINA fades in here (CSS animation — alive pre-hydration). The
+            exiting overlay skips the entrance so the name doesn't re-fade
+            during the success beat. */}
         <span
           aria-hidden
-          className="mt-[min(10.7vw,42px)] uppercase tracking-[0.46em] indent-[0.46em] text-[min(4.5vw,17px)]"
+          className={`mt-[min(10.7vw,42px)] uppercase tracking-[0.46em] indent-[0.46em] text-[min(4.5vw,17px)] ${exiting ? '' : 'animate-boot-word'}`}
           style={{ color: '#E6E6F0', fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace' }}
         >
           Machina
@@ -213,7 +217,7 @@ export default function Home() {
             {/* Sized to the previous lockup's footprint (text-lg/text-xl type),
                 keeping the mock's glyph:wordmark ratio (32:168). */}
             <CitationGlyph className="w-5 sm:w-6 h-auto shrink-0" />
-            <Wordmark className="w-[104px] sm:w-[122px] h-auto" />
+            <Wordmark className="w-[94px] sm:w-[110px] h-auto" />
           </h1>
 
           {/* Controls — one cohesive cluster */}
