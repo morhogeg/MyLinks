@@ -812,6 +812,20 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — IDENTITY ROUND 13: THE STAGED ARRIVAL (owner: boot still
+  underwhelming — "make it amazing", keep the letterspaced look).** The §04
+  prototype's arrival choreography now runs in PURE CSS (fill-mode `both` →
+  alive from the first painted frame, the pre-hydration rule intact): splash
+  tile → ground → brackets slide in and settle (`--ease-modal`) → the point
+  STRIKES with a spring pop (`--ease-spring`) as the glow blooms → MACHINA
+  fades in while its letterspacing breathes open (.30em→.46em) → the point
+  holds a slow 3.4s breath while waiting → success exit (unchanged; exiting
+  overlay pins final states so nothing re-plays). The whole-mark opacity
+  pulse is retired. Reduced motion collapses every stage to the settled
+  frame. Header lockup trimmed again (glyph 18/20px, wordmark 84/98px).
+  Feature `d2dd91d`, merge `45d32e4` → Vercel; TestFlight run #201 → build
+  1201 (supersedes 1200).
+
 - **2026-07-26 — IDENTITY ROUND 12: THE NAME ARRIVES + SMALLER HEADER
   WORDMARK.** Owner: the mockup showed the icon first, then MACHINA appearing
   letterspaced. Now faithful to the §04 sequence: the static native splash is
