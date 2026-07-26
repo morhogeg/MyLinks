@@ -5,16 +5,16 @@ import {
     X,
     ArrowRight,
     ArrowLeft,
+    ArrowUp,
     Plus,
     Share,
     Puzzle,
-    Sparkles,
-    Wand2,
     Link2,
     MessageCircleQuestion,
-    Quote,
     Bell,
     CalendarClock,
+    Clock,
+    ExternalLink,
     FileText,
     Mail,
     MessageCircle,
@@ -25,6 +25,7 @@ import {
     Image as ImageIcon,
     StickyNote,
 } from 'lucide-react';
+import { CitationGlyph } from './ui/Wordmark';
 import { isNativeApp } from '@/lib/api';
 import { hapticSelection, hapticLight } from '@/lib/haptics';
 import { useVisualViewport } from '@/lib/useVisualViewport';
@@ -103,7 +104,7 @@ function CaptureMock({ native }: { native: boolean }) {
                 {/* Machina — the highlighted, "chosen" target. */}
                 <div className="flex flex-col items-center gap-1.5 w-14 shrink-0">
                     <div className="relative w-11 h-11 rounded-[14px] bg-[image:var(--accent-gradient)] flex items-center justify-center ring-2 ring-accent shadow-lg shadow-accent/25">
-                        <Sparkles className="w-5 h-5 text-accent-ink" />
+                        <CitationGlyph className="w-5 h-5 text-accent-ink" />
                         <span className="absolute -top-1 -end-1 w-3.5 h-3.5 rounded-full bg-accent ring-2 ring-card" />
                     </div>
                     <span className="text-[9px] font-bold text-accent truncate w-full text-center">Machina</span>
@@ -130,68 +131,84 @@ function CaptureMock({ native }: { native: boolean }) {
     );
 }
 
-/** A structured card: thumbnail, AI summary, auto tags, and connections. */
+/** A miniature of the REAL feed card — same anatomy as Card.tsx (category chip
+    + source byline chrome row, bold title, summary, uppercase tag chips, read
+    time), so the tour shows the product, not a generic mock-up. */
 function StructuredCardMock() {
     return (
-        <div className="w-full rounded-2xl bg-card border border-border-subtle shadow-xl overflow-hidden" aria-hidden>
-            {/* Thumbnail band */}
-            <div className="h-16 bg-[image:var(--accent-gradient)] opacity-90 flex items-center justify-center">
-                <FileText className="w-6 h-6 text-accent-ink/90" />
+        <div className="w-full rounded-[20px] bg-card border border-border-subtle shadow-xl overflow-hidden" aria-hidden>
+            {/* Thumbnail band — like a real card's image, with its bottom scrim */}
+            <div className="relative h-16 bg-[image:var(--accent-gradient)] opacity-90">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
             </div>
-            <div className="p-3.5">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-accent/12 text-accent text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 ring-1 ring-accent/20">
-                        <Wand2 className="w-2.5 h-2.5" /> AI summary
+            <div className="p-3.5 space-y-2">
+                {/* Chrome row: category (start) + source (end), as on every card */}
+                <div className="flex items-center justify-between gap-2">
+                    <span className="text-[9px] uppercase font-black tracking-widest px-1.5 py-0.5 rounded-lg bg-accent/12 text-accent">
+                        Productivity
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[10px] text-text-muted/70 min-w-0">
+                        <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                        <span className="truncate">nature.com</span>
                     </span>
                 </div>
-                <p className="text-[12.5px] font-bold text-text leading-snug">The science of deep focus</p>
-                <p className="mt-1 text-[11px] text-text-secondary leading-relaxed">
+                <p className="text-[13px] font-bold text-text leading-tight">The science of deep focus</p>
+                <p className="text-[11px] text-text-secondary leading-relaxed">
                     Sustained attention is a trainable skill — short, undistracted blocks beat long fractured ones.
                 </p>
-                {/* Auto tags */}
-                <div className="flex flex-wrap gap-1.5 mt-2.5">
+                {/* Auto tags — the card's real chip style */}
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
                     {['focus', 'productivity', 'neuroscience'].map((t) => (
-                        <span key={t} className="rounded-full bg-fill-subtle text-text-secondary text-[10px] font-medium px-2 py-0.5">
-                            #{t}
+                        <span key={t} className="text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-fill-subtle text-text-muted/60">
+                            {t}
                         </span>
                     ))}
                 </div>
-                {/* Connections */}
-                <div className="flex items-center gap-1.5 mt-2.5 pt-2.5 border-t border-border-subtle text-text-muted">
-                    <Link2 className="w-3.5 h-3.5 text-accent" />
-                    <span className="text-[10.5px] font-medium">Linked to 3 related saves</span>
+                {/* Footer: read time + connections */}
+                <div className="flex items-center justify-between pt-2 border-t border-border-subtle">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-text-muted/60">
+                        <Clock className="w-3 h-3" /> 4m
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-accent">
+                        <Link2 className="w-3 h-3" /> 3 related saves
+                    </span>
                 </div>
             </div>
         </div>
     );
 }
 
-/** A mini "Ask your knowledge" exchange with a cited answer. */
+/** A miniature of the REAL Ask screen — the exact vocabulary of AskBrain.tsx:
+    accent question pill (rounded-br-md), the answer as plain text on the page
+    (no bubble — like the real one), the bracket-glyph source chip, and the
+    composer pill. */
 function AskMock() {
     return (
-        <div className="w-full flex flex-col gap-2.5" aria-hidden>
-            {/* Question */}
-            <div className="self-end max-w-[80%] rounded-2xl rounded-ee-md bg-accent text-accent-ink px-3.5 py-2 shadow-sm shadow-accent/20">
-                <p className="text-[12px] font-medium leading-snug">What have I saved about staying focused?</p>
+        <div className="w-full flex flex-col gap-3" aria-hidden>
+            {/* Question — the real user pill */}
+            <div className="self-end max-w-[80%] px-3.5 py-2 rounded-2xl rounded-br-md bg-accent text-accent-ink">
+                <p className="text-[12px] leading-relaxed">What have I saved about staying focused?</p>
             </div>
-            {/* Answer */}
-            <div className="self-start max-w-[92%] rounded-2xl rounded-ss-md bg-card border border-border-subtle px-3.5 py-2.5 shadow-md">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                    <div className="w-5 h-5 rounded-lg bg-accent/12 text-accent flex items-center justify-center ring-1 ring-accent/20">
-                        <Sparkles className="w-3 h-3" />
-                    </div>
-                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-wide">Answer</span>
-                </div>
-                <p className="text-[11.5px] text-text-secondary leading-relaxed">
-                    Your saves point to one habit: protect short, single-task blocks and remove ambient distractions.
-                </p>
-                {/* Citation */}
-                <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-fill-subtle px-2 py-1">
-                    <Quote className="w-3 h-3 text-accent shrink-0" />
-                    <span className="text-[10px] font-semibold text-text-secondary truncate">
-                        The science of deep focus
-                    </span>
-                </div>
+            {/* Answer — plain text on the page, exactly like the real Ask */}
+            <p className="px-1 text-[12.5px] text-text leading-relaxed">
+                Your saves point to one habit: protect short, single-task blocks and remove ambient distractions.
+            </p>
+            {/* Citation — the real source chip: bracket-glyph tile, source, title */}
+            <div className="self-start flex items-center gap-2.5 max-w-full ps-2.5 pe-3.5 py-2 rounded-xl bg-card border border-border-subtle shadow-sm">
+                <span className="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-lg bg-accent/10 text-accent">
+                    <CitationGlyph className="w-3.5 h-auto" />
+                </span>
+                <span className="min-w-0 flex flex-col">
+                    <span className="text-[9px] font-semibold tracking-wide text-text-muted">nature.com</span>
+                    <span className="text-[11.5px] font-medium text-text leading-snug truncate">The science of deep focus</span>
+                </span>
+            </div>
+            {/* Composer — grounds the scene as the real Ask screen */}
+            <div className="flex items-center gap-2 p-2 mt-1 rounded-2xl bg-card border border-border-subtle shadow-sm">
+                <span className="flex-1 px-2 text-[11.5px] text-text-muted truncate">Ask about anything you’ve saved…</span>
+                <span className="shrink-0 w-7 h-7 rounded-full bg-accent text-accent-ink flex items-center justify-center">
+                    <ArrowUp className="w-3.5 h-3.5" />
+                </span>
             </div>
         </div>
     );
@@ -235,7 +252,7 @@ function ResurfaceMock() {
             <div className="flex flex-col gap-2">
                 {[
                     { icon: <CalendarClock className="w-3.5 h-3.5" />, title: '3 threads came together', sub: 'Focus · habits · attention' },
-                    { icon: <Sparkles className="w-3.5 h-3.5" />, title: 'A new connection surfaced', sub: 'Deep work ↔ sleep quality' },
+                    { icon: <CitationGlyph className="w-3.5 h-auto" />, title: 'A new connection surfaced', sub: 'Deep work ↔ sleep quality' },
                 ].map((r) => (
                     <div key={r.title} className="flex items-center gap-2.5 rounded-xl bg-fill-subtle px-2.5 py-2">
                         <div className="w-7 h-7 rounded-lg bg-accent/12 text-accent flex items-center justify-center shrink-0 ring-1 ring-accent/20">
@@ -281,7 +298,7 @@ function buildSteps(native: boolean): Step[] {
             visual: <CaptureMock native={native} />,
         },
         {
-            icon: <Wand2 className="w-4 h-4" />,
+            icon: <CitationGlyph className="w-4 h-auto" />,
             eyebrow: 'Understand',
             title: 'Every save gets understood',
             body: 'Machina reads the whole thing and files a clean card — a summary, smart tags, and connections to everything related you’ve saved.',
@@ -309,7 +326,7 @@ function buildSteps(native: boolean): Step[] {
             visual: <ResurfaceMock />,
         },
         {
-            icon: <Sparkles className="w-4 h-4" />,
+            icon: <CitationGlyph className="w-4 h-auto" />,
             eyebrow: 'You’re set',
             title: 'Your Machina is ready',
             body: native
