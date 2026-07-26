@@ -98,7 +98,7 @@ export default function LoginScreen({
                 ) : (
                     <>
                         <p className="mt-8 text-sm text-text-secondary">
-                            Sign in to access your second brain.
+                            Sign in to access your Machina.
                         </p>
                         {showApple && (
                             <button
