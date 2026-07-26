@@ -7,7 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { getDominantDirection } from '@/lib/rtl';
-import { getPlatform, platformColor, PLATFORM_LABELS, xHandle, linkedinDisplayName } from '@/lib/platform';
+import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS, xHandle, linkedinDisplayName } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl, isNativeApp, fetchWithTimeout } from '@/lib/api';
@@ -232,20 +232,21 @@ function ThinkingIndicator({ origin }: { origin: AskOrigin }) {
                 {/* The identity prototype's chat loop, exactly: the TRACE entry
                     (the reticle assembling) hands off seamlessly into the CLAMP
                     cycle — search → lock-on → answer → release — running
-                    CONTINUOUSLY while the phrases keep their own beats. The
-                    42px slot is the prototype's; `roam` gives the brackets
-                    their travel (the tight viewBox clipped every spread and
-                    left the resting ink oversized in the slot). The
-                    phrase-exchange choreography is OrbStatus's: only the mark
-                    dips; the label is replaced outright, never animated. */}
+                    CONTINUOUSLY while the phrases keep their own beats. `roam`
+                    gives the brackets their travel (the tight viewBox clipped
+                    every spread); the roam envelope is trimmed to the motion,
+                    so the 26px slot holds ~19px of resting ink right beside
+                    the phrase — no dead margin. The phrase-exchange
+                    choreography is OrbStatus's: only the mark dips; the label
+                    is replaced outright, never animated. */}
                 <OrbStatus
                     orb="clamp"
                     label={stages[stage].phrase}
                     stageKey={stage}
-                    size={42}
+                    size={26}
                     entry="trace"
                     roam
-                    className="inline-flex items-center gap-[13px]"
+                    className="inline-flex items-center gap-2.5"
                     labelClassName="text-[15px] text-text-muted"
                 />
             </div>
@@ -1252,11 +1253,19 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                                         const tag = sourceTag(s);
                                                         return (
                                                             <>
-                                                                {/* The bracket glyph marks every cited source — the
-                                                                    thing that was searching is visibly the thing that
-                                                                    found this (ask_in_situ_answer.png). */}
-                                                                <span className="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-lg bg-accent/10 text-accent group-hover:bg-accent/15 transition-colors">
-                                                                    <CitationGlyph className="w-3.5 h-auto" />
+                                                                {/* Platform sources keep their OWN icon (YouTube,
+                                                                    X, LinkedIn, Instagram, Facebook — owner call:
+                                                                    those must be recognisable at a glance). The
+                                                                    bracket glyph marks everything else — the thing
+                                                                    that was searching is the thing that found this
+                                                                    (ask_in_situ_answer.png). */}
+                                                                <span
+                                                                    className="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-lg bg-accent/10 text-accent group-hover:bg-accent/15 transition-colors"
+                                                                    style={tag?.platform ? platformActiveStyle(tag.platform) : undefined}
+                                                                >
+                                                                    {tag?.platform
+                                                                        ? platformIcon(tag.platform, 'w-3.5 h-3.5')
+                                                                        : <CitationGlyph className="w-3.5 h-auto" />}
                                                                 </span>
                                                                 <span className="min-w-0 flex flex-col">
                                                                     {tag && (

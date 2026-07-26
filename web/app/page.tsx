@@ -44,14 +44,14 @@ function BootScreen({ exiting = false }: { exiting?: boolean }) {
   return (
     <div
       className={`min-h-screen flex items-center justify-center ${exiting ? 'animate-boot-exit' : ''}`}
-      style={{ background: 'radial-gradient(120% 90% at 50% 42%, #1B1B23, #08080C 72%)' }}
+      style={{ background: '#0C0C11' }}
     >
       <div
         className="flex flex-col items-center"
         style={{ filter: 'drop-shadow(0 0 16px rgba(174,184,206,0.34))' }}
       >
         <span
-          className={`w-[min(43vw,166px)] text-white ${exiting ? 'animate-boot-exit-mark' : 'animate-pulse'}`}
+          className={`w-[min(30vw,117px)] text-white ${exiting ? 'animate-boot-exit-mark' : 'animate-pulse'}`}
           aria-hidden
         >
           <CitationGlyph className="w-full h-auto" />
@@ -141,7 +141,7 @@ export default function Home() {
       return () => cancelAnimationFrame(raf);
     }
     if (bootPhase === 'exit') {
-      const t = setTimeout(() => setBootPhase('done'), 560);
+      const t = setTimeout(() => setBootPhase('done'), 700);
       return () => clearTimeout(t);
     }
   }, [loading, bootPhase]);
