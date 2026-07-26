@@ -53,7 +53,7 @@ export function RowShell({
     const cls = `w-full flex items-center gap-3 px-[14px] min-h-[46px] text-left ${onClick ? 'hover:bg-card-hover transition-colors cursor-pointer' : ''} ${className || ''}`;
     const inner = (
         <>
-            {tile && <span className={`${TILE_BASE} ${tileClass || 'bg-accent text-accent-ink'}`}>{tile}</span>}
+            {tile && <span className={`${TILE_BASE} ${tileClass || 'bg-tile text-tile-ink'}`}>{tile}</span>}
             {children}
         </>
     );
@@ -85,7 +85,7 @@ export function NavRow({ tile, tileClass, title, value, onClick }: { tile?: Reac
 
 export function ExternalRow({ title, onClick }: { title: string; onClick: () => void }) {
     return (
-        <RowShell tile={<ShieldCheck className="w-[16px] h-[16px]" />} tileClass="bg-slate-500 text-white" onClick={onClick}>
+        <RowShell tile={<ShieldCheck className="w-[16px] h-[16px]" />} onClick={onClick}>
             <RowText title={title} />
             <ExternalLink className="ml-auto w-[15px] h-[15px] text-text-muted/60 shrink-0" />
         </RowShell>

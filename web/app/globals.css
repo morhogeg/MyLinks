@@ -19,6 +19,10 @@
   /* Ink for content sitting ON an accent surface (dark text on porcelain). */
   --accent-ink: #101016;
   --accent-hover: #FFFFFF;
+  /* Settings icon tiles. Dark can't reuse --accent (porcelain tiles glared on
+     the near-black rows) — a quiet graphite with a light glyph instead. */
+  --tile: #3A3A44;
+  --tile-ink: #F2F2F6;
 
   /* Surface fill / inset / strong-border tokens (theme-aware materials).
      The app was built dark-first with hardcoded white/black alphas
@@ -81,6 +85,9 @@
   --accent: #22222A;
   --accent-ink: #F7F7F9;
   --accent-hover: #34343F;
+  /* Light: the tile IS the graphite accent (the look that already read right). */
+  --tile: #22222A;
+  --tile-ink: #F7F7F9;
 
   /* Light-theme materials: dark alphas over the light card/bg so fills, insets
      and hairlines stay visible (white alphas would vanish on white). */
@@ -129,6 +136,8 @@
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
   --color-accent-hover: var(--accent-hover);
+  --color-tile: var(--tile);
+  --color-tile-ink: var(--tile-ink);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
