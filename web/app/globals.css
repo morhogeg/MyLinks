@@ -371,6 +371,20 @@ html {
   animation: boot-exit-mark 0.62s var(--ease-modal) forwards;
 }
 
+/* The launch sequence's arrival beat (identity §04: mark first, then the
+   letterspaced name fades in under it). Pure CSS, so it runs pre-hydration —
+   the native splash shows the icon alone, and MACHINA arrives here. */
+@keyframes boot-word-in {
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-boot-word {
+  opacity: 0;
+  animation: boot-word-in 0.6s ease-out 0.55s forwards;
+}
+
 /* Scale-up: used by ConfirmDialog (was referenced but never defined). */
 @keyframes scale-up {
   from {
@@ -524,6 +538,7 @@ a {
   .animate-ios-push,
   .animate-boot-exit,
   .animate-boot-exit-mark,
+  .animate-boot-word,
   .animate-fade-in {
     animation-duration: 0.01ms !important;
     animation-delay: 0ms !important;
