@@ -25,6 +25,54 @@ function pickBanner(...states: (AnalyzingState | null)[]): AnalyzingState | null
 }
 
 /**
+ * The boot frame while auth resolves — and its success exit.
+ *
+ * A launch screen is a shipped asset, not a themed surface: fixed to the Lumen
+ * graphite ground whichever theme the app is in (identity §04), matching the
+ * native splash so splash → boot is one continuous dark frame in BOTH themes.
+ * That fixed ground is also what lets the mark sit BARE on the page.
+ *
+ * No orb, no canvas: everything on the ENTRY frame is CSS/static markup, alive
+ * on the first painted frame (an orb was tried and removed — the iOS build is
+ * a static export, so a canvas can't paint until React hydrates). The EXIT is
+ * allowed to be richer: by the time auth resolves, hydration is done, so the
+ * `exiting` overlay plays the success beat — the mark steps forward while the
+ * frame dissolves into the app (CSS keyframes, reduced-motion collapses it).
+ * Sizes follow the prototype's phone mock: mark ~43% width, wordmark 4.5%.
+ */
+function BootScreen({ exiting = false }: { exiting?: boolean }) {
+  return (
+    <div
+      className={`min-h-screen flex items-center justify-center ${exiting ? 'animate-boot-exit' : ''}`}
+      style={{ background: 'radial-gradient(120% 90% at 50% 42%, #1B1B23, #08080C 72%)' }}
+    >
+      <div
+        className="flex flex-col items-center"
+        style={{ filter: 'drop-shadow(0 0 16px rgba(174,184,206,0.34))' }}
+      >
+        <span
+          className={`w-[min(43vw,166px)] text-white ${exiting ? 'animate-boot-exit-mark' : 'animate-pulse'}`}
+          aria-hidden
+        >
+          <CitationGlyph className="w-full h-auto" />
+        </span>
+        {/* The launch wordmark stays the letterspaced setting (settled):
+            mono, tracking .46em, with a matching text-indent so the run of
+            letterspace after the final A doesn't off-centre it. */}
+        <span
+          aria-hidden
+          className="mt-[min(10.7vw,42px)] font-mono uppercase tracking-[0.46em] indent-[0.46em] text-[min(4.5vw,17px)] font-medium"
+          style={{ color: '#E6E6F0' }}
+        >
+          Machina
+        </span>
+        {!exiting && <span className="sr-only" role="status">Starting Machina…</span>}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Main dashboard page
  */
 export default function Home() {
@@ -80,6 +128,23 @@ export default function Home() {
   // Scroll-scrubbed top bar: opacity rides the scroll itself (down = away,
   // up = back), settling to shown/hidden when the finger rests.
   const headerRef = useHeaderFade<HTMLElement>();
+  // Boot success exit: when auth resolves, the boot frame stays on top for one
+  // short beat and dissolves into the app (the X-style release). 'done' from
+  // the start when there was no boot frame to exit (e.g. auth already known).
+  const [bootPhase, setBootPhase] = useState<'boot' | 'exit' | 'done'>(loading ? 'boot' : 'done');
+  useEffect(() => {
+    if (!loading && bootPhase === 'boot') {
+      // rAF, not a direct set: the static overlay gets one painted frame
+      // before the exit classes land, so the animation always runs from its
+      // visible start.
+      const raf = requestAnimationFrame(() => setBootPhase('exit'));
+      return () => cancelAnimationFrame(raf);
+    }
+    if (bootPhase === 'exit') {
+      const t = setTimeout(() => setBootPhase('done'), 560);
+      return () => clearTimeout(t);
+    }
+  }, [loading, bootPhase]);
 
   // First-run onboarding: once auth resolves and the feed is on screen, show the
   // guided tour if this browser hasn't seen it yet. A short delay lets the
@@ -106,43 +171,7 @@ export default function Home() {
 
   // Loading state while auth resolves
   if (loading) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        /* A launch screen is a shipped asset, not a themed surface — fixed to
-           the Lumen graphite ground whichever theme the app is in (identity
-           §04), matching the native splash so splash → boot is one continuous
-           dark frame in BOTH themes. That fixed ground is also what lets the
-           mark sit BARE on the page instead of inside an icon tile. */
-        style={{ background: 'radial-gradient(120% 90% at 50% 42%, #1B1B23, #08080C 72%)' }}
-      >
-        {/* Bare mark + letterspaced MACHINA — the identity prototype's launch
-            frame. No orb, no canvas: everything here is CSS/static markup,
-            alive on the first painted frame (an orb was tried and removed —
-            the iOS build is a static export, so a canvas can't paint until
-            React hydrates). Sizes follow the prototype's phone mock: mark at
-            ~43% of screen width, wordmark 4.5%/gap 10.7%. */}
-        <div
-          className="flex flex-col items-center"
-          style={{ filter: 'drop-shadow(0 0 16px rgba(174,184,206,0.34))' }}
-        >
-          <span className="w-[min(43vw,166px)] text-white animate-pulse" aria-hidden>
-            <CitationGlyph className="w-full h-auto" />
-          </span>
-          {/* The launch wordmark stays the letterspaced setting (settled):
-              mono, tracking .46em, with a matching text-indent so the run of
-              letterspace after the final A doesn't off-centre it. */}
-          <span
-            aria-hidden
-            className="mt-[min(10.7vw,42px)] font-mono uppercase tracking-[0.46em] indent-[0.46em] text-[min(4.5vw,17px)] font-medium"
-            style={{ color: '#E6E6F0' }}
-          >
-            Machina
-          </span>
-          <span className="sr-only" role="status">Starting Machina…</span>
-        </div>
-      </div>
-    );
+    return <BootScreen />;
   }
 
   return (
@@ -264,6 +293,17 @@ export default function Home() {
 
       {/* First-run guided tour */}
       <OnboardingTour open={isTourOpen} onClose={() => setIsTourOpen(false)} />
+
+      {/* Boot success exit — the boot frame dissolving into the app. Rendered
+          from the first post-auth frame (bootPhase 'boot') so there is no
+          one-frame flash of the app before the exit starts; the animation
+          begins when the effect advances the phase to 'exit'. Inert
+          (pointer-events-none) so nothing is blocked during the beat. */}
+      {bootPhase !== 'done' && (
+        <div className="fixed inset-0 z-[100] pointer-events-none">
+          <BootScreen exiting={bootPhase === 'exit'} />
+        </div>
+      )}
     </div>
   );
 }

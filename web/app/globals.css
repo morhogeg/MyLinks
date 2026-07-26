@@ -347,6 +347,30 @@ html {
 /* Inline "working" marks are now CitationMark (motion.js ported verbatim) —
    see components/ui/CitationMark.tsx. No CSS ring. */
 
+/* Boot success exit — the boot frame dissolving into the app once auth
+   resolves: the mark steps forward (scale leads) while the whole frame fades
+   (fade trails by a beat). Runs on a hydrated overlay, so keyframes are safe;
+   `forwards` holds the final state until the overlay unmounts. */
+@keyframes boot-exit {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes boot-exit-mark {
+  to {
+    transform: scale(1.14);
+  }
+}
+
+.animate-boot-exit {
+  animation: boot-exit 0.44s var(--ease-modal) 0.1s forwards;
+}
+
+.animate-boot-exit-mark {
+  animation: boot-exit-mark 0.5s var(--ease-modal) forwards;
+}
+
 /* Scale-up: used by ConfirmDialog (was referenced but never defined). */
 @keyframes scale-up {
   from {
@@ -498,6 +522,8 @@ a {
   .animate-slide-up,
   .animate-slide-in-left,
   .animate-ios-push,
+  .animate-boot-exit,
+  .animate-boot-exit-mark,
   .animate-fade-in {
     animation-duration: 0.01ms !important;
     animation-delay: 0ms !important;
