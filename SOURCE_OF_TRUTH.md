@@ -812,6 +812,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — TOUR ROUND 4: BRAND GLYPH + REAL-UI MOCKS (owner device QA on
+  1210: "sloppy — generic AI icons; why a generic chat mock; why 'AI summary'").**
+  Every sparkle/wand stand-in in `OnboardingTour.tsx` is now the **Citation
+  mark** (share-sheet Machina tile, Understand + You're-set step icons, the
+  synthesis "new connection" row). The **Understand** slide is a miniature of
+  the real `Card.tsx` anatomy — category chip + source-byline chrome row,
+  title, summary, uppercase tag chips, read-time + related-saves footer; the
+  "AI SUMMARY" pill is gone. The **Recall** slide miniaturizes the real
+  `AskBrain.tsx` vocabulary — accent question pill (`rounded-br-md`),
+  bubble-less plain-text answer, the real bracket-glyph source chip
+  (tile + source + title), and the composer pill ("Ask about anything you've
+  saved…" + send). Final slide untouched (owner: "great"). Feature `7081487`,
+  merge `803d7a2` → Vercel; TestFlight run #211 → build 1211 (supersedes 1210).
+  Owner QA on device next round.
+
 - **2026-07-26 — SETTINGS: "THE STORY BEHIND MACHINA" FOUNDER'S NOTE.** Owner
   wanted a quiet founder-story section — discoverable, never in the way. New
   `story` view in the Settings stack (`settings/StoryView.tsx`): the Citation
