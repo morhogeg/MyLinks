@@ -812,6 +812,15 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — IDENTITY ROUND 10: SCREENSHOT CITATION CHIPS.** Owner:
+  screenshot cards cited in Ask must carry both the screenshot icon and the
+  Machina icon. `ChatSource` has no `sourceType`, so the chip resolves the
+  cited id against the live `links` prop: `sourceType === 'image'` chips show
+  the feed's byline vocabulary (image icon + "Screenshot") above the title,
+  with the Machina bracket in the tile; cited cards outside the loaded window
+  fall back to the plain treatment. Feature `e0e4ce8`, merge `1fe90a7` →
+  Vercel; TestFlight run #198 → build 1198 (supersedes 1197).
+
 - **2026-07-26 — IDENTITY ROUND 9 (owner QA on 1196-era builds).** (1) **Ask
   chip platform icons restored** — owner call: YouTube/X/LinkedIn/Instagram/
   Facebook cited chips show their platform icon again (`platformIcon` +
