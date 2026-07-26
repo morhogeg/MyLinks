@@ -823,12 +823,14 @@ exact-match, capped.
   Files: `settings/{StoryView.tsx,types.ts,MainView.tsx}`, `SettingsModal.tsx`.
   Owner may reuse the text for the App Store description (`docs/APP_STORE.md`
   §2) — not done, deliberate. Feature `a8e073b`, merge `22130ff` → Vercel
-  (live). TestFlight run #209 (build 1209) **failed at upload with the same
-  90382 daily-limit error as #207/#208** — archive/entitlements/URL-scheme
-  checks all green, so no code action needed. The story section rides the
-  already-scheduled 2026-07-27 ~17:20Z re-trigger (see the tour-redo entry
-  below): one new build from main HEAD carries tour redo + story. A fallback
-  check at ~18:30Z re-triggers only if that run didn't happen.
+  (live). TestFlight run #209 (build 1209) failed at upload with the same
+  90382 daily-limit error as #207/#208, but an owner-requested retry ~4h later
+  went through: **run #210 → build 1210 GREEN (21:23Z)**, built from main HEAD
+  `28fcf27` so it carries the story section AND the tour redo — supersedes
+  1206–1209. The 90382 limit had already cleared same-day; the 2026-07-27
+  ~17:20Z re-trigger scheduled by the tour-redo session is now **redundant**
+  (it will push the same content — harmless duplicate build if it fires); this
+  session's 18:30Z fallback check was cancelled.
 
 - **2026-07-26 — ADD-SHEET ICON + SETTINGS TILE TOKENS.** Owner design pass from
   device screenshots. (1) The Add-to-Machina header glyph now follows the active
@@ -854,9 +856,10 @@ exact-match, capped.
   on device in light + dark. Commit `16d5ed1` → Vercel; TestFlight runs #207/#208
   (builds 1207/1208) **failed at upload — App Store Connect error 90382,
   daily upload limit reached** (builds 1203–1206 consumed the quota). Web is
-  live; the newest TestFlight build is **1206** (settings tiles only — tour
-  redo NOT on device yet). Re-trigger scheduled for ~17:20Z 2026-07-27 via
-  session check-in (`git push -f origin main:trigger/testflight`).
+  live. **RESOLVED same day:** the limit cleared by ~21:16Z and run #210 →
+  **build 1210** uploaded green with the tour redo (+ the founder-story
+  section — see the entry above). The ~17:20Z 2026-07-27 re-trigger scheduled
+  here is now redundant; if it fires it just builds a duplicate of main HEAD.
 
 - **2026-07-26 — IDENTITY ROUND 17: THE JITTER WAS ARCHITECTURAL — PERSISTENT
   BOOT OVERLAY.** Rounds 15-16 patched animation symptoms; the real cause: at
