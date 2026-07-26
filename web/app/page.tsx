@@ -52,15 +52,25 @@ function BootScreen({ exiting = false }: { exiting?: boolean }) {
       }}
     >
       <div className="flex flex-col items-center">
-        {/* The glow belongs to the MARK ALONE (identity §04: the drop-shadow
-            sits on the svg) — on a wrapper it renders a smoky halo around the
-            whole group's silhouette, wordmark included. */}
+        {/* The arrival, staged (identity §04: "the arms join. The brackets
+            close. The point lands. Only then does the wordmark arrive."):
+            brackets slide in and settle → the point strikes with a spring pop
+            as the glow blooms → the point keeps a slow quiet breath while
+            waiting. Pure CSS keyframes with fill-mode `both`, so the sequence
+            is alive from the first painted frame, pre-hydration. The exiting
+            overlay skips every entrance (final states inline) and plays the
+            success beat instead. The glow belongs to the MARK ALONE — on a
+            wrapper it renders a smoky halo around the whole silhouette. */}
         <span
-          className={`w-[min(30vw,117px)] text-white ${exiting ? 'animate-boot-exit-mark' : 'animate-pulse'}`}
+          className={`w-[min(30vw,117px)] text-white ${exiting ? 'animate-boot-exit-mark' : 'animate-boot-glow'}`}
           style={{ filter: 'drop-shadow(0 0 18px rgba(174,184,206,0.34))' }}
           aria-hidden
         >
-          <CitationGlyph className="w-full h-auto" />
+          <svg viewBox="288 292 448 416" className="w-full h-auto" fill="currentColor">
+            <path className={exiting ? undefined : 'animate-boot-bkt-l'} d="M296 300 L396 300 L396 358 L354 358 L354 642 L396 642 L396 700 L296 700 Z" />
+            <path className={exiting ? undefined : 'animate-boot-bkt-r'} d="M728 300 L628 300 L628 358 L670 358 L670 642 L628 642 L628 700 L728 700 Z" />
+            <circle className={`boot-dot ${exiting ? '' : 'animate-boot-dot'}`} cx="512" cy="500" r="52" />
+          </svg>
         </span>
         {/* The launch wordmark stays the letterspaced setting (settled):
             ui-monospace — SF Mono on device, the face the prototype rendered
@@ -216,8 +226,8 @@ export default function Home() {
           <h1 className="flex items-center gap-2 sm:gap-2.5 text-text">
             {/* Sized to the previous lockup's footprint (text-lg/text-xl type),
                 keeping the mock's glyph:wordmark ratio (32:168). */}
-            <CitationGlyph className="w-5 sm:w-6 h-auto shrink-0" />
-            <Wordmark className="w-[94px] sm:w-[110px] h-auto" />
+            <CitationGlyph className="w-[18px] sm:w-5 h-auto shrink-0" />
+            <Wordmark className="w-[84px] sm:w-[98px] h-auto" />
           </h1>
 
           {/* Controls — one cohesive cluster */}
