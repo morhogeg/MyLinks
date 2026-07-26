@@ -44,25 +44,33 @@ function BootScreen({ exiting = false }: { exiting?: boolean }) {
   return (
     <div
       className={`min-h-screen flex items-center justify-center ${exiting ? 'animate-boot-exit' : ''}`}
-      style={{ background: '#0C0C11' }}
+      /* The prototype's radial graphite ground — its depth is the luxury. A
+         faint grain (inline SVG turbulence, ~3% alpha) dithers the gradient so
+         it can't band on OLED, which is what forced the earlier flat fill. */
+      style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.03'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"), radial-gradient(120% 90% at 50% 42%, #1B1B23, #08080C 72%)`,
+      }}
     >
-      <div
-        className="flex flex-col items-center"
-        style={{ filter: 'drop-shadow(0 0 16px rgba(174,184,206,0.34))' }}
-      >
+      <div className="flex flex-col items-center">
+        {/* The glow belongs to the MARK ALONE (identity §04: the drop-shadow
+            sits on the svg) — on a wrapper it renders a smoky halo around the
+            whole group's silhouette, wordmark included. */}
         <span
           className={`w-[min(30vw,117px)] text-white ${exiting ? 'animate-boot-exit-mark' : 'animate-pulse'}`}
+          style={{ filter: 'drop-shadow(0 0 18px rgba(174,184,206,0.34))' }}
           aria-hidden
         >
           <CitationGlyph className="w-full h-auto" />
         </span>
         {/* The launch wordmark stays the letterspaced setting (settled):
-            mono, tracking .46em, with a matching text-indent so the run of
-            letterspace after the final A doesn't off-centre it. */}
+            ui-monospace — SF Mono on device, the face the prototype rendered
+            in — at the mock's delicate normal weight, tracking .46em, with a
+            matching text-indent so the run of letterspace after the final A
+            doesn't off-centre it. No glow on the type. */}
         <span
           aria-hidden
-          className="mt-[min(10.7vw,42px)] font-mono uppercase tracking-[0.46em] indent-[0.46em] text-[min(4.5vw,17px)] font-medium"
-          style={{ color: '#E6E6F0' }}
+          className="mt-[min(10.7vw,42px)] uppercase tracking-[0.46em] indent-[0.46em] text-[min(4.5vw,17px)]"
+          style={{ color: '#E6E6F0', fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace' }}
         >
           Machina
         </span>
