@@ -812,6 +812,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — IDENTITY ROUND 8: BOOT SUCCESS EXIT + CARD CHROME PINNED LTR.**
+  (1) Owner: a "final" animation before the app opens (X-style). The boot
+  frame now plays a success beat when auth resolves: overlay holds one painted
+  frame, then the mark steps forward (scale→1.14) while the frame dissolves
+  into the app (~0.5s, `--ease-modal`; `animate-boot-exit`/`-mark` keyframes).
+  Entry frames stay CSS/static-only (the §9 pre-hydration rule holds — the
+  EXIT runs post-hydration on an inert overlay); reduced-motion collapses it
+  to a cut. rAF-staged phase change avoids both the one-frame app flash and
+  the eslint set-state-in-effect error. (2) Owner design call, agreed +
+  shipped: the card header row (category / source / ⋯ actions) is CHROME and
+  is now pinned `dir="ltr"` on every card — controls in one stable place
+  instead of hopping sides in a mixed EN/HE feed; title/summary/tags keep
+  dir="auto". ListCard has no ⋯ (star only) — untouched. Feature `25b57aa`,
+  merge `baa66eb` → Vercel; TestFlight run #196 → build 1196 (supersedes
+  1195; run #195 status was still pending owner-side at ship time).
+
 - **2026-07-26 — IDENTITY ROUND 7: ASK THINKING ROW — TRACE+CLAMP, RIGHT-SIZED
   (owner: mark next to phrases "way too big", animations "underwhelming vs the
   mockup").** One root cause for both: the 42px slot used the tight
