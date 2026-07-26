@@ -813,7 +813,8 @@ exact-match, capped.
 > One short paragraph per session, newest first. Detail lives in git history and
 
 - **2026-07-26 (latest) — MACHINA IDENTITY BUILT: CITATION MARK, LUMEN PALETTE,
-  ACHROMATIC SWEEP (§4 item 20b).** First implementation of the identity
+  ACHROMATIC SWEEP (§4 item 20b).** Feature `1f713c2`, merge `cccaff4` → Vercel
+  (auto); TestFlight run #189 → build 1189. First implementation of the identity
   designed on `claude/logo-design-feedback-uhl1sk` (mockups in
   `design/icon-concepts/` are the spec; numbers ported, not re-derived).
   **(1) Icons:** every asset regenerated from `cit_lumen.svg` through the
