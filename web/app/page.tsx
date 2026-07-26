@@ -107,26 +107,35 @@ export default function Home() {
   // Loading state while auth resolves
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        {/* The pulsing icon + letterspaced MACHINA carry this screen — no orb,
-            no canvas. An orb here was tried and removed: the iOS build is a
-            static export, so a canvas can't paint until React hydrates, which
-            left it blank for the first part of the very window it was meant to
-            fill and then popped in. Everything here is CSS/static markup, alive
-            on the first painted frame. The layout mirrors the native splash
-            (tile at 29% of screen width, wordmark below at the same
-            proportions), so splash → boot reads as one continuous frame with
-            the pulse as the only motion. */}
-        <div className="flex flex-col items-center">
-          <div className="w-[min(29vw,113px)] aspect-square rounded-[22%] overflow-hidden shadow-lg shadow-accent/20 animate-pulse ring-1 ring-white/15">
-            <img src="/app-icon.png" alt="" className="w-full h-full object-cover" />
-          </div>
+      <div
+        className="min-h-screen flex items-center justify-center"
+        /* A launch screen is a shipped asset, not a themed surface — fixed to
+           the Lumen graphite ground whichever theme the app is in (identity
+           §04), matching the native splash so splash → boot is one continuous
+           dark frame in BOTH themes. That fixed ground is also what lets the
+           mark sit BARE on the page instead of inside an icon tile. */
+        style={{ background: 'radial-gradient(120% 90% at 50% 42%, #1B1B23, #08080C 72%)' }}
+      >
+        {/* Bare mark + letterspaced MACHINA — the identity prototype's launch
+            frame. No orb, no canvas: everything here is CSS/static markup,
+            alive on the first painted frame (an orb was tried and removed —
+            the iOS build is a static export, so a canvas can't paint until
+            React hydrates). Sizes follow the prototype's phone mock: mark at
+            ~43% of screen width, wordmark 4.5%/gap 10.7%. */}
+        <div
+          className="flex flex-col items-center"
+          style={{ filter: 'drop-shadow(0 0 16px rgba(174,184,206,0.34))' }}
+        >
+          <span className="w-[min(43vw,166px)] text-white animate-pulse" aria-hidden>
+            <CitationGlyph className="w-full h-auto" />
+          </span>
           {/* The launch wordmark stays the letterspaced setting (settled):
               mono, tracking .46em, with a matching text-indent so the run of
               letterspace after the final A doesn't off-centre it. */}
           <span
             aria-hidden
-            className="mt-[min(10.7vw,42px)] font-mono uppercase text-text tracking-[0.46em] indent-[0.46em] text-[min(4.5vw,17px)] font-medium"
+            className="mt-[min(10.7vw,42px)] font-mono uppercase tracking-[0.46em] indent-[0.46em] text-[min(4.5vw,17px)] font-medium"
+            style={{ color: '#E6E6F0' }}
           >
             Machina
           </span>
