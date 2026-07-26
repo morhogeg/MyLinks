@@ -812,6 +812,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — IDENTITY ROUND 9 (owner QA on 1196-era builds).** (1) **Ask
+  chip platform icons restored** — owner call: YouTube/X/LinkedIn/Instagram/
+  Facebook cited chips show their platform icon again (`platformIcon` +
+  `platformActiveStyle`); the bracket glyph stays as the fallback for plain
+  text/article cards. (2) **Think-row gap** — the roam viewBox was the full
+  1024 artboard, leaving ~12px dead margin each side of the resting ink; now
+  trimmed to the motion's exact travel envelope (`224 292 576 416`), slot
+  42→26px, gap 13→10px — same ~19px resting ink, mark sits beside the phrase.
+  (3) **Boot screen** — the radial ground BANDED on OLED (fine in desktop
+  renders): boot, splash PNGs and the storyboard bg are all the solid Lumen
+  ground `#0C0C11` now; boot mark 43vw→30vw (owner: too big); success exit
+  amplified (mark scale→1.42 leading, frame fade trailing, ~0.6s total, timer
+  700ms). Feature `32bb062`, merge `7df0f60` → Vercel; TestFlight run #197 →
+  build 1197.
+
 - **2026-07-26 — IDENTITY ROUND 8: BOOT SUCCESS EXIT + CARD CHROME PINNED LTR.**
   (1) Owner: a "final" animation before the app opens (X-style). The boot
   frame now plays a success beat when auth resolves: overlay holds one painted
