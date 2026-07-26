@@ -812,6 +812,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — SETTINGS: "THE STORY BEHIND MACHINA" FOUNDER'S NOTE.** Owner
+  wanted a quiet founder-story section — discoverable, never in the way. New
+  `story` view in the Settings stack (`settings/StoryView.tsx`): the Citation
+  glyph over a letter-style prose page written in the owner's voice (scattered
+  saves → one place; summarize/file/tag/connect; digest + Ask; recall-is-
+  learning), signed "— Mor". Entry point: a new final **About** section in
+  MainView ("The story behind Machina", Heart tile) — after Advanced, so it
+  stays out of the launch-critical surface. No data, no flags, both platforms.
+  Files: `settings/{StoryView.tsx,types.ts,MainView.tsx}`, `SettingsModal.tsx`.
+  Owner may reuse the text for the App Store description (`docs/APP_STORE.md`
+  §2) — not done, deliberate. On branch `claude/onboarding-pqqc3c`.
+
 - **2026-07-26 — ADD-SHEET ICON + SETTINGS TILE TOKENS.** Owner design pass from
   device screenshots. (1) The Add-to-Machina header glyph now follows the active
   tab (Link chain / ImageIcon / StickyNote — the app's canonical card glyphs).
