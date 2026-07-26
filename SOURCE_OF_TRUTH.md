@@ -812,6 +812,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — IDENTITY ROUND 11: THE LUXURY BOOT FRAME (owner: "the mockup
+  was luxury and this looks meh" + the writing seems off).** Three restorations
+  to match the §04 prototype faithfully: (1) the **radial graphite ground is
+  back** — its depth was the luxury; the earlier flat #0C0C11 was the wrong
+  fix for OLED banding. Banding solved properly instead: ~3% inline-SVG
+  turbulence grain dithers the CSS gradient (still pre-hydration-safe), and
+  the splash PNGs get real gaussian dither (σ1.1) in `gen_assets.py`. (2) the
+  **glow moved to the mark alone** — on the wrapper it rendered a smoky halo
+  around the whole group's silhouette, wordmark included (the "blob" in the
+  device screenshot). (3) the **boot wordmark renders in ui-monospace** (SF
+  Mono on iOS — the face the prototypes actually rendered in) at normal
+  weight, not Geist Mono medium — this was the "writing seems off". Storyboard
+  bg → gradient edge #08080C. Feature `f7d88c7`, merge `42e5704` → Vercel;
+  TestFlight run #199 → build 1199 (supersedes 1198, which went green with
+  rounds 1–10).
+
 - **2026-07-26 — IDENTITY ROUND 10: SCREENSHOT CITATION CHIPS.** Owner:
   screenshot cards cited in Ask must carry both the screenshot icon and the
   Machina icon. `ChatSource` has no `sourceType`, so the chip resolves the
