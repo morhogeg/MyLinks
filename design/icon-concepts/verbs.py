@@ -5,7 +5,7 @@ says what kind of work is running, and it repeats deliberately when two adjacent
 phases do the same kind of work. A single mark can keep that rule by varying
 MOTION instead of shape.
 
-  listening  REST    locked, a very slow breathe        at ease, ready
+  listening  STATIC  locked, no motion at all          at ease, ready
   working    PULSE   tight fast pumping                 in flight, on the wire
   searching  SWEEP   wide slow sweep, point faint       scanning
   solving    STEP    ratchets, one tick per candidate   weighing candidates
@@ -36,8 +36,9 @@ def sstep(a, b, x):
 
 
 def rest(t):
-    """listening — the idle hero. Barely moves; it is a resting state."""
-    return dict(spread=0, dot_r=52 + 2 * math.sin(2 * math.pi * t), dot_op=1)
+    """listening — the Ask idle hero. STATIC: motion means work is happening,
+    and an invitation screen has none."""
+    return dict(spread=0, dot_r=52, dot_op=1)
 
 
 def pulse(t):
@@ -70,7 +71,7 @@ def hold(t):
     return dict(spread=0, dot_r=52 + amp * math.sin(2 * math.pi * t), dot_op=1)
 
 
-VERBS = [("listening", "REST", rest), ("working", "PULSE", pulse),
+VERBS = [("listening", "STATIC", rest), ("working", "PULSE", pulse),
          ("searching", "SWEEP", sweep), ("solving", "STEP", step),
          ("shaping", "HOLD", hold)]
 

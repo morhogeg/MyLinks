@@ -68,7 +68,7 @@ function launchAt(u) {
    adjacent phases do the same kind of work. A single mark keeps that rule by
    varying MOTION instead of shape. Reference render: verb_motions.gif.
 
-     listening  REST    locked, a very slow breathe        at ease, ready
+     listening  STATIC  locked, no motion at all          at ease, ready
      working    PULSE   tight fast pumping                 in flight, on the wire
      searching  SWEEP   wide slow sweep, point faint       scanning
      solving    STEP    ratchets, one tick per candidate   weighing candidates
@@ -77,8 +77,10 @@ function launchAt(u) {
    TRACE is NOT in this table. It stays reserved for arrival — Ask opening, app
    launch — and is never looped. */
 
-function restAt(t) {                                   // listening
-  return { spread: 0, dotR: R_HI + 2 * Math.sin(2 * Math.PI * t), dotOp: 1, clipH: HALF };
+/* listening — the Ask idle hero. STATIC, by decision: motion means work is
+   happening, and an invitation screen has none. Takes no t. */
+function restAt() {
+  return { spread: 0, dotR: R_HI, dotOp: 1, clipH: HALF };
 }
 
 function pulseAt(t) {                                  // working / fetching
