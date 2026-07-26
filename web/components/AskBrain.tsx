@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Plus, MessagesSquare, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X } from 'lucide-react';
+import { ArrowUp, Plus, MessagesSquare, Image as ImageIcon, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X } from 'lucide-react';
 import type { OrbState } from '@/components/ui/CitationMark';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -1251,6 +1251,12 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                                 >
                                                     {(() => {
                                                         const tag = sourceTag(s);
+                                                        // Screenshot captures: ChatSource doesn't carry
+                                                        // sourceType, but the live library does — resolve
+                                                        // the cited id so the chip can wear the feed's own
+                                                        // "🖼 Screenshot" tag (cards outside the loaded
+                                                        // window just keep the plain treatment).
+                                                        const isShot = links.some(l => l.id === s.id && l.sourceType === 'image');
                                                         return (
                                                             <>
                                                                 {/* Platform sources keep their OWN icon (YouTube,
@@ -1268,7 +1274,15 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                                                         : <CitationGlyph className="w-3.5 h-auto" />}
                                                                 </span>
                                                                 <span className="min-w-0 flex flex-col">
-                                                                    {tag && (
+                                                                    {isShot ? (
+                                                                        /* Same vocabulary as the feed card's byline:
+                                                                           icon + "Screenshot", beside the Machina
+                                                                           glyph in the tile. */
+                                                                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wide text-text-muted text-start">
+                                                                            <ImageIcon className="w-3 h-3" />
+                                                                            Screenshot
+                                                                        </span>
+                                                                    ) : tag && (
                                                                         <span
                                                                             dir="auto"
                                                                             className="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wide text-text-muted text-start"
