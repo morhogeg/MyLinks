@@ -812,6 +812,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — IDENTITY ROUND 5: C OVERSHOOT (owner: "the C in Machina at
+  the top bar cuts off at the bottom").** Confirmed by pixel-zooming the device
+  screenshot: the drawn wordmark had NO overshoot — every letter ended exactly
+  at cap/baseline, and a curve's tangent point carries ~zero pixel coverage at
+  the header's ~1.5px stroke, so the C's arc antialiased away before the
+  baseline (straight letters keep a full-width final row and survive). Fix is
+  classic type craft: the C's outer ellipse overshoots ±8 units (ry 211→219,
+  inner 169→177, stroke 42 preserved), `Wordmark.tsx` viewBox → `0 -8 3455
+  438`. Verified old-vs-new at 3× header size through the design pipeline.
+  `design/icon-concepts/wordmark.svg` still carries the pre-overshoot drawing
+  (reference); the shipped component is the corrected one. Feature `b704bc5`,
+  merge `550c079` → Vercel; TestFlight run #193 → build 1193 (supersedes 1192).
+
 - **2026-07-26 — IDENTITY ROUND 4: ICON PRESENCE (owner: mark too small next
   to neighbor icons).** The home-screen icon's ink covered 42% of the tile
   width vs ~50-60% for X/Claude/Gemini/Slack. Owner asked about "opening up
