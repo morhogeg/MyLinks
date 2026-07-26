@@ -40,12 +40,14 @@ function pickBanner(...states: (AnalyzingState | null)[]): AnalyzingState | null
  * frame dissolves into the app (CSS keyframes, reduced-motion collapses it).
  * Sizes follow the prototype's phone mock: mark ~43% width, wordmark 4.5%.
  */
-function BootScreen({ exiting = false, settled = false }: { exiting?: boolean; settled?: boolean }) {
-  // The success overlay mounts one frame BEFORE the exit class lands. A fresh
-  // mount restarts every entrance animation from its from{} state (brackets
-  // flung out, dot gone) — one visible glitch frame right before the jump.
-  // `settled` renders the finished frame with no entrances at all.
-  const quiet = exiting || settled;
+function BootScreen({ exiting = false }: { exiting?: boolean }) {
+  // ONE instance of this component lives from the first painted frame until
+  // the exit completes — Home renders it as a persistent overlay and never
+  // remounts it (a remount restarts every entrance animation from its from{}
+  // state for a glitch frame, and lands fresh compositor layers exactly when
+  // the exit starts — the "jitter before the jump"). The entrance classes
+  // stay on their elements permanently: they completed long ago and hold
+  // their final frames; the exit only ADDS classes to existing elements.
   return (
     <div
       className={`min-h-screen flex items-center justify-center ${exiting ? 'animate-boot-exit' : ''}`}
@@ -72,25 +74,28 @@ function BootScreen({ exiting = false, settled = false }: { exiting?: boolean; s
               drop-shadow filter animates — a scaling child there forces WebKit
               to re-rasterize the glow every frame, which read as shaking on
               device. Opacity on a sibling can't jitter. */}
-          <span className={`absolute -inset-[45%] rounded-full ${quiet ? '' : 'animate-boot-halo'}`}
+          <span className="absolute -inset-[45%] rounded-full animate-boot-halo"
             style={{ background: 'radial-gradient(closest-side, rgba(174,184,206,0.20), rgba(174,184,206,0) 72%)' }}
           />
           {/* The push-through zooms THIS wrapper, not the filtered span inside
               it: WebKit rasterizes the glowing mark once into the wrapper's
               composited layer and scales the texture, so the glow rides the
               zoom without a single re-raster (the slight soften at high scale
-              reads as motion blur). Scaling the filtered element itself
-              re-rasterized the glow per frame — the shake; removing the filter
-              at exit made the glow pop off — the flicker. */}
-          <span className={`relative inline-flex ${exiting ? 'animate-boot-exit-mark' : ''}`}>
+              reads as motion blur). will-change is set from MOUNT so the
+              layer exists long before the exit — promoting it at exit time
+              caused a one-frame re-raster shift. */}
+          <span
+            className={`relative inline-flex ${exiting ? 'animate-boot-exit-mark' : ''}`}
+            style={{ willChange: 'transform' }}
+          >
             <span
-              className={`relative w-[min(30vw,117px)] text-white ${quiet ? '' : 'animate-boot-glow'}`}
+              className="relative w-[min(30vw,117px)] text-white animate-boot-glow"
               style={{ filter: 'drop-shadow(0 0 18px rgba(174,184,206,0.34))' }}
             >
               <svg viewBox="288 292 448 416" className="w-full h-auto" fill="currentColor">
-                <path className={quiet ? undefined : 'animate-boot-bkt-l'} d="M296 300 L396 300 L396 358 L354 358 L354 642 L396 642 L396 700 L296 700 Z" />
-                <path className={quiet ? undefined : 'animate-boot-bkt-r'} d="M728 300 L628 300 L628 358 L670 358 L670 642 L628 642 L628 700 L728 700 Z" />
-                <circle className={`boot-dot ${quiet ? '' : 'animate-boot-dot'}`} cx="512" cy="500" r="52" />
+                <path className="animate-boot-bkt-l" d="M296 300 L396 300 L396 358 L354 358 L354 642 L396 642 L396 700 L296 700 Z" />
+                <path className="animate-boot-bkt-r" d="M728 300 L628 300 L628 358 L670 358 L670 642 L628 642 L628 700 L728 700 Z" />
+                <circle className="boot-dot animate-boot-dot" cx="512" cy="500" r="52" />
               </svg>
             </span>
           </span>
@@ -106,12 +111,12 @@ function BootScreen({ exiting = false, settled = false }: { exiting?: boolean; s
             during the success beat. */}
         <span
           aria-hidden
-          className={`mt-[min(10.7vw,42px)] uppercase tracking-[0.46em] indent-[0.46em] text-[min(4.5vw,17px)] ${quiet ? '' : 'animate-boot-word'}`}
+          className="mt-[min(10.7vw,42px)] uppercase tracking-[0.46em] indent-[0.46em] text-[min(4.5vw,17px)] animate-boot-word"
           style={{ color: '#E6E6F0', fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace' }}
         >
           Machina
         </span>
-        {!exiting && <span className="sr-only" role="status">Starting Machina…</span>}
+        <span className="sr-only" role="status">Starting Machina…</span>
       </div>
     </div>
   );
@@ -179,11 +184,12 @@ export default function Home() {
   const [bootPhase, setBootPhase] = useState<'boot' | 'exit' | 'done'>(loading ? 'boot' : 'done');
   useEffect(() => {
     if (!loading && bootPhase === 'boot') {
-      // rAF, not a direct set: the static overlay gets one painted frame
-      // before the exit classes land, so the animation always runs from its
-      // visible start.
-      const raf = requestAnimationFrame(() => setBootPhase('exit'));
-      return () => cancelAnimationFrame(raf);
+      // The app tree mounts UNDER the opaque overlay on this same commit —
+      // a heavy one (Feed, listeners, first grid paint). Hold the exit for a
+      // beat so that work lands before the animation starts; kicking off the
+      // zoom in the same breath as the mount is what made it stutter.
+      const t = setTimeout(() => setBootPhase('exit'), 180);
+      return () => clearTimeout(t);
     }
     if (bootPhase === 'exit') {
       const t = setTimeout(() => setBootPhase('done'), 700);
@@ -214,12 +220,14 @@ export default function Home() {
     setTimeout(() => setIsTourOpen(true), 250);
   };
 
-  // Loading state while auth resolves
-  if (loading) {
-    return <BootScreen />;
-  }
-
+  // The boot overlay is a SIBLING of the app tree, not an early return: one
+  // BootScreen instance persists from the first painted frame through the
+  // success exit (same DOM, same compositor layers — an unmount/remount here
+  // is what jittered). While auth resolves only the overlay renders; the app
+  // tree mounts beneath it and the exit plays over the finished first paint.
   return (
+    <>
+    {!loading && (
     <div className="min-h-screen bg-background text-text transition-colors duration-200">
       {/* Header — the sticky bar owns the top safe-area inset so it always sits
           below the status bar/notch, even once it sticks on scroll. content-box
@@ -338,17 +346,18 @@ export default function Home() {
 
       {/* First-run guided tour */}
       <OnboardingTour open={isTourOpen} onClose={() => setIsTourOpen(false)} />
-
-      {/* Boot success exit — the boot frame dissolving into the app. Rendered
-          from the first post-auth frame (bootPhase 'boot') so there is no
-          one-frame flash of the app before the exit starts; the animation
-          begins when the effect advances the phase to 'exit'. Inert
-          (pointer-events-none) so nothing is blocked during the beat. */}
-      {bootPhase !== 'done' && (
-        <div className="fixed inset-0 z-[100] pointer-events-none overflow-hidden">
-          <BootScreen settled exiting={bootPhase === 'exit'} />
-        </div>
-      )}
     </div>
+    )}
+
+    {/* The persistent boot overlay — the SAME element from the app's first
+        painted frame (pre-hydration) through the success exit. Only its
+        `exiting` prop ever changes; it is never remounted. Inert so nothing
+        is blocked once the app is beneath it. */}
+    {(loading || bootPhase !== 'done') && (
+      <div className="fixed inset-0 z-[100] pointer-events-none overflow-hidden">
+        <BootScreen exiting={bootPhase === 'exit'} />
+      </div>
+    )}
+    </>
   );
 }
