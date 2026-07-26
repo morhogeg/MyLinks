@@ -48,7 +48,7 @@ function BootScreen({ exiting = false }: { exiting?: boolean }) {
          faint grain (inline SVG turbulence, ~3% alpha) dithers the gradient so
          it can't band on OLED, which is what forced the earlier flat fill. */
       style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.03'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"), radial-gradient(120% 90% at 50% 42%, #1B1B23, #08080C 72%)`,
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.03'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"), radial-gradient(120% 90% at 50% 42%, #131319, #050507 72%)`,
       }}
     >
       <div className="flex flex-col items-center">
@@ -61,16 +61,25 @@ function BootScreen({ exiting = false }: { exiting?: boolean }) {
             overlay skips every entrance (final states inline) and plays the
             success beat instead. The glow belongs to the MARK ALONE — on a
             wrapper it renders a smoky halo around the whole silhouette. */}
-        <span
-          className={`w-[min(30vw,117px)] text-white ${exiting ? 'animate-boot-exit-mark' : 'animate-boot-glow'}`}
-          style={{ filter: 'drop-shadow(0 0 18px rgba(174,184,206,0.34))' }}
-          aria-hidden
-        >
-          <svg viewBox="288 292 448 416" className="w-full h-auto" fill="currentColor">
-            <path className={exiting ? undefined : 'animate-boot-bkt-l'} d="M296 300 L396 300 L396 358 L354 358 L354 642 L396 642 L396 700 L296 700 Z" />
-            <path className={exiting ? undefined : 'animate-boot-bkt-r'} d="M728 300 L628 300 L628 358 L670 358 L670 642 L628 642 L628 700 L728 700 Z" />
-            <circle className={`boot-dot ${exiting ? '' : 'animate-boot-dot'}`} cx="512" cy="500" r="52" />
-          </svg>
+        <span className="relative inline-flex" aria-hidden>
+          {/* The waiting state breathes with LIGHT, not geometry: a soft halo
+              behind the mark oscillates in opacity. Nothing under the mark's
+              drop-shadow filter animates — a scaling child there forces WebKit
+              to re-rasterize the glow every frame, which read as shaking on
+              device. Opacity on a sibling can't jitter. */}
+          <span className={`absolute -inset-[45%] rounded-full ${exiting ? '' : 'animate-boot-halo'}`}
+            style={{ background: 'radial-gradient(closest-side, rgba(174,184,206,0.20), rgba(174,184,206,0) 72%)' }}
+          />
+          <span
+            className={`relative w-[min(30vw,117px)] text-white ${exiting ? 'animate-boot-exit-mark' : 'animate-boot-glow'}`}
+            style={{ filter: 'drop-shadow(0 0 18px rgba(174,184,206,0.34))' }}
+          >
+            <svg viewBox="288 292 448 416" className="w-full h-auto" fill="currentColor">
+              <path className={exiting ? undefined : 'animate-boot-bkt-l'} d="M296 300 L396 300 L396 358 L354 358 L354 642 L396 642 L396 700 L296 700 Z" />
+              <path className={exiting ? undefined : 'animate-boot-bkt-r'} d="M728 300 L628 300 L628 358 L670 358 L670 642 L628 642 L628 700 L728 700 Z" />
+              <circle className={`boot-dot ${exiting ? '' : 'animate-boot-dot'}`} cx="512" cy="500" r="52" />
+            </svg>
+          </span>
         </span>
         {/* The launch wordmark stays the letterspaced setting (settled):
             ui-monospace — SF Mono on device, the face the prototype rendered
@@ -227,7 +236,7 @@ export default function Home() {
             {/* Sized to the previous lockup's footprint (text-lg/text-xl type),
                 keeping the mock's glyph:wordmark ratio (32:168). */}
             <CitationGlyph className="w-[18px] sm:w-5 h-auto shrink-0" />
-            <Wordmark className="w-[84px] sm:w-[98px] h-auto" />
+            <Wordmark className="h-[11px] sm:h-[13px] w-auto" />
           </h1>
 
           {/* Controls — one cohesive cluster */}
