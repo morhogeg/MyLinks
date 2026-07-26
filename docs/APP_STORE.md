@@ -45,20 +45,24 @@ Notes for edge cases:
 
 ## 2. Metadata (App Store Connect → App Information / version page)
 
+> Copy refreshed 2026-07-26 around the **capture → connection → recall** arc,
+> benefits-first: every section leads with what the user *gets*, not what the
+> app does. All counts verified against Connect limits.
+
 | Field | Value | Limit |
 |---|---|---|
-| **Name** | `Machina AI` | 30 |
-| **Subtitle** | `Ask your saves anything` | 30 |
+| **Name** | `Machina AI — Ask Your Saves` *(27 — recommended: the name field carries the most ASO weight, per §8's title plan)*. Fallback if Apple flags the dash/claim: `Machina AI` (10). | 30 |
+| **Subtitle** | `Your memory, with answers` *(25 — recommended; pairs with the name without repeating "saves")*. Alternates: `Save it. Ask it. Know it.` (25) · `Ask your saves anything` (23, use this one if Name stays plain `Machina AI`). | 30 |
 | **Category** | Primary: **Productivity**. Secondary (optional): Utilities. | |
 | **Privacy Policy URL** | `https://my-links-sable.vercel.app/privacy` | |
 | **Support URL** | `https://my-links-sable.vercel.app` | |
 | **Marketing URL** (optional) | `https://my-links-sable.vercel.app` | |
 | **Copyright** | `© 2026 Mor Hogeg` | |
 
-**Promotional text** (170 chars, editable without review):
+**Promotional text** (153/170 chars, editable without review):
 
-> Machina reads everything you save — links, screenshots, videos — and answers
-> questions from it, with sources.
+> Stop losing what you save. Machina reads every link, screenshot, and video —
+> connects them — and answers your questions with sources from your own saves.
 
 **Keywords** (comma-separated, no spaces after commas; 92/100 chars):
 
@@ -67,39 +71,46 @@ second brain,read later,bookmarks,ai summary,save links,knowledge base,notes,rec
 ```
 
 (Don't repeat "machina" or "ai" from the name — the name field already indexes
-them.)
+them. If the recommended Name ships, "ask" and "saves" are indexed by the name
+too, but keep them in keywords — the field has room and exact-match helps.)
 
-**Description:**
+**Description** (~1,600/4,000 chars — the first paragraph is what shows above
+the "more" fold; it carries the problem, the promise, and the payoff):
 
-> You save links, screenshots, and videos everywhere — then never look at them
-> again. Machina fixes the second half.
+> You save things all day — articles, videos, screenshots, links friends send
+> you — and never look at them again. Machina fixes that. Save anything in two
+> taps, and when you need it, just ask: it answers from your own saves, with
+> sources.
 >
-> Share anything to Machina from any app. It reads the page, watches the video,
-> looks at the screenshot — and turns each save into a clean card with a real
-> summary, category, tags, and connections to things you saved before.
+> NEVER LOSE ANOTHER SAVE
+> Share to Machina from any app — Safari, YouTube, X, your camera roll, or your
+> computer's browser. AI reads the page, watches the video, looks at the
+> screenshot, and turns each one into a clean card: real summary, category,
+> tags. No filing, no folders, no effort.
 >
-> Then comes the part that feels like magic: ask your saves a question.
-> "What did I save about mortgage rates?" Machina answers in plain language,
-> with citations that jump back to your own sources.
+> SEE WHAT CONNECTS
+> Every new save is linked to what you already know — "3 of your saves connect
+> to Network Effects." Machina builds a knowledge graph from your saves
+> automatically, so ideas resurface exactly when they're relevant instead of
+> dying in a list.
 >
-> CAPTURE FROM ANYWHERE
-> • iOS share sheet — save from Safari, YouTube, X, anywhere
-> • Web app and browser extension on your computer
+> REMEMBER EVERYTHING — JUST ASK
+> "What did I save about mortgage rates?" Ask Machina and get a plain-language
+> answer with citations that jump straight back to your own sources. Semantic
+> search finds meaning, not just keywords. And every week, Machina writes you a
+> synthesis of what you saved: the themes, one standout, an open question.
 >
-> UNDERSTAND WHAT YOU SAVED
-> • AI summaries, categories, and tags on every save
-> • "See also" connections between related saves
-> • Semantic search that finds meaning, not just keywords
+> CURATE AND SHARE (OR DON'T)
+> • Collections for projects, trips, and research
+> • Reminders that bring the right save back at the right time
+> • Publish any collection as a shareable page — or keep everything private
 >
-> COME BACK TO IT
-> • Ask Machina — cited answers from your own knowledge
-> • Weekly synthesis — themes and standouts from your week's saves
-> • Reminders and digests, on your schedule
-> • Collections you can keep private or publish as a shareable page
+> BUILT FOR TRUST
+> • No ads, no tracking, and your content is never used to train AI models
+> • Sign in with Apple or Google
+> • Delete your account — and all your data — anytime, right from Settings
 >
-> Private by design: no ads, no tracking, and your content is never used to
-> train AI models. Sign in with Apple or Google. Delete your account — and all
-> your data — anytime, right from Settings.
+> Stop saving into the void. Start asking your memory.
 
 **Age rating questionnaire:** answer **None/No to everything** (no violence,
 no sexual content, no profanity, no horror, no gambling/contests, no drugs, no

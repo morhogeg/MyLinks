@@ -812,6 +812,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — APP STORE PAGE COPY REWRITE (docs/APP_STORE.md §2).**
+  Benefits-first refresh of the store metadata around the **capture →
+  connection → recall** arc: new above-the-fold hook (problem + promise +
+  payoff in one paragraph), description restructured into NEVER LOSE ANOTHER
+  SAVE / SEE WHAT CONNECTS / REMEMBER EVERYTHING — JUST ASK / CURATE AND
+  SHARE / BUILT FOR TRUST (~1,600/4,000 chars), new promo text (153/170),
+  and a Name/Subtitle recommendation: `Machina AI — Ask Your Saves` (27) +
+  `Your memory, with answers` (25), with alternates listed for the owner to
+  pick in Connect. Keywords, nutrition label, review notes, shot-list
+  untouched. Copy-only — no code; owner still enters it into App Store
+  Connect per §4 task 8's remaining-manual note. Branch
+  `claude/app-store-page-copy-m1mj6z`.
+
 - **2026-07-26 — IDENTITY ROUND 17: THE JITTER WAS ARCHITECTURAL — PERSISTENT
   BOOT OVERLAY.** Rounds 15-16 patched animation symptoms; the real cause: at
   auth-resolve the boot early-return UNMOUNTED, a copy REMOUNTED as an
