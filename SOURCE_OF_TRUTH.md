@@ -822,7 +822,8 @@ exact-match, capped.
   stays out of the launch-critical surface. No data, no flags, both platforms.
   Files: `settings/{StoryView.tsx,types.ts,MainView.tsx}`, `SettingsModal.tsx`.
   Owner may reuse the text for the App Store description (`docs/APP_STORE.md`
-  §2) — not done, deliberate. On branch `claude/onboarding-pqqc3c`.
+  §2) — not done, deliberate. Feature `a8e073b`, merge `22130ff` → Vercel;
+  TestFlight run #209 → build 1209.
 
 - **2026-07-26 — ADD-SHEET ICON + SETTINGS TILE TOKENS.** Owner design pass from
   device screenshots. (1) The Add-to-Machina header glyph now follows the active
