@@ -812,6 +812,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-26 — IDENTITY ROUND 6: BOOT SCREEN GOES BARE ON A FIXED DARK
+  GROUND (owner: "let's have the logo right on the page, not within that
+  container… maybe always have our dark background for boot").** Exactly the
+  identity §04 rule — a launch screen is a shipped asset, not a themed
+  surface. The boot screen's ground is now the same graphite radial as the
+  native splash in BOTH themes (was `bg-background`, which in light mode cut
+  the launch into dark-splash → white-page and made the icon tile read as a
+  floating container). With the ground fixed dark, the tile is gone: bare
+  white Citation mark (~43% width, glow, CSS pulse) + letterspaced MACHINA —
+  the prototype's launch frame. Still CSS/static-only pre-hydration. Feature
+  `f7b72ca`, merge `62b0682` → Vercel; TestFlight run #194 → build 1194
+  (supersedes 1193, which went green with rounds 1–5).
+
 - **2026-07-26 — IDENTITY ROUND 5: C OVERSHOOT (owner: "the C in Machina at
   the top bar cuts off at the bottom").** Confirmed by pixel-zooming the device
   screenshot: the drawn wordmark had NO overshoot — every letter ended exactly
