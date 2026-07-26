@@ -846,8 +846,12 @@ exact-match, capped.
   Recall and Resurface; CaptureMock gains a Links/Images/Notes chip strip;
   capture copy now names all three save types per platform; Understand/Recall
   copy tightened. Mocks stay theme-token-only. Owner should QA the new slide
-  on device in light + dark. Commit `16d5ed1` → Vercel; TestFlight run #208 →
-  build 1208 (supersedes 1206/1207).
+  on device in light + dark. Commit `16d5ed1` → Vercel; TestFlight runs #207/#208
+  (builds 1207/1208) **failed at upload — App Store Connect error 90382,
+  daily upload limit reached** (builds 1203–1206 consumed the quota). Web is
+  live; the newest TestFlight build is **1206** (settings tiles only — tour
+  redo NOT on device yet). Re-trigger scheduled for ~17:20Z 2026-07-27 via
+  session check-in (`git push -f origin main:trigger/testflight`).
 
 - **2026-07-26 — IDENTITY ROUND 17: THE JITTER WAS ARCHITECTURAL — PERSISTENT
   BOOT OVERLAY.** Rounds 15-16 patched animation symptoms; the real cause: at
