@@ -411,7 +411,15 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                 {(showBack || loadError) && (
                     <div
                         className="px-[18px] py-2.5 border-t border-border-subtle bg-background"
-                        style={isMobile ? { paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)' } : undefined}
+                        /* Bottom inset MINUS 18px, matching BottomTabBar — not the
+                           inset PLUS 8px this used to add. env(safe-area-inset-bottom)
+                           is ~34px on a home-indicator iPhone, but the indicator only
+                           occupies a sliver of it, so padding the full inset (let alone
+                           inset + 8) floats the bar well clear of the bottom edge: this
+                           footer sat ~26px higher than the app's own tab bar, which is
+                           what read as "way too high" (owner, 2026-07-27). The 4px floor
+                           keeps a non-notched device from collapsing to zero. */
+                        style={isMobile ? { paddingBottom: 'max(calc(env(safe-area-inset-bottom) - 18px), 4px)' } : undefined}
                     >
                         <div className="w-full max-w-2xl mx-auto flex items-center justify-end gap-2">
                             {loadError && (

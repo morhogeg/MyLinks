@@ -937,6 +937,21 @@ exact-match, capped.
   `deploy-hosting.sh` stays as the local escape hatch. **The recurring manual
   step is gone: a future `firebase.json` rewrite change now ships by merging.**
 
+- **2026-07-27 — SETTINGS "DONE" BAR SAT TOO HIGH ON iOS (owner, device).** The
+  footer padded `calc(env(safe-area-inset-bottom) + 0.5rem)` — on a
+  home-indicator iPhone that is ~34px of inset PLUS 8px, so the bar floated ~42px
+  clear of the bottom edge. The indicator itself only occupies a sliver of that
+  inset, and the app already knows it: **`BottomTabBar` uses
+  `max(calc(env(safe-area-inset-bottom) - 18px), 4px)`** (~16px), and `Feed`
+  composes its overlay offsets from that same expression. So the Settings footer
+  was sitting ~26px higher than the app's own docked bar. Now uses the identical
+  formula. **Convention to follow for any DOCKED bar: inset − 18px, floor 4px.**
+  Deliberately NOT changed: full-screen pages (`Onboarding`, `OnboardingTour`,
+  `AIConsentNotice`) and sheets (`TagInput`) use `max(env(...), 16–24px)`, which
+  is a different family where a generous bottom margin is correct. Not
+  device-verified — the inset is 0 in every desktop browser, so this can only be
+  seen on a phone; the arithmetic is deterministic and matches the tab bar.
+
 - **2026-07-27 — SHIP: build 1219, web-only (`/ship`).** Release pass over the
   whole 2026-07-27 owner-QA batch. **Scope assessed, not assumed:** `functions/`
   and `firebase.json` are untouched since the other session's deploy (`bf89346`),
