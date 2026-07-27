@@ -350,6 +350,30 @@ The multi-user auth work is **fully written but not live**:
 
 ### 🟡 P2 — security/cost hardening & honest product surface
 
+11a1. **[ ] Owner QA on build 1212 — the three 2026-07-27 fixes are all
+    device-unverified.** Nothing below was seen running; the cloud sandbox
+    cannot compile Swift, render the app, or call Gemini. In order of risk:
+    (1) **Share-extension scanner** (`CitationMarkView`) — statically reviewed
+    only, never once rendered. Share into Machina and check the mark actually
+    draws, the strike/breathe reads right, and nothing clips at 32pt, in light
+    and dark. (2) **Capture-banner replay** — share a post, open the app, and
+    confirm the bar shows its phases ONCE and closes. Watch specifically for the
+    new hand-off: the bridge should pass to the Firestore banner with no "Saved"
+    flash in between. (3) **Japan/Tokyo** — re-share that post (and a couple of
+    other country/industry-level ones) and check the title, summary AND tags for
+    a narrower place than the source names. If it still narrows, the prompt half
+    is not holding and the next lever is `_THIN_TWEET_CHARS` / raising the
+    non-primary vision resolution unconditionally.
+11a2. **[ ] Image-mode scan phases drift between the app and the Share
+    Extension** (found 2026-07-27). Thresholds match (95/80/60/45) but the
+    wording does not: Swift says "Understanding content… / Reading text… /
+    Scanning image…", `AnalyzingBanner.tsx`'s inline table says "Understanding
+    the content… / Reading the text… / Scanning the image…". Link phases ARE in
+    sync because they share `scanPhases.ts`; image phases have no shared twin.
+    Fix by adding `IMAGE_SCAN_STEPS` to `web/lib/scanPhases.ts` and having both
+    surfaces read it, the way `LINK_SCAN_STEPS` already works. Cosmetic, and
+    only visible to someone comparing the two screens — but it is exactly the
+    kind of drift the shared-constants pattern exists to prevent.
 11b. **[ ] "Python tests" CI workflow is perpetually red** (runs #47–#51+): the
     only failures are 4 mocks in `functions/tests/test_embed_trigger_backstop.py`
     (`SimpleNamespace` lacks `_get_attributes` — firebase_functions version
@@ -845,6 +869,7 @@ exact-match, capped.
   labels drift in *wording* (thresholds match) from `AnalyzingBanner.tsx`'s
   inline table; the fix belongs in `scanPhases.ts` as an `IMAGE_SCAN_STEPS`
   twin, outside `ShareExt/`.
+  Feature `de99e30`, merge `4aa3586` → TestFlight run #212 → **build 1212**.
 
 - **2026-07-27 — CAPTURE BANNER REPLAYED ITSELF (owner report, real device).**
   Share a post from another app, open Machina: the bar ran its phases, said
@@ -892,6 +917,7 @@ exact-match, capped.
   second capture does show, mid-capture foreground resumes forward, retry
   reopens, suppressId round-trip). **Device confirmation still pending** — the
   root-cause timeline is reasoned from the code, not measured on hardware.
+  Feature `6519e08`, merge `4aa3586` → Vercel (web) + TestFlight build 1212.
 
 - **2026-07-27 — PROMPT FIDELITY: THE MODEL MUST NOT NARROW THE SUBJECT (owner
   report).** An X post that was a screenshot of a Hebrew rant about the **Japan**
@@ -926,6 +952,12 @@ exact-match, capped.
   owner:** this raises per-save vision cost on thin-text photo posts only —
   the trade was made for knowledge-base accuracy (§7); dial `_THIN_TWEET_CHARS`
   down if the bill moves. 5 offline tests in `test_post_image_analysis.py`.
+  Feature `6519e08`, merge `4aa3586` → "Deploy Cloud Functions" run #47, scoped
+  `Deploy-Functions: analyze_link,analyze_image,share_ingest,process_link_background`.
+  **Scoped deliberately** — a trailer-less run deploys the whole codebase, which
+  would have lit up the still-dark M12 synthesis backend (§4 task 4) as a side
+  effect of a bug fix. `synthesize_week`'s prompt also gained the rule but ships
+  with M12 whenever that is turned on intentionally.
 
 - **2026-07-26 — TOUR ROUND 4: BRAND GLYPH + REAL-UI MOCKS (owner device QA on
   1210: "sloppy — generic AI icons; why a generic chat mock; why 'AI summary'").**
