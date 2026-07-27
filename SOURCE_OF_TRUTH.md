@@ -466,8 +466,30 @@ The multi-user auth work is **fully written but not live**:
     (`ea3bc2e`, merge `464e986`) — mocks now call `sync_link_embedding.__wrapped__`
     with the already-parsed event shape, and `cardThumbnail.ts` uses the shared
     `isHttpUrl()`. 525 tests green. See the §9 entry for the full reasoning.
-11c. **[ ] Web traffic shares ONE per-IP rate-limit bucket (audit S-12) — found
-    2026-07-25 (`/security web`), fix belongs in `functions/`.** `/api/chat` is
+11c. **[x] Web traffic shares ONE per-IP rate-limit bucket (audit S-12) —
+    FIXED 2026-07-27.** The pre-body gate is no longer keyed on the client IP;
+    it uses the new `_rate_limit_identity(req)` in `main.py`, which returns
+    `auth:<verified auth uid>` when the caller presents a valid bearer token and
+    `ip:<last XFF hop>` only when it can't identify them. Applied to all 8
+    pre-body gates (`analyze`, `chat`, `image`, `search`, `share`,
+    `device_token`, both `publish-ip` sites); the `-uid` buckets are untouched.
+    `_verify_bearer` is now memoized per request, so the pre-filter and
+    `_authed_uid` share one verification instead of doing it twice (and a bad
+    token logs one warning, not two). **Takes effect immediately — it does NOT
+    wait on the cutover:** the web client already sends `authHeaders()` on these
+    calls and the Vercel route forwards `Authorization`, and web is already
+    behind the Google gate. Anonymous callers are still bounded per IP, so
+    nothing is left unlimited; signed-in ones are now bounded per account, which
+    is also harder to rotate than an IP. +7 tests in
+    `tests/test_rate_limit.py`, including the regression case (two signed-in
+    users behind one proxy IP must not share a bucket). One-time effect on
+    deploy: keys change (`chat:1.2.3.4` → `chat:ip:1.2.3.4`), so every fixed
+    window resets once — worst case one extra hour's allowance.
+    ⛔ **Not fixed by this, deliberately:** an ANONYMOUS caller behind the proxy
+    still shares the IP bucket with every other anonymous caller behind it.
+    That is the correct behaviour (they are genuinely indistinguishable), and it
+    is only reachable pre-cutover; post-cutover these endpoints require a token.
+    The original diagnosis, kept because the reasoning is what matters: `/api/chat` is
     deliberately not a rewrite, so `web/app/api/chat/route.ts:50` is a Vercel
     serverless function that fetches the Cloud Function's direct URL
     **server-side**. `rate_limit.client_ip` takes the LAST `X-Forwarded-For` hop
@@ -480,10 +502,14 @@ The multi-user auth work is **fully written but not live**:
     all~~, **moot: the reader feature and its `get_article` endpoint were
     deleted 2026-07-27**), though those add a Firebase Hosting hop that couldn't
     be verified from the cloud sandbox, so only the `/api/chat` chain is
-    asserted. Fix options:
-    consult the per-uid bucket first for authenticated callers and treat the IP
-    bucket as anonymous-only, or have the proxy pass a signed client-IP header.
-    Take it in the next `/security functions` pass.
+    asserted. ~~Fix options: consult the per-uid bucket first for authenticated
+    callers and treat the IP bucket as anonymous-only, or have the proxy pass a
+    signed client-IP header.~~ **Took the first, at the identity layer rather
+    than per-endpoint** — which also covers the unproven Hosting-hop chain
+    without needing to verify it first. The signed-client-IP option was
+    rejected: it needs a shared secret in both the Vercel and functions envs,
+    i.e. new owner config that can silently drift out of sync, to end up at the
+    same place.
 11d. **[ ] Dependency + CSP posture (audit S-13/S-14) — reviewed 2026-07-25, no
     reachable exposure.** `npm audit` in `web/`: 1 critical / 18 high / 1
     moderate, all triaged as unreachable — `next@16.2.10`'s nine advisories need
@@ -931,6 +957,46 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-07-27 — S-12 FIXED: the shared per-IP rate-limit bucket (§4 item 11c).**
+  `/api/chat` runs through a Vercel route rather than a rewrite (SSE needs a
+  streaming pass-through), so every desktop-web Ask reached the backend wearing
+  **Vercel's egress IP**. `client_ip` takes the last `X-Forwarded-For` hop —
+  correctly, it is the only unforgeable one — so the fail-CLOSED 60/hr `chat`
+  bucket was ONE ceiling shared by the whole web user base, and a single script
+  could lock out every web user.
+  **Fixed at the identity layer, not per endpoint.** New
+  `main._rate_limit_identity(req)` returns `auth:<verified auth uid>` when a
+  bearer token is present and `ip:<last hop>` when it isn't; all 8 pre-body
+  gates now use it. Doing it generically also covers the `vercel.json` rewrites'
+  Firebase-Hosting hop, which has the same shape but could never be verified
+  from a cloud sandbox — **fixing the class was cheaper than proving the second
+  instance.** The other option on the table (proxy sends a signed client-IP
+  header) was rejected: it needs a shared secret in both the Vercel and
+  functions envs — new owner config that can silently drift — to reach the same
+  place.
+  **This takes effect immediately; it does not wait on the cutover.** The web
+  client already sends `authHeaders()` on these calls, the Vercel route already
+  forwards `Authorization`, and web already sits behind the Google gate.
+  Anonymous callers stay bounded per IP so nothing is left unlimited, and
+  signed-in ones are now bounded per ACCOUNT, which is harder to rotate than an
+  IP — so the pre-cutover `publish-ip` reasoning (a rotating client-supplied uid
+  is spoofable) gets stronger, not weaker.
+  `_verify_bearer` is now **memoized per request** (sentinel-guarded, so a
+  cached `None` isn't re-verified — anonymous floods are the hot path): the
+  pre-filter and `_authed_uid` share one verification, and a bad token logs one
+  warning instead of two. +7 tests, including the one that states the bug: two
+  signed-in users behind one proxy IP must not share a bucket. Full suite green.
+  **Deploy note:** keys change (`chat:1.2.3.4` → `chat:ip:1.2.3.4`), so every
+  fixed window resets once — worst case one extra hour's allowance.
+  **Sandbox friction worth recording:** the offline harness cannot import
+  `main.py` at all without `pydantic` (conftest fakes firebase_admin /
+  google.genai / firestore / requests, but not that), so every `import main`
+  test — `test_workspace_claim`, `test_search_http`, ~10 others — errors on
+  collection here. Pre-existing, not caused by this work; `pip install pydantic`
+  is enough. And `monkeypatch.setattr(main.admin_auth, "verify_id_token", …)`
+  needs `raising=False`, because the faked `firebase_admin.auth` is a bare
+  `SimpleNamespace` — the same drift class as item 11b's mocks.
 
 - **2026-07-27 — RULES NOW DEPLOY FROM CI, AND THE CUTOVER CHECKLIST WAS
   REWRITTEN AROUND WHAT IS ACTUALLY TRUE.** Rules were the last deploy surface
