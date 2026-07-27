@@ -286,17 +286,28 @@ function ListCard({
                     style={{ order: isRtl ? -1 : 1 }}
                     className="shrink-0 -mt-1.5 -mr-1 flex items-start"
                 >
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onStatusChange(link.id, isFavorite ? 'unread' : 'favorite');
-                        }}
-                        aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                        className={`shrink-0 w-9 h-11 flex items-center justify-center rounded-lg transition-colors ${isFavorite ? 'text-yellow-500' : 'text-text-muted/40 hover:text-accent'
-                            }`}
-                    >
-                        <Star className={`w-4 h-4 ${isFavorite ? 'fill-yellow-500' : ''}`} />
-                    </button>
+                    {/* Favourite: shown only when the card IS one. An empty star on
+                        every row spent 36px of title width to advertise an action
+                        that already lives in ⋯ (and in swipe-right on touch); most
+                        rows aren't favourites, so most rows got nothing for it —
+                        titles were wrapping to three lines beside a blank outline.
+                        Kept for favourites because the filled star is the ONLY
+                        at-a-glance "you starred this" cue in the list, and losing it
+                        would make the scanning view unable to show the thing it is
+                        for. It still un-stars on tap. ⋯ is the last child either way,
+                        so the menu never moves — only the star comes and goes. */}
+                    {isFavorite && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onStatusChange(link.id, 'unread');
+                            }}
+                            aria-label="Remove from favorites"
+                            className="shrink-0 w-9 h-11 flex items-center justify-center rounded-lg text-yellow-500 transition-colors"
+                        >
+                            <Star className="w-4 h-4 fill-yellow-500" />
+                        </button>
+                    )}
 
                     {/* Actions — the same sheet the grid card opens. Unlike the
                         grid, this is NOT gated to coarse pointers: a list row has

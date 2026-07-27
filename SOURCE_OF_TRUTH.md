@@ -858,7 +858,22 @@ exact-match, capped.
   compact row. **Render-verified in real Chromium** (throwaway `/dev-listcard`
   harness, EN+HE fixtures, light+dark side by side, removed before commit):
   controls sit top-right on every row, Hebrew text stays RTL, and the colour bar
-  does not crowd them. `tsc --noEmit` + eslint clean. Not yet device-QA'd.
+  does not crowd them. `tsc --noEmit` + eslint clean.
+  **Round 2 (owner device QA on 1213: "maybe we should remove the star icon and
+  reclaim some horizontal space for the title?").** Star is now rendered **only
+  when the card IS a favourite**, rather than removed outright. An empty outline
+  on every row was spending 36px of title width to advertise an action that
+  already lives in ⋯ and in swipe-right — and most rows aren't favourites, so
+  most rows paid for nothing. Deleting it entirely was the owner's suggestion but
+  would have cost the list its ONLY at-a-glance "you starred this" cue, which the
+  scanning view is precisely the place to keep; the filled star stays and still
+  un-stars on tap. Adding a favourite from the list is now ⋯ → Favourite (or
+  swipe-right on touch) — a deliberate second tap on desktop, flagged to the
+  owner. ⋯ is the cluster's last child either way, so the menu never moves; only
+  the star comes and goes. Render-verified again in Chromium (5 fixtures, 2
+  starred, EN+HE, light+dark). Note the reclaim is real but does not collapse a
+  line on every title — at 390px the two long Tech headlines still wrap to three
+  lines, since that depends on where the words break.
 
 - **2026-07-27 — SHARE-EXTENSION SCANNER REDESIGNED IN LUMEN (owner: "it has the
   old design").** The HUD that appears when you share into Machina from another
