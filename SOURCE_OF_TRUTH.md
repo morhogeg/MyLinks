@@ -372,20 +372,28 @@ The multi-user auth work is **fully written but not live**:
 
 ### 🟡 P2 — security/cost hardening & honest product surface
 
-11a1. **[ ] Owner QA on build 1212 — the three 2026-07-27 fixes are all
-    device-unverified.** Nothing below was seen running; the cloud sandbox
-    cannot compile Swift, render the app, or call Gemini. In order of risk:
+11a1. **[ ] Owner QA on build 1219 — the device-unverified 2026-07-27 work.**
+    QA this build; 1212–1218 are superseded. The cloud sandbox cannot compile
+    Swift, render the app under auth, or call Gemini, so everything here is
+    reasoned/statically-checked, not seen running. In order of risk:
     (1) **Share-extension scanner** (`CitationMarkView`) — statically reviewed
     only, never once rendered. Share into Machina and check the mark actually
     draws, the strike/breathe reads right, and nothing clips at 32pt, in light
-    and dark. (2) **Capture-banner replay** — share a post, open the app, and
-    confirm the bar shows its phases ONCE and closes. Watch specifically for the
-    new hand-off: the bridge should pass to the Firestore banner with no "Saved"
-    flash in between. (3) **Japan/Tokyo** — re-share that post (and a couple of
-    other country/industry-level ones) and check the title, summary AND tags for
-    a narrower place than the source names. If it still narrows, the prompt half
-    is not holding and the next lever is `_THIN_TWEET_CHARS` / raising the
+    and dark. **Highest risk item in the batch.** (2) **Capture-banner replay** —
+    share a post, open the app, and confirm the bar shows its phases ONCE and
+    closes. Watch specifically for the new hand-off: the bridge should pass to
+    the Firestore banner with no "Saved" flash in between. (3) **Settings
+    scroll** — scroll to the bottom of Settings, open the story, confirm it lands
+    at the top with the glyph visible, then Back and confirm you are still at the
+    bottom of the list (the per-view memory, not a blanket scroll-to-0).
+    (4) **Account screen** — sign in with Google and confirm it says Google, not
+    Apple. (5) **Japan/Tokyo** — ✅ *apparently confirmed on device 2026-07-27*
+    (a re-shared card titled "ביקורת על חוויית התיירות **ביפן**", not Tokyo), but
+    worth one more country/industry-level post, checking title, summary AND tags.
+    If it ever narrows again the next lever is `_THIN_TWEET_CHARS` / raising the
     non-primary vision resolution unconditionally.
+    Owner-confirmed working already: the list-view ⋯ menu + conditional star, the
+    dark-mode FAB, the desktop tag create, and the favicon (Chrome).
 11a2. **[ ] Image-mode scan phases drift between the app and the Share
     Extension** (found 2026-07-27). Thresholds match (95/80/60/45) but the
     wording does not: Swift says "Understanding content… / Reading text… /
@@ -928,6 +936,25 @@ exact-match, capped.
   OPTIONS) still resolves — this class of change silently half-lands otherwise.
   `deploy-hosting.sh` stays as the local escape hatch. **The recurring manual
   step is gone: a future `firebase.json` rewrite change now ships by merging.**
+
+- **2026-07-27 — SHIP: build 1219, web-only (`/ship`).** Release pass over the
+  whole 2026-07-27 owner-QA batch. **Scope assessed, not assumed:** `functions/`
+  and `firebase.json` are untouched since the other session's deploy (`bf89346`),
+  so **no functions redeploy and no hosting deploy** — desktop web had already
+  auto-deployed on each push, and the only outstanding surface was iOS. Merged
+  `origin/main` (their CI hosting-deploy workflow, fast-forward, no conflicts)
+  and triggered **TestFlight run #219 → build 1219** from `12d46d0`. Builds
+  1215/1216/1217 went green earlier in the session and are superseded; 1218 was
+  theirs. Verified before triggering: `tsc --noEmit` clean (after `rm -rf .next`
+  — stale route types from their deleted `/api/article` produce phantom errors),
+  `py_compile` clean, 535 backend tests pass with only the known `google.genai`
+  sandbox failure CI doesn't hit. §4 item 11a1 re-pointed at 1219 with the QA
+  list split into confirmed-vs-outstanding. Contents of this build: share-ext
+  Lumen scanner, capture-banner latch + settle-window fix, analyzer
+  anti-narrowing + MEDIUM vision for thin-text posts, list-view ⋯ menu and
+  favourites-only star, dark-mode FAB ink, Account provider fix + redesign,
+  founder's-note copy, `safe-pt` toolbar padding, Settings per-view scroll
+  memory, favicon URLs, filters label.
 
 - **2026-07-27 — SETTINGS SUB-SCREENS NOW OPEN AT THE TOP (owner: the story
   "opens here, and the user must scroll up to start reading").** Every screen in
