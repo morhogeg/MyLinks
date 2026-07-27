@@ -936,6 +936,24 @@ exact-match, capped.
   OPTIONS) still resolves — this class of change silently half-lands otherwise.
   `deploy-hosting.sh` stays as the local escape hatch. **The recurring manual
   step is gone: a future `firebase.json` rewrite change now ships by merging.**
+  **GREEN on run #3** (`actions/runs/30264412870`) — all nine steps, including
+  `Verify rewrites`. **Hosting is deployed and `/api/article` is confirmed dead
+  in prod.** Runs #1 and #2 both failed, and BOTH failures were the assertion
+  being wrong rather than the deploy — which is the lesson worth keeping,
+  because each wrong guess looked exactly like a real outage:
+  • **#1** asserted `/api/article` must stop returning 200. It can't: the
+    catch-all `"**" -> /index.html` means a REMOVED route falls through to the
+    SPA shell and answers **200 text/html**. The 200 it flagged was the proof
+    the route was gone. Status codes cannot distinguish removed-from-live under
+    a catch-all; **content-type** can (JSON = function still wired).
+  • **#2** then applied that same content-type rule to the LIVE route and
+    misread `204 text/html` as the shell. A CORS preflight is 204 No Content —
+    no body, so Flask's default `text/html` header rides along meaninglessly.
+    For a live route the discriminator is the **status** (204 = the function
+    answered; the shell would answer 200).
+  So the two directions need two different tests, and the workflow now says so
+  in comments next to each. Both wrong versions would have passed a naive
+  "deploy succeeded" check — which is exactly why the step exists.
 
 - **2026-07-27 — SHIP: build 1219, web-only (`/ship`).** Release pass over the
   whole 2026-07-27 owner-QA batch. **Scope assessed, not assumed:** `functions/`
