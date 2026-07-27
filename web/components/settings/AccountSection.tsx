@@ -2,8 +2,26 @@
 
 import { LogOut, Trash2 } from 'lucide-react';
 import ProfileAvatar from '../ProfileAvatar';
-import { LargeTitle, Footnote } from './primitives';
+import { LargeTitle, Footnote, List, RowShell, RowText } from './primitives';
 
+/**
+ * Account screen.
+ *
+ * Rebuilt on the shared settings grammar (SectionHeader / List / RowShell) that
+ * every other screen in this modal already uses. It previously rolled its own
+ * `rounded-2xl` card with a bordered pill button and a full-width red outlined
+ * block, so it read as a different, older app than the screen you reached it
+ * from — that inconsistency was most of what felt dated.
+ *
+ * Two specific things retired:
+ *  · the emerald status dot + emerald label. Lumen is achromatic (porcelain on
+ *    graphite); a green "online" pip is off-palette and reads like a chat
+ *    presence indicator, not an identity line. The provider is now quiet
+ *    secondary text under the email, where it belongs in the hierarchy.
+ *  · the outlined Delete button. Destructive actions in this app are rows, and
+ *    the confirm dialog is what carries the weight — an always-shouting red box
+ *    above the fold made the screen feel like a warning page.
+ */
 export function AccountView({
     accountEmail, displayName, photoURL, providerLabel, signOut, onClose, onDelete, deleteError,
 }: {
@@ -16,38 +34,57 @@ export function AccountView({
     onDelete: () => void;
     deleteError: string | null;
 }) {
+    // With a display name the email is the subtitle and the provider sits under
+    // it; without one the email IS the title, so the provider becomes the only
+    // subtitle rather than repeating the address.
+    const title = displayName || accountEmail || 'Signed in';
+    const showEmail = Boolean(displayName && accountEmail);
+
     return (
         <>
             <LargeTitle>Account</LargeTitle>
-            <div className="p-3.5 rounded-2xl bg-card border border-border-subtle">
-                <div className="flex items-center gap-3.5">
-                    <ProfileAvatar email={accountEmail} name={displayName} photoURL={photoURL} size={48} />
-                    <div className="min-w-0 flex-1">
-                        <div className="text-[15px] font-semibold text-text truncate">{displayName || accountEmail || 'Signed in'}</div>
-                        {displayName && accountEmail && <div className="text-[12px] text-text-muted truncate">{accountEmail}</div>}
-                        <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-emerald-500">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                            {providerLabel}
-                        </div>
+
+            {/* Identity — the person, stated plainly. No card chrome of its own:
+                it sits on the sheet like a header, which is what gives the screen
+                its air. */}
+            <div className="flex items-center gap-3.5 px-1.5 pt-1 pb-5">
+                <ProfileAvatar email={accountEmail} name={displayName} photoURL={photoURL} size={56} />
+                <div className="min-w-0 flex-1">
+                    <div className="text-[19px] font-semibold tracking-[-0.015em] text-text truncate leading-tight">
+                        {title}
                     </div>
+                    {showEmail && (
+                        <div className="text-[13px] text-text-secondary truncate mt-0.5">{accountEmail}</div>
+                    )}
+                    <div className="text-[12.5px] text-text-muted truncate mt-0.5">{providerLabel}</div>
                 </div>
-                <button
-                    onClick={() => { onClose(); signOut(); }}
-                    className="mt-3 w-full inline-flex items-center justify-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold border border-border-subtle text-text hover:bg-card-hover transition-colors cursor-pointer"
-                >
-                    <LogOut className="w-4 h-4" />
-                    Sign out
-                </button>
             </div>
 
-            <button
-                onClick={onDelete}
-                className="mt-2.5 w-full inline-flex items-center justify-center gap-2 rounded-2xl px-3.5 py-3 text-[13px] font-semibold border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-            >
-                <Trash2 className="w-4 h-4" />
-                Delete account
-            </button>
-            <Footnote>Permanently deletes your account and all saved links, collections, and chats. This can&apos;t be undone.</Footnote>
+            <List>
+                <RowShell tile={<LogOut className="w-[16px] h-[16px]" />} onClick={() => { onClose(); signOut(); }}>
+                    <RowText title="Sign out" />
+                </RowShell>
+            </List>
+
+            {/* Destructive action in its own group, separated by space rather than
+                a "Danger zone" header — that phrase is developer-tool vocabulary
+                and off-voice here. Distance and the footnote do the warning; the
+                confirm dialog does the stopping. */}
+            <div className="mt-7">
+                <List>
+                    <RowShell
+                        tile={<Trash2 className="w-[16px] h-[16px]" />}
+                        tileClass="bg-red-500/12 text-red-500"
+                        onClick={onDelete}
+                    >
+                        <RowText title="Delete account" />
+                    </RowShell>
+                </List>
+            </div>
+            <Footnote>
+                Permanently deletes your account and all saved links, collections, and chats.
+                This can&apos;t be undone.
+            </Footnote>
             {deleteError && <p className="mt-1.5 text-[12px] text-red-500 px-2">{deleteError}</p>}
         </>
     );

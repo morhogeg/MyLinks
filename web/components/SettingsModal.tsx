@@ -66,16 +66,48 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     const { theme, setTheme } = useTheme();
     const { authUid, email: accountEmail, displayName, photoURL, signOut } = useAuth();
 
-    // Which provider the user signed in with — read from Firebase Auth's
-    // providerData so the status line can say "Signed in with Apple/Google".
-    // Computed each render (not memoized): SettingsModal only mounts once uid is
-    // set (app/page.tsx), so auth.currentUser is always populated, and reading it
-    // live keeps the label correct without the non-reactive-dep lint warning.
+    // Which provider the user signed in with THIS session.
+    //
+    // This used to read `providerData` and return Apple if 'apple.com' appeared
+    // at all — but providerData lists every provider LINKED to the account, and
+    // linking both is the norm here (AUTH_SPEC: Google/Apple both attach to one
+    // workspace via authUids[]). So an owner who signed in with Google was told
+    // "Signed in with Apple" purely because Apple was tested first.
+    //
+    // The ID token knows which one actually authenticated this session
+    // (`signInProvider`), so ask it. It's async, hence state + effect rather than
+    // a render-time computation. While it resolves — and if the token can't be
+    // read — fall back to providerData, but only name a provider when exactly one
+    // is linked; with several linked, guessing is what caused the bug.
+    // Only the async result is state; the fallback is derived during render, so
+    // nothing calls setState synchronously inside the effect.
+    const [tokenProvider, setTokenProvider] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        let cancelled = false;
+        auth.currentUser?.getIdTokenResult()
+            .then((res) => {
+                if (!cancelled) setTokenProvider(res.signInProvider ?? null);
+            })
+            .catch(() => { /* keep the fallback — a label is never worth an error */ });
+        return () => { cancelled = true; };
+    }, [isOpen, authUid]);
+
     const providerLabel = (() => {
-        const ids = auth.currentUser?.providerData.map((p) => p.providerId) ?? [];
-        if (ids.includes('apple.com')) return 'Signed in with Apple';
-        if (ids.includes('google.com')) return 'Signed in with Google';
-        return 'Signed in';
+        const NAMES: Record<string, string> = {
+            'google.com': 'Google',
+            'apple.com': 'Apple',
+            'password': 'email',
+        };
+        // The token is authoritative about THIS session.
+        const fromToken = NAMES[tokenProvider ?? ''];
+        if (fromToken) return `Signed in with ${fromToken}`;
+        // Until it resolves: name a provider only when exactly one is linked.
+        // With several linked, picking one is precisely what caused the bug.
+        const linked = auth.currentUser?.providerData.map((p) => p.providerId) ?? [];
+        const only = linked.length === 1 ? NAMES[linked[0]] : undefined;
+        return only ? `Signed in with ${only}` : 'Signed in';
     })();
 
     // The settings-persistence brain: loaded settings, topic options, the

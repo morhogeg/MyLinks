@@ -839,6 +839,35 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-27 — ACCOUNT SCREEN: WRONG PROVIDER LABEL + REBUILT ON THE SETTINGS
+  GRAMMAR (owner: "logged in with google, it still says signed in with apple" +
+  "improve the design here, it looks a bit dated").** (1) **Real bug.**
+  `SettingsModal` derived the label from `providerData` and returned Apple if
+  `'apple.com'` appeared *at all* — but `providerData` lists every provider
+  LINKED to the account, and linking both is the design here (`AUTH_SPEC`:
+  Google and Apple both attach to one workspace via `authUids[]`). Apple was
+  simply tested first, so a Google session was mislabelled. The **ID token**
+  knows which provider authenticated THIS session, so the label now comes from
+  `getIdTokenResult().signInProvider`. Until that resolves (and if it throws) it
+  falls back to `providerData` but names a provider **only when exactly one is
+  linked** — guessing among several is what caused the bug. Only the async result
+  is state; the fallback is derived during render, so nothing calls setState
+  synchronously in an effect (that lint rule is enforced here). (2) **Design.**
+  `AccountSection` rolled its own `rounded-2xl` card, bordered pill button and
+  full-width red outlined block, so it read as an older, different app than the
+  screen you reach it from — that inconsistency was most of "dated". Rebuilt on
+  the shared `List`/`RowShell`/`RowText` primitives every other settings screen
+  uses: identity as a plain header (56px avatar, name / email / provider
+  hierarchy, no card chrome), Sign out as a row, Delete as a destructive row in
+  its own group. Retired the **emerald status dot + emerald label** (Lumen is
+  achromatic; a green pip reads as chat presence, not identity) and the
+  always-shouting red outlined Delete box. Also rejected a **"Danger zone"**
+  header on the way — developer-tool vocabulary, off-voice; distance plus the
+  footnote warns, the confirm dialog stops. Render-verified light+dark in
+  Chromium via a throwaway `/dev-account` harness, removed before commit. tsc +
+  eslint clean (2 pre-existing `set-state-in-effect` errors in `SettingsModal`
+  remain, confirmed by stashing — not introduced here, worth a pass later).
+
 - **2026-07-27 — FAVICON, ROUND 2: THE FIX WAS A NEW URL, NOT A NEW FILE (owner,
   after round 1 failed: "the favicon is still the old one").** Round 1 assumed a
   cache and shipped an SVG; the tab kept the purple M. **Proof it was never a
