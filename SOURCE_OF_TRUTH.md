@@ -955,6 +955,41 @@ exact-match, capped.
   in comments next to each. Both wrong versions would have passed a naive
   "deploy succeeded" check — which is exactly why the step exists.
 
+- **2026-07-27 — READING PROSE HONOURS SYSTEM TEXT SIZE (step 1 of the
+  text-size question; owner approved the scoped version over a settings
+  slider).** Owner asked whether to add a card text-size setting. Answer was
+  yes to the capability, no to a slider first — and the reason is structural:
+  **~half this codebase's type is hardcoded px** (243 `text-[Npx]`: `[11px]`
+  ×54, `[13px]` ×50, `[15px]` ×27 …) **and half is Tailwind's rem scale** (223).
+  Any root-level `font-size` scale — which is what both a slider and naive
+  Dynamic Type support would do — grows the rem half and freezes the px half,
+  so a summary swells while its own byline, chips and metadata stay put. That
+  breaks hierarchy rather than enlarging text; it is worse than shipping
+  nothing. **So the scale is scoped to the READING PROSE only.** New
+  `lib/useReadingScale.ts` measures the reader's Dynamic Type setting by
+  rendering an off-screen probe with `font: -apple-system-body` (the only thing
+  that resolves to the user's preferred body size — a WKWebView does not apply
+  it to ordinary CSS), divides by the 17px default, clamps to **1–1.35** (the
+  accessibility sizes go past 2× and would leave a few words per line), and
+  publishes `--reading-scale` on `:root`. Re-measures on foreground, since
+  Dynamic Type can change while Machina is backgrounded and the app is not
+  reloaded on return. Consumed by a new `.reading-prose` utility applied to the
+  card detail's summary + detailed summary; headings inside are re-anchored to
+  `1em` so the heading:body relationship holds at any scale. Desktop needs
+  nothing — browser zoom already does this, and the probe lands at ~1 there.
+  **Verified:** rendered at scale 1 / 1.2 / 1.35 in Chromium — prose grows,
+  the 11px and 15px chrome stays pixel-identical; probe leaves no DOM residue;
+  `--reading-scale` present in the production CSS bundle; tsc + eslint + full
+  `next build` clean. **NOT verified:** the actual measured value on a real
+  iPhone at a real Dynamic Type setting — that is device-only.
+  **Step 2 (NOT built, only if still wanted after living with step 1):** a
+  three-option control (Default / Large / Larger) next to Theme, writing the
+  same `--reading-scale`. Three discrete states are testable in light/dark and
+  EN/HE; a continuous slider gives a dozen states nobody will verify, and RTL
+  Hebrew at an arbitrary scale is exactly where it would break.
+  ⚠️ **Do NOT promote `.reading-prose` to `html`/`body`** — that reintroduces
+  the px/rem split above. The comment in `globals.css` says so at the rule.
+
 - **2026-07-27 — CAPTURE-NOTE WARNING REMOVED (owner: "remove it, I don't want
   it anymore").** `main._append_capture_note` appended a trailing blockquote —
   "⚠️ **הערה:** לא ניתן היה לקרוא את הטקסט המלא… נסו לשמור צילום מסך" / the
