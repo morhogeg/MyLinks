@@ -374,6 +374,21 @@ The multi-user auth work is **fully written but not live**:
     surfaces read it, the way `LINK_SCAN_STEPS` already works. Cosmetic, and
     only visible to someone comparing the two screens — but it is exactly the
     kind of drift the shared-constants pattern exists to prevent.
+11a3. **[ ] Em dashes read as AI-written — 92 left across 34 files** (owner call
+    2026-07-27, after the founder's note was de-em-dashed: "it's the most basic
+    trademark of AI writing, and not in a good way"). Only `StoryView` was
+    rewritten. Remaining density: `Feed` 8, `OnboardingTour` 8, `AddLinkForm` 7,
+    `Onboarding` 5, `AskBrain` 5, `PinLockModal` 4, `ShareCollectionSheet` 4,
+    `StatsView` 4, plus ~20 more files. **Do it by BREAKING SENTENCES, never by
+    swapping in commas** — a comma where a dash bracketed a list turns the main
+    clause into another list item (proven on the story note). Prioritise the
+    first-run voice surfaces (`OnboardingTour`, `Onboarding`, `LoginScreen`,
+    `AIConsentNotice`) since those are what a new user reads; `app/privacy` +
+    `app/terms` (11 between them) are legal prose where dashes are unremarkable —
+    probably leave them. Not swept in one pass deliberately: it is ~90 copy edits
+    across onboarding, empty states and dialogs, each needing a judgement call on
+    rhythm, and a blind find-and-replace would flatten the voice it is meant to
+    protect.
 11b. **[x] "Python tests" CI workflow is perpetually red** (runs #47–#51+): the
     only failures were 4 mocks in `functions/tests/test_embed_trigger_backstop.py`
     (`SimpleNamespace` lacks `_get_attributes` — firebase_functions version
@@ -838,6 +853,36 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-07-27 — FOUNDER'S NOTE DE-EM-DASHED + `safe-pt` WAS EATING TOOLBAR
+  PADDING.** (1) **Story copy.** Owner: the em dashes "read as AI generated
+  content… the most basic trademark of AI writing". Fair — the note carried
+  **five** in ~250 words. Removed by **breaking sentences**, not by substituting
+  commas: an owner revision that swapped the dashes for commas had made
+  "everywhere, such as a post on Instagram… , and I rarely came back" read as a
+  run-on where the main clause looks like another list item. Short sentences and
+  fragments keep the same beats and read as speech. Substance is untouched, and
+  the owner's own "five platforms" and "almost never" were kept (a revision to
+  "multiple platforms" was argued down — it was the vaguest word on the most
+  concrete sentence). The `— Mor` signature keeps its dash: conventional in a
+  letter, not a tell. Rule recorded in the component header. **Open, not done:
+  92 em dashes remain across 34 non-comment files** (`Feed`, `OnboardingTour`,
+  `AddLinkForm`, `Onboarding`, `AskBrain`, the legal pages…). Not swept
+  unilaterally — see the new §4 item. (2) **Real layout bug (owner: the open
+  card's top action bar "is too far up, as if the buttons are not vertically
+  centered").** They were centred; the PADDING was wrong. `.safe-pt` sets
+  `padding-top: env(safe-area-inset-top)`, which **REPLACES** padding rather than
+  adding to it, so `p-3 sm:p-4 safe-pt` resolved to **0px top / 16px bottom** on
+  every desktop browser (inset = 0). Both call sites that combined it with
+  padding are fixed to write the sum
+  (`pt-[calc(0.75rem+env(safe-area-inset-top))]`): `LinkDetailModal`'s header and
+  — same latent defect, found by grep — `ReadingView`'s. The two legitimate users
+  (`OfflineBanner`, `ChatHistorySidebar`) have no other top padding and are
+  untouched; `.safe-pt` now carries a warning comment. ⚠️ **Lesson: `tsc` and
+  eslint do not check CSS.** The first version of that warning comment contained
+  `p-*/py-*`, whose `*/` closed the comment early and broke the whole stylesheet
+  — caught only by actually running the app, then re-gated with a full
+  `next build`. Render-verified fixed-vs-before side by side.
 
 - **2026-07-27 — ACCOUNT SCREEN: WRONG PROVIDER LABEL + REBUILT ON THE SETTINGS
   GRAMMAR (owner: "logged in with google, it still says signed in with apple" +

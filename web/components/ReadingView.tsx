@@ -167,7 +167,10 @@ export default function ReadingView({ link, onClose }: ReadingViewProps) {
             </div>
 
             {/* Toolbar */}
-            <div className="flex items-center justify-between gap-2 px-3 sm:px-5 py-3 safe-pt border-b border-border-subtle">
+            {/* Additive safe-area top padding, not `safe-pt` — that utility REPLACES
+                padding-top, so `py-3 safe-pt` collapsed the top to 0 on desktop while
+                the bottom kept 12px. Same defect as the card detail header. */}
+            <div className="flex items-center justify-between gap-2 px-3 sm:px-5 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))] border-b border-border-subtle">
                 <Button
                     onClick={onClose}
                     title="Back"

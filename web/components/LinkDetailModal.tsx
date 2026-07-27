@@ -460,7 +460,14 @@ export default function LinkDetailModal({
                 {/* Header Actions — a single compact row: the item actions scroll
                     horizontally if they don't all fit (so nothing is ever clipped),
                     while the close button stays pinned and always reachable. */}
-                <div className="flex items-center gap-2 p-3 sm:p-4 safe-pt border-b border-border-subtle/60">
+                {/* Top padding ADDS the safe-area inset instead of using `safe-pt`,
+                    which sets `padding-top: env(safe-area-inset-top)` and therefore
+                    REPLACED the `p-3 sm:p-4` top padding. On any desktop browser the
+                    inset is 0, so this row had 0px above the buttons and 16px below
+                    — they sat hard against the top edge and read as vertically
+                    off-centre (owner, 2026-07-27). On a notched device the inset is
+                    now added to the normal padding rather than standing in for it. */}
+                <div className="flex items-center gap-2 p-3 sm:p-4 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:pt-[calc(1rem+env(safe-area-inset-top))] border-b border-border-subtle/60">
                     <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 flex-1 overflow-x-auto scrollbar-hide">
                         {/* Back to the previous card — only when opened from another
                             card's Related list. Distinct from Close (X), which

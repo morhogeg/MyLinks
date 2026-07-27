@@ -594,6 +594,12 @@ html {
   }
 
   /* Safe area utility classes */
+  /* WARNING: this REPLACES padding-top, it does not add to it. Only put it on an
+     element that has no other top padding. Combining it with a Tailwind padding
+     utility silently zeroes that padding on every device without an inset (i.e.
+     all desktop browsers), which is what pushed the card-detail and reading-view
+     toolbars flush against their top edge. When an element needs both, write the
+     sum instead: pt-[calc(0.75rem+env(safe-area-inset-top))]. */
   .safe-pt {
     padding-top: env(safe-area-inset-top);
   }
