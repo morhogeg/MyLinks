@@ -854,6 +854,40 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-27 — STORY COPY ROUND 2 + DESKTOP TAG-CREATE AFFORDANCE.**
+  (1) **"didremember" — a real JSX whitespace bug, and it is PRE-EXISTING, not
+  from the de-em-dash rewrite.** `when I <em>did</em> remember` renders with the
+  space swallowed: JSX drops the whitespace at that tag boundary. Confirmed by
+  rendering `StoryView` in Chromium and grepping the DOM (`<em>did</em>remember`),
+  then re-confirmed fixed. The original text used the identical construction, so
+  it has shipped wrong since the note landed on 2026-07-26. Fix: explicit
+  `{' '}`. **Watch for this anywhere `<em>`/`<strong>` is followed by a space in
+  prose.** (2) **Paragraph 2 reflow (owner: "the research sentences seems to
+  start out of no where").** Correct, and it was a regression from the em-dash
+  removal: the original `…making something new out of what I've learned — that's
+  not a chore` had the dash TYING the list back to the clause, and replacing it
+  with a full stop orphaned the list as a verbless fragment. Now a colon
+  introduces it from "collecting ideas is genuinely my thing:", and "None of that
+  is a chore for me" closes it. Also split "Machina came from that genuine need."
+  so the paragraph doesn't carry two colons. Verified in a real render.
+  (3) **Desktop tag create (owner: "should have the option to actually type in a
+  new tag name and create it, like we do on mobile").** The desktop path already
+  supported typing and had a `Create "…"` row, and I could NOT reproduce a
+  functional failure headlessly (the throwaway harness would not hydrate, so the
+  simulated keystroke never reached React — an inconclusive test, not a passing
+  one). What is objectively wrong is the affordance: the field said
+  **"Add tag..."** above a list of existing tags, which reads as a picker, while
+  the mobile sheet says "Search or create a tag…". Desktop placeholder now
+  matches, and the field widened `w-32 → w-44` (at 8rem a typed name scrolled out
+  of view as you typed, which feels like the field is not taking input). Also
+  hardened: click-outside now exempts the dropdown by **containment check**
+  instead of relying on the portal's `stopPropagation` beating a document-level
+  listener — order there depends on where React attached its root listener, so a
+  click on a suggestion could in principle close the field instead of adding the
+  tag. ⚠️ **Still open if the owner's issue was functional rather than
+  discoverability** — needs the specific symptom (typing does nothing / no Create
+  row / Enter does nothing) to go further.
+
 - **2026-07-27 — FOUNDER'S NOTE DE-EM-DASHED + `safe-pt` WAS EATING TOOLBAR
   PADDING.** (1) **Story copy.** Owner: the em dashes "read as AI generated
   content… the most basic trademark of AI writing". Fair — the note carried
