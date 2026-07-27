@@ -986,8 +986,10 @@ exact-match, capped.
   Functions" run #53** (`actions/runs/30306416602`) — **deliberately UNSCOPED, no
   `Deploy-Functions:` trailer**: `ai_service.py` is a shared module imported by
   every AI-touching function (analysis, RAG, weekly synthesis), so enumerating
-  targets risks silently missing one. iOS → **"iOS → TestFlight" run #223 =
-  build 1223** (`actions/runs/30306427975`).
+  targets risks silently missing one — **GREEN**. iOS → **"iOS → TestFlight" run
+  #223 = build 1223** (`actions/runs/30306427975`) — **GREEN, all 15 steps**,
+  including `Verify entitlements in exported IPA` (the App Group guard that
+  protects the Share Extension token bridge) and `Upload to TestFlight`.
   **Merge-time finding — the stale local `main` is BACK, exactly as the previous
   entry describes.** Local `main` was `7b86a77`, **not** an ancestor of
   `origin/main`, with 127 commits origin had never seen while origin/main was 83
