@@ -812,6 +812,40 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-27 — SHARE-EXTENSION SCANNER REDESIGNED IN LUMEN (owner: "it has the
+  old design").** The HUD that appears when you share into Machina from another
+  app was the last surface still wearing the pre-Lumen identity — hardcoded
+  `#A855F7`/`#EC4899` and a native port of the retired particle Thinking Orb —
+  which meant the *first* thing a share shows was off-brand before the app even
+  opened. Repainted, not rebuilt: the scanner window, layout, sweep band, %
+  counter, phase label, progress bar, `ShareProgressCurve`, the App Group
+  handoff writes and every network/watchdog path are unchanged. New
+  **`enum Lumen`** ports the `globals.css` `:root` block so every colour and
+  curve traces to a token (`--accent` for the purple, `--accent-2/-3` on the
+  sweep, `--card`/`--background` for the `.secondarySystemBackground` and
+  white-alpha wells, `--ease-modal`/`--ease-spring` as `CAMediaTimingFunction`
+  control points); the VC pins `.dark` since the surface is now hand-mixed.
+  **No green** — the app's own scan surfaces render their check in `text-accent`,
+  so resolution is porcelain here too. `OrbitsOrbView` is **deleted**, replaced
+  by **`CitationMarkView`** (CAShapeLayer/CGPath, no assets): geometry ported
+  unit-for-unit from `CitationMark.tsx` (viewBox `288 292 448 416`, TOP 300 /
+  BOT 700 / ARM 100 / W 58 / LX 296 / RX 728, point c(512,500) r52) and
+  **verified numerically** against both `cit_lumen.svg` and `bracketPaths()`
+  rather than eyeballed, with the shipped boot choreography — brackets settle on
+  `--ease-modal`, glow blooms, the point strikes on `--ease-spring`, then a slow
+  breath while work is in flight, collapsing to the settled frame under reduced
+  motion. **Round 14's lesson is structural here:** no layer carrying a glow is
+  ever animated — the ink rests after the strike and the breath is opacity on a
+  sibling radial halo behind it, so the glow cannot re-rasterise per frame.
+  ⚠️ **Swift cannot be compiled in the cloud sandbox** — this is statically
+  reviewed only (delimiters balance, no force-unwraps, no `self` captures,
+  `contentsScale` pinned on manually-added sublayers, layout geometry inside a
+  disabled `CATransaction`). **It has never been seen running — QA it on the
+  TestFlight build.** Known, pre-existing, NOT fixed: the image-mode phase
+  labels drift in *wording* (thresholds match) from `AnalyzingBanner.tsx`'s
+  inline table; the fix belongs in `scanPhases.ts` as an `IMAGE_SCAN_STEPS`
+  twin, outside `ShareExt/`.
+
 - **2026-07-27 — CAPTURE BANNER REPLAYED ITSELF (owner report, real device).**
   Share a post from another app, open Machina: the bar ran its phases, said
   "finished saving", hit 100%, vanished — then **reappeared and replayed the
