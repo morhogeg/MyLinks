@@ -936,6 +936,24 @@ exact-match, capped.
   OPTIONS) still resolves — this class of change silently half-lands otherwise.
   `deploy-hosting.sh` stays as the local escape hatch. **The recurring manual
   step is gone: a future `firebase.json` rewrite change now ships by merging.**
+  **GREEN on run #3** (`actions/runs/30264412870`) — all nine steps, including
+  `Verify rewrites`. **Hosting is deployed and `/api/article` is confirmed dead
+  in prod.** Runs #1 and #2 both failed, and BOTH failures were the assertion
+  being wrong rather than the deploy — which is the lesson worth keeping,
+  because each wrong guess looked exactly like a real outage:
+  • **#1** asserted `/api/article` must stop returning 200. It can't: the
+    catch-all `"**" -> /index.html` means a REMOVED route falls through to the
+    SPA shell and answers **200 text/html**. The 200 it flagged was the proof
+    the route was gone. Status codes cannot distinguish removed-from-live under
+    a catch-all; **content-type** can (JSON = function still wired).
+  • **#2** then applied that same content-type rule to the LIVE route and
+    misread `204 text/html` as the shell. A CORS preflight is 204 No Content —
+    no body, so Flask's default `text/html` header rides along meaninglessly.
+    For a live route the discriminator is the **status** (204 = the function
+    answered; the shell would answer 200).
+  So the two directions need two different tests, and the workflow now says so
+  in comments next to each. Both wrong versions would have passed a naive
+  "deploy succeeded" check — which is exactly why the step exists.
 
 - **2026-07-27 — SETTINGS "DONE" BAR SAT TOO HIGH ON iOS (owner, device).** The
   footer padded `calc(env(safe-area-inset-bottom) + 0.5rem)` — on a
@@ -1179,7 +1197,24 @@ exact-match, capped.
   and, pre-existing since the page shipped 2026-07-03, "Questions you ask.Your
   …". Fixed with the explicit `{" "}` idiom the file already used; caught by
   asserting on `innerText`, not by reading the screenshot, where a missing
-  single space is invisible at any sane zoom. **Deliberately NOT done:** the
+  single space is invisible at any sane zoom.
+  **⚠️ It came back TWICE more the same day, and is now guarded.** Owner spotted
+  "neversent" and "paidtier" on the live page — the same defect on the OTHER
+  side of the tag (`<span>never</span> sent`, `<em>paid</em> tier`), which the
+  first fix's label-only rule didn't cover. A DOM sweep (walk every inline
+  `span/em/a/strong/b`, compare the adjacent text nodes for a missing boundary
+  space) found a **third** the owner hadn't: `address in|section 14`, a missing
+  space *before* a link. All three fixed, plus 4 latent cases whose runs simply
+  carry no entity today. **`test_web_client_hygiene` now enforces the idiom, not
+  the symptom:** zero bare spaces adjacent to an inline tag on `/privacy` and
+  `/terms`, so a currently-fine line can't break the moment someone adds an
+  apostrophe. Two details that took a round to get right — the eaten whitespace
+  can be a **newline+indent**, not just a space (the first regex used `[ \t]+`
+  and a mutation test caught it MISSING the real shape), and a gap before
+  **punctuation** is intentional (`</a>\n.` renders "…com." with the period
+  hugging, which is wanted), so only a gap before a WORD is flagged. The guard
+  was mutation-tested against both broken shapes before being trusted.
+  **Deliberately NOT done:** the
   Vertex AI migration (data residency, CMEK, and the only documented path to
   zero data retention) — it touches every call site and is an owner decision,
   not a fix; ZDR on the Developer API needs an abuse-monitoring opt-out form.
