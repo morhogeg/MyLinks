@@ -924,6 +924,37 @@ exact-match, capped.
   Google cannot separate one user's requests from another's, let alone name
   them. Content can still be self-identifying (a note that names its author is
   words in a prompt); that is inherent to the feature and now said plainly.
+  **Then owner asked for the policy to be restructured — "exec summary / TL;DR,
+  then the full policy" — and `/privacy` was rewritten around that.** Top is an
+  **In short** panel (`bg-card` + `border-border-subtle`): six plain-language
+  principles — yours / an AI reads it and we name it / never trains a model /
+  Google is never told who you are / private cards stay out / take it or delete
+  it — two of them deep-linking into the sections that qualify them. Below it,
+  the policy proper as **14 numbered sections**, mirroring `/terms`' numbering
+  so the two documents read as a pair. New material the old page lacked: §1
+  names the controller and the surfaces covered, §3 states GDPR legal bases
+  (contract / consent — the first-run AI gate IS the consent record / legitimate
+  interest), §7 covers international transfer with the SCC reliance, §10 adds
+  portability, objection, consent-withdrawal and the supervisory-authority
+  complaint right, §9 now states the 14-day diagnostic-record TTL. §13 declares
+  the numbered sections operative and the summary a non-binding guide, so the
+  two halves can't be read as competing documents. Extracted `Section` and
+  `Point` helpers (heading rhythm + anchor ids in one place). **Two render-only
+  findings, both real:** (1) every bold label now carries an explicit `{" "}`
+  uniformly — not just the ones that needed it — so the entity/space bug can't
+  come back when someone adds an `&rsquo;` to an existing line; (2) `text-accent`
+  alone gives inline links NO affordance in Lumen dark, because `--accent` is
+  `#E9E9F2`, a near-white emphasis neutral rather than a hue — the cross-
+  reference links read exactly like the bold labels until they got a persistent
+  `underline underline-offset-2` (the idiom `AIConsentNotice` already uses).
+  Verified in Chromium at 375 and 900px: no horizontal overflow, no dropped
+  spaces, and **no dead anchors** (asserted every `href="#…"` resolves to a real
+  id, so a renamed section can't silently break a cross-reference). ~1,900
+  words. ⚠️ **Owner/legal:** §1 says "operated from Israel by its developer" —
+  if you incorporate, or App Review asks for a legal entity, that line and §14
+  need a registered name and address. Worth one lawyer pass before submission;
+  the factual sections are code-derived and accurate, but the legal-basis and
+  transfer language is written to be honest, not to be litigated.
   **Gotcha worth keeping:** in JSX, a space after `</span>` is DROPPED when the
   same text run contains an HTML entity (`&rsquo;`, `&ldquo;`) — the entity
   splits the run and the leading
