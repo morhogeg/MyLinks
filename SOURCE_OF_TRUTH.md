@@ -878,6 +878,43 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-27 — 🚢 SHIPPED: privacy audit + policy rewrite + reader removal
+  (merge `65d3afd`, pushed as `ee99317`).** Desktop web → Vercel (auto on the
+  `main` push). Functions → "Deploy Cloud Functions" **run #50**
+  (`actions/runs/30262519613`). iOS → "iOS → TestFlight" **run #218 = build
+  1218** (`actions/runs/30262554654`), queued behind the parallel session's #217
+  exactly as §2 predicts (shared concurrency group, no build-number collision).
+  **The functions deploy was deliberately left UNSCOPED — no `Deploy-Functions:`
+  trailer.** This ship DELETES `get_article`, and only a whole-codebase deploy
+  "derives the function list from source and prunes functions deleted from
+  source" (`deploy-functions.yml:170-171`); a scoped deploy would have left the
+  endpoint live in prod forever with no caller. **Make that the rule: a function
+  DELETION always ships unscoped.**
+  **Merge-time findings worth keeping.** (1) The local `main` branch in this
+  sandbox was a **stale parallel history** — tip dated 2026-07-24, not an
+  ancestor of `origin/main`, ~120 commits `origin/main` had never seen by
+  subject. It was NOT unique work: every sampled commit's content (askExcluded,
+  the hide/show-image toggle, `cardThumbnail.ts`) is present on `origin/main`
+  under different SHAs, so the histories are the same work rebuilt. Resolved by
+  `git checkout -B main origin/main` — **verify by CONTENT, not commit subject,
+  before ever resetting a diverged main.** (2) `origin/main` moved twice
+  mid-ship; both conflicts were the same shape — two sessions prepending §9
+  entries — and both were resolved by keeping BOTH sides, never by taking one.
+  (3) A `git push … | tail -3` in a retry loop reports **`tail`'s** exit code,
+  so a rejected push printed "PUSH OK". The push had actually failed; check
+  `git push`'s own status, not a pipeline's.
+  (4) The parallel session's `ea3bc2e` fixed the exact 5 tests this branch had
+  been calling a red baseline, so **the suite is now 536 passed / 0 failed** —
+  green for the first time in this work. The privacy §9 entry was corrected in
+  the merge so it no longer claims a 5-failure baseline that no longer exists.
+  (5) **Direct `curl` to api.github.com is blocked in this sandbox** ("GitHub
+  access is not enabled for this session") — CI polling must go through the
+  GitHub **MCP** tools; a background `until curl …` loop will spin forever.
+  ⛔ **OWNER STEP — hosting redeploy.** `firebase.json` rewrites changed (the
+  `/api/article` → `get_article` rewrite is gone), and hosting does NOT deploy
+  from a `main` push. Run `cd ~/MyLinks && ./deploy-hosting.sh`. Until then
+  Hosting still advertises a route whose function the deploy has pruned.
+
 - **2026-07-27 — STORY COPY ROUND 2 + DESKTOP TAG-CREATE AFFORDANCE.**
   (1) **"didremember" — a real JSX whitespace bug, and it is PRE-EXISTING, not
   from the de-em-dash rewrite.** `when I <em>did</em> remember` renders with the
