@@ -33,7 +33,7 @@ The `/api/*` calls are proxied to Firebase via `vercel.json`.
 ## App Check (protects the paid AI endpoints from bots/cost-abuse)
 
 The backend can require a Firebase App Check token on `/api/analyze`,
-`/api/analyze-image`, `/api/chat`, and `/api/article`. To turn it on:
+`/api/analyze-image`, and `/api/chat`. To turn it on:
 
 1. Firebase Console → App Check → register the web app with the **reCAPTCHA v3**
    provider (free). Copy the reCAPTCHA v3 **site key**.

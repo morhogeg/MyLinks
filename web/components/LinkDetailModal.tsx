@@ -3,11 +3,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, LinkStatus, UserNote } from '@/lib/types';
 import SourceByline from './SourceByline';
-import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, BookOpen, Layers, Share2, ChevronLeft, StickyNote } from 'lucide-react';
+import { ExternalLink, Star, X, Clock, Tag, Trash2, Bell, BellOff, Plus, Pencil, Circle, Check, Network, Play, Youtube, ImageOff, Image as ImageIcon, Layers, Share2, ChevronLeft, StickyNote } from 'lucide-react';
 import { getPlatform } from '@/lib/platform';
 import SimpleMarkdown from './SimpleMarkdown';
 import { openExternal } from '@/lib/share';
-import ReadingView from './ReadingView';
 import { getCategoryColorStyle } from '@/lib/colors';
 import CategoryInput from './CategoryInput';
 import TagInput from './TagInput';
@@ -101,7 +100,6 @@ export default function LinkDetailModal({
     onToggleThumbnail,
     scrollToNotes,
 }: LinkDetailModalProps) {
-    const [isReading, setIsReading] = useState(false);
     const [isEditingCategory, setIsEditingCategory] = useState(false);
     const [now, setNow] = useState<number>(0);
     const [isAddingTag, setIsAddingTag] = useState(false);
@@ -266,7 +264,7 @@ export default function LinkDetailModal({
     // otherwise dismisses — matching native back behaviour. The X button and
     // backdrop, by contrast, always close the whole stack.
     const goBack = onBack ?? onClose;
-    useEdgeSwipeBack(goBack, isOpen && !isReading);
+    useEdgeSwipeBack(goBack, isOpen);
 
     // Clamp the modal to the *visible* viewport so an inline edit (category /
     // tags) can't be hidden behind the on-screen keyboard: the body scrolls the
@@ -324,8 +322,7 @@ export default function LinkDetailModal({
         const onKey = (e: KeyboardEvent) => {
             if (e.key !== 'Escape') return;
             e.preventDefault();
-            if (isReading) setIsReading(false);
-            else if (isEditingNote) setIsEditingNote(false);
+            if (isEditingNote) setIsEditingNote(false);
             else if (isEditingTitle) setIsEditingTitle(false);
             else if (isEditingSummary) setIsEditingSummary(false);
             else if (editingNoteId) setEditingNoteId(null);
@@ -335,7 +332,7 @@ export default function LinkDetailModal({
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [isOpen, isReading, isEditingNote, isEditingTitle, isEditingSummary, editingNoteId, isEditingCategory, isAddingTag, onClose]);
+    }, [isOpen, isEditingNote, isEditingTitle, isEditingSummary, editingNoteId, isEditingCategory, isAddingTag, onClose]);
 
     if (!isOpen) return null;
 
@@ -349,8 +346,6 @@ export default function LinkDetailModal({
     // Branded source credit, matching the card: YouTube channel in red, X
     // author (@handle from the URL) in the X grey, everything else muted.
     const isYouTube = getPlatform(link.url) === 'youtube' || link.sourceType === 'youtube';
-    // Reading mode is for text articles — not videos or screenshots.
-    const canRead = isHttpUrl(link.url) && !isYouTube && link.sourceType !== 'image';
     // The source byline is rendered by the shared <SourceByline> — don't
     // reintroduce per-view platform/author derivation here.
 
@@ -439,7 +434,6 @@ export default function LinkDetailModal({
 
     return (
         <>
-        {isReading && <ReadingView link={link} onClose={() => setIsReading(false)} />}
         <div
             className="fixed inset-x-0 z-50 flex items-center justify-center p-0 sm:p-4"
             style={{ top: vp.offsetTop || 0, height: vp.height || '100%', bottom: 'auto' }}
@@ -535,24 +529,19 @@ export default function LinkDetailModal({
                                 <Share2 className="w-[18px] h-[18px]" />
                             </button>
                         )}
-                        {canRead && (
-                            <button
-                                onClick={() => setIsReading(true)}
-                                title="Read in distraction-free mode"
-                                aria-label="Read article"
-                                className="shrink-0 h-10 w-10 rounded-xl flex items-center justify-center text-text-muted hover:text-accent hover:bg-card-hover transition-colors"
-                            >
-                                <BookOpen className="w-[18px] h-[18px]" />
-                            </button>
-                        )}
                         {onToggleThumbnail && link.metadata?.thumbnailUrl && (
                             <button
                                 onClick={() => onToggleThumbnail(link)}
                                 title={link.hideThumbnail ? 'Show image' : 'Hide image'}
                                 aria-label={link.hideThumbnail ? 'Show image' : 'Hide image'}
-                                className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${link.hideThumbnail
-                                    ? 'bg-card-hover text-text'
-                                    : 'text-text-muted hover:text-accent hover:bg-card-hover'
+                                /* No filled "on" chip: this toggle already states
+                                   itself through the icon (ImageIcon = show,
+                                   ImageOff = hide), and the grey pill made one
+                                   button in an otherwise flat row look selected
+                                   for no reason a reader could decode. State now
+                                   shows as icon + a brighter glyph, and hover
+                                   matches every sibling. */
+                                className={`shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-colors hover:text-accent hover:bg-card-hover ${link.hideThumbnail ? 'text-text' : 'text-text-muted'
                                     }`}
                             >
                                 {link.hideThumbnail ? <ImageIcon className="w-[18px] h-[18px]" /> : <ImageOff className="w-[18px] h-[18px]" />}

@@ -4,7 +4,7 @@ Every server-side fetch of a user-supplied URL funnels through `safe_get`, and
 `requests` buffers the WHOLE body before any caller-side length check can run
 (`main._fetch_post_images` tests `len(resp.content)` — too late). One URL
 pointing at a large public file was therefore enough to exhaust a 256 MiB
-Cloud Functions instance, reachable without credentials via `get_article`.
+Cloud Functions instance on any user-supplied URL.
 
 These tests drive `safe_get` against a fake `requests.get` — no sockets, no DNS
 (the SSRF guard's resolver is stubbed to a public address).

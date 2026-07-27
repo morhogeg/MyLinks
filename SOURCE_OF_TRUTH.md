@@ -221,9 +221,12 @@ The multi-user auth work is **fully written but not live**:
    firestore.rules && firebase deploy --only firestore:rules` (point of no
    return); (6) device-verify the **brand-new-user** claim path (fresh non-owner
    account → auto-created workspace — only works once `REQUIRE_AUTH` is on).
-   Flagged decision: `get_article` stays anonymous-callable
-   (App Check + rate limit only) — keep or gate deliberately. Closes audit
-   blockers B-1/B-2/B-3. Full checklist: `NATIVE_AUTH_SETUP.md` §6.
+   ~~Flagged decision: `get_article` stays anonymous-callable (App Check + rate
+   limit only) — keep or gate deliberately.~~ **RESOLVED BY DELETION
+   2026-07-27** — the reader feature was removed at owner request, taking the
+   endpoint with it, so the cutover no longer has an anonymous exception to
+   reason about (see §9). Closes audit blockers B-1/B-2/B-3. Full checklist:
+   `NATIVE_AUTH_SETUP.md` §6.
    ⚠️ **Cutover-day breakage found + fixed 2026-07-25 (`/security web`, audit
    S-9).** `firestore.rules.locked` denied ALL writes on `users/{uid}/digests`,
    but the per-digest **Delete** action is a direct client `deleteDoc`
@@ -408,9 +411,11 @@ The multi-user auth work is **fully written but not live**:
     the per-uid bucket at `:1522`. Net effect: **60 Ask questions an hour across
     the entire desktop-web user base**, and one script locks out every web user.
     Same topology for the `vercel.json` rewrites (`analyze` 30/hr, `image`
-    30/hr, `share` 120/hr, `article` 120/hr — `article` has no uid bucket at
-    all), though those add a Firebase Hosting hop that couldn't be verified from
-    the cloud sandbox, so only the `/api/chat` chain is asserted. Fix options:
+    30/hr, `share` 120/hr — ~~`article` 120/hr, which had no uid bucket at
+    all~~, **moot: the reader feature and its `get_article` endpoint were
+    deleted 2026-07-27**), though those add a Firebase Hosting hop that couldn't
+    be verified from the cloud sandbox, so only the `/api/chat` chain is
+    asserted. Fix options:
     consult the per-uid bucket first for authenticated callers and treat the IP
     bucket as anonymous-only, or have the proxy pass a signed client-IP header.
     Take it in the next `/security functions` pass.
@@ -854,6 +859,45 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-07-27 — READER MODE DELETED + THE THUMBNAIL TOGGLE LOST ITS GREY PILL
+  (owner: "we have the reader feature — remove it completely. it doesn't work
+  half the time, not needed", and "why is the hide/show image with a grey
+  background?").** Reader is gone at every layer, not just hidden: deleted
+  `web/components/ReadingView.tsx` and `web/app/api/article/route.ts`, the
+  `get_article` Cloud Function and its `"article": (120, 3600, True)` rate-limit
+  row, `scraper.extract_readable_article`, both rewrites (`firebase.json` +
+  `web/vercel.json`), the `reader-font-size` device-preference allowlist entry,
+  and the `BookOpen` toolbar button with its `canRead`/`isReading` state, Escape
+  ladder rung, and `useEdgeSwipeBack` suppression. Two references that would
+  have rotted were updated rather than left: `test_web_client_hygiene` asserts
+  the localStorage allowlist EXACTLY, so it now expects `{"theme"}` alone (it
+  would have gone red on the next run), and `test_response_caps`' docstring no
+  longer cites a removed endpoint as the reason `safe_get` caps response size —
+  the cap still matters, every URL fetch funnels through it, only the example
+  changed. `web/VERCEL.md`'s App Check list dropped `/api/article` too. Grepped
+  clean: no `get_article`/`ReadingView`/`api/article` reference survives outside
+  build output. **Side benefit:** this deletes the one endpoint the auth cutover
+  had to make a deliberate exception for — §4 task 2's "`get_article` stays
+  anonymous-callable (App Check + rate limit only) — keep or gate deliberately"
+  is now answered by deletion, and §4-11c's `article`-has-no-uid-bucket finding
+  is moot. The **thumbnail toggle** was the only control in a flat icon row
+  carrying a filled `bg-card-hover` chip when active, which read as "selected"
+  with nothing to decode it against; the state was already legible from the
+  icon swap (`ImageIcon` = show / `ImageOff` = hide), so the pill went and the
+  active state is now just a brighter glyph, with hover identical to every
+  sibling. **Render-verified in real Chromium** (throwaway `/dev-modal` harness
+  with a `hideThumbnail: true` fixture — the ACTIVE state is the one that had
+  the pill, so testing the default would have proved nothing; removed before
+  commit): asserted `getComputedStyle().backgroundColor` is transparent on every
+  toolbar control in both themes, and that no "Read article" button exists.
+  ⛔ **TWO OWNER DEPLOY STEPS — neither happens on a normal push.** (1)
+  `firebase.json` rewrites changed, so hosting must be redeployed
+  (`firebase deploy --only hosting`) or `/api/article` keeps resolving. (2) The
+  **`get_article` function stays deployed** until explicitly removed — deleting
+  source does not prune it — so run `firebase functions:delete get_article
+  --project secondbrain-app-94da2`. Until both, the endpoint is live with no
+  caller.
 
 - **2026-07-27 — GEMINI PRIVACY AUDIT: WHAT WE ACTUALLY SEND, AND TWO PAYLOADS
   THAT LEAKED (owner: "privacy is key… since we are sending to Gemini, that's
