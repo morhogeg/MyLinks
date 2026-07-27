@@ -905,9 +905,28 @@ exact-match, capped.
   surface, and the consent screen — which a third row pushed past a short
   viewport — got `overflow-y-auto` + `my-auto` (flex centering CLIPS overflow
   instead of scrolling it) plus tightened copy, so the CTA is above the fold on
-  iPhone 14 and reachable by scroll on SE. **Gotcha worth keeping:** in JSX, a
-  space after `</span>` is DROPPED when the same text run contains an HTML
-  entity (`&rsquo;`, `&ldquo;`) — the entity splits the run and the leading
+  iPhone 14 and reachable by scroll on SE.
+  **Follow-up same day — the "no human reads it" line was itself an over-claim,
+  fixed.** Owner asked to confirm the three guarantees in plain words, which
+  forced a re-check of the middle one. The human review you're exempt from on
+  the paid tier is the *product-improvement* kind (reviewers reading and
+  annotating API input/output, which is standard practice on the unpaid tier).
+  A narrower path survives: content Google's automated systems FLAG as possibly
+  violating its usage policies can be assessed by authorized Google staff to
+  confirm or overturn the flag. Not hypothetical here — Machina already owns a
+  card that trips Gemini's prompt filter (`askExcluded`, 2026-07-24). Consent
+  row now reads "never used to train or improve Google's models. It's kept up
+  to 55 days for abuse checks, then deleted" (the 55-day fact earns its place
+  back), and `/privacy` states the flagged-content exception outright. The
+  identity guarantee needed no change and is the strongest of the three: no
+  account identifier of any kind is on the wire, the calls are server-to-server
+  so Google never sees a user's IP, and every user shares one project key — so
+  Google cannot separate one user's requests from another's, let alone name
+  them. Content can still be self-identifying (a note that names its author is
+  words in a prompt); that is inherent to the feature and now said plainly.
+  **Gotcha worth keeping:** in JSX, a space after `</span>` is DROPPED when the
+  same text run contains an HTML entity (`&rsquo;`, `&ldquo;`) — the entity
+  splits the run and the leading
   space is trimmed. It rendered "Saving a link.The text…" in four new bullets
   and, pre-existing since the page shipped 2026-07-03, "Questions you ask.Your
   …". Fixed with the explicit `{" "}` idiom the file already used; caught by

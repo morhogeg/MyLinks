@@ -54,7 +54,7 @@ export default function AIConsentNotice({ onAccept }: { onAccept: () => void }) 
                     <InfoRow
                         icon={<ShieldCheck className="w-[18px] h-[18px]" />}
                         title="Not used to train AI models"
-                        body="Machina uses Gemini's paid tier: Google's terms state your content is never used to train Google's models, and no human reads it."
+                        body="Machina uses Gemini's paid tier: Google's terms state your content is never used to train or improve Google's models. It's kept up to 55 days for abuse checks, then deleted."
                     />
                     <InfoRow
                         icon={<UserX className="w-[18px] h-[18px]" />}

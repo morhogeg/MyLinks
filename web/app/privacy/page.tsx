@@ -80,7 +80,7 @@ export default function PrivacyPage() {
         on. We do not use your data for advertising, and we do not sell it. Your content is not used
         to train AI models — not by us, and not by Google: Machina uses the <em>paid</em> tier of
         the Gemini API, whose terms state that prompts and responses are not used to improve or
-        train Google&rsquo;s models, and are not read by human reviewers.
+        train Google&rsquo;s models, and are not read by reviewers to improve them.
       </p>
 
       <h2 className="mt-10 text-xl font-semibold text-text">Where your data lives</h2>
@@ -98,9 +98,12 @@ export default function PrivacyPage() {
           page text, images — and the questions you ask are sent server-side to the Google Gemini
           API to produce summaries, tags, embeddings, and answers. Machina uses the paid tier, under
           which Google&rsquo;s API terms state that your prompts and responses are not used to
-          improve or train Google&rsquo;s models and are not read by human reviewers. Google does
-          retain them for up to 55 days for the sole purpose of detecting abuse of the API, after
-          which they are deleted. The exact contents of every request are listed below.
+          improve or train Google&rsquo;s models, and are not read by reviewers to improve them.
+          Google does retain them for up to 55 days for the sole purpose of detecting abuse of the
+          API, after which they are deleted. One honest exception sits inside that: content its
+          automated systems flag as possibly breaking Google&rsquo;s usage policies can be assessed
+          by authorized Google staff, to confirm or overturn the flag. The exact contents of every
+          request are listed below.
         </li>
         <li>
           <span className="text-text">Google Firebase / Google Cloud.</span> Storage, authentication,
