@@ -50,10 +50,6 @@
         "function": "search_links_http"
       },
       {
-        "source": "/api/article",
-        "function": "get_article"
-      },
-      {
         "source": "/api/claim-workspace",
         "function": "claim_workspace_http"
       },

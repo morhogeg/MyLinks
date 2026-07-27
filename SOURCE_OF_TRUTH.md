@@ -221,9 +221,12 @@ The multi-user auth work is **fully written but not live**:
    firestore.rules && firebase deploy --only firestore:rules` (point of no
    return); (6) device-verify the **brand-new-user** claim path (fresh non-owner
    account → auto-created workspace — only works once `REQUIRE_AUTH` is on).
-   Flagged decision: `get_article` stays anonymous-callable
-   (App Check + rate limit only) — keep or gate deliberately. Closes audit
-   blockers B-1/B-2/B-3. Full checklist: `NATIVE_AUTH_SETUP.md` §6.
+   ~~Flagged decision: `get_article` stays anonymous-callable (App Check + rate
+   limit only) — keep or gate deliberately.~~ **RESOLVED BY DELETION
+   2026-07-27** — the reader feature was removed at owner request, taking the
+   endpoint with it, so the cutover no longer has an anonymous exception to
+   reason about (see §9). Closes audit blockers B-1/B-2/B-3. Full checklist:
+   `NATIVE_AUTH_SETUP.md` §6.
    ⚠️ **Cutover-day breakage found + fixed 2026-07-25 (`/security web`, audit
    S-9).** `firestore.rules.locked` denied ALL writes on `users/{uid}/digests`,
    but the per-digest **Delete** action is a direct client `deleteDoc`
@@ -277,6 +280,25 @@ The multi-user auth work is **fully written but not live**:
    matching `_require_admin`'s stated policy. Before flipping `REQUIRE_AUTH`:
    set `OWNER_EMAIL`, and confirm `users/{owner doc}.authUids` already contains
    your auth uid (if it does, step 1 short-circuits and the gate never runs).
+   ⚠️ **Gemini key must stay on the PAID project (privacy audit 2026-07-27).**
+   Owner confirmed via AI Studio → Spend: project **`gen-lang-client-0057642876`
+   ("2nd brain"), Tier 1**, real daily spend all July — so the paid-tier terms
+   (no training, no human review, ≤55-day abuse log) DO apply today, and the
+   `/privacy` + consent copy that now asserts them is true. This guarantee is
+   **per Cloud project**: when rotating the key (above), mint the new one in
+   *that* project. A key from an unbilled project silently reverts every save
+   to the unpaid terms, under which Google trains on user content — with no
+   runtime signal, since the API and the code are identical either way.
+5b. **[ ] Gemini monthly spend cap is ₪5.00 — raise it before any cohort wider
+   than the owner (found 2026-07-27, privacy audit).** AI Studio shows the cap
+   at ₪5.00/mo with ₪1.49 used by a single user. §7 puts one heavy user at
+   $1.30–2.00/mo, so **two real users exhaust it mid-month**; hitting it is a
+   hard kill-switch (429 "billing account has exceeded its monthly spending
+   cap", blocked until the 1st — Google documents **no** fallback to free
+   quota). Privacy-wise that fails safe, which is why this is an availability
+   item, not a privacy one: analysis, Ask, and synthesis simply stop for
+   everybody. Raise the cap and keep the GCP **budget alert** (task 19) as the
+   early warning instead of using the cap as enforcement.
 5a. **[x] Share-doc `ownerUid` PII leak — FIXED via option (a), owner chose it
     2026-07-07.** `shared_cards`/`shared_collections` used to store `ownerUid`
     (= owner phone number) in a world-readable doc. Fix: new Admin-SDK
@@ -407,9 +429,11 @@ The multi-user auth work is **fully written but not live**:
     the per-uid bucket at `:1522`. Net effect: **60 Ask questions an hour across
     the entire desktop-web user base**, and one script locks out every web user.
     Same topology for the `vercel.json` rewrites (`analyze` 30/hr, `image`
-    30/hr, `share` 120/hr, `article` 120/hr — `article` has no uid bucket at
-    all), though those add a Firebase Hosting hop that couldn't be verified from
-    the cloud sandbox, so only the `/api/chat` chain is asserted. Fix options:
+    30/hr, `share` 120/hr — ~~`article` 120/hr, which had no uid bucket at
+    all~~, **moot: the reader feature and its `get_article` endpoint were
+    deleted 2026-07-27**), though those add a Firebase Hosting hop that couldn't
+    be verified from the cloud sandbox, so only the `/api/chat` chain is
+    asserted. Fix options:
     consult the per-uid bucket first for authenticated callers and treat the IP
     bucket as anonymous-only, or have the proxy pass a signed client-IP header.
     Take it in the next `/security functions` pass.
@@ -853,6 +877,162 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-07-27 — READER MODE DELETED + THE THUMBNAIL TOGGLE LOST ITS GREY PILL
+  (owner: "we have the reader feature — remove it completely. it doesn't work
+  half the time, not needed", and "why is the hide/show image with a grey
+  background?").** Reader is gone at every layer, not just hidden: deleted
+  `web/components/ReadingView.tsx` and `web/app/api/article/route.ts`, the
+  `get_article` Cloud Function and its `"article": (120, 3600, True)` rate-limit
+  row, `scraper.extract_readable_article`, both rewrites (`firebase.json` +
+  `web/vercel.json`), the `reader-font-size` device-preference allowlist entry,
+  and the `BookOpen` toolbar button with its `canRead`/`isReading` state, Escape
+  ladder rung, and `useEdgeSwipeBack` suppression. Two references that would
+  have rotted were updated rather than left: `test_web_client_hygiene` asserts
+  the localStorage allowlist EXACTLY, so it now expects `{"theme"}` alone (it
+  would have gone red on the next run), and `test_response_caps`' docstring no
+  longer cites a removed endpoint as the reason `safe_get` caps response size —
+  the cap still matters, every URL fetch funnels through it, only the example
+  changed. `web/VERCEL.md`'s App Check list dropped `/api/article` too. Grepped
+  clean: no `get_article`/`ReadingView`/`api/article` reference survives outside
+  build output. **Side benefit:** this deletes the one endpoint the auth cutover
+  had to make a deliberate exception for — §4 task 2's "`get_article` stays
+  anonymous-callable (App Check + rate limit only) — keep or gate deliberately"
+  is now answered by deletion, and §4-11c's `article`-has-no-uid-bucket finding
+  is moot. The **thumbnail toggle** was the only control in a flat icon row
+  carrying a filled `bg-card-hover` chip when active, which read as "selected"
+  with nothing to decode it against; the state was already legible from the
+  icon swap (`ImageIcon` = show / `ImageOff` = hide), so the pill went and the
+  active state is now just a brighter glyph, with hover identical to every
+  sibling. **Render-verified in real Chromium** (throwaway `/dev-modal` harness
+  with a `hideThumbnail: true` fixture — the ACTIVE state is the one that had
+  the pill, so testing the default would have proved nothing; removed before
+  commit): asserted `getComputedStyle().backgroundColor` is transparent on every
+  toolbar control in both themes, and that no "Read article" button exists.
+  ⛔ **ONE OWNER DEPLOY STEP.** `firebase.json` rewrites changed, so **hosting
+  must be redeployed** (`cd ~/MyLinks && ./deploy-hosting.sh`) or `/api/article`
+  keeps resolving through Hosting. The cloud sandbox can't do it (no firebase
+  auth), so it is genuinely yours. ~~`firebase functions:delete get_article`~~ —
+  **not needed:** the ship deliberately omitted the `Deploy-Functions:` trailer,
+  and a whole-codebase deploy "derives the function list from source and prunes
+  functions deleted from source" (`deploy-functions.yml:170-171`), so
+  `get_article` is removed from prod by the deploy itself. That is the reason to
+  skip the trailer whenever a function is DELETED rather than changed — a scoped
+  deploy would have left the endpoint live forever.
+
+- **2026-07-27 — GEMINI PRIVACY AUDIT: WHAT WE ACTUALLY SEND, AND TWO PAYLOADS
+  THAT LEAKED (owner: "privacy is key… since we are sending to Gemini, that's
+  probably the weak spot — confirm Gemini is not training on our users'
+  information").** Traced every Gemini call site and answered the question at
+  the root of it: `ai_service.py:662` is `genai.Client(api_key=…)` = the
+  **Gemini Developer API**, not Vertex — and that API's terms split hard by
+  tier. Unpaid quota: Google uses submitted content to improve its products and
+  **human reviewers may read it**. Paid quota: not used for training, no human
+  review, logged ≤55 days for abuse detection only. Same code, same env var,
+  opposite outcome, and nothing in the repo can tell you which one you're on.
+  **Owner resolved it from AI Studio → Spend: Tier 1, project
+  `gen-lang-client-0057642876`, real daily spend all month ⇒ paid tier, so the
+  training guarantee holds today** (recorded in §4 task 5 — the guarantee is
+  per Cloud *project*, so the rotation there must mint into that same project).
+  Two side findings: Google's terms require Paid Services for EEA/CH/UK users
+  at all, and the ₪5.00 monthly spend cap is a hard kill-switch that two real
+  users would trip mid-month (new §4 task 5b — availability, not privacy).
+  **Two payload builders had no privacy filter and now do.** (1)
+  `digest_service.fetch_candidate_links` fed BOTH the curated digest and the
+  weekly synthesis with no `isPrivate` check, so private cards went to Gemini
+  in `synthesize_week` **and** the model's generated title became the push
+  notification — a private card's subject on a locked phone. Filtered at the
+  single point both consumers read from, via the `search.is_effectively_private`
+  /`private_collection_ids` pair Ask has used since it shipped; `askExcluded`
+  now also drops out of `synthesis_window_cards`, so the one card that trips
+  Gemini's prompt filter can't kill the whole weekly recap the way it killed
+  Ask. (2) `link_service.get_user_tags` returned **every tag the user ever
+  made, alphabetically, uncapped**, and it is interpolated into EVERY analysis
+  prompt — so a private card's tags ("fertility", "layoff") rode along with an
+  unrelated public save, forever. Now counts only non-private cards (a tag also
+  used on a public card survives — withholding it would just fragment the
+  vocabulary), ranks by usage, and caps at `MAX_PROMPT_TAGS = 50`, mirroring
+  the `_sanitize_tags` cap its client-supplied twin always had. 11 tests in a
+  new `tests/test_ai_payload_privacy.py`. (Written against a 531-pass/5-fail
+  baseline — the 4 §4-11b mocks + a `cardThumbnail.ts` hygiene assert, both
+  confirmed unrelated by stashing. A parallel session fixed exactly those 5 on
+  `main` while this branch was in flight, so **at merge the suite is 536 passed,
+  0 failed** — fully green.) **Copy now says something defensible.** The
+  consent gate's second row claimed "Never used for AI training" while its own
+  body only supported *"Machina* does not…" — silent about Google, the party
+  actually holding the data. It now names the paid tier as the reason, and a
+  third row states what Google never receives: no name, email, phone or IP,
+  because the calls are server-to-server (verified — no user identifier is
+  attached to any Gemini request, so Google cannot link a prompt to a person).
+  `/privacy` gained a **feature-by-feature list of every payload** and an honest
+  **Private cards** section: private ⇒ never sent again, but the card WAS
+  analyzed at save time and the PIN is a screen lock, not encryption. Settings'
+  Privacy & AI footnote matches. **Render-verified in real Chromium** (throwaway
+  `/dev-consent` harness, removed before commit): no horizontal overflow on any
+  surface, and the consent screen — which a third row pushed past a short
+  viewport — got `overflow-y-auto` + `my-auto` (flex centering CLIPS overflow
+  instead of scrolling it) plus tightened copy, so the CTA is above the fold on
+  iPhone 14 and reachable by scroll on SE.
+  **Follow-up same day — the "no human reads it" line was itself an over-claim,
+  fixed.** Owner asked to confirm the three guarantees in plain words, which
+  forced a re-check of the middle one. The human review you're exempt from on
+  the paid tier is the *product-improvement* kind (reviewers reading and
+  annotating API input/output, which is standard practice on the unpaid tier).
+  A narrower path survives: content Google's automated systems FLAG as possibly
+  violating its usage policies can be assessed by authorized Google staff to
+  confirm or overturn the flag. Not hypothetical here — Machina already owns a
+  card that trips Gemini's prompt filter (`askExcluded`, 2026-07-24). Consent
+  row now reads "never used to train or improve Google's models. It's kept up
+  to 55 days for abuse checks, then deleted" (the 55-day fact earns its place
+  back), and `/privacy` states the flagged-content exception outright. The
+  identity guarantee needed no change and is the strongest of the three: no
+  account identifier of any kind is on the wire, the calls are server-to-server
+  so Google never sees a user's IP, and every user shares one project key — so
+  Google cannot separate one user's requests from another's, let alone name
+  them. Content can still be self-identifying (a note that names its author is
+  words in a prompt); that is inherent to the feature and now said plainly.
+  **Then owner asked for the policy to be restructured — "exec summary / TL;DR,
+  then the full policy" — and `/privacy` was rewritten around that.** Top is an
+  **In short** panel (`bg-card` + `border-border-subtle`): six plain-language
+  principles — yours / an AI reads it and we name it / never trains a model /
+  Google is never told who you are / private cards stay out / take it or delete
+  it — two of them deep-linking into the sections that qualify them. Below it,
+  the policy proper as **14 numbered sections**, mirroring `/terms`' numbering
+  so the two documents read as a pair. New material the old page lacked: §1
+  names the controller and the surfaces covered, §3 states GDPR legal bases
+  (contract / consent — the first-run AI gate IS the consent record / legitimate
+  interest), §7 covers international transfer with the SCC reliance, §10 adds
+  portability, objection, consent-withdrawal and the supervisory-authority
+  complaint right, §9 now states the 14-day diagnostic-record TTL. §13 declares
+  the numbered sections operative and the summary a non-binding guide, so the
+  two halves can't be read as competing documents. Extracted `Section` and
+  `Point` helpers (heading rhythm + anchor ids in one place). **Two render-only
+  findings, both real:** (1) every bold label now carries an explicit `{" "}`
+  uniformly — not just the ones that needed it — so the entity/space bug can't
+  come back when someone adds an `&rsquo;` to an existing line; (2) `text-accent`
+  alone gives inline links NO affordance in Lumen dark, because `--accent` is
+  `#E9E9F2`, a near-white emphasis neutral rather than a hue — the cross-
+  reference links read exactly like the bold labels until they got a persistent
+  `underline underline-offset-2` (the idiom `AIConsentNotice` already uses).
+  Verified in Chromium at 375 and 900px: no horizontal overflow, no dropped
+  spaces, and **no dead anchors** (asserted every `href="#…"` resolves to a real
+  id, so a renamed section can't silently break a cross-reference). ~1,900
+  words. ⚠️ **Owner/legal:** §1 says "operated from Israel by its developer" —
+  if you incorporate, or App Review asks for a legal entity, that line and §14
+  need a registered name and address. Worth one lawyer pass before submission;
+  the factual sections are code-derived and accurate, but the legal-basis and
+  transfer language is written to be honest, not to be litigated.
+  **Gotcha worth keeping:** in JSX, a space after `</span>` is DROPPED when the
+  same text run contains an HTML entity (`&rsquo;`, `&ldquo;`) — the entity
+  splits the run and the leading
+  space is trimmed. It rendered "Saving a link.The text…" in four new bullets
+  and, pre-existing since the page shipped 2026-07-03, "Questions you ask.Your
+  …". Fixed with the explicit `{" "}` idiom the file already used; caught by
+  asserting on `innerText`, not by reading the screenshot, where a missing
+  single space is invisible at any sane zoom. **Deliberately NOT done:** the
+  Vertex AI migration (data residency, CMEK, and the only documented path to
+  zero data retention) — it touches every call site and is an owner decision,
+  not a fix; ZDR on the Developer API needs an abuse-monitoring opt-out form.
 
 - **2026-07-27 — FOUNDER'S NOTE DE-EM-DASHED + `safe-pt` WAS EATING TOOLBAR
   PADDING.** (1) **Story copy.** Owner: the em dashes "read as AI generated

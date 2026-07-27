@@ -15,6 +15,11 @@ from log_safe import mask_uid
 
 logger = logging.getLogger(__name__)
 
+# How many of the user's tags may ride into a Gemini analysis prompt. Mirrors
+# main.MAX_TAGS, which caps the client-supplied `existingTags` on the twin path
+# — the server-side builder (get_user_tags) went uncapped until 2026-07-27.
+MAX_PROMPT_TAGS = 50
+
 # Defaults for a brand-new workspace. Mirrors DEFAULT_SETTINGS in
 # web/lib/useUserSettings.ts — keep the two in sync.
 DEFAULT_USER_SETTINGS = {
@@ -147,18 +152,54 @@ def save_link_to_firestore(uid: str, link_data: dict) -> str:
 
 
 def get_user_tags(uid: str) -> list:
-    """Get all unique tags for a user from Firestore."""
+    """The user's tag vocabulary, for the "reuse these tags" half of the
+    analysis prompt.
+
+    PRIVACY (2026-07-27): this list is interpolated into EVERY Gemini analysis
+    prompt, so it is the one field that travels with an unrelated save. Two
+    rules follow from that, and both are load-bearing:
+
+      * Tags that exist ONLY on effectively-private cards are dropped. Tags are
+        the most self-describing data in the app ("fertility", "layoff"), and
+        a private card's vocabulary must not ride along with a public save —
+        the same promise `search.strip_private_cards` enforces for Ask. A tag
+        the user also applied to a non-private card stays: it is already part
+        of their open vocabulary and withholding it would only fragment tagging.
+      * The result is CAPPED and ranked by usage instead of returned whole.
+        The old version returned every tag ever created, alphabetically, so the
+        prompt grew without bound and an `a`-heavy vocabulary crowded out the
+        tags actually worth reusing. MAX_PROMPT_TAGS mirrors main._sanitize_tags'
+        MAX_TAGS, which has always capped the client-supplied twin of this list.
+
+    Ties break alphabetically so the list is deterministic run to run.
+    """
+    # Lazy import: `search` pulls in ai_service/genai, and this module is
+    # imported on cold paths that never need them (house pattern — see
+    # digest_service's lazy ai_service/push_service imports).
+    from search import is_effectively_private, private_collection_ids
+
     db = get_db()
     links_ref = db.collection('users').document(uid).collection('links')
     docs = links_ref.get()
 
-    tags = set()
+    private_ids = private_collection_ids(uid)
+    counts = {}
     for doc in docs:
-        link_tags = doc.to_dict().get('tags', [])
+        data = doc.to_dict() or {}
+        if is_effectively_private(data, private_ids):
+            continue
+        link_tags = data.get('tags') or []
+        if not isinstance(link_tags, list):
+            continue
         for tag in link_tags:
-            tags.add(tag)
+            if isinstance(tag, str) and tag.strip():
+                counts[tag] = counts.get(tag, 0) + 1
 
-    return sorted(list(tags))
+    # Counting only non-private cards gives the private-only exclusion for
+    # free: a tag shared with a public card still lands here, with the private
+    # card's use of it simply not counted toward its rank.
+    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    return [tag for tag, _ in ranked[:MAX_PROMPT_TAGS]]
 
 
 def is_hebrew(text: str) -> bool:

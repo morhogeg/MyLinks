@@ -332,7 +332,6 @@ _RATE_LIMITS = {
     "image-uid": (30, 3600, False),
     "chat": (60, 3600, False),
     "chat-uid": (60, 3600, False),
-    "article": (120, 3600, True),
     "share": (120, 3600, False),
     # Per-uid ceiling on the share-extension token path (report 3.3): the IP
     # `share` bucket alone can't stop a leaked ingest token from spamming the
@@ -2134,59 +2133,6 @@ def search_links_http(req: https_fn.Request) -> https_fn.Response:
         )
     except Exception as e:
         return _server_error(headers, e, "Search failed")
-
-
-@https_fn.on_request(max_instances=10)
-def get_article(req: https_fn.Request) -> https_fn.Response:
-    """HTTP endpoint: extract a clean, readable version of an article for the
-    in-app reading mode. Body: { url }. Returns { success, title, paragraphs }.
-
-    Fetched on demand so it works for every saved link (including old ones)
-    without a schema migration or backfill.
-    """
-    if req.method == 'OPTIONS':
-        return _cors_preflight(req)
-
-    headers = _cors_headers(req)
-
-    rl = _rate_limited("article", client_ip(req), headers)
-    if rl:
-        return rl
-
-    if not _require_app_check(req, headers):
-        return _error_response("App Check verification failed", 401, headers)
-
-    try:
-        data = req.get_json()
-        url = (data or {}).get('url')
-        if not url:
-            return _error_response("url is required", 400, headers)
-        if len(url) > MAX_URL_LENGTH:
-            return _error_response("URL is too long", 400, headers)
-
-        from scraper import extract_readable_article, UnsafeURLError
-        try:
-            article = extract_readable_article(url)
-        except UnsafeURLError as e:
-            # Blocked host, oversized body, or a stalled transfer (see
-            # scraper.safe_get). This is a caller problem, so answer 4xx instead
-            # of falling through to _server_error — a 500 here would let an
-            # anonymous caller mint durable `server_errors` records on demand.
-            logger.info("get_article rejected a URL: %s", e)
-            return _error_response("Couldn't read this page.", 422, headers)
-
-        if not article.get("paragraphs"):
-            return _error_response(
-                "Couldn't extract readable text from this page.", 422, headers
-            )
-
-        return https_fn.Response(
-            json.dumps({"success": True, **article}),
-            status=200, headers=headers, mimetype='application/json'
-        )
-
-    except Exception as e:
-        return _server_error(headers, e)
 
 
 @https_fn.on_request(max_instances=10, timeout_sec=120)

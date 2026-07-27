@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Sparkles, ShieldCheck } from 'lucide-react';
+import { Sparkles, ShieldCheck, UserX } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { policyUrl, openExternal } from '@/lib/share';
 import { isNativeApp } from '@/lib/api';
@@ -22,13 +22,17 @@ export default function AIConsentNotice({ onAccept }: { onAccept: () => void }) 
     const privacyHref = policyUrl('/privacy');
     return (
         <div
-            className="min-h-screen bg-background text-text flex items-center justify-center px-6"
+            // overflow-y-auto + my-auto on the child (rather than
+            // justify-center): a third InfoRow pushes this past a short
+            // viewport (iPhone SE), and flex centering CLIPS the overflowing
+            // top instead of letting it scroll.
+            className="min-h-screen overflow-y-auto bg-background text-text flex items-start px-6"
             style={{
                 paddingTop: 'max(env(safe-area-inset-top), 24px)',
                 paddingBottom: 'max(env(safe-area-inset-bottom), 24px)',
             }}
         >
-            <div className="w-full max-w-sm flex flex-col items-center animate-slide-up">
+            <div className="w-full max-w-sm mx-auto my-auto flex flex-col items-center animate-slide-up">
                 {/* Brand mark — same lockup as LoginScreen/Onboarding. */}
                 <div className="w-16 h-16 rounded-3xl overflow-hidden shadow-lg shadow-accent/20 ring-1 ring-white/15">
                     <img src="/app-icon.png" alt="Machina" className="w-full h-full object-cover" />
@@ -45,12 +49,17 @@ export default function AIConsentNotice({ onAccept }: { onAccept: () => void }) 
                     <InfoRow
                         icon={<Sparkles className="w-[18px] h-[18px]" />}
                         title="Analyzed by Google Gemini"
-                        body="Content you save — links, page text, and images — and the questions you ask are sent to Google Gemini, Google's AI service, to create your summaries, tags, and answers."
+                        body="Links, page text, images, and the questions you ask are sent to Google Gemini, Google's AI service, to create your summaries, tags, and answers."
                     />
                     <InfoRow
                         icon={<ShieldCheck className="w-[18px] h-[18px]" />}
-                        title="Never used for AI training"
-                        body="Machina uses Gemini only to analyze your saves for you. Machina does not use your content to train AI models."
+                        title="Not used to train AI models"
+                        body="Machina uses Gemini's paid tier: Google's terms state your content is never used to train or improve Google's models. It's kept up to 55 days for abuse checks, then deleted."
+                    />
+                    <InfoRow
+                        icon={<UserX className="w-[18px] h-[18px]" />}
+                        title="Sent without your identity"
+                        body="Requests come from Machina's servers with no name, email, phone or IP attached."
                     />
                 </div>
 

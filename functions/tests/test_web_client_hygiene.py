@@ -111,4 +111,4 @@ def test_local_storage_purge_is_an_allowlist_not_a_denylist():
     kept = re.search(r"DEVICE_PREFERENCE_KEYS = new Set\(\[(.*?)\]\)", src, re.S)
     assert kept, "expected an explicit keep-allowlist"
     # Only device-level preferences may survive; nothing user- or content-scoped.
-    assert set(re.findall(r"'([^']+)'", kept.group(1))) == {"theme", "reader-font-size"}
+    assert set(re.findall(r"'([^']+)'", kept.group(1))) == {"theme"}
