@@ -36,7 +36,6 @@ import { db } from './firebase';
  */
 const DEVICE_PREFERENCE_KEYS = new Set([
     'theme',             // ThemeProvider — light/dark/system choice
-    'reader-font-size',  // ReadingView — reader text size
 ]);
 
 /** Drop every localStorage entry that isn't an allowlisted device preference. */
