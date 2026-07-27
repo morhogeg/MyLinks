@@ -1,8 +1,8 @@
-# Machina AI
+# Machina
 
 **Your AI-powered personal knowledge base — save anything, then just ask.**
 
-Machina AI captures links and images from wherever you find them, reads and
+Machina captures links and images from wherever you find them, reads and
 analyzes them with AI, and turns the pile into a knowledge base you can actually
 query. The hero is the **Recall Engine**: ask a question in plain language and get
 a cited answer drawn from your own saves.

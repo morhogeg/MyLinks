@@ -220,7 +220,7 @@ def _retry_delay(attempt: int) -> float:
     return base + random.uniform(0, base)
 
 # Professional system prompt
-SYSTEM_PROMPT = """You are a professional knowledge extraction assistant for Machina AI, a personal knowledge capture and recall system.
+SYSTEM_PROMPT = """You are a professional knowledge extraction assistant for Machina, a personal knowledge capture and recall system.
 Your goal is to objectively summarize web content with accuracy and precision. Do NOT add opinions, interpretations, or subjective assessments.
 
 Output MUST be a valid JSON object only.
@@ -267,7 +267,7 @@ Requirements for the analysis:
 5. sourceName: Extract the name of the source or publisher (e.g., CNN, The New York Times, X, Reddit, Wikipedia, YouTube, TikTok).
    - For images or screenshots that don't reveal a source, use "Screenshot".
    - **CRITICAL**: The sourceName MUST ALWAYS be in English or its original brand name.
-   - **NEVER use "Machina", "Machina AI", or any name of this assistant/app as the sourceName** — you are the analyzer, not the publisher. If the publisher cannot be determined from the content, use the site's domain name (e.g. "nytimes.com"). Never invent a publisher.
+   - **NEVER use "Machina" or any name of this assistant/app as the sourceName** — you are the analyzer, not the publisher. If the publisher cannot be determined from the content, use the site's domain name (e.g. "nytimes.com"). Never invent a publisher.
 
 6. category: Assign exactly one high-level category (e.g., Tech, Health, Philosophy, Business, Research, Science, Finance, Productivity, Design, Career). If the content is a recipe, use "Recipe".
    - **CRITICAL**: The category MUST ALWAYS be in English, even if the content is in another language.
@@ -530,7 +530,7 @@ def _build_rag_prompt(question: str, cards: list, history: list = None,
             f"card titles keep their original language."
         )
 
-    return f"""You are Machina AI, the user's personal knowledge assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved. Today's date is {today}.
+    return f"""You are Machina, the user's personal knowledge assistant. Answer the question USING ONLY the saved sources below — these are links and notes the user personally saved. Today's date is {today}.
 
 Rules:
 - Ground every claim in the provided sources. Do NOT use outside knowledge or invent facts.
@@ -1125,7 +1125,7 @@ Work only from what is legible: keep the subject at the level the image states i
         {"answer": str, "citedIds": [str], "ungrounded": bool}. Raises
         AnalysisError on failure.
 
-        The whole point of a Machina AI answer is trust: the model must
+        The whole point of a Machina answer is trust: the model must
         speak only from what the user actually saved, and cite it. Generation is
         schema-constrained (BrainAnswer) so the model returns valid, fully
         escaped JSON even when the answer contains quotes or newlines — a plain
@@ -1561,7 +1561,7 @@ Work only from what is legible: keep the subject at the level the image states i
         sources_text = "\n\n".join(_card_block(c) for c in cards)
         valid_ids = {c.get("id") for c in cards if c.get("id")}
 
-        prompt = f"""You are Machina AI, the user's personal knowledge companion. Below are the {len(cards)} things this person saved this week — their reading, in their own library. Write them a short, warm "What you learned this week" recap.
+        prompt = f"""You are Machina, the user's personal knowledge companion. Below are the {len(cards)} things this person saved this week — their reading, in their own library. Write them a short, warm "What you learned this week" recap.
 
 This is the highlight of their week with the app, so it must read like a thoughtful debrief from a smart friend who actually read everything — NOT a list of links or a bullet dump. Find the real throughline.
 

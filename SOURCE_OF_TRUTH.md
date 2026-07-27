@@ -1,4 +1,4 @@
-# Machina AI — Single Source of Truth
+# Machina — Single Source of Truth
 
 > **This is the ONE document.** It consolidates and supersedes: `HANDOFF.md`,
 > `HANDOFF-iOS-AUTH.md`, `TASKS.md`, `MACHINA_SPEC.md`, `PRODUCT_REVIEW.md`,
@@ -26,7 +26,9 @@
 
 ## 1. What Machina is
 
-**Machina AI** (`com.morhogeg.machina`) — an AI-powered personal knowledge base.
+**Machina** (`com.morhogeg.machina`) — a personal knowledge base.
+**The name is `Machina`, not `Machina AI` — see `docs/BRANDING.md` D-1 before
+writing the name anywhere.**
 Capture a link/image from anywhere (iOS share sheet, web UI, browser
 extension) → Python Cloud Function scrapes + Gemini analyzes → a structured card
 (summary, category, tags, concepts, embedding, related links) lands in a real-time
@@ -825,9 +827,11 @@ launch (Tuesday–Thursday), a Show HN, an X thread, and a 30-second screen-reco
 demo (share → analyzed card → ask → cited answer) reused everywhere including
 TikTok/Reels/Shorts — short-form screen demos of "I asked my bookmarks a question
 and it answered with sources" are exactly what performs organically in the
-productivity niche. (4) **Ongoing:** App Store Optimization (title "Machina AI —
-Ask Your Saves"; keywords: second brain, read later, bookmark manager, AI
-summary, save links, knowledge base), and a monthly public "what Machina learned
+productivity niche. (4) **Ongoing:** App Store Optimization — the exact Name /
+Subtitle / keywords live in `docs/APP_STORE.md` §2 and the reasoning behind them
+in `docs/BRANDING.md` (title `Machina: Save & Recall`, subtitle `Save anything.
+It reads it.`; **"second brain" and "ai" are keywords-field-only — never put
+either on a user-visible surface**, see BRANDING D-3), and a monthly public "what Machina learned
 this month" post generated from the actual synthesis feature — the product
 markets itself if you publish what it produces. Success metric for month one:
 1,000 installs, 20% week-2 retention, 50 organic shares — retention gates any
@@ -872,9 +876,10 @@ paid spend.
 *Product Hunt:* tagline "**Ask your bookmarks anything**"; first comment covers
 the origin story (WhatsApp self-messages), the capture surface, and the free tier.
 
-*App Store subtitle/promo:* "Save from anywhere. Ask it anything." / promo text:
-"Machina reads everything you save — links, screenshots, videos — and answers
-questions from it, with sources."
+*App Store subtitle/promo:* subtitle is `Capture. Ask. Connect.`
+(`docs/APP_STORE.md` §2; reasoning in `docs/BRANDING.md` D-2 — it opens on
+capture and ends on the knowledge graph on purpose) / promo text: "Machina reads everything you save — links, screenshots, videos — and
+answers questions from it, with sources."
 
 *Where to "advertise" for free:* X (primary), Product Hunt, Hacker News,
 r/PKMS + r/productivity (follow self-promo rules: give value first), Indie
@@ -885,6 +890,72 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-07-27 — THE NAME LOSES ITS "AI": `Machina AI` → `Machina`, and a new
+  `docs/BRANDING.md`.** Owner's call, on two arguments — AI fatigue in the
+  market, and AI being the *infrastructure* under a capture-and-recall product
+  rather than the product itself (it is not a chatbot or an image generator).
+  Agreed, with a third argument they hadn't made: **the shipped identity never
+  had "AI" in it.** The wordmark from identity rounds 2/3/11/12 is letterspaced
+  **MACHINA** on the splash, the boot screen, and the header lockup — "AI"
+  survived only in display-name *strings*, so the name and the mark had been
+  contradicting each other for months. `com.morhogeg.machina` was already the
+  bundle ID, so this is display strings only: no bundle-ID change, no Firebase
+  change, no migration.
+  **The constraint that shaped everything: bare `Machina` is TAKEN on the App
+  Store** (owner screenshot — Philip Gebben, Utilities, "Opening up Creativity",
+  and its own screenshots read "Knowledge & Inspiration" + "Machina Studio uses
+  AI…"). That is an *adjacent* AI-knowledge app, not a distant collision, so
+  "confusingly similar" at review is a live risk. Resolved by splitting the name
+  into two layers, which works because **App Store name uniqueness does not apply
+  to `CFBundleDisplayName`**: the home screen, the web tab, the extension, and
+  all in-app copy say plain **Machina** (the layer the owner cared about most),
+  while the App Store *listing* name is **`Machina: Save & Recall`** (22/30) with
+  subtitle **`Capture. Ask. Connect.`** (22/30).
+  **Two title candidates were rejected, and the reasons are worth keeping.**
+  `Machina: Second Brain` — vetoed by the owner ("it carries weight that I don't
+  want to deal with") despite being the highest-volume term in the category.
+  `Machina: Ask Your Saves` (the old §8 plan) — accepted only lukewarmly, because
+  it leads with *recall* when the owner's favourite part of the product is the
+  frictionless share → auto summary + category capture. `Save & Recall` names
+  both halves and the subtitle leads with capture. **The lost search volume was
+  recovered, not conceded:** `second brain` and `ai` both moved into the App
+  Store **keywords** field, which is invisible to users — so the app ranks for
+  the query without ever calling itself the thing (`docs/BRANDING.md` D-3).
+  Keywords rebalanced to 98/100 after dropping `save links`/`recall`, which the
+  new Name field now indexes for free.
+  **One code hazard checked before renaming, and it was clean:**
+  `functions/main.py` `_ground_source_name()` rejects any Gemini-proposed
+  publisher containing the substring `"machina"` (the model seeds its own name
+  from the system prompt and emits it as the article's publisher — the old
+  alaxon.co.il bug). The guard matches `machina`, not `Machina AI`, and
+  `test_source_name_grounding.py` already covers the bare-`machina` case, so
+  shortening the prompt self-names in `ai_service.py` did not reopen it.
+  **If the brand ever changes to a name without "machina" in it, that guard and
+  `_MACHINA_HOSTS` must change in the same commit.**
+  Renamed: `Info.plist` (`CFBundleDisplayName`), `capacitor.config.ts`,
+  `manifest.json`, `layout.tsx`, `privacy`/`terms` pages, the extension manifest
+  + popup, the three Gemini prompt self-names, the public READMEs, `CLAUDE.md`,
+  and `docs/APP_STORE.md` §2. **Deliberately NOT renamed:** dated audit/history
+  docs (`AUDIT.md`, `AUDIT_FINDINGS.md`, `APP_WEAKNESSES.md`, `AUTH_SPEC.md`,
+  `PRODUCTION_READINESS_2026-07-14.md`), the `design/icon-concepts/` prototypes,
+  and the grounding-test fixtures — they are records of what was true on their
+  date, and rewriting them would falsify the history.
+  **New doc: `docs/BRANDING.md`** — the running record for branding/marketing
+  decisions (§1 decisions, §2 naming mechanics + the full list of files the name
+  lives in, §3 the App Store collision, §4 open questions, §5 action items, §6
+  discussion log). It is a *decision log*, not another handoff/spec/audit doc —
+  `SOURCE_OF_TRUTH.md` stays the single source of truth and §8 now points at it.
+  **Open owner items:** (A-1) **trademark search for "Machina"** (USPTO + Israel,
+  classes 9/42) before submission — the one finding that could still veto this;
+  (A-2) enter the new Name/Subtitle/keywords in App Store Connect; (A-4) the §4
+  task 9 screenshots must be shot with the new label. **Left open on purpose:**
+  the product description is still "Your AI-powered knowledge capture and
+  retrieval system" (`manifest.json` + `layout.tsx`) — same AI-forward problem,
+  but that is a positioning decision, not a naming one (BRANDING Q-1/A-3).
+  **Not shipped — verification only** (`npx tsc --noEmit` clean, `py_compile`
+  clean, grounding tests pass). The iOS label change needs a TestFlight build to
+  be visible on the home screen.
 
 - **2026-07-27 — 🚢 SHIPPED: privacy audit + policy rewrite + reader removal
   (merge `65d3afd`, pushed as `ee99317`).** Desktop web → Vercel (auto on the

@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Machina AI",
-  description: "How Machina AI collects, uses, and protects your data.",
+  title: "Privacy Policy — Machina",
+  description: "How Machina collects, uses, and protects your data.",
 };
 
 /**
@@ -55,7 +55,7 @@ export default function PrivacyPage() {
   return (
     <main className="mx-auto max-w-2xl px-6 py-16">
       <Link href="/" className="text-sm text-text-secondary hover:text-text transition-colors">
-        &larr; Machina AI
+        &larr; Machina
       </Link>
 
       <h1 className="mt-6 text-3xl font-semibold tracking-tight text-text">
@@ -64,7 +64,7 @@ export default function PrivacyPage() {
       <p className="mt-2 text-sm text-text-muted">Last updated: July 27, 2026</p>
 
       <p className="mt-6 leading-relaxed text-text-secondary">
-        Machina AI (&ldquo;Machina&rdquo;, &ldquo;we&rdquo;) is a personal knowledge base: you save
+        Machina (&ldquo;we&rdquo;) is a personal knowledge base: you save
         links, text, and images, and Machina analyzes them with AI so you can search them and ask
         questions about them later. Doing that means handling things you wrote and things you chose
         to keep, so this policy is specific rather than general — it names the companies involved
@@ -114,7 +114,7 @@ export default function PrivacyPage() {
 
       <Section id="who" n={1} title="Who we are">
         <p className="mt-4 leading-relaxed text-text-secondary">
-          Machina AI is an independent app operated from Israel by its developer, who is the data
+          Machina is an independent app operated from Israel by its developer, who is the data
           controller for the personal data described here. For any privacy question or request,
           including the rights described in{" "}
           <a href="#rights" className="text-accent underline underline-offset-2">section 10</a>, contact{" "}
@@ -392,7 +392,7 @@ export default function PrivacyPage() {
       <footer className="mt-14 border-t border-border-subtle pt-6 text-sm text-text-muted">
         <a href="/terms" className="hover:text-text transition-colors">Terms of Service</a>
         <span className="mx-2">&middot;</span>
-        <Link href="/" className="hover:text-text transition-colors">Machina AI</Link>
+        <Link href="/" className="hover:text-text transition-colors">Machina</Link>
       </footer>
     </main>
   );
