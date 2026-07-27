@@ -2374,6 +2374,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                         isSelectionMode={isSelectionMode}
                                         isSelected={selectedIds.has(link.id)}
                                         onToggleSelection={toggleSelection}
+                                        onReadStatusChange={handleReadStatusChange}
+                                        onUpdateReminder={handleOpenReminderModal}
+                                        onAddToCollection={handleAddToCollection}
+                                        onShare={handleShareCard}
+                                        onTogglePrivate={handleToggleCardPrivate}
+                                        onToggleThumbnail={handleToggleThumbnail}
+                                        cardCollections={cardCollectionsByLink.get(link.id)}
+                                        activeCollectionId={openCol?.id}
+                                        onRemoveFromCollection={handleRemoveFromCollection}
                                     />
                                 </div>
                             ))}

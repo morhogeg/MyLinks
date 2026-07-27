@@ -6,8 +6,9 @@ import { getCategoryColorStyle } from '@/lib/colors';
 import { getDirection } from '@/lib/rtl';
 import { getPlatform, platformIcon, platformColor, PLATFORM_LABELS, xHandle, prettyHost } from '@/lib/platform';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
-import { Star, Check, Trash2, StickyNote, Lock } from 'lucide-react';
+import { Star, Check, Trash2, StickyNote, Lock, MoreHorizontal } from 'lucide-react';
 import { getNotes } from '@/lib/notes';
+import CardActionSheet from './CardActionSheet';
 
 interface ListCardProps {
     link: Link;
@@ -20,6 +21,21 @@ interface ListCardProps {
     onToggleSelection?: (id: string) => void;
     /** Position in the feed, used to stagger the entrance animation. */
     index?: number;
+    // ── Actions menu (⋯) ─────────────────────────────────────────────────────
+    // The same handler set the grid Card takes, so the shared CardActionSheet
+    // offers an identical menu in both views. All optional: without them the
+    // row still renders, just without the ⋯.
+    onReadStatusChange?: (id: string, isRead: boolean) => void;
+    onUpdateReminder?: (link: Link) => void;
+    onAddToCollection?: (link: Link) => void;
+    onShare?: (link: Link) => void;
+    onTogglePrivate?: (link: Link) => void;
+    onToggleThumbnail?: (link: Link) => void;
+    /** Collections this card belongs to — names the "remove from" row. */
+    cardCollections?: { id: string; name: string }[];
+    /** Set when the feed is scoped to one collection (enables that row). */
+    activeCollectionId?: string;
+    onRemoveFromCollection?: (link: Link, collectionId: string) => void;
 }
 
 // Swipe thresholds (px): MAX caps the travel, TRIGGER is the release point that
@@ -45,7 +61,21 @@ function ListCard({
     isSelected = false,
     onToggleSelection,
     index = 0,
+    onReadStatusChange,
+    onUpdateReminder,
+    onAddToCollection,
+    onShare,
+    onTogglePrivate,
+    onToggleThumbnail,
+    cardCollections,
+    activeCollectionId,
+    onRemoveFromCollection,
 }: ListCardProps) {
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
+    // The sheet needs a place to send read/remind/delete. Without those three the
+    // menu would be mostly empty rows, so the ⋯ only appears once the parent has
+    // wired them (Feed always does; other call sites can opt out by omitting).
+    const hasActions = Boolean(onReadStatusChange && onUpdateReminder && onDelete);
     const isRtl = getDirection(link.title, link.language) === 'rtl';
     const colorStyle = getCategoryColorStyle(link.category);
     const isFavorite = link.status === 'favorite';
@@ -122,6 +152,7 @@ function ListCard({
     const armed = Math.abs(offset) >= TRIGGER;
 
     return (
+        <>
         <div
             data-no-edge-swipe
             style={{ ['--enter-delay' as string]: enterDelay }}
@@ -239,23 +270,78 @@ function ListCard({
                     })()}
                 </div>
 
-                {/* Favourite toggle — stays put as you scan. Keeps its 44px hit
-                    target (M-P3) but hugs the row's top corner (negative margins
-                    eat into the row padding) so 3-line titles aren't forced to
-                    centre around it. */}
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onStatusChange(link.id, isFavorite ? 'unread' : 'favorite');
-                    }}
-                    aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                    className={`shrink-0 -mt-2 -me-1.5 w-11 h-11 flex items-center justify-center rounded-lg transition-colors ${isFavorite ? 'text-yellow-500' : 'text-text-muted/40 hover:text-accent'
-                        }`}
+                {/* Row CHROME: favourite + actions, always in the row's TOP-RIGHT
+                    corner — never mirrored. The article flips per card language so
+                    the title and byline read correctly, which used to carry the
+                    star along with them: in a mixed EN/HE feed the control hopped
+                    sides row to row. `order` pins the cluster to the physical right
+                    in both directions (last child in LTR, first in RTL), matching
+                    the grid Card, whose chrome row is likewise dir-pinned. Its own
+                    dir="ltr" keeps star-then-⋯ in a stable reading order and makes
+                    the physical margins below unambiguous.
+                    Negative margins eat into the row padding so the cluster hugs
+                    the corner and 3-line titles aren't forced to centre around it. */}
+                <div
+                    dir="ltr"
+                    style={{ order: isRtl ? -1 : 1 }}
+                    className="shrink-0 -mt-1.5 -mr-1 flex items-start"
                 >
-                    <Star className={`w-4 h-4 ${isFavorite ? 'fill-yellow-500' : ''}`} />
-                </button>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onStatusChange(link.id, isFavorite ? 'unread' : 'favorite');
+                        }}
+                        aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                        className={`shrink-0 w-9 h-11 flex items-center justify-center rounded-lg transition-colors ${isFavorite ? 'text-yellow-500' : 'text-text-muted/40 hover:text-accent'
+                            }`}
+                    >
+                        <Star className={`w-4 h-4 ${isFavorite ? 'fill-yellow-500' : ''}`} />
+                    </button>
+
+                    {/* Actions — the same sheet the grid card opens. Unlike the
+                        grid, this is NOT gated to coarse pointers: a list row has
+                        no hover-reveal action set, so without a visible trigger
+                        these actions would be unreachable on desktop. */}
+                    {hasActions && !isSelectionMode && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsSheetOpen(true);
+                            }}
+                            aria-label="Actions"
+                            className="shrink-0 w-9 h-11 flex items-center justify-center rounded-lg text-text-muted/50 hover:text-text active:bg-fill-strong transition-colors"
+                        >
+                            <MoreHorizontal className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
             </article>
         </div>
+
+        {hasActions && (
+            <CardActionSheet
+                link={link}
+                isOpen={isSheetOpen}
+                onClose={() => setIsSheetOpen(false)}
+                onStatusChange={onStatusChange}
+                onReadStatusChange={onReadStatusChange!}
+                onUpdateReminder={onUpdateReminder!}
+                onDelete={onDelete!}
+                onAddToCollection={onAddToCollection}
+                onShare={onShare}
+                onTogglePrivate={onTogglePrivate}
+                onToggleThumbnail={onToggleThumbnail}
+                removeFromCollection={
+                    activeCollectionId && onRemoveFromCollection
+                        ? {
+                            name: cardCollections?.find((c) => c.id === activeCollectionId)?.name ?? 'collection',
+                            onRemove: () => onRemoveFromCollection(link, activeCollectionId),
+                        }
+                        : undefined
+                }
+            />
+        )}
+        </>
     );
 }
 

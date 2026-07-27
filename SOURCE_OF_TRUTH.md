@@ -836,6 +836,30 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-27 — LIST VIEW GETS THE ⋯ ACTIONS MENU (owner: "we should have the
+  3 dots menu per card in the list view as well… all in the top right corner,
+  like in the card view").** List rows carried a star and nothing else, so every
+  other per-card action (read, remind, share, add to collection, private,
+  thumbnail, delete) was reachable only by opening the card — or, on touch, by
+  guessing the swipe. `ListCard` now takes the same handler set the grid `Card`
+  does and opens the SAME `CardActionSheet`, so the two views offer an identical
+  menu; `Feed` already owned every handler, so this was pass-through, not new
+  logic. Unlike the grid the ⋯ is **not** gated to coarse pointers — a list row
+  has no hover-reveal action set, so gating it would leave desktop with no way
+  in. **Chrome is now pinned to the physical top-right in both directions.** The
+  row mirrors per card language (`dir` on the `<article>`), which used to carry
+  the star with it — in a mixed EN/HE feed the control hopped sides row to row,
+  the same defect fixed on the grid card on 2026-07-26. The cluster now sets
+  `order: isRtl ? -1 : 1` (last child in LTR, first in RTL ⇒ physical right
+  either way) and carries its own `dir="ltr"` so star-then-⋯ keeps a stable
+  reading order and its margins are unambiguous. Title, byline and the leading
+  category colour bar still mirror — only the controls are pinned. Star tightened
+  44→36px wide (still 44px tall, M-P3 target intact) so two controls fit a
+  compact row. **Render-verified in real Chromium** (throwaway `/dev-listcard`
+  harness, EN+HE fixtures, light+dark side by side, removed before commit):
+  controls sit top-right on every row, Hebrew text stays RTL, and the colour bar
+  does not crowd them. `tsc --noEmit` + eslint clean. Not yet device-QA'd.
+
 - **2026-07-27 — SHARE-EXTENSION SCANNER REDESIGNED IN LUMEN (owner: "it has the
   old design").** The HUD that appears when you share into Machina from another
   app was the last surface still wearing the pre-Lumen identity — hardcoded
