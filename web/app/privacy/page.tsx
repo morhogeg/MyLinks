@@ -21,7 +21,7 @@ export default function PrivacyPage() {
       <h1 className="mt-6 text-3xl font-semibold tracking-tight text-text">
         Privacy Policy
       </h1>
-      <p className="mt-2 text-sm text-text-muted">Last updated: July 3, 2026</p>
+      <p className="mt-2 text-sm text-text-muted">Last updated: July 27, 2026</p>
 
       <p className="mt-6 leading-relaxed text-text-secondary">
         Machina AI (&ldquo;Machina&rdquo;, &ldquo;we&rdquo;) is a personal knowledge base: you save
@@ -44,7 +44,12 @@ export default function PrivacyPage() {
           notes, tags, categories, and collections you add.
         </li>
         <li>
-          <span className="text-text">Questions you ask.</span> Your &ldquo;Ask Machina&rdquo;
+          {/* The `{" "}` is load-bearing wherever the text run contains an HTML
+              entity (&ldquo;, &rsquo;): the entity splits the JSX text into
+              separate children and the space after </span> is dropped, so the
+              label runs into the sentence ("Questions you ask.Your …"). */}
+          <span className="text-text">Questions you ask.</span>{" "}
+          Your &ldquo;Ask Machina&rdquo;
           questions and the resulting chat history, so you can revisit past conversations.
         </li>
         <li>
@@ -72,8 +77,10 @@ export default function PrivacyPage() {
         Everything we collect is used to run the product for you: analyzing saved content
         (summaries, categories, tags, connections between saves), semantic search, answering your
         questions with citations to your own saves, and sending the reminders and digests you turn
-        on. We do not use your data for advertising, we do not sell it, and we do not use your
-        content to train AI models.
+        on. We do not use your data for advertising, and we do not sell it. Your content is not used
+        to train AI models — not by us, and not by Google: Machina uses the <em>paid</em> tier of
+        the Gemini API, whose terms state that prompts and responses are not used to improve or
+        train Google&rsquo;s models, and are not read by human reviewers.
       </p>
 
       <h2 className="mt-10 text-xl font-semibold text-text">Where your data lives</h2>
@@ -86,10 +93,14 @@ export default function PrivacyPage() {
       <h2 className="mt-10 text-xl font-semibold text-text">Service providers (processors)</h2>
       <ul className="mt-4 list-disc space-y-2 pl-6 leading-relaxed text-text-secondary">
         <li>
-          <span className="text-text">Google Gemini (AI analysis).</span> The content you save —
+          <span className="text-text">Google Gemini (AI analysis).</span>{" "}
+          The content you save —
           page text, images — and the questions you ask are sent server-side to the Google Gemini
-          API to produce summaries, tags, embeddings, and answers. This processing is governed by
-          Google&rsquo;s API terms; Machina does not use your content to train models.
+          API to produce summaries, tags, embeddings, and answers. Machina uses the paid tier, under
+          which Google&rsquo;s API terms state that your prompts and responses are not used to
+          improve or train Google&rsquo;s models and are not read by human reviewers. Google does
+          retain them for up to 55 days for the sole purpose of detecting abuse of the API, after
+          which they are deleted. The exact contents of every request are listed below.
         </li>
         <li>
           <span className="text-text">Google Firebase / Google Cloud.</span> Storage, authentication,
@@ -100,6 +111,67 @@ export default function PrivacyPage() {
           standard web-server request logs (such as IP addresses) to do so.
         </li>
       </ul>
+
+      <h2 className="mt-10 text-xl font-semibold text-text">What we send to Google Gemini</h2>
+      <p className="mt-4 leading-relaxed text-text-secondary">
+        Because this is the part of Machina that involves another company, here is the complete
+        list, feature by feature:
+      </p>
+      <ul className="mt-4 list-disc space-y-2 pl-6 leading-relaxed text-text-secondary">
+        <li>
+          <span className="text-text">Saving a link.</span>{" "}
+          The text of the page we fetched (up to
+          30,000 characters) and your list of existing tags, so the new card can reuse them. The
+          link&rsquo;s full address is not sent — only the site&rsquo;s name.
+        </li>
+        <li>
+          <span className="text-text">Saving a post with photos, or a screenshot.</span> The above,
+          plus the image itself.
+        </li>
+        <li>
+          <span className="text-text">Saving a YouTube video.</span>{" "}
+          The video&rsquo;s address.
+          Google watches the video on its own servers to summarize it.
+        </li>
+        <li>
+          <span className="text-text">Writing a note.</span> The text of the note.
+        </li>
+        <li>
+          <span className="text-text">Search.</span>{" "}
+          A card&rsquo;s summary text, converted into the
+          numeric vector that makes semantic search and related-card links work.
+        </li>
+        <li>
+          <span className="text-text">Asking a question.</span> Your question, the last few messages
+          of that conversation, and up to 20 of your saved cards — their titles, summaries, details,
+          and <span className="text-text">any notes you wrote on them</span>.
+        </li>
+        <li>
+          <span className="text-text">The weekly synthesis.</span> The titles, summaries, tags, and
+          categories of what you saved that week.
+        </li>
+      </ul>
+      <p className="mt-4 leading-relaxed text-text-secondary">
+        What is <span className="text-text">never</span> sent: your name, email address, phone
+        number, sign-in token, IP address, or any other account identifier. These requests are made
+        by Machina&rsquo;s servers rather than by your device, so Google sees Machina — not you —
+        and cannot connect what you save to your identity.
+      </p>
+
+      <h2 className="mt-10 text-xl font-semibold text-text">Private cards</h2>
+      <p className="mt-4 leading-relaxed text-text-secondary">
+        A card you mark private — on its own, or by putting it in a private collection — is excluded
+        from Ask, from digests, and from the weekly synthesis, and its tags are left out of the tag
+        list described above. In other words, once a card is private, nothing about it is sent to
+        Gemini again.
+      </p>
+      <p className="mt-4 leading-relaxed text-text-secondary">
+        Two honest limits. First, a card is analyzed at the moment you save it — that analysis is
+        what produces its summary and tags — so its content did reach Gemini then; marking it
+        private afterwards stops all future processing but cannot undo the original request.
+        Second, the optional PIN is a lock on the screen of this device, not encryption: private
+        cards are stored the same way as the rest of your workspace.
+      </p>
 
       <h2 className="mt-10 text-xl font-semibold text-text">Public share pages</h2>
       <p className="mt-4 leading-relaxed text-text-secondary">

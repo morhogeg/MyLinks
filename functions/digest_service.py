@@ -126,15 +126,31 @@ def fetch_candidate_links(uid: str) -> List[dict]:
     web/lib/types.ts), and Firestore sorts across types, so it would corrupt the
     order. A correct fix needs a normalized numeric sort field (a backfill/
     migration) — tracked in SOURCE_OF_TRUTH §4, deferred until it actually bites.
+
+    PRIVACY (2026-07-27): effectively-private cards (own `isPrivate` flag or
+    membership in a private collection) are dropped here, at the single point
+    both consumers read from. It matters more on this path than anywhere else:
+    the digest renders card titles into an in-app surface, and the SYNTHESIS
+    mode sends every card in the window to Gemini and then puts the model's
+    generated title into a PUSH NOTIFICATION — i.e. a private card's subject
+    on a locked phone. Ask has enforced the same rule since it shipped
+    (`search.strip_private_cards`); these two surfaces never got it.
     """
+    # Lazy import: `search` pulls in ai_service/genai, which the scheduler
+    # path has no other reason to load (house pattern in this module).
+    from search import is_effectively_private, private_collection_ids
+
     db = get_db()
     links_ref = db.collection("users").document(uid).collection("links")
     docs = links_ref.limit(CANDIDATE_LIMIT).get()
 
+    private_ids = private_collection_ids(uid)
     links = []
     for doc in docs:
         data = doc.to_dict() or {}
         if data.get("status") == "archived":
+            continue
+        if is_effectively_private(data, private_ids):
             continue
         # Drop the heavy embedding vector — never needed for a digest.
         data.pop("embedding_vector", None)
@@ -259,9 +275,18 @@ def _week_id(now: Optional[datetime] = None) -> str:
 
 def synthesis_window_cards(links: List[dict]) -> List[dict]:
     """The saves from the last SYNTHESIS_WINDOW_DAYS, newest first — the raw
-    material for the weekly recap. Pure function so it can be unit-tested."""
+    material for the weekly recap. Pure function so it can be unit-tested.
+
+    Cards flagged `askExcluded` are dropped: the flag means the card's stored
+    text trips Gemini's non-configurable prompt filter (the 2026-07-24
+    incident), and this window is fed straight to `synthesize_week`. Ask has
+    filtered it since that incident; the weekly call could still be poisoned by
+    the same one card, losing the whole synthesis. Privacy filtering happens
+    upstream in fetch_candidate_links, which both consumers share.
+    """
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     cutoff = now_ms - SYNTHESIS_WINDOW_DAYS * 86_400_000
+    links = [l for l in links if not l.get("askExcluded")]
     recent = [l for l in links if _to_ms(l.get("createdAt")) >= cutoff]
     recent.sort(key=lambda l: _to_ms(l.get("createdAt")), reverse=True)
     return recent

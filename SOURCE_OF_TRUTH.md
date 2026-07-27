@@ -277,6 +277,25 @@ The multi-user auth work is **fully written but not live**:
    matching `_require_admin`'s stated policy. Before flipping `REQUIRE_AUTH`:
    set `OWNER_EMAIL`, and confirm `users/{owner doc}.authUids` already contains
    your auth uid (if it does, step 1 short-circuits and the gate never runs).
+   ⚠️ **Gemini key must stay on the PAID project (privacy audit 2026-07-27).**
+   Owner confirmed via AI Studio → Spend: project **`gen-lang-client-0057642876`
+   ("2nd brain"), Tier 1**, real daily spend all July — so the paid-tier terms
+   (no training, no human review, ≤55-day abuse log) DO apply today, and the
+   `/privacy` + consent copy that now asserts them is true. This guarantee is
+   **per Cloud project**: when rotating the key (above), mint the new one in
+   *that* project. A key from an unbilled project silently reverts every save
+   to the unpaid terms, under which Google trains on user content — with no
+   runtime signal, since the API and the code are identical either way.
+5b. **[ ] Gemini monthly spend cap is ₪5.00 — raise it before any cohort wider
+   than the owner (found 2026-07-27, privacy audit).** AI Studio shows the cap
+   at ₪5.00/mo with ₪1.49 used by a single user. §7 puts one heavy user at
+   $1.30–2.00/mo, so **two real users exhaust it mid-month**; hitting it is a
+   hard kill-switch (429 "billing account has exceeded its monthly spending
+   cap", blocked until the 1st — Google documents **no** fallback to free
+   quota). Privacy-wise that fails safe, which is why this is an availability
+   item, not a privacy one: analysis, Ask, and synthesis simply stop for
+   everybody. Raise the cap and keep the GCP **budget alert** (task 19) as the
+   early warning instead of using the cap as enforcement.
 5a. **[x] Share-doc `ownerUid` PII leak — FIXED via option (a), owner chose it
     2026-07-07.** `shared_cards`/`shared_collections` used to store `ownerUid`
     (= owner phone number) in a world-readable doc. Fix: new Admin-SDK
@@ -835,6 +854,68 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-07-27 — GEMINI PRIVACY AUDIT: WHAT WE ACTUALLY SEND, AND TWO PAYLOADS
+  THAT LEAKED (owner: "privacy is key… since we are sending to Gemini, that's
+  probably the weak spot — confirm Gemini is not training on our users'
+  information").** Traced every Gemini call site and answered the question at
+  the root of it: `ai_service.py:662` is `genai.Client(api_key=…)` = the
+  **Gemini Developer API**, not Vertex — and that API's terms split hard by
+  tier. Unpaid quota: Google uses submitted content to improve its products and
+  **human reviewers may read it**. Paid quota: not used for training, no human
+  review, logged ≤55 days for abuse detection only. Same code, same env var,
+  opposite outcome, and nothing in the repo can tell you which one you're on.
+  **Owner resolved it from AI Studio → Spend: Tier 1, project
+  `gen-lang-client-0057642876`, real daily spend all month ⇒ paid tier, so the
+  training guarantee holds today** (recorded in §4 task 5 — the guarantee is
+  per Cloud *project*, so the rotation there must mint into that same project).
+  Two side findings: Google's terms require Paid Services for EEA/CH/UK users
+  at all, and the ₪5.00 monthly spend cap is a hard kill-switch that two real
+  users would trip mid-month (new §4 task 5b — availability, not privacy).
+  **Two payload builders had no privacy filter and now do.** (1)
+  `digest_service.fetch_candidate_links` fed BOTH the curated digest and the
+  weekly synthesis with no `isPrivate` check, so private cards went to Gemini
+  in `synthesize_week` **and** the model's generated title became the push
+  notification — a private card's subject on a locked phone. Filtered at the
+  single point both consumers read from, via the `search.is_effectively_private`
+  /`private_collection_ids` pair Ask has used since it shipped; `askExcluded`
+  now also drops out of `synthesis_window_cards`, so the one card that trips
+  Gemini's prompt filter can't kill the whole weekly recap the way it killed
+  Ask. (2) `link_service.get_user_tags` returned **every tag the user ever
+  made, alphabetically, uncapped**, and it is interpolated into EVERY analysis
+  prompt — so a private card's tags ("fertility", "layoff") rode along with an
+  unrelated public save, forever. Now counts only non-private cards (a tag also
+  used on a public card survives — withholding it would just fragment the
+  vocabulary), ranks by usage, and caps at `MAX_PROMPT_TAGS = 50`, mirroring
+  the `_sanitize_tags` cap its client-supplied twin always had. 11 tests in a
+  new `tests/test_ai_payload_privacy.py`; suite 531 pass / 5 pre-existing fails
+  (the 4 §4-11b mocks + a `cardThumbnail.ts` hygiene assert, both unrelated —
+  baseline confirmed by stashing). **Copy now says something defensible.** The
+  consent gate's second row claimed "Never used for AI training" while its own
+  body only supported *"Machina* does not…" — silent about Google, the party
+  actually holding the data. It now names the paid tier as the reason, and a
+  third row states what Google never receives: no name, email, phone or IP,
+  because the calls are server-to-server (verified — no user identifier is
+  attached to any Gemini request, so Google cannot link a prompt to a person).
+  `/privacy` gained a **feature-by-feature list of every payload** and an honest
+  **Private cards** section: private ⇒ never sent again, but the card WAS
+  analyzed at save time and the PIN is a screen lock, not encryption. Settings'
+  Privacy & AI footnote matches. **Render-verified in real Chromium** (throwaway
+  `/dev-consent` harness, removed before commit): no horizontal overflow on any
+  surface, and the consent screen — which a third row pushed past a short
+  viewport — got `overflow-y-auto` + `my-auto` (flex centering CLIPS overflow
+  instead of scrolling it) plus tightened copy, so the CTA is above the fold on
+  iPhone 14 and reachable by scroll on SE. **Gotcha worth keeping:** in JSX, a
+  space after `</span>` is DROPPED when the same text run contains an HTML
+  entity (`&rsquo;`, `&ldquo;`) — the entity splits the run and the leading
+  space is trimmed. It rendered "Saving a link.The text…" in four new bullets
+  and, pre-existing since the page shipped 2026-07-03, "Questions you ask.Your
+  …". Fixed with the explicit `{" "}` idiom the file already used; caught by
+  asserting on `innerText`, not by reading the screenshot, where a missing
+  single space is invisible at any sane zoom. **Deliberately NOT done:** the
+  Vertex AI migration (data residency, CMEK, and the only documented path to
+  zero data retention) — it touches every call site and is an owner decision,
+  not a fix; ZDR on the Developer API needs an abuse-monitoring opt-out form.
 
 - **2026-07-27 — LIST VIEW GETS THE ⋯ ACTIONS MENU (owner: "we should have the
   3 dots menu per card in the list view as well… all in the top right corner,
