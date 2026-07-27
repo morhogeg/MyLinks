@@ -231,6 +231,7 @@ Requirements for the analysis:
 
 2. title: Create a concise, descriptive title that captures the core topic. Be factual, not clickbait.
    - **LANGUAGE**: Write the title in the SAME language as the input content.
+   - **SCOPE**: Title the subject at the source's OWN level of generality. If the content is about a country, an industry, a category, or a period, the title must say that — never a city, company, brand, or date the content itself does not name. A narrower title is not a sharper title, it is a wrong one.
 
 3. summary: Write 2 to 4 concise, information-dense sentences for a card preview. 
    - **LANGUAGE**: Write the summary in the SAME language as the input content.
@@ -287,6 +288,7 @@ CRITICAL RULES:
 - Avoid subjective phrases like: "offers valuable insights", "provides a comprehensive overview", "explores interesting ideas", "is a must-read", "excellently explains".
 - Use factual language: "The article discusses...", "The author argues...", "The research shows...", "Key topics include...".
 - GROUNDING: Base the analysis STRICTLY on the provided content. If the content is empty, truncated, or contains only a placeholder or metadata (e.g. "[no text content available]", a bare URL, or just a title with no body), do NOT invent a summary from outside/training knowledge. In that case set the title to what little is known and make the summary state plainly that the content could not be retrieved — never fabricate specifics, statistics, or claims that are not present.
+- SAME LEVEL OF GENERALITY (do not narrow): every place, person, organization, company, brand, product, or date you name anywhere — title, summary, detailedSummary, tags, concepts — MUST actually appear in the content. Never substitute something more specific than the source states: not a city for a country, a company for its industry, a brand or model for a product, a person for a role, nor a specific date for a vague time reference. When the content discusses a general subject and mentions examples, stay on the general subject — do not headline one example. Concretizing beyond the source is a fabrication, exactly like inventing a statistic.
 - DIRECTIONALITY (do not reverse the meaning): Preserve the exact direction of every claim. Watch for temporal contrasts ("used to / previously / now / no longer"), negations ("not X but Y", "instead of", "rather than", "avoid"), comparisons and preferences ("better to", "prefer", "worse than", "beats"), cause/effect, and who recommends or opposes what. When an author contrasts an old option with a new one, the recommended option is the NEW one — never state the abandoned or rejected option as the recommendation. A summary that flips any of these directions is WRONG even if every noun in it is correct.
 
 9. concepts: Identify up to 5 "Philosophical Anchors" or "Abstract Concepts".
@@ -303,7 +305,7 @@ IMPORTANT: You are analyzing an **actual YouTube video that you can watch** (its
 **GROUNDING RULES (critical for a trustworthy knowledge base):**
 - Report only what the video actually contains. Do NOT invent facts, statistics, names, or claims that are not present in the video.
 - Do NOT use outside/training knowledge about the creator or topic to fill gaps. If something is not in the video, leave it out.
-- Because you watched the video, you can and should be specific and concrete about what it covers — this is grounded fact, not speculation.
+- Because you watched the video, you can and should be specific and concrete about what it covers — this is grounded fact, not speculation. "Specific" means exactly what the video says, never narrower than it: keep its own level of generality (a country stays a country, a category stays a category) and name no place, company, brand, person, or date the video does not.
 - If the video is mostly non-verbal (e.g. music, ambient), describe what is shown rather than inventing a narrative.
 
 **Video-specific output:**
@@ -765,6 +767,7 @@ class GeminiService:
 
     def analyze_text_with_images(self, text: str, images: list, existing_tags: list = None,
                                  content_type: str = None, image_is_primary: bool = False,
+                                 image_text_dense: bool = False,
                                  attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
         """Analyze text PLUS the images embedded in it in a SINGLE multimodal Gemini
         call, so the resulting card reflects what the images show — not just the
@@ -785,6 +788,16 @@ class GeminiService:
             the image is treated as the authoritative source, so the summary
             preserves the real claims/outcome instead of the caption's framing.
 
+        `image_text_dense` is the middle case, orthogonal to the above: the text
+        stays primary (guidance unchanged), but the attached image is believed to
+        CARRY text rather than illustrate it — so vision is raised to MEDIUM
+        anyway. Set by the scraper (`image_text_likely`) when a post's own words
+        are thin but it has photos. LOW cannot reliably read dense Hebrew/RTL
+        screenshots, and a model that can't read a passage tends to complete it
+        from training knowledge — that is how a post about a COUNTRY came back
+        summarized as one of its CITIES. Legibility is the real fix there; the
+        "do not narrow" prompt rules are the backstop for when it still slips.
+
         Raises AnalysisError on failure so the caller can fall back to text-only.
         """
         from google.genai import types
@@ -800,7 +813,11 @@ class GeminiService:
 post are attached, and the image is very likely a screenshot that CONTAINS the
 post's actual text. Read the image(s) carefully and treat them as the
 AUTHORITATIVE source of what the post says. Extract the specific, concrete claims
-— not a generic gist. Preserve the real outcome and tense: if the text describes a
+— not a generic gist — but only the claims actually written there, at their own
+level of generality: never narrow a country to a city, an industry to a company,
+or a category to a brand the text does not name. Read only what is legible; where
+the text is unclear or cut off, leave it out rather than completing it from your
+own knowledge. Preserve the real outcome and tense: if the text describes a
 decision already made or an action already taken, report it as done — do NOT
 re-frame a resolved decision as an open question. The scraped caption is often
 just a teaser; when it conflicts with the image, trust the image."""
@@ -809,8 +826,16 @@ just a teaser; when it conflicts with the image, trust the image."""
             image_guidance = f"""The content below is a social post, and {len(images)} image(s) attached to that
 post are provided alongside it. Treat the images as part of the content: read any
 text, charts, or scenes they contain and fold what they reveal into the summary,
-takeaway, tags, and concepts — the post's words alone may not tell the whole story."""
-            media_resolution = "MEDIA_RESOLUTION_LOW"
+takeaway, tags, and concepts — the post's words alone may not tell the whole story.
+An image is often a screenshot of another post, so its text carries the real
+subject: report it at the level it is written (a country stays a country, not one
+of its cities) and use only what you can actually read — where the image is blurry
+or partly unreadable, stay with what the post itself says instead of filling the
+gap with a place, name, or date from your own knowledge."""
+            # Thin words + photos ⇒ the image is carrying the post, so pay for the
+            # resolution that can actually read it. Guidance stays text-primary.
+            media_resolution = ("MEDIA_RESOLUTION_MEDIUM" if image_text_dense
+                                else "MEDIA_RESOLUTION_LOW")
 
         prompt = f"""{SYSTEM_PROMPT}{tags_context}
 
@@ -874,7 +899,8 @@ Content to analyze:
 
 Based on the image provided, extract the text and analyze it according to the instructions above.
 If the image contains a tweet or social media post, extract the content as if it were the text.
-If the image is an article, extract the headline and body."""
+If the image is an article, extract the headline and body.
+Work only from what is legible: keep the subject at the level the image states it (a country stays a country, a category stays a category), and where the text is unclear or cropped, leave it out rather than guessing a place, name, brand, or date."""
 
         from google.genai import types
 
@@ -1540,7 +1566,7 @@ If the image is an article, extract the headline and body."""
 This is the highlight of their week with the app, so it must read like a thoughtful debrief from a smart friend who actually read everything — NOT a list of links or a bullet dump. Find the real throughline.
 
 Rules:
-- Ground everything ONLY in the saved cards below. Do NOT invent facts, statistics, or claims that aren't in a card's title/summary.
+- Ground everything ONLY in the saved cards below. Do NOT invent facts, statistics, or claims that aren't in a card's title/summary, and never name a place, company, brand, or date a card doesn't — keep each subject at the level the card states it.
 - Write the narrative as 2-4 short paragraphs that connect the week's saves into a story: what themes emerged, how ideas related or tensioned, what the arc of the week was. Be specific — name the actual ideas, not "you read some interesting things."
 - Identify 2-4 themes. Each theme references the ids of the cards that fed it.
 - Pick ONE standout card (the most noteworthy save) and say in one sentence why.
