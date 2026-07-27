@@ -1137,7 +1137,24 @@ exact-match, capped.
   and, pre-existing since the page shipped 2026-07-03, "Questions you ask.Your
   …". Fixed with the explicit `{" "}` idiom the file already used; caught by
   asserting on `innerText`, not by reading the screenshot, where a missing
-  single space is invisible at any sane zoom. **Deliberately NOT done:** the
+  single space is invisible at any sane zoom.
+  **⚠️ It came back TWICE more the same day, and is now guarded.** Owner spotted
+  "neversent" and "paidtier" on the live page — the same defect on the OTHER
+  side of the tag (`<span>never</span> sent`, `<em>paid</em> tier`), which the
+  first fix's label-only rule didn't cover. A DOM sweep (walk every inline
+  `span/em/a/strong/b`, compare the adjacent text nodes for a missing boundary
+  space) found a **third** the owner hadn't: `address in|section 14`, a missing
+  space *before* a link. All three fixed, plus 4 latent cases whose runs simply
+  carry no entity today. **`test_web_client_hygiene` now enforces the idiom, not
+  the symptom:** zero bare spaces adjacent to an inline tag on `/privacy` and
+  `/terms`, so a currently-fine line can't break the moment someone adds an
+  apostrophe. Two details that took a round to get right — the eaten whitespace
+  can be a **newline+indent**, not just a space (the first regex used `[ \t]+`
+  and a mutation test caught it MISSING the real shape), and a gap before
+  **punctuation** is intentional (`</a>\n.` renders "…com." with the period
+  hugging, which is wanted), so only a gap before a WORD is flagged. The guard
+  was mutation-tested against both broken shapes before being trusted.
+  **Deliberately NOT done:** the
   Vertex AI migration (data residency, CMEK, and the only documented path to
   zero data retention) — it touches every call site and is an owner decision,
   not a fix; ZDR on the Developer API needs an abuse-monitoring opt-out form.

@@ -121,23 +121,49 @@ jobs:
       # The whole point of this workflow is rewrite correctness, so assert it
       # rather than trusting a green deploy: a pruned function must NOT still be
       # advertised, and a live one must still resolve.
+      #
+      # STATUS CODES CANNOT TELL YOU THIS. firebase.json ends with a catch-all
+      # `"**" -> /index.html`, so a route whose rewrite was REMOVED does not 404
+      # — it falls through to the SPA shell and returns 200 text/html. (Run #1
+      # of this workflow failed on exactly that: it read `/api/article -> 200`
+      # as "still wired" when the 200 was the fallback proving it was gone.)
+      # CONTENT-TYPE is the real discriminator: a function answers JSON, the
+      # fallback answers HTML.
       - name: Verify rewrites
         run: |
           set -euo pipefail
           base="https://${FIREBASE_PROJECT}.web.app"
-          echo "Checking that /api/article is gone (reader mode was removed)…"
-          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$base/api/article" \
-                   -H 'Content-Type: application/json' -d '{"url":"https://example.com"}' || echo 000)
-          echo "  /api/article → $code"
-          if [ "$code" = "200" ]; then
-            echo "::error::/api/article still resolves — the rewrite was not removed."
-            exit 1
-          fi
-          echo "Checking that a live rewrite still resolves (OPTIONS preflight on /api/chat)…"
-          code=$(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS "$base/api/chat" || echo 000)
-          echo "  /api/chat OPTIONS → $code"
-          if [ "$code" = "404" ]; then
-            echo "::error::/api/chat no longer resolves — hosting rewrites are broken."
-            exit 1
-          fi
+
+          probe() {  # method path [json-body] -> "<status> <content-type>"
+            if [ -n "${3:-}" ]; then
+              curl -s -o /dev/null -w '%{http_code} %{content_type}' --max-time 30 \
+                -X "$1" "$base$2" -H 'Content-Type: application/json' -d "$3" || echo "000 -"
+            else
+              curl -s -o /dev/null -w '%{http_code} %{content_type}' --max-time 30 \
+                -X "$1" "$base$2" || echo "000 -"
+            fi
+          }
+
+          echo "REMOVED route — /api/article must fall through to the SPA shell:"
+          res=$(probe POST /api/article '{"url":"https://example.com"}')
+          echo "  $res"
+          case "$res" in
+            *application/json*)
+              echo "::error::/api/article still answers JSON — the get_article rewrite is live."
+              exit 1 ;;
+            *text/html*) echo "  ✓ HTML fallback — rewrite is gone." ;;
+            *) echo "::error::/api/article returned an unexpected shape: $res"; exit 1 ;;
+          esac
+
+          echo "LIVE route — /api/chat must still reach ask_brain, not the shell:"
+          res=$(probe OPTIONS /api/chat)
+          echo "  $res"
+          case "$res" in
+            *text/html*)
+              echo "::error::/api/chat fell through to the SPA shell — hosting rewrites are broken."
+              exit 1 ;;
+            000*) echo "::error::/api/chat unreachable: $res"; exit 1 ;;
+            *) echo "  ✓ handled by the function, not the fallback." ;;
+          esac
+
           echo "✅ Rewrites verified."

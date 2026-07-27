@@ -160,7 +160,9 @@ export default function PrivacyPage() {
           </li>
         </ul>
         <p className="mt-4 leading-relaxed text-text-secondary">
-          What we do <span className="text-text">not</span> collect: no third-party analytics or
+          What we do{" "}
+        <span className="text-text">not</span>{" "}
+        collect: no third-party analytics or
           tracking SDKs, no advertising identifiers, no location, no contacts, and no browsing
           history beyond the pages you explicitly choose to save.
         </p>
@@ -228,7 +230,9 @@ export default function PrivacyPage() {
           </li>
         </ul>
         <p className="mt-4 leading-relaxed text-text-secondary">
-          What is <span className="text-text">never</span> sent: your name, email address, phone
+          What is{" "}
+          <span className="text-text">never</span>{" "}
+          sent: your name, email address, phone
           number, sign-in token, IP address, or any other account identifier. These requests are
           made by Machina&rsquo;s servers rather than by your device, and every Machina user shares
           a single API key — so Google cannot tell one user&rsquo;s requests from another&rsquo;s,
@@ -237,7 +241,9 @@ export default function PrivacyPage() {
           that.
         </p>
         <p className="mt-4 leading-relaxed text-text-secondary">
-          Machina uses the <em>paid</em> tier of the Gemini API. Under Google&rsquo;s API terms for
+          Machina uses the{" "}
+          <em>paid</em>{" "}
+          tier of the Gemini API. Under Google&rsquo;s API terms for
           that tier, your prompts and responses are not used to improve or train Google&rsquo;s
           models, and are not read by reviewers in order to improve them. Google does retain them
           for up to 55 days for the sole purpose of detecting abuse of the API, after which they are
@@ -338,8 +344,9 @@ export default function PrivacyPage() {
           Depending on where you live, you may also have legal rights to access your personal data,
           correct it, delete it, receive a portable copy, restrict or object to certain processing,
           and withdraw consent you previously gave. To exercise any of these, email us at the
-          address in
-          <a href="#contact" className="text-accent underline underline-offset-2">section 14</a> — we
+          address in{" "}
+          <a href="#contact" className="text-accent underline underline-offset-2">section 14</a>{" "}
+          — we
           answer every request, and we will not treat you differently for making one. If you are in
           the European Economic Area or the United Kingdom, you also have the right to complain to
           your local data-protection authority.

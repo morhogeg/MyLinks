@@ -112,3 +112,40 @@ def test_local_storage_purge_is_an_allowlist_not_a_denylist():
     assert kept, "expected an explicit keep-allowlist"
     # Only device-level preferences may survive; nothing user- or content-scoped.
     assert set(re.findall(r"'([^']+)'", kept.group(1))) == {"theme"}
+
+
+def test_policy_pages_never_put_a_bare_space_next_to_an_inline_tag():
+    """JSX drops a space adjacent to an inline tag when the same text run
+    contains an HTML entity.
+
+    The entity (``&rsquo;``, ``&ldquo;``) splits the run into separate children
+    and the whitespace at the split is trimmed, so ``<em>paid</em> tier``
+    renders as "paidtier" and ``</span> sent`` as "neversent". It is invisible
+    in code review, invisible in a screenshot at normal zoom, and it shipped
+    three separate times on /privacy before anyone caught it by reading the
+    live page.
+
+    The fix is to never rely on JSX whitespace next to an inline tag on these
+    pages: use an explicit ``{" "}``, which is preserved unconditionally. This
+    test enforces the idiom rather than the symptom, so a line that is fine
+    today cannot break silently the moment someone adds an apostrophe to it.
+    """
+    inline = r"span|em|a|strong|b"
+    # The whitespace that gets eaten may be a plain space OR a newline+indent,
+    # so match \s+, not [ \t]+. Exclusions keep this to TEXT boundaries:
+    #   after  — `<` is another tag, `{` is already an explicit expression;
+    #   before — `>` is the enclosing tag, `}` is an explicit {" "}.
+    bare = re.compile(
+        # Punctuation after the gap is intentional — `</a>\n.` renders as
+        # "…com." with the period hugging the link, which is what's wanted.
+        # Only a gap before a WORD is the bug.
+        rf"(</(?:{inline})>\s+[^\s<{{.,;:!?)\]\u2026\u2014\u2013'\u2019\"])"
+        rf"|([^\s>}}]\s+<(?:{inline})[ >])"   # text, gap, then opening tag
+    )
+    for page in ("privacy", "terms"):
+        src = (WEB / "app" / page / "page.tsx").read_text(encoding="utf-8")
+        offenders = [m.group(0) for m in bare.finditer(src)]
+        assert not offenders, (
+            f"/{page}: bare space next to an inline tag — use {{\" \"}} instead, "
+            f"or an entity added to this line later will eat it: {offenders}"
+        )
