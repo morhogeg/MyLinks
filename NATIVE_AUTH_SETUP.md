@@ -102,85 +102,144 @@ SDK). That native SDK ships its own privacy manifest — no action needed for it
 
 ## 5. Environment variables (Cloud Functions)
 
-| Var | Purpose |
-|---|---|
-| `OWNER_EMAIL` | If set, only this account may claim the existing (single-owner) workspace via `claim_workspace`. Set it to your Google/Apple email for the migration. |
-| `ADMIN_TOKEN` | Required to reach the debug/admin endpoints (they 404 otherwise). |
-| `APPCHECK_ENFORCE=true` | Enforce App Check on the paid endpoints (closes audit H-2). |
+**These are GitHub repo secrets, not Firebase console settings.** This is the
+single most misunderstood thing about the cutover, and it has been described as
+"console work" more than once. `deploy-functions.yml:129-152` reads each of these
+from `secrets.*` and writes it into `functions/.env` at deploy time (this project
+deliberately uses a plain `.env`, not Secret Manager — see SOURCE_OF_TRUTH §2).
 
-Web build (Vercel / `web/.env.local`): `NEXT_PUBLIC_OWNER_EMAIL` may still be set
-for parity, but claim gating is now enforced server-side by `OWNER_EMAIL`.
+So setting them is: **GitHub → Settings → Secrets and variables → Actions → New
+repository secret**, then push any `functions/**` change to `main` so the backend
+redeploys and picks them up. No Mac, no `firebase` CLI, no console.
+
+| Repo secret | Purpose |
+|---|---|
+| `OWNER_EMAIL` | Only this account may claim the existing (single-owner) workspace via `claim_workspace`. **No longer optional** — the gate fails CLOSED when unset (audit S-8). Set it to your Google/Apple email. |
+| `ADMIN_TOKEN` | Required to reach the debug/admin endpoints (they 404 otherwise). Fails closed when unset. |
+| `APPCHECK_ENFORCE` | `true` enforces App Check on the paid endpoints (closes audit H-2). |
+| `REQUIRE_AUTH` | `true` makes a verified ID token mandatory on every data endpoint. The backend half of the cutover. |
+
+Truthiness for `REQUIRE_AUTH` / `APPCHECK_ENFORCE` is `1`/`true`/`yes`,
+case-insensitive; anything else (including unset) is off — `functions/main.py:553`.
+
+Web build (Vercel): `NEXT_PUBLIC_REQUIRE_AUTH` is the frontend half and is a
+**Vercel environment variable**, set in the Vercel dashboard — it is the one
+piece of cutover config that does not live in GitHub. `NEXT_PUBLIC_OWNER_EMAIL`
+may still be set for parity, but claim gating is enforced server-side by
+`OWNER_EMAIL`.
 
 ## 6. Cutover order (flag-gated — nothing breaks until you flip)
 
-1. **Deploy Cloud Functions with flags OFF** (`REQUIRE_AUTH` unset). The client
-   already sends `Authorization: Bearer` when signed in, so you can confirm from
-   the logs that verified tokens are arriving before enforcing anything.
-   `cd functions && firebase deploy --only functions`.
-2. **Deploy the web app** with `NEXT_PUBLIC_REQUIRE_AUTH` still off (Vercel auto on
-   push; Firebase Hosting via `./deploy-hosting.sh`). Behavior is unchanged.
-3. **Flip the flags on** — set `REQUIRE_AUTH=true` (Functions) and
-   `NEXT_PUBLIC_REQUIRE_AUTH=true` (Vercel + `web/.env.local`) and redeploy both.
-   Sign in on web with Google → confirm your cards appear (this triggers
-   `claim_workspace`, linking your account). Rollback = flip both back off.
+> **Rewritten 2026-07-27.** The old version of this section described a Mac
+> workflow — `firebase deploy --only functions`, `./deploy-hosting.sh`, `npm test`
+> against a local emulator, `firebase deploy --only firestore:rules`, Xcode →
+> Archive. **None of that is how this ships anymore.** Every one of those steps
+> is now CI, and three of the "known breaks" it warned about have since been
+> fixed. Following the old list would have had you redo work and reach for a
+> laptop you do not need. What is actually left is below.
 
-   **Known break to fix BEFORE flipping** (found in the 2026-07-03 readiness
-   audit): `retryFailedLink` (`web/lib/storage.ts` ~line 82) POSTs
-   `/api/analyze` **without** `authHeaders()` — with `REQUIRE_AUTH=true` the
-   backend 401s and every failed-card Retry fails. Add
-   `...(await authHeaders())` to that fetch (same pattern as
-   `AddLinkForm.tsx`). Related, non-blocking notes:
-   - `/api/article` (`get_article`) verifies **no** token even when
-     `REQUIRE_AUTH` is on — reading view keeps working (its fetch in
-     `ReadingView.tsx` sends no auth header), but the endpoint stays
-     anonymous-callable (App Check + per-IP rate limit only). Decide whether
-     that's acceptable or add `_authed_uid` + a client header.
-   - `backfill_related_links` (functions/main.py) has **no `_require_admin`
-     guard** (unlike `backfill_youtube_channels`) — anyone who finds the URL can
-     trigger a paid all-user embedding backfill. Add the guard before/at cutover
-     (then pass `X-Admin-Token` when running the M9 backfill).
-   - Unaffected by the flag (verified): `share_ingest` still authenticates by
-     ingest token (Share Extension, browser extension keep working);
-     the callables (`search_links`, `get_share_config`, `send_digest_now`,
-     `claim_workspace`, `delete_account`) take the SDK-attached token; the Vercel
-     proxy routes (`web/app/api/*/route.ts`) forward the `Authorization` header.
-4. **Test the locked rules in the Firestore emulator** — a ready-made suite
-   lives in `firestore-rules-test/` (see its README):
-   `cd firestore-rules-test && npm install && npm test`
-   (needs Java for the emulator). It verifies: owner can read/write their
-   `users/{uid}` doc + `links`/`chats`/`collections` and read `syntheses`; the
-   `authUids array-contains` workspace-resolve **list query** works; a different
-   signed-in account and an unauthenticated client get nothing; `shared_cards`/
-   `shared_collections` are publicly readable but owner-only writable;
-   `rate_limits`/`pending_processing`/`task_logs` stay denied.
+**What still needs a human: four GitHub repo secrets, one Vercel variable, and
+one check on your phone.** Everything else is a push.
 
-   Rules changes staged 2026-07-03 in `firestore.rules.locked`:
-   - **`syntheses` subcollection added** (M12 was newer than the locked file):
-     client read-only; writes stay Cloud-Functions-only.
-   - **`users/{uid}` read rule rewritten** from `owns(uid)` to
-     `request.auth.uid in resource.data.authUids`: list rules can't call
-     `get()` with an unbound `{uid}`, so the old rule would have rejected the
-     workspace-resolve query and dead-ended every sign-in on the restricted
-     screen. The resource-based form is provable from the query's own
-     `array-contains` filter.
-   - **`users/{uid}` create/delete denied to clients** (claim/deletion are
-     Admin-SDK-side). If the new-user onboarding path creates the workspace doc
-     client-side rather than in `claim_workspace`, add an `allow create` first.
-   - `rate_limits` confirmed denied.
-5. **Deploy the locked rules** —
-   `cp firestore.rules.locked firestore.rules && firebase deploy --only firestore:rules`.
-   Point of no return for the open-rules era; do it only after 1–4 pass.
-6. **Archive the iOS app** (after 1–5, with `NEXT_PUBLIC_REQUIRE_AUTH=true` baked
-   into the build). `./build-ios.sh`, then Xcode → Archive → TestFlight. Test
-   Google **and** Apple sign-in on device, then account deletion.
+### Before you start
+
+Set these as **GitHub repo secrets** (Settings → Secrets and variables → Actions)
+— see §5. They do nothing until a functions deploy picks them up.
+
+- `OWNER_EMAIL` — your Google/Apple email. **Required**: the legacy-workspace
+  claim gate fails closed without it (audit S-8).
+- `ADMIN_TOKEN` — any long random string.
+- `APPCHECK_ENFORCE` — `true`.
+- `REQUIRE_AUTH` — **leave this one unset for now.** It is step 3.
+
+Then set `NEXT_PUBLIC_REQUIRE_AUTH=false` (or leave unset) in **Vercel**.
+
+Also confirm, once: does `users/{your doc}.authUids` already contain your auth
+uid? If it does, `claim_workspace` short-circuits and the `OWNER_EMAIL` gate is
+never exercised.
+
+### The steps
+
+1. **Ship the config with auth still off.** Push any `functions/**` change to
+   `main` (bump `functions/.deploy-ping` if you have nothing else). The
+   **Deploy Cloud Functions** workflow writes the secrets above into
+   `functions/.env` and redeploys. Behavior is unchanged — `REQUIRE_AUTH` is
+   still unset. Confirm from the function logs that verified bearer tokens are
+   arriving before you enforce anything.
+
+2. **Web is already deployed.** Vercel auto-deploys `web/` on every push to
+   `main`, and Hosting has its own CI workflow now (`deploy-hosting.yml`). There
+   is nothing to run.
+
+3. **Flip the flags.** Set the `REQUIRE_AUTH` repo secret to `true`, set
+   `NEXT_PUBLIC_REQUIRE_AUTH=true` in Vercel, then push a `functions/**` change
+   to `main` so the backend redeploys with the new value. Sign in on web with
+   Google and confirm your cards appear — that call is what runs
+   `claim_workspace` and links your account.
+   **Rollback = flip both back off and redeploy.** Still cheap at this point;
+   after step 5 it is not.
+
+   *Three breaks the old checklist warned about here are already fixed — do not
+   go looking for them:* `retryFailedLink` now sends the bearer header;
+   `backfill_related_links` is admin-gated; and `/api/article` (`get_article`),
+   the anonymous-callable exception that needed a decision, was **deleted**
+   2026-07-27 along with the reader feature.
+   *Verified unaffected by the flag:* `share_ingest` still authenticates by
+   ingest token (Share Extension and browser extension keep working), the
+   callables take the SDK-attached token, and the Vercel proxy routes forward
+   the `Authorization` header.
+
+4. **The rules are already tested.** ~~Run the emulator suite on your Mac.~~
+   `.github/workflows/rules-tests.yml` runs `firestore-rules-test/` against a
+   real Firestore emulator on every push touching `firestore.rules*`, and
+   **run #6 (2026-07-25) is green** on the merge that landed the S-9
+   digest-delete rule. A GitHub runner downloads the emulator JAR fine; only the
+   cloud sandbox cannot, and that limitation was mistakenly written down as
+   "unverified" for a while. Just check the workflow is green on your branch.
+
+   What the suite covers: owner can read/write their `users/{uid}` doc plus
+   `links`/`chats`/`collections` and read `syntheses`; the `authUids
+   array-contains` workspace-resolve **list query** works; a different signed-in
+   account and an unauthenticated client get nothing; `shared_cards` /
+   `shared_collections` are publicly readable but client-write-denied;
+   `rate_limits` / `pending_processing` / `task_logs` stay denied; and the
+   per-digest **delete** allowance (S-9) that a client `deleteDoc` depends on.
+
+5. **Deploy the locked rules — by merging, not by typing.** Commit
+   `cp firestore.rules.locked firestore.rules` and merge it to `main`. The
+   **Deploy Firestore rules** workflow (`deploy-rules.yml`) re-runs the emulator
+   suite, deploys, and then probes the live database anonymously to prove the
+   lock actually landed.
+
+   It also refuses to deploy a locked ruleset while the `REQUIRE_AUTH` secret is
+   off — the ordering mistake that would brick every sign-in is now enforced by
+   the pipeline rather than by this paragraph. **It cannot see
+   `NEXT_PUBLIC_REQUIRE_AUTH` (a Vercel variable), so confirm that one
+   yourself.**
+
+   This is still the point of no return for the open-rules era. Do it after 1–4.
+
+6. **Ship the iOS build.** `git push -f origin main:trigger/testflight` triggers
+   the **iOS → TestFlight** workflow (cloud-managed signing, `macos-26`). No
+   `./build-ios.sh`, no Xcode, no Mac. Then on device: Google **and** Apple
+   sign-in, a capture through the share sheet, and account deletion.
+
+7. **Device-verify the brand-new-user path** — sign in with a fresh non-owner
+   account and confirm it lands on the welcome screen with an auto-created
+   workspace, not the restricted screen. This only works once `REQUIRE_AUTH` is
+   on, which is why it cannot be checked earlier.
 
 ## 7. Open questions / limits
 
-- **New (non-owner) users:** `claim_workspace` only links the *existing* unclaimed
-  workspace (single-owner migration). There is no self-serve "create a fresh empty
-  workspace for a brand-new user" flow yet — a new account currently lands on the
-  restricted screen. If you want open public sign-up, that onboarding path is a
-  follow-up (create `users/{newId}` with `authUids` on first sign-in).
+- ~~**New (non-owner) users** land on the restricted screen — no self-serve
+  workspace creation.~~ **RESOLVED 2026-07-03 (SOURCE_OF_TRUTH §4 task 3), this
+  entry was stale.** `claim_workspace` now falls back to creating a fresh
+  `users/{authUid}` workspace (authUids / email / createdAt / default settings /
+  ingest token) for any verified account that cannot claim the `OWNER_EMAIL`-gated
+  legacy doc, and the app shows a one-screen welcome
+  (`web/components/Onboarding.tsx`) instead. The restricted screen now appears
+  only on a genuine creation failure, with a Retry. It is flag-gated behind
+  `REQUIRE_AUTH`, which is why §6 step 7 is the device check for it.
 - **Plugin version** must match Capacitor 8 (see step 1).
 - **Sign in with Apple on web** is optional; if you only need it on iOS you can
   skip the Services ID / `.p8` (step 3.2) — the iOS native flow doesn't use them.

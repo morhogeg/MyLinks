@@ -1,0 +1,264 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Deploy Firestore + Storage security rules.
+#
+# WHY THIS EXISTS: rules were the last deploy surface with no CI path. Functions
+# deploy on a `main` push (deploy-functions.yml), Hosting does too
+# (deploy-hosting.yml), desktop web is Vercel, iOS is the TestFlight workflow —
+# but `firebase deploy --only firestore:rules` still meant a Mac with
+# `firebase login`. That made it the single manual step standing in the middle
+# of the auth cutover, i.e. the "point of no return" in NATIVE_AUTH_SETUP.md §6.
+# It reuses the SAME `FIREBASE_SERVICE_ACCOUNT` secret as the functions and
+# hosting deploys (that service account holds Firebase Admin, which covers
+# rules), so it needs no new owner setup.
+#
+# The cutover is now a reviewable one-line commit — `cp firestore.rules.locked
+# firestore.rules` — that CI tests and deploys on merge, instead of a hand-typed
+# command whose ordering nobody could verify.
+#
+# WHAT THIS DOES NOT DEPLOY:
+#   • `firestore.indexes.json` — owned by deploy-functions.yml (:168), which
+#     deploys indexes BEFORE functions on purpose. Two workflows racing on the
+#     same index set would be a bug, so indexes are deliberately not in `paths`.
+#   • `firestore.rules.locked` — the STAGED file. Editing it must never deploy
+#     anything; that is the whole point of it being staged. It is exercised by
+#     rules-tests.yml and by this workflow's test gate, never shipped by an edit.
+#
+# `firebase deploy --only firestore:rules` from a Mac remains the escape hatch.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Deploy Firestore rules
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      # The LIVE rulesets — the files that actually ship.
+      - "firestore.rules"
+      - "storage.rules"
+      # Self-referential on purpose (mirrors deploy-functions.yml /
+      # deploy-hosting.yml): a change to this workflow takes effect on its own
+      # merge rather than waiting for the next unrelated rules edit.
+      - ".github/workflows/deploy-rules.yml"
+
+concurrency:
+  group: deploy-rules
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FIREBASE_PROJECT: secondbrain-app-94da2
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required secrets
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          # Read from the environment — never interpolate a secret into the
+          # script body with ${{ }}, which would bake it into the run command
+          # (same rule as deploy-functions.yml / deploy-hosting.yml).
+          if [ -z "${FIREBASE_SERVICE_ACCOUNT}" ]; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT secret is not set — it is already" \
+                 "required by Deploy Cloud Functions and Deploy Firebase Hosting," \
+                 "so it should already exist."
+            exit 1
+          fi
+          echo "Required secrets present."
+
+      # ───────────────────────────────────────────────────────────────────────
+      # THE CUTOVER TRIPWIRE. This is the most important step in the file.
+      #
+      # Deploying the locked ruleset while the BACKEND still trusts a
+      # client-supplied uid does not half-work — it bricks every sign-in, and
+      # the recovery is another deploy. NATIVE_AUTH_SETUP.md has always said
+      # "flip REQUIRE_AUTH first, deploy rules last", but nothing enforced the
+      # order; a doc is not a seatbelt.
+      #
+      # Detection is by CONTENT, not by byte-equality with the locked file, so a
+      # hand-edited lock is caught too: today's live ruleset is permissive and
+      # says so with `allow read, write: if true`. If that marker is gone, this
+      # is a locking deploy and REQUIRE_AUTH must already be on.
+      # ───────────────────────────────────────────────────────────────────────
+      - name: Cutover tripwire (refuse to lock rules before auth is enforced)
+        env:
+          REQUIRE_AUTH: ${{ secrets.REQUIRE_AUTH }}
+        run: |
+          set -euo pipefail
+
+          if grep -qE 'allow[[:space:]]+read,[[:space:]]*write:[[:space:]]*if[[:space:]]+true' firestore.rules; then
+            posture=open
+          else
+            posture=locked
+          fi
+
+          if cmp -s firestore.rules firestore.rules.locked; then
+            identical=yes
+          else
+            identical=no
+          fi
+
+          echo "Live ruleset posture : $posture"
+          echo "Identical to .locked : $identical"
+          echo "POSTURE=$posture" >> "$GITHUB_ENV"
+
+          if [ "$posture" = "open" ]; then
+            echo "::warning::Deploying the PERMISSIVE ruleset — users/{uid} stays world-readable." \
+                 "This is the pre-cutover state (SOURCE_OF_TRUTH §3), not a failure."
+            exit 0
+          fi
+
+          # Mirror functions/main.py:553 exactly — REQUIRE_AUTH is truthy for
+          # 1/true/yes, anything else (including unset) is off.
+          case "$(printf '%s' "${REQUIRE_AUTH:-}" | tr '[:upper:]' '[:lower:]')" in
+            1|true|yes) enforced=yes ;;
+            *)          enforced=no  ;;
+          esac
+
+          if [ "$enforced" != "yes" ]; then
+            echo "::error::REFUSING TO DEPLOY. This is a LOCKING ruleset, but the REQUIRE_AUTH"
+            echo "repo secret is not set to 1/true/yes, so the deployed backend still trusts a"
+            echo "client-supplied uid. Deploying now would deny every client read and brick"
+            echo "sign-in for everybody."
+            echo ""
+            echo "Correct order (NATIVE_AUTH_SETUP.md §6):"
+            echo "  1. Set the REQUIRE_AUTH repo secret to 'true'."
+            echo "  2. Set NEXT_PUBLIC_REQUIRE_AUTH=true in Vercel and redeploy web."
+            echo "     (This workflow CANNOT see that one — it is a Vercel env var. Confirm it.)"
+            echo "  3. Push any functions/** change to main so the backend redeploys and"
+            echo "     picks REQUIRE_AUTH up from functions/.env (deploy-functions.yml:150)."
+            echo "  4. Re-run this workflow."
+            exit 1
+          fi
+
+          echo "✓ REQUIRE_AUTH is enforced — locking deploy permitted."
+          echo "::warning::Deploying the LOCKED ruleset. Confirm NEXT_PUBLIC_REQUIRE_AUTH is" \
+               "also true in Vercel — this workflow cannot check that."
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: firestore-rules-test/package-lock.json
+
+      # The emulator is a Java JAR that firebase-tools downloads on first run.
+      # (This is the step the cloud sandbox cannot do — which is why the rules
+      # suite has always been described as "run it on your Mac". A GitHub runner
+      # has always been able to; see the 2026-07-27 §9 correction.)
+      - name: Set up Java (Firestore emulator runtime)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install rules-test dependencies
+        working-directory: firestore-rules-test
+        run: npm ci
+
+      # WHAT THIS GATE DOES AND DOES NOT PROVE — read before trusting it.
+      # The suite's `pretest` copies `../firestore.rules.locked` and tests THAT
+      # file (see firestore-rules-test/package.json). So:
+      #   • When the live rules ARE the locked ones (a cutover deploy), this
+      #     tests exactly what is about to ship. Load-bearing.
+      #   • When they differ (the pre-cutover state), it does not test what
+      #     ships — it keeps the STAGED file from rotting while it waits, which
+      #     is worth doing on every rules touch anyway.
+      # Either way a red suite blocks the deploy, which is the behavior we want.
+      - name: Rules tests (emulator)
+        working-directory: firestore-rules-test
+        run: npm test
+
+      - name: Write service account credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          creds="$RUNNER_TEMP/firebase-sa.json"
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$creds"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$creds" >> "$GITHUB_ENV"
+
+      - name: Install firebase-tools
+        run: npm i -g firebase-tools
+
+      - name: Deploy rules
+        run: |
+          set -euo pipefail
+          firebase deploy --only firestore:rules,storage \
+            --project "$FIREBASE_PROJECT" --non-interactive --force
+
+      # ───────────────────────────────────────────────────────────────────────
+      # VERIFY THE POSTURE THAT ACTUALLY LANDED.
+      #
+      # The lesson from deploy-hosting.yml (§9, 2026-07-27) is that a green
+      # `firebase deploy` proves nothing about the resulting behavior. For rules
+      # the behavior is directly measurable without any credential: ask the
+      # Firestore REST API for /users as an ANONYMOUS caller and read the status.
+      #   • open ruleset  → 200 (the collection is world-readable)
+      #   • locked ruleset → 403 PERMISSION_DENIED
+      # We report the result against the ruleset we just deployed.
+      #
+      # ⚠️ STATUS CODE ONLY — the body is never printed. On the open ruleset the
+      # response contains real user documents, whose ids are phone numbers.
+      # Echoing it would put PII in a public CI log.
+      #
+      # WHAT IS FATAL HERE, AND WHY ONLY THAT: this step must never fail a
+      # deploy that actually succeeded unless it PROVES something is wrong. Only
+      # `locked:200` proves it — we shipped a ruleset that denies anonymous
+      # reads and anonymous reads still work, so the lock did not land.
+      # `open:403` looks alarming but is genuinely ambiguous: it means either
+      # something locked the rules, OR Firestore App Check enforcement is on in
+      # the console (which would deny an unauthenticated REST call regardless of
+      # rules). Whether that enforcement is on is an OPEN QUESTION nobody has
+      # confirmed — see SOURCE_OF_TRUTH §4 task 5. Failing a good deploy over a
+      # signal with two explanations would just teach everyone to ignore it.
+      # ───────────────────────────────────────────────────────────────────────
+      - name: Verify deployed posture
+        run: |
+          set -euo pipefail
+          url="https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/(default)/documents/users?pageSize=1"
+
+          # `status=$(curl …) || status=000` — NOT `curl … || echo 000`. On a
+          # connection failure curl writes "000" to stdout AND exits non-zero,
+          # so the `|| echo` form concatenates into "000000" and silently misses
+          # every case label. (deploy-hosting.yml has the same shape; it only
+          # survives because its labels are `000*` globs.)
+          # -o /dev/null: discard the body. It may contain user documents.
+          status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$url") || status="000"
+          echo "Anonymous GET /users → HTTP $status (body discarded on purpose)"
+
+          case "$POSTURE:$status" in
+            locked:403)
+              echo "✅ Locked ruleset confirmed live — anonymous reads are denied." ;;
+
+            locked:200)
+              echo "::error::Deployed the locked ruleset but anonymous reads still SUCCEED."
+              echo "The lock did not land — the database is still world-readable."
+              exit 1 ;;
+
+            open:200)
+              echo "✓ Permissive ruleset confirmed live (expected pre-cutover)."
+              echo "::warning::users/{uid} is readable by anyone holding the projectId, which" \
+                   "ships in the public web bundle — and ingestToken lives on those docs." \
+                   "Known exposure, tracked as SOURCE_OF_TRUTH §4 task 2. Closing it is the" \
+                   "auth cutover." ;;
+
+            open:403)
+              echo "::warning::Anonymous reads are DENIED while the permissive ruleset is live." \
+                   "Two explanations, and they need different responses: (a) something locked" \
+                   "the rules out of band — check the console, the app is probably broken; or" \
+                   "(b) Firestore App Check enforcement is ON, which denies unauthenticated" \
+                   "REST regardless of rules. (b) would be good news and would resolve an open" \
+                   "question (§4 task 5). Tell them apart by loading the app: if it works, it" \
+                   "is (b). Not failing the build over an ambiguous signal." ;;
+
+            *:000)
+              echo "::warning::Could not reach the Firestore REST API — posture unverified." \
+                   "The deploy itself succeeded; only this probe is inconclusive." ;;
+
+            *)
+              echo "::warning::Unexpected result for posture '$POSTURE': HTTP $status." \
+                   "Deploy succeeded; probe inconclusive." ;;
+          esac

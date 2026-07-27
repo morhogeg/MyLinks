@@ -82,6 +82,22 @@ surface in the category and a knowledge graph computed on every save. The path t
     2026-07-17 — fully operational, no owner step per deploy). Mac
     fallback: `./deploy-functions.sh functions:<a>,functions:<b>` (always pass
     explicit targets; scheduler/webhook fns aren't in the default set).
+    **Functions ENV CONFIG rides this workflow too:** `ADMIN_TOKEN`,
+    `OWNER_EMAIL`, `APPCHECK_ENFORCE` and `REQUIRE_AUTH` are read from **GitHub
+    repo secrets** and written into `functions/.env` at deploy time
+    (`deploy-functions.yml:129-152`) — they are NOT Firebase console settings.
+    Set a secret, push a `functions/**` change, done.
+  - **Firestore + Storage rules** → **"Deploy Firestore rules"**
+    (`.github/workflows/deploy-rules.yml`, added 2026-07-27), auto on `main`
+    pushes touching `firestore.rules` or `storage.rules`. Runs the
+    `firestore-rules-test` emulator suite, deploys, then probes the live DB
+    anonymously to prove the resulting posture. **Carries the cutover tripwire:**
+    it refuses to deploy a locked ruleset while the `REQUIRE_AUTH` secret is off,
+    so the ordering that would brick every sign-in is enforced by the pipeline
+    rather than by a doc. `firestore.indexes.json` is deliberately NOT in its
+    paths — deploy-functions.yml owns indexes (`:168`) and two workflows racing
+    on the same index set would be a bug. `firestore.rules.locked` is also not in
+    its paths: editing the staged file must never ship anything.
 
 ### Operational gotchas (hard-won — don't re-learn these)
 
@@ -211,16 +227,33 @@ The multi-user auth work is **fully written but not live**:
    `delete_account_http` (bearer + `_allowed_origins` CORS); native routes to
    `/api/claim-workspace` + `/api/delete-account`, web keeps the callable —
    **deployed + curl-verified.** Web login now also shows Apple+Google (no
-   cutover). **Owner steps that REMAIN before flipping** (nothing left in code):
-   (1) configure the Apple **Services ID + `.p8`** in the Firebase Apple provider
-   — REQUIRED for web Apple sign-in (native didn't need it; the web Apple button
-   errors until then); (2) set `OWNER_EMAIL` (+ task 5 env) so only the owner can
-   claim the legacy workspace; (3) flip `REQUIRE_AUTH` +
-   `NEXT_PUBLIC_REQUIRE_AUTH`, redeploy functions + web; (4) `cd
-   firestore-rules-test && npm test`; (5) `cp firestore.rules.locked
-   firestore.rules && firebase deploy --only firestore:rules` (point of no
-   return); (6) device-verify the **brand-new-user** claim path (fresh non-owner
-   account → auto-created workspace — only works once `REQUIRE_AUTH` is on).
+   cutover). **Owner steps that REMAIN before flipping — REWRITTEN 2026-07-27,
+   and it is now much smaller than this item used to claim.** The old list sent
+   you to a Mac for three of its six steps; all three are CI now. What is left:
+   - **(a) Four GitHub repo secrets** — `OWNER_EMAIL`, `ADMIN_TOKEN`,
+     `APPCHECK_ENFORCE=true`, and (when you are ready) `REQUIRE_AUTH=true`.
+     These are **repo secrets, not Firebase console settings**
+     (`deploy-functions.yml:129-152` writes them into `functions/.env`), so this
+     is a GitHub settings page plus a push to `main`.
+   - **(b) One Vercel variable** — `NEXT_PUBLIC_REQUIRE_AUTH=true`. The only
+     piece of cutover config that lives outside GitHub, and the one thing
+     `deploy-rules.yml`'s tripwire cannot check for you.
+   - **(c) Merge a one-line commit** — `cp firestore.rules.locked
+     firestore.rules`. "Deploy Firestore rules" tests, deploys and verifies it.
+     Still the point of no return, but it is now a reviewable diff rather than a
+     hand-typed command, and it is blocked automatically if (a) is not done.
+   - **(d) One device check** — the brand-new-user claim path (fresh non-owner
+     account → auto-created workspace), which only works once `REQUIRE_AUTH` is
+     on.
+   - **(e) Only if you want web Apple sign-in:** the Apple **Services ID + `.p8`**
+     in the Firebase Apple provider. **Not a cutover blocker** — native Apple
+     sign-in does not need it; the web Apple button errors until it is set.
+     Google works on both platforms regardless.
+   ~~(4) `cd firestore-rules-test && npm test`~~ — **struck: CI already does
+   this** on every `firestore.rules*` push (`rules-tests.yml`, run #6 green
+   2026-07-25), and `deploy-rules.yml` re-runs it before deploying.
+   ~~(5) `firebase deploy --only firestore:rules` from a Mac~~ — **struck:**
+   superseded by (c).
    ~~Flagged decision: `get_article` stays anonymous-callable (App Check + rate
    limit only) — keep or gate deliberately.~~ **RESOLVED BY DELETION
    2026-07-27** — the reader feature was removed at owner request, taking the
@@ -898,6 +931,58 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-07-27 — RULES NOW DEPLOY FROM CI, AND THE CUTOVER CHECKLIST WAS
+  REWRITTEN AROUND WHAT IS ACTUALLY TRUE.** Rules were the last deploy surface
+  with no CI path, which put a Mac-only `firebase deploy --only firestore:rules`
+  in the middle of the auth cutover — the "point of no return" step. New
+  **`.github/workflows/deploy-rules.yml`** closes it, reusing the existing
+  `FIREBASE_SERVICE_ACCOUNT` secret (that account holds Firebase Admin, which
+  covers rules), so it needed **no owner setup at all** — same trick
+  `deploy-hosting.yml` used last week. Fires on `main` pushes touching
+  `firestore.rules` / `storage.rules`; deploys `firestore:rules,storage`.
+  **Three deliberate design calls, each of which is the interesting part:**
+  (1) **The cutover tripwire.** Deploying the locked ruleset while the backend
+  still trusts a client uid does not half-work — it bricks every sign-in.
+  `NATIVE_AUTH_SETUP.md` has always said "flags first, rules last", but a doc is
+  not a seatbelt. The workflow now detects a locking ruleset **by content** (the
+  `allow read, write: if true` marker is gone — so a hand-edited lock is caught
+  too, not just a byte-identical `cp`) and refuses to deploy unless the
+  `REQUIRE_AUTH` secret is truthy, mirroring `main.py:553`'s exact 1/true/yes
+  rule. It cannot see `NEXT_PUBLIC_REQUIRE_AUTH` (a Vercel var) and says so
+  loudly rather than implying it checked.
+  (2) **Verify the posture, not the deploy** (the `deploy-hosting.yml` lesson):
+  an anonymous REST GET on `/users` returns 200 under the open ruleset and 403
+  under the locked one, so the live security posture is directly measurable with
+  no credential. **Status code only — the body is never printed**, because under
+  the open ruleset it contains user documents whose ids are phone numbers, and
+  that would put PII in a public CI log.
+  (3) **Only `locked:200` is fatal.** `open:403` looks alarming but is genuinely
+  ambiguous — it means either the rules got locked out of band OR **Firestore
+  App Check enforcement is on**, which nobody has ever confirmed (§4 task 5).
+  Failing a good deploy on a two-explanation signal just teaches everyone to
+  ignore the step, so that case warns and explains how to tell them apart.
+  **A real bug caught while testing this:** `status=$(curl …) || echo "000"` is
+  wrong — on a connection failure curl writes `000` to stdout *and* exits
+  non-zero, so the `|| echo` form concatenates to `000000` and misses every
+  `case` label. Verified live (this sandbox has no egress to
+  `firestore.googleapis.com`, so the failure path was easy to exercise). Correct
+  form is `status=$(curl …) || status="000"`. `deploy-hosting.yml` has the same
+  shape and survives only because its labels are `000*` globs — left alone
+  deliberately, with a comment pointing at it.
+  **Docs rewritten to match, and a lot of what they said was stale.**
+  `NATIVE_AUTH_SETUP.md` §6 described a workflow that no longer exists: manual
+  functions deploy, `./deploy-hosting.sh`, a local emulator run, a hand-typed
+  rules deploy, and Xcode → Archive. All five are CI. It also still warned about
+  three breaks that are fixed (`retryFailedLink` sends the bearer header,
+  `backfill_related_links` is admin-gated, `get_article` was deleted), and §7
+  still claimed new users hit the restricted screen — resolved back on 07-03 by
+  task 3. §5 now states the thing that keeps getting mis-described: **the
+  functions env config is GitHub repo secrets, not Firebase console.**
+  **Net effect — the cutover is now: 4 repo secrets, 1 Vercel variable, 1 merged
+  one-line commit, 1 device check.** No Mac, no firebase CLI, no emulator run.
+  §4 task 2's owner list was rewritten accordingly, and the Apple Services ID +
+  `.p8` demoted out of it — it gates *web* Apple sign-in only, never the cutover.
 
 - **2026-07-27 — ✅ OWNER DEVICE QA ON BUILD 1219: ALL CLEAR + a codebase
   review.** The owner ran the full 11a1 list on a physical iPhone and reported
