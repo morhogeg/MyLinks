@@ -871,12 +871,20 @@ export default function AddLinkForm({ onLinkAdded, hidden = false, onAnalyzingCh
                     data-tour="add"
                     aria-label="Add to Machina"
                     onClick={() => setIsExpanded(!isExpanded)}
+                    /* The glyph is `--accent-ink`, NOT white. `--accent` is the
+                       neutral EMPHASIS token, and in DARK mode it is porcelain
+                       (#E9E9F2) — so a white `+` on it was white-on-white and the
+                       whole control read as a washed-out disc. `--accent-ink`
+                       exists precisely for content sitting ON an accent surface
+                       and flips per theme (#101016 dark / #F7F7F9 light).
+                       Treatment now matches the mobile capture button in
+                       BottomTabBar: same action, same brand gradient + ink. */
                     className={`w-14 h-14 min-h-[44px] min-w-[44px] rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${isExpanded
                         ? 'bg-card border border-border-strong rotate-45 scale-90 opacity-0 pointer-events-none'
-                        : 'bg-accent hover:scale-105 active:scale-95'
+                        : 'bg-[image:var(--accent-gradient)] shadow-accent/40 hover:scale-105 active:scale-95'
                         }`}
                 >
-                    <Plus className={`w-7 h-7 transition-colors ${isExpanded ? 'text-text' : 'text-white'}`} />
+                    <Plus className={`w-7 h-7 transition-colors ${isExpanded ? 'text-text' : 'text-accent-ink'}`} />
                 </button>
             </div>
         </>

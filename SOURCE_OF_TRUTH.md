@@ -839,6 +839,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-27 — DARK-MODE CAPTURE FAB WAS WHITE-ON-WHITE + FILTERS LABEL GLYPH
+  (owner device QA, desktop Safari).** (1) **The `+` FAB "looks weird" in dark
+  mode — it was invisible.** `AddLinkForm`'s desktop FAB painted `bg-accent` with
+  a **`text-white`** glyph. `--accent` is the neutral EMPHASIS token, and in dark
+  it is porcelain `#E9E9F2` — so the `+` was white on near-white and the control
+  read as a washed-out disc. The token for this exact situation already existed:
+  `--accent-ink`, "ink for content sitting ON an accent surface", which flips per
+  theme (`#101016` dark / `#F7F7F9` light). The FAB now uses it, plus
+  `--accent-gradient`, making it identical to the mobile capture button in
+  `BottomTabBar` — same action, same treatment, and that button had been doing it
+  correctly all along. Light mode was already fine and is visually unchanged
+  (`.light` overrides `--accent-gradient` to graphite, so the disc stays dark).
+  Render-verified fixed-vs-before side by side in Chromium, both themes: dark
+  before = white `+` on a white disc, after = crisp dark `+`. Swept
+  `components/**` for the same `bg-accent` + `text-white` pairing — this was the
+  only one. (2) Removed the `Shapes` glyph beside the **Categories** label in
+  `feed/MobileFiltersSheet.tsx` per owner request. ⚠️ Note the sheet is now
+  inconsistent: **Show** has no icon, **Categories** no longer does, but **Tags**
+  still carries `TagIcon`. Left deliberately — the owner asked only about
+  Categories — but it should be settled one way or the other next pass.
+
 - **2026-07-27 — DESKTOP TAB ICON: SVG FAVICON (owner: "in desktop, we need the
   new logo in the favicon" + a screenshot showing the OLD purple M).** Diagnosis
   first: **`app/favicon.ico` was already the Citation mark** — it was rebuilt in

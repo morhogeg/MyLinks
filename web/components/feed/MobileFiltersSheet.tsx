@@ -1,7 +1,7 @@
 'use client';
 
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
-import { X, Tag as TagIcon, Shapes } from 'lucide-react';
+import { X, Tag as TagIcon } from 'lucide-react';
 import Dropdown, { type DropdownOption } from '../Dropdown';
 import TagExplorer from '../TagExplorer';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -105,8 +105,8 @@ export default function MobileFiltersSheet({
                     {categories.length > 0 && (
                         <div>
                             <div className="flex items-center justify-between mb-2.5">
-                                <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">
-                                    <Shapes className="w-3.5 h-3.5 text-accent/70" /> Categories
+                                <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">
+                                    Categories
                                 </span>
                                 {selectedCategory.size > 0 && (
                                     <button
