@@ -845,9 +845,9 @@ TikTok/Reels/Shorts — short-form screen demos of "I asked my bookmarks a quest
 and it answered with sources" are exactly what performs organically in the
 productivity niche. (4) **Ongoing:** App Store Optimization — the exact Name /
 Subtitle / keywords live in `docs/APP_STORE.md` §2 and the reasoning behind them
-in `docs/BRANDING.md` (title `Machina: Save & Recall`, subtitle `Save anything.
-It reads it.`; **"second brain" and "ai" are keywords-field-only — never put
-either on a user-visible surface**, see BRANDING D-3), and a monthly public "what Machina learned
+in `docs/BRANDING.md` (title `Machina: Save & Recall`, subtitle
+`Capture. Ask. Connect.`; **"second brain" and "ai" are keywords-field-only —
+never put either on a user-visible surface**, see BRANDING D-3), and a monthly public "what Machina learned
 this month" post generated from the actual synthesis feature — the product
 markets itself if you publish what it produces. Success metric for month one:
 1,000 installs, 20% week-2 retention, 50 organic shares — retention gates any
