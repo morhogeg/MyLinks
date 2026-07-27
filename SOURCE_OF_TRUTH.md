@@ -884,9 +884,13 @@ exact-match, capped.
   instead of relying on the portal's `stopPropagation` beating a document-level
   listener — order there depends on where React attached its root listener, so a
   click on a suggestion could in principle close the field instead of adding the
-  tag. ⚠️ **Still open if the owner's issue was functional rather than
-  discoverability** — needs the specific symptom (typing does nothing / no Create
-  row / Enter does nothing) to go further.
+  tag. ✅ **RESOLVED — owner confirmed it works ("my mistake, it works"), so
+  there was never a functional bug: it was purely a discoverability problem, and
+  the placeholder was the cause.** The width bump and the click-outside
+  containment check stay as hardening, not as fixes. Worth remembering as a
+  pattern: a field labelled with the ACTION ("Add tag") over a list of existing
+  values reads as a picker; label it with the CAPABILITY ("Search or create") and
+  the second affordance stops being invisible.
 
 - **2026-07-27 — FOUNDER'S NOTE DE-EM-DASHED + `safe-pt` WAS EATING TOOLBAR
   PADDING.** (1) **Story copy.** Owner: the em dashes "read as AI generated
