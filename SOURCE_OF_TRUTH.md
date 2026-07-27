@@ -915,6 +915,25 @@ exact-match, capped.
   from a `main` push. Run `cd ~/MyLinks && ./deploy-hosting.sh`. Until then
   Hosting still advertises a route whose function the deploy has pruned.
 
+- **2026-07-27 — SETTINGS SUB-SCREENS NOW OPEN AT THE TOP (owner: the story
+  "opens here, and the user must scroll up to start reading").** Every screen in
+  the Settings stack shares ONE `overflow-y-auto` body, and pushing a screen
+  inherited the previous screen's offset. "The story behind Machina" sits at the
+  very bottom of the main list (last item, under About), so by the time you tap
+  it you are scrolled all the way down — and the letter opened mid-paragraph with
+  its Citation glyph clipped off the top. Fixed with **per-view scroll memory**
+  rather than a blanket reset: `go`/`back` stash the outgoing screen's
+  `scrollTop` in a `Map`, and an effect on `view` restores the incoming screen's
+  (0 when never visited). So a new screen opens at the top AND Back still lands
+  where you left the long main list — a plain "always scroll to 0" would have
+  fixed the report while quietly costing that. The map clears when Settings
+  opens, so a fresh session never inherits stale offsets. `StatsView`'s existing
+  "Back to Insights" restore is unaffected: it applies later, once its async
+  stats resolve, so it still wins for that case. tsc clean; the 2 remaining
+  eslint `set-state-in-effect` errors in this file are the pre-existing ones
+  (lines 190/247), re-confirmed unchanged. **Not device-verified** — rendering
+  the Settings modal headlessly needs an authenticated session.
+
 - **2026-07-27 — STORY COPY ROUND 2 + DESKTOP TAG-CREATE AFFORDANCE.**
   (1) **"didremember" — a real JSX whitespace bug, and it is PRE-EXISTING, not
   from the de-em-dash rewrite.** `when I <em>did</em> remember` renders with the

@@ -122,8 +122,35 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
     // Navigation stack; the last entry is the visible screen.
     const [stack, setStack] = useState<View[]>(['main']);
     const view = stack[stack.length - 1];
-    const go = (v: View) => setStack((s) => [...s, v]);
-    const back = () => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s));
+
+    // Per-screen scroll memory. Every view shares ONE scroll container, and
+    // pushing a screen used to inherit whatever offset the previous one was at:
+    // "The story behind Machina" lives at the very bottom of the main list, so
+    // opening it dropped you into the middle of the letter and you had to scroll
+    // UP to reach the first line (owner, 2026-07-27). Resetting to 0 on every
+    // change would fix that but lose your place in the long main list on Back, so
+    // each view's offset is remembered and restored instead — new screens open at
+    // the top, Back lands where you left.
+    const bodyRef = useRef<HTMLDivElement>(null);
+    const scrollByView = useRef<Map<string, number>>(new Map());
+
+    const rememberScroll = () => {
+        scrollByView.current.set(view, bodyRef.current?.scrollTop ?? 0);
+    };
+    const go = (v: View) => { rememberScroll(); setStack((s) => [...s, v]); };
+    const back = () => {
+        rememberScroll();
+        setStack((s) => (s.length > 1 ? s.slice(0, -1) : s));
+    };
+
+    // Apply the remembered offset (0 for a screen not visited yet). Runs after
+    // the new screen has mounted, matching how StatsView restores its own
+    // position — that one lands later still, once its async stats arrive, so it
+    // keeps winning for the "Back to Insights" case.
+    useEffect(() => {
+        const el = bodyRef.current;
+        if (el) el.scrollTop = scrollByView.current.get(view) ?? 0;
+    }, [view]);
 
     // Auto-save: there's no explicit Save button. Preferences persist when the
     // user leaves a sub-screen (Back / Done) or closes the sheet.
@@ -218,6 +245,9 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
             // Deep-link: open straight to the digest screen (main → Reminders &
             // Digest) so Back still walks out one level at a time.
             setStack(initialSection === 'digest' ? ['main', 'resurfacing'] : initialSection === 'stats' ? ['main', 'stats'] : ['main']);
+            // Forget last session's offsets — a fresh open of Settings should
+            // always start at the top, not where a previous visit left off.
+            scrollByView.current.clear();
             setTopicQuery('');
             loadSettings();
             loadDigestExtras();
@@ -285,7 +315,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 overflow-y-auto">
+                <div ref={bodyRef} className="flex-1 overflow-y-auto">
                     <div className="w-full max-w-2xl mx-auto px-[18px] pt-1.5 pb-8">
                         {view === 'main' && (
                             <MainView
