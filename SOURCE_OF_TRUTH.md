@@ -812,6 +812,121 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-27 — SHARE-EXTENSION SCANNER REDESIGNED IN LUMEN (owner: "it has the
+  old design").** The HUD that appears when you share into Machina from another
+  app was the last surface still wearing the pre-Lumen identity — hardcoded
+  `#A855F7`/`#EC4899` and a native port of the retired particle Thinking Orb —
+  which meant the *first* thing a share shows was off-brand before the app even
+  opened. Repainted, not rebuilt: the scanner window, layout, sweep band, %
+  counter, phase label, progress bar, `ShareProgressCurve`, the App Group
+  handoff writes and every network/watchdog path are unchanged. New
+  **`enum Lumen`** ports the `globals.css` `:root` block so every colour and
+  curve traces to a token (`--accent` for the purple, `--accent-2/-3` on the
+  sweep, `--card`/`--background` for the `.secondarySystemBackground` and
+  white-alpha wells, `--ease-modal`/`--ease-spring` as `CAMediaTimingFunction`
+  control points); the VC pins `.dark` since the surface is now hand-mixed.
+  **No green** — the app's own scan surfaces render their check in `text-accent`,
+  so resolution is porcelain here too. `OrbitsOrbView` is **deleted**, replaced
+  by **`CitationMarkView`** (CAShapeLayer/CGPath, no assets): geometry ported
+  unit-for-unit from `CitationMark.tsx` (viewBox `288 292 448 416`, TOP 300 /
+  BOT 700 / ARM 100 / W 58 / LX 296 / RX 728, point c(512,500) r52) and
+  **verified numerically** against both `cit_lumen.svg` and `bracketPaths()`
+  rather than eyeballed, with the shipped boot choreography — brackets settle on
+  `--ease-modal`, glow blooms, the point strikes on `--ease-spring`, then a slow
+  breath while work is in flight, collapsing to the settled frame under reduced
+  motion. **Round 14's lesson is structural here:** no layer carrying a glow is
+  ever animated — the ink rests after the strike and the breath is opacity on a
+  sibling radial halo behind it, so the glow cannot re-rasterise per frame.
+  ⚠️ **Swift cannot be compiled in the cloud sandbox** — this is statically
+  reviewed only (delimiters balance, no force-unwraps, no `self` captures,
+  `contentsScale` pinned on manually-added sublayers, layout geometry inside a
+  disabled `CATransaction`). **It has never been seen running — QA it on the
+  TestFlight build.** Known, pre-existing, NOT fixed: the image-mode phase
+  labels drift in *wording* (thresholds match) from `AnalyzingBanner.tsx`'s
+  inline table; the fix belongs in `scanPhases.ts` as an `IMAGE_SCAN_STEPS`
+  twin, outside `ShareExt/`.
+
+- **2026-07-27 — CAPTURE BANNER REPLAYED ITSELF (owner report, real device).**
+  Share a post from another app, open Machina: the bar ran its phases, said
+  "finished saving", hit 100%, vanished — then **reappeared and replayed the
+  phases from the start**. Root cause: one capture is narrated by two
+  independent banner sources that had no shared notion of "this one is done".
+  `useSharedCaptureBanner` (the optimistic Share-Extension bridge) measures its
+  `SETTLE_MS = 4s` give-up window from **capture start**, not from feed-load —
+  and the extension HUD typically runs several seconds before the user taps
+  "Open Machina", so the window is already spent when the feed's first snapshot
+  lands. The bridge therefore plays its terminal "Saved" frame *before* the
+  server's `processing` placeholder streams in; when that card arrives,
+  `useProcessingBanner` sees a brand-new activation and opens a second
+  lifecycle (`AnalyzingBanner` resets its `maxPct` on unmount, so the ramp reads
+  as a restart). Fixed structurally, not with a timing nudge: new
+  **`web/lib/captureLifecycle.ts`**, a session-scoped per-capture completion
+  **latch** both hooks consult. The two clocks are NOT equal (the extension's
+  `startedAt` is device capture start; the card's `processingStartedAt` is
+  server-receive time, seconds later), so the latch correlates them the way the
+  existing handoff anchoring does — each placeholder card **claims** the nearest
+  unclaimed share entry inside a bounded window, and a claimed entry is never
+  offered to a second card. Nearest-match + one-claim-each is what keeps two
+  shares 30s apart distinct. A capture whose entry is latched is filtered out of
+  the processing banner; a new capture, and a retry (re-stamped
+  `processingStartedAt` ⇒ new entry), still show normally. The latch reads are
+  pure so render already knows a late card is spent (no one-frame flash), and
+  bookkeeping happens in an effect keyed to the RAW processing set so
+  `suppressId` (the in-dialog stepper) is never mistaken for "resolved".
+  Continuity is untouched — both sources still ramp from the shared
+  `progressFor` clock.
+
+  **The premature finish itself is also fixed, not just latched.** Leaving it in
+  place would have traded the replay for a different lie: the bridge would flash
+  "Saved" a beat after the feed loaded, every time, while the server was still
+  working. `SETTLE_MS` now runs from `max(feedReadyAt, armedAt)` — when we
+  actually started WAITING for a placeholder — instead of from the capture's
+  start clock, so the window means what its comment always claimed. The normal
+  path is now the designed hand-off (bridge → `useProcessingBanner`, same ramp,
+  no finish frame in between); the latch is the backstop for when a placeholder
+  really is late. `MAX_MS` (absolute 30s age cap, and the guard that refuses to
+  arm for a stale capture) is unchanged, so nothing can ramp forever.
+
+  Verified: `npx tsc --noEmit` clean, eslint clean; a throwaway harness exercised
+  the latch across 23 cases (single capture once, late card does not reopen,
+  second capture does show, mid-capture foreground resumes forward, retry
+  reopens, suppressId round-trip). **Device confirmation still pending** — the
+  root-cause timeline is reasoned from the code, not measured on hardware.
+
+- **2026-07-27 — PROMPT FIDELITY: THE MODEL MUST NOT NARROW THE SUBJECT (owner
+  report).** An X post that was a screenshot of a Hebrew rant about the **Japan**
+  travel trend came back titled "ביקורת על חופשות בטוקיו" — Tokyo, a city the
+  post never names. The model silently substituted a narrower entity, the same
+  failure mode that invents a company for an industry, a brand for a product, or
+  a date for a vague time. Fixed as a class, not as a Japan special case: a new
+  **SAME LEVEL OF GENERALITY** rule sits in `ai_service.SYSTEM_PROMPT` next to
+  the existing GROUNDING clause (extending it, not competing with it) and so
+  reaches all four capture paths — text/note, image OCR, and both text+image
+  variants — plus a `**SCOPE**` line on the title instruction (where the bug was
+  visible) and a matching qualifier on `VIDEO_ANALYSIS_PROMPT`'s "be specific"
+  licence. The rule names title/summary/tags/concepts explicitly, so a "tokyo"
+  tag can't pollute the graph either. The two vision addenda also now say to use
+  only what is **legible** rather than completing blurry screenshot text from
+  training knowledge. Language handling untouched (source-language summary,
+  English category/concepts). New `tests/test_prompt_generality.py` guards
+  against divergence by capture type. **The prompt half is an LLM-behaviour
+  mitigation — unverifiable until a similar post is re-shared post-deploy.**
+
+  **The deterministic half, also fixed here (this was the likelier root cause).**
+  X posts carrying a text-screenshot were running vision at
+  `MEDIA_RESOLUTION_LOW` — only Instagram ever set `image_primary` — and LOW
+  cannot reliably read dense Hebrew/RTL, which is exactly the gap the model then
+  filled from training knowledge. New `scraper._image_text_likely()`: when a
+  tweet's own words are thin (<180 chars, URLs discounted) but it carries
+  photos, the image IS the post, so the formatter sets `image_text_likely` and
+  `_analyze_scraped` passes `image_text_dense=True` → vision runs at
+  **MEDIUM**. Deliberately orthogonal to `image_is_primary`: only the resolution
+  moves, the guidance stays text-primary, so a normal wordy tweet with an
+  illustrative photo is untouched and keeps paying LOW. **Cost note for the
+  owner:** this raises per-save vision cost on thin-text photo posts only —
+  the trade was made for knowledge-base accuracy (§7); dial `_THIN_TWEET_CHARS`
+  down if the bill moves. 5 offline tests in `test_post_image_analysis.py`.
+
 - **2026-07-26 — TOUR ROUND 4: BRAND GLYPH + REAL-UI MOCKS (owner device QA on
   1210: "sloppy — generic AI icons; why a generic chat mock; why 'AI summary'").**
   Every sparkle/wand stand-in in `OnboardingTour.tsx` is now the **Citation

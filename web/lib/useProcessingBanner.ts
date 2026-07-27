@@ -6,6 +6,7 @@ import type { AnalyzingState } from '@/components/AnalyzingBanner';
 import { progressFor, CEILING } from './shareProgress';
 import { stageProgress } from './scanPhases';
 import { lastShareHandoff } from './shareConfig';
+import { claimCardCapture, finishCardCapture, isCardCaptureFinished } from './captureLifecycle';
 
 /**
  * Drives the app-level "Analyzing…" banner for captures shared from OTHER apps
@@ -36,8 +37,18 @@ function toMs(v: number | string | undefined): number | null {
     return null;
 }
 
+/** The shared start clock a card anchors its ramp to, or null if it has none.
+    Same precedence the ramp below uses, so the latch and the ramp always agree
+    about which capture a card belongs to. */
+function cardStartOf(l: Link): number | null {
+    return toMs(l.processingStartedAt) ?? toMs(l.createdAt);
+}
+
 export function useProcessingBanner(links: Link[], suppressId?: string | null): AnalyzingState | null {
     const firstSeen = useRef<Map<string, number>>(new Map());
+    // Cards currently in `status: 'processing'` (id → start clock), so the effect
+    // below can tell a card that RESOLVED from one that merely got suppressed.
+    const liveCards = useRef<Map<string, number | null>>(new Map());
     // `now` advances once a second while a capture is in flight (down from a
     // 200 ms tick), so the banner ramp re-renders the feed ≤1×/s instead of
     // 5×/s. The clock is read inside effects, never during render, keeping the
@@ -48,16 +59,53 @@ export function useProcessingBanner(links: Link[], suppressId?: string | null): 
     // hand-off from the optimistic banner or between successive `now` ticks.
     const lastPct = useRef(0);
 
-    // Exclude the card currently owned by the "+" dialog's in-dialog stepper —
-    // that surface is already showing it, so the pill must not double it (which
-    // read as a restart at hand-off). When the dialog closes, suppressId clears
-    // and this picks the card up mid-ramp at the same %.
-    const processing = links.filter((l) => l.status === 'processing' && l.id !== suppressId);
+    // Every card the backend currently has in flight — the raw truth, before any
+    // display filtering. The latch bookkeeping below keys off THIS (not the
+    // filtered list) so that hiding a card behind `suppressId` is never mistaken
+    // for it having resolved.
+    const rawProcessing = links.filter((l) => l.status === 'processing');
+    // Two display filters:
+    //  · suppressId — the card currently owned by the "+" dialog's in-dialog
+    //    stepper. That surface is already showing it, so the pill must not double
+    //    it (which read as a restart at hand-off). When the dialog closes,
+    //    suppressId clears and this picks the card up mid-ramp at the same %.
+    //  · the capture LATCH — one banner lifecycle per capture. Drop cards whose
+    //    capture already showed its finish frame (typically the optimistic
+    //    Share-Extension bridge finished before the server's placeholder card
+    //    streamed in; without this the card's arrival replayed the whole ramp).
+    //    A genuinely new capture has its own entry and is untouched. See
+    //    captureLifecycle.
+    const processing = rawProcessing.filter(
+        (l) => l.id !== suppressId && !isCardCaptureFinished(l.id, cardStartOf(l)),
+    );
     const active = processing.length > 0;
 
     // A stable key for "the set of processing cards" so the bookkeeping effect
     // only re-runs when that set actually changes.
     const liveKey = processing.map((l) => l.id).sort().join(',');
+    // Same, over the raw set — drives the capture-latch bookkeeping.
+    const rawKey = rawProcessing
+        .map((l) => `${l.id}@${cardStartOf(l) ?? ''}`)
+        .sort()
+        .join(',');
+
+    // Bind each in-flight card to its capture (claiming the pending Share-Extension
+    // entry it belongs to, if any), and latch any card that has genuinely LEFT
+    // processing — it resolved, so its capture is spent and no later source may
+    // reopen a banner for it. Effect, not render: this mutates shared state.
+    useEffect(() => {
+        const stillLive = new Map<string, number | null>();
+        for (const l of rawProcessing) {
+            const start = cardStartOf(l);
+            claimCardCapture(l.id, start);
+            stillLive.set(l.id, start);
+        }
+        for (const [id, start] of liveCards.current) {
+            if (!stillLive.has(id)) finishCardCapture(id, start);
+        }
+        liveCards.current = stillLive;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rawKey]);
 
     // Prune first-seen entries for cards that are no longer processing, and
     // stamp newly-seen ones (only used as a last-resort clock when a card has no

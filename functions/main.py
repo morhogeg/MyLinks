@@ -722,6 +722,11 @@ def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = Non
                 # real text) → read at higher res + trust the image over the
                 # caption. X leaves this unset: text stays primary, image low-res.
                 image_is_primary=bool(scraped.get("image_primary")),
+                # X post whose own words are thin: text stays primary, but the
+                # photo is carrying the content, so read it at MEDIUM instead of
+                # LOW — an unreadable screenshot is what the model fills in from
+                # training knowledge.
+                image_text_dense=bool(scraped.get("image_text_likely")),
                 **kw)
             if isinstance(analysis, dict) and scraped.get("truncated"):
                 analysis["detailedSummary"] = _append_capture_note(

@@ -43,6 +43,58 @@ def test_fxtwitter_formatter_no_media_yields_empty_list():
     assert result["image_urls"] == []
 
 
+# ── Thin-text posts: the IMAGE carries the content, so vision needs resolution ──
+# Regression guard for the "post about Japan summarized as Tokyo" bug: the post
+# was a screenshot of dense Hebrew text, OCR'd at MEDIA_RESOLUTION_LOW, and the
+# model filled the illegible gaps from training knowledge.
+
+def test_image_text_likely_needs_both_thin_text_and_a_photo():
+    assert scraper._image_text_likely("", 1) is True
+    assert scraper._image_text_likely("כל הטרנד הזה של יפן", 1) is True
+    # No photo → nothing for vision to read, regardless of how thin the text is.
+    assert scraper._image_text_likely("", 0) is False
+    # Substantive words → the text is the content and the photo illustrates it.
+    assert scraper._image_text_likely("x" * 200, 1) is False
+
+
+def test_image_text_likely_ignores_urls_when_measuring_thinness():
+    # A bare t.co link pads length without adding content — still a "look at this"
+    # post whose substance lives in the screenshot.
+    assert scraper._image_text_likely("https://t.co/" + "a" * 200, 1) is True
+
+
+def test_fxtwitter_formatter_flags_thin_text_posts_for_higher_res_vision():
+    thin = {
+        "text": "😳",
+        "author": {"name": "Yotam", "screen_name": "gutmanyotam"},
+        "media": {"photos": [{"url": "https://pbs.twimg.com/media/a.jpg", "type": "photo"}]},
+    }
+    assert scraper._format_twitter_data(thin, "fxtwitter")["image_text_likely"] is True
+
+    wordy = {
+        "text": "Here is my full argument about the trend, at length. " * 5,
+        "author": {"name": "Yotam", "screen_name": "gutmanyotam"},
+        "media": {"photos": [{"url": "https://pbs.twimg.com/media/a.jpg", "type": "photo"}]},
+    }
+    assert scraper._format_twitter_data(wordy, "fxtwitter")["image_text_likely"] is False
+
+
+def test_vxtwitter_formatter_flags_thin_text_posts_too():
+    thin = {
+        "text": "",
+        "user_name": "Yotam",
+        "user_screen_name": "gutmanyotam",
+        "media_extended": [{"url": "https://x/photo.jpg", "type": "image"}],
+    }
+    assert scraper._format_vxtwitter_data(thin)["image_text_likely"] is True
+
+
+def test_thin_text_without_photos_is_never_flagged():
+    # A media-less tweet must not pay for MEDIUM vision it has no image to spend it on.
+    tweet = {"text": "hi", "author": {"name": "X", "screen_name": "x"}}
+    assert scraper._format_twitter_data(tweet, "fxtwitter")["image_text_likely"] is False
+
+
 def test_vxtwitter_formatter_prefers_typed_photos_over_videos():
     data = {
         "text": "post with a photo and a video",

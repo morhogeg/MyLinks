@@ -750,6 +750,33 @@ Source: {source} API (article)
     }
 
 
+# A tweet whose own words are this short, but which carries photos, is almost
+# always a "look at this" post: the substance lives INSIDE the image (typically a
+# screenshot of another post). Above this the text carries real content and the
+# photo merely illustrates it. Tuned generously — a normal 280-char tweet with an
+# opinion in it stays text-primary.
+_THIN_TWEET_CHARS = 180
+
+# t.co links and bare URLs pad a tweet's length without adding words.
+_URL_IN_TEXT_RE = re.compile(r"https?://\S+")
+
+
+def _image_text_likely(own_text: str, photo_count: int) -> bool:
+    """True when a post's attached photo probably CARRIES the post's real text
+    rather than illustrating it — i.e. the words are thin but photos are present.
+
+    The analysis layer reads this as a signal to run vision at MEDIUM resolution
+    instead of LOW. That matters for dense non-Latin text: a Hebrew/RTL screenshot
+    OCR'd at LOW comes back with gaps, and a model that can't read a word tends to
+    fill it in from training knowledge (the "post about Japan summarized as Tokyo"
+    failure). Legibility is the fix; the prompt rules are only the backstop.
+    """
+    if photo_count < 1:
+        return False
+    stripped = _URL_IN_TEXT_RE.sub("", own_text or "").strip()
+    return len(stripped) < _THIN_TWEET_CHARS
+
+
 def _format_twitter_data(tweet: dict, source: str) -> dict:
     """Format fxtwitter API tweet data for AI analysis."""
     # X Articles (long-form posts) store their body in tweet.article, not in
@@ -819,6 +846,10 @@ Source: {source} API
         "text": formatted_text,
         "image_urls": image_urls,
         "video_thumbnail_url": video_thumbnail_url,
+        # X stays TEXT-primary (unlike Instagram, `image_primary` is left unset),
+        # but when the tweet's own words are thin the photo is carrying the post —
+        # ask vision for the resolution that can actually read it.
+        "image_text_likely": _image_text_likely(tweet.get('text') or '', len(image_urls)),
     }
 
 
@@ -870,6 +901,8 @@ Source: vxtwitter API
         "text": formatted_text,
         "image_urls": image_urls,
         "video_thumbnail_url": video_thumbnail_url,
+        # Same thin-text signal as the fxtwitter path — see _image_text_likely.
+        "image_text_likely": _image_text_likely(data.get('text') or '', len(image_urls)),
     }
 
 

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { AnalyzingState } from '@/components/AnalyzingBanner';
 import { consumePendingShare } from './shareConfig';
 import { progressFor, elapsedForProgress } from './shareProgress';
+import { beginShareCapture, finishShareCapture, isShareCaptureFinished } from './captureLifecycle';
 
 /**
  * Optimistic "Analyzing… N%" banner for a capture the user just handed over from
@@ -28,10 +29,19 @@ import { progressFor, elapsedForProgress } from './shareProgress';
 const MAX_MS = 30_000; // give up (or never start) the optimistic banner past this age
 // Once the live feed is authoritative, a capture with no `processing` card has
 // already resolved to a ready card — but the server-side placeholder can lag the
-// app foreground by a beat, so allow this settle window from capture start before
-// treating "feed loaded + nothing processing" as "already done". Comfortably
-// longer than a placeholder write, far shorter than MAX_MS (which used to keep a
-// finished capture's bar ramping to ~92% for ~30s — the phantom this fixes).
+// app foreground by a beat, so allow this settle window before treating "feed
+// loaded + nothing processing" as "already done". Comfortably longer than a
+// placeholder write, far shorter than MAX_MS (which used to keep a finished
+// capture's bar ramping to ~92% for ~30s — the phantom this fixes).
+//
+// MEASURED FROM WHEN THE FEED BECAME AUTHORITATIVE, NOT FROM CAPTURE START. It
+// used to run from `startMs`, which made it dead on arrival: the user watches the
+// extension HUD for several seconds and only THEN opens the app, so by the first
+// Firestore snapshot the window was already spent and the bridge fired its finish
+// frame instantly — "Saved" before the placeholder had any chance to land. The
+// real card then streamed in and replayed the whole ramp (owner-reported: the bar
+// hit 100%, vanished, and started the phases over). The window only means
+// anything if it starts when we actually begin waiting for the card.
 const SETTLE_MS = 4_000;
 
 export function useSharedCaptureBanner(processingActive: boolean, feedLoaded = false): AnalyzingState | null {
@@ -55,8 +65,17 @@ export function useSharedCaptureBanner(processingActive: boolean, feedLoaded = f
     }, [processingActive]);
     // Latest feedLoaded, same reason — read inside the ticker without rebinding it.
     const feedRef = useRef(feedLoaded);
+    // When the feed FIRST became authoritative (epoch ms, 0 = not yet). The settle
+    // window runs from here, so it measures how long we've actually been waiting
+    // for a placeholder rather than how long ago the user tapped Share.
+    const feedReadyAt = useRef(0);
+    // When this bridge armed (epoch ms, 0 = not yet). The settle window starts at
+    // whichever came LATER — arming or the feed going authoritative — because both
+    // must be true before "feed shows nothing processing" means anything.
+    const armedAt = useRef(0);
     useEffect(() => {
         feedRef.current = feedLoaded;
+        if (feedLoaded && feedReadyAt.current === 0) feedReadyAt.current = Date.now();
     }, [feedLoaded]);
 
     // Poll the native App Group flag on mount and on every foreground. WKWebView
@@ -87,7 +106,13 @@ export function useSharedCaptureBanner(processingActive: boolean, feedLoaded = f
             // would be driving the banner) or the work has finished, don't open an
             // optimistic loader at all. The ready card just appears.
             if (nowMs - startMs > MAX_MS) return;
+            // LATCH — one lifecycle per capture: if this capture already played
+            // its finish frame (a foreground re-check, or a re-armed flag for a
+            // capture we've already narrated), stay silent.
+            if (isShareCaptureFinished(startMs)) return;
+            beginShareCapture(startMs);
             setNow(nowMs);
+            if (armedAt.current === 0) armedAt.current = nowMs;
             setSignal((cur) => cur ?? { startMs, kind: res.kind });
         };
         void check();
@@ -124,7 +149,12 @@ export function useSharedCaptureBanner(processingActive: boolean, feedLoaded = f
             // resolved to a ready card. Finish gracefully instead of ramping a fake
             // % to MAX_MS while the done card sits in the feed (owner-reported: the
             // bar "still works" after the card is ready).
-            if (feedRef.current && t - signal.startMs > SETTLE_MS) {
+            const waitingSince = Math.max(feedReadyAt.current, armedAt.current);
+            if (feedRef.current && waitingSince > 0 && t - waitingSince > SETTLE_MS) {
+                // This capture has now shown its one finish frame — latch it so a
+                // late-arriving `processing` card can't reopen the banner and
+                // replay the phases (see captureLifecycle).
+                finishShareCapture(signal.startMs);
                 setTerminal({ active: false, progress: 100, kind: signal.kind });
                 setSignal(null);
                 return;
@@ -133,6 +163,7 @@ export function useSharedCaptureBanner(processingActive: boolean, feedLoaded = f
             // ramp has run its course — hand the banner one terminal frame instead
             // of ticking forever.
             if (t - signal.startMs > MAX_MS) {
+                finishShareCapture(signal.startMs);
                 setTerminal({ active: false, progress: 100, kind: signal.kind });
                 setSignal(null);
                 return;
