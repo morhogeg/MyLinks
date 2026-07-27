@@ -374,11 +374,14 @@ The multi-user auth work is **fully written but not live**:
     surfaces read it, the way `LINK_SCAN_STEPS` already works. Cosmetic, and
     only visible to someone comparing the two screens — but it is exactly the
     kind of drift the shared-constants pattern exists to prevent.
-11b. **[ ] "Python tests" CI workflow is perpetually red** (runs #47–#51+): the
-    only failures are 4 mocks in `functions/tests/test_embed_trigger_backstop.py`
+11b. **[x] "Python tests" CI workflow is perpetually red** (runs #47–#51+): the
+    only failures were 4 mocks in `functions/tests/test_embed_trigger_backstop.py`
     (`SimpleNamespace` lacks `_get_attributes` — firebase_functions version
-    drift). 389 real tests pass. Fix the mocks (or pin the lib) so a red run
-    means something again.
+    drift) plus a 5th, `test_web_client_hygiene` flagging a real inline
+    URL-scheme regex in `web/lib/cardThumbnail.ts`. **FIXED 2026-07-27**
+    (`ea3bc2e`, merge `464e986`) — mocks now call `sync_link_embedding.__wrapped__`
+    with the already-parsed event shape, and `cardThumbnail.ts` uses the shared
+    `isHttpUrl()`. 525 tests green. See the §9 entry for the full reasoning.
 11c. **[ ] Web traffic shares ONE per-IP rate-limit bucket (audit S-12) — found
     2026-07-25 (`/security web`), fix belongs in `functions/`.** `/api/chat` is
     deliberately not a rewrite, so `web/app/api/chat/route.ts:50` is a Vercel
@@ -864,6 +867,23 @@ exact-match, capped.
   32/48, legible at 16. Web-only, no native change. Owner note: your browser may
   still show the old M until Chrome's favicon cache turns over; a hard reload or
   removing the shortcut entry forces it.
+
+- **2026-07-27 — "PYTHON TESTS" WORKFLOW GREEN AGAIN (was red on every main
+  merge, runs #47–#51+, hiding real regressions).** Two independent breakages,
+  both fixed. (1) The 4 `test_embed_trigger_backstop.py` tests called the
+  decorated `sync_link_embedding` with a `SimpleNamespace` event; firebase-functions
+  0.6.0's `@on_document_written` wrapper now parses a raw CloudEvent first
+  (`raw._get_attributes()`) → `AttributeError` before the handler ran. The tests
+  pin the handler's rate-limit behavior, not the library's event plumbing, so
+  they now invoke the undecorated function via `sync_link_embedding.__wrapped__`
+  with the already-parsed shape (`.data.after`/`.params`) — decoupled from
+  future wrapper drift; no version pin change (0.6.0 is what deploys). (2) The
+  5th failure: `test_web_client_hygiene.py` correctly flagged an inline
+  `/^https?:\/\//i` copy in `web/lib/cardThumbnail.ts` (from the 2026-07-26
+  screenshot-banner work) — replaced with the shared `isHttpUrl()` from
+  `web/lib/url.ts`, behavior identical. `pytest functions/tests` fully green
+  locally (525 passed); `tsc --noEmit` clean. Deploy scoped to
+  `Deploy-Functions: debug_status` since the functions change is tests-only.
 
 - **2026-07-27 — LIST VIEW GETS THE ⋯ ACTIONS MENU (owner: "we should have the
   3 dots menu per card in the list view as well… all in the top right corner,

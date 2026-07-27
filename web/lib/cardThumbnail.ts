@@ -11,6 +11,8 @@
  * the two can never disagree about whether a card has an image.
  */
 
+import { isHttpUrl } from './url';
+
 export interface ThumbnailLink {
     url?: string;
     sourceType?: string;
@@ -20,7 +22,7 @@ export interface ThumbnailLink {
 export function cardThumbnailUrl(link: ThumbnailLink): string | null {
     if (link.sourceType === 'image') {
         // Guard the scheme — never render a stored javascript:/data: URL.
-        return link.url && /^https?:\/\//i.test(link.url) ? link.url : null;
+        return isHttpUrl(link.url) ? link.url! : null;
     }
     return link.metadata?.thumbnailUrl || null;
 }

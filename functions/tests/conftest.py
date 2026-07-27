@@ -111,7 +111,21 @@ def _install_fakes():
             annotations like ``Event[Change[Snapshot]]``), and further
             attribute access all resolve to another _FnAttr."""
             def __call__(self, *a, **k):
-                return lambda f: f
+                # The REAL firebase-functions decorators wrap the handler with
+                # functools.wraps, so it stays reachable as `fn.__wrapped__` —
+                # and tests use that to call the handler directly, bypassing the
+                # library's CloudEvent parsing. This stub is an identity
+                # decorator, so expose the same attribute pointing at the
+                # function itself. Without it those tests raise AttributeError
+                # at COLLECTION time, which aborts the whole suite (not just
+                # those tests) anywhere the real package isn't installed.
+                def _decorate(f):
+                    try:
+                        f.__wrapped__ = f
+                    except (AttributeError, TypeError):
+                        pass
+                    return f
+                return _decorate
             def __getitem__(self, _item):
                 return self
             def __getattr__(self, _name):
