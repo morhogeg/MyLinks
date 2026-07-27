@@ -839,6 +839,35 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-27 — FAVICON, ROUND 2: THE FIX WAS A NEW URL, NOT A NEW FILE (owner,
+  after round 1 failed: "the favicon is still the old one").** Round 1 assumed a
+  cache and shipped an SVG; the tab kept the purple M. **Proof it was never a
+  repo problem:** scanned every `.png`/`.ico`/`.svg` under `web/` for
+  magenta/purple pixels — `favicon.ico`, `app-icon`, `apple-touch-icon`,
+  `icon-192/512`, `assets/icon.*`, the iOS AppIcon: **zero purple in all of
+  them.** The old mark exists nowhere in the tree, so the origin cannot have been
+  serving it. **Root cause: Safari's favicon cache is keyed per URL, and
+  `/favicon.ico` has existed since before the rebrand** — rewriting the file's
+  CONTENTS never invalidated the entry, and Next's content-hash query
+  (`?favicon.<hash>.ico`) doesn't either, because Safari caches on the base URL.
+  Round 1's `icon.svg` didn't rescue it: Safari's SVG-favicon support is
+  unreliable, so it fell back to the cached `.ico`. **Fix — serve the icon from
+  URLs that have never existed:** new `public/favicon-32.png` + `favicon-180.png`
+  (rasterised from `public/icon.svg` via headless Chromium at 512 then LANCZOS
+  down, so they are the same geometry, not a re-draw), declared PNG-FIRST in
+  `metadata.icons`; `apple` repointed off the long-cached
+  `/apple-touch-icon.png` to `/favicon-180.png` for the same reason. And
+  **`app/favicon.ico` moved to `public/favicon.ico`**: from `public/` the URL
+  still answers 200 for browsers that blind-probe `/favicon.ico`, but Next no
+  longer emits a `<link>` for it — previously that link was emitted FIRST and
+  gave Safari licence to keep using the stale entry. Verified in a real
+  production build: `<head>` now advertises ONLY the three fresh URLs, and
+  `/favicon.ico` still serves 200. ⚠️ **RULE FOR NEXT TIME: if this icon is ever
+  redrawn, RENAME the files — do not just overwrite them,** or the same cache
+  will pin the old bitmap again. Still unverifiable from here: the sandbox
+  network policy blocks `my-links-sable.vercel.app`, so the live response has
+  never been fetched in any round.
+
 - **2026-07-27 — DARK-MODE CAPTURE FAB WAS WHITE-ON-WHITE + FILTERS LABEL GLYPH
   (owner device QA, desktop Safari).** (1) **The `+` FAB "looks weird" in dark
   mode — it was invisible.** `AddLinkForm`'s desktop FAB painted `bg-accent` with

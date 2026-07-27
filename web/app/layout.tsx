@@ -20,15 +20,26 @@ export const metadata: Metadata = {
     title: "Machina AI",
   },
   icons: {
-    // The SVG tab icon, declared explicitly and living in public/ rather than as
-    // an app/icon.svg file convention. Two Next behaviours forced this: an
-    // explicit `icons` object (this one already existed for `apple`) suppresses
-    // the auto-generated icon links, and app/icon.svg + explicit config together
-    // emitted NO icon link at all — the tab silently kept the 48px .ico.
-    // app/favicon.ico still auto-emits its own link, so it is not repeated here;
-    // browsers that understand SVG take this one, the rest fall back to the ico.
-    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
-    apple: "/apple-touch-icon.png",
+    // Tab icons, declared explicitly and living in public/ rather than as an
+    // app/icon.* file convention. Two Next behaviours forced that: an explicit
+    // `icons` object (this one already existed for `apple`) suppresses the
+    // auto-generated icon links, and app/icon.svg + explicit config together
+    // emitted NO icon link at all.
+    //
+    // PNG IS LISTED FIRST AND IS THE ONE THAT MATTERS. Safari's SVG-favicon
+    // support is unreliable, so it fell back to /favicon.ico — a URL that has
+    // existed since before the rebrand, which means Safari's per-URL favicon
+    // cache kept serving the OLD purple-M bitmap no matter what we wrote into
+    // the file. /favicon-32.png is a URL that has never existed before, so
+    // there is no cache entry to hit and every browser must fetch it. Keep it
+    // that way: if this icon is ever redrawn, ALSO rename the file.
+    icon: [
+      { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-180.png", type: "image/png", sizes: "180x180" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    // Same reasoning — a fresh URL, not the long-cached /apple-touch-icon.png.
+    apple: "/favicon-180.png",
   },
 };
 
