@@ -1,0 +1,43 @@
+<!-- Browser tab icon. Next.js App Router serves this as
+     <link rel="icon" type="image/svg+xml">, which desktop Chrome/Firefox/Safari
+     prefer over favicon.ico — so the tab gets a mark that stays crisp at any
+     size and on HiDPI, instead of a 48px raster. favicon.ico stays alongside it
+     as the fallback for browsers that don't take SVG.
+
+     Geometry is the SHIPPED icon composition, copied verbatim from
+     design/icon-concepts/cit_lumen_icon.svg (citation() scaled x1.16 about the
+     centre, owner-approved 2026-07-26) — do NOT re-derive it.
+
+     Deliberately simplified from that source: the contact glow, top/bottom edge
+     masks and feGaussianBlur passes are dropped. They are presence cues for a
+     512px home-screen tile; at 16-32px they are sub-pixel, cost bytes on every
+     page load, and blur filters rasterise inconsistently across browsers at tiny
+     sizes. What survives is what actually reads in a tab strip: the graphite
+     ground and the lit porcelain mark.
+
+     The dark tile is carried by the icon itself rather than left transparent, so
+     the porcelain mark keeps its contrast on a LIGHT tab strip too — a bare mark
+     would disappear there. Corner radius echoes the iOS squircle, since a
+     browser won't round it for us. -->
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="ground" cx="50%" cy="36%" r="84%">
+      <stop offset="0%" stop-color="#282833"/>
+      <stop offset="42%" stop-color="#16161D"/>
+      <stop offset="100%" stop-color="#07070A"/>
+    </radialGradient>
+    <!-- a lit solid, not an emitter: brightest along the top, falling away -->
+    <linearGradient id="ink" gradientUnits="userSpaceOnUse" x1="0" y1="254" x2="0" y2="774">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="42%" stop-color="#F2F5FA"/>
+      <stop offset="100%" stop-color="#CBD2E0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" rx="200" fill="url(#ground)"/>
+
+  <!-- left bracket · right bracket · the point -->
+  <path d="M261.4 268.0 L377.4 268.0 L377.4 335.3 L328.7 335.3 L328.7 664.7 L377.4 664.7 L377.4 732.0 L261.4 732.0 Z" fill="url(#ink)"/>
+  <path d="M762.6 268.0 L646.6 268.0 L646.6 335.3 L695.3 335.3 L695.3 664.7 L646.6 664.7 L646.6 732.0 L762.6 732.0 Z" fill="url(#ink)"/>
+  <circle cx="512" cy="500" r="60.32" fill="url(#ink)"/>
+</svg>

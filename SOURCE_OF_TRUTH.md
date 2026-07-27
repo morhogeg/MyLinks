@@ -836,6 +836,35 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-27 — DESKTOP TAB ICON: SVG FAVICON (owner: "in desktop, we need the
+  new logo in the favicon" + a screenshot showing the OLD purple M).** Diagnosis
+  first: **`app/favicon.ico` was already the Citation mark** — it was rebuilt in
+  the identity commit `1f713c2` and refined in `bbccbd0`, as are every
+  `public/` icon (`app-icon`, `apple-touch-icon`, `icon-192/512`). The purple M
+  in the screenshot is Chrome's own favicon cache for a new-tab/suggestion
+  entry, which does not refresh just because the site's icon changed. So nothing
+  was actually stale — but the real gap it exposed was worth closing: the ONLY
+  tab icon was a 48px-max `.ico`, which is soft on HiDPI desktop. Added
+  **`web/public/icon.svg`** — the shipped icon composition (geometry copied
+  verbatim from `design/icon-concepts/cit_lumen_icon.svg`, the x1.16 tile), with
+  the contact glow / edge masks / blur filters deliberately dropped: those are
+  512px presence cues, sub-pixel in a tab strip, and blur rasterises
+  inconsistently at tiny sizes. Keeps its own dark ground so the porcelain mark
+  survives a LIGHT tab strip. ⚠️ **Two Next.js metadata traps, both hit and
+  documented in `layout.tsx`:** (1) an explicit `metadata.icons` object — this
+  file already had one for `apple` — **suppresses the auto-generated icon
+  links**, so an `app/icon.svg` file convention was served at `/icon.svg` but
+  never referenced from `<head>`; (2) `app/icon.svg` + explicit config together
+  emitted **no** `rel="icon"` at all. Fix: SVG lives in `public/`, declared
+  explicitly; `app/favicon.ico` keeps auto-emitting its own link and is NOT
+  repeated in config. Also removed a **duplicate `<link rel="apple-touch-icon">`**
+  (metadata and a manual tag both shipped it). Verified by curling the dev
+  server's `<head>`: exactly one ico link, one svg link, one apple link; and the
+  mark rasterised at 16/32/48px on light and dark grounds in Chromium — crisp at
+  32/48, legible at 16. Web-only, no native change. Owner note: your browser may
+  still show the old M until Chrome's favicon cache turns over; a hard reload or
+  removing the shortcut entry forces it.
+
 - **2026-07-27 — LIST VIEW GETS THE ⋯ ACTIONS MENU (owner: "we should have the
   3 dots menu per card in the list view as well… all in the top right corner,
   like in the card view").** List rows carried a star and nothing else, so every

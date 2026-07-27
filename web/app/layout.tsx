@@ -20,6 +20,14 @@ export const metadata: Metadata = {
     title: "Machina AI",
   },
   icons: {
+    // The SVG tab icon, declared explicitly and living in public/ rather than as
+    // an app/icon.svg file convention. Two Next behaviours forced this: an
+    // explicit `icons` object (this one already existed for `apple`) suppresses
+    // the auto-generated icon links, and app/icon.svg + explicit config together
+    // emitted NO icon link at all — the tab silently kept the 48px .ico.
+    // app/favicon.ico still auto-emits its own link, so it is not repeated here;
+    // browsers that understand SVG take this one, the rest fall back to the ico.
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
     apple: "/apple-touch-icon.png",
   },
 };
@@ -62,7 +70,8 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Machina AI" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        {/* No <link rel="apple-touch-icon"> here — `metadata.icons.apple` above
+            already emits one, and having both shipped the tag twice. */}
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-text transition-colors duration-200`}
