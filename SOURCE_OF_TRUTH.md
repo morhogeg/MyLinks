@@ -372,6 +372,22 @@ The multi-user auth work is **fully written but not live**:
     AddLinkForm on iPhone SE); pull-to-refresh vs edge-swipe conflicts; failed
     card → Retry; Apple + Google sign-in; account deletion end-to-end.
 
+8a. **[ ] Trademark clearance for the name "Machina"** *(new 2026-07-27, from the
+    rename — `docs/BRANDING.md` A-1/C-1).* Bare **`Machina` is already taken on
+    the App Store** by an *adjacent* app (Philip Gebben, Utilities, "Opening up
+    Creativity", screenshots referencing "Knowledge & Inspiration" and "Machina
+    Studio uses AI…"). App Store *listing* name uniqueness is handled — the
+    listing is `Machina: Save & Recall` — and `CFBundleDisplayName` has no
+    uniqueness requirement, so the home-screen label is safely plain `Machina`.
+    **Unmitigated: trademark.** Search USPTO + the Israel TM register (classes 9
+    and 42) before submission. The incumbent developer is an individual, which
+    suggests low odds of a registered mark, but this is the single finding that
+    could force another rename — and it gets more expensive every week the
+    identity is built out further. Secondary risk: App Review raising
+    "confusingly similar"; mitigations already in place are the differentiated
+    listing name, a different primary category (Productivity vs Utilities), and a
+    completely different mark/palette.
+
 ### 🟡 P2 — security/cost hardening & honest product surface
 
 11a1. **[ ] Owner QA on build 1219 — the device-unverified 2026-07-27 work.**
@@ -953,9 +969,44 @@ exact-match, capped.
   the product description is still "Your AI-powered knowledge capture and
   retrieval system" (`manifest.json` + `layout.tsx`) — same AI-forward problem,
   but that is a positioning decision, not a naming one (BRANDING Q-1/A-3).
-  **Not shipped — verification only** (`npx tsc --noEmit` clean, `py_compile`
-  clean, grounding tests pass). The iOS label change needs a TestFlight build to
-  be visible on the home screen.
+  **Subtitle took four rounds and the reasoning is the useful part.** Two drafts
+  were rejected by the owner for the SAME flaw — `Save anything. It reads it.`
+  ("simplistic and lame") and `Analyzed, organized, connected` — both described a
+  *mechanism* instead of making a promise. The line only worked once it became
+  **verbs**: `Capture. Connect. Recall.` → `Remember` (the Name already supplies
+  `Recall`, and a token indexed twice buys nothing) → finally `Capture. Ask.
+  Connect.`, using the product's own verb. It ends on `Connect` because in a
+  three-beat line the first and last positions carry the weight: `Ask` is table
+  stakes, the knowledge graph is the moat, so the moat goes last. (The owner's
+  stated reason — "the question comes before the connection" — is actually
+  backwards for Machina, where the graph is computed on every save and surfaces
+  unprompted; the order survives on positioning, not chronology.)
+  🚢 **SHIPPED.** Feature `1a7b2b7`, merge `e223635` → pushed to `main`.
+  Desktop web → **Vercel** (auto on the push). Functions → **"Deploy Cloud
+  Functions" run #53** (`actions/runs/30306416602`) — **deliberately UNSCOPED, no
+  `Deploy-Functions:` trailer**: `ai_service.py` is a shared module imported by
+  every AI-touching function (analysis, RAG, weekly synthesis), so enumerating
+  targets risks silently missing one. iOS → **"iOS → TestFlight" run #223 =
+  build 1223** (`actions/runs/30306427975`).
+  **Merge-time finding — the stale local `main` is BACK, exactly as the previous
+  entry describes.** Local `main` was `7b86a77`, **not** an ancestor of
+  `origin/main`, with 127 commits origin had never seen while origin/main was 83
+  commits ahead. Verified by CONTENT again, not commit subject: `_ground_source_name`,
+  `cardThumbnail.ts`, and `askExcluded` are all present on `origin/main`, and the
+  `origin/main → main` diff is −14,439 lines (local main is *missing* work, not
+  holding unique work). Resolved the same way: `git checkout -B main origin/main`
+  then merge. **This sandbox's local `main` cannot be trusted at the start of a
+  ship — always fetch and check `merge-base --is-ancestor` first.**
+  Verified before merge: `npx tsc --noEmit` **exit 0** (needed `npm ci` first —
+  `node_modules` is absent in a fresh sandbox and tsc's "Cannot find module
+  'react'" errors are that, not a code break), `py_compile` clean, and the full
+  backend suite **537 passed / 0 failed** (`pip install --ignore-installed
+  blinker -r requirements.txt` — a plain `pip install -r` fails on the
+  debian-owned `blinker` with "Cannot uninstall … RECORD file not found").
+  **Owner steps:** the home-screen label only changes once **build 1223** is
+  installed from TestFlight; and **A-1, the trademark search on "Machina"**
+  (USPTO + Israel, classes 9/42) is the one open item that could still veto the
+  whole rename — now tracked as §4 P1 task 8a.
 
 - **2026-07-27 — 🚢 SHIPPED: privacy audit + policy rewrite + reader removal
   (merge `65d3afd`, pushed as `ee99317`).** Desktop web → Vercel (auto on the
