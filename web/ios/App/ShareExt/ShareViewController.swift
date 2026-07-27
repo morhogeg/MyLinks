@@ -26,18 +26,57 @@ enum ShareProgressCurve {
     }
 }
 
+/// The **Lumen** design tokens, ported from `web/app/globals.css` (`:root` — the
+/// dark theme this HUD always renders in).
+///
+/// Machina's identity moved OFF hue: `--accent` is no longer a colour, it is the
+/// neutral EMPHASIS token — porcelain on a graphite ground — and affordance
+/// comes from contrast, never from a purple. Nothing in this file may reach for
+/// a hue again. Keep these values in step with globals.css.
+enum Lumen {
+    // Emphasis (porcelain). --accent is the fill; --accent-2/-3 are the discrete
+    // stops of --accent-gradient (linear-gradient(135deg, #FFFFFF, #CBD2E0)).
+    static let accent = UIColor(red: 0xE9 / 255.0, green: 0xE9 / 255.0, blue: 0xF2 / 255.0, alpha: 1)   // --accent   #E9E9F2
+    static let accent2 = UIColor(red: 0xCB / 255.0, green: 0xD2 / 255.0, blue: 0xE0 / 255.0, alpha: 1)  // --accent-2 #CBD2E0
+    static let accent3 = UIColor(red: 0xF2 / 255.0, green: 0xF5 / 255.0, blue: 0xFA / 255.0, alpha: 1)  // --accent-3 #F2F5FA
+    /// --accent-ring: rgba(174, 184, 206, 0.34) — the identity glow.
+    static let accentRing = UIColor(red: 174 / 255.0, green: 184 / 255.0, blue: 206 / 255.0, alpha: 0.34)
+
+    // Graphite surfaces.
+    static let ground = UIColor(red: 0x05 / 255.0, green: 0x05 / 255.0, blue: 0x05 / 255.0, alpha: 1) // --background #050505
+    static let card = UIColor(red: 0x12 / 255.0, green: 0x12 / 255.0, blue: 0x12 / 255.0, alpha: 1)   // --card       #121212
+
+    // Ink.
+    static let text = UIColor(red: 0xE5 / 255.0, green: 0xE5 / 255.0, blue: 0xE5 / 255.0, alpha: 1)          // --text
+    static let textSecondary = UIColor(red: 0xA0 / 255.0, green: 0xA0 / 255.0, blue: 0xA0 / 255.0, alpha: 1) // --text-secondary
+    static let textMuted = UIColor(red: 0x66 / 255.0, green: 0x66 / 255.0, blue: 0x66 / 255.0, alpha: 1)     // --text-muted
+
+    // Materials — the dark values of the theme-aware fill/hairline tokens.
+    static let fillSubtle = UIColor(white: 1, alpha: 0.05)   // --fill-subtle
+    static let fillStrong = UIColor(white: 1, alpha: 0.10)   // --fill-strong
+    static let borderSubtle = UIColor(white: 1, alpha: 0.05) // --border
+    static let borderStrong = UIColor(white: 1, alpha: 0.10) // --border-strong
+
+    // Motion.
+    /// --ease-modal: the one decisive, no-overshoot settle curve.
+    static let easeModal = CAMediaTimingFunction(controlPoints: 0.32, 0.72, 0, 1)
+    /// --ease-spring: the pop, with its deliberate overshoot.
+    static let easeSpring = CAMediaTimingFunction(controlPoints: 0.34, 1.56, 0.64, 1)
+}
+
 /// Share Extension entry point. Pulls the shared item (link, text, or image)
 /// out of the share sheet, reads the user's ingest endpoint + token from the
 /// App Group (written by the main app, see ShareConfigPlugin.swift), uploads it
 /// to the backend's /api/share endpoint, and shows a brief confirmation.
 ///
 /// For images it re-creates — natively, in UIKit + CoreAnimation — the in-app
-/// "image scan" animation (see web/components/ImageScanProgress.tsx): a purple
-/// scan-line sweeping over a preview of the shared image, a rising percentage
-/// counter, a thin accent progress bar, and a rotating phase label. The
-/// animation is cosmetic; the *real* completion is driven by the network
+/// "image scan" animation (see web/components/ImageScanProgress.tsx): a
+/// porcelain scan-line sweeping over a preview of the shared image, a rising
+/// percentage counter, a thin accent progress bar, and a rotating phase label.
+/// The animation is cosmetic; the *real* completion is driven by the network
 /// upload, so the percentage eases toward 90% while the request is in flight
-/// and only snaps to 100% (green check) once the upload actually succeeds.
+/// and only resolves to the "saved, still analyzing" frame once the upload
+/// actually succeeds.
 @objc(ShareViewController)
 class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionTaskDelegate {
 
@@ -52,12 +91,12 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     private let kText = "public.text"
     private let kPlainText = "public.plain-text"
 
-    // MARK: Accent palette (mirrors --accent / --accent-gradient in globals.css)
-    private static let accent = UIColor(red: 0xA8 / 255.0, green: 0x55 / 255.0, blue: 0xF7 / 255.0, alpha: 1)      // #A855F7
-    private static let accentPink = UIColor(red: 0xEC / 255.0, green: 0x48 / 255.0, blue: 0x99 / 255.0, alpha: 1)   // #EC4899
-    private static let successGreen = UIColor(red: 0x4A / 255.0, green: 0xDE / 255.0, blue: 0x80 / 255.0, alpha: 1) // green-400
+    // MARK: Palette — see `Lumen` above. Every colour in this HUD is a token.
+    // There is deliberately NO success-green: the app's own capture surfaces
+    // (AnalyzingBanner's CheckCircle2, LinkScanProgress's Check) resolve in
+    // `text-accent` — porcelain — so "done" here is porcelain too.
 
-    // MARK: Generic (non-image) HUD — kept simple, matching the old card look.
+    // MARK: Generic (non-image) HUD — kept simple, matching the app card look.
     private let card = UIView()
     private let spinner = UIActivityIndicatorView(style: .medium)
     private let label = UILabel()
@@ -97,7 +136,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     private let linkPreview = UIView()            // faux page container
     private let faviconView = UIImageView()       // site favicon (or globe fallback)
     private let hostLabel = UILabel()             // the link's host
-    private let linkRing = OrbitsOrbView()        // "working" Thinking Orb above the % counter
+    private let citationMark = CitationMarkView() // the brand mark, working, above the % counter
     private var faviconTask: URLSessionDataTask?
 
     private var displayLink: CADisplayLink?
@@ -115,7 +154,14 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor.black.withAlphaComponent(0.25)
+        // The HUD is a fixed graphite surface (Lumen tokens, no dynamic system
+        // colours), so pin the trait style — otherwise system-drawn bits (SF
+        // Symbols, the activity indicator) would flip with the host app's theme
+        // while our hand-mixed greys would not.
+        overrideUserInterfaceStyle = .dark
+        // Scrim: the graphite card needs a darker ground under it than the old
+        // 0.25 to sit on, especially over a light host app.
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.45)
         sweepStaleShareTempFiles()
         setupGenericUI()
         setupScanUI()
@@ -150,24 +196,37 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         super.viewDidLayoutSubviews()
         // Re-apply the accent gradient now that the sweep band has real bounds.
         layoutSweepGradient()
+        // Elevation (--shadow-card): on a near-black ground the depth comes from
+        // the hairline + a wide soft drop. An explicit shadowPath keeps it off
+        // the per-frame offscreen-render path. Static — never animated.
+        for surface in [card, scanContainer] where !surface.bounds.isEmpty {
+            surface.layer.shadowPath = UIBezierPath(
+                roundedRect: surface.bounds,
+                cornerRadius: surface.layer.cornerRadius
+            ).cgPath
+        }
     }
 
     // MARK: - Generic UI (links / text / errors)
 
     private func setupGenericUI() {
-        card.backgroundColor = UIColor.secondarySystemBackground
+        card.backgroundColor = Lumen.card
         card.layer.cornerRadius = 16
+        card.layer.borderWidth = 1
+        card.layer.borderColor = Lumen.borderSubtle.cgColor
+        applyCardElevation(to: card)
         card.translatesAutoresizingMaskIntoConstraints = false
         card.isHidden = true
         view.addSubview(card)
 
         spinner.translatesAutoresizingMaskIntoConstraints = false
+        spinner.color = Lumen.accent2
         spinner.startAnimating()
         card.addSubview(spinner)
 
         label.text = "Saving to Machina…"
         label.font = .systemFont(ofSize: 16, weight: .medium)
-        label.textColor = .label
+        label.textColor = Lumen.text
         label.textAlignment = .center
         label.numberOfLines = 0
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -196,14 +255,28 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         ])
     }
 
+    /// The app's `--shadow-card` elevation, approximated natively: on the
+    /// near-black ground a dark shadow alone is invisible, so the card also
+    /// carries a hairline (set by the caller). Static — the shadowPath is
+    /// refreshed in viewDidLayoutSubviews.
+    private func applyCardElevation(to surface: UIView) {
+        surface.layer.shadowColor = UIColor.black.cgColor
+        surface.layer.shadowOpacity = 0.55
+        surface.layer.shadowRadius = 20
+        surface.layer.shadowOffset = CGSize(width: 0, height: 8)
+    }
+
     /// Shared styling for the circular translucent "✕" close button. Tapping it
     /// dismisses the share sheet immediately; the upload keeps running on the
     /// background session.
     private func configureCloseButton(_ button: UIButton) {
         button.translatesAutoresizingMaskIntoConstraints = false
-        button.backgroundColor = UIColor(white: 1, alpha: 0.15)
-        button.tintColor = .white
+        // A quiet material button, not a hue: --fill-strong under a hairline.
+        button.backgroundColor = Lumen.fillStrong
+        button.tintColor = Lumen.text
         button.layer.cornerRadius = 15   // half of the 30pt size => a circle
+        button.layer.borderWidth = 1
+        button.layer.borderColor = Lumen.borderStrong.cgColor
         button.clipsToBounds = true
         if let xmark = UIImage(systemName: "xmark",
                                withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold)) {
@@ -212,7 +285,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         } else {
             button.setTitle("✕", for: .normal)
             button.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
-            button.setTitleColor(.white, for: .normal)
+            button.setTitleColor(Lumen.text, for: .normal)
         }
         button.accessibilityLabel = "Close"
         button.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
@@ -268,17 +341,23 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     // MARK: - Scan UI (images)
 
     private func setupScanUI() {
-        scanContainer.backgroundColor = UIColor.secondarySystemBackground
+        // The card is the app's own surface: --card on --background, a
+        // --border-subtle hairline, --shadow-card elevation.
+        scanContainer.backgroundColor = Lumen.card
         scanContainer.layer.cornerRadius = 20
+        scanContainer.layer.borderWidth = 1
+        scanContainer.layer.borderColor = Lumen.borderSubtle.cgColor
+        applyCardElevation(to: scanContainer)
         scanContainer.translatesAutoresizingMaskIntoConstraints = false
         scanContainer.isHidden = true
         view.addSubview(scanContainer)
 
         // Preview area — aspect-video (16:9), rounded, clips the sweep + image.
-        previewView.backgroundColor = UIColor(white: 0.10, alpha: 1)
+        // An inset well: --background sunk into the --card face.
+        previewView.backgroundColor = Lumen.ground
         previewView.layer.cornerRadius = 12
         previewView.layer.borderWidth = 1
-        previewView.layer.borderColor = UIColor(white: 1, alpha: 0.10).cgColor
+        previewView.layer.borderColor = Lumen.borderStrong.cgColor
         previewView.clipsToBounds = true
         previewView.translatesAutoresizingMaskIntoConstraints = false
         scanContainer.addSubview(previewView)
@@ -300,51 +379,53 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         // Big % counter.
         percentLabel.text = "0%"
         percentLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 30, weight: .bold)
-        percentLabel.textColor = .white
+        percentLabel.textColor = Lumen.accent3
         percentLabel.textAlignment = .center
         percentLabel.translatesAutoresizingMaskIntoConstraints = false
         previewView.addSubview(percentLabel)
 
-        // ✓ success glyph (hidden until done).
+        // ✓ resolved glyph (hidden until done). Porcelain, never green — the
+        // app's own capture surfaces resolve in `text-accent`.
         checkLabel.text = "✓"
         checkLabel.font = .systemFont(ofSize: 40, weight: .bold)
-        checkLabel.textColor = Self.successGreen
+        checkLabel.textColor = Lumen.accent
         checkLabel.textAlignment = .center
         checkLabel.alpha = 0
         checkLabel.translatesAutoresizingMaskIntoConstraints = false
         previewView.addSubview(checkLabel)
 
-        // Working ring, shown above the % counter in link mode — the same
-        // spinning "working" mark used across Ask + the in-app save loader
-        // (web `.working-ring`). Replaces the old static link glyph. Hidden in
-        // image mode (the image itself is the visual there).
-        linkRing.isHidden = true
-        linkRing.translatesAutoresizingMaskIntoConstraints = false
-        previewView.addSubview(linkRing)
+        // The brand mark, working — the Citation mark above the % counter, the
+        // same glyph the in-app scan surfaces ride (LinkScanProgress /
+        // AnalyzingBanner via OrbStatus). Replaces the retired Thinking Orb.
+        // Hidden in image mode (the image itself is the visual there).
+        citationMark.isHidden = true
+        citationMark.translatesAutoresizingMaskIntoConstraints = false
+        previewView.addSubview(citationMark)
 
         // Phase label.
         phaseLabel.text = "Uploading…"
         phaseLabel.font = .systemFont(ofSize: 14, weight: .medium)
-        phaseLabel.textColor = UIColor(white: 1, alpha: 0.90)
+        phaseLabel.textColor = Lumen.text
         phaseLabel.textAlignment = .center
         phaseLabel.translatesAutoresizingMaskIntoConstraints = false
         previewView.addSubview(phaseLabel)
 
-        // Progress bar.
-        barTrack.backgroundColor = UIColor(white: 1, alpha: 0.10)
+        // Progress bar — --fill-strong track, porcelain fill (bg-accent, the
+        // same pairing as AnalyzingBanner's bar).
+        barTrack.backgroundColor = Lumen.fillStrong
         barTrack.layer.cornerRadius = 3
         barTrack.clipsToBounds = true
         barTrack.translatesAutoresizingMaskIntoConstraints = false
         scanContainer.addSubview(barTrack)
 
-        barFill.backgroundColor = Self.accent
+        barFill.backgroundColor = Lumen.accent
         barFill.layer.cornerRadius = 3
         barFill.translatesAutoresizingMaskIntoConstraints = false
         barTrack.addSubview(barFill)
 
         hintLabel.text = "You can close this — we’ll keep analyzing in the background."
         hintLabel.font = .systemFont(ofSize: 11, weight: .regular)
-        hintLabel.textColor = .secondaryLabel
+        hintLabel.textColor = Lumen.textMuted
         hintLabel.textAlignment = .center
         hintLabel.numberOfLines = 0
         hintLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -384,10 +465,13 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             checkLabel.centerXAnchor.constraint(equalTo: percentLabel.centerXAnchor),
             checkLabel.centerYAnchor.constraint(equalTo: percentLabel.centerYAnchor),
 
-            linkRing.centerXAnchor.constraint(equalTo: percentLabel.centerXAnchor),
-            linkRing.bottomAnchor.constraint(equalTo: percentLabel.topAnchor, constant: -6),
-            linkRing.widthAnchor.constraint(equalToConstant: 30),
-            linkRing.heightAnchor.constraint(equalToConstant: 30),
+            citationMark.centerXAnchor.constraint(equalTo: percentLabel.centerXAnchor),
+            citationMark.bottomAnchor.constraint(equalTo: percentLabel.topAnchor, constant: -6),
+            citationMark.widthAnchor.constraint(equalToConstant: 32),
+            // The tight viewBox is 448×416, so the slot keeps the ink's aspect
+            // instead of letterboxing it.
+            citationMark.heightAnchor.constraint(equalTo: citationMark.widthAnchor,
+                                                 multiplier: 1 / CitationMarkView.aspect),
 
             phaseLabel.topAnchor.constraint(equalTo: percentLabel.bottomAnchor, constant: 4),
             phaseLabel.leadingAnchor.constraint(equalTo: previewView.leadingAnchor, constant: 12),
@@ -423,7 +507,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     /// behind the dim + sweep in link mode. Mirrors the skeleton page in
     /// web/components/LinkScanProgress.tsx.
     private func setupLinkPreview() {
-        linkPreview.backgroundColor = UIColor(white: 0.10, alpha: 1)
+        linkPreview.backgroundColor = Lumen.ground
         linkPreview.isHidden = true
         linkPreview.translatesAutoresizingMaskIntoConstraints = false
         // Behind the dim overlay so the scan line and status still read clearly.
@@ -432,21 +516,21 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         faviconView.contentMode = .scaleAspectFit
         faviconView.layer.cornerRadius = 4
         faviconView.clipsToBounds = true
-        faviconView.tintColor = UIColor(white: 1, alpha: 0.6)
+        faviconView.tintColor = Lumen.textSecondary
         faviconView.translatesAutoresizingMaskIntoConstraints = false
         linkPreview.addSubview(faviconView)
 
         hostLabel.font = .systemFont(ofSize: 12, weight: .medium)
-        hostLabel.textColor = UIColor(white: 1, alpha: 0.75)
+        hostLabel.textColor = Lumen.textSecondary
         hostLabel.lineBreakMode = .byTruncatingTail
         hostLabel.translatesAutoresizingMaskIntoConstraints = false
         linkPreview.addSubview(hostLabel)
 
-        // Skeleton: a title line, then body lines of decreasing width.
-        let title = skeletonLine(alpha: 0.10)
-        let b1 = skeletonLine(alpha: 0.06)
-        let b2 = skeletonLine(alpha: 0.06)
-        let b3 = skeletonLine(alpha: 0.06)
+        // Skeleton: a title line (--fill-strong), then body lines (--fill-subtle).
+        let title = skeletonLine(Lumen.fillStrong)
+        let b1 = skeletonLine(Lumen.fillSubtle)
+        let b2 = skeletonLine(Lumen.fillSubtle)
+        let b3 = skeletonLine(Lumen.fillSubtle)
         [title, b1, b2, b3].forEach { linkPreview.addSubview($0) }
 
         NSLayoutConstraint.activate([
@@ -486,16 +570,17 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         ])
     }
 
-    private func skeletonLine(alpha: CGFloat) -> UIView {
+    private func skeletonLine(_ fill: UIColor) -> UIView {
         let v = UIView()
-        v.backgroundColor = UIColor(white: 1, alpha: alpha)
+        v.backgroundColor = fill
         v.layer.cornerRadius = 3
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }
 
-    /// Gradient (transparent -> accent -> transparent) for the sweep band, plus a
-    /// bright glowing line along its bottom edge — mirrors the web sweep.
+    /// Gradient (transparent -> porcelain -> transparent) for the sweep band,
+    /// plus a bright leading line along its bottom edge — mirrors the web sweep,
+    /// repainted in --accent-gradient's stops instead of the retired purple.
     private let sweepGradient = CAGradientLayer()
     private let sweepLine = CALayer()
     private var sweepConfigured = false
@@ -510,19 +595,29 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         sweepGradient.frame = sweepView.bounds
         sweepLine.frame = CGRect(x: 0, y: sweepView.bounds.height - 1.5, width: sweepView.bounds.width, height: 1.5)
 
+        // The band's glow is a static rect, so pin its shadowPath — an unset
+        // path makes CoreAnimation re-derive the shadow from the layer contents
+        // on every pass, and this layer is under a running animation.
+        sweepLine.shadowPath = CGPath(rect: sweepLine.bounds, transform: nil)
+
         if !sweepConfigured {
+            // Porcelain, not purple: --accent-2 through the band, --accent-3 on
+            // the leading edge (the two discrete stops of --accent-gradient).
+            // Lower alpha than the old hue — at full strength a near-white band
+            // blows out the dimmed preview underneath.
             sweepGradient.colors = [
                 UIColor.clear.cgColor,
-                Self.accent.withAlphaComponent(0.70).cgColor,
+                Lumen.accent2.withAlphaComponent(0.34).cgColor,
                 UIColor.clear.cgColor,
             ]
             sweepGradient.locations = [0, 0.5, 1]
             sweepView.layer.addSublayer(sweepGradient)
 
-            sweepLine.backgroundColor = Self.accent.cgColor
-            sweepLine.shadowColor = Self.accent.cgColor
-            sweepLine.shadowRadius = 8
-            sweepLine.shadowOpacity = 0.9
+            sweepLine.backgroundColor = Lumen.accent3.cgColor
+            // --accent-ring is the identity's glow; the line carries it softly.
+            sweepLine.shadowColor = Lumen.accentRing.cgColor
+            sweepLine.shadowRadius = 9
+            sweepLine.shadowOpacity = 1
             sweepLine.shadowOffset = .zero
             sweepView.layer.addSublayer(sweepLine)
             sweepConfigured = true
@@ -599,11 +694,12 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         let trackWidth = barTrack.bounds.width
         barFillWidth.constant = trackWidth * (p / 100.0)
         if done {
-            barFill.backgroundColor = Self.successGreen
+            // No colour change on the bar — "done" is porcelain like everything
+            // else; the ✓ and the full track carry the resolution.
             percentLabel.alpha = 0
             checkLabel.alpha = 1
             sweepView.isHidden = true
-            linkRing.alpha = 0
+            citationMark.settle()
         }
         // Animate the bar width change smoothly.
         UIView.animate(withDuration: 0.2) { self.barTrack.layoutIfNeeded() }
@@ -616,17 +712,21 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     /// never "everything finished":
     ///   - the ✓ attaches to the SAVE ("Saved to Machina ✓"), not a full-screen glyph;
     ///   - the % counter stays on the live curve value, so the frame reads mid-flight;
-    ///   - the bar KEEPS its live curve width in the accent colour — never full/green.
+    ///   - the bar KEEPS its live curve width in the accent colour — never full.
     /// Auto-dismiss timing is unchanged: the host share sheet is never held open for
     /// analysis.
+    ///
+    /// The mark SETTLES rather than vanishing: the work it was reporting on has
+    /// resolved, so it holds the locked frame under a steady light — the same
+    /// "at rest, not gone" grammar as the app's own resolved beat.
     private func completeScanSuccess(then: @escaping () -> Void) {
         DispatchQueue.main.async {
             self.displayLink?.invalidate()
             self.displayLink = nil
             self.sweepView.isHidden = true
-            self.linkRing.alpha = 0
+            self.citationMark.settle()
             // Keep the live % visible (the ✓ rides the copy, not the counter) and
-            // leave the bar at its accent-coloured curve width — do NOT green or fill it.
+            // leave the bar at its accent curve width — do NOT fill it.
             self.percentLabel.alpha = 1
             self.checkLabel.alpha = 0
             self.phaseLabel.text = "Saved to Machina ✓"
@@ -650,10 +750,11 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             self.clearPendingShareHint()
             if self.isImageFlow || self.isLinkFlow {
                 self.sweepView.isHidden = true
-                self.linkRing.alpha = 0
+                self.citationMark.settle()
                 self.percentLabel.alpha = 0
                 self.checkLabel.alpha = 1
-                self.barFill.backgroundColor = Self.successGreen
+                // The bar completes; it stays porcelain (no green) — resolution
+                // is carried by the full track + the ✓, not by a hue.
                 self.barFillWidth.constant = self.barTrack.bounds.width
                 self.phaseLabel.text = "Already in your library"
                 self.hintLabel.text = "This one is saved in Machina — no new card was added."
@@ -673,7 +774,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     /// Present the outcome of the save.
     ///
     /// - success == true  → the server acknowledged (2xx). Only here do we ever
-    ///   show the green check.
+    ///   show the ✓.
     /// - neutral == true  → we genuinely don't know the outcome yet (the watchdog
     ///   fired, or the request timed out while the background upload keeps going).
     ///   We must NOT claim success OR a hard failure — show a calm "still saving"
@@ -699,9 +800,12 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
                     self.sweepView.isHidden = true
                     self.percentLabel.alpha = 0
                     self.checkLabel.alpha = 0
-                    self.linkRing.alpha = 0
+                    // Nothing resolved — the mark stops and steps away rather
+                    // than settling (settling would read as "done").
+                    self.citationMark.stop()
+                    self.citationMark.alpha = 0
                     self.phaseLabel.text = message
-                    self.phaseLabel.textColor = .white
+                    self.phaseLabel.textColor = Lumen.text
                     if neutral {
                         // Neutral terminal state: the save may still be finishing on
                         // the background session. Keep the card up with the ✕ close
@@ -817,12 +921,15 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         imageView.isHidden = true
         linkPreview.isHidden = false
         dimView.backgroundColor = UIColor.black.withAlphaComponent(0.50)
-        linkRing.isHidden = false
-        linkRing.start()
+        citationMark.isHidden = false
         beginScanAnimation()
         view.setNeedsLayout()
         view.layoutIfNeeded()
         layoutSweepGradient()
+        // Started AFTER layout: the arrival's bracket travel is a fraction of
+        // the slot's width, so it needs real bounds. (start() also self-defers
+        // to the next layout pass if it is ever called too early.)
+        citationMark.start()
         if let host = host { loadFavicon(host: host) }
     }
 
@@ -852,7 +959,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
 
     private func setGlobeFavicon() {
         faviconView.image = UIImage(systemName: "globe")
-        faviconView.tintColor = UIColor(white: 1, alpha: 0.6)
+        faviconView.tintColor = Lumen.textSecondary
     }
 
     /// The display host for a shared link or a URL embedded in shared text,
@@ -1082,122 +1189,336 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     }
 }
 
-/// The "working" Thinking Orb, natively — a faithful port of the library's
-/// `orbits` mode (particles on tilted orbits + a ghost trail), recoloured to
-/// Machina's pink→purple so it matches the in-app orbs. The library is JS/canvas
-/// and can't run in a native share extension, so the exact draw math is ported
-/// here: per-orbit hashed orientation (`hash`), a yaw/pitch projection
-/// (`project`), depth z-sort, and dots painted in our palette by luminance.
+/// **The Citation mark, natively** — Machina's brand glyph as the share sheet's
+/// working indicator. Replaces the retired Thinking Orb (`OrbitsOrbView`), which
+/// was a port of a mark the app no longer uses, recoloured to a hue the identity
+/// no longer has.
 ///
-/// Twin: web `BrandOrb` (state="working") — keep the constants below in sync with
-/// resolvePreset('working', 20) if the library is bumped.
-final class OrbitsOrbView: UIView {
-    private var displayLink: CADisplayLink?
-    private var startedAt: CFTimeInterval = 0
+/// ── Geometry ────────────────────────────────────────────────────────────────
+/// Ported unit-for-unit from `design/icon-concepts/cit_lumen.svg`, which is the
+/// same ink as `bracketPaths(0)` + the resting point in
+/// `web/components/ui/CitationMark.tsx` (verified point-for-point, not eyeballed):
+///
+///     viewBox   288 292 448 416        the TIGHT resting-ink box, as the app
+///                                      uses at ≤20px — the ink must fill the
+///                                      slot, not float in the full artboard
+///     bracket   TOP 300 · BOT 700 · ARM 100 · W 58 · LX 296 · RX 728
+///     point     c (512, 500) · r 52    (R_HI, the locked radius)
+///
+/// The point's centre IS the viewBox centre, which is what lets the strike be a
+/// plain `transform.scale` on the point layer: the layer's anchor point already
+/// sits exactly on the point.
+///
+/// The mark uses the tight box, not the roomy `roam` one, because here only the
+/// ARRIVAL moves the brackets — there is no clamp/sweep loop swinging them past
+/// rest — and a `CAShapeLayer` is not clipped by its own bounds, so the sliding
+/// brackets simply travel outside the slot and settle into it.
+///
+/// ── Motion ──────────────────────────────────────────────────────────────────
+/// The arrival choreography from SOURCE_OF_TRUTH §9 (IDENTITY ROUND 13), with
+/// the timings ported 1:1 from the `.animate-boot-*` rules in globals.css:
+///
+///     0.14s  the brackets slide in and settle   0.55s   --ease-modal
+///     0.55s  the glow blooms                    0.70s   ease-out
+///     0.60s  the point STRIKES (a spring pop)   0.36s   --ease-spring
+///     1.60s  then a slow breath, while waiting  4.20s   ease-in-out, forever
+///
+/// ROUND 14's lesson is structural here, not a detail: **nothing carrying a glow
+/// is ever animated.** The ink RESTS after the strike and the waiting motion
+/// lives in a sibling radial-gradient layer BEHIND the mark, animating opacity
+/// only. A glow that re-rasterises every frame visibly shakes on device.
+///
+/// `settle()` is the resolved beat ("saved"): the breath stops and the mark
+/// holds its locked frame under a steady, quieter light.
+///
+/// Reduced motion collapses the whole sequence to that settled frame.
+final class CitationMarkView: UIView {
 
-    // Brand stops (bright ink → pink, shadowed ink → purple), same mapping as web.
-    private static let pink: (CGFloat, CGFloat, CGFloat) = (236 / 255, 72 / 255, 153 / 255)   // #EC4899
-    private static let purple: (CGFloat, CGFloat, CGFloat) = (168 / 255, 85 / 255, 247 / 255)  // #A855F7
+    // MARK: Geometry — cit_lumen.svg. Do NOT re-derive these.
+    private static let vbX: CGFloat = 288, vbY: CGFloat = 292
+    private static let vbW: CGFloat = 448, vbH: CGFloat = 416
+    private static let top: CGFloat = 300, bot: CGFloat = 700
+    private static let arm: CGFloat = 100, thick: CGFloat = 58
+    private static let lx: CGFloat = 296, rx: CGFloat = 728
+    private static let cx: CGFloat = 512, cy: CGFloat = 500
+    private static let pointR: CGFloat = 52          // R_HI — the locked point
 
-    // resolvePreset('working', 20) — the tuned inline preset.
-    private let orbitN = 3, ghostN = 10, particles = 3
-    private let ghostR = 2.16, ghostA = 0.5, partR = 2.88, partRDepth = 3.84
-    private let rsPow = 0.6, rMin = 0.3, baseSpeed = 3.9
+    /// Aspect (w/h) of the tight viewBox, so callers can size a slot that fits
+    /// the ink exactly instead of letterboxing it.
+    static let aspect: CGFloat = CitationMarkView.vbW / CitationMarkView.vbH
+
+    // MARK: Beats — globals.css `.animate-boot-*`, in seconds.
+    private static let bktDelay: CFTimeInterval = 0.14, bktDur: CFTimeInterval = 0.55
+    private static let glowDelay: CFTimeInterval = 0.55, glowDur: CFTimeInterval = 0.70
+    private static let strikeDelay: CFTimeInterval = 0.60, strikeDur: CFTimeInterval = 0.36
+    private static let breatheDelay: CFTimeInterval = 1.60
+    /// Half a breath: 2.1s out, 2.1s back = the boot halo's 4.2s cycle.
+    private static let breatheHalf: CFTimeInterval = 2.10
+    private static let settleDur: CFTimeInterval = 0.32
+
+    /// Bracket travel as a fraction of the slot width — the boot's 92px against
+    /// its 117px mark, kept proportional so the gesture reads the same at 32pt.
+    private static let bktTravel: CGFloat = 92.0 / 117.0
+
+    /// Halo opacity: lit at the top of a breath, dim at the bottom, steady once
+    /// resolved. The boot halo breathes fully to 0; at this size a full
+    /// extinction reads as a blink, so the trough keeps a resting glow.
+    private static let haloLit: Float = 1.0
+    private static let haloDim: Float = 0.34
+    private static let haloSettled: Float = 0.50
+
+    // MARK: Layers. The halo is a SIBLING behind the ink — see round 14.
+    private let halo = CAGradientLayer()
+    private let bracketL = CAShapeLayer()
+    private let bracketR = CAShapeLayer()
+    private let point = CAShapeLayer()
+
+    private var started = false
+    private var settled = false
+    /// `start()` needs real bounds for the bracket travel; if it is called
+    /// before layout we defer to the next pass rather than animating from 0.
+    private var startPending = false
 
     override init(frame: CGRect) {
         super.init(frame: frame)
+        buildLayers()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        buildLayers()
+    }
+
+    private func buildLayers() {
         backgroundColor = .clear
         isOpaque = false
-        contentMode = .redraw
-    }
-    required init?(coder: NSCoder) { fatalError("OrbitsOrbView is code-only") }
+        isUserInteractionEnabled = false
 
+        // The waiting light: --accent-ring falling off to nothing, matching the
+        // boot's `radial-gradient(closest-side, rgba(174,184,206,.20), … 72%)`.
+        halo.type = .radial
+        halo.startPoint = CGPoint(x: 0.5, y: 0.5)
+        halo.endPoint = CGPoint(x: 1, y: 1)
+        halo.colors = [
+            Lumen.accentRing.withAlphaComponent(0.22).cgColor,
+            Lumen.accentRing.withAlphaComponent(0.10).cgColor,
+            Lumen.accentRing.withAlphaComponent(0).cgColor,
+        ]
+        halo.locations = [0, 0.45, 1]
+        halo.opacity = 0
+        layer.addSublayer(halo)
+
+        // The ink. `--accent` is the emphasis token, so the mark is porcelain —
+        // the native equivalent of the web mark's `currentColor` on a dark card.
+        for shape in inkLayers {
+            shape.fillColor = Lumen.accent.cgColor
+            shape.fillRule = .nonZero
+            shape.opacity = 1
+            layer.addSublayer(shape)
+        }
+    }
+
+    private var inkLayers: [CAShapeLayer] { [bracketL, bracketR, point] }
+
+    // MARK: - Layout
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let box = bounds
+        guard box.width > 0, box.height > 0 else { return }
+
+        // Manually-added sublayers default to contentsScale 1 — without this the
+        // vector ink rasterises at 1x and reads soft on every retina device.
+        let scale = traitCollection.displayScale > 0 ? traitCollection.displayScale : 2
+        halo.contentsScale = scale
+
+        // Fit the tight viewBox into the slot, centred (the slot's aspect
+        // matches, so in practice this is a pure scale).
+        let s = min(box.width / Self.vbW, box.height / Self.vbH)
+        let tx = (box.width - Self.vbW * s) / 2 - Self.vbX * s
+        let ty = (box.height - Self.vbH * s) / 2 - Self.vbY * s
+        let fit = CGAffineTransform(scaleX: s, y: s)
+            .concatenating(CGAffineTransform(translationX: tx, y: ty))
+
+        // These layers are not view-backed, so `path`/`frame` would each pick up
+        // CoreAnimation's implicit 0.25s action — a re-layout would morph the ink
+        // instead of just re-drawing it. Geometry is set, never animated.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for shape in inkLayers {
+            shape.contentsScale = scale
+            // Full-slot bounds so `transform.scale` on the point pivots on the
+            // slot's centre — which is exactly the point's centre (512, 500).
+            shape.frame = box
+        }
+        bracketL.path = Self.bracketPath(left: true, fit: fit)
+        bracketR.path = Self.bracketPath(left: false, fit: fit)
+        point.path = Self.pointPath(fit: fit)
+
+        // The boot's `-inset-[45%]`: light spilling well past the ink.
+        halo.frame = box.insetBy(dx: -box.width * 0.45, dy: -box.height * 0.45)
+        CATransaction.commit()
+
+        if startPending {
+            startPending = false
+            start()
+        }
+    }
+
+    /// One bracket, in slot coordinates. Point-for-point the path in
+    /// cit_lumen.svg / `bracketPaths(0)` — the resting mark, spread 0.
+    private static func bracketPath(left: Bool, fit: CGAffineTransform) -> CGPath {
+        let dir: CGFloat = left ? 1 : -1
+        let x0 = left ? lx : rx
+        let pts = [
+            CGPoint(x: x0, y: top),
+            CGPoint(x: x0 + dir * arm, y: top),
+            CGPoint(x: x0 + dir * arm, y: top + thick),
+            CGPoint(x: x0 + dir * thick, y: top + thick),
+            CGPoint(x: x0 + dir * thick, y: bot - thick),
+            CGPoint(x: x0 + dir * arm, y: bot - thick),
+            CGPoint(x: x0 + dir * arm, y: bot),
+            CGPoint(x: x0, y: bot),
+        ]
+        let path = CGMutablePath()
+        path.addLines(between: pts, transform: fit)
+        path.closeSubpath()
+        return path
+    }
+
+    /// The point, at its locked radius.
+    private static func pointPath(fit: CGAffineTransform) -> CGPath {
+        var fit = fit
+        let box = CGRect(x: cx - pointR, y: cy - pointR, width: pointR * 2, height: pointR * 2)
+        return CGPath(ellipseIn: box, transform: &fit)
+    }
+
+    // MARK: - Motion
+
+    /// Play the arrival, then hold the working breath. Idempotent, and safe to
+    /// call before layout (it defers itself to the next layout pass).
     func start() {
-        if UIAccessibility.isReduceMotionEnabled { setNeedsDisplay(); return } // one static frame
-        guard displayLink == nil else { return }
-        startedAt = CACurrentMediaTime()
-        let link = CADisplayLink(target: self, selector: #selector(tick))
-        link.add(to: .main, forMode: .common)
-        displayLink = link
+        guard !started, !settled else { return }
+        guard bounds.width > 0 else { startPending = true; return }
+        started = true
+
+        // Reduced motion: no arrival, no breath — the settled frame, at once.
+        guard !UIAccessibility.isReduceMotionEnabled else {
+            applySettledFrame()
+            return
+        }
+
+        let now = CACurrentMediaTime()
+        let travel = bounds.width * Self.bktTravel
+
+        // 1 — the brackets slide in and settle, on --ease-modal.
+        slideIn(bracketL, from: -travel, at: now)
+        slideIn(bracketR, from: travel, at: now)
+
+        // 2 — the glow blooms, just before the point lands.
+        halo.opacity = Self.haloLit
+        let bloom = CABasicAnimation(keyPath: "opacity")
+        bloom.fromValue = 0
+        bloom.toValue = Self.haloLit
+        bloom.duration = Self.glowDur
+        bloom.beginTime = now + Self.glowDelay
+        bloom.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        bloom.fillMode = .backwards        // stays dark through the delay
+        halo.add(bloom, forKey: "bloom")
+
+        // 3 — the point STRIKES: the spring's overshoot IS the gesture, so the
+        // scale carries --ease-spring. The opacity rides a plain ease-out over
+        // half the beat instead: a >1 control point on alpha only clamps.
+        let strike = CABasicAnimation(keyPath: "transform.scale")
+        strike.fromValue = 0
+        strike.toValue = 1
+        strike.duration = Self.strikeDur
+        strike.beginTime = now + Self.strikeDelay
+        strike.timingFunction = Lumen.easeSpring
+        strike.fillMode = .backwards
+        point.add(strike, forKey: "strike")
+
+        let lit = CABasicAnimation(keyPath: "opacity")
+        lit.fromValue = 0
+        lit.toValue = 1
+        lit.duration = Self.strikeDur * 0.5
+        lit.beginTime = now + Self.strikeDelay
+        lit.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        lit.fillMode = .backwards
+        point.add(lit, forKey: "lit")
+
+        // 4 — and then the wait: a slow breath of LIGHT, forever. Only the halo
+        // moves; the ink is at rest (round 14). This begins after the bloom has
+        // finished and been removed, so the two never composite against each
+        // other — `bloom` fills backwards only, `breathe` not at all.
+        let breathe = CABasicAnimation(keyPath: "opacity")
+        breathe.fromValue = Self.haloLit
+        breathe.toValue = Self.haloDim
+        breathe.duration = Self.breatheHalf
+        breathe.beginTime = now + Self.breatheDelay
+        breathe.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        breathe.autoreverses = true
+        breathe.repeatCount = .infinity
+        halo.add(breathe, forKey: "breathe")
     }
-    func stop() { displayLink?.invalidate(); displayLink = nil }
-    override func didMoveToWindow() { super.didMoveToWindow(); if window == nil { stop() } }
-    deinit { displayLink?.invalidate() }
 
-    @objc private func tick() { setNeedsDisplay() }
+    private func slideIn(_ shape: CAShapeLayer, from dx: CGFloat, at now: CFTimeInterval) {
+        let slide = CABasicAnimation(keyPath: "transform.translation.x")
+        slide.fromValue = dx
+        slide.toValue = 0
+        slide.duration = Self.bktDur
+        slide.beginTime = now + Self.bktDelay
+        slide.timingFunction = Lumen.easeModal
+        slide.fillMode = .backwards
+        shape.add(slide, forKey: "slide")
 
-    /// Deterministic hash, = the library's `F(e,n)` (fract of a scaled sine).
-    private func hash(_ e: Double, _ n: Double) -> Double {
-        let s = sin(e * 12.9898 + n * 78.233) * 43758.5453
-        return s - floor(s)
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0
+        fade.toValue = 1
+        fade.duration = Self.bktDur
+        fade.beginTime = now + Self.bktDelay
+        fade.timingFunction = Lumen.easeModal
+        fade.fillMode = .backwards
+        shape.add(fade, forKey: "fade")
     }
 
-    override func draw(_ rect: CGRect) {
-        guard let ctx = UIGraphicsGetCurrentContext() else { return }
-        let n = Double(min(bounds.width, bounds.height))
-        if n <= 0 { return }
-        let elapsed = displayLink == nil ? 0.6 / baseSpeed : (CACurrentMediaTime() - startedAt)
-        let s = elapsed * baseSpeed
+    /// The resolved beat — "saved". The work this mark was reporting on has
+    /// finished, so the breath stops and the mark holds its locked frame under a
+    /// steady, quieter light. Nothing in this state ever moves again.
+    func settle() {
+        guard !settled else { return }
+        settled = true
+        started = true
+        startPending = false
 
-        let cx = n / 2, cy = n / 2, a = n / 2 * 0.82
-        let dotScale = pow(n / 300.0, rsPow)
+        // Read the live value BEFORE removing the animation, so a settle landing
+        // mid-bloom or mid-breath eases from where the light actually is.
+        let from = halo.presentation()?.opacity ?? halo.opacity
+        halo.removeAnimation(forKey: "bloom")
+        halo.removeAnimation(forKey: "breathe")
+        halo.opacity = Self.haloSettled
 
-        // Projection q(s*0.12, 0.3, cx, cy, 1): yaw then pitch, orthographic.
-        let yaw = s * 0.12, pitch = 0.3
-        let cosY = cos(yaw), sinY = sin(yaw), cosP = cos(pitch), sinP = sin(pitch)
-        func project(_ mx: Double, _ my: Double, _ mz: Double) -> (Double, Double, Double) {
-            let u = mx * cosY + mz * sinY
-            let h = -mx * sinY + mz * cosY
-            let b = my * cosP - h * sinP
-            let x = my * sinP + h * cosP
-            return (cx + u, cy - b, x)
-        }
+        guard !UIAccessibility.isReduceMotionEnabled else { return }
+        let ease = CABasicAnimation(keyPath: "opacity")
+        ease.fromValue = from
+        ease.toValue = Self.haloSettled
+        ease.duration = Self.settleDur
+        ease.timingFunction = Lumen.easeModal
+        halo.add(ease, forKey: "settle")
+    }
 
-        struct Dot { let x: Double; let y: Double; let z: Double; let r: Double; let white: Double; let a: Double }
-        var dots: [Dot] = []
+    /// Park everything. Used when the mark is being taken off screen (an error
+    /// frame), where settling would wrongly read as "done".
+    func stop() {
+        halo.removeAllAnimations()
+        for shape in inkLayers { shape.removeAllAnimations() }
+    }
 
-        for orbit in 0..<orbitN {
-            let bd = Double(orbit)
-            let rx = hash(bd, 1.7), ri = hash(bd, 5.2), rp = hash(bd, 8.9)
-            let radius = a * (0.45 + 0.52 * rx)
-            let dLon = rx * 2 * .pi
-            let w = acos(2 * ri - 1)
-            let k = sin(w) * cos(dLon), v = cos(w), rr = sin(w) * sin(dLon)   // orbit normal
-            var px = -v, py = k
-            let f = max(1e-6, (px * px + py * py).squareRoot())
-            px /= f; py /= f                                                  // basis 1 (in-plane)
-            let sX = -rr * py, sY = rr * px, sZ = k * py - v * px             // basis 2 (normal × basis1)
-            let spin = (0.25 + 0.55 * rp) * (rp > 0.5 ? 1.0 : -1.0)
-
-            for c in 0..<ghostN {
-                let e = Double(c) / Double(ghostN) * 2 * .pi
-                let (t, z, nz) = project((px * cos(e) + sX * sin(e)) * radius,
-                                         (py * cos(e) + sY * sin(e)) * radius,
-                                         (sZ * sin(e)) * radius)
-                let depth = (nz / radius + 1) / 2
-                dots.append(Dot(x: t, y: z, z: nz, r: ghostR * dotScale, white: 0.72, a: ghostA * (0.4 + 0.6 * depth)))
-            }
-            for c in 0..<particles {
-                let e = s * spin + Double(c) / Double(particles) * 2 * .pi + ri * 6
-                let (t, z, nz) = project((px * cos(e) + sX * sin(e)) * radius,
-                                         (py * cos(e) + sY * sin(e)) * radius,
-                                         (sZ * sin(e)) * radius)
-                let depth = (nz / radius + 1) / 2
-                dots.append(Dot(x: t, y: z, z: nz, r: (partR + partRDepth * depth) * dotScale, white: 0.3 - 0.22 * depth, a: 1))
-            }
-        }
-
-        // Painter `_`: z-sort back→front, recolour by luminance, draw filled dots.
-        dots.sort { $0.z < $1.z }
-        for dot in dots where dot.a >= 0.02 {
-            let cw = min(1.0, max(0.0, dot.white))
-            let t = CGFloat(1.0 - cw)                        // dark-ink mapping (matches web BrandOrb)
-            let r = Self.pink.0 + (Self.purple.0 - Self.pink.0) * t
-            let g = Self.pink.1 + (Self.purple.1 - Self.pink.1) * t
-            let b = Self.pink.2 + (Self.purple.2 - Self.pink.2) * t
-            ctx.setFillColor(red: r, green: g, blue: b, alpha: CGFloat(dot.a))
-            let rad = CGFloat(max(rMin, dot.r))
-            ctx.fillEllipse(in: CGRect(x: CGFloat(dot.x) - rad, y: CGFloat(dot.y) - rad, width: rad * 2, height: rad * 2))
-        }
+    /// The frame the whole choreography resolves to: brackets home, the point at
+    /// its locked radius, a steady light. Reduced motion starts here and stays.
+    private func applySettledFrame() {
+        stop()
+        for shape in inkLayers { shape.opacity = 1 }
+        halo.opacity = Self.haloSettled
     }
 }
