@@ -1,0 +1,143 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Deploy Firebase Hosting.
+#
+# WHY THIS EXISTS: Firebase Hosting is NOT a user-facing surface — the iPhone
+# PWA is retired, desktop web is Vercel, iOS is the native app. But the Hosting
+# ORIGIN still serves two things the product depends on, both configured in
+# `firebase.json`:
+#   • the `/api/*` rewrites the native app calls (NEXT_PUBLIC_API_BASE)
+#   • the `/s` and `/c` share pages (the `share_page` function)
+#
+# Vercel does not pick those up, and a `main` push does not deploy Hosting, so
+# a `firebase.json` rewrite change used to require the owner to run
+# `./deploy-hosting.sh` by hand on a Mac with `firebase login`. That manual step
+# was silently skippable: prod would keep advertising a route whose function had
+# already been pruned. This workflow closes that gap — it uses the same
+# FIREBASE_SERVICE_ACCOUNT secret as "Deploy Cloud Functions" and the same
+# NEXT_PUBLIC_FIREBASE_* secrets as "iOS → TestFlight", so it needs no new
+# owner setup.
+#
+# `deploy-hosting.sh` is kept as the local/manual escape hatch.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Deploy Firebase Hosting
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      # The rewrites/headers that make this deploy necessary at all.
+      - "firebase.json"
+      # Self-referential on purpose (mirrors deploy-functions.yml): a change to
+      # this workflow takes effect on its own merge rather than waiting for the
+      # next unrelated firebase.json edit.
+      - ".github/workflows/deploy-hosting.yml"
+
+concurrency:
+  group: deploy-hosting
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FIREBASE_PROJECT: secondbrain-app-94da2
+      # The Hosting origin is its own API base — the rewrites above are what the
+      # bundle calls. Matches API_BASE in ios-testflight.yml.
+      API_BASE: https://secondbrain-app-94da2.web.app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fail fast with instructions rather than deploying a broken bundle: a
+      # missing NEXT_PUBLIC_FIREBASE_* silently produces an app that can't reach
+      # Firebase at all (CI already learned this the hard way — see §9).
+      - name: Check required secrets
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+        run: |
+          missing=0
+          for name in FIREBASE_SERVICE_ACCOUNT NEXT_PUBLIC_FIREBASE_API_KEY \
+                      NEXT_PUBLIC_FIREBASE_PROJECT_ID NEXT_PUBLIC_FIREBASE_APP_ID; do
+            # Indirect expansion: read the exported var, never interpolate the
+            # secret into the script body (see deploy-functions.yml).
+            if [ -z "${!name}" ]; then
+              echo "::error::$name secret is not set — it is already required by" \
+                   "Deploy Cloud Functions / iOS → TestFlight, so it should exist."
+              missing=1
+            fi
+          done
+          [ "$missing" = "0" ] || exit 1
+          echo "Required secrets present."
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install firebase-tools
+        run: npm i -g firebase-tools
+
+      # Write the service-account JSON to a temp file and point
+      # GOOGLE_APPLICATION_CREDENTIALS at it so firebase-tools authenticates
+      # non-interactively. Same mechanism as the functions deploy.
+      - name: Write service account credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          creds="$RUNNER_TEMP/firebase-sa.json"
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$creds"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$creds" >> "$GITHUB_ENV"
+
+      # VERCEL is unset here, so next.config emits `output: export` and the
+      # build lands in web/out — which is firebase.json's `hosting.public`.
+      - name: Build static export
+        working-directory: web
+        env:
+          NEXT_PUBLIC_API_BASE: ${{ env.API_BASE }}
+          NEXT_PUBLIC_SHARE_BASE: ${{ env.API_BASE }}
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+          NEXT_PUBLIC_RECAPTCHA_SITE_KEY: ${{ secrets.NEXT_PUBLIC_RECAPTCHA_SITE_KEY }}
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+          test -f out/index.html || { echo "::error::static export missing (web/out/index.html)"; exit 1; }
+
+      - name: Deploy hosting
+        run: |
+          set -euo pipefail
+          firebase deploy --only hosting --project "$FIREBASE_PROJECT" --non-interactive --force
+
+      # The whole point of this workflow is rewrite correctness, so assert it
+      # rather than trusting a green deploy: a pruned function must NOT still be
+      # advertised, and a live one must still resolve.
+      - name: Verify rewrites
+        run: |
+          set -euo pipefail
+          base="https://${FIREBASE_PROJECT}.web.app"
+          echo "Checking that /api/article is gone (reader mode was removed)…"
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$base/api/article" \
+                   -H 'Content-Type: application/json' -d '{"url":"https://example.com"}' || echo 000)
+          echo "  /api/article → $code"
+          if [ "$code" = "200" ]; then
+            echo "::error::/api/article still resolves — the rewrite was not removed."
+            exit 1
+          fi
+          echo "Checking that a live rewrite still resolves (OPTIONS preflight on /api/chat)…"
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS "$base/api/chat" || echo 000)
+          echo "  /api/chat OPTIONS → $code"
+          if [ "$code" = "404" ]; then
+            echo "::error::/api/chat no longer resolves — hosting rewrites are broken."
+            exit 1
+          fi
+          echo "✅ Rewrites verified."

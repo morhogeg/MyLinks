@@ -910,10 +910,24 @@ exact-match, capped.
   (5) **Direct `curl` to api.github.com is blocked in this sandbox** ("GitHub
   access is not enabled for this session") — CI polling must go through the
   GitHub **MCP** tools; a background `until curl …` loop will spin forever.
-  ⛔ **OWNER STEP — hosting redeploy.** `firebase.json` rewrites changed (the
-  `/api/article` → `get_article` rewrite is gone), and hosting does NOT deploy
-  from a `main` push. Run `cd ~/MyLinks && ./deploy-hosting.sh`. Until then
-  Hosting still advertises a route whose function the deploy has pruned.
+  ✅ **HOSTING IS NOW CI, NOT AN OWNER STEP (new `deploy-hosting.yml`).** The
+  ship originally ended with "owner: run `./deploy-hosting.sh` on the Mac",
+  because Hosting has never deployed from a `main` push and the sandbox has no
+  `firebase login`. Owner said "you can run it" — there is no firebase CLI or
+  credential here either, so the actual fix was to give Hosting the same CI path
+  the backend already has. **`.github/workflows/deploy-hosting.yml`** reuses the
+  EXISTING secrets (`FIREBASE_SERVICE_ACCOUNT` from the functions deploy,
+  `NEXT_PUBLIC_FIREBASE_*` from iOS → TestFlight) so it needed no owner setup at
+  all: checks secrets → static export (`VERCEL` unset ⇒ `output: export` ⇒
+  `web/out`, which IS `hosting.public`) → `firebase deploy --only hosting`.
+  Triggers on pushes touching `firebase.json`, plus the workflow file itself, so
+  it fires on its own merge (the `deploy-functions.yml` trick).
+  **It ends with a `Verify rewrites` step, and that is the point:** a green
+  Firebase deploy proves nothing about the routing table, so the job asserts
+  `/api/article` no longer returns 200 AND that a live rewrite (`/api/chat`
+  OPTIONS) still resolves — this class of change silently half-lands otherwise.
+  `deploy-hosting.sh` stays as the local escape hatch. **The recurring manual
+  step is gone: a future `firebase.json` rewrite change now ships by merging.**
 
 - **2026-07-27 — SETTINGS SUB-SCREENS NOW OPEN AT THE TOP (owner: the story
   "opens here, and the user must scroll up to start reading").** Every screen in
