@@ -27,17 +27,17 @@ export function StoryView() {
                     Machina started with a frustration I couldn&apos;t shake. I kept saving
                     things everywhere. A post on Instagram, a thread on X, a video on
                     YouTube, an article somewhere else. And I almost never came back to any
-                    of it. Worse: when I <em>did</em> remember something I&apos;d loved and
-                    wanted to find it again, it was nearly impossible to recall which app
+                    of it. Worse: when I <em>did</em>{' '}remember something I&apos;d loved
+                    and wanted to find it again, it was nearly impossible to recall which app
                     I&apos;d buried it in. Everything that interested me was scattered
                     across five platforms, quietly disappearing.
                 </p>
                 <p>
-                    That hit a nerve, because collecting ideas is genuinely my thing.
-                    Research, accumulating knowledge, making something new out of what
-                    I&apos;ve learned. That&apos;s not a chore for me, it&apos;s the fun
+                    That hit a nerve, because collecting ideas is genuinely my thing:
+                    research, accumulating knowledge, making something new out of what
+                    I&apos;ve learned. None of that is a chore for me, it&apos;s the fun
                     part. So a pile of saved-and-forgotten links felt like a real loss.
-                    Machina came from that genuine need: one place for everything that
+                    Machina came from that genuine need. One place for everything that
                     catches my interest, wherever I found it.
                 </p>
                 <p>

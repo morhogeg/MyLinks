@@ -22,7 +22,10 @@ export default function TagInput({
     onAdd,
     onCancel,
     className = '',
-    placeholder = 'Add tag...'
+    // Desktop parity with the mobile sheet, which says "Search or create a tag…".
+    // "Add tag..." over a list of existing tags reads as a PICKER, so it was not
+    // obvious that typing a name you don't have yet is allowed (owner, 2026-07-27).
+    placeholder = 'Search or create…'
 }: TagInputProps) {
     const [value, setValue] = useState('');
     const [isOpen, setIsOpen] = useState(true);
@@ -30,6 +33,7 @@ export default function TagInput({
     const containerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);       // desktop inline field
     const sheetInputRef = useRef<HTMLInputElement>(null);  // mobile sheet field
+    const dropdownRef = useRef<HTMLDivElement>(null);      // desktop portal panel
 
     // This component only ever mounts client-side (after a tap), so reading the
     // width synchronously here is safe and avoids a first-frame flash.
@@ -101,6 +105,13 @@ export default function TagInput({
         function handleClickOutside(event: MouseEvent) {
             const target = event.target as Node;
             if (inputRef.current && inputRef.current.contains(target)) return;
+            // Also exempt the dropdown itself. It lives in a portal on
+            // document.body, so whether its own onMouseDown stopPropagation beats
+            // this document-level listener depends on where React attached its
+            // root listener — a real containment check does not. Without this, a
+            // click meant for a suggestion (or the "Create …" row) could close the
+            // field instead of adding the tag.
+            if (dropdownRef.current && dropdownRef.current.contains(target)) return;
             onCancel();
         }
         document.addEventListener('mousedown', handleClickOutside);
@@ -240,6 +251,7 @@ export default function TagInput({
     // ── Desktop anchored dropdown ─────────────────────────────────────────────
     const desktopDropdown = (
         <div
+            ref={dropdownRef}
             className="fixed z-[100] overflow-hidden rounded-xl shadow-2xl bg-background border border-border-strong animate-in fade-in zoom-in-95 duration-150"
             style={{
                 top: coords?.openUpwards ? undefined : (coords?.top ? coords.top + 4 : 0),
@@ -280,7 +292,11 @@ export default function TagInput({
                     onFocus={() => setIsOpen(true)}
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder}
-                    className={`text-xs bg-fill-subtle border border-accent/30 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-accent w-32 animate-in fade-in zoom-in-95 duration-200 ${className}`}
+                    /* w-44, not w-32: at 8rem the longer placeholder was clipped and a
+                       typed tag name scrolled out of view while you were typing it,
+                       which made the field feel like it wasn't taking input. Matches
+                       the 14rem dropdown more closely too. */
+                    className={`text-xs bg-fill-subtle border border-accent/30 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-accent w-44 animate-in fade-in zoom-in-95 duration-200 ${className}`}
                 />
             )}
             {isOpen && typeof document !== 'undefined' && createPortal(isMobile ? mobileSheet : desktopDropdown, document.body)}
