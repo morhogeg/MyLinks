@@ -372,28 +372,24 @@ The multi-user auth work is **fully written but not live**:
 
 ### 🟡 P2 — security/cost hardening & honest product surface
 
-11a1. **[ ] Owner QA on build 1219 — the device-unverified 2026-07-27 work.**
-    QA this build; 1212–1218 are superseded. The cloud sandbox cannot compile
-    Swift, render the app under auth, or call Gemini, so everything here is
-    reasoned/statically-checked, not seen running. In order of risk:
-    (1) **Share-extension scanner** (`CitationMarkView`) — statically reviewed
-    only, never once rendered. Share into Machina and check the mark actually
-    draws, the strike/breathe reads right, and nothing clips at 32pt, in light
-    and dark. **Highest risk item in the batch.** (2) **Capture-banner replay** —
-    share a post, open the app, and confirm the bar shows its phases ONCE and
-    closes. Watch specifically for the new hand-off: the bridge should pass to
-    the Firestore banner with no "Saved" flash in between. (3) **Settings
-    scroll** — scroll to the bottom of Settings, open the story, confirm it lands
-    at the top with the glyph visible, then Back and confirm you are still at the
-    bottom of the list (the per-view memory, not a blanket scroll-to-0).
-    (4) **Account screen** — sign in with Google and confirm it says Google, not
-    Apple. (5) **Japan/Tokyo** — ✅ *apparently confirmed on device 2026-07-27*
-    (a re-shared card titled "ביקורת על חוויית התיירות **ביפן**", not Tokyo), but
-    worth one more country/industry-level post, checking title, summary AND tags.
-    If it ever narrows again the next lever is `_THIN_TWEET_CHARS` / raising the
-    non-primary vision resolution unconditionally.
-    Owner-confirmed working already: the list-view ⋯ menu + conditional star, the
-    dark-mode FAB, the desktop tag create, and the favicon (Chrome).
+11a1. **[x] Owner QA on build 1219 — ✅ ALL CONFIRMED ON DEVICE 2026-07-27.**
+    The owner ran the full list on a physical iPhone and reported everything
+    working ("they are great"). The device-verification debt this item tracked is
+    **cleared** for build 1219. Confirmed working: (1) the **share-extension
+    scanner** (`CitationMarkView`) — the highest-risk item in the batch, since the
+    sandbox can't compile Swift and it had never once been rendered; it draws
+    correctly in light and dark; (2) **capture-banner replay** — phases show once
+    and close, with the bridge → Firestore-banner hand-off clean (no "Saved"
+    flash); (3) **Settings scroll** — sub-screens open at the top, Back returns to
+    the bottom of the main list (per-view memory behaves); (4) **Account screen**
+    reports the real provider; (5) **Japan/Tokyo** anti-narrowing holds at
+    country/industry level. Previously confirmed and unchanged: the list-view ⋯
+    menu + conditional star, the dark-mode FAB, the desktop tag create, the
+    favicon (Chrome).
+    ⚠️ **NOT covered by this pass:** the Settings "Done" bar safe-area fix
+    (`157c11d`) landed *after* build 1219 was cut, so it has never been in a
+    TestFlight build. It rides the next iOS build and needs one look on a
+    home-indicator iPhone — see the 2026-07-27 §9 entry.
 11a2. **[ ] Image-mode scan phases drift between the app and the Share
     Extension** (found 2026-07-27). Thresholds match (95/80/60/45) but the
     wording does not: Swift says "Understanding content… / Reading text… /
@@ -610,10 +606,11 @@ The multi-user auth work is **fully written but not live**:
     (`ac32efa`, merge `728c16e`, build 1161):** the native iOS share extension
     (`ShareViewController.swift`) now uses the ring too (scanner kept, `linkGlyph`
     → `SpinningRingView`) and its `phase(for:)` labels re-synced to `scanPhases`.
-    **Deferred owner step:** on-device light+dark QA of the ring everywhere — Ask,
-    the in-app save stepper (WKWebView conic-gradient + CSS mask), and the native
-    share-sheet scanner (CAGradientLayer `.conic`) — none device-verified this
-    session.
+    ~~**Deferred owner step:** on-device light+dark QA of the ring everywhere~~ —
+    **CLOSED 2026-07-27.** Partly by supersession (item 20b retired the ring for
+    the Citation mark on every surface, including the share extension), and partly
+    by the owner's device pass on build 1219, which confirmed the mark renders in
+    light and dark in the share sheet and in-app. Nothing left to QA here.
 20b. **[x] Machina identity build-out — shipped 2026-07-26.** The Citation mark
     (brackets enclosing a struck point) + Lumen palette from
     `design/icon-concepts/` (branch `claude/logo-design-feedback-uhl1sk`,
@@ -625,23 +622,29 @@ The multi-user auth work is **fully written but not live**:
     graphite on light, new `--accent-ink`/`--accent-hover` tokens; destructive
     red + platform/collection colors deliberately kept), `CitationMark`
     replaces `thinking-orbs` everywhere (motion.js ported verbatim, verb →
-    motion), bracket glyph on Ask citation chips. **Still open (owner/QA):**
-    (1) on-device light+dark QA; (2) whether 20px needs a reduced drawing
-    (crisp in 2x renders, check 1x devices); (3) iOS 26 Icon Composer layered
-    variant (needs a Mac); (4) the NATIVE share-extension indicator
-    (`ShareViewController.swift`) still draws the old ring — not in this
-    session's spec scope, swap to the mark in a follow-up (§4 item 18c).
+    motion), bracket glyph on Ask citation chips.
+    **Still open (owner/QA):** ~~(1) on-device light+dark QA~~ — **✅ DONE
+    2026-07-27**, owner confirmed on a physical iPhone against build 1219 (see
+    item 11a1); (2) whether 20px needs a reduced drawing (crisp in 2x renders,
+    check 1x devices); (3) iOS 26 Icon Composer layered variant (needs a Mac);
+    ~~(4) the NATIVE share-extension indicator still draws the old ring~~ —
+    **✅ DONE, shipped in build 1219 and device-confirmed:**
+    `ShareViewController.swift` now draws `CitationMarkView` (`:139`, `:1235`)
+    and `OrbitsOrbView` is retired (see the comment at `:1193`).
 
 ### 🟢 P3 — product roadmap (post-launch)
 
-18c. **[ ] Native share-extension orb: per-phase states.** Web now maps every
-    capture phase to its own orb (`LINK_SCAN_ORBS` in `web/lib/scanPhases.ts` —
+18c. **[ ] Native share-extension indicator: per-phase states.** Web maps every
+    capture phase to its own motion (`LINK_SCAN_ORBS` in `web/lib/scanPhases.ts` —
     fetch=`working`, read=`searching`, write=`shaping`, connect=`searching`,
-    organize=`solving`). The share extension's Swift `OrbitsOrbView` only ports
-    the `orbits` (`working`) mode, so it shows one shape for the whole save. To
-    match, port `globe`/`morph`/`rubik` to CoreGraphics — or deliberately leave
-    it single-state (the sheet is short-lived and hands off to the in-app
-    banner). Owner call; not blocking.
+    organize=`solving`). **Rewritten 2026-07-27:** the premise changed — the Swift
+    `OrbitsOrbView` this item was written against is retired
+    (`ShareViewController.swift:1193`) and the sheet now draws `CitationMarkView`
+    (`:139`, `:1235`), device-confirmed on build 1219. What remains is the same
+    gap in new clothes: the mark renders ONE motion for the whole save while web
+    varies it per phase. Either port the remaining verb→motion mappings to
+    CoreGraphics, or deliberately leave it single-state (the sheet is short-lived
+    and hands off to the in-app banner). Owner call; not blocking.
 
 19b. **[ ] Retire dead search backend (post search-rebuild 2026-07-17):** the
     client no longer calls `search_links` / `search_links_http` (search is
@@ -885,6 +888,47 @@ exact-match, capped.
 ## 9. Session log
 
 > One short paragraph per session, newest first. Detail lives in git history and
+
+- **2026-07-27 — ✅ OWNER DEVICE QA ON BUILD 1219: ALL CLEAR + a codebase
+  review.** The owner ran the full 11a1 list on a physical iPhone and reported
+  everything working. **The device-verification debt for 1219 is cleared**,
+  including the item that carried the most risk: `CitationMarkView` in the share
+  extension had been *statically reviewed only, never once rendered* (the sandbox
+  cannot compile Swift), and it draws correctly in light and dark. §4 items
+  11a1, 20 and 20b(1)/(4) updated to match; item 18c was rewritten because its
+  premise had gone stale — it was written against `OrbitsOrbView`, which is now
+  retired, so the real remaining gap is that the mark shows one motion for the
+  whole save while web varies it per phase. **Carry-over: the Settings "Done" bar
+  safe-area fix (`157c11d`) landed AFTER 1219 was cut**, so it is not in any
+  TestFlight build and is still unverified on a home-indicator iPhone — QA it on
+  the next iOS build.
+  **Review findings worth keeping** (full pass over docs + code, no changes made):
+  the backend is hardened to a genuinely professional standard — `safe_get`
+  `is_global` SSRF guard + 13 tests, `_require_admin` failing closed with
+  `hmac.compare_digest`, per-uid+IP rate limits, `log_safe` PII masking with an
+  AST regression scan, pre-b64 size caps, quotas — but **the front door is
+  unlocked and the two facts compound**. (1) Live `firestore.rules` is still
+  `allow read, write: if true` on `users/{uid}` and every subcollection, while
+  ~18 client modules talk to Firestore *directly* and `projectId` ships in the
+  public JS bundle; the rules file defends this by citing Cloud Function
+  hardening (App Check, CORS, rate limits), **which guards a different door
+  entirely and does nothing about direct client SDK access**. (2) `ingestToken`
+  is stored on the user doc (`link_service.py:229`), i.e. inside that
+  world-readable blast radius, and uid = phone number — so read a user doc → get
+  the token → write into that library. Read + write + impersonate, not
+  theoretical. Exposure is ~one user today, which is why it hasn't bitten; the
+  first outside TestFlight tester changes that. **Sequencing critique the owner
+  accepted:** the app is ~95% built and 0% launched, and the remaining 5% is
+  console work that keeps losing to polish rounds — task 2 has been P0 since
+  July 3 while ~30 features shipped on top of it. Agreed next order: auth
+  cutover → raise the ₪5/mo Gemini cap (two real users exhaust it mid-month and
+  429 with no free-tier fallback) → `ADMIN_TOKEN` + `APPCHECK_ENFORCE` → move
+  `ingestToken` off the user doc (§4 task 12, the only pure-code item of the
+  four). Also flagged for later: `Feed.tsx` is 2,728 lines / 41 `useState`
+  (R-3) and `main.py` is 3,630 lines (R-1), and `web/` still has **no JS test
+  runner** — which is why web invariants are enforced by a Python test that
+  greps TypeScript source (`test_web_client_hygiene.py`). Handoff prompts for
+  task 12, R-3 and R-1 were written for separate sessions.
 
 - **2026-07-27 — 🚢 SHIPPED: privacy audit + policy rewrite + reader removal
   (merge `65d3afd`, pushed as `ee99317`).** Desktop web → Vercel (auto on the
