@@ -1,4 +1,4 @@
-# App Store submission pack — Machina AI
+# App Store submission pack — Machina
 
 > Reference doc for filling out App Store Connect (§4 tasks 8–9 in
 > `SOURCE_OF_TRUTH.md`). Everything here was written against the actual
@@ -47,8 +47,8 @@ Notes for edge cases:
 
 | Field | Value | Limit |
 |---|---|---|
-| **Name** | `Machina AI` | 30 |
-| **Subtitle** | `Ask your saves anything` | 30 |
+| **Name** | `Machina: Save & Recall` | 30 (22 used) |
+| **Subtitle** | `Capture. Ask. Connect.` | 30 (22 used) |
 | **Category** | Primary: **Productivity**. Secondary (optional): Utilities. | |
 | **Privacy Policy URL** | `https://my-links-sable.vercel.app/privacy` | |
 | **Support URL** | `https://my-links-sable.vercel.app` | |
@@ -60,14 +60,33 @@ Notes for edge cases:
 > Machina reads everything you save — links, screenshots, videos — and answers
 > questions from it, with sources.
 
-**Keywords** (comma-separated, no spaces after commas; 92/100 chars):
+**Keywords** (comma-separated, no spaces after commas):
 
 ```
-second brain,read later,bookmarks,ai summary,save links,knowledge base,notes,recall,pkm,ask
+second brain,read later,bookmarks,ai summary,knowledge base,notes,pkm,summarize,organize,video
 ```
 
-(Don't repeat "machina" or "ai" from the name — the name field already indexes
-them.)
+98/100 chars. Rules that shaped this list:
+
+- **Never repeat a word already in the Name or Subtitle** — Apple indexes those
+  fields and builds search phrases by combining tokens across all of them. The
+  name supplies `machina`, `save`, `recall`; the subtitle supplies `capture`,
+  `ask`, `connect`. That is why `save links` and `recall` were dropped from
+  this field (they were here when the name was `Machina AI`) — `save` + `links`
+  still forms the phrase for free. The reclaimed characters bought `summarize`,
+  `organize`, `research`, and `links`.
+- **The subtitle must not repeat `save` or `recall`.** Both are Name tokens, and
+  a token indexed twice buys nothing while costing subtitle characters. This is
+  why the subtitle opens on `Capture` rather than the more obvious `Save`, and
+  why `ask` was dropped from this keyword list once the subtitle started
+  supplying it.
+- **`ai` must live here now.** It used to be indexed via the old `Machina AI`
+  name; with "AI" out of the name it is carried by the `ai summary` token.
+- **`second brain` stays in this field and nowhere else.** It is the
+  highest-volume term in the category, but the label carries connotations the
+  product deliberately does not claim — keywords are invisible to users, so this
+  captures the search traffic without putting it on the storefront. Do not
+  promote it into the Name, Subtitle, or promotional text. See `docs/BRANDING.md`.
 
 **Description:**
 

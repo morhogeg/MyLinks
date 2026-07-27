@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Machina AI",
-  description: "The terms that govern your use of Machina AI.",
+  title: "Terms of Service — Machina",
+  description: "The terms that govern your use of Machina.",
 };
 
 /**
@@ -14,7 +14,7 @@ export default function TermsPage() {
   return (
     <main className="mx-auto max-w-2xl px-6 py-16">
       <Link href="/" className="text-sm text-text-secondary hover:text-text transition-colors">
-        &larr; Machina AI
+        &larr; Machina
       </Link>
 
       <h1 className="mt-6 text-3xl font-semibold tracking-tight text-text">
@@ -23,7 +23,7 @@ export default function TermsPage() {
       <p className="mt-2 text-sm text-text-muted">Last updated: July 21, 2026</p>
 
       <p className="mt-6 leading-relaxed text-text-secondary">
-        These terms govern your use of Machina AI (&ldquo;Machina&rdquo;, the
+        These terms govern your use of Machina (&ldquo;Machina&rdquo;, the
         &ldquo;Service&rdquo;) — the iOS app, the web app, and the capture surfaces they connect to.
         By creating an account or using the Service you agree to them. If you do not agree, do not
         use the Service.
@@ -134,7 +134,7 @@ export default function TermsPage() {
       <footer className="mt-14 border-t border-border-subtle pt-6 text-sm text-text-muted">
         <a href="/privacy" className="hover:text-text transition-colors">Privacy Policy</a>
         <span className="mx-2">&middot;</span>
-        <Link href="/" className="hover:text-text transition-colors">Machina AI</Link>
+        <Link href="/" className="hover:text-text transition-colors">Machina</Link>
       </footer>
     </main>
   );

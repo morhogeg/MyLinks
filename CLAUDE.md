@@ -1,4 +1,4 @@
-# Machina AI (repo: MyLinks)
+# Machina (repo: MyLinks)
 
 **Read `SOURCE_OF_TRUTH.md` first.** It is the single source of truth for this
 project: product/architecture overview (§1–§2), auth cutover state (§3), the

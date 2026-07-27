@@ -938,7 +938,7 @@ def _prettified_host(url: str) -> str:
 def _ground_source_name(candidate, url, fallback=None):
     """Reject an assistant/app name hallucinated as the publisher.
 
-    Gemini seeds its own name ("Machina AI") from the system prompt and emits it
+    Gemini seeds its own name ("Machina") from the system prompt and emits it
     as the publisher when the real one is unclear. Any candidate containing
     "machina" is rejected — unless the link genuinely lives on a Machina host —
     and replaced with the prettified URL host (or ``fallback`` when no host is
