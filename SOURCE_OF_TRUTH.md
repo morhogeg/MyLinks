@@ -232,11 +232,21 @@ The multi-user auth work is **fully written but not live**:
    but the per-digest **Delete** action is a direct client `deleteDoc`
    (`lib/digest.ts:61`) — so at the cutover that button would have become a
    silent no-op. The rule now allows `delete` for the owner and keeps
-   `create, update` denied; 4 cases added to `firestore-rules-test`. **Step (4)
-   of the checklist above is now load-bearing** — the cloud sandbox cannot
-   download the emulator JAR, so this rule change has never run against a live
-   emulator. Run `cd firestore-rules-test && npm test` on your machine BEFORE
-   step (5).
+   `create, update` denied; 4 cases added to `firestore-rules-test`.
+   ~~**Step (4) of the checklist above is now load-bearing** — the cloud sandbox
+   cannot download the emulator JAR, so this rule change has never run against a
+   live emulator.~~ ❌ **THAT WAS WRONG — CORRECTED 2026-07-27. Step (4) is
+   ALREADY DONE, by CI, and can be struck from the owner checklist.**
+   `.github/workflows/rules-tests.yml` runs the suite against a real emulator on
+   every push touching `firestore.rules*`, and a **GitHub runner downloads the
+   emulator JAR fine — only this sandbox cannot.** **Run #6 (2026-07-25) is
+   GREEN on the exact merge that landed the S-9 digest-delete rule**, so the
+   locked ruleset has been emulator-verified. The generalisable error: "the
+   sandbox can't do X" was silently promoted to "X is unverified", when CI had
+   been doing X all along. Before trusting this, confirm the run is still green
+   for the newest `firestore.rules.locked` — but do NOT re-add a manual Mac step
+   that CI already covers. (Audit N-2a — "run the rules suite in CI" — is
+   likewise already shipped, not open.)
 3. **[x] New-user path** *(code done 2026-07-03; goes live with the task-2
    cutover — flag-gated behind `REQUIRE_AUTH`).* `claim_workspace` now falls
    back to creating a fresh `users/{authUid}` workspace (authUids/email/
