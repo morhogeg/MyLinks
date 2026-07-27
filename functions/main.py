@@ -597,23 +597,13 @@ def _estimate_read_time(text: str, words_per_minute: int = 200) -> int:
     return max(1, round(words / words_per_minute))
 
 
-def _append_capture_note(detailed: str, language: str) -> str:
-    """Append an honest note to detailedSummary when the scraper could only read
-    a partial preview (Facebook's truncated og:description, a social-teaser
-    fallback on a JS shell) or nothing at all (login wall, PDF). Either way the
-    summary is incomplete for a reason the user can't see, so we say so and
-    suggest the workaround. Wording is source-agnostic — every `truncated`
-    scrape rides this channel now, not just Facebook. Rendered as a trailing
-    blockquote, so it never violates the 'start with ## Key Points' rule."""
-    he = (language or "").lower().startswith("he")
-    if he:
-        note = ("> ⚠️ **הערה:** לא ניתן היה לקרוא את הטקסט המלא של התוכן הזה. "
-                "לסיכום מלא, נסו לשמור צילום מסך במקום את הקישור.")
-    else:
-        note = ("> ⚠️ **Note:** The full text of this content couldn't be read. "
-                "For a complete summary, try saving a screenshot instead.")
-    detailed = (detailed or "").rstrip()
-    return f"{detailed}\n\n{note}" if detailed else note
+# NOTE: `_append_capture_note` was removed 2026-07-27 at the owner's request.
+# It appended a "⚠️ the full text couldn't be read, try a screenshot" blockquote
+# to detailedSummary whenever `scraped['truncated']` was set (Facebook's
+# truncated og:description, social-teaser fallbacks, login walls, PDFs). The
+# owner does not want it on cards. The scraper still SETS `truncated` — it is
+# read elsewhere and is worth keeping as a signal — nothing appends user-facing
+# text from it any more.
 
 
 # Images embedded in a shared post (e.g. photos on an X post) that we fetch and
@@ -727,9 +717,6 @@ def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = Non
                 # training knowledge.
                 image_text_dense=bool(scraped.get("image_text_likely")),
                 **kw)
-            if isinstance(analysis, dict) and scraped.get("truncated"):
-                analysis["detailedSummary"] = _append_capture_note(
-                    analysis.get("detailedSummary"), analysis.get("language"))
             # Keep the cover image we just read so the card can SHOW it, not just
             # summarize it. The caller persists a downscaled copy (never the
             # expiring social CDN URL). First image only — the card header is one.
@@ -740,11 +727,6 @@ def _analyze_scraped(ai, scraped: dict, existing_tags: list, attempts: int = Non
 
     analysis = ai.analyze_text(content_text,
                                existing_tags=existing_tags, content_type=content_type, **kw)
-    # When the scraper could only get a truncated preview (Facebook text posts),
-    # tell the user plainly rather than presenting a thin summary as complete.
-    if isinstance(analysis, dict) and scraped.get("truncated"):
-        analysis["detailedSummary"] = _append_capture_note(
-            analysis.get("detailedSummary"), analysis.get("language"))
     # Video posts (X / Instagram reels / LinkedIn / Facebook) have no embedded
     # photo to run vision on, but often expose a poster frame. Fetch that single
     # image purely to SHOW as the card banner — no model call — so they get a

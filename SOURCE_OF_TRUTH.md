@@ -955,6 +955,24 @@ exact-match, capped.
   in comments next to each. Both wrong versions would have passed a naive
   "deploy succeeded" check — which is exactly why the step exists.
 
+- **2026-07-27 — CAPTURE-NOTE WARNING REMOVED (owner: "remove it, I don't want
+  it anymore").** `main._append_capture_note` appended a trailing blockquote —
+  "⚠️ **הערה:** לא ניתן היה לקרוא את הטקסט המלא… נסו לשמור צילום מסך" / the
+  English twin — to `detailedSummary` whenever the scraper set
+  `scraped['truncated']` (Facebook's truncated `og:description`, social-teaser
+  fallbacks on JS shells, login walls, PDFs). Helper and both call sites in
+  `_analyze_scraped` deleted; a tombstone comment records why so it isn't
+  re-added as a "helpful honesty" feature. **`truncated` itself is untouched** —
+  the scraper still sets it and it is still read elsewhere; only the user-facing
+  text is gone. `py_compile` clean, 536 tests pass.
+  ⚠️ **AFFECTS NEW SAVES ONLY. Existing cards keep the note**, because it was
+  baked into each card's stored `detailedSummary` at analysis time, not rendered
+  from a flag. Cleaning them needs a one-off backfill that strips the trailing
+  blockquote from `users/{uid}/links/*.detailedSummary` — NOT written, since it
+  mutates the owner's real card text and was not requested. If wanted, the safe
+  shape is: match only a trailing `> ⚠️ **הערה:**` / `> ⚠️ **Note:**` blockquote
+  at the very end, batched per-user like `rebuild_connections`, idempotent.
+
 - **2026-07-27 — SETTINGS "DONE" BAR SAT TOO HIGH ON iOS (owner, device).** The
   footer padded `calc(env(safe-area-inset-bottom) + 0.5rem)` — on a
   home-indicator iPhone that is ~34px of inset PLUS 8px, so the bar floated ~42px
