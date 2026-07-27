@@ -17,6 +17,12 @@ import types
 
 import search
 
+# The @on_document_written wrapper is firebase_functions plumbing that parses a
+# raw CloudEvent (its shape drifts across library versions); these tests pin the
+# handler's behavior, so invoke the undecorated function it wraps directly with
+# an already-parsed event shape (.data.after / .params).
+_handler = search.sync_link_embedding.__wrapped__
+
 
 class _Snap:
     def __init__(self, data, doc_id="link-1"):
@@ -86,7 +92,7 @@ def test_per_uid_over_limit_skips_embed_and_writes(monkeypatch):
     limiter_keys, constructed, db_touched = _instrument(
         monkeypatch, {"embed-uid": False, "embed-global": True})
 
-    search.sync_link_embedding(_event(_EMBEDDABLE))
+    _handler(_event(_EMBEDDABLE))
 
     assert limiter_keys == ["embed-uid:uid-1"]  # short-circuits before global
     assert constructed == []
@@ -97,7 +103,7 @@ def test_global_over_limit_skips_embed_and_writes(monkeypatch):
     limiter_keys, constructed, db_touched = _instrument(
         monkeypatch, {"embed-uid": True, "embed-global": False})
 
-    search.sync_link_embedding(_event(_EMBEDDABLE))
+    _handler(_event(_EMBEDDABLE))
 
     assert limiter_keys == ["embed-uid:uid-1", "embed-global"]
     assert constructed == []
@@ -109,7 +115,7 @@ def test_within_limits_proceeds_to_embed(monkeypatch):
         monkeypatch, {"embed-uid": True, "embed-global": True})
 
     # Both buckets pass → the paid embed call must be reached.
-    search.sync_link_embedding(_event(_EMBEDDABLE))
+    _handler(_event(_EMBEDDABLE))
 
     assert limiter_keys == ["embed-uid:uid-1", "embed-global"]
     assert constructed == [1]
@@ -122,7 +128,7 @@ def test_settled_card_never_hits_the_limiter(monkeypatch):
         monkeypatch, {"embed-uid": True, "embed-global": True})
     from google.cloud.firestore_v1.vector import Vector
 
-    search.sync_link_embedding(
+    _handler(
         _event({"title": "T", "summary": "S",
                 "embedding_vector": Vector([0.1] * 768)}))
 
