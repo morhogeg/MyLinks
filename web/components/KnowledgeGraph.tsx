@@ -79,6 +79,8 @@ export default function KnowledgeGraph({
     loading,
     filtered,
     onOpenCard,
+    onAskCluster,
+    onSaveCluster,
 }: {
     /** The card pool (already privacy-filtered by the Feed). */
     links: Link[];
@@ -87,6 +89,10 @@ export default function KnowledgeGraph({
     /** True when grid filters/search currently scope the pool. */
     filtered: boolean;
     onOpenCard: (link: Link) => void;
+    /** Hand a cluster to Ask Machina — question + the member titles as anchors. */
+    onAskCluster?: (question: string, anchorTitles: string[]) => void;
+    /** Save a cluster's members as a new collection; resolves true on success. */
+    onSaveCluster?: (name: string, linkIds: string[]) => Promise<boolean>;
 }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -95,6 +101,10 @@ export default function KnowledgeGraph({
     const [building, setBuilding] = useState(true);
     const [selected, setSelected] = useState<number | null>(null);
     const [categoryFocus, setCategoryFocus] = useState<string | null>(null);
+    // A tapped island caption spotlights that cluster and opens its panel.
+    const [clusterFocus, setClusterFocus] = useState<number | null>(null);
+    const [savingCluster, setSavingCluster] = useState(false);
+    const [savedClusters, setSavedClusters] = useState<Set<number>>(new Set());
     // Bumped by the MutationObserver when the .light class flips — palette and
     // canvas colors re-derive from the live CSS tokens.
     const [themeNonce, setThemeNonce] = useState(0);
@@ -113,9 +123,15 @@ export default function KnowledgeGraph({
     // how "tap a connection in the list" visibly walks the graph. Any user
     // gesture (pan/zoom) takes the camera back.
     const followRef = useRef<number | null>(null);
+    // While set, the camera glides to frame this whole cluster.
+    const clusterFitRef = useRef<number | null>(null);
+    const clusterFocusRef = useRef<number | null>(null);
+    // Screen-space rects of the island captions drawn last frame, for tap tests.
+    const captionRectsRef = useRef<{ x1: number; y1: number; x2: number; y2: number; cluster: number }[]>([]);
     const openRef = useRef(onOpenCard);
     selectedRef.current = selected;
     focusRef.current = categoryFocus;
+    clusterFocusRef.current = clusterFocus;
     openRef.current = onOpenCard;
 
     // Every selection (canvas tap or panel row) starts a follow; deselect ends it.
@@ -123,6 +139,12 @@ export default function KnowledgeGraph({
         followRef.current = selected;
         if (selected !== null) autoFitRef.current = false;
     }, [selected]);
+    useEffect(() => {
+        clusterFitRef.current = clusterFocus;
+        if (clusterFocus !== null) autoFitRef.current = false;
+        setSavingCluster(false);
+        drawPendingRef.current = true;
+    }, [clusterFocus]);
 
     // ── Build the model (chunked; cancelled when the pool changes) ───────────
     useEffect(() => {
@@ -209,6 +231,33 @@ export default function KnowledgeGraph({
                     cam.y += (target.y - cam.y) * ease;
                     drawPendingRef.current = true;
                 }
+            } else if (clusterFitRef.current !== null && model.clusters[clusterFitRef.current]) {
+                // Frame the focused cluster with padding.
+                const members = model.clusters[clusterFitRef.current].nodeIndices;
+                const dpr = Math.min(2, window.devicePixelRatio || 1);
+                const w = canvas.width / dpr;
+                const h = canvas.height / dpr;
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                for (const i of members) {
+                    const n = model.nodes[i];
+                    minX = Math.min(minX, n.x - n.r);
+                    minY = Math.min(minY, n.y - n.r);
+                    maxX = Math.max(maxX, n.x + n.r);
+                    maxY = Math.max(maxY, n.y + n.r);
+                }
+                const desktop = w >= 640;
+                const freeW = desktop ? w - 360 : w;
+                const freeH = desktop ? h : h * 0.5;
+                const pad = 70;
+                const bw = Math.max(80, maxX - minX);
+                const bh = Math.max(80, maxY - minY);
+                const tk = Math.min(1.3, Math.max(0.2, Math.min((freeW - pad * 2) / bw, (freeH - pad * 2) / bh)));
+                const cam = camRef.current;
+                const ease = reducedMotionRef.current ? 1 : 0.1;
+                cam.k += (tk - cam.k) * ease;
+                cam.x += (freeW / 2 - ((minX + maxX) / 2) * cam.k - cam.x) * ease;
+                cam.y += (freeH / 2 - ((minY + maxY) / 2) * cam.k - cam.y) * ease;
+                drawPendingRef.current = true;
             } else if (followRef.current !== null && model.nodes[followRef.current]) {
                 // Frame the followed node in the area the selection panel leaves
                 // free (right panel on desktop, bottom sheet on mobile).
@@ -229,10 +278,11 @@ export default function KnowledgeGraph({
             }
             if (simActive || drawPendingRef.current) {
                 drawPendingRef.current = false;
-                draw(canvas, model, camRef.current, paletteRef.current ?? readPalette(), {
+                captionRectsRef.current = draw(canvas, model, camRef.current, paletteRef.current ?? readPalette(), {
                     selected: selectedRef.current,
                     hover: hoverRef.current,
                     categoryFocus: focusRef.current,
+                    clusterFocus: clusterFocusRef.current,
                 });
             }
         };
@@ -289,7 +339,8 @@ export default function KnowledgeGraph({
             const p = toLocal(e);
             pointers.set(e.pointerId, p);
             autoFitRef.current = false;
-            followRef.current = null; // any gesture takes the camera back
+            followRef.current = null;     // any gesture takes the camera back
+            clusterFitRef.current = null;
             if (pointers.size === 2) {
                 mode = 'pinch';
                 const [a, b] = [...pointers.values()];
@@ -322,7 +373,10 @@ export default function KnowledgeGraph({
                     hoverRef.current = hit >= 0 ? hit : null;
                     drawPendingRef.current = true;
                 }
-                canvas.style.cursor = hit >= 0 ? 'pointer' : 'grab';
+                const overCaption = hit < 0 && captionRectsRef.current.some(
+                    (r) => p.x >= r.x1 && p.x <= r.x2 && p.y >= r.y1 && p.y <= r.y2,
+                );
+                canvas.style.cursor = hit >= 0 || overCaption ? 'pointer' : 'grab';
                 return;
             }
             const prev = pointers.get(e.pointerId)!;
@@ -374,12 +428,26 @@ export default function KnowledgeGraph({
                         // Open button and this gesture agree.
                         openRef.current(modelRef.current!.nodes[dragNode].link);
                     } else {
+                        setClusterFocus(null);
                         setSelected(dragNode);
                     }
                 }
                 dragNode = -1;
             } else if (mode === 'pan' && moved < TAP_SLOP) {
-                setSelected(null);
+                // Empty-space tap: an island caption spotlights its cluster;
+                // anywhere else clears every focus.
+                const p2 = last;
+                const caption = captionRectsRef.current.find(
+                    (r) => p2.x >= r.x1 && p2.x <= r.x2 && p2.y >= r.y1 && p2.y <= r.y2,
+                );
+                if (caption) {
+                    hapticLight();
+                    setSelected(null);
+                    setClusterFocus((cur) => (cur === caption.cluster ? null : caption.cluster));
+                } else {
+                    setSelected(null);
+                    setClusterFocus(null);
+                }
             }
             if (pointers.size === 0) mode = 'idle';
             else if (pointers.size === 1) mode = 'pan';
@@ -390,6 +458,7 @@ export default function KnowledgeGraph({
             e.preventDefault();
             autoFitRef.current = false;
             followRef.current = null;
+            clusterFitRef.current = null;
             const cam = camRef.current;
             const p = toLocal(e);
             const factor = Math.exp(-e.deltaY * 0.0016);
@@ -437,6 +506,7 @@ export default function KnowledgeGraph({
                 return {
                     index: e.a === selected ? e.b : e.a,
                     link: other.link,
+                    category: other.category,
                     weight: e.weight,
                     strong: e.strong,
                     reason: edgeReason(node.link, other.link, isRtl),
@@ -446,13 +516,41 @@ export default function KnowledgeGraph({
         return { node, neighbors };
     }, [model, selected]);
 
+    // ── Cluster panel data ───────────────────────────────────────────────────
+    const clusterPanel = useMemo(() => {
+        if (!model || clusterFocus === null || !model.clusters[clusterFocus]) return null;
+        const cluster = model.clusters[clusterFocus];
+        const members = cluster.nodeIndices
+            .map((i) => model.nodes[i])
+            .sort((a, b) => b.degree - a.degree);
+        return { index: clusterFocus, label: cluster.label, members };
+    }, [model, clusterFocus]);
+
+    const askCluster = useCallback(() => {
+        if (!clusterPanel || !onAskCluster) return;
+        const question = clusterPanel.label
+            ? `What have I saved about ${clusterPanel.label.split(' · ')[0]}?`
+            : `What connects these ${clusterPanel.members.length} cards I saved?`;
+        onAskCluster(question, clusterPanel.members.slice(0, 8).map((m) => m.link.title));
+    }, [clusterPanel, onAskCluster]);
+
+    const saveCluster = useCallback(async () => {
+        if (!clusterPanel || !onSaveCluster || savingCluster) return;
+        setSavingCluster(true);
+        const ok = await onSaveCluster(
+            clusterPanel.label ?? 'From the graph',
+            clusterPanel.members.map((m) => m.id),
+        );
+        setSavingCluster(false);
+        if (ok) setSavedClusters((prev) => new Set(prev).add(clusterPanel.index));
+    }, [clusterPanel, onSaveCluster, savingCluster]);
+
     // ── Legend (top categories among connected nodes) ────────────────────────
     const legend = useMemo(() => {
         if (!model) return [];
         const counts = new Map<string, number>();
         for (const n of model.nodes) {
-            const cat = n.link.category || 'Other';
-            counts.set(cat, (counts.get(cat) ?? 0) + 1);
+            counts.set(n.category, (counts.get(n.category) ?? 0) + 1);
         }
         return [...counts.entries()]
             .sort((a, b) => b[1] - a[1])
@@ -588,14 +686,14 @@ export default function KnowledgeGraph({
                             <div className="flex items-start gap-2.5">
                                 <span
                                     className="mt-1 w-2.5 h-2.5 rounded-full shrink-0"
-                                    style={{ backgroundColor: getCategoryColorStyle(selection.node.link.category || 'Other').color }}
+                                    style={{ backgroundColor: getCategoryColorStyle(selection.node.category).color }}
                                 />
                                 <div className="flex-1 min-w-0">
                                     <h3 dir="auto" className="text-[14px] font-semibold text-text leading-snug line-clamp-2">
                                         {selection.node.link.title}
                                     </h3>
                                     <p className="mt-0.5 text-[11px] font-medium text-text-muted uppercase tracking-wide">
-                                        {selection.node.link.category || 'Other'}
+                                        {selection.node.category}
                                     </p>
                                 </div>
                                 <button
@@ -628,7 +726,7 @@ export default function KnowledgeGraph({
                                         <span className="flex items-center gap-2">
                                             <span
                                                 className="w-1.5 h-1.5 rounded-full shrink-0"
-                                                style={{ backgroundColor: getCategoryColorStyle(nb.link.category || 'Other').color }}
+                                                style={{ backgroundColor: getCategoryColorStyle(nb.category).color }}
                                             />
                                             <span dir="auto" className="flex-1 min-w-0 text-[13px] font-medium text-text truncate">
                                                 {nb.link.title}
@@ -655,6 +753,89 @@ export default function KnowledgeGraph({
                                     </button>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Cluster panel — a tapped island caption: the auto-derived
+                    theme, its members, and what to DO with the cluster (ask
+                    your brain about it, keep it as a collection). Selection
+                    takes precedence; closing a selection returns here. */}
+                {!selection && clusterPanel && (
+                    <div className="absolute inset-x-2 bottom-2 sm:inset-x-auto sm:bottom-auto sm:top-3 sm:end-3 sm:w-[330px] max-h-[48%] sm:max-h-[calc(100%-24px)] flex flex-col rounded-2xl bg-card/95 backdrop-blur-xl border border-border-subtle shadow-[var(--shadow-card)] animate-fade-in">
+                        <div className="p-3.5 pb-3">
+                            <div className="flex items-start gap-2.5">
+                                <Waypoints className="mt-0.5 w-4 h-4 shrink-0 text-text-muted" />
+                                <div className="flex-1 min-w-0">
+                                    <h3 dir="auto" className="text-[14px] font-semibold text-text leading-snug line-clamp-2">
+                                        {clusterPanel.label ?? 'A cluster of related cards'}
+                                    </h3>
+                                    <p className="mt-0.5 text-[11px] font-medium text-text-muted uppercase tracking-wide">
+                                        Cluster · {clusterPanel.members.length} cards
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setClusterFocus(null)}
+                                    aria-label="Close cluster details"
+                                    className="p-1 -m-1 rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <div className="mt-2.5 flex gap-2">
+                                {onAskCluster && (
+                                    <button
+                                        onClick={askCluster}
+                                        className="flex-1 h-9 inline-flex items-center justify-center gap-1.5 rounded-full bg-accent text-accent-ink text-[13px] font-bold hover:bg-accent-hover active:scale-[0.98] transition-all cursor-pointer"
+                                    >
+                                        Ask about this
+                                    </button>
+                                )}
+                                {onSaveCluster && (
+                                    <button
+                                        onClick={saveCluster}
+                                        disabled={savingCluster || savedClusters.has(clusterPanel.index)}
+                                        className="flex-1 h-9 inline-flex items-center justify-center gap-1.5 rounded-full bg-card border border-border-strong text-[13px] font-bold text-text hover:bg-card-hover active:scale-[0.98] transition-all cursor-pointer disabled:opacity-60 disabled:cursor-default"
+                                    >
+                                        {savedClusters.has(clusterPanel.index) ? 'Saved ✓' : savingCluster ? 'Saving…' : 'Save as collection'}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        <p className="px-3.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-text-muted">
+                            Cards in this cluster
+                        </p>
+                        <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2 space-y-0.5">
+                            {clusterPanel.members.map((m) => {
+                                const idx = model!.nodes.indexOf(m);
+                                return (
+                                    <div key={m.id} className="flex items-stretch gap-0.5">
+                                        <button
+                                            onClick={() => selectNeighbor(idx)}
+                                            title="Focus this card in the graph"
+                                            className="flex-1 min-w-0 text-start px-1.5 py-2 rounded-xl hover:bg-card-hover transition-colors cursor-pointer"
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <span
+                                                    className="w-1.5 h-1.5 rounded-full shrink-0"
+                                                    style={{ backgroundColor: getCategoryColorStyle(m.category).color }}
+                                                />
+                                                <span dir="auto" className="flex-1 min-w-0 text-[13px] font-medium text-text truncate">
+                                                    {m.link.title}
+                                                </span>
+                                            </span>
+                                        </button>
+                                        <button
+                                            onClick={() => onOpenCard(m.link)}
+                                            aria-label={`Open ${m.link.title}`}
+                                            title="Open this card"
+                                            className="self-center shrink-0 w-8 h-8 inline-flex items-center justify-center rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
+                                        >
+                                            <ArrowUpRight className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 )}
@@ -762,15 +943,17 @@ function fitCamera(model: GraphModel, canvas: HTMLCanvasElement): Camera | null 
 
 // ── Drawing ──────────────────────────────────────────────────────────────────
 
+type CaptionRect = { x1: number; y1: number; x2: number; y2: number; cluster: number };
+
 function draw(
     canvas: HTMLCanvasElement,
     model: GraphModel,
     cam: Camera,
     palette: Palette,
-    state: { selected: number | null; hover: number | null; categoryFocus: string | null },
-) {
+    state: { selected: number | null; hover: number | null; categoryFocus: string | null; clusterFocus: number | null },
+): CaptionRect[] {
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) return [];
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
@@ -793,7 +976,9 @@ function draw(
         }
     }
     const inFocusCategory = (i: number) =>
-        !state.categoryFocus || (nodes[i].link.category || 'Other') === state.categoryFocus;
+        !state.categoryFocus || nodes[i].category === state.categoryFocus;
+    const inFocusCluster = (i: number) =>
+        state.clusterFocus === null || nodes[i].cluster === state.clusterFocus;
 
     // Edges first, under the nodes.
     for (let ei = 0; ei < edges.length; ei++) {
@@ -804,13 +989,14 @@ function draw(
         let alpha: number;
         if (litEdges) alpha = emphasized ? 0.85 : 0.05;
         else if (state.categoryFocus) alpha = inFocusCategory(e.a) && inFocusCategory(e.b) ? 0.45 : 0.05;
+        else if (state.clusterFocus !== null) alpha = inFocusCluster(e.a) ? 0.4 : 0.05;
         else alpha = 0.13 + Math.max(0, Math.min(1, (e.weight - 0.7) / 0.3)) * 0.22;
 
         if (emphasized) {
             // Lit edges carry both endpoint colors — a quiet gradient thread.
             const grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-            grad.addColorStop(0, rgba(getCategoryColorStyle(a.link.category || 'Other').color, alpha));
-            grad.addColorStop(1, rgba(getCategoryColorStyle(b.link.category || 'Other').color, alpha));
+            grad.addColorStop(0, rgba(getCategoryColorStyle(a.category).color, alpha));
+            grad.addColorStop(1, rgba(getCategoryColorStyle(b.category).color, alpha));
             ctx.strokeStyle = grad;
         } else {
             ctx.strokeStyle = rgba(palette.textMuted.startsWith('#') ? hexToRgb(palette.textMuted) : palette.textMuted, alpha);
@@ -825,10 +1011,11 @@ function draw(
     // Nodes.
     for (let i = 0; i < nodes.length; i++) {
         const n = nodes[i];
-        const color = getCategoryColorStyle(n.link.category || 'Other').color;
+        const color = getCategoryColorStyle(n.category).color;
         let dim = 1;
         if (lit) dim = lit.has(i) ? 1 : 0.14;
         else if (state.categoryFocus) dim = inFocusCategory(i) ? 1 : 0.14;
+        else if (state.clusterFocus !== null) dim = inFocusCluster(i) ? 1 : 0.14;
 
         const isFocused = i === state.selected || i === state.hover;
         if (isFocused) {
@@ -876,7 +1063,12 @@ function draw(
         else if (inLit) { show = true; alpha = 0.9; }
         else if (!lit && labelAlpha > 0 && (hubs.has(i) || (cam.k >= 1.05 && n.r * cam.k >= 7))) {
             show = true;
-            alpha = labelAlpha * (state.categoryFocus ? (inFocusCategory(i) ? 0.85 : 0.06) : 0.85);
+            const focusDim = state.categoryFocus
+                ? (inFocusCategory(i) ? 0.85 : 0.06)
+                : state.clusterFocus !== null
+                    ? (inFocusCluster(i) ? 0.85 : 0.06)
+                    : 0.85;
+            alpha = labelAlpha * focusDim;
         }
         if (!show || alpha <= 0.02) continue;
         const title = n.link.title.length > 30 ? `${n.link.title.slice(0, 29)}…` : n.link.title;
@@ -884,11 +1076,50 @@ function draw(
         ctx.font = `600 ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
         // A background-colored stroke keeps the text legible over edges.
         ctx.lineWidth = 3;
-        ctx.strokeStyle = rgba(hexToRgb(palette.bg), alpha * 0.85);
+        // Halo in the CARD tone — the canvas sits on a card→background
+        // gradient, so a bg-colored halo reads darker than its local backdrop
+        // and smears ghost shapes around glyphs (owner QA round 2).
+        ctx.strokeStyle = rgba(hexToRgb(palette.card), alpha * 0.7);
         ctx.strokeText(title, n.x, n.y + n.r + 4);
         ctx.fillStyle = rgba(hexToRgb(isFocused ? palette.text : palette.textSecondary), alpha);
         ctx.fillText(title, n.x, n.y + n.r + 4);
     }
+
+    // Island captions — each named cluster gets its theme drawn above it, and
+    // the caption doubles as the tap target that opens the cluster panel. The
+    // returned rects are in SCREEN space for the pointer handler.
+    const rects: CaptionRect[] = [];
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // captions render at fixed screen size
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    for (let c = 0; c < model.clusters.length; c++) {
+        const cluster = model.clusters[c];
+        if (!cluster.label || cluster.nodeIndices.length < 3) continue;
+        let sumX = 0;
+        let minY = Infinity;
+        for (const i of cluster.nodeIndices) {
+            sumX += nodes[i].x;
+            minY = Math.min(minY, nodes[i].y - nodes[i].r);
+        }
+        const sx = (sumX / cluster.nodeIndices.length) * cam.k + cam.x;
+        const sy = (minY * cam.k + cam.y) - 14;
+        let alpha = 0.75;
+        if (lit) alpha = 0.12;
+        else if (state.clusterFocus !== null) alpha = c === state.clusterFocus ? 0.95 : 0.12;
+        else if (state.categoryFocus) alpha = 0.15;
+        const focusedCaption = state.clusterFocus === c;
+        ctx.font = `700 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+        const label = cluster.label.toUpperCase();
+        const tw = ctx.measureText(label).width;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = rgba(hexToRgb(palette.card), alpha * 0.7);
+        ctx.strokeText(label, sx, sy);
+        ctx.fillStyle = rgba(hexToRgb(focusedCaption ? palette.text : palette.textSecondary), alpha);
+        ctx.fillText(label, sx, sy);
+        // A generous tap halo around the drawn text.
+        rects.push({ x1: sx - tw / 2 - 14, y1: sy - 22, x2: sx + tw / 2 + 14, y2: sy + 10, cluster: c });
+    }
+    return rects;
 }
 
 // The most-connected nodes — the only ones labelled at rest (labelling every

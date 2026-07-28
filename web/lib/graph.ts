@@ -21,6 +21,11 @@ export interface GraphNode {
     link: Link;
     id: string;
     degree: number;
+    /** Canonical category display name — case-variants ("Sports"/"sports")
+     *  merged onto the majority spelling so the legend and colors agree. */
+    category: string;
+    /** Index into the model's `clusters`. */
+    cluster: number;
     /** Render radius (world units) — derived from degree. */
     r: number;
     // Force-simulation state, owned by the view. Seeded by the builder so a
@@ -48,11 +53,21 @@ export interface GraphEdge {
     kind: 'ai' | 'semantic' | 'concept';
 }
 
+/** One connected component of the graph — an island on screen. */
+export interface GraphCluster {
+    /** Auto-derived theme ("Claude Code · AI coding") — null when the cluster
+     *  is too small or too diffuse to name honestly. */
+    label: string | null;
+    nodeIndices: number[];
+}
+
 export interface GraphModel {
     nodes: GraphNode[];
     edges: GraphEdge[];
     /** Adjacency: node index → indices of its edges in `edges`. */
     adjacency: number[][];
+    /** Connected components, largest first — parallel to each node's `cluster`. */
+    clusters: GraphCluster[];
     /** Cards with no qualifying tie — counted, not drawn. */
     isolatedCount: number;
     clusterCount: number;
@@ -211,15 +226,42 @@ export async function buildGraphModel(
         degree[e.i]++;
         degree[e.j]++;
     }
+    // Canonical category display: case-variants of the same category ("Sports"
+    // vs "sports") collapse onto the spelling the library uses most, so the
+    // legend never shows the same category twice and colors agree.
+    const casingCounts = new Map<string, Map<string, number>>();
+    for (const l of pool) {
+        const raw = (l.category || 'Other').trim() || 'Other';
+        const key = raw.toLowerCase();
+        let variants = casingCounts.get(key);
+        if (!variants) casingCounts.set(key, (variants = new Map()));
+        variants.set(raw, (variants.get(raw) ?? 0) + 1);
+    }
+    const canonicalCategory = new Map<string, string>();
+    for (const [key, variants] of casingCounts) {
+        let best = '';
+        let bestCount = -1;
+        for (const [display, count] of variants) {
+            if (count > bestCount) {
+                best = display;
+                bestCount = count;
+            }
+        }
+        canonicalCategory.set(key, best);
+    }
+
     const nodeIndex = new Map<number, number>(); // pool index → node index
     const nodes: GraphNode[] = [];
     for (let i = 0; i < pool.length; i++) {
         if (!degree[i]) continue;
         nodeIndex.set(i, nodes.length);
+        const raw = (pool[i].category || 'Other').trim() || 'Other';
         nodes.push({
             link: pool[i],
             id: pool[i].id,
             degree: degree[i],
+            category: canonicalCategory.get(raw.toLowerCase()) ?? raw,
+            cluster: 0,
             r: nodeRadius(degree[i]),
             x: 0,
             y: 0,
@@ -270,6 +312,10 @@ export async function buildGraphModel(
         list.push(i);
     }
     const comps = [...byRoot.values()].sort((a, b) => b.length - a.length);
+    const clusters: GraphCluster[] = comps.map((members, ci) => {
+        for (const i of members) nodes[i].cluster = ci;
+        return { label: clusterLabel(members.map((i) => nodes[i])), nodeIndices: members };
+    });
     const placedIslands: { x: number; y: number; r: number }[] = [];
     for (const members of comps) {
         const R = 70 + 52 * Math.sqrt(members.length);
@@ -303,10 +349,45 @@ export async function buildGraphModel(
         nodes,
         edges,
         adjacency,
+        clusters,
         isolatedCount: pool.length - nodes.length,
         clusterCount: roots.size,
         totalCards: pool.length,
     };
+}
+
+/**
+ * Auto-name a cluster from what its cards actually share — the concept with the
+ * widest coverage (plus a second when it genuinely co-defines the theme), falling
+ * back to the dominant category. Deterministic, no model call; null when the
+ * cluster is too small or too diffuse to name honestly.
+ */
+function clusterLabel(members: GraphNode[]): string | null {
+    if (members.length < 3) return null;
+    const counts = new Map<string, { display: string; count: number }>();
+    for (const n of members) {
+        for (const c of new Set((n.link.concepts ?? []).map((s) => s.trim()).filter(Boolean))) {
+            const key = c.toLowerCase();
+            const entry = counts.get(key);
+            if (entry) entry.count++;
+            else counts.set(key, { display: c, count: 1 });
+        }
+    }
+    const ranked = [...counts.values()].sort((a, b) => b.count - a.count);
+    const floor = Math.max(2, Math.ceil(members.length * 0.25));
+    const top = ranked[0];
+    if (top && top.count >= floor) {
+        const second = ranked[1];
+        if (second && second.count >= floor && second.display.toLowerCase() !== top.display.toLowerCase()) {
+            return `${top.display} · ${second.display}`;
+        }
+        return top.display;
+    }
+    // No concept carries the room — fall back to a dominant category (≥70%).
+    const byCategory = new Map<string, number>();
+    for (const n of members) byCategory.set(n.category, (byCategory.get(n.category) ?? 0) + 1);
+    const [cat, catCount] = [...byCategory.entries()].sort((a, b) => b[1] - a[1])[0];
+    return catCount >= members.length * 0.7 ? cat : null;
 }
 
 /**

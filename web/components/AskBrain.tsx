@@ -269,11 +269,15 @@ interface AskBrainProps {
     /** The live library (Feed's Firestore snapshot) — powers suggestions that
      *  react the moment a new card lands. */
     links: Link[];
+    /** A question another surface (the Graph's cluster panel) wants asked the
+     *  moment Ask opens. Nonce-gated so each hand-off fires exactly once, in a
+     *  fresh conversation; the hints carry the cluster's anchor titles. */
+    initialAsk?: { question: string; hints?: AskHints; nonce: number } | null;
 }
 
 const HISTORY_COLLAPSE_KEY = 'askbrain:histcollapsed';
 
-export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayOpen = false, links }: AskBrainProps) {
+export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayOpen = false, links, initialAsk }: AskBrainProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
@@ -581,6 +585,19 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
         setFreshCard(null);         // the banner belongs to the conversation it appeared in
         textareaRef.current?.focus();
     };
+
+    // A question handed in from another surface (Graph cluster → "Ask about
+    // this"): consume each nonce exactly once, in a fresh conversation. The
+    // empty `base` matters — newChat's setMessages hasn't landed yet in this
+    // tick, so the send must not inherit the previous conversation's history.
+    const consumedAskNonce = useRef(0);
+    useEffect(() => {
+        if (!initialAsk || !uid || initialAsk.nonce === consumedAskNonce.current) return;
+        consumedAskNonce.current = initialAsk.nonce;
+        newChat();
+        send(initialAsk.question, [], 'library', initialAsk.hints);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initialAsk, uid]);
 
     const selectChat = (id: string) => {
         const chat = chats.find(c => c.id === id);

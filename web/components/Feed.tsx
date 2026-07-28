@@ -830,6 +830,26 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             })();
         return base.filter((l) => !isPending(l) && !isEffectivelyPrivateCard(l));
     }, [viewMode, graphFiltersActive, filteredLinks, links, libraryLinks, isEffectivelyPrivateCard]);
+    // Graph → Ask hand-off: a cluster's "Ask about this" opens Ask with this
+    // question pre-sent (nonce-gated inside AskBrain, fresh conversation).
+    const [graphAsk, setGraphAsk] = useState<{ question: string; hints?: import('@/lib/askSuggestions').AskHints; nonce: number } | null>(null);
+    const handleAskCluster = useCallback((question: string, anchorTitles: string[]) => {
+        setGraphAsk((prev) => ({ question, hints: { anchorTitles }, nonce: (prev?.nonce ?? 0) + 1 }));
+        setViewMode('ask');
+    }, []);
+    // Graph → Collections: keep a cluster as a real collection.
+    const handleSaveCluster = useCallback(async (name: string, linkIds: string[]) => {
+        if (!uid) return false;
+        try {
+            const id = await createCollection(uid, { name });
+            await addLinksToCollection(uid, linkIds, id);
+            toast.success(`Saved “${name}” as a collection`);
+            return true;
+        } catch {
+            toast.error("Couldn't save the collection. Please try again.");
+            return false;
+        }
+    }, [uid, toast]);
 
     // A card opened FROM My Notes reveals its notes section (the user tapped a
     // note — land them on it). One-shot: cleared when the modal stack closes so
@@ -2315,6 +2335,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             // pops only the modal, back to the chat — not out to home.
                             overlayOpen={anyOverlayOpen}
                             links={visibleLinks}
+                            initialAsk={graphAsk}
                         />
                     ) : filteredLinks.length === 0 && pendingCards.length === 0 ? (
                         (() => {
@@ -2435,6 +2456,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             loading={isLoadingLibrary && !graphFiltersActive}
                             filtered={graphFiltersActive}
                             onOpenCard={openLinkDetails}
+                            onAskCluster={handleAskCluster}
+                            onSaveCluster={handleSaveCluster}
                         />
                     ) : viewMode === 'review' ? (
                         <SwipeDeck
