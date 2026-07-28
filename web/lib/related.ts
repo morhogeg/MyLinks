@@ -33,17 +33,19 @@ export interface RelatedCardEntry {
 const MAX_RELATED = 4;
 // Gemini embeddings sit on a high cosine floor; the backend badges > 0.85 as a
 // strong tie. Alone, a match must clear SEMANTIC_MIN; with a shared concept or
-// tag corroborating it, SEMANTIC_ASSIST_MIN is enough.
-const STRONG = 0.85;
-const SEMANTIC_MIN = 0.8;
-const SEMANTIC_ASSIST_MIN = 0.74;
+// tag corroborating it, SEMANTIC_ASSIST_MIN is enough. Exported so the
+// knowledge-graph view (lib/graph.ts) qualifies edges by the SAME bar — the
+// graph must never show a tie this list wouldn't.
+export const STRONG = 0.85;
+export const SEMANTIC_MIN = 0.8;
+export const SEMANTIC_ASSIST_MIN = 0.74;
 
 /**
  * Normalize an embedding read from Firestore. The backend has stored the field
  * both as a plain array and as a Firestore Vector — the web SDK surfaces the
  * latter as a VectorValue object whose numbers live behind `.toArray()`.
  */
-function toVector(raw: unknown): number[] | null {
+export function toVector(raw: unknown): number[] | null {
     if (Array.isArray(raw)) return raw.length ? (raw as number[]) : null;
     if (raw && typeof (raw as { toArray?: unknown }).toArray === 'function') {
         const arr = (raw as { toArray: () => number[] }).toArray();
@@ -67,7 +69,7 @@ function cosine(a: number[], b: number[]): number {
 }
 
 /** Case-insensitive intersection, preserving the first list's display casing. */
-function overlap(a: string[] | undefined, b: string[] | undefined): string[] {
+export function overlap(a: string[] | undefined, b: string[] | undefined): string[] {
     if (!a?.length || !b?.length) return [];
     const byKey = new Map<string, string>();
     for (const s of a) if (s) byKey.set(s.toLowerCase(), s);
@@ -84,7 +86,7 @@ function overlap(a: string[] | undefined, b: string[] | undefined): string[] {
 }
 
 /** Deterministic "why related" sentence for a live (non-AI-verified) match. */
-function liveReason(
+export function liveReason(
     sharedConcepts: string[],
     sharedTags: string[],
     sameCategory: boolean,
