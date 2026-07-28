@@ -1065,6 +1065,26 @@ exact-match, capped.
   `allowedDevOrigins: ["127.0.0.1"]` to `next.config.ts` (revert after). Also
   note `AuthGate` swaps EVERY non-public route for the LoginScreen, so a
   throwaway preview route must be added to `PUBLIC_ROUTES` to render at all.
+- **2026-07-28 — Tag round 4 (`83f365a`, run #63 green): reuse must not
+  REDUCE the count + See-also has been silently broken since ≥07-27.**
+  Round-3 card came back with ONE generic tag ("recipe"): no backstop drop
+  logged, so the model itself under-generated — with Hebrew filtered from the
+  offered vocabulary, the prompt's "only create a new tag if no existing tag
+  fits" rule capped output at the library's one English tag. Rule rewritten:
+  reuse supplements, ALWAYS 3-5 total, create specific tags to fill, prefer
+  specific over generic (a tag repeating the category badge is called out as
+  wrong). Same save's logs also exposed `find_related_links` raising
+  `firebase_admin.firestore has no attribute 'DistanceMeasure'` on EVERY call
+  (back through at least 07-27, predates all of today): firebase-admin 6.9.0
+  doesn't re-export it — graph_service.py now imports from
+  `google.cloud.firestore_v1.base_vector_query` like search.py always did, so
+  See-also candidate retrieval works again. Deployed scoped to
+  process_link_background, analyze_link, analyze_image, rebuild_connections,
+  backfill_related_links. **The full tag saga (rounds 1-4) is one lesson:**
+  each fix exposed the next layer (ignored instruction → strip → empty →
+  reuse-cap); the Hebrew-majority library made English content the
+  never-exercised edge. Owner re-save of the recipe card = the acceptance
+  test (expect 3-4 specific English tags).
 - **2026-07-28 — Tag round 3: vocabulary pre-filter + abbreviation-safe card
   markdown (`3045a44`; functions run #62 green, Vercel auto, TestFlight #230 /
   build 1230 green).** Owner re-saved the recipe card on the #61 revision:
