@@ -14,10 +14,17 @@ import { Link } from './types';
  *
  * The feed already holds every card's `embedding_vector` and `concepts` in
  * memory, so we can compute fresh matches on open for free: cosine similarity
- * over embeddings, corroborated by shared concepts/tags. Stored AI relations
- * come first (their reasons are LLM-verified prose); live matches fill the
- * remaining slots with a deterministic reason built from the shared signal —
- * no model call, no latency, no cost.
+ * over embeddings, corroborated by shared concepts/tags.
+ *
+ * Order of the returned list, and the contract the Graph view depends on:
+ *  1. This card's OWN stored relations (LLM-verified prose reasons).
+ *  2. REVERSE stored relations — cards that stored a pointer AT this one. Blind
+ *     spot 1 above is exactly this case, and the graph draws stored relations
+ *     from both directions, so omitting them made the graph honestly report
+ *     more connections than the card detail listed (owner QA).
+ *  3. Live matches, by score, with a deterministic reason built from the shared
+ *     signal — no model call, no latency, no cost.
+ * Every pass shares one cap (`MAX_RELATED`) and one dedupe/exclusion set.
  */
 
 export interface RelatedCardEntry {
@@ -30,7 +37,9 @@ export interface RelatedCardEntry {
     sharedConcepts: string[];
 }
 
-const MAX_RELATED = 4;
+// Matches what a node's neighborhood can realistically hold in the graph — the
+// two surfaces must be able to agree on a count (the graph's "Connections · N").
+const MAX_RELATED = 8;
 // Gemini embeddings sit on a high cosine floor; the backend badges > 0.85 as a
 // strong tie. Alone, a match must clear SEMANTIC_MIN; with a shared concept or
 // tag corroborating it, SEMANTIC_ASSIST_MIN is enough. Exported so the
@@ -142,7 +151,26 @@ export function getRelatedCards(
     }
     if (entries.length >= MAX_RELATED) return entries;
 
-    // 2) Live matches — cards the snapshot can't know about (saved later, or
+    // 2) Reverse stored relations — cards that pointed AT this one when they
+    //    were saved. Their reason is phrased from the other card's perspective
+    //    but describes the same tie, so it stays honest prose.
+    for (const other of allLinks) {
+        if (entries.length >= MAX_RELATED) break;
+        if (used.has(other.id)) continue;
+        if (other.status === 'processing' || other.status === 'failed') continue;
+        const rel = other.relatedLinks?.find((r) => r.id === link.id);
+        if (!rel) continue;
+        used.add(other.id);
+        entries.push({
+            link: other,
+            reason: rel.reason,
+            strong: rel.similarity > STRONG,
+            sharedConcepts: rel.commonConcepts ?? [],
+        });
+    }
+    if (entries.length >= MAX_RELATED) return entries;
+
+    // 3) Live matches — cards the snapshot can't know about (saved later, or
     //    this card predates the graph entirely).
     const myVec = toVector(link.embedding_vector);
     const candidates: Array<{ entry: RelatedCardEntry; score: number }> = [];

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, Maximize2, Waypoints, X } from 'lucide-react';
 import { Link } from '@/lib/types';
-import { buildGraphModel, edgeReason, GraphModel, BuildSignal } from '@/lib/graph';
+import { buildGraphModel, edgeReason, spacingScale, GraphModel, BuildSignal } from '@/lib/graph';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getDominantDirection } from '@/lib/rtl';
 import { hapticLight } from '@/lib/haptics';
@@ -850,6 +850,11 @@ function tick(model: GraphModel, alphaRef: { current: number }) {
     const alpha = alphaRef.current;
     const { nodes, edges } = model;
     const n = nodes.length;
+    // Small graphs spread out (see lib/graph.ts spacingScale) — the same factor
+    // the builder used for island radii, so seeds and forces agree.
+    const spacing = spacingScale(n);
+    const repulsion = REPULSION * spacing * spacing;
+    const repulsionMax = REPULSION_MAX_DIST * spacing;
 
     // Many-body repulsion + collision, one O(n²) pass.
     for (let i = 0; i < n; i++) {
@@ -864,9 +869,9 @@ function tick(model: GraphModel, alphaRef: { current: number }) {
                 dy = (Math.random() - 0.5) * 0.1;
                 d2 = dx * dx + dy * dy;
             }
-            if (d2 > REPULSION_MAX_DIST * REPULSION_MAX_DIST) continue;
+            if (d2 > repulsionMax * repulsionMax) continue;
             const d = Math.sqrt(d2);
-            let f = (REPULSION * alpha) / d2;
+            let f = (repulsion * alpha) / d2;
             // Hard-core collision: overlapping nodes push apart decisively.
             const minDist = a.r + b.r + 6;
             if (d < minDist) f += ((minDist - d) / minDist) * 2.5;
@@ -887,7 +892,7 @@ function tick(model: GraphModel, alphaRef: { current: number }) {
         const dy = b.y - a.y;
         const d = Math.max(1, Math.hypot(dx, dy));
         const strength = 0.35 + Math.max(0, Math.min(1, (e.weight - 0.7) / 0.3)) * 0.5;
-        const rest = a.r + b.r + 65 + (1 - strength) * 130;
+        const rest = a.r + b.r + (65 + (1 - strength) * 130) * spacing;
         const f = ((d - rest) / d) * 0.08 * strength * alpha * 8;
         const fx = dx * f;
         const fy = dy * f;
@@ -943,7 +948,17 @@ function fitCamera(model: GraphModel, canvas: HTMLCanvasElement): Camera | null 
 
 // ── Drawing ──────────────────────────────────────────────────────────────────
 
-type CaptionRect = { x1: number; y1: number; x2: number; y2: number; cluster: number };
+type Rect = { x1: number; y1: number; x2: number; y2: number };
+type CaptionRect = Rect & { cluster: number };
+
+// Node-label typography (screen space) and the collision budget between two
+// accepted labels.
+const LABEL_SIZE = 11;
+const LABEL_PAD = 2;
+// Canvas titles ellipsize here — long enough to identify a card at a glance
+// (30 cut most real titles mid-word); collision culling, not truncation, is
+// what keeps the view readable.
+const MAX_LABEL_CHARS = 48;
 
 function draw(
     canvas: HTMLCanvasElement,
@@ -979,6 +994,13 @@ function draw(
         !state.categoryFocus || nodes[i].category === state.categoryFocus;
     const inFocusCluster = (i: number) =>
         state.clusterFocus === null || nodes[i].cluster === state.clusterFocus;
+    /** 1 when a node is fully lit, 0.14 when the current focus pushes it back. */
+    const dimOf = (i: number) => {
+        if (lit) return lit.has(i) ? 1 : 0.14;
+        if (state.categoryFocus) return inFocusCategory(i) ? 1 : 0.14;
+        if (state.clusterFocus !== null) return inFocusCluster(i) ? 1 : 0.14;
+        return 1;
+    };
 
     // Edges first, under the nodes.
     for (let ei = 0; ei < edges.length; ei++) {
@@ -1012,10 +1034,7 @@ function draw(
     for (let i = 0; i < nodes.length; i++) {
         const n = nodes[i];
         const color = getCategoryColorStyle(n.category).color;
-        let dim = 1;
-        if (lit) dim = lit.has(i) ? 1 : 0.14;
-        else if (state.categoryFocus) dim = inFocusCategory(i) ? 1 : 0.14;
-        else if (state.clusterFocus !== null) dim = inFocusCluster(i) ? 1 : 0.14;
+        const dim = dimOf(i);
 
         const isFocused = i === state.selected || i === state.hover;
         if (isFocused) {
@@ -1047,51 +1066,31 @@ function draw(
         ctx.stroke();
     }
 
-    // Labels — the focused neighborhood always; otherwise only the hubs, until
-    // the user zooms in far enough that density supports labelling everything.
-    const labelAlpha = Math.max(0, Math.min(1, (cam.k - 0.35) / 0.3));
-    const hubs = hubLabels(model);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    for (let i = 0; i < nodes.length; i++) {
-        const n = nodes[i];
-        const inLit = lit?.has(i) ?? false;
-        const isFocused = i === state.selected || i === state.hover;
-        let show = false;
-        let alpha = 0;
-        if (isFocused) { show = true; alpha = 1; }
-        else if (inLit) { show = true; alpha = 0.9; }
-        else if (!lit && labelAlpha > 0 && (hubs.has(i) || (cam.k >= 1.05 && n.r * cam.k >= 7))) {
-            show = true;
-            const focusDim = state.categoryFocus
-                ? (inFocusCategory(i) ? 0.85 : 0.06)
-                : state.clusterFocus !== null
-                    ? (inFocusCluster(i) ? 0.85 : 0.06)
-                    : 0.85;
-            alpha = labelAlpha * focusDim;
-        }
-        if (!show || alpha <= 0.02) continue;
-        const title = n.link.title.length > 30 ? `${n.link.title.slice(0, 29)}…` : n.link.title;
-        const size = Math.max(10, 11 / Math.max(0.7, cam.k));
-        ctx.font = `600 ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-        // A background-colored stroke keeps the text legible over edges.
-        ctx.lineWidth = 3;
-        // Halo in the CARD tone — the canvas sits on a card→background
-        // gradient, so a bg-colored halo reads darker than its local backdrop
-        // and smears ghost shapes around glyphs (owner QA round 2).
-        ctx.strokeStyle = rgba(hexToRgb(palette.card), alpha * 0.7);
-        ctx.strokeText(title, n.x, n.y + n.r + 4);
-        ctx.fillStyle = rgba(hexToRgb(isFocused ? palette.text : palette.textSecondary), alpha);
-        ctx.fillText(title, n.x, n.y + n.r + 4);
-    }
+    // ── Text: island captions, then node labels ──────────────────────────────
+    // Both are laid out in SCREEN space, so type stays a constant, legible size
+    // at any zoom AND overlap can be settled with plain rect tests: candidates
+    // are ranked, then accepted greedily — a label whose rect hits one already
+    // placed is DROPPED rather than drawn across it (owner QA: small and
+    // filtered graphs were an unreadable pile of stacked titles). Captions are
+    // placed first, so a cluster's theme always outranks a single card's title.
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const viewW = canvas.width / dpr;
+    const viewH = canvas.height / dpr;
+    const placed: Rect[] = [];
+    const fits = (r: Rect) =>
+        placed.every((p) =>
+            r.x2 + LABEL_PAD < p.x1 || r.x1 - LABEL_PAD > p.x2
+            || r.y2 + LABEL_PAD < p.y1 || r.y1 - LABEL_PAD > p.y2);
+    const onScreen = (r: Rect) => r.x2 > 0 && r.x1 < viewW && r.y2 > 0 && r.y1 < viewH;
 
     // Island captions — each named cluster gets its theme drawn above it, and
     // the caption doubles as the tap target that opens the cluster panel. The
     // returned rects are in SCREEN space for the pointer handler.
     const rects: CaptionRect[] = [];
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // captions render at fixed screen size
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
+    ctx.font = '700 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.lineWidth = 3;
     for (let c = 0; c < model.clusters.length; c++) {
         const cluster = model.clusters[c];
         if (!cluster.label || cluster.nodeIndices.length < 3) continue;
@@ -1108,16 +1107,112 @@ function draw(
         else if (state.clusterFocus !== null) alpha = c === state.clusterFocus ? 0.95 : 0.12;
         else if (state.categoryFocus) alpha = 0.15;
         const focusedCaption = state.clusterFocus === c;
-        ctx.font = `700 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
         const label = cluster.label.toUpperCase();
         const tw = ctx.measureText(label).width;
-        ctx.lineWidth = 3;
         ctx.strokeStyle = rgba(hexToRgb(palette.card), alpha * 0.7);
         ctx.strokeText(label, sx, sy);
         ctx.fillStyle = rgba(hexToRgb(focusedCaption ? palette.text : palette.textSecondary), alpha);
         ctx.fillText(label, sx, sy);
         // A generous tap halo around the drawn text.
         rects.push({ x1: sx - tw / 2 - 14, y1: sy - 22, x2: sx + tw / 2 + 14, y2: sy + 10, cluster: c });
+        // Only a caption that actually reads claims space from node labels —
+        // a dimmed-to-0.12 one is background texture, not text.
+        if (alpha >= 0.3) placed.push({ x1: sx - tw / 2, y1: sy - 11, x2: sx + tw / 2, y2: sy + 3 });
+    }
+
+    // Node labels — the focused neighborhood always; otherwise only the hubs,
+    // until the user zooms in far enough that density supports labelling more.
+    // Tier drives who wins a contested spot: focused/hovered card, then its lit
+    // neighbours, then the rest by degree (hubs name the constellation).
+    const labelAlpha = Math.max(0, Math.min(1, (cam.k - 0.35) / 0.3));
+    const hubs = hubLabels(model);
+    const candidates: { i: number; alpha: number; tier: number; focused: boolean }[] = [];
+    for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        const inLit = lit?.has(i) ?? false;
+        const isFocused = i === state.selected || i === state.hover;
+        if (isFocused) candidates.push({ i, alpha: 1, tier: 0, focused: true });
+        else if (inLit) candidates.push({ i, alpha: 0.9, tier: 1, focused: false });
+        else if (!lit && labelAlpha > 0 && (hubs.has(i) || (cam.k >= 1.05 && n.r * cam.k >= 7))) {
+            const focusDim = state.categoryFocus
+                ? (inFocusCategory(i) ? 0.85 : 0.06)
+                : state.clusterFocus !== null
+                    ? (inFocusCluster(i) ? 0.85 : 0.06)
+                    : 0.85;
+            const alpha = labelAlpha * focusDim;
+            if (alpha > 0.02) candidates.push({ i, alpha, tier: hubs.has(i) ? 2 : 3, focused: false });
+        }
+    }
+    candidates.sort((a, b) => a.tier - b.tier || nodes[b.i].degree - nodes[a.i].degree);
+
+    // Discs are obstacles too: a title lying across a neighbouring dot reads as
+    // badly as one lying across another title. Only LIT dots count — a dot
+    // pushed back to 0.14 is atmosphere, and letting it veto a label would
+    // silence the very neighbourhood the selection is meant to explain.
+    const discs: (Rect | null)[] = candidates.length
+        ? nodes.map((n, i) => {
+            if (dimOf(i) < 1) return null;
+            const dx = n.x * cam.k + cam.x;
+            const dy = n.y * cam.k + cam.y;
+            const dr = n.r * cam.k;
+            return { x1: dx - dr, y1: dy - dr, x2: dx + dr, y2: dy + dr };
+        })
+        : [];
+    const clearsDiscs = (r: Rect, self: number) =>
+        discs.every((d, di) =>
+            !d || di === self
+            || r.x2 < d.x1 || r.x1 > d.x2 || r.y2 < d.y1 || r.y1 > d.y2);
+
+    ctx.textBaseline = 'top';
+    ctx.font = `600 ${LABEL_SIZE}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+    // On a phone a 48-char title is wider than the canvas, so nothing could ever
+    // clear its neighbours — labels are also trimmed to a share of the viewport.
+    const maxLabelPx = Math.min(viewW * 0.62, 280);
+    for (const { i, alpha, focused } of candidates) {
+        const n = nodes[i];
+        let title = n.link.title.length > MAX_LABEL_CHARS
+            ? `${n.link.title.slice(0, MAX_LABEL_CHARS - 1)}…`
+            : n.link.title;
+        let tw = ctx.measureText(title).width;
+        if (tw > maxLabelPx) {
+            let cut = title.replace(/…$/, '');
+            while (cut.length > 6 && ctx.measureText(`${cut}…`).width > maxLabelPx) {
+                cut = cut.slice(0, Math.max(6, Math.ceil(cut.length * 0.9) - 1));
+            }
+            title = `${cut.trimEnd()}…`;
+            tw = ctx.measureText(title).width;
+        }
+        // Nudge a label that would run off the edge back inside — a title
+        // sliced by the canvas border is no more use than one that's covered.
+        const nx = n.x * cam.k + cam.x;
+        const sx = nx > 0 && nx < viewW
+            ? Math.min(Math.max(nx, tw / 2 + 4), viewW - tw / 2 - 4)
+            : nx;
+        // Below the dot is the house position; above is the fallback, so a
+        // crowded hub keeps its name instead of losing it to a neighbour.
+        let rect: Rect | null = null;
+        for (const sy of [
+            (n.y + n.r) * cam.k + cam.y + 5,
+            (n.y - n.r) * cam.k + cam.y - 5 - LABEL_SIZE,
+        ]) {
+            const r = { x1: sx - tw / 2, y1: sy, x2: sx + tw / 2, y2: sy + LABEL_SIZE };
+            if (onScreen(r) && fits(r) && clearsDiscs(r, i)) {
+                rect = r;
+                break;
+            }
+        }
+        if (!rect) continue;
+        const sy = rect.y1;
+        placed.push(rect);
+        // A background-colored stroke keeps the text legible over edges.
+        // Halo in the CARD tone — the canvas sits on a card→background
+        // gradient, so a bg-colored halo reads darker than its local backdrop
+        // and smears ghost shapes around glyphs (owner QA round 2).
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = rgba(hexToRgb(palette.card), alpha * 0.7);
+        ctx.strokeText(title, sx, sy);
+        ctx.fillStyle = rgba(hexToRgb(focused ? palette.text : palette.textSecondary), alpha);
+        ctx.fillText(title, sx, sy);
     }
     return rects;
 }

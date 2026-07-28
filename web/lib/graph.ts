@@ -104,6 +104,23 @@ export function nodeRadius(degree: number): number {
     return Math.min(16, 5 + 3 * Math.sqrt(degree));
 }
 
+// Below this many nodes the layout gets extra breathing room (see spacingScale).
+const SPACIOUS_BELOW = 25;
+
+/**
+ * How much to stretch the layout for a given node count. A small graph — a
+ * search-filtered view, say 11 cards — used the same spring/repulsion constants
+ * as a 200-card library, packed into a knot, and then auto-fit zoomed all the
+ * way in, so every label fired at once on top of its neighbours (owner QA).
+ * Stretching rest lengths, repulsion and island radii pushes those nodes apart
+ * and lets the fit settle wider. Graphs at or above SPACIOUS_BELOW nodes are
+ * untouched (factor 1) — big libraries already have their own density problem.
+ */
+export function spacingScale(nodeCount: number): number {
+    if (nodeCount >= SPACIOUS_BELOW) return 1;
+    return 1 + ((SPACIOUS_BELOW - nodeCount) / SPACIOUS_BELOW) * 1.1;
+}
+
 export async function buildGraphModel(
     links: Link[],
     signal?: BuildSignal,
@@ -317,18 +334,19 @@ export async function buildGraphModel(
         return { label: clusterLabel(members.map((i) => nodes[i])), nodeIndices: members };
     });
     const placedIslands: { x: number; y: number; r: number }[] = [];
+    const spacing = spacingScale(nodes.length);
     for (const members of comps) {
-        const R = 70 + 52 * Math.sqrt(members.length);
+        const R = (70 + 52 * Math.sqrt(members.length)) * spacing;
         let x = 0;
         let y = 0;
         if (placedIslands.length) {
             // Walk outward on a spiral until this island clears every placed one.
             for (let t = 1; t < 4000; t++) {
                 const angle = t * 0.6;
-                const dist = 60 + t * 11;
+                const dist = (60 + t * 11) * spacing;
                 x = Math.cos(angle) * dist;
                 y = Math.sin(angle) * dist;
-                if (placedIslands.every((p) => Math.hypot(x - p.x, y - p.y) >= p.r + R + 70)) break;
+                if (placedIslands.every((p) => Math.hypot(x - p.x, y - p.y) >= p.r + R + 70 * spacing)) break;
             }
         }
         placedIslands.push({ x, y, r: R });
