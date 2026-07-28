@@ -1065,6 +1065,20 @@ exact-match, capped.
   `allowedDevOrigins: ["127.0.0.1"]` to `next.config.ts` (revert after). Also
   note `AuthGate` swaps EVERY non-public route for the LoginScreen, so a
   throwaway preview route must be added to `PUBLIC_ROUTES` to render at all.
+- **2026-07-28 — Tag-language prompt fix actually DEPLOYED (`769854e`, run
+  #60 green).** Owner QA: an English recipe card saved "just now" still got
+  Hebrew tags — because `f3055f8` (the same-language tag-reuse prompt fix)
+  merged AFTER the day's unscoped deploy #55, and the scoped deploys since
+  (#56 janitor, #58 digest) never included the tag-writing functions. Prod's
+  `process_link_background` / `analyze_link` / `analyze_image` were serving
+  the old prompt all day. Redeployed those three via a `.deploy-ping` bump.
+  **Ship-skill lesson (recurring trap):** a change to a SHARED module
+  (`ai_service.py`, `search.py`, `models.py`) is only live for functions
+  actually redeployed with it — when scoping a `Deploy-Functions:` trailer,
+  list every function that imports the changed module, or the fix silently
+  doesn't ship. Existing wrong-tag cards still need §4 item 21 (owner:
+  `tools/retag_language_mismatch.py`); the owner's spaghetti card can just
+  be Retried now.
 - **2026-07-28 — Reminders & Digest settings redone: synthesis is its own
   weekly toggle + share-ext scanner fix** (`9030ae1`, merge `152291b`; earlier
   same-session: scanner `97c37c2` → build 1228). Owner device QA drove both.
