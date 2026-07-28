@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Maximize2, Waypoints, X } from 'lucide-react';
+import { ArrowUpRight, Maximize2, Waypoints, X } from 'lucide-react';
 import { Link } from '@/lib/types';
 import { buildGraphModel, edgeReason, GraphModel, BuildSignal } from '@/lib/graph';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -66,9 +66,9 @@ function readPalette(): Palette {
 }
 
 // ── Simulation constants ─────────────────────────────────────────────────────
-const REPULSION = 3200;        // many-body charge (world units²)
+const REPULSION = 4200;        // many-body charge (world units²)
 const REPULSION_MAX_DIST = 480;
-const GRAVITY = 0.018;         // pull toward the centroid, scaled by alpha
+const GRAVITY = 0.05;          // pull toward the node's ISLAND anchor (per component)
 const VELOCITY_DECAY = 0.8;
 const ALPHA_DECAY = 0.99;
 const ALPHA_MIN = 0.015;
@@ -109,8 +109,20 @@ export default function KnowledgeGraph({
     const selectedRef = useRef<number | null>(null);
     const focusRef = useRef<string | null>(null);
     const reducedMotionRef = useRef(false);
+    // While set, the camera glides to keep this node framed clear of the panel —
+    // how "tap a connection in the list" visibly walks the graph. Any user
+    // gesture (pan/zoom) takes the camera back.
+    const followRef = useRef<number | null>(null);
+    const openRef = useRef(onOpenCard);
     selectedRef.current = selected;
     focusRef.current = categoryFocus;
+    openRef.current = onOpenCard;
+
+    // Every selection (canvas tap or panel row) starts a follow; deselect ends it.
+    useEffect(() => {
+        followRef.current = selected;
+        if (selected !== null) autoFitRef.current = false;
+    }, [selected]);
 
     // ── Build the model (chunked; cancelled when the pool changes) ───────────
     useEffect(() => {
@@ -197,6 +209,23 @@ export default function KnowledgeGraph({
                     cam.y += (target.y - cam.y) * ease;
                     drawPendingRef.current = true;
                 }
+            } else if (followRef.current !== null && model.nodes[followRef.current]) {
+                // Frame the followed node in the area the selection panel leaves
+                // free (right panel on desktop, bottom sheet on mobile).
+                const n = model.nodes[followRef.current];
+                const dpr = Math.min(2, window.devicePixelRatio || 1);
+                const w = canvas.width / dpr;
+                const h = canvas.height / dpr;
+                const desktop = w >= 640;
+                const cx = desktop ? (w - 342) / 2 : w / 2;
+                const cy = desktop ? h / 2 : h * 0.28;
+                const cam = camRef.current;
+                const ease = reducedMotionRef.current ? 1 : 0.11;
+                const tk = Math.min(1.25, Math.max(0.7, cam.k));
+                cam.k += (tk - cam.k) * ease;
+                cam.x += (cx - n.x * cam.k - cam.x) * ease;
+                cam.y += (cy - n.y * cam.k - cam.y) * ease;
+                drawPendingRef.current = true;
             }
             if (simActive || drawPendingRef.current) {
                 drawPendingRef.current = false;
@@ -242,7 +271,10 @@ export default function KnowledgeGraph({
                 const n = m.nodes[i];
                 const dx = n.x - w.x;
                 const dy = n.y - w.y;
-                const reach = n.r + 6 / cam.k; // a touch-friendly halo
+                // Every dot must be hittable: at least a 16px screen-space
+                // target regardless of how small the node draws (owner QA:
+                // low-degree dots were effectively un-tappable).
+                const reach = Math.max(n.r + 4 / cam.k, 16 / cam.k);
                 const d2 = dx * dx + dy * dy;
                 if (d2 < reach * reach && d2 < bestDist) {
                     best = i;
@@ -257,6 +289,7 @@ export default function KnowledgeGraph({
             const p = toLocal(e);
             pointers.set(e.pointerId, p);
             autoFitRef.current = false;
+            followRef.current = null; // any gesture takes the camera back
             if (pointers.size === 2) {
                 mode = 'pinch';
                 const [a, b] = [...pointers.values()];
@@ -336,7 +369,13 @@ export default function KnowledgeGraph({
                 n.fy = null;
                 if (moved < TAP_SLOP) {
                     hapticLight();
-                    setSelected((cur) => (cur === dragNode ? null : dragNode));
+                    if (selectedRef.current === dragNode) {
+                        // Second tap on the focused card opens it — the panel's
+                        // Open button and this gesture agree.
+                        openRef.current(modelRef.current!.nodes[dragNode].link);
+                    } else {
+                        setSelected(dragNode);
+                    }
                 }
                 dragNode = -1;
             } else if (mode === 'pan' && moved < TAP_SLOP) {
@@ -350,6 +389,7 @@ export default function KnowledgeGraph({
         const onWheel = (e: WheelEvent) => {
             e.preventDefault();
             autoFitRef.current = false;
+            followRef.current = null;
             const cam = camRef.current;
             const p = toLocal(e);
             const factor = Math.exp(-e.deltaY * 0.0016);
@@ -459,7 +499,7 @@ export default function KnowledgeGraph({
                 </div>
                 <div className="hidden sm:block flex-1" />
                 <div className="hidden sm:block text-[12px] text-text-muted">
-                    Tap a card to explore · drag to pan · scroll to zoom
+                    Tap a card to explore · tap it again to open · drag to pan · scroll to zoom
                 </div>
             </div>
             {legend.length > 1 && (
@@ -535,67 +575,86 @@ export default function KnowledgeGraph({
                     </div>
                 )}
 
-                {/* Selection panel — the "why" behind the highlighted neighborhood. */}
+                {/* Selection panel — the "why" behind the highlighted neighborhood.
+                    Layout contract (owner QA round 1): the Open button sits
+                    DIRECTLY under the selected card's title so there is no doubt
+                    which card it opens; the neighbor list below is explicitly
+                    labelled Connections, each row tap re-focuses the graph on
+                    that card (the camera follows), and each row's ↗ opens that
+                    card's detail directly. */}
                 {selection && (
-                    <div className="absolute inset-x-2 bottom-2 sm:inset-x-auto sm:bottom-auto sm:top-3 sm:end-3 sm:w-[330px] max-h-[46%] sm:max-h-[calc(100%-24px)] flex flex-col rounded-2xl bg-card/95 backdrop-blur-xl border border-border-subtle shadow-[var(--shadow-card)] animate-fade-in">
-                        <div className="flex items-start gap-2.5 p-3.5 pb-2.5">
-                            <span
-                                className="mt-1 w-2.5 h-2.5 rounded-full shrink-0"
-                                style={{ backgroundColor: getCategoryColorStyle(selection.node.link.category || 'Other').color }}
-                            />
-                            <div className="flex-1 min-w-0">
-                                <h3 dir="auto" className="text-[14px] font-semibold text-text leading-snug line-clamp-2">
-                                    {selection.node.link.title}
-                                </h3>
-                                <p className="mt-0.5 text-[11px] font-medium text-text-muted uppercase tracking-wide">
-                                    {selection.node.link.category || 'Other'}
-                                    <span className="normal-case tracking-normal"> · {selection.neighbors.length} {selection.neighbors.length === 1 ? 'connection' : 'connections'}</span>
-                                </p>
+                    <div className="absolute inset-x-2 bottom-2 sm:inset-x-auto sm:bottom-auto sm:top-3 sm:end-3 sm:w-[330px] max-h-[48%] sm:max-h-[calc(100%-24px)] flex flex-col rounded-2xl bg-card/95 backdrop-blur-xl border border-border-subtle shadow-[var(--shadow-card)] animate-fade-in">
+                        <div className="p-3.5 pb-3">
+                            <div className="flex items-start gap-2.5">
+                                <span
+                                    className="mt-1 w-2.5 h-2.5 rounded-full shrink-0"
+                                    style={{ backgroundColor: getCategoryColorStyle(selection.node.link.category || 'Other').color }}
+                                />
+                                <div className="flex-1 min-w-0">
+                                    <h3 dir="auto" className="text-[14px] font-semibold text-text leading-snug line-clamp-2">
+                                        {selection.node.link.title}
+                                    </h3>
+                                    <p className="mt-0.5 text-[11px] font-medium text-text-muted uppercase tracking-wide">
+                                        {selection.node.link.category || 'Other'}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setSelected(null)}
+                                    aria-label="Close card details"
+                                    className="p-1 -m-1 rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
                             </div>
                             <button
-                                onClick={() => setSelected(null)}
-                                aria-label="Close card details"
-                                className="p-1 -m-1 rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
+                                onClick={() => onOpenCard(selection.node.link)}
+                                className="mt-2.5 w-full h-9 inline-flex items-center justify-center gap-1.5 rounded-full bg-accent text-accent-ink text-[13px] font-bold hover:bg-accent-hover active:scale-[0.98] transition-all cursor-pointer"
                             >
-                                <X className="w-4 h-4" />
+                                Open this card
+                                <ArrowUpRight className="w-3.5 h-3.5" />
                             </button>
                         </div>
-                        <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-1 space-y-0.5">
+                        <p className="px-3.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-text-muted">
+                            Connections · {selection.neighbors.length}
+                        </p>
+                        <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2 space-y-0.5">
                             {selection.neighbors.map((nb) => (
-                                <button
-                                    key={nb.link.id}
-                                    onClick={() => selectNeighbor(nb.index)}
-                                    className="w-full text-start px-1.5 py-2 rounded-xl hover:bg-card-hover transition-colors cursor-pointer"
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <span
-                                            className="w-1.5 h-1.5 rounded-full shrink-0"
-                                            style={{ backgroundColor: getCategoryColorStyle(nb.link.category || 'Other').color }}
-                                        />
-                                        <span dir="auto" className="flex-1 min-w-0 text-[13px] font-medium text-text truncate">
-                                            {nb.link.title}
+                                <div key={nb.link.id} className="flex items-stretch gap-0.5">
+                                    <button
+                                        onClick={() => selectNeighbor(nb.index)}
+                                        title="Focus this card in the graph"
+                                        className="flex-1 min-w-0 text-start px-1.5 py-2 rounded-xl hover:bg-card-hover transition-colors cursor-pointer"
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <span
+                                                className="w-1.5 h-1.5 rounded-full shrink-0"
+                                                style={{ backgroundColor: getCategoryColorStyle(nb.link.category || 'Other').color }}
+                                            />
+                                            <span dir="auto" className="flex-1 min-w-0 text-[13px] font-medium text-text truncate">
+                                                {nb.link.title}
+                                            </span>
+                                            {nb.strong && (
+                                                <span className="text-[10px] font-semibold text-accent bg-fill-subtle border border-border-subtle rounded-full px-1.5 py-px shrink-0">
+                                                    strong
+                                                </span>
+                                            )}
                                         </span>
-                                        {nb.strong && (
-                                            <span className="text-[10px] font-semibold text-accent bg-fill-subtle border border-border-subtle rounded-full px-1.5 py-px shrink-0">
-                                                strong
+                                        {nb.reason && (
+                                            <span dir="auto" className="block ms-3.5 mt-0.5 text-[12px] text-text-secondary leading-snug line-clamp-2">
+                                                {nb.reason}
                                             </span>
                                         )}
-                                    </span>
-                                    {nb.reason && (
-                                        <span dir="auto" className="block ms-3.5 mt-0.5 text-[12px] text-text-secondary leading-snug line-clamp-2">
-                                            {nb.reason}
-                                        </span>
-                                    )}
-                                </button>
+                                    </button>
+                                    <button
+                                        onClick={() => onOpenCard(nb.link)}
+                                        aria-label={`Open ${nb.link.title}`}
+                                        title="Open this card"
+                                        className="self-center shrink-0 w-8 h-8 inline-flex items-center justify-center rounded-full text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
+                                    >
+                                        <ArrowUpRight className="w-4 h-4" />
+                                    </button>
+                                </div>
                             ))}
-                        </div>
-                        <div className="p-2.5 pt-1.5">
-                            <button
-                                onClick={() => onOpenCard(selection.node.link)}
-                                className="w-full h-9 rounded-full bg-accent text-accent-ink text-[13px] font-bold hover:bg-accent-hover active:scale-[0.98] transition-all cursor-pointer"
-                            >
-                                Open card
-                            </button>
                         </div>
                     </div>
                 )}
@@ -647,7 +706,7 @@ function tick(model: GraphModel, alphaRef: { current: number }) {
         const dy = b.y - a.y;
         const d = Math.max(1, Math.hypot(dx, dy));
         const strength = 0.35 + Math.max(0, Math.min(1, (e.weight - 0.7) / 0.3)) * 0.5;
-        const rest = a.r + b.r + 55 + (1 - strength) * 110;
+        const rest = a.r + b.r + 65 + (1 - strength) * 130;
         const f = ((d - rest) / d) * 0.08 * strength * alpha * 8;
         const fx = dx * f;
         const fy = dy * f;
@@ -666,8 +725,8 @@ function tick(model: GraphModel, alphaRef: { current: number }) {
             node.vy = 0;
             continue;
         }
-        node.vx += -node.x * GRAVITY * alpha;
-        node.vy += -node.y * GRAVITY * alpha;
+        node.vx += (node.cx - node.x) * GRAVITY * alpha;
+        node.vy += (node.cy - node.y) * GRAVITY * alpha;
         node.vx *= VELOCITY_DECAY;
         node.vy *= VELOCITY_DECAY;
         node.x += node.vx;
