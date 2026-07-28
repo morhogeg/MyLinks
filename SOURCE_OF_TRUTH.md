@@ -1021,6 +1021,28 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 (same session, round 8) — Graph: Ask returns to the pill row as
+  "Ask about cluster", cluster-specific question, Ask round-trip restore, why
+  headline (owner QA round 5).** (1) The Connections-header "Ask about all"
+  (round 7) read worse than the pill row — reverted to two quiet pills under
+  the title (**Open card / Ask about cluster**); the word "cluster" carries the
+  scope. (2) The pre-sent question is now cluster-SPECIFIC: **"What connects my
+  N cards about <theme>?"** (fallback "What connects these N cards?") instead
+  of the generic "What have I saved about X?"; one `askAboutCluster(index)`
+  serves both the selection panel and the cluster panel. (3) **Back from Ask
+  restores the graph focus that launched it**: `onAskCluster` now carries a
+  restore payload (selected card id / cluster anchor id — ids, not indices,
+  since the model rebuilds), Feed holds it and hands it back via a new
+  `restoreFocus` prop; the graph re-applies it after the model build and
+  camera-frames it, so Ask is a detour, not an exit. (4) The **"CONNECTIONS ·
+  N" section row is gone** (phone space) — a hairline divider separates the
+  list. (5) **Cluster panel "why" headline**: subtitle is now a sentence —
+  "5 cards · linked by Artificial Intelligence and Efficiency" (top shared
+  concepts at ≥25% coverage; fallback "linked by closely related content" for
+  purely semantic ties), sentence-case, answering "why are these connected".
+  Verified: tsc 0; Playwright iPhone-390 light — new pills, question wording,
+  unmount/remount restore reopens the selection, caption tap → why headline,
+  zero console errors.
 - **2026-07-28 (same session, round 7) — Graph: Ask scope by position, quiet
   Open, center icon, captions everywhere (owner QA round 4).** (1) "Ask about
   this" beside the card title read as asking about THAT card while it actually

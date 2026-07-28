@@ -45,6 +45,14 @@ interface Camera {
     y: number;
 }
 
+/** What the graph should re-focus when the user returns from an Ask it
+ *  launched — the tapped card, or the cluster holding this anchor card.
+ *  Ids, not indices: the model is rebuilt on re-entry. */
+export interface GraphRestoreFocus {
+    selectedId?: string;
+    clusterAnchorId?: string;
+}
+
 /** Parse "rgb(r, g, b)" / "rgba(…)" into an rgba() string at the given alpha. */
 function rgba(color: string, alpha: number): string {
     const m = color.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
@@ -80,6 +88,8 @@ export default function KnowledgeGraph({
     filtered,
     onOpenCard,
     onAskCluster,
+    restoreFocus,
+    onRestoreConsumed,
     onSaveCluster,
 }: {
     /** The card pool (already privacy-filtered by the Feed). */
@@ -89,8 +99,13 @@ export default function KnowledgeGraph({
     /** True when grid filters/search currently scope the pool. */
     filtered: boolean;
     onOpenCard: (link: Link) => void;
-    /** Hand a cluster to Ask Machina — question + the member titles as anchors. */
-    onAskCluster?: (question: string, anchorTitles: string[]) => void;
+    /** Hand a cluster to Ask Machina — question, the member titles as anchors,
+     *  and what to re-focus when the user comes BACK from Ask. */
+    onAskCluster?: (question: string, anchorTitles: string[], restore: GraphRestoreFocus) => void;
+    /** The focus to re-apply after returning from Ask (see onAskCluster). */
+    restoreFocus?: GraphRestoreFocus | null;
+    /** Called once the restore has been applied (the owner clears it). */
+    onRestoreConsumed?: () => void;
     /** Save a cluster's members as a new collection; resolves true on success. */
     onSaveCluster?: (name: string, linkIds: string[]) => Promise<boolean>;
 }) {
@@ -129,6 +144,10 @@ export default function KnowledgeGraph({
     // Screen-space rects of the island captions drawn last frame, for tap tests.
     const captionRectsRef = useRef<{ x1: number; y1: number; x2: number; y2: number; cluster: number }[]>([]);
     const openRef = useRef(onOpenCard);
+    const restoreRef = useRef<GraphRestoreFocus | null>(restoreFocus ?? null);
+    restoreRef.current = restoreFocus ?? restoreRef.current;
+    const onRestoreConsumedRef = useRef(onRestoreConsumed);
+    onRestoreConsumedRef.current = onRestoreConsumed;
     selectedRef.current = selected;
     focusRef.current = categoryFocus;
     clusterFocusRef.current = clusterFocus;
@@ -162,6 +181,20 @@ export default function KnowledgeGraph({
             setModel(m);
             setBuilding(false);
             drawPendingRef.current = true;
+            // Coming back from an Ask this graph launched: re-open the focus
+            // that launched it, so Ask reads as a detour, not an exit.
+            const restore = restoreRef.current;
+            if (restore) {
+                restoreRef.current = null;
+                if (restore.selectedId) {
+                    const idx = m.nodes.findIndex((n) => n.id === restore.selectedId);
+                    if (idx >= 0) setSelected(idx);
+                } else if (restore.clusterAnchorId) {
+                    const anchor = m.nodes.find((n) => n.id === restore.clusterAnchorId);
+                    if (anchor) setClusterFocus(anchor.cluster);
+                }
+                onRestoreConsumedRef.current?.();
+            }
         });
         return () => {
             signal.cancelled = true;
@@ -554,30 +587,53 @@ export default function KnowledgeGraph({
         const members = cluster.nodeIndices
             .map((i) => model.nodes[i])
             .sort((a, b) => b.degree - a.degree);
-        return { index: clusterFocus, label: cluster.label, members };
+        // The "why" headline — what actually ties these cards together
+        // (owner QA: cross-category islands looked arbitrary without it).
+        // Concepts shared by at least a quarter of the members name the tie;
+        // otherwise the honest answer is embedding-level similarity.
+        const conceptCounts = new Map<string, { display: string; count: number }>();
+        for (const m of members) {
+            for (const c of new Set((m.link.concepts ?? []).map((s) => s.trim()).filter(Boolean))) {
+                const key = c.toLowerCase();
+                const entry = conceptCounts.get(key);
+                if (entry) entry.count++;
+                else conceptCounts.set(key, { display: c, count: 1 });
+            }
+        }
+        const floor = Math.max(2, Math.ceil(members.length * 0.25));
+        const threads = [...conceptCounts.values()]
+            .filter((e) => e.count >= floor)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 2)
+            .map((e) => e.display);
+        const why = threads.length
+            ? `linked by ${threads.join(' and ')}`
+            : 'linked by closely related content';
+        return { index: clusterFocus, label: cluster.label, members, why };
     }, [model, clusterFocus]);
 
-    const askCluster = useCallback(() => {
-        if (!clusterPanel || !onAskCluster) return;
-        const question = clusterPanel.label
-            ? `What have I saved about ${clusterPanel.label.split(' · ')[0]}?`
-            : `What connects these ${clusterPanel.members.length} cards I saved?`;
-        onAskCluster(question, clusterPanel.members.slice(0, 8).map((m) => m.link.title));
-    }, [clusterPanel, onAskCluster]);
+    // One cluster-scoped question for both entry points (selection panel and
+    // cluster panel): what TIES the cards together — not a generic topic sweep
+    // ("What have I saved on Tech?" told the owner nothing the label didn't).
+    const askAboutCluster = useCallback((clusterIndex: number, restore: GraphRestoreFocus) => {
+        if (!model || !onAskCluster || !model.clusters[clusterIndex]) return;
+        const cluster = model.clusters[clusterIndex];
+        const members = cluster.nodeIndices.map((i) => model.nodes[i]);
+        const question = cluster.label
+            ? `What connects my ${members.length} cards about ${cluster.label.split(' · ')[0]}?`
+            : `What connects these ${members.length} cards I saved?`;
+        onAskCluster(question, members.slice(0, 8).map((m) => m.link.title), restore);
+    }, [model, onAskCluster]);
 
-    // Ask about the SELECTED card's neighborhood — right in the selection
-    // panel, so reaching Ask never needs the extra hop through the cluster
-    // panel (owner QA: the chip route was one screen too many).
+    const askCluster = useCallback(() => {
+        if (!clusterPanel) return;
+        askAboutCluster(clusterPanel.index, { clusterAnchorId: clusterPanel.members[0]?.id });
+    }, [clusterPanel, askAboutCluster]);
+
     const askSelection = useCallback(() => {
-        if (!selection || !onAskCluster) return;
-        const question = selection.clusterLabel
-            ? `What have I saved about ${selection.clusterLabel.split(' · ')[0]}?`
-            : `How does “${selection.node.link.title.slice(0, 60)}” relate to my other saves?`;
-        onAskCluster(question, [
-            selection.node.link.title,
-            ...selection.neighbors.slice(0, 7).map((nb) => nb.link.title),
-        ]);
-    }, [selection, onAskCluster]);
+        if (!selection) return;
+        askAboutCluster(selection.node.cluster, { selectedId: selection.node.id });
+    }, [selection, askAboutCluster]);
 
     const saveCluster = useCallback(async () => {
         if (!clusterPanel || !onSaveCluster || savingCluster) return;
@@ -758,33 +814,31 @@ export default function KnowledgeGraph({
                                     <X className="w-4 h-4" />
                                 </button>
                             </div>
-                            {/* One quiet, full-width action for the card itself.
-                                Ask lives on the Connections header below —
-                                sitting beside the title it read as "ask about
-                                this one card" when it actually asks about the
-                                whole neighborhood (owner QA); position now
-                                states the scope. */}
-                            <button
-                                onClick={() => onOpenCard(selection.node.link)}
-                                className="mt-2.5 w-full h-9 inline-flex items-center justify-center gap-1.5 rounded-full bg-card border border-border-strong text-[13px] font-bold text-text hover:bg-card-hover active:scale-[0.98] transition-all cursor-pointer"
-                            >
-                                Open card
-                                <ArrowUpRight className="w-3.5 h-3.5" />
-                            </button>
-                        </div>
-                        <div className="flex items-center justify-between px-3 sm:px-3.5 pb-1">
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
-                                Connections · {selection.neighbors.length}
-                            </p>
-                            {onAskCluster && (
+                            {/* Two quiet pills — "cluster" in the Ask label is
+                                what carries the scope (owner QA round 5: the
+                                Connections-header placement read worse, and a
+                                section label cost a row the phone didn't have).
+                                The list below needs no heading; the divider
+                                separates it. */}
+                            <div className="mt-2.5 flex gap-2">
                                 <button
-                                    onClick={askSelection}
-                                    className="text-[12px] font-bold text-accent hover:text-accent-hover transition-colors cursor-pointer"
+                                    onClick={() => onOpenCard(selection.node.link)}
+                                    className="flex-1 h-9 inline-flex items-center justify-center gap-1.5 rounded-full bg-card border border-border-strong text-[13px] font-bold text-text hover:bg-card-hover active:scale-[0.98] transition-all cursor-pointer"
                                 >
-                                    Ask about all
+                                    Open card
+                                    <ArrowUpRight className="w-3.5 h-3.5" />
                                 </button>
-                            )}
+                                {onAskCluster && (
+                                    <button
+                                        onClick={askSelection}
+                                        className="flex-1 h-9 inline-flex items-center justify-center rounded-full bg-card border border-border-strong text-[13px] font-bold text-text hover:bg-card-hover active:scale-[0.98] transition-all cursor-pointer"
+                                    >
+                                        Ask about cluster
+                                    </button>
+                                )}
+                            </div>
                         </div>
+                        <div className="mx-3 sm:mx-3.5 h-px bg-border-subtle" />
                         <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2 space-y-0.5">
                             {selection.neighbors.map((nb) => (
                                 <div key={nb.link.id} className="flex items-stretch gap-0.5">
@@ -840,8 +894,10 @@ export default function KnowledgeGraph({
                                     <h3 dir="auto" className="text-[14px] font-semibold text-text leading-snug line-clamp-2">
                                         {clusterPanel.label ?? 'A cluster of related cards'}
                                     </h3>
-                                    <p className="mt-0.5 text-[11px] font-medium text-text-muted uppercase tracking-wide">
-                                        {clusterPanel.members.length} cards
+                                    {/* Sentence case — this line now carries the
+                                        WHY of the cluster, not a section label. */}
+                                    <p dir="auto" className="mt-0.5 text-[12px] text-text-secondary leading-snug">
+                                        {clusterPanel.members.length} cards · {clusterPanel.why}
                                     </p>
                                 </div>
                                 <button
