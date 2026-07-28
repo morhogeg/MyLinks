@@ -841,6 +841,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         setGraphRestore(restore);
         setViewMode('ask');
     }, []);
+    // A graph hand-off is for ONE Ask entry. Clear it the moment Ask is left,
+    // so no later entrance (tab bar, toolbar, push intent) can replay the
+    // question — AskBrain's consumed-nonce guard resets on unmount, so the
+    // stale payload otherwise re-fires on remount (owner bug 2026-07-28).
+    // graphRestore survives this: the graph consumes it on return.
+    const prevViewMode = useRef(viewMode);
+    useEffect(() => {
+        if (prevViewMode.current === 'ask' && viewMode !== 'ask') setGraphAsk(null);
+        prevViewMode.current = viewMode;
+    }, [viewMode]);
     // Graph → Collections: keep a cluster as a real collection.
     const handleSaveCluster = useCallback(async (name: string, linkIds: string[]) => {
         if (!uid) return false;
@@ -1239,7 +1249,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         if (tab === activeTab && tab === 'home') { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
         if (tab === 'home') setViewMode(lastLayout.current);
         else if (tab === 'collections') { setSelectedCollections(new Set()); setOpenCollectionId(null); setViewMode('collections'); }
-        else if (tab === 'ask') setViewMode('ask');
+        else if (tab === 'ask') {
+            // The tab bar is Ask's BLANK-SLATE entrance (owner call): clear
+            // any pending graph hand-off so it can't replay its question on
+            // remount, and any graph-restore focus that ride-along implied.
+            // The interrupted thread is safe — it lives in the history
+            // sidebar, and a mid-stream answer still lands in its chat doc.
+            setGraphAsk(null);
+            setGraphRestore(null);
+            setViewMode('ask');
+        }
         else setViewMode('digest');
     };
 
@@ -1768,7 +1787,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             {isLibraryView && (
                             <button
                                 data-tour="ask"
-                                onClick={() => setViewMode('ask')}
+                                // Blank-slate entrance, same as the mobile tab
+                                // (clears a pending graph hand-off — see selectTab).
+                                onClick={() => { setGraphAsk(null); setGraphRestore(null); setViewMode('ask'); }}
                                 title="Ask your brain"
                                 aria-label="Ask your brain"
                                 className={`${ctrlBase} px-3.5 ${ctrlIdle}`}

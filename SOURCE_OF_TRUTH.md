@@ -1021,6 +1021,19 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 (same session, round 13) — Ask tab is a BLANK SLATE; graph
+  hand-off can no longer replay (owner bug: graph-ask → close mid-reply →
+  toolbar Ask re-showed the previous question).** Root cause was NOT
+  conversation resume (Ask always mounts empty): the pending `graphAsk`
+  payload lives in Feed while its consumed-once nonce guard lives in
+  AskBrain and resets on unmount — every re-entry replayed the last graph
+  question. Fixes: (1) tab-bar + desktop-toolbar Ask entrances clear
+  `graphAsk`/`graphRestore` first (owner's contract: those entrances always
+  start fresh; the interrupted thread stays in the history sidebar and a
+  mid-stream answer still lands in its chat doc via detachStream); (2)
+  belt-and-braces: leaving the ask view clears `graphAsk` unconditionally
+  (graphRestore survives — the graph consumes it on return), so NO entry
+  path can replay. tsc 0. Frontend-only → Vercel + TestFlight.
 - **2026-07-28 (same session, round 12) — Ask answers get READABLE STRUCTURE
   (owner: "one block of text, hard to follow" — app-wide, not graph-only).**
   Two ends: (1) new rule in the shared `_build_rag_prompt` (buffered +
