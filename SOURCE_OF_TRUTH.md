@@ -979,6 +979,33 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 — Review's right swipe means KEEP again, not "favorite"** (branch
+  `claude/review-view-swipe-behavior-efa5ee`). Owner: the deck's setup reads as
+  confusing — right swipe should simply keep the card where it is. It was
+  right — a green **Star** labelled `KEEP` was writing `status: 'favorite'`, so
+  one gesture made two different promises, and the deck forced every card into
+  an archive-or-favorite binary with no way to say "leave this alone".
+  **The catch that shaped the fix:** `reviewQueue.isOpen()` is the ONLY thing
+  that removes a card from the review pool (archived / favorite /
+  reminder-pending), so a Keep that changed nothing would re-deal the same 12
+  cards forever and turn "Review 12 more" into a loop. Keep therefore still
+  writes something, just not a status: a new **`reviewedAt`** timestamp
+  (`markLinkReviewed` in `lib/storage.ts`, `deleteField()` on Undo) that rests
+  the card from sessions for **`REVIEWED_REST_DAYS` = 30**. `isOpen` gained an
+  injectable `now` — note `links.filter(isOpen)` had to become
+  `filter((l) => isOpen(l, now))`, because `Array.filter` passes the INDEX as
+  the second arg and would otherwise feed `0,1,2…` in as the clock and empty
+  the entire pool. `reviewedAt` also folds into the queue's `viewed()` recency,
+  so a kept card isn't instantly re-classed "forgotten" when its rest ends.
+  Icon Star → **Check** (button + drag HintBadge); Undo of a Keep clears the
+  stamp instead of resetting status. **Favorites stay EXCLUDED from the pool**
+  (a favorite is an explicit keep-forever verdict) and favoriting is now
+  reachable from the card detail view rather than from the swipe grammar —
+  deliberate subtraction, Review is for sorting, not rating. Verified: `tsc
+  --noEmit` clean + a 12-case logic harness over `reviewQueue` (cooldown
+  boundaries at 29d/31d, Undo, the filter-index trap, "a session of all-Keeps
+  empties the pool and refills after the cooldown"). Not render-verified on
+  device — the deck's visual change is the icon swap.
 - **2026-07-27 — S-12 FIXED: the shared per-IP rate-limit bucket (§4 item 11c).**
   `/api/chat` runs through a Vercel route rather than a rewrite (SSE needs a
   streaming pass-through), so every desktop-web Ask reached the backend wearing
