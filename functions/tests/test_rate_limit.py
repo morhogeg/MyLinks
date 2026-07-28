@@ -154,3 +154,115 @@ def test_safe_key_strips_slashes_and_caps_length():
     safe = rate_limit._safe_key(key)
     assert "/" not in safe
     assert len(safe) <= 1400
+
+
+# ── Rate-limit IDENTITY (main._rate_limit_identity, audit S-12) ──────────────
+#
+# The bug this guards: `client_ip` returns the LAST X-Forwarded-For hop (the only
+# unforgeable one), which for a server-side-proxied request is the PROXY's egress
+# IP — the same value for every user behind it. `/api/chat` runs through a Vercel
+# route rather than a rewrite, so the fail-CLOSED 60/hr `chat` bucket had become
+# one ceiling shared by the whole desktop-web user base.
+
+import main
+
+
+class _StubReq:
+    """Minimal request stand-in: headers plus attribute assignment (the memo)."""
+
+    def __init__(self, headers=None, remote_addr=None):
+        self.headers = headers or {}
+        self.remote_addr = remote_addr
+
+
+def _fake_tokens(monkeypatch, mapping):
+    """Map bearer token -> decoded dict; anything else raises like the SDK does."""
+    calls = []
+
+    def _verify(token):
+        calls.append(token)
+        if token in mapping:
+            return mapping[token]
+        raise ValueError("invalid token")
+
+    # raising=False: in CI the real firebase_admin.auth has verify_id_token, but
+    # the offline harness fakes that module as a bare SimpleNamespace which does
+    # not (conftest only fakes what it must). Same drift class as the
+    # test_embed_trigger_backstop mocks — see SOURCE_OF_TRUTH §4 item 11b.
+    monkeypatch.setattr(main.admin_auth, "verify_id_token", _verify, raising=False)
+    monkeypatch.setattr(main, "ensure_app", lambda: None, raising=False)
+    return calls
+
+
+def test_identity_is_per_ip_when_anonymous(monkeypatch):
+    _fake_tokens(monkeypatch, {})
+    req = _StubReq(headers={"X-Forwarded-For": "1.1.1.1, 76.76.21.9"})
+    assert main._rate_limit_identity(req) == "ip:76.76.21.9"
+
+
+def test_identity_is_per_auth_uid_when_a_token_is_present(monkeypatch):
+    _fake_tokens(monkeypatch, {"good": {"uid": "auth-abc"}})
+    req = _StubReq(headers={"Authorization": "Bearer good",
+                            "X-Forwarded-For": "76.76.21.9"})
+    assert main._rate_limit_identity(req) == "auth:auth-abc"
+
+
+def test_identity_falls_back_to_ip_for_an_invalid_token(monkeypatch):
+    _fake_tokens(monkeypatch, {"good": {"uid": "auth-abc"}})
+    req = _StubReq(headers={"Authorization": "Bearer forged",
+                            "X-Forwarded-For": "76.76.21.9"})
+    assert main._rate_limit_identity(req) == "ip:76.76.21.9"
+
+
+def test_two_users_behind_one_proxy_ip_do_not_share_a_bucket(monkeypatch):
+    """THE regression test for S-12 — everything else here is scaffolding.
+
+    Both requests carry the identical proxy egress IP, exactly as they do in
+    production behind the Vercel route. Before the fix both collapsed to
+    `chat:76.76.21.9` and the 60th Ask of the hour locked out everybody.
+    """
+    _fake_tokens(monkeypatch, {"tok-a": {"uid": "user-a"},
+                               "tok-b": {"uid": "user-b"}})
+    proxy_ip = "76.76.21.9"
+    a = main._rate_limit_identity(
+        _StubReq(headers={"Authorization": "Bearer tok-a",
+                          "X-Forwarded-For": f"10.0.0.1, {proxy_ip}"}))
+    b = main._rate_limit_identity(
+        _StubReq(headers={"Authorization": "Bearer tok-b",
+                          "X-Forwarded-For": f"10.0.0.2, {proxy_ip}"}))
+    assert a != b, "two signed-in users behind one proxy still share a bucket"
+    assert proxy_ip not in a and proxy_ip not in b
+
+
+def test_auth_and_ip_identities_cannot_collide(monkeypatch):
+    """An auth uid that looks like an IP must not land on an anonymous key."""
+    _fake_tokens(monkeypatch, {"tok": {"uid": "76.76.21.9"}})
+    signed_in = main._rate_limit_identity(
+        _StubReq(headers={"Authorization": "Bearer tok",
+                          "X-Forwarded-For": "8.8.8.8"}))
+    anon = main._rate_limit_identity(_StubReq(headers={"X-Forwarded-For": "76.76.21.9"}))
+    assert signed_in == "auth:76.76.21.9"
+    assert anon == "ip:76.76.21.9"
+    assert signed_in != anon
+
+
+def test_bearer_verification_is_memoized_per_request(monkeypatch):
+    """_rate_limit_identity and _authed_uid both verify; it must cost one check.
+
+    Also keeps a bad token from logging "verification failed" twice per request.
+    """
+    calls = _fake_tokens(monkeypatch, {"good": {"uid": "auth-abc"}})
+    req = _StubReq(headers={"Authorization": "Bearer good"})
+    assert main._verify_bearer(req)["uid"] == "auth-abc"
+    assert main._verify_bearer(req)["uid"] == "auth-abc"
+    assert main._rate_limit_identity(req) == "auth:auth-abc"
+    assert calls == ["good"], f"verify_id_token called {len(calls)}x, expected 1"
+
+
+def test_memoized_none_is_not_reverified(monkeypatch):
+    """A cached negative must stick — anonymous floods are the hot path."""
+    calls = _fake_tokens(monkeypatch, {})
+    req = _StubReq(headers={"Authorization": "Bearer forged"})
+    assert main._verify_bearer(req) is None
+    assert main._verify_bearer(req) is None
+    assert len(calls) == 1

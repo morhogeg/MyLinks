@@ -225,13 +225,40 @@ def _ask_diag(exc: Exception) -> str:
         return ""
 
 
+# Sentinel so a memoized `None` ("checked, no valid token") is distinguishable
+# from "not checked yet". A plain `None` default would re-verify every time for
+# exactly the anonymous callers we most want to keep cheap.
+_BEARER_UNSET = object()
+
+
 def _verify_bearer(req):
     """Verify the Firebase ID token from the Authorization: Bearer header.
 
     Returns the decoded token dict on success, or None if the header is missing
     or the token is invalid/expired. The caller derives the user identity from
     the returned token — never from the request body.
+
+    Memoized per request. `_rate_limit_identity` now needs the caller's identity
+    BEFORE the body is parsed, and `_authed_uid` verifies again a few lines
+    later; without this the token would be verified twice per request and the
+    "verification failed" warning logged twice for one bad token.
     """
+    cached = getattr(req, "_machina_bearer", _BEARER_UNSET)
+    if cached is not _BEARER_UNSET:
+        return cached
+
+    decoded = _verify_bearer_uncached(req)
+    try:
+        req._machina_bearer = decoded
+    except Exception:
+        # Some request implementations don't accept new attributes. Caching is
+        # an optimization, never a correctness requirement — fall through.
+        pass
+    return decoded
+
+
+def _verify_bearer_uncached(req):
+    """The actual verification. Call `_verify_bearer`, not this."""
     header = req.headers.get("Authorization", "")
     if not header.startswith("Bearer "):
         return None
@@ -325,6 +352,14 @@ MAX_IMAGE_B64_CHARS = (MAX_IMAGE_BYTES * 4) // 3 + 1024
 # reject on a limiter backend error rather than strip the last cost ceiling.
 # Cheap / IP-only buckets (article scrape, device-token writes) fail OPEN so a
 # Firestore hiccup doesn't take those harmless paths down.
+# NAMING NOTE (S-12 fix, 2026-07-27): the bare buckets below ("analyze", "chat",
+# "share", "publish-ip", …) are the PRE-BODY gate. They used to be keyed on the
+# client IP, which is where the name comes from; they are now keyed by
+# `_rate_limit_identity(req)` — the verified auth uid when the caller presents a
+# bearer token, the IP only when they don't. The `-uid` buckets are unchanged and
+# are still keyed on the resolved WORKSPACE uid after the body is parsed. The
+# names are kept as-is deliberately: renaming them would change every Firestore
+# key a second time for no behavioural gain.
 _RATE_LIMITS = {
     "analyze": (30, 3600, False),
     "analyze-uid": (30, 3600, False),
@@ -499,6 +534,44 @@ def _sanitize_tags(tags) -> list:
         if s:
             cleaned.append(s)
     return cleaned
+
+
+def _rate_limit_identity(req) -> str:
+    """Identity for the pre-body rate-limit gate: per USER when we know who the
+    caller is, per IP only when we don't.
+
+    WHY THIS IS NOT JUST `client_ip(req)` (audit S-12). Several surfaces reach
+    these endpoints through a SERVER-SIDE hop, and `client_ip` deliberately
+    returns the LAST `X-Forwarded-For` entry because that is the only one a
+    caller cannot forge (`rate_limit.py:74-87`). For a proxied request that last
+    hop is the PROXY's egress IP — identical for every user behind it.
+
+    `/api/chat` is the proven case: it is deliberately NOT a `vercel.json`
+    rewrite (SSE needs a streaming pass-through), so `web/app/api/chat/route.ts`
+    fetches the Cloud Function server-side from Vercel. Every desktop-web Ask
+    therefore arrived wearing Vercel's egress IP, which turned the fail-CLOSED
+    60/hr `chat` bucket into ONE ceiling shared by the entire web user base —
+    and let a single script lock out every web user. The `vercel.json` rewrites
+    (`analyze`, `image`, `share`, …) add a Firebase Hosting hop with the same
+    shape; that chain could not be verified from a cloud sandbox, so treat it as
+    likely-affected rather than proven, which is another reason to fix this at
+    the identity level rather than per-endpoint.
+
+    Keying on the verified auth uid when a bearer token is present fixes it
+    without weakening anything: anonymous callers are still bounded per IP,
+    identified ones are bounded per ACCOUNT (harder to rotate than an IP), and
+    nobody is left unbounded. The web client already sends `authHeaders()` on
+    these calls and the Vercel route forwards `Authorization`, so this takes
+    effect today — it does not wait on the auth cutover.
+
+    Keys are namespaced (`auth:` / `ip:`) so an auth uid can never collide with
+    an IP string. NOTE: this changes existing Firestore keys (`chat:1.2.3.4` →
+    `chat:ip:1.2.3.4`), so every fixed window resets once on deploy. Harmless —
+    the worst case is one extra window's allowance for one hour.
+    """
+    decoded = _verify_bearer(req)
+    auth_uid = decoded.get("uid") if decoded else None
+    return f"auth:{auth_uid}" if auth_uid else f"ip:{client_ip(req)}"
 
 
 def _rate_limited(bucket: str, identity: str, headers: dict = None):
@@ -1335,7 +1408,7 @@ def analyze_link(req: https_fn.Request) -> https_fn.Response:
 
     headers = _cors_headers(req)
 
-    rl = _rate_limited("analyze", client_ip(req), headers)
+    rl = _rate_limited("analyze", _rate_limit_identity(req), headers)
     if rl:
         return rl
 
@@ -1538,7 +1611,7 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
 
     headers = _cors_headers(req)
 
-    rl = _rate_limited("chat", client_ip(req), headers)
+    rl = _rate_limited("chat", _rate_limit_identity(req), headers)
     if rl:
         return rl
 
@@ -2073,7 +2146,7 @@ def search_links_http(req: https_fn.Request) -> https_fn.Response:
 
     headers = _cors_headers(req)
 
-    rl = _rate_limited("search", client_ip(req), headers)
+    rl = _rate_limited("search", _rate_limit_identity(req), headers)
     if rl:
         return rl
 
@@ -2125,7 +2198,7 @@ def analyze_image(req: https_fn.Request) -> https_fn.Response:
 
     headers = _cors_headers(req)
 
-    rl = _rate_limited("image", client_ip(req), headers)
+    rl = _rate_limited("image", _rate_limit_identity(req), headers)
     if rl:
         return rl
 
@@ -2310,7 +2383,7 @@ def share_ingest(req: https_fn.Request) -> https_fn.Response:
 
     headers = _cors_headers(req)
 
-    rl = _rate_limited("share", client_ip(req), headers)
+    rl = _rate_limited("share", _rate_limit_identity(req), headers)
     if rl:
         return rl
 
@@ -2792,7 +2865,7 @@ def _device_token_request(req):
     """
     headers = _cors_headers(req)
 
-    rl = _rate_limited("device_token", client_ip(req), headers)
+    rl = _rate_limited("device_token", _rate_limit_identity(req), headers)
     if rl:
         return None, None, rl
 
@@ -2910,7 +2983,7 @@ def publish_share_http(req: https_fn.Request) -> https_fn.Response:
     # admin-SDK snapshots to a world-readable collection, so gate it like the
     # paid endpoints (the per-uid `publish` bucket below is bypassable by a
     # rotating client-supplied uid pre-cutover).
-    rl = _rate_limited("publish-ip", client_ip(req), headers)
+    rl = _rate_limited("publish-ip", _rate_limit_identity(req), headers)
     if rl:
         return rl
     if not _require_app_check(req, headers):
@@ -2955,7 +3028,7 @@ def unpublish_share_http(req: https_fn.Request) -> https_fn.Response:
     headers = _cors_headers(req)
     # Per-IP rate limit + App Check (unpublish had neither) — same world-readable
     # write surface as publish; gate it identically.
-    rl = _rate_limited("publish-ip", client_ip(req), headers)
+    rl = _rate_limited("publish-ip", _rate_limit_identity(req), headers)
     if rl:
         return rl
     if not _require_app_check(req, headers):

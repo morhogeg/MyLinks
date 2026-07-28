@@ -84,6 +84,22 @@ surface in the category and a knowledge graph computed on every save. The path t
     2026-07-17 — fully operational, no owner step per deploy). Mac
     fallback: `./deploy-functions.sh functions:<a>,functions:<b>` (always pass
     explicit targets; scheduler/webhook fns aren't in the default set).
+    **Functions ENV CONFIG rides this workflow too:** `ADMIN_TOKEN`,
+    `OWNER_EMAIL`, `APPCHECK_ENFORCE` and `REQUIRE_AUTH` are read from **GitHub
+    repo secrets** and written into `functions/.env` at deploy time
+    (`deploy-functions.yml:129-152`) — they are NOT Firebase console settings.
+    Set a secret, push a `functions/**` change, done.
+  - **Firestore + Storage rules** → **"Deploy Firestore rules"**
+    (`.github/workflows/deploy-rules.yml`, added 2026-07-27), auto on `main`
+    pushes touching `firestore.rules` or `storage.rules`. Runs the
+    `firestore-rules-test` emulator suite, deploys, then probes the live DB
+    anonymously to prove the resulting posture. **Carries the cutover tripwire:**
+    it refuses to deploy a locked ruleset while the `REQUIRE_AUTH` secret is off,
+    so the ordering that would brick every sign-in is enforced by the pipeline
+    rather than by a doc. `firestore.indexes.json` is deliberately NOT in its
+    paths — deploy-functions.yml owns indexes (`:168`) and two workflows racing
+    on the same index set would be a bug. `firestore.rules.locked` is also not in
+    its paths: editing the staged file must never ship anything.
 
 ### Operational gotchas (hard-won — don't re-learn these)
 
@@ -213,16 +229,33 @@ The multi-user auth work is **fully written but not live**:
    `delete_account_http` (bearer + `_allowed_origins` CORS); native routes to
    `/api/claim-workspace` + `/api/delete-account`, web keeps the callable —
    **deployed + curl-verified.** Web login now also shows Apple+Google (no
-   cutover). **Owner steps that REMAIN before flipping** (nothing left in code):
-   (1) configure the Apple **Services ID + `.p8`** in the Firebase Apple provider
-   — REQUIRED for web Apple sign-in (native didn't need it; the web Apple button
-   errors until then); (2) set `OWNER_EMAIL` (+ task 5 env) so only the owner can
-   claim the legacy workspace; (3) flip `REQUIRE_AUTH` +
-   `NEXT_PUBLIC_REQUIRE_AUTH`, redeploy functions + web; (4) `cd
-   firestore-rules-test && npm test`; (5) `cp firestore.rules.locked
-   firestore.rules && firebase deploy --only firestore:rules` (point of no
-   return); (6) device-verify the **brand-new-user** claim path (fresh non-owner
-   account → auto-created workspace — only works once `REQUIRE_AUTH` is on).
+   cutover). **Owner steps that REMAIN before flipping — REWRITTEN 2026-07-27,
+   and it is now much smaller than this item used to claim.** The old list sent
+   you to a Mac for three of its six steps; all three are CI now. What is left:
+   - **(a) Four GitHub repo secrets** — `OWNER_EMAIL`, `ADMIN_TOKEN`,
+     `APPCHECK_ENFORCE=true`, and (when you are ready) `REQUIRE_AUTH=true`.
+     These are **repo secrets, not Firebase console settings**
+     (`deploy-functions.yml:129-152` writes them into `functions/.env`), so this
+     is a GitHub settings page plus a push to `main`.
+   - **(b) One Vercel variable** — `NEXT_PUBLIC_REQUIRE_AUTH=true`. The only
+     piece of cutover config that lives outside GitHub, and the one thing
+     `deploy-rules.yml`'s tripwire cannot check for you.
+   - **(c) Merge a one-line commit** — `cp firestore.rules.locked
+     firestore.rules`. "Deploy Firestore rules" tests, deploys and verifies it.
+     Still the point of no return, but it is now a reviewable diff rather than a
+     hand-typed command, and it is blocked automatically if (a) is not done.
+   - **(d) One device check** — the brand-new-user claim path (fresh non-owner
+     account → auto-created workspace), which only works once `REQUIRE_AUTH` is
+     on.
+   - **(e) Only if you want web Apple sign-in:** the Apple **Services ID + `.p8`**
+     in the Firebase Apple provider. **Not a cutover blocker** — native Apple
+     sign-in does not need it; the web Apple button errors until it is set.
+     Google works on both platforms regardless.
+   ~~(4) `cd firestore-rules-test && npm test`~~ — **struck: CI already does
+   this** on every `firestore.rules*` push (`rules-tests.yml`, run #6 green
+   2026-07-25), and `deploy-rules.yml` re-runs it before deploying.
+   ~~(5) `firebase deploy --only firestore:rules` from a Mac~~ — **struck:**
+   superseded by (c).
    ~~Flagged decision: `get_article` stays anonymous-callable (App Check + rate
    limit only) — keep or gate deliberately.~~ **RESOLVED BY DELETION
    2026-07-27** — the reader feature was removed at owner request, taking the
@@ -234,11 +267,21 @@ The multi-user auth work is **fully written but not live**:
    but the per-digest **Delete** action is a direct client `deleteDoc`
    (`lib/digest.ts:61`) — so at the cutover that button would have become a
    silent no-op. The rule now allows `delete` for the owner and keeps
-   `create, update` denied; 4 cases added to `firestore-rules-test`. **Step (4)
-   of the checklist above is now load-bearing** — the cloud sandbox cannot
-   download the emulator JAR, so this rule change has never run against a live
-   emulator. Run `cd firestore-rules-test && npm test` on your machine BEFORE
-   step (5).
+   `create, update` denied; 4 cases added to `firestore-rules-test`.
+   ~~**Step (4) of the checklist above is now load-bearing** — the cloud sandbox
+   cannot download the emulator JAR, so this rule change has never run against a
+   live emulator.~~ ❌ **THAT WAS WRONG — CORRECTED 2026-07-27. Step (4) is
+   ALREADY DONE, by CI, and can be struck from the owner checklist.**
+   `.github/workflows/rules-tests.yml` runs the suite against a real emulator on
+   every push touching `firestore.rules*`, and a **GitHub runner downloads the
+   emulator JAR fine — only this sandbox cannot.** **Run #6 (2026-07-25) is
+   GREEN on the exact merge that landed the S-9 digest-delete rule**, so the
+   locked ruleset has been emulator-verified. The generalisable error: "the
+   sandbox can't do X" was silently promoted to "X is unverified", when CI had
+   been doing X all along. Before trusting this, confirm the run is still green
+   for the newest `firestore.rules.locked` — but do NOT re-add a manual Mac step
+   that CI already covers. (Audit N-2a — "run the rules suite in CI" — is
+   likewise already shipped, not open.)
 3. **[x] New-user path** *(code done 2026-07-03; goes live with the task-2
    cutover — flag-gated behind `REQUIRE_AUTH`).* `claim_workspace` now falls
    back to creating a fresh `users/{authUid}` workspace (authUids/email/
@@ -390,28 +433,24 @@ The multi-user auth work is **fully written but not live**:
 
 ### 🟡 P2 — security/cost hardening & honest product surface
 
-11a1. **[ ] Owner QA on build 1219 — the device-unverified 2026-07-27 work.**
-    QA this build; 1212–1218 are superseded. The cloud sandbox cannot compile
-    Swift, render the app under auth, or call Gemini, so everything here is
-    reasoned/statically-checked, not seen running. In order of risk:
-    (1) **Share-extension scanner** (`CitationMarkView`) — statically reviewed
-    only, never once rendered. Share into Machina and check the mark actually
-    draws, the strike/breathe reads right, and nothing clips at 32pt, in light
-    and dark. **Highest risk item in the batch.** (2) **Capture-banner replay** —
-    share a post, open the app, and confirm the bar shows its phases ONCE and
-    closes. Watch specifically for the new hand-off: the bridge should pass to
-    the Firestore banner with no "Saved" flash in between. (3) **Settings
-    scroll** — scroll to the bottom of Settings, open the story, confirm it lands
-    at the top with the glyph visible, then Back and confirm you are still at the
-    bottom of the list (the per-view memory, not a blanket scroll-to-0).
-    (4) **Account screen** — sign in with Google and confirm it says Google, not
-    Apple. (5) **Japan/Tokyo** — ✅ *apparently confirmed on device 2026-07-27*
-    (a re-shared card titled "ביקורת על חוויית התיירות **ביפן**", not Tokyo), but
-    worth one more country/industry-level post, checking title, summary AND tags.
-    If it ever narrows again the next lever is `_THIN_TWEET_CHARS` / raising the
-    non-primary vision resolution unconditionally.
-    Owner-confirmed working already: the list-view ⋯ menu + conditional star, the
-    dark-mode FAB, the desktop tag create, and the favicon (Chrome).
+11a1. **[x] Owner QA on build 1219 — ✅ ALL CONFIRMED ON DEVICE 2026-07-27.**
+    The owner ran the full list on a physical iPhone and reported everything
+    working ("they are great"). The device-verification debt this item tracked is
+    **cleared** for build 1219. Confirmed working: (1) the **share-extension
+    scanner** (`CitationMarkView`) — the highest-risk item in the batch, since the
+    sandbox can't compile Swift and it had never once been rendered; it draws
+    correctly in light and dark; (2) **capture-banner replay** — phases show once
+    and close, with the bridge → Firestore-banner hand-off clean (no "Saved"
+    flash); (3) **Settings scroll** — sub-screens open at the top, Back returns to
+    the bottom of the main list (per-view memory behaves); (4) **Account screen**
+    reports the real provider; (5) **Japan/Tokyo** anti-narrowing holds at
+    country/industry level. Previously confirmed and unchanged: the list-view ⋯
+    menu + conditional star, the dark-mode FAB, the desktop tag create, the
+    favicon (Chrome).
+    ⚠️ **NOT covered by this pass:** the Settings "Done" bar safe-area fix
+    (`157c11d`) landed *after* build 1219 was cut, so it has never been in a
+    TestFlight build. It rides the next iOS build and needs one look on a
+    home-indicator iPhone — see the 2026-07-27 §9 entry.
 11a2. **[ ] Image-mode scan phases drift between the app and the Share
     Extension** (found 2026-07-27). Thresholds match (95/80/60/45) but the
     wording does not: Swift says "Understanding content… / Reading text… /
@@ -445,8 +484,30 @@ The multi-user auth work is **fully written but not live**:
     (`ea3bc2e`, merge `464e986`) — mocks now call `sync_link_embedding.__wrapped__`
     with the already-parsed event shape, and `cardThumbnail.ts` uses the shared
     `isHttpUrl()`. 525 tests green. See the §9 entry for the full reasoning.
-11c. **[ ] Web traffic shares ONE per-IP rate-limit bucket (audit S-12) — found
-    2026-07-25 (`/security web`), fix belongs in `functions/`.** `/api/chat` is
+11c. **[x] Web traffic shares ONE per-IP rate-limit bucket (audit S-12) —
+    FIXED 2026-07-27.** The pre-body gate is no longer keyed on the client IP;
+    it uses the new `_rate_limit_identity(req)` in `main.py`, which returns
+    `auth:<verified auth uid>` when the caller presents a valid bearer token and
+    `ip:<last XFF hop>` only when it can't identify them. Applied to all 8
+    pre-body gates (`analyze`, `chat`, `image`, `search`, `share`,
+    `device_token`, both `publish-ip` sites); the `-uid` buckets are untouched.
+    `_verify_bearer` is now memoized per request, so the pre-filter and
+    `_authed_uid` share one verification instead of doing it twice (and a bad
+    token logs one warning, not two). **Takes effect immediately — it does NOT
+    wait on the cutover:** the web client already sends `authHeaders()` on these
+    calls and the Vercel route forwards `Authorization`, and web is already
+    behind the Google gate. Anonymous callers are still bounded per IP, so
+    nothing is left unlimited; signed-in ones are now bounded per account, which
+    is also harder to rotate than an IP. +7 tests in
+    `tests/test_rate_limit.py`, including the regression case (two signed-in
+    users behind one proxy IP must not share a bucket). One-time effect on
+    deploy: keys change (`chat:1.2.3.4` → `chat:ip:1.2.3.4`), so every fixed
+    window resets once — worst case one extra hour's allowance.
+    ⛔ **Not fixed by this, deliberately:** an ANONYMOUS caller behind the proxy
+    still shares the IP bucket with every other anonymous caller behind it.
+    That is the correct behaviour (they are genuinely indistinguishable), and it
+    is only reachable pre-cutover; post-cutover these endpoints require a token.
+    The original diagnosis, kept because the reasoning is what matters: `/api/chat` is
     deliberately not a rewrite, so `web/app/api/chat/route.ts:50` is a Vercel
     serverless function that fetches the Cloud Function's direct URL
     **server-side**. `rate_limit.client_ip` takes the LAST `X-Forwarded-For` hop
@@ -459,10 +520,14 @@ The multi-user auth work is **fully written but not live**:
     all~~, **moot: the reader feature and its `get_article` endpoint were
     deleted 2026-07-27**), though those add a Firebase Hosting hop that couldn't
     be verified from the cloud sandbox, so only the `/api/chat` chain is
-    asserted. Fix options:
-    consult the per-uid bucket first for authenticated callers and treat the IP
-    bucket as anonymous-only, or have the proxy pass a signed client-IP header.
-    Take it in the next `/security functions` pass.
+    asserted. ~~Fix options: consult the per-uid bucket first for authenticated
+    callers and treat the IP bucket as anonymous-only, or have the proxy pass a
+    signed client-IP header.~~ **Took the first, at the identity layer rather
+    than per-endpoint** — which also covers the unproven Hosting-hop chain
+    without needing to verify it first. The signed-client-IP option was
+    rejected: it needs a shared secret in both the Vercel and functions envs,
+    i.e. new owner config that can silently drift out of sync, to end up at the
+    same place.
 11d. **[ ] Dependency + CSP posture (audit S-13/S-14) — reviewed 2026-07-25, no
     reachable exposure.** `npm audit` in `web/`: 1 critical / 18 high / 1
     moderate, all triaged as unreachable — `next@16.2.10`'s nine advisories need
@@ -628,10 +693,11 @@ The multi-user auth work is **fully written but not live**:
     (`ac32efa`, merge `728c16e`, build 1161):** the native iOS share extension
     (`ShareViewController.swift`) now uses the ring too (scanner kept, `linkGlyph`
     → `SpinningRingView`) and its `phase(for:)` labels re-synced to `scanPhases`.
-    **Deferred owner step:** on-device light+dark QA of the ring everywhere — Ask,
-    the in-app save stepper (WKWebView conic-gradient + CSS mask), and the native
-    share-sheet scanner (CAGradientLayer `.conic`) — none device-verified this
-    session.
+    ~~**Deferred owner step:** on-device light+dark QA of the ring everywhere~~ —
+    **CLOSED 2026-07-27.** Partly by supersession (item 20b retired the ring for
+    the Citation mark on every surface, including the share extension), and partly
+    by the owner's device pass on build 1219, which confirmed the mark renders in
+    light and dark in the share sheet and in-app. Nothing left to QA here.
 20b. **[x] Machina identity build-out — shipped 2026-07-26.** The Citation mark
     (brackets enclosing a struck point) + Lumen palette from
     `design/icon-concepts/` (branch `claude/logo-design-feedback-uhl1sk`,
@@ -643,23 +709,29 @@ The multi-user auth work is **fully written but not live**:
     graphite on light, new `--accent-ink`/`--accent-hover` tokens; destructive
     red + platform/collection colors deliberately kept), `CitationMark`
     replaces `thinking-orbs` everywhere (motion.js ported verbatim, verb →
-    motion), bracket glyph on Ask citation chips. **Still open (owner/QA):**
-    (1) on-device light+dark QA; (2) whether 20px needs a reduced drawing
-    (crisp in 2x renders, check 1x devices); (3) iOS 26 Icon Composer layered
-    variant (needs a Mac); (4) the NATIVE share-extension indicator
-    (`ShareViewController.swift`) still draws the old ring — not in this
-    session's spec scope, swap to the mark in a follow-up (§4 item 18c).
+    motion), bracket glyph on Ask citation chips.
+    **Still open (owner/QA):** ~~(1) on-device light+dark QA~~ — **✅ DONE
+    2026-07-27**, owner confirmed on a physical iPhone against build 1219 (see
+    item 11a1); (2) whether 20px needs a reduced drawing (crisp in 2x renders,
+    check 1x devices); (3) iOS 26 Icon Composer layered variant (needs a Mac);
+    ~~(4) the NATIVE share-extension indicator still draws the old ring~~ —
+    **✅ DONE, shipped in build 1219 and device-confirmed:**
+    `ShareViewController.swift` now draws `CitationMarkView` (`:139`, `:1235`)
+    and `OrbitsOrbView` is retired (see the comment at `:1193`).
 
 ### 🟢 P3 — product roadmap (post-launch)
 
-18c. **[ ] Native share-extension orb: per-phase states.** Web now maps every
-    capture phase to its own orb (`LINK_SCAN_ORBS` in `web/lib/scanPhases.ts` —
+18c. **[ ] Native share-extension indicator: per-phase states.** Web maps every
+    capture phase to its own motion (`LINK_SCAN_ORBS` in `web/lib/scanPhases.ts` —
     fetch=`working`, read=`searching`, write=`shaping`, connect=`searching`,
-    organize=`solving`). The share extension's Swift `OrbitsOrbView` only ports
-    the `orbits` (`working`) mode, so it shows one shape for the whole save. To
-    match, port `globe`/`morph`/`rubik` to CoreGraphics — or deliberately leave
-    it single-state (the sheet is short-lived and hands off to the in-app
-    banner). Owner call; not blocking.
+    organize=`solving`). **Rewritten 2026-07-27:** the premise changed — the Swift
+    `OrbitsOrbView` this item was written against is retired
+    (`ShareViewController.swift:1193`) and the sheet now draws `CitationMarkView`
+    (`:139`, `:1235`), device-confirmed on build 1219. What remains is the same
+    gap in new clothes: the mark renders ONE motion for the whole save while web
+    varies it per phase. Either port the remaining verb→motion mappings to
+    CoreGraphics, or deliberately leave it single-state (the sheet is short-lived
+    and hands off to the in-app banner). Owner call; not blocking.
 
 19b. **[ ] Retire dead search backend (post search-rebuild 2026-07-17):** the
     client no longer calls `search_links` / `search_links_http` (search is
@@ -907,6 +979,98 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-27 — S-12 FIXED: the shared per-IP rate-limit bucket (§4 item 11c).**
+  `/api/chat` runs through a Vercel route rather than a rewrite (SSE needs a
+  streaming pass-through), so every desktop-web Ask reached the backend wearing
+  **Vercel's egress IP**. `client_ip` takes the last `X-Forwarded-For` hop —
+  correctly, it is the only unforgeable one — so the fail-CLOSED 60/hr `chat`
+  bucket was ONE ceiling shared by the whole web user base, and a single script
+  could lock out every web user.
+  **Fixed at the identity layer, not per endpoint.** New
+  `main._rate_limit_identity(req)` returns `auth:<verified auth uid>` when a
+  bearer token is present and `ip:<last hop>` when it isn't; all 8 pre-body
+  gates now use it. Doing it generically also covers the `vercel.json` rewrites'
+  Firebase-Hosting hop, which has the same shape but could never be verified
+  from a cloud sandbox — **fixing the class was cheaper than proving the second
+  instance.** The other option on the table (proxy sends a signed client-IP
+  header) was rejected: it needs a shared secret in both the Vercel and
+  functions envs — new owner config that can silently drift — to reach the same
+  place.
+  **This takes effect immediately; it does not wait on the cutover.** The web
+  client already sends `authHeaders()` on these calls, the Vercel route already
+  forwards `Authorization`, and web already sits behind the Google gate.
+  Anonymous callers stay bounded per IP so nothing is left unlimited, and
+  signed-in ones are now bounded per ACCOUNT, which is harder to rotate than an
+  IP — so the pre-cutover `publish-ip` reasoning (a rotating client-supplied uid
+  is spoofable) gets stronger, not weaker.
+  `_verify_bearer` is now **memoized per request** (sentinel-guarded, so a
+  cached `None` isn't re-verified — anonymous floods are the hot path): the
+  pre-filter and `_authed_uid` share one verification, and a bad token logs one
+  warning instead of two. +7 tests, including the one that states the bug: two
+  signed-in users behind one proxy IP must not share a bucket. Full suite green.
+  **Deploy note:** keys change (`chat:1.2.3.4` → `chat:ip:1.2.3.4`), so every
+  fixed window resets once — worst case one extra hour's allowance.
+  **Sandbox friction worth recording:** the offline harness cannot import
+  `main.py` at all without `pydantic` (conftest fakes firebase_admin /
+  google.genai / firestore / requests, but not that), so every `import main`
+  test — `test_workspace_claim`, `test_search_http`, ~10 others — errors on
+  collection here. Pre-existing, not caused by this work; `pip install pydantic`
+  is enough. And `monkeypatch.setattr(main.admin_auth, "verify_id_token", …)`
+  needs `raising=False`, because the faked `firebase_admin.auth` is a bare
+  `SimpleNamespace` — the same drift class as item 11b's mocks.
+
+- **2026-07-27 — RULES NOW DEPLOY FROM CI, AND THE CUTOVER CHECKLIST WAS
+  REWRITTEN AROUND WHAT IS ACTUALLY TRUE.** Rules were the last deploy surface
+  with no CI path, which put a Mac-only `firebase deploy --only firestore:rules`
+  in the middle of the auth cutover — the "point of no return" step. New
+  **`.github/workflows/deploy-rules.yml`** closes it, reusing the existing
+  `FIREBASE_SERVICE_ACCOUNT` secret (that account holds Firebase Admin, which
+  covers rules), so it needed **no owner setup at all** — same trick
+  `deploy-hosting.yml` used last week. Fires on `main` pushes touching
+  `firestore.rules` / `storage.rules`; deploys `firestore:rules,storage`.
+  **Three deliberate design calls, each of which is the interesting part:**
+  (1) **The cutover tripwire.** Deploying the locked ruleset while the backend
+  still trusts a client uid does not half-work — it bricks every sign-in.
+  `NATIVE_AUTH_SETUP.md` has always said "flags first, rules last", but a doc is
+  not a seatbelt. The workflow now detects a locking ruleset **by content** (the
+  `allow read, write: if true` marker is gone — so a hand-edited lock is caught
+  too, not just a byte-identical `cp`) and refuses to deploy unless the
+  `REQUIRE_AUTH` secret is truthy, mirroring `main.py:553`'s exact 1/true/yes
+  rule. It cannot see `NEXT_PUBLIC_REQUIRE_AUTH` (a Vercel var) and says so
+  loudly rather than implying it checked.
+  (2) **Verify the posture, not the deploy** (the `deploy-hosting.yml` lesson):
+  an anonymous REST GET on `/users` returns 200 under the open ruleset and 403
+  under the locked one, so the live security posture is directly measurable with
+  no credential. **Status code only — the body is never printed**, because under
+  the open ruleset it contains user documents whose ids are phone numbers, and
+  that would put PII in a public CI log.
+  (3) **Only `locked:200` is fatal.** `open:403` looks alarming but is genuinely
+  ambiguous — it means either the rules got locked out of band OR **Firestore
+  App Check enforcement is on**, which nobody has ever confirmed (§4 task 5).
+  Failing a good deploy on a two-explanation signal just teaches everyone to
+  ignore the step, so that case warns and explains how to tell them apart.
+  **A real bug caught while testing this:** `status=$(curl …) || echo "000"` is
+  wrong — on a connection failure curl writes `000` to stdout *and* exits
+  non-zero, so the `|| echo` form concatenates to `000000` and misses every
+  `case` label. Verified live (this sandbox has no egress to
+  `firestore.googleapis.com`, so the failure path was easy to exercise). Correct
+  form is `status=$(curl …) || status="000"`. `deploy-hosting.yml` has the same
+  shape and survives only because its labels are `000*` globs — left alone
+  deliberately, with a comment pointing at it.
+  **Docs rewritten to match, and a lot of what they said was stale.**
+  `NATIVE_AUTH_SETUP.md` §6 described a workflow that no longer exists: manual
+  functions deploy, `./deploy-hosting.sh`, a local emulator run, a hand-typed
+  rules deploy, and Xcode → Archive. All five are CI. It also still warned about
+  three breaks that are fixed (`retryFailedLink` sends the bearer header,
+  `backfill_related_links` is admin-gated, `get_article` was deleted), and §7
+  still claimed new users hit the restricted screen — resolved back on 07-03 by
+  task 3. §5 now states the thing that keeps getting mis-described: **the
+  functions env config is GitHub repo secrets, not Firebase console.**
+  **Net effect — the cutover is now: 4 repo secrets, 1 Vercel variable, 1 merged
+  one-line commit, 1 device check.** No Mac, no firebase CLI, no emulator run.
+  §4 task 2's owner list was rewritten accordingly, and the Apple Services ID +
+  `.p8` demoted out of it — it gates *web* Apple sign-in only, never the cutover.
+
 - **2026-07-27 — THE NAME LOSES ITS "AI": `Machina AI` → `Machina`, and a new
   `docs/BRANDING.md`.** Owner's call, on two arguments — AI fatigue in the
   market, and AI being the *infrastructure* under a capture-and-recall product
@@ -1009,6 +1173,46 @@ exact-match, capped.
   installed from TestFlight; and **A-1, the trademark search on "Machina"**
   (USPTO + Israel, classes 9/42) is the one open item that could still veto the
   whole rename — now tracked as §4 P1 task 8a.
+- **2026-07-27 — ✅ OWNER DEVICE QA ON BUILD 1219: ALL CLEAR + a codebase
+  review.** The owner ran the full 11a1 list on a physical iPhone and reported
+  everything working. **The device-verification debt for 1219 is cleared**,
+  including the item that carried the most risk: `CitationMarkView` in the share
+  extension had been *statically reviewed only, never once rendered* (the sandbox
+  cannot compile Swift), and it draws correctly in light and dark. §4 items
+  11a1, 20 and 20b(1)/(4) updated to match; item 18c was rewritten because its
+  premise had gone stale — it was written against `OrbitsOrbView`, which is now
+  retired, so the real remaining gap is that the mark shows one motion for the
+  whole save while web varies it per phase. **Carry-over: the Settings "Done" bar
+  safe-area fix (`157c11d`) landed AFTER 1219 was cut**, so it is not in any
+  TestFlight build and is still unverified on a home-indicator iPhone — QA it on
+  the next iOS build.
+  **Review findings worth keeping** (full pass over docs + code, no changes made):
+  the backend is hardened to a genuinely professional standard — `safe_get`
+  `is_global` SSRF guard + 13 tests, `_require_admin` failing closed with
+  `hmac.compare_digest`, per-uid+IP rate limits, `log_safe` PII masking with an
+  AST regression scan, pre-b64 size caps, quotas — but **the front door is
+  unlocked and the two facts compound**. (1) Live `firestore.rules` is still
+  `allow read, write: if true` on `users/{uid}` and every subcollection, while
+  ~18 client modules talk to Firestore *directly* and `projectId` ships in the
+  public JS bundle; the rules file defends this by citing Cloud Function
+  hardening (App Check, CORS, rate limits), **which guards a different door
+  entirely and does nothing about direct client SDK access**. (2) `ingestToken`
+  is stored on the user doc (`link_service.py:229`), i.e. inside that
+  world-readable blast radius, and uid = phone number — so read a user doc → get
+  the token → write into that library. Read + write + impersonate, not
+  theoretical. Exposure is ~one user today, which is why it hasn't bitten; the
+  first outside TestFlight tester changes that. **Sequencing critique the owner
+  accepted:** the app is ~95% built and 0% launched, and the remaining 5% is
+  console work that keeps losing to polish rounds — task 2 has been P0 since
+  July 3 while ~30 features shipped on top of it. Agreed next order: auth
+  cutover → raise the ₪5/mo Gemini cap (two real users exhaust it mid-month and
+  429 with no free-tier fallback) → `ADMIN_TOKEN` + `APPCHECK_ENFORCE` → move
+  `ingestToken` off the user doc (§4 task 12, the only pure-code item of the
+  four). Also flagged for later: `Feed.tsx` is 2,728 lines / 41 `useState`
+  (R-3) and `main.py` is 3,630 lines (R-1), and `web/` still has **no JS test
+  runner** — which is why web invariants are enforced by a Python test that
+  greps TypeScript source (`test_web_client_hygiene.py`). Handoff prompts for
+  task 12, R-3 and R-1 were written for separate sessions.
 
 - **2026-07-27 — 🚢 SHIPPED: privacy audit + policy rewrite + reader removal
   (merge `65d3afd`, pushed as `ee99317`).** Desktop web → Vercel (auto on the
