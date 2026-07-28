@@ -1118,6 +1118,21 @@ exact-match, capped.
   shape but survives because its expression is well-formed (`secrets.X` resolves
   to empty) — left alone deliberately; it works, and touching it triggers a
   functions deploy.
+  ✅ **GREEN on run #4** (`3f0820a`): tripwire → emulator suite → deploy →
+  posture probe, 59s. **And the probe answered a question that had been open
+  since the first review.** It printed:
+  `Anonymous GET /users → HTTP 200` — an unauthenticated GitHub runner, holding
+  no credential of any kind, successfully read the `users` collection of the
+  production database. Two things follow, and both were previously guesses:
+  (1) the world-readable exposure is **observed, not inferred** — every card,
+  chat, collection and `ingestToken` is readable by anyone with the projectId,
+  which ships in the public web bundle; (2) **Firestore App Check enforcement is
+  NOT on**, because it would have denied that call regardless of rules. That was
+  explicitly flagged as unverified when the exposure was first written up, and
+  the `open:403` branch of the probe exists precisely to handle the other
+  answer. It is now settled: nothing but the ruleset is guarding Firestore, and
+  the ruleset says `if true`. Closing it is the auth cutover (task 2), and this
+  probe now re-states the finding on every rules deploy until it is.
 
 - **2026-07-27 — THE NAME LOSES ITS "AI": `Machina AI` → `Machina`, and a new
   `docs/BRANDING.md`.** Owner's call, on two arguments — AI fatigue in the
