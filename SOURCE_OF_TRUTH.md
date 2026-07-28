@@ -309,11 +309,15 @@ The multi-user auth work is **fully written but not live**:
    - `/api/analyze` 60s timeout — confirmed moot (2026-07-11 weaknesses sprint):
      web saves enqueue via `/api/share` into `process_link_background` (300s);
      `/api/analyze` serves only Retry / image / Note (all short).
-   4b. **[ ] Prove synthesis end-to-end (owner-gated, 5 min):** deploy is live
-   but no synthesis has ever generated. Either set digest mode = Synthesis
-   on-device, or give a session the workspace uid to call `send_digest_now`
-   with `{mode:'synthesis'}` (force bypasses the per-ISO-week idempotency).
-   A green deploy is not evidence the feature works. See 2026-07-28 §9 entry.
+   4b. **[ ] Prove synthesis end-to-end (owner-gated):** deploy is live but no
+   synthesis has ever generated. Owner set style=Weekly synthesis on device
+   2026-07-28 (legacy slot) — the daily-3AM legacy path should generate the
+   first one overnight 2026-07-29; after that, the redesigned settings
+   (2026-07-28, build 1229) migrate it to the independent `synthesis_enabled`
+   toggle firing on `synthesis_day` (default Sun). **Check the feed/Digest tab
+   on 2026-07-29** — if nothing rendered, debug via functions logs
+   (`send_digests`) or force via `send_digest_now` `{mode:'synthesis'}` with
+   the workspace uid. A green deploy is not evidence the feature works.
    4c. **[ ] Audit remaining collection-group queries in `functions/` for the
    COLLECTION_GROUP index-scope trap** that broke `sweep_stuck_processing`
    every 5 min in prod (2026-07-28 §9): default single-field indexes are
@@ -1049,6 +1053,36 @@ exact-match, capped.
   `allowedDevOrigins: ["127.0.0.1"]` to `next.config.ts` (revert after). Also
   note `AuthGate` swaps EVERY non-public route for the LoginScreen, so a
   throwaway preview route must be added to `PUBLIC_ROUTES` to render at all.
+- **2026-07-28 — Reminders & Digest settings redone: synthesis is its own
+  weekly toggle + share-ext scanner fix** (`9030ae1`, merge `152291b`; earlier
+  same-session: scanner `97c37c2` → build 1228). Owner device QA drove both.
+  **(1) Settings redesign.** The old menu had two lies: the Reminders section
+  never said it's about the BELL on a card, and "Weekly synthesis" sat under
+  digest **Style** — where Schedule ("Daily · 3:00 AM") and "Cards per digest"
+  were false for it, and choosing it silently REPLACED the card digest (one
+  digest_mode slot). Now three honest sections: **Card reminders** (copy names
+  the bell; Cadence renamed **Pacing**), **Curated digest** (Style = the three
+  batch styles only), **Weekly synthesis** (own toggle + Delivery-day picker,
+  full day names, default Sunday, delivered at the digest hour). Backend:
+  `synthesis_enabled` / `synthesis_day` settings (models.py, link_service.py
+  defaults), `is_synthesis_due` + `_synthesis_enabled` + shared
+  `_fired_window` refactor of `is_due`, and an independent synthesis pass in
+  `run_digest_check` (idempotent per ISO week, so overlap with the legacy
+  path is a no-op). Legacy `digest_mode='synthesis'` is honored server-side
+  and migrated client-side on settings load (→ smart + synthesis_enabled).
+  Deployed: functions run **#58 green** (scoped: send_digests,
+  send_digest_now, force_send_digests), Vercel auto, TestFlight run **#229 /
+  build 1229** green. Verified: tsc clean, 537 pytest green, plus a live
+  due-gate harness (right-day/hour → True incl. Asia/Jerusalem tz, wrong day /
+  disabled → False, legacy mode implies enabled, digest is_due unchanged).
+  **Owner note:** owner had set style=Weekly synthesis on device pre-redesign,
+  so the legacy daily-3AM path will generate the FIRST synthesis on its own
+  (closing §4 4b when it renders); opening Settings after build 1229 migrates
+  the setting to the new toggle.
+  **(2) Share-extension scanner** (build 1228): the Citation mark sat on the
+  favicon+host row and the 30pt % crowded the preview. Link mode drops the
+  mark+%+phase cluster (+12 vs -8 via `statusCenterY`), % 30→26pt, mark
+  32→28pt; sweep untouched. Numbers-verified only — owner QAs on device.
 - **2026-07-28 — M12 synthesis backend LIT UP (task 4 done) + janitor index
   fix + Tags-row dedup.** Three things in one session window:
   **(1) The unscoped functions deploy finally ran** — commit `78780f4` (a
