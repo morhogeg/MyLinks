@@ -273,10 +273,10 @@ Requirements for the analysis:
    - **CRITICAL**: The category MUST ALWAYS be in English, even if the content is in another language.
 
 7. tags: Provide 3 to 5 specific, relevant tags for organization (aim for 3-4; use 5 only when genuinely warranted).
-   - **LANGUAGE**: Write tags in the SAME language as the input content.
+   - **LANGUAGE**: Write tags in the SAME language as the input content. This rule OVERRIDES tag reuse: NEVER attach a tag written in a different language than the content (e.g. no Hebrew tags on an English article, no English tags on a Hebrew one), even if that tag appears in the "Existing Tags" list.
    - Use lowercase.
-   - PREFER REUSING EXISTING TAGS provided in the "Existing Tags" list if they are applicable.
-   - Only create a new tag if no existing tags fit the content.
+   - PREFER REUSING EXISTING TAGS provided in the "Existing Tags" list if they are applicable — but ONLY those written in the content's language; ignore the rest of the list for this content.
+   - Only create a new tag if no same-language existing tag fits the content.
 
 8. actionableTakeaway: One concrete, specific action the reader can apply. This field is OPTIONAL.
    - **LANGUAGE**: Write the takeaway in the SAME language as the input content.
@@ -758,7 +758,7 @@ class GeminiService:
         """
         clean_text = text[:30000]
         tags_context = (
-            f"\n\nExisting Tags in Brain (Reuse these if possible):\n{', '.join(existing_tags)}"
+            f"\n\nExisting Tags in Brain (Reuse ONLY those in the content's language):\n{', '.join(existing_tags)}"
             if existing_tags else ""
         )
 
@@ -804,7 +804,7 @@ class GeminiService:
 
         clean_text = text[:30000]
         tags_context = (
-            f"\n\nExisting Tags in Brain (Reuse these if possible):\n{', '.join(existing_tags)}"
+            f"\n\nExisting Tags in Brain (Reuse ONLY those in the content's language):\n{', '.join(existing_tags)}"
             if existing_tags else ""
         )
 
@@ -867,7 +867,7 @@ Content to analyze:
         from google.genai import types
 
         tags_context = (
-            f"\n\nExisting Tags in Brain (Reuse these if possible):\n{', '.join(existing_tags)}"
+            f"\n\nExisting Tags in Brain (Reuse ONLY those in the content's language):\n{', '.join(existing_tags)}"
             if existing_tags else ""
         )
         prompt = f"{VIDEO_ANALYSIS_PROMPT}{tags_context}"
@@ -891,7 +891,7 @@ Content to analyze:
 
         `attempts` is threaded to _generate_json (synchronous callers pass 2)."""
         tags_context = (
-            f"\n\nExisting Tags in Brain (Reuse these if possible):\n{', '.join(existing_tags)}"
+            f"\n\nExisting Tags in Brain (Reuse ONLY those in the content's language):\n{', '.join(existing_tags)}"
             if existing_tags else ""
         )
 

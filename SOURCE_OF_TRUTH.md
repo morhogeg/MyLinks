@@ -993,6 +993,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 — tag language no longer leaks across cards (prompt fix +
+  cleanup tool).** Owner spotted an English card ("Spaghetti al limone recipe")
+  tagged אוכל/מטבח/מתכונים. Root cause: in `ai_service.SYSTEM_PROMPT` the
+  "PREFER REUSING EXISTING TAGS" clause could override the "tags in the SAME
+  language as the content" rule two lines above it, because the reuse list
+  (`get_user_tags`) is mostly Hebrew and was offered without a language
+  constraint. Decision (over English-only tags): KEEP per-content-language
+  tags — tags render on the card and category is already forced-English for
+  cross-language grouping — but reuse is now restricted to same-language
+  existing tags, in both the rule text and the four "Existing Tags in Brain"
+  prompt headers. New saves are fixed; existing cards are not silently
+  rewritten. **DEFERRED OWNER STEP:** run the new
+  `functions/tools/retag_language_mismatch.py <uid>` (dry run, then `--apply`)
+  with prod credentials + `GEMINI_API_KEY` to repair already-saved mismatched
+  cards — it scans both directions (Hebrew tags on English cards and vice
+  versa) and regenerates tags in the card's language, preferring the user's
+  same-language vocabulary. 544 backend tests green.
 - **2026-07-28 (same session, follow-up) — the four Review buttons now explain
   themselves.** Desktop: a hover tooltip per button (`DeckAction` gained a
   `hint`); touch: a small **ⓘ** at the start of the deck's progress header opens
