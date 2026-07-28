@@ -7,7 +7,7 @@ import SourceByline from './SourceByline';
 import SimpleMarkdown from './SimpleMarkdown';
 import { hasHebrew } from '@/lib/rtl';
 import { hapticLight } from '@/lib/haptics';
-import { Star, Archive, Bell, RotateCcw, Sparkles } from 'lucide-react';
+import { Check, Archive, Bell, RotateCcw, Sparkles } from 'lucide-react';
 import { REVIEW_SESSION_SIZE, isOpen, reviewSessionQueue } from '@/lib/reviewQueue';
 
 type SwipeDir = 'left' | 'right' | 'up';
@@ -16,12 +16,14 @@ type ActionKind = 'keep' | 'archive' | 'remind';
 
 interface SwipeDeckProps {
     links: Link[];
-    onFavorite: (link: Link) => void;
+    /** Keep the card exactly where it is — stamp (`true`) or clear (`false`,
+     *  used by Undo) the "reviewed" marker. No status change, no favorite. */
+    onKeep: (link: Link, keep: boolean) => void;
     onArchive: (link: Link) => void;
     /** Open the reminder modal for `link` (resolves back via `remindSignal`). */
     onRemind: (link: Link) => void;
     onOpen: (link: Link) => void;
-    /** Reverse a favorite/archive back to unread (used by Undo). */
+    /** Reverse an archive back to unread (used by Undo). */
     onResetStatus: (link: Link) => void;
     /** Clear a reminder that was just set (used by Undo of an up-swipe). */
     onCancelRemind: (link: Link) => void;
@@ -40,6 +42,12 @@ const THRESHOLD = 110; // px past which a drag commits to a swipe
  * The interactive twin of the digest: a short, curated resurfacing session.
  * Swipe right to keep, left to archive, up to set a reminder; tap to open.
  *
+ * "Keep" means exactly what it says: the card stays where it is, unchanged —
+ * it is NOT favorited (right-swipe used to write `status: 'favorite'`, which
+ * made a green star mean two things at once). Keep only stamps `reviewedAt`,
+ * which rests the card from future sessions; favoriting lives in the card
+ * detail view now.
+ *
  * The session is dealt from ONE smart order (see lib/reviewQueue: forgotten
  * cards first, then newest unread, then the rest — no user-facing queue
  * selection), narrowed by the active feed filters. Card ORDER is snapshotted
@@ -49,7 +57,7 @@ const THRESHOLD = 110; // px past which a drag commits to a swipe
  */
 export default function SwipeDeck({
     links,
-    onFavorite,
+    onKeep,
     onArchive,
     onRemind,
     onOpen,
@@ -187,7 +195,7 @@ export default function SwipeDeck({
         if (!link) return settle();
         const idx = currentIndex;
         if (dir === 'right') {
-            onFavorite(link);
+            onKeep(link, true);
             setKept((k) => k + 1);
             setLastAction({ index: idx, kind: 'keep', link });
         } else {
@@ -296,10 +304,12 @@ export default function SwipeDeck({
         if (kind === 'remind') {
             onCancelRemind(link);
             setReminders((r) => Math.max(0, r - 1));
+        } else if (kind === 'keep') {
+            onKeep(link, false); // clear the reviewed stamp; nothing else moved
+            setKept((k) => Math.max(0, k - 1));
         } else {
             onResetStatus(link);
-            if (kind === 'keep') setKept((k) => Math.max(0, k - 1));
-            else setArchived((a) => Math.max(0, a - 1));
+            setArchived((a) => Math.max(0, a - 1));
         }
         setPos(index);
         setLastAction(null);
@@ -435,7 +445,7 @@ export default function SwipeDeck({
                             <CardFace link={link} />
                             {isTop && (
                                 <>
-                                    <HintBadge label="KEEP" color="34,197,94" icon={<Star className="w-4 h-4" />} opacity={rightHint} pos="left" />
+                                    <HintBadge label="KEEP" color="34,197,94" icon={<Check className="w-4 h-4" />} opacity={rightHint} pos="left" />
                                     <HintBadge label="ARCHIVE" color="59,130,246" icon={<Archive className="w-4 h-4" />} opacity={leftHint} pos="right" />
                                     <HintBadge label="REMIND" color="107,114,128" icon={<Bell className="w-4 h-4" />} opacity={upHint} pos="top" />
                                 </>
@@ -458,7 +468,7 @@ export default function SwipeDeck({
                     <Bell className="w-6 h-6" />
                 </DeckAction>
                 <DeckAction label="Keep →" onClick={() => fling('right')} buttonClassName="text-green-500 hover:bg-green-500 hover:text-white border-green-500/30">
-                    <Star className="w-6 h-6" />
+                    <Check className="w-6 h-6" />
                 </DeckAction>
             </div>
 

@@ -398,6 +398,17 @@ export async function updateLinkReadStatus(uid: string, id: string, isRead: bool
 }
 
 /**
+ * Stamp (or clear) the "kept in Review" marker — the right swipe in the deck.
+ * Deliberately touches NOTHING else: Keep means "leave this card exactly where
+ * it is", and the timestamp only rests the card from review sessions
+ * (lib/reviewQueue REVIEWED_REST_DAYS). Clearing is the deck's Undo.
+ */
+export async function markLinkReviewed(uid: string, id: string, reviewed: boolean): Promise<void> {
+    const linkRef = doc(db, 'users', uid, 'links', id);
+    await updateDoc(linkRef, { reviewedAt: reviewed ? Date.now() : deleteField() });
+}
+
+/**
  * Update a link's tags in Firestore
  */
 export async function updateLinkTags(uid: string, id: string, tags: string[]): Promise<void> {
