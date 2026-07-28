@@ -1006,6 +1006,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 (same session, round 2) — Graph view interaction refinement from
+  owner desktop QA.** Five fixes on the just-shipped Graph: (1) **cluster
+  islands** — each connected component now gets its own gravity anchor packed
+  on a clearance spiral (`graph.ts` `cx`/`cy`, gravity pulls per-island, not to
+  a global origin) + stronger repulsion/longer springs, so "9 clusters" renders
+  as 9 visible constellations instead of one blob; (2) **every dot tappable** —
+  hit-testing now guarantees a ≥16px screen-space target regardless of node
+  size (low-degree dots were effectively un-hittable); (3) **"Open card"
+  de-vagued** — the button ("Open this card" + ↗) moved directly under the
+  selected card's title, with an explicit "CONNECTIONS · N" section below;
+  (4) **panel rows act** — tapping a connection row visibly walks the graph
+  (a follow-camera glides the newly focused node into the area the panel
+  leaves free: left of the 330px desktop panel, above the mobile sheet), and
+  each row gained its own ↗ that opens that card's detail directly; (5)
+  **second tap on the focused dot opens it** (gesture and button agree; tap-
+  to-deselect removed — deselect is background tap or ✕). Any pan/zoom gesture
+  cancels the follow. Verified: tsc 0; Playwright desktop+mobile — islands
+  visible, select→walk→row-open all pass, zero console errors (same temp
+  harness, deleted again before commit).
 - **2026-07-28 — Graph view: the knowledge graph made visible (feature
   `ddd505b`, merge **`cfb818b`** → Vercel auto; TestFlight run **#232 / build
   1232**).** New

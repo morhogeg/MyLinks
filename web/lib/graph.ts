@@ -24,11 +24,15 @@ export interface GraphNode {
     /** Render radius (world units) — derived from degree. */
     r: number;
     // Force-simulation state, owned by the view. Seeded by the builder so a
-    // category starts near its cluster-mates instead of exploding from (0,0).
+    // node starts inside its cluster's island instead of exploding from (0,0).
     x: number;
     y: number;
     vx: number;
     vy: number;
+    /** This node's cluster anchor — gravity pulls here, not to a global origin,
+     *  so separate connected components render as separate islands. */
+    cx: number;
+    cy: number;
     /** Drag pin — while set, the simulation holds the node here. */
     fx: number | null;
     fy: number | null;
@@ -209,41 +213,23 @@ export async function buildGraphModel(
     }
     const nodeIndex = new Map<number, number>(); // pool index → node index
     const nodes: GraphNode[] = [];
-    const categoryAngle = new Map<string, number>();
     for (let i = 0; i < pool.length; i++) {
         if (!degree[i]) continue;
-        const link = pool[i];
-        const cat = link.category || 'Other';
-        if (!categoryAngle.has(cat)) categoryAngle.set(cat, categoryAngle.size);
         nodeIndex.set(i, nodes.length);
-        // Seed near the category's slice of a ring, with deterministic jitter —
-        // the simulation then only has to refine, not untangle.
-        const slice = categoryAngle.get(cat)!;
-        const h = idHash(link.id);
-        const angle = (slice / Math.max(1, categoryAngle.size)) * Math.PI * 2 + ((h % 1000) / 1000 - 0.5) * 0.9;
-        const dist = 160 + ((h >>> 10) % 1000) / 1000 * 220;
         nodes.push({
-            link,
-            id: link.id,
+            link: pool[i],
+            id: pool[i].id,
             degree: degree[i],
             r: nodeRadius(degree[i]),
-            x: Math.cos(angle) * dist,
-            y: Math.sin(angle) * dist,
+            x: 0,
+            y: 0,
             vx: 0,
             vy: 0,
+            cx: 0,
+            cy: 0,
             fx: null,
             fy: null,
         });
-    }
-    // Re-space the seeds now that the full category count is known.
-    const catCount = Math.max(1, categoryAngle.size);
-    for (const n of nodes) {
-        const slice = categoryAngle.get(n.link.category || 'Other')!;
-        const h = idHash(n.id);
-        const angle = (slice / catCount) * Math.PI * 2 + ((h % 1000) / 1000 - 0.5) * (Math.PI * 2 / catCount) * 0.8;
-        const dist = 140 + ((h >>> 10) % 1000) / 1000 * 240;
-        n.x = Math.cos(angle) * dist;
-        n.y = Math.sin(angle) * dist;
     }
 
     const edges: GraphEdge[] = [];
@@ -272,6 +258,46 @@ export async function buildGraphModel(
     }
     const roots = new Set<number>();
     for (let i = 0; i < nodes.length; i++) roots.add(find(i));
+
+    // Components → spatial anchors: each connected component gets its own
+    // gravity island, packed on a spiral with clearance, so separate clusters
+    // render as separate constellations instead of one entangled blob.
+    const byRoot = new Map<number, number[]>();
+    for (let i = 0; i < nodes.length; i++) {
+        const r = find(i);
+        let list = byRoot.get(r);
+        if (!list) byRoot.set(r, (list = []));
+        list.push(i);
+    }
+    const comps = [...byRoot.values()].sort((a, b) => b.length - a.length);
+    const placedIslands: { x: number; y: number; r: number }[] = [];
+    for (const members of comps) {
+        const R = 70 + 52 * Math.sqrt(members.length);
+        let x = 0;
+        let y = 0;
+        if (placedIslands.length) {
+            // Walk outward on a spiral until this island clears every placed one.
+            for (let t = 1; t < 4000; t++) {
+                const angle = t * 0.6;
+                const dist = 60 + t * 11;
+                x = Math.cos(angle) * dist;
+                y = Math.sin(angle) * dist;
+                if (placedIslands.every((p) => Math.hypot(x - p.x, y - p.y) >= p.r + R + 70)) break;
+            }
+        }
+        placedIslands.push({ x, y, r: R });
+        for (const i of members) {
+            const n = nodes[i];
+            n.cx = x;
+            n.cy = y;
+            // Deterministic in-island seed so the layout is stable across builds.
+            const h = idHash(n.id);
+            const angle = ((h % 1000) / 1000) * Math.PI * 2;
+            const dist = (((h >>> 10) % 1000) / 1000) * R * 0.8;
+            n.x = x + Math.cos(angle) * dist;
+            n.y = y + Math.sin(angle) * dist;
+        }
+    }
 
     return {
         nodes,
