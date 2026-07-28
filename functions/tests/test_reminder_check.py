@@ -75,8 +75,8 @@ class FakeQuery:
         self._filters = []
         self._limit = None
 
-    def where(self, field, op, value):
-        self._filters.append((field, op, value))
+    def where(self, filter):
+        self._filters.append((filter.field_path, filter.op_string, filter.value))
         return self
 
     def limit(self, n):

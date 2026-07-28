@@ -9,6 +9,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from google.cloud.firestore_v1.base_query import FieldFilter
+
 from db import get_db
 from log_safe import mask_uid
 from link_service import is_hebrew
@@ -261,8 +263,8 @@ def run_reminder_check() -> dict:
     try:
         due_links = list(
             db.collection_group('links')
-            .where('reminderStatus', '==', 'pending')
-            .where('nextReminderAt', '<=', now_ms)
+            .where(filter=FieldFilter('reminderStatus', '==', 'pending'))
+            .where(filter=FieldFilter('nextReminderAt', '<=', now_ms))
             .limit(REMINDER_BATCH_LIMIT)
             .get()
         )
@@ -490,7 +492,7 @@ def coerce_pending_reminder_times(limit: int = 1000) -> dict:
     try:
         docs = list(
             db.collection_group('links')
-            .where('reminderStatus', '==', 'pending')
+            .where(filter=FieldFilter('reminderStatus', '==', 'pending'))
             .limit(limit)
             .get()
         )

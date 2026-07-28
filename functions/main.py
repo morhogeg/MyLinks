@@ -26,6 +26,7 @@ from datetime import datetime, timezone, timedelta
 from firebase_functions import https_fn, scheduler_fn, firestore_fn, options
 from firebase_admin import storage, auth as admin_auth
 from google.cloud import firestore as gc_firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 from google.cloud.firestore_v1.vector import Vector
 
 # Cost ceiling (report 3.1): a hard cap on total concurrent instances across
@@ -3458,7 +3459,7 @@ def run_processing_janitor() -> dict:
 
     try:
         stuck = db.collection_group("links").where(
-            "status", "==", LinkStatus.PROCESSING.value
+            filter=FieldFilter("status", "==", LinkStatus.PROCESSING.value)
         ).limit(200).stream()
     except Exception as e:
         logger.error(f"Janitor query failed: {e}")
@@ -3501,7 +3502,7 @@ def run_processing_janitor() -> dict:
     # Primary: Timestamp `expireAt` <= now (what a TTL policy keys on too).
     try:
         for doc in db.collection("task_logs").where(
-            "expireAt", "<=", now_dt
+            filter=FieldFilter("expireAt", "<=", now_dt)
         ).limit(200).stream():
             if doc.id not in seen_ids:
                 seen_ids.add(doc.id)
@@ -3518,7 +3519,7 @@ def run_processing_janitor() -> dict:
         try:
             cutoff_iso = cutoff_dt.isoformat()
             for doc in db.collection("task_logs").where(
-                "timestamp", "<", cutoff_iso
+                filter=FieldFilter("timestamp", "<", cutoff_iso)
             ).limit(remaining).stream():
                 if doc.id not in seen_ids:
                     seen_ids.add(doc.id)
@@ -3545,7 +3546,7 @@ def run_processing_janitor() -> dict:
         err_refs = [
             doc.reference
             for doc in db.collection("server_errors").where(
-                "expireAt", "<=", now_dt
+                filter=FieldFilter("expireAt", "<=", now_dt)
             ).limit(200).stream()
         ]
         if err_refs:
