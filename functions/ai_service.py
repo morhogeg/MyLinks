@@ -572,9 +572,20 @@ User question: {question}
 # place and can be unit-tested without a live model.
 
 # Output-format instruction appended to the buffered JSON RAG prompt.
+# Repeated at the OUTPUT-FORMAT position — the last thing the model reads.
+# The structure rule in the main rules list alone was ignored in practice:
+# 6-sentence answers still came back as one block (owner report 2026-07-28).
+_STRUCTURE_REMINDER = (
+    " FORMATTING of the answer text: if it exceeds ~4 sentences it MUST be "
+    "broken into short paragraphs separated by a blank line, with markdown "
+    "bullets and brief **bold mini-headings** where they aid scanning; a "
+    "short answer stays one plain paragraph."
+)
+
 _CITED_JSON_SUFFIX = (
     'Return ONLY a JSON object: {"answer": string, "citedIds": string[]} '
     "where citedIds are the ids (without brackets) of the sources you relied on."
+    + _STRUCTURE_REMINDER
 )
 
 # Stricter variant used for the single re-ask when the first answer came back
@@ -588,6 +599,7 @@ _CITED_JSON_STRICT_SUFFIX = (
     "genuinely contain nothing that answers the question, say that plainly in the "
     "answer text and return an empty citedIds. Never invent an id. "
     'Return ONLY a JSON object: {"answer": string, "citedIds": string[]}.'
+    + _STRUCTURE_REMINDER
 )
 
 # Fallback framing used when a first, verbatim-oriented answer came back EMPTY —
@@ -604,6 +616,7 @@ _CITED_JSON_PARAPHRASE_SUFFIX = (
     "substance the user asked for (the key ingredients, the gist of each step), "
     "just paraphrased. Cite the ids you relied on. "
     'Return ONLY a JSON object: {"answer": string, "citedIds": string[]}.'
+    + _STRUCTURE_REMINDER
 )
 
 
@@ -1407,6 +1420,7 @@ Work only from what is legible: keep the subject at the level the image states i
             "brackets) of the sources you relied on, in exactly this format:\n"
             "[[CITED: id1, id2]]\n"
             "Output the marker exactly once, as the very last line, and nothing after it."
+            + _STRUCTURE_REMINDER
         )
         verbatim_prompt = base_prompt + marker_instruction
         # Paraphrase-safe variant — reached only if the verbatim answer streamed

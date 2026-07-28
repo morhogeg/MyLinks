@@ -51,3 +51,8 @@ def test_prompt_demands_structured_long_answers():
     assert "never return one unbroken block of text" in p.lower()
     assert "mini-heading" in p
     assert "Short answers (a few sentences) stay plain" in p
+    # The rule must ALSO ride the output-format suffixes — the rules-list copy
+    # alone was ignored in practice (owner report: 6-sentence single block).
+    assert "FORMATTING of the answer text" in ai_service._CITED_JSON_SUFFIX
+    assert "FORMATTING of the answer text" in ai_service._CITED_JSON_STRICT_SUFFIX
+    assert "FORMATTING of the answer text" in ai_service._CITED_JSON_PARAPHRASE_SUFFIX
