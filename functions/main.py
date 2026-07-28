@@ -3443,8 +3443,11 @@ def run_processing_janitor() -> dict:
     can't retry. This sweep is the backstop: it ages those out so they become
     visible, retryable failed cards.
 
-    Uses a collection-group query (equality-only → served by the default
-    single-field index) so it doesn't scan every user. Age is measured from
+    Uses a collection-group query so it doesn't scan every user. NOTE: the
+    default single-field indexes cover COLLECTION scope only — this query needs
+    the `status` field enabled at COLLECTION_GROUP scope, declared as a
+    fieldOverride in firestore.indexes.json (it 400'd in prod without it,
+    every 5 minutes, until 2026-07-28). Age is measured from
     `processingStartedAt` when present (a retry preserves the old `createdAt`),
     falling back to `createdAt`.
     """
