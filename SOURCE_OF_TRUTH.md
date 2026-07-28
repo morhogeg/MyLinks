@@ -309,6 +309,17 @@ The multi-user auth work is **fully written but not live**:
    - `/api/analyze` 60s timeout — confirmed moot (2026-07-11 weaknesses sprint):
      web saves enqueue via `/api/share` into `process_link_background` (300s);
      `/api/analyze` serves only Retry / image / Note (all short).
+   4b. **[ ] Prove synthesis end-to-end (owner-gated, 5 min):** deploy is live
+   but no synthesis has ever generated. Either set digest mode = Synthesis
+   on-device, or give a session the workspace uid to call `send_digest_now`
+   with `{mode:'synthesis'}` (force bypasses the per-ISO-week idempotency).
+   A green deploy is not evidence the feature works. See 2026-07-28 §9 entry.
+   4c. **[ ] Audit remaining collection-group queries in `functions/` for the
+   COLLECTION_GROUP index-scope trap** that broke `sweep_stuck_processing`
+   every 5 min in prod (2026-07-28 §9): default single-field indexes are
+   COLLECTION-scope only; each `db.collection_group(...)` filter field needs a
+   fieldOverride (or composite) at COLLECTION_GROUP scope in
+   firestore.indexes.json.
 5. **[ ] Security config + key hygiene (30 min, do with #2):** set `ADMIN_TOKEN`,
    `APPCHECK_ENFORCE=true`, `OWNER_EMAIL` in functions env. **Rotate the Gemini
    key** (was pasted in chat 2026-06-23) and the **App Store Connect API `.p8`**
@@ -1010,6 +1021,38 @@ exact-match, capped.
   `allowedDevOrigins: ["127.0.0.1"]` to `next.config.ts` (revert after). Also
   note `AuthGate` swaps EVERY non-public route for the LoginScreen, so a
   throwaway preview route must be added to `PUBLIC_ROUTES` to render at all.
+- **2026-07-28 — M12 synthesis backend LIT UP (task 4 done) + janitor index
+  fix + Tags-row dedup.** Three things in one session window:
+  **(1) The unscoped functions deploy finally ran** — commit `78780f4` (a
+  `.deploy-ping` bump with deliberately NO `Deploy-Functions:` trailer, verified
+  with the workflow's own sed expression pre-push), run **#55 green**. All 31
+  functions live incl. the dark M12 payload: `send_digests` (scheduled),
+  `send_digest_now`, `rebuild_connections`, `backfill_related_links`. §4 task 4
+  checked off with its owner-narrowed scope (M9 backfill + youtube-channels
+  confirm dropped; syntheses rule verified already live via deploy-rules run #4,
+  not redone; /api/analyze timeout confirmed moot). **DEFERRED OWNER STEP — the
+  end-to-end synthesis proof is still open:** no UI button calls
+  `send_digest_now`, `force_send_digests` needs the unset `ADMIN_TOKEN` (§4
+  task 5), and the client-uid path needs the owner's uid (= phone number, §10)
+  which the session declined to scrape. Owner: either set digest mode =
+  Synthesis on-device and force, or hand a session the uid to call
+  `send_digest_now` with `{mode:'synthesis'}` (idempotent per ISO week;
+  force/preview bypasses).
+  **(2) Real prod bug found during verification, predating the deploy:**
+  `sweep_stuck_processing` had been throwing FAILED_PRECONDITION on EVERY
+  5-minute tick — its collection-group equality query on `links.status` needs
+  the field enabled at COLLECTION_GROUP scope, and default single-field indexes
+  are COLLECTION-scope only (the docstring claimed otherwise; corrected). Fixed
+  by a `fieldOverrides` entry in firestore.indexes.json (`02b0c67`), deploy run
+  **#56 green** (scoped `Deploy-Functions: sweep_stuck_processing`). Lesson for
+  §2: every OTHER collection-group query in functions should be checked against
+  this same trap before it ships dark.
+  **(3) Tags-row dedup (owner device QA, build 1225):** the search Tags row now
+  hides when it duplicates the grid below (single matching tag, count ==
+  filteredLinks.length — equal counts imply identical sets since a tag match
+  implies a card match); stays when several tags match or the tag narrows.
+  `f963849`, merged `1906514` → Vercel + TestFlight run **#227 / build 1227**
+  green. Not render-verified; owner QAs on device.
 - **2026-07-28 — Search now covers TAGS + a "Tags" typeahead row** (branch
   `claude/hebrew-nutrition-tag-search-f01fbb`). Owner bug: a card tagged
   `תזונה` was unfindable by searching that exact word — the 2026-07-17 search
