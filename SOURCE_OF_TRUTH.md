@@ -1065,6 +1065,17 @@ exact-match, capped.
   `allowedDevOrigins: ["127.0.0.1"]` to `next.config.ts` (revert after). Also
   note `AuthGate` swaps EVERY non-public route for the LoginScreen, so a
   throwaway preview route must be added to `PUBLIC_ROUTES` to render at all.
+- **2026-07-28 — Tag saga CLOSED (owner-verified) + related-reason RTL fix
+  (`d159886`, Vercel + TestFlight #231 / build 1231 green).** Owner re-save
+  after round 4: **4 specific English tags** (recipe, cooking techniques,
+  sauce, butter) AND Related Cards populated — the DistanceMeasure fix
+  verified live on the very next save. Acceptance met. One more polish from
+  that screenshot: a related card's REASON sentence is written in the parent
+  card's language, but its direction was forced to the related card's TITLE
+  direction — an English reason under a Hebrew title rendered period-on-the-
+  left. LinkDetailModal now resolves direction per piece (title from title,
+  reason from reason via getDominantDirection). Build 1231 supersedes 1230
+  (identical + this fix); owner installs 1231.
 - **2026-07-28 — Tag round 4 (`83f365a`, run #63 green): reuse must not
   REDUCE the count + See-also has been silently broken since ≥07-27.**
   Round-3 card came back with ONE generic tag ("recipe"): no backstop drop
