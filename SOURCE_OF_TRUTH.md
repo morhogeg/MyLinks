@@ -1021,6 +1021,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 (same session, round 7) — Graph: Ask scope by position, quiet
+  Open, center icon, captions everywhere (owner QA round 4).** (1) "Ask about
+  this" beside the card title read as asking about THAT card while it actually
+  asks about the neighborhood — solved by position, not copy: the action is now
+  **"Ask about all" on the CONNECTIONS section header**, so what it asks sits
+  next to what it names; Open card became the single quiet full-width pill
+  (owner: black button too heavy). (2) Re-fit button icon `Maximize2` (read as
+  expand) → **`LocateFixed`** (center). (3) **Every island now gets a caption**:
+  the labeler's floor dropped from 3 to 2 members and gained a guaranteed
+  fallback chain (shared concepts → dominant category ≥70% → most common
+  concept → most common category) — unlabeled pairs looked broken AND had no
+  route to the cluster panel. (4) Captions clamp into the viewport like node
+  labels (a left-edge island's theme was clipping). Verified: tsc 0; Playwright
+  iPhone-390 light — pair clusters captioned ("PARENTAL LEAVE", fallback
+  "PHILOSOPHY" on a mixed pair), Ask-about-all fires with theme + 6 anchors,
+  zero console errors.
 - **2026-07-28 (same session, round 6) — Graph selection panel made minimal
   (owner design QA).** The panel had stacked four layers before content
   (title → POLITICS row → grey cluster chip → big Open button), and the chip —
