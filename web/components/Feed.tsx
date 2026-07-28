@@ -830,11 +830,15 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             })();
         return base.filter((l) => !isPending(l) && !isEffectivelyPrivateCard(l));
     }, [viewMode, graphFiltersActive, filteredLinks, links, libraryLinks, isEffectivelyPrivateCard]);
-    // Graph → Ask hand-off: a cluster's "Ask about this" opens Ask with this
-    // question pre-sent (nonce-gated inside AskBrain, fresh conversation).
+    // Graph → Ask hand-off: a cluster's "Ask about cluster" opens Ask with this
+    // question pre-sent (nonce-gated inside AskBrain, fresh conversation). The
+    // restore payload re-opens the same graph focus when the user comes back —
+    // Ask is a detour from the graph, not an exit.
     const [graphAsk, setGraphAsk] = useState<{ question: string; hints?: import('@/lib/askSuggestions').AskHints; nonce: number } | null>(null);
-    const handleAskCluster = useCallback((question: string, anchorTitles: string[]) => {
+    const [graphRestore, setGraphRestore] = useState<import('./KnowledgeGraph').GraphRestoreFocus | null>(null);
+    const handleAskCluster = useCallback((question: string, anchorTitles: string[], restore: import('./KnowledgeGraph').GraphRestoreFocus) => {
         setGraphAsk((prev) => ({ question, hints: { anchorTitles }, nonce: (prev?.nonce ?? 0) + 1 }));
+        setGraphRestore(restore);
         setViewMode('ask');
     }, []);
     // Graph → Collections: keep a cluster as a real collection.
@@ -2457,6 +2461,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             filtered={graphFiltersActive}
                             onOpenCard={openLinkDetails}
                             onAskCluster={handleAskCluster}
+                            restoreFocus={graphRestore}
+                            onRestoreConsumed={() => setGraphRestore(null)}
                             onSaveCluster={handleSaveCluster}
                         />
                     ) : viewMode === 'review' ? (
