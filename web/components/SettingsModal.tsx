@@ -17,7 +17,7 @@ import { AccountView } from './settings/AccountSection';
 import { StatsView } from './settings/StatsView';
 import { StoryView } from './settings/StoryView';
 import {
-    DIGEST_MODES, DAYS, COUNT_OPTIONS, formatTime,
+    DIGEST_MODES, DAYS, DAY_NAMES, COUNT_OPTIONS, formatTime,
     ResurfacingView, StyleView, ScheduleView, PickerView,
 } from './settings/DigestSettings';
 import { useScrollLock } from '@/lib/useScrollLock';
@@ -47,10 +47,11 @@ const VIEW_TITLE: Record<View, string> = {
     account: 'Account',
     stats: 'Insights',
     resurfacing: 'Reminders & Digest',
-    cadence: 'Reminder cadence',
+    cadence: 'Reminder pacing',
     style: 'Digest style',
     schedule: 'Schedule',
     cards: 'Cards per digest',
+    synthesisDay: 'Delivery day',
     story: 'Our story',
 };
 
@@ -368,7 +369,7 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
 
                         {view === 'cadence' && (
                             <PickerView
-                                title="Reminder cadence"
+                                title="Reminder pacing"
                                 options={(['smart', 'daily', 'weekly'] as Frequency[]).map((f) => ({ value: f as string, label: f === 'smart' ? 'Smart (spaced)' : CADENCE_LABEL[f] }))}
                                 value={settings.reminder_frequency}
                                 onSelect={(v) => setSettings((p) => ({ ...p, reminder_frequency: v as Frequency }))}
@@ -400,6 +401,16 @@ export default function SettingsModal({ uid, isOpen, onClose, onReplayTour, init
                                 options={COUNT_OPTIONS.map((c) => ({ value: String(c), label: `${c} cards` }))}
                                 value={String(settings.digest_count)}
                                 onSelect={(v) => setSettings((p) => ({ ...p, digest_count: Number(v) }))}
+                            />
+                        )}
+
+                        {view === 'synthesisDay' && (
+                            <PickerView
+                                title="Delivery day"
+                                options={DAY_NAMES.map((d, i) => ({ value: String(i), label: d }))}
+                                value={String(settings.synthesis_day)}
+                                onSelect={(v) => setSettings((p) => ({ ...p, synthesis_day: Number(v) }))}
+                                footnote={`Your weekly synthesis is written and delivered every ${DAY_NAMES[settings.synthesis_day]}, at your digest time (${formatTime(settings.digest_hour, settings.digest_minute)}).`}
                             />
                         )}
                     </div>

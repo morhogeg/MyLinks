@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { DigestMode } from '@/lib/types';
-import { Sparkles, Check, BrainCircuit, Tag, History, Search, Info } from 'lucide-react';
+import { Sparkles, Check, Tag, History, Search, Info } from 'lucide-react';
 import { X } from 'lucide-react';
 import type { Settings, SetSettings, View } from './types';
 import {
@@ -11,15 +11,17 @@ import {
     NavRow, Toggle, Segmented, TopicGroup, TopicPill, Wheel,
 } from './primitives';
 
-// Every mode is curated server-side; this is presentation only.
+// Every mode is curated server-side; this is presentation only. Styles are
+// BATCHES of saved cards — the weekly synthesis is a different artifact (an
+// AI-written recap) and lives under its own section/toggle, not here.
 export const DIGEST_MODES: { value: DigestMode; label: string; icon: ReactNode; note: string }[] = [
     { value: 'smart', label: 'Smart mix', icon: <Sparkles className="w-[18px] h-[18px]" />, note: 'A balanced blend of your backlog and older gems worth a second look.' },
-    { value: 'synthesis', label: 'Weekly synthesis', icon: <BrainCircuit className="w-[18px] h-[18px]" />, note: 'A short "what you learned" recap that ties your week\'s saves together — themes, a standout, and an open question.' },
     { value: 'rediscover', label: 'Rediscover', icon: <History className="w-[18px] h-[18px]" />, note: 'Resurface older saves you haven\'t opened in a while.' },
     { value: 'topic', label: 'By topic', icon: <Tag className="w-[18px] h-[18px]" />, note: 'Only cards from a category or tag you choose.' },
 ];
 
 export const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+export const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 export const COUNT_OPTIONS = [3, 5, 7, 10];
 
 // Wheel-picker columns (Schedule). Hour index 0 = "12" (12 AM / 12 PM).
@@ -48,22 +50,22 @@ export function ResurfacingView({
         <>
             <LargeTitle>Reminders &amp; Digest</LargeTitle>
 
-            <SectionHeader first>Reminders</SectionHeader>
+            <SectionHeader first>Card reminders</SectionHeader>
             <List tight>
                 <RowShell>
-                    <RowText title="Reminders" sub="Nudge me to revisit an individual saved card" />
+                    <RowText title="Card reminders" sub="Bring back cards you bell-marked to revisit" />
                     <Toggle on={settings.reminders_enabled} onChange={() => setSettings((p) => ({ ...p, reminders_enabled: !p.reminders_enabled }))} />
                 </RowShell>
                 {settings.reminders_enabled && (
-                    <NavRow title="Cadence" value={cadenceLabel} onClick={() => go('cadence')} />
+                    <NavRow title="Pacing" value={cadenceLabel} onClick={() => go('cadence')} />
                 )}
             </List>
-            <Footnote>Smart spacing surfaces each card when you&apos;re most likely to want it — not on a fixed clock.</Footnote>
+            <Footnote>Tap the bell on any card and Machina brings it back — tomorrow, then after a week, then a month. Pacing controls how densely those nudges arrive.</Footnote>
 
             <SectionHeader>Curated digest</SectionHeader>
             <List tight>
                 <RowShell>
-                    <RowText title="Curated digest" sub="An automated batch of picks, delivered together" />
+                    <RowText title="Curated digest" sub="A hand-picked batch of your saved cards" />
                     <Toggle on={settings.digest_enabled} onChange={() => setSettings((p) => ({ ...p, digest_enabled: !p.digest_enabled }))} />
                 </RowShell>
                 {settings.digest_enabled && <NavRow title="Style" value={modeLabel} onClick={() => go('style')} />}
@@ -78,6 +80,20 @@ export function ResurfacingView({
                     </RowShell>
                 )}
             </List>
+            <Footnote>Machina picks the cards; you choose the style and when they arrive.</Footnote>
+
+            <SectionHeader>Weekly synthesis</SectionHeader>
+            <List tight>
+                <RowShell>
+                    <RowText title="Weekly synthesis" sub={'An AI recap of what you learned this week'} />
+                    <Toggle on={settings.synthesis_enabled} onChange={() => setSettings((p) => ({ ...p, synthesis_enabled: !p.synthesis_enabled }))} />
+                </RowShell>
+                {settings.synthesis_enabled && (
+                    <NavRow title="Delivery day" value={DAY_NAMES[settings.synthesis_day] ?? 'Sunday'} onClick={() => go('synthesisDay')} />
+                )}
+            </List>
+            <Footnote>Ties the week&apos;s saves into a short story — themes, a standout, and an open question. Lands in your feed and Digest tab{settings.synthesis_enabled ? ` every ${DAY_NAMES[settings.synthesis_day] ?? 'Sunday'}` : ''}.</Footnote>
+
             <Footnote>In-app and push delivery are always on. Push is toggled on the main screen.</Footnote>
         </>
     );

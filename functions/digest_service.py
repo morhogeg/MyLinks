@@ -604,6 +604,47 @@ def _local_now(tz_name: Optional[str]) -> datetime:
     return now
 
 
+def _fired_window(settings: dict, tz_name: Optional[str]) -> Optional[datetime]:
+    """The local datetime whose delivery window this scheduler tick falls in,
+    or None. Fires on the first tick in [target, target + cadence). Comparing
+    actual datetimes (not raw hour/minute) makes this correct across midnight:
+    a target of 23:58 is caught by the 00:00 tick, and the returned datetime
+    still reports the day the window opened on — which is what the weekly
+    day checks need. Shared by the digest and synthesis due-gates."""
+    local = _local_now(tz_name)
+    target_hour = int(settings.get("digest_hour", 9))
+    target_minute = int(settings.get("digest_minute", 0))
+    target_today = local.replace(
+        hour=target_hour, minute=target_minute, second=0, microsecond=0
+    )
+    window = timedelta(minutes=DIGEST_CADENCE_MINUTES)
+    for candidate in (target_today, target_today - timedelta(days=1)):
+        if timedelta(0) <= (local - candidate) < window:
+            return candidate
+    return None
+
+
+def _synthesis_enabled(settings: dict) -> bool:
+    """The dedicated toggle, plus the legacy encoding: digest_mode 'synthesis'
+    (when it was a digest style) implied the weekly synthesis. The client
+    migrates that to synthesis_enabled on its next settings save."""
+    if settings.get("synthesis_enabled"):
+        return True
+    return normalize_mode(settings.get("digest_mode")) == "synthesis"
+
+
+def is_synthesis_due(settings: dict, tz_name: Optional[str]) -> bool:
+    """Weekly synthesis due-gate: fires on the user's synthesis_day at their
+    digest hour. No last-sent guard needed — build_and_send_synthesis is
+    idempotent per ISO week (the syntheses/{weekId} doc)."""
+    if not _synthesis_enabled(settings):
+        return False
+    fired = _fired_window(settings, tz_name)
+    if fired is None:
+        return False
+    return fired.weekday() == int(settings.get("synthesis_day", 6))
+
+
 def is_due(settings: dict, tz_name: Optional[str], last_sent_ms: Optional[int]) -> bool:
     """
     Decide whether a user's digest is due *right now*. Designed to be called by
@@ -617,23 +658,7 @@ def is_due(settings: dict, tz_name: Optional[str], last_sent_ms: Optional[int]) 
     # always-on surface, so a digest with zero outbound channels still runs
     # (it just persists to users/{uid}/digests and sends nothing).
 
-    local = _local_now(tz_name)
-    target_hour = int(settings.get("digest_hour", 9))
-    target_minute = int(settings.get("digest_minute", 0))
-
-    # Fire on the first scheduler tick in [target, target + cadence). Comparing
-    # actual datetimes (not raw hour/minute) makes this correct across midnight:
-    # a target of 23:58 is caught by the 00:00 tick, and `fired` still reports
-    # the day the window opened on — which is what the weekly day check needs.
-    target_today = local.replace(
-        hour=target_hour, minute=target_minute, second=0, microsecond=0
-    )
-    window = timedelta(minutes=DIGEST_CADENCE_MINUTES)
-    fired = None
-    for candidate in (target_today, target_today - timedelta(days=1)):
-        if timedelta(0) <= (local - candidate) < window:
-            fired = candidate
-            break
+    fired = _fired_window(settings, tz_name)
     if fired is None:
         return False
 
@@ -664,6 +689,7 @@ def run_digest_check() -> dict:
         "users_checked": 0,
         "users_enabled": 0,
         "digests_sent": 0,
+        "syntheses_sent": 0,
         "cards_delivered": 0,
         "errors": [],
     }
@@ -683,19 +709,34 @@ def run_digest_check() -> dict:
         user_data = user_doc.to_dict() or {}
         settings = user_data.get("settings", {}) or {}
 
-        if not settings.get("digest_enabled"):
-            continue
-        report["users_enabled"] += 1
+        # Curated digest pass. Legacy note: a stored digest_mode of 'synthesis'
+        # still routes build_and_send_digest to the synthesis path here — the
+        # per-week idempotency guard makes any overlap with the independent
+        # synthesis pass below a no-op.
+        if settings.get("digest_enabled"):
+            report["users_enabled"] += 1
+            try:
+                if is_due(settings, user_data.get("timezone"), user_data.get("lastDigestSentAt")):
+                    res = build_and_send_digest(uid, user_data, force=False)
+                    if res.get("sent"):
+                        report["digests_sent"] += 1
+                        report["cards_delivered"] += res.get("card_count", 0)
+            except Exception as e:
+                err = f"Digest failed for {uid}: {e}"
+                logger.error(err)
+                report["errors"].append(err)
 
+        # Weekly synthesis pass — independent of the digest (its own toggle and
+        # delivery day), so both can run for the same user. Idempotent per ISO
+        # week, so a re-fired window never double-generates or double-pushes.
         try:
-            if not is_due(settings, user_data.get("timezone"), user_data.get("lastDigestSentAt")):
-                continue
-            res = build_and_send_digest(uid, user_data, force=False)
-            if res.get("sent"):
-                report["digests_sent"] += 1
-                report["cards_delivered"] += res.get("card_count", 0)
+            if is_synthesis_due(settings, user_data.get("timezone")):
+                links = fetch_candidate_links(uid)
+                synth_res = build_and_send_synthesis(uid, user_data, links, force=False)
+                if synth_res.get("sent"):
+                    report["syntheses_sent"] += 1
         except Exception as e:
-            err = f"Digest failed for {uid}: {e}"
+            err = f"Synthesis failed for {uid}: {e}"
             logger.error(err)
             report["errors"].append(err)
 

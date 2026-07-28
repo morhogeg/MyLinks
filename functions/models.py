@@ -129,6 +129,15 @@ class UserSettings(BaseModel):
     # Don't send a digest if there's nothing fresh to show.
     digest_skip_empty: bool = True
 
+    # ── Weekly "What you learned" synthesis (M12) ───────────────────────
+    # Independent of the digest since 2026-07-28 — synthesis used to be a
+    # digest_mode, which silently replaced the card digest (one mode slot).
+    # A stored digest_mode == "synthesis" still implies enabled (legacy read
+    # in digest_service._synthesis_enabled) until the client migrates it.
+    synthesis_enabled: bool = False
+    # Delivery weekday (0=Mon … 6=Sun), at the digest hour/minute.
+    synthesis_day: int = 6
+
 
 class UserDocument(BaseModel):
     """

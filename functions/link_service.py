@@ -46,6 +46,9 @@ DEFAULT_USER_SETTINGS = {
     "digest_minute": 0,
     "digest_day": 0,
     "digest_skip_empty": True,
+    # Weekly synthesis (M12) — its own toggle, independent of the digest.
+    "synthesis_enabled": False,
+    "synthesis_day": 6,  # Sunday, at the digest hour
 }
 
 

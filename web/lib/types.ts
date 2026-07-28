@@ -325,6 +325,11 @@ export interface User {
     digest_minute: number; // 0-59, local time
     digest_day: number;    // 0=Mon … 6=Sun (weekly)
     digest_skip_empty: boolean;
+    // Weekly "What you learned" synthesis (M12) — independent of the digest so
+    // both can run. Legacy digest_mode === 'synthesis' migrates to this flag at
+    // load time (useUserSettings.loadSettings).
+    synthesis_enabled: boolean;
+    synthesis_day: number; // 0=Mon … 6=Sun; delivered at the digest hour
   };
 }
 
