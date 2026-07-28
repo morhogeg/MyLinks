@@ -1021,6 +1021,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 (same session, round 4) — Graph legibility + related-count
+  parity (owner QA round 3; implemented by an Opus 5 subagent, lead-reviewed).**
+  (1) **Label collision culling**: node labels moved to constant 11px SCREEN
+  space and are placed greedily by tier (focused → lit neighbour → hub →
+  zoomed-in) — a label that would overlap an accepted label, a readable
+  caption, or a LIT node disc is dropped (or falls back above the dot), with
+  viewport clamping and a `min(62vw, 280px)` pixel cap so phones stay
+  readable. (2) **Small graphs breathe**: new `spacingScale(n)` (1.0 at ≥25
+  nodes → ~1.6 at 11) multiplies spring rest, repulsion (²), island radius
+  and clearance — search-filtered graphs no longer knot; ≥25-node layouts are
+  bit-identical. (3) **Truncation 30→48 chars** on canvas labels. (4)
+  **Related-count parity bug**: card detail's `getRelatedCards` capped at 4
+  and ignored REVERSE stored relations (cards pointing AT the open card), so
+  the graph honestly showed 5 while the detail showed 4 — `MAX_RELATED` now
+  8 with a reverse-stored pass (own-stored → reverse-stored → live) sharing
+  the same dedupe/exclusions; LinkDetailModal needed no change (uncapped
+  list). Verified: tsc 0; 18 Playwright captures across 3 mock scenarios
+  (large / 11-node dense / 60-char titles), both themes + breakpoints, zero
+  console errors; parity proven both ways (graph CONNECTIONS · 5 ==
+  getRelatedCards length 5). Known cosmetic: ellipsized Hebrew canvas labels
+  put the … on the visual left (needs a bidi pass — not attempted).
 - **2026-07-28 (same session, round 3) — Graph clusters get NAMES, and become
   actionable (owner QA round 2).** (1) **Case-variant categories merged**
   graph-side ("Sports"/"sports" → one legend chip on the majority spelling;
