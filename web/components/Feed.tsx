@@ -2134,8 +2134,16 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 <div className="flex-grow min-w-0">
                     {/* Search typeahead — split the live results into "Sources" and
                         "Tags" rows (tap to jump straight to that filter) above the
-                        "Cards" grid below, so searching "ynet" or a tag offers both. */}
-                    {(viewMode === 'grid' || viewMode === 'list') && searchQuery.trim() && (matchingSources.length > 0 || matchingTags.length > 0) && (
+                        "Cards" grid below, so searching "ynet" or a tag offers both.
+                        The Tags row hides when it's pure duplication (owner call,
+                        2026-07-28): one matching tag covering exactly the cards
+                        already below adds nothing — a tag match implies a card
+                        match, so equal counts mean identical sets. It stays when
+                        several tags match or the tag would NARROW the grid. */}
+                    {(viewMode === 'grid' || viewMode === 'list') && searchQuery.trim() && (() => {
+                        const visibleTags = matchingTags.length === 1 && matchingTags[0].count === filteredLinks.length
+                            ? [] : matchingTags;
+                        return (matchingSources.length > 0 || visibleTags.length > 0) && (
                         <div className="mb-5 animate-in fade-in slide-in-from-top-1 duration-200">
                             {matchingSources.length > 0 && (
                                 <>
@@ -2167,14 +2175,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     </div>
                                 </>
                             )}
-                            {matchingTags.length > 0 && (
+                            {visibleTags.length > 0 && (
                                 <>
                                     <div className={`flex items-center gap-2 mb-2.5 ${matchingSources.length > 0 ? 'mt-5' : ''}`}>
                                         <TagIcon className="w-3.5 h-3.5 text-accent/70" />
                                         <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">Tags</span>
                                     </div>
                                     <div className="flex flex-wrap gap-2">
-                                        {matchingTags.map(({ tag, count }) => {
+                                        {visibleTags.map(({ tag, count }) => {
                                             const active = selectedTags.has(tag);
                                             return (
                                                 <button
@@ -2205,7 +2213,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 </div>
                             )}
                         </div>
-                    )}
+                        );
+                    })()}
                     {/* Library-fetch status. Matches from the loaded window render
                         immediately; while the one-time full-library fetch is still
                         in flight, older cards may be missing — show a subtle line
