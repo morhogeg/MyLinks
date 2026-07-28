@@ -733,6 +733,15 @@ The multi-user auth work is **fully written but not live**:
     `ShareViewController.swift` now draws `CitationMarkView` (`:139`, `:1235`)
     and `OrbitsOrbView` is retired (see the comment at `:1193`).
 
+21. **[ ] Run the tag-language cleanup on prod (owner, 5 min).** The 2026-07-28
+    prompt fix stops NEW cards from inheriting wrong-language tags (English
+    card → Hebrew tags), but already-saved cards keep theirs. With prod
+    credentials + `GEMINI_API_KEY`, from `functions/`:
+    `python tools/retag_language_mismatch.py <uid>` (dry run), then `--apply`.
+    Scans both directions and regenerates tags in each card's language,
+    preferring the existing same-language vocabulary. See the 2026-07-28 §9
+    entry.
+
 ### 🟢 P3 — product roadmap (post-launch)
 
 18c. **[ ] Native share-extension indicator: per-phase states.** Web maps every
@@ -1009,7 +1018,9 @@ exact-match, capped.
   with prod credentials + `GEMINI_API_KEY` to repair already-saved mismatched
   cards — it scans both directions (Hebrew tags on English cards and vice
   versa) and regenerates tags in the card's language, preferring the user's
-  same-language vocabulary. 544 backend tests green.
+  same-language vocabulary. 544 backend tests green. **Shipped:** merged to
+  main as `96c1381` (`Deploy-Functions: all`), functions deploy run **#57**;
+  backend-only, so no TestFlight build.
 - **2026-07-28 (same session, follow-up) — the four Review buttons now explain
   themselves.** Desktop: a hover tooltip per button (`DeckAction` gained a
   `hint`); touch: a small **ⓘ** at the start of the deck's progress header opens
