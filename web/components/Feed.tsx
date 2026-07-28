@@ -50,9 +50,10 @@ import CollectionFormModal from './CollectionFormModal';
 import ManageCollectionCardsSheet from './ManageCollectionCardsSheet';
 import MobileSubheader from './MobileSubheader';
 import NotesView from './NotesView';
+import KnowledgeGraph from './KnowledgeGraph';
 import { getNoteGroups } from '@/lib/notes';
 import LoadMoreSentinel from './feed/LoadMoreSentinel';
-import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, Sparkles, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote } from 'lucide-react';
+import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, Sparkles, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
 import { subscribeLatestSynthesis } from '@/lib/synthesis';
@@ -253,7 +254,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // 'digest' is the list of digests and 'digestDetail' is one opened digest
     // (Task B); 'notes' is the central My Notes view. The detail places are
     // history-like: back returns to their parent list, never to the home library.
-    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'ask' | 'collections' | 'collection' | 'digest' | 'digestDetail' | 'notes'>('grid');
+    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'graph' | 'ask' | 'collections' | 'collection' | 'digest' | 'digestDetail' | 'notes'>('grid');
     // The collection currently open as a place (viewMode 'collection').
     const [openCollectionId, setOpenCollectionId] = useState<string | null>(null);
     // The digest currently open as a place (viewMode 'digestDetail'); the sentinel
@@ -805,6 +806,31 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             .filter((l) => !isPending(l) && !isEffectivelyPrivateCard(l));
         return getNoteGroups(pool);
     }, [viewMode, links, libraryLinks, isEffectivelyPrivateCard]);
+    // ── Graph view data ──────────────────────────────────────────────────────
+    // Entering the Graph kicks off the full-library fetch: connections reach
+    // across the whole library, so the windowed feed alone would draw a partial
+    // (and therefore wrong) map.
+    useEffect(() => {
+        if (viewMode === 'graph') ensureLibrary();
+    }, [viewMode, ensureLibrary]);
+    // True when the grid's filters/search currently scope the library — the
+    // graph then maps exactly what the grid shows (filteredLinks); with nothing
+    // active it maps the WHOLE library (window ∪ snapshot), not just the loaded
+    // window. Same pending/privacy gates as My Notes.
+    const graphFiltersActive =
+        !!searchQuery.trim() || filter !== 'all' || selectedCategory.size > 0
+        || selectedTags.size > 0 || selectedSources.size > 0 || selectedCollections.size > 0;
+    const graphLinks = useMemo(() => {
+        if (viewMode !== 'graph') return [];
+        const base = graphFiltersActive
+            ? filteredLinks
+            : (() => {
+                const seen = new Set(links.map((l) => l.id));
+                return links.concat(libraryLinks.filter((l) => !seen.has(l.id)));
+            })();
+        return base.filter((l) => !isPending(l) && !isEffectivelyPrivateCard(l));
+    }, [viewMode, graphFiltersActive, filteredLinks, links, libraryLinks, isEffectivelyPrivateCard]);
+
     // A card opened FROM My Notes reveals its notes section (the user tapped a
     // note — land them on it). One-shot: cleared when the modal stack closes so
     // feed/search opens stay top-anchored.
@@ -1150,10 +1176,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         { key: 'grid', label: 'Card', icon: <LayoutGrid className="w-4 h-4" />, hint: 'Card' },
         { key: 'list', label: 'List', icon: <List className="w-4 h-4" />, hint: 'List' },
         { key: 'review', label: 'Review', icon: <GalleryHorizontalEnd className="w-4 h-4" />, hint: 'Review' },
+        { key: 'graph', label: 'Graph', icon: <Waypoints className="w-4 h-4" />, hint: 'Graph' },
     ];
     // The layout the Ask/Collections buttons return you to when you leave them.
-    const lastLayout = useRef<'grid' | 'list' | 'review'>('grid');
-    if (viewMode === 'grid' || viewMode === 'list' || viewMode === 'review') lastLayout.current = viewMode;
+    const lastLayout = useRef<'grid' | 'list' | 'review' | 'graph'>('grid');
+    if (viewMode === 'grid' || viewMode === 'list' || viewMode === 'review' || viewMode === 'graph') lastLayout.current = viewMode;
 
     // ---- Mobile v4 chrome (bottom tab bar + header glyphs) ----
     // Which bottom tab the current viewMode belongs to; detail places roll up
@@ -1246,7 +1273,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     }, [vaultLocked, filter, setFilter]);
     // True for the card-browsing layouts (everything except the full-screen
     // Ask chat and the Collections gallery), which share the search/filter chrome.
-    const isLibraryView = viewMode === 'grid' || viewMode === 'list' || viewMode === 'review';
+    const isLibraryView = viewMode === 'grid' || viewMode === 'list' || viewMode === 'review' || viewMode === 'graph';
     // When scoped to exactly one collection, cards offer a quick "remove from it".
     const activeCollectionId = selectedCollections.size === 1 ? Array.from(selectedCollections)[0] : undefined;
     // Count of active grid filters — badges the mobile "Filters" button.
@@ -2402,6 +2429,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                         </div>
                             );
                         })()
+                    ) : viewMode === 'graph' ? (
+                        <KnowledgeGraph
+                            links={graphLinks}
+                            loading={isLoadingLibrary && !graphFiltersActive}
+                            filtered={graphFiltersActive}
+                            onOpenCard={openLinkDetails}
+                        />
                     ) : viewMode === 'review' ? (
                         <SwipeDeck
                             links={filteredLinks}

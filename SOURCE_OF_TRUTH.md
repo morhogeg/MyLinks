@@ -1006,6 +1006,33 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 — Graph view: the knowledge graph made visible (branch
+  `claude/card-connections-knowledge-graph-fw6a1p`, not yet shipped).** New
+  fourth layout in the view switcher (Card/List/Review/**Graph**, `Waypoints`
+  icon — mobile gets it via the Display sheet automatically): a canvas
+  force-directed constellation of the whole library, nodes colored by category
+  and sized by connectedness. **Accuracy contract:** edges are exactly what
+  "See also" would show — stored `relatedLinks` (AI edges) plus live matches at
+  lib/related.ts thresholds (now exported and imported by the new
+  `web/lib/graph.ts`), so the graph and the card detail can never disagree.
+  Full-library by default (`ensureLibrary()` on entry, window ∪ snapshot, same
+  pending/privacy gates as My Notes); active grid filters/search scope it to
+  `filteredLinks` with a "filtered" badge. Tap a node → ego focus (neighborhood
+  lit, rest dimmed, per-edge reason panel with "strong" badges, tap-through
+  walks the graph, "Open card" opens LinkDetailModal); legend chips spotlight a
+  category; drag/pan/pinch/wheel, auto-fit camera until first user gesture, ⤢
+  re-fits. No graph library — custom O(n²) sim + 2D canvas (WKWebView-safe);
+  the O(n²) embedding pass is chunked off the main thread (rows yield via
+  setTimeout), capped at 600 cards (concept-index fallback above), live edges
+  capped at 5/node so hubs stay legible; idle labels are top-12 hubs only.
+  Theme via live CSS-token reads + MutationObserver on `.light`;
+  reduced-motion pre-settles the layout. Verified: tsc 0; Playwright
+  render-check light+dark, desktop+390px mobile, select/legend/Open-card
+  interactions clicked through with zero console errors (temp `/graph-preview`
+  harness used for this was deleted before commit; `allowedDevOrigins` +
+  PUBLIC_ROUTES tweaks reverted). **Watch on device:** sim feel on an older
+  iPhone with a big library, and pinch-zoom in the WKWebView.
+
 - **2026-07-28 — Firestore `.where()` warning silenced (FieldFilter
   migration).** Every Cloud Functions invocation that ran a Firestore query was
   emitting `UserWarning: Detected filter using positional arguments` into
