@@ -41,3 +41,13 @@ def test_prompt_forbids_ids_in_answer_text():
     # and streaming paths carry it.
     p = ai_service._build_rag_prompt("q", [{"id": "x", "title": "T"}])
     assert "NEVER write a source's id" in p
+
+
+def test_prompt_demands_structured_long_answers():
+    # The wall-of-text rule (owner report 2026-07-28): long answers must break
+    # into paragraphs/bullets with optional bold mini-headings; short answers
+    # stay plain. Lives in the shared builder so both paths carry it.
+    p = ai_service._build_rag_prompt("q", [{"id": "x", "title": "T"}])
+    assert "never return one unbroken block of text" in p.lower()
+    assert "mini-heading" in p
+    assert "Short answers (a few sentences) stay plain" in p
