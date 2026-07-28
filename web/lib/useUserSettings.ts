@@ -31,6 +31,8 @@ export const DEFAULT_SETTINGS: User['settings'] = {
     digest_minute: 0,
     digest_day: 0,
     digest_skip_empty: true,
+    synthesis_enabled: false,
+    synthesis_day: 6, // Sunday — the natural "week wrap" default
 };
 
 // Push is ONE shared control (the "Push notifications" toggle) that governs both
@@ -120,6 +122,8 @@ export function useUserSettings(uid: string) {
                 digest_minute: settings.digest_minute,
                 digest_day: settings.digest_day,
                 digest_skip_empty: settings.digest_skip_empty,
+                synthesis_enabled: settings.synthesis_enabled,
+                synthesis_day: settings.synthesis_day,
             });
             // Advance the baseline so a subsequent leave doesn't re-write unchanged settings.
             setSettingsBaseline(JSON.stringify(settings));
@@ -162,6 +166,13 @@ export function useUserSettings(uid: string) {
         setLoadError(false);
         try {
             const userSettings = await getUserSettings(uid);
+            // Legacy migration: 'synthesis' used to be a digest STYLE, which
+            // silently replaced the card digest. It's now its own weekly toggle —
+            // a stored synthesis mode becomes synthesis_enabled and the digest
+            // style falls back to smart. Persisted on the next save; the Style
+            // picker no longer offers synthesis, so the old value can't return.
+            const storedMode = normalizeDigestMode(userSettings?.digest_mode);
+            const legacySynthesisMode = storedMode === 'synthesis';
             let loaded: User['settings'] = userSettings
                 ? {
                     theme: userSettings.theme || 'dark',
@@ -176,7 +187,7 @@ export function useUserSettings(uid: string) {
                     digest_enabled: userSettings.digest_enabled ?? false,
                     digest_frequency: userSettings.digest_frequency || 'weekly',
                     digest_channels: normalizeChannels<DigestChannel>(userSettings.digest_channels, ['push'], 'push'),
-                    digest_mode: normalizeDigestMode(userSettings.digest_mode),
+                    digest_mode: legacySynthesisMode ? 'smart' : storedMode,
                     digest_topics: userSettings.digest_topics?.length
                         ? userSettings.digest_topics
                         : (userSettings.digest_topic ? [userSettings.digest_topic] : []),
@@ -186,6 +197,8 @@ export function useUserSettings(uid: string) {
                     digest_minute: userSettings.digest_minute ?? 0,
                     digest_day: userSettings.digest_day ?? 0,
                     digest_skip_empty: userSettings.digest_skip_empty ?? true,
+                    synthesis_enabled: userSettings.synthesis_enabled ?? legacySynthesisMode,
+                    synthesis_day: userSettings.synthesis_day ?? 6,
                 }
                 : DEFAULT_SETTINGS;
             // Push is one shared control now — reconcile both channel arrays to the
