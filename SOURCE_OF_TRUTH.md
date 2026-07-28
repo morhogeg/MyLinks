@@ -292,27 +292,23 @@ The multi-user auth work is **fully written but not live**:
    now remains only for creation failures (with a Retry). Example-card seeding
    was skipped (optional). Ships with the task-2 functions deploy — no separate
    action.
-4. **[ ] Pending deploys/verifications from the last sessions** *(2026-07-17:
-   no Mac needed anymore — any session can run these via the push-triggered
-   "Deploy Cloud Functions" CI: push a `functions/**`-touching commit to main
-   with a `Deploy-Functions:` line, or bump `functions/.deploy-ping`; a
-   whole-codebase run (no trailer) executes ALL of the below at once — do it
-   deliberately, it lights up the dark M12 synthesis backend)*:
-   - `./deploy-functions.sh` — M12 weekly synthesis backend is written but dark.
-   - `firebase deploy --only firestore:rules` — the `syntheses` read rule.
-   - M9 backfill (See-also for old cards): **now a one-tap in-app action** —
-     after the deploy above ships the `rebuild_connections` callable, tap
-     **Settings → Connections → Rebuild** (per-user, no admin token, batched so
-     it can't time out). The admin all-users `backfill_related_links` HTTP fn
-     still exists as a fallback (`curl -H "X-Admin-Token: $ADMIN_TOKEN" …`).
-   - Confirm `backfill_youtube_channels` was run (channel-name repair).
-   - `/api/analyze` 60s timeout on slow YouTube videos — **largely moot as of
-     2026-07-11 (weaknesses sprint):** web link saves no longer ride the
-     synchronous `/api/analyze` request; they write a `processing` placeholder
-     and enqueue via `/api/share` into `process_link_background` (300s budget).
-     `/api/analyze` remains in use only for the card **Retry** flow, image
-     analysis, and the Note tab (all short) — the slow-YouTube exposure there is
-     retry-only and tolerable.
+4. **[x] M12 weekly-synthesis backend deployed (2026-07-28)** — the unscoped
+   (no-trailer) whole-codebase functions deploy ran, lighting up the dark M12
+   synthesis backend and pruning main-vs-prod drift. **Scope was narrowed by the
+   owner 2026-07-28** before the deploy; the dropped sub-items, for the record:
+   - ~~M9 backfill (See-also on old cards)~~ — DROPPED: launch cohort will have
+     all features live from day one, so no "old" cards lack connections. The
+     `rebuild_connections` callable (Settings → Connections → Rebuild) and the
+     admin `backfill_related_links` HTTP fallback still shipped with the deploy;
+     nobody needs to run them.
+   - ~~Confirm `backfill_youtube_channels` was run~~ — DROPPED, same reasoning:
+     it repairs channel names on pre-existing cards only.
+   - ~~`firestore:rules` for the `syntheses` read rule~~ — already live:
+     deploy-rules.yml run #4 (green, 2026-07-28) shipped the ruleset containing
+     the `syntheses/{weekId}` match (verified, not redone).
+   - `/api/analyze` 60s timeout — confirmed moot (2026-07-11 weaknesses sprint):
+     web saves enqueue via `/api/share` into `process_link_background` (300s);
+     `/api/analyze` serves only Retry / image / Note (all short).
 5. **[ ] Security config + key hygiene (30 min, do with #2):** set `ADMIN_TOKEN`,
    `APPCHECK_ENFORCE=true`, `OWNER_EMAIL` in functions env. **Rotate the Gemini
    key** (was pasted in chat 2026-06-23) and the **App Store Connect API `.p8`**
