@@ -613,16 +613,37 @@ export default function KnowledgeGraph({
     }, [model, clusterFocus]);
 
     // One cluster-scoped question for both entry points (selection panel and
-    // cluster panel): what TIES the cards together — not a generic topic sweep
-    // ("What have I saved on Tech?" told the owner nothing the label didn't).
+    // cluster panel): what TIES the cards together. The question must NAME the
+    // cards in quotes — quoted titles are the backend's anchor-pinning trigger
+    // AND the only phrasing the model can't reinterpret. A theme-only question
+    // ("my 2 cards about Data Interpretation") let the model pick whichever
+    // in-context cards IT thought matched the theme, and it answered about two
+    // entirely different cards (owner bug report, 2026-07-28).
     const askAboutCluster = useCallback((clusterIndex: number, restore: GraphRestoreFocus) => {
         if (!model || !onAskCluster || !model.clusters[clusterIndex]) return;
         const cluster = model.clusters[clusterIndex];
         const members = cluster.nodeIndices.map((i) => model.nodes[i]);
-        const question = cluster.label
-            ? `What connects my ${members.length} cards about ${cluster.label.split(' · ')[0]}?`
-            : `What connects these ${members.length} cards I saved?`;
-        onAskCluster(question, members.slice(0, 8).map((m) => m.link.title), restore);
+        // Internal double quotes would split the quoted span the backend
+        // extracts; its title matching is punctuation-insensitive, so
+        // dropping them loses nothing. Long titles truncate with an
+        // ellipsis, which the backend treats as a prefix match.
+        const quote = (t: string) => {
+            const clean = t.replace(/["“”«»]/g, '').trim();
+            return clean.length > 80 ? `“${clean.slice(0, 79)}…”` : `“${clean}”`;
+        };
+        const titles = members.map((m) => m.link.title);
+        let question: string;
+        if (members.length <= 3) {
+            const quoted = titles.map(quote);
+            const list = quoted.length === 2
+                ? `${quoted[0]} and ${quoted[1]}`
+                : quoted.join(', ');
+            question = `What connects ${list}?`;
+        } else {
+            const theme = cluster.label ? ` about ${cluster.label.split(' · ')[0]}` : '';
+            question = `What connects my ${members.length} cards${theme}, like ${quote(titles[0])} and ${quote(titles[1])}?`;
+        }
+        onAskCluster(question, titles.slice(0, 8), restore);
     }, [model, onAskCluster]);
 
     const askCluster = useCallback(() => {
