@@ -1021,6 +1021,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 (same session, round 15) — cluster why-copy de-duplicated +
+  answer structure ENFORCED at the suffix (owner QA round 6).** (1) The
+  why-line said "linked by Geopolitics and Sovereignty" under a label reading
+  "Geopolitics · Sovereignty" — subject restated, not a why. Restored the
+  dedup: threads already covered by the label are filtered; extras render as
+  "also share X and Y"; label-covered → count only ("6 cards"); concept-less →
+  "linked by closely related content". (2) Answers still one block despite
+  round 12's rules-list instruction (deployed + live — the model ignored a
+  mid-list rule): new `_STRUCTURE_REMINDER` appended to ALL FOUR output-format
+  suffixes (`_CITED_JSON_SUFFIX`, strict, paraphrase, and the streaming
+  marker_instruction) — the last thing the model reads. Tripwire extended to
+  assert the reminder on the three JSON suffixes; 553/553 green; tsc 0.
+  Deployed `Deploy-Functions: all` + Vercel + TestFlight. If a suffix-level
+  demand STILL comes back unstructured, the next step is a deterministic
+  post-format pass (sentence-split into paragraphs server-side) — noted here
+  so the next session doesn't re-try prompt-only.
 - **2026-07-28 (same session, round 14) — graph⇄Ask round trip completed
   (owner idea: badge cluster chats + link back to the graph view).**
   (1) **Chat docs remember their graph origin**: `ChatSession.graphFocus`

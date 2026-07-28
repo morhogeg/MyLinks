@@ -601,14 +601,20 @@ export default function KnowledgeGraph({
             }
         }
         const floor = Math.max(2, Math.ceil(members.length * 0.25));
-        const threads = [...conceptCounts.values()]
+        const labelLower = (cluster.label ?? '').toLowerCase();
+        const ranked = [...conceptCounts.values()]
             .filter((e) => e.count >= floor)
             .sort((a, b) => b.count - a.count)
-            .slice(0, 2)
             .map((e) => e.display);
-        const why = threads.length
-            ? `linked by ${threads.join(' and ')}`
-            : 'linked by closely related content';
+        // Only say what the LABEL doesn't already say (owner copy QA:
+        // "Geopolitics · Sovereignty — linked by Geopolitics and Sovereignty"
+        // is the subject restated, not a why). Extra shared threads add real
+        // information; when the label covers them all, the count alone is
+        // honest; only a concept-less cluster needs the semantic-tie fallback.
+        const extra = ranked.filter((t) => !labelLower.includes(t.toLowerCase())).slice(0, 2);
+        const why = extra.length
+            ? `also share ${extra.join(' and ')}`
+            : ranked.length ? null : 'linked by closely related content';
         return { index: clusterFocus, label: cluster.label, members, why };
     }, [model, clusterFocus]);
 
@@ -925,7 +931,7 @@ export default function KnowledgeGraph({
                                     {/* Sentence case — this line now carries the
                                         WHY of the cluster, not a section label. */}
                                     <p dir="auto" className="mt-0.5 text-[12px] text-text-secondary leading-snug">
-                                        {clusterPanel.members.length} cards · {clusterPanel.why}
+                                        {clusterPanel.members.length} cards{clusterPanel.why ? ` · ${clusterPanel.why}` : ''}
                                     </p>
                                 </div>
                                 <button
