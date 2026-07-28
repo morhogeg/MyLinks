@@ -1021,6 +1021,24 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 (same session, round 9) — Graph Ask GROUNDING BUG fixed (owner
+  bug report: asked about 2 sunscreen cards, got an answer about 2 unrelated
+  cards).** Root cause was the QUESTION, not retrieval: the round-8 phrasing
+  ("What connects my 2 cards about Data Interpretation?") let the model
+  re-decide which in-context cards "about Data Interpretation" meant — the
+  backend's anchor pipeline (verified: `_sanitize_hints` caps 8×120 chars →
+  `anchor_phrases_for` → per-anchor `keyword_scan_cards` rescue →
+  `pin_title_phrases`) had pinned the right cards into context, but the
+  ~20-card context also contained topic-matched strangers and the model chose
+  those. Fix (frontend-only): the composed question now NAMES the cards in
+  quotes — ≤3 members: `What connects "A" and "B"?`; >3: theme + two quoted
+  exemplars ("…, like "A" and "B"?"). Quoted titles are also the backend's
+  `extract_quoted_phrases` anchor trigger, so grounding is now enforced by
+  BOTH the prompt and the pin. Internal `"..."` inside titles are stripped
+  before quoting (they'd split the quoted span; backend title-matching is
+  punctuation-insensitive) and >80-char titles ellipsize (backend prefix-
+  matches). Verified: tsc 0; harness reproducing the exact bug shape — both
+  question forms captured correct. Backend untouched, no functions deploy.
 - **2026-07-28 (same session, round 8) — Graph: Ask returns to the pill row as
   "Ask about cluster", cluster-specific question, Ask round-trip restore, why
   headline (owner QA round 5).** (1) The Connections-header "Ask about all"
