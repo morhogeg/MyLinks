@@ -10,6 +10,7 @@ import {
     SquarePen,
     MoreHorizontal,
     Search,
+    Waypoints,
 } from 'lucide-react';
 import { ChatSession } from '@/lib/types';
 import SidebarIcon from './ui/SidebarIcon';
@@ -138,8 +139,13 @@ function ChatRow({
                 title={chat.title}
                 className="flex-1 min-w-0 flex flex-col items-start text-start ps-3.5 pe-1 py-2 min-h-[42px] justify-center cursor-pointer"
             >
-                <span dir="auto" className={`w-full truncate text-sm leading-snug text-start ${active ? 'font-medium text-text' : 'text-text-secondary'}`}>
-                    {chat.title}
+                <span className="w-full flex items-center gap-1.5 min-w-0">
+                    {/* Graph-born conversation — the Waypoints glyph is the same
+                        mark the Graph view wears, so the rows read at a glance. */}
+                    {chat.graphFocus && <Waypoints className="w-3.5 h-3.5 shrink-0 text-text-muted" />}
+                    <span dir="auto" className={`min-w-0 truncate text-sm leading-snug text-start ${active ? 'font-medium text-text' : 'text-text-secondary'}`}>
+                        {chat.title}
+                    </span>
                 </span>
                 <span className="text-[11px] text-text-muted">{relativeTime(chat.updatedAt)}</span>
             </button>

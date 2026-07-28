@@ -390,6 +390,10 @@ export interface ChatSession {
   messages: ChatMessage[];
   createdAt: number;      // Date.now()
   updatedAt: number;      // Date.now() — drives sidebar sort (most recent first)
+  /** Set when the conversation was launched from the Graph ("Ask about
+   *  these"/cluster): the focus to reopen there. Badges the sidebar row and
+   *  powers the answer's "Graph" chip. Immutable after creation. */
+  graphFocus?: { selectedId?: string; clusterAnchorId?: string };
 }
 
 // Request/Response types for API routes

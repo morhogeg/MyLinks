@@ -1021,6 +1021,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 (same session, round 14) — graph⇄Ask round trip completed
+  (owner idea: badge cluster chats + link back to the graph view).**
+  (1) **Chat docs remember their graph origin**: `ChatSession.graphFocus`
+  ({selectedId|clusterAnchorId}), set when a conversation is born from the
+  graph's ask hand-off (rides the convo OBJECT through the debounced persist
+  so the create writes the right chat's focus; immutable after creation;
+  `createChat` gained the param, `toSession` round-trips it). (2) **Sidebar
+  badge**: graph-born rows wear the Waypoints glyph before the title — same
+  mark as the Graph view. (3) **"Graph" chip on every cited answer** (owner's
+  "even for regular chats"): a quiet dashed chip at the end of each answer's
+  sources row — graph-born chats reopen the EXACT origin focus; any other
+  chat opens the first cited card's neighborhood (selectedId), via new
+  `onOpenGraphFocus` → Feed sets `graphRestore` + viewMode 'graph' (reuses
+  the round-8 restore mechanism). tsc 0. Frontend-only → Vercel + TestFlight.
+  Not render-verified (Ask needs live auth/backend) — owner device QA is the
+  check; watch: chip layout in RTL answers, badge alignment on long titles.
 - **2026-07-28 (same session, round 13) — Ask tab is a BLANK SLATE; graph
   hand-off can no longer replay (owner bug: graph-ask → close mid-reply →
   toolbar Ask re-showed the previous question).** Root cause was NOT

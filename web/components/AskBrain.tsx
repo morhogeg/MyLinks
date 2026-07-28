@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Plus, MessagesSquare, Image as ImageIcon, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X } from 'lucide-react';
+import { ArrowUp, Plus, MessagesSquare, Image as ImageIcon, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X, Waypoints } from 'lucide-react';
 import type { OrbState } from '@/components/ui/CitationMark';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -278,13 +278,17 @@ interface AskBrainProps {
     links: Link[];
     /** A question another surface (the Graph's cluster panel) wants asked the
      *  moment Ask opens. Nonce-gated so each hand-off fires exactly once, in a
-     *  fresh conversation; the hints carry the cluster's anchor titles. */
-    initialAsk?: { question: string; hints?: AskHints; nonce: number } | null;
+     *  fresh conversation; the hints carry the cluster's anchor ids/titles and
+     *  `restore` names the graph focus this conversation was born from (saved
+     *  on the chat doc → sidebar badge + the answer's "Graph" chip). */
+    initialAsk?: { question: string; hints?: AskHints; restore?: { selectedId?: string; clusterAnchorId?: string }; nonce: number } | null;
+    /** Open the Graph view focused on a card/cluster (the answer's "Graph" chip). */
+    onOpenGraphFocus?: (focus: { selectedId?: string; clusterAnchorId?: string }) => void;
 }
 
 const HISTORY_COLLAPSE_KEY = 'askbrain:histcollapsed';
 
-export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayOpen = false, links, initialAsk }: AskBrainProps) {
+export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayOpen = false, links, initialAsk, onOpenGraphFocus }: AskBrainProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
@@ -308,7 +312,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
     // chat swaps in a fresh object; async work captures THE OBJECT, so a late
     // write can never attach itself (or its freshly-created Firestore id) to a
     // conversation the user has since navigated to.
-    const convoRef = useRef<{ id: string | null }>({ id: null });
+    // `graphFocus` rides the conversation OBJECT (not separate state) so the
+    // debounced persist that creates the doc saves the focus of the right
+    // conversation even if the user has navigated on by then.
+    const convoRef = useRef<{ id: string | null; graphFocus?: ChatSession['graphFocus'] }>({ id: null });
     const lastSavedRef = useRef<string>('');   // signature of the last persisted messages
     const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     // Every chats write goes through this chain, so the eager create fired on
@@ -544,7 +551,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
     // the sidebar while the answer is still being written; then update in place.
     // Serialized through persistChainRef. Resolves to the chat's Firestore id
     // (null when there's nothing to save or the write failed).
-    const persistConversation = useCallback((msgs: ChatMessage[], convo: { id: string | null }): Promise<string | null> => {
+    const persistConversation = useCallback((msgs: ChatMessage[], convo: { id: string | null; graphFocus?: ChatSession['graphFocus'] }): Promise<string | null> => {
         const task = persistChainRef.current.then(async (): Promise<string | null> => {
             if (!uid || msgs.length === 0) return null;
             const sig = JSON.stringify(msgs);
@@ -554,7 +561,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                 if (convo.id) {
                     await updateChat(uid, convo.id, { messages: msgs });
                 } else {
-                    convo.id = await createChat(uid, msgs);
+                    convo.id = await createChat(uid, msgs, undefined, convo.graphFocus);
                     if (isCurrent()) setActiveChatId(convo.id);
                 }
                 if (isCurrent()) lastSavedRef.current = sig;
@@ -602,6 +609,7 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
         if (!initialAsk || !uid || initialAsk.nonce === consumedAskNonce.current) return;
         consumedAskNonce.current = initialAsk.nonce;
         newChat();
+        if (initialAsk.restore) convoRef.current.graphFocus = initialAsk.restore;
         send(initialAsk.question, [], 'library', initialAsk.hints);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initialAsk, uid]);
@@ -1324,6 +1332,25 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                                     })()}
                                                 </button>
                                             ))}
+                                            {/* "Graph" — jump to where these sources LIVE.
+                                                A graph-born chat reopens the exact focus it
+                                                was asked from; any other chat opens the first
+                                                cited card's neighborhood. Quieter than the
+                                                source chips: it's a wayfinding action, not a
+                                                source. */}
+                                            {onOpenGraphFocus && (
+                                                <button
+                                                    onClick={() => onOpenGraphFocus(
+                                                        (chats.find(c => c.id === activeChatId)?.graphFocus
+                                                            ?? convoRef.current.graphFocus)
+                                                        ?? { selectedId: m.sources![0].id })}
+                                                    title="See these cards in the graph"
+                                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-dashed border-border-strong text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
+                                                >
+                                                    <Waypoints className="w-3.5 h-3.5" />
+                                                    <span className="text-[12px] font-semibold">Graph</span>
+                                                </button>
+                                            )}
                                         </div>
                                     )}
                                 </div>
