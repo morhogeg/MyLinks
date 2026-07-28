@@ -747,6 +747,36 @@ class GeminiService:
             raise last_error
         raise AnalysisError(f"AI {what} failed: {last_error}")
 
+    @staticmethod
+    def _enforce_tag_language(data: dict) -> dict:
+        """Code-level backstop for the prompt's same-language tag rule.
+
+        The 2026-07-28 prompt fix (f3055f8) told the model to never reuse a
+        tag written in a different language than the content — and prod showed
+        it still doing exactly that the same day (Hebrew vocabulary tags on an
+        English recipe card, twice). Instruction-following can't be trusted
+        here, so mismatches are dropped after parsing: a card ends up with
+        fewer tags rather than wrong-language ones. Scoped to the library's
+        real bilingual split — Hebrew content keeps only Hebrew-script tags,
+        any other KNOWN language drops Hebrew-script tags, and an unreported
+        language leaves the tags untouched (never guess the direction).
+        """
+        tags = data.get("tags") if isinstance(data, dict) else None
+        lang = (data.get("language") or "").lower() if isinstance(data, dict) else ""
+        if not isinstance(tags, list) or not tags or not lang:
+            return data
+        has_hebrew = re.compile("[\\u0590-\\u05FF]").search
+        if lang == "he":
+            kept = [t for t in tags if isinstance(t, str) and has_hebrew(t)]
+        else:
+            kept = [t for t in tags if isinstance(t, str) and not has_hebrew(t)]
+        if len(kept) != len(tags):
+            logger.info(
+                f"Dropped {len(tags) - len(kept)} wrong-language tag(s) for lang={lang}"
+            )
+            data["tags"] = kept
+        return data
+
     def analyze_text(self, text: str, existing_tags: list = None, content_type: str = None,
                      attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
         """Analyze text content using Gemini. Raises AnalysisError on failure.
@@ -763,7 +793,8 @@ class GeminiService:
         )
 
         prompt = f"{SYSTEM_PROMPT}{tags_context}\n\nContent to analyze:\n{clean_text}"
-        return self._generate_json([prompt], "text analysis", attempts=attempts)
+        return self._enforce_tag_language(
+            self._generate_json([prompt], "text analysis", attempts=attempts))
 
     def analyze_text_with_images(self, text: str, images: list, existing_tags: list = None,
                                  content_type: str = None, image_is_primary: bool = False,
@@ -848,11 +879,11 @@ Content to analyze:
         for img_bytes, mime in images:
             contents.append(types.Part.from_bytes(data=img_bytes, mime_type=mime))
 
-        return self._generate_json(
+        return self._enforce_tag_language(self._generate_json(
             contents, "text+image analysis",
             config_extra={"media_resolution": media_resolution},
             attempts=attempts,
-        )
+        ))
 
     def analyze_youtube(self, watch_url: str, existing_tags: list = None,
                         attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
@@ -878,12 +909,12 @@ Content to analyze:
         ]
         # Low media resolution (~100 tokens/sec) keeps cost and latency bounded
         # while remaining ample for understanding speech and on-screen content.
-        return self._generate_json(
+        return self._enforce_tag_language(self._generate_json(
             contents,
             "youtube video analysis",
             config_extra={"media_resolution": "MEDIA_RESOLUTION_LOW"},
             attempts=attempts,
-        )
+        ))
 
     def analyze_image(self, image_bytes: bytes, mime_type: str, existing_tags: list = None,
                       attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
@@ -908,7 +939,8 @@ Work only from what is legible: keep the subject at the level the image states i
             types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
             prompt,
         ]
-        return self._generate_json(contents, "image analysis", attempts=attempts)
+        return self._enforce_tag_language(
+            self._generate_json(contents, "image analysis", attempts=attempts))
 
     def _probe_prompt_blocked(self, prompt: str) -> bool:
         """Ask Gemini's filter whether it ACCEPTS a prompt, without paying for
