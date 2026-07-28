@@ -128,6 +128,10 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
     private let barFill = UIView()                // progress bar fill
     private let hintLabel = UILabel()             // "You can close this…"
     private var barFillWidth: NSLayoutConstraint!
+    /// The status cluster's vertical anchor (the % counter; mark and phase hang
+    /// off it). Image mode centers it slightly high (-8); link mode pushes it
+    /// down (+12) so the Citation mark clears the favicon+host header row.
+    private var statusCenterY: NSLayoutConstraint!
 
     // MARK: Link scan HUD (mirrors web/components/LinkScanProgress.tsx)
     // A faux page preview — favicon + host + skeleton lines — shown behind the
@@ -376,9 +380,10 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         sweepView.isUserInteractionEnabled = false
         previewView.addSubview(sweepView)
 
-        // Big % counter.
+        // Big % counter. 26pt (not 30) so the mark + % + phase cluster fits the
+        // 16:9 preview with air above and below.
         percentLabel.text = "0%"
-        percentLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 30, weight: .bold)
+        percentLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 26, weight: .bold)
         percentLabel.textColor = Lumen.accent3
         percentLabel.textAlignment = .center
         percentLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -437,6 +442,7 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         scanContainer.addSubview(scanCloseButton)
 
         barFillWidth = barFill.widthAnchor.constraint(equalToConstant: 0)
+        statusCenterY = percentLabel.centerYAnchor.constraint(equalTo: previewView.centerYAnchor, constant: -8)
 
         NSLayoutConstraint.activate([
             scanContainer.centerXAnchor.constraint(equalTo: view.centerXAnchor),
@@ -460,14 +466,14 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
             dimView.bottomAnchor.constraint(equalTo: previewView.bottomAnchor),
 
             percentLabel.centerXAnchor.constraint(equalTo: previewView.centerXAnchor),
-            percentLabel.centerYAnchor.constraint(equalTo: previewView.centerYAnchor, constant: -8),
+            statusCenterY,
 
             checkLabel.centerXAnchor.constraint(equalTo: percentLabel.centerXAnchor),
             checkLabel.centerYAnchor.constraint(equalTo: percentLabel.centerYAnchor),
 
             citationMark.centerXAnchor.constraint(equalTo: percentLabel.centerXAnchor),
             citationMark.bottomAnchor.constraint(equalTo: percentLabel.topAnchor, constant: -6),
-            citationMark.widthAnchor.constraint(equalToConstant: 32),
+            citationMark.widthAnchor.constraint(equalToConstant: 28),
             // The tight viewBox is 448×416, so the slot keeps the ink's aspect
             // instead of letterboxing it.
             citationMark.heightAnchor.constraint(equalTo: citationMark.widthAnchor,
@@ -922,6 +928,8 @@ class ShareViewController: UIViewController, URLSessionDataDelegate, URLSessionT
         linkPreview.isHidden = false
         dimView.backgroundColor = UIColor.black.withAlphaComponent(0.50)
         citationMark.isHidden = false
+        // Drop the status cluster below the favicon+host header (see statusCenterY).
+        statusCenterY.constant = 12
         beginScanAnimation()
         view.setNeedsLayout()
         view.layoutIfNeeded()
