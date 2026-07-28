@@ -134,6 +134,11 @@ export interface Link {
   reminderDue?: boolean;
   reminderDueAt?: number; // Unix timestamp (ms) the reminder came due
   lastViewedAt?: number; // Unix timestamp (ms)
+  // Last time the card was KEPT in Review (right swipe) — "I've seen this, leave
+  // it where it is". Deliberately NOT a status change: it only rests the card
+  // from review sessions for a cooldown (see lib/reviewQueue REVIEWED_REST_DAYS),
+  // so Keep can't be confused with favoriting. Cleared by the deck's Undo.
+  reviewedAt?: number; // Unix timestamp (ms)
   language?: string;
   isRead?: boolean;
 

@@ -19,27 +19,45 @@ export const REVIEW_SESSION_SIZE = 12;
 const FORGOTTEN_MIN_AGE_DAYS = 30;
 const DAY_MS = 86_400_000;
 
+/**
+ * How long a card rests after being KEPT in Review (right swipe). Keep is not a
+ * status change — the card stays exactly where it was, in whatever state it was
+ * in — so this cooldown is the ONLY thing that takes it out of the pool. Without
+ * it a session of all-Keeps would re-deal the same cards immediately and
+ * "Review N more" would loop forever.
+ */
+export const REVIEWED_REST_DAYS = 30;
+
 const created = (l: Link): number => getTimestampNumber(l.createdAt);
-const viewed = (l: Link): number => getTimestampNumber(l.lastViewedAt);
+/** Last time the user actually laid eyes on the card — opened OR kept in Review. */
+const viewed = (l: Link): number =>
+    Math.max(getTimestampNumber(l.lastViewedAt), getTimestampNumber(l.reviewedAt));
 
 /**
- * A card is a live review candidate only while it's still "open" — not already
- * kept (favorite), archived, awaiting a reminder, or mid-capture. Acting on a
+ * A card is a live review candidate only while it's still "open" — not archived,
+ * awaiting a reminder, mid-capture, or resting after a recent Keep. Acting on a
  * card in the deck flips one of these, which is exactly how it leaves the pool
  * (and how Undo, by reversing the flip, brings it back). Exported so the deck
  * can also skip cards acted on OUTSIDE its gestures mid-session (e.g. a
  * reminder set from the detail modal).
+ *
+ * Favorites stay excluded even though right-swipe no longer favorites: a
+ * favorite is an explicit keep-forever verdict, so re-asking about it is noise.
  */
-export function isOpen(link: Link): boolean {
+export function isOpen(link: Link, now: number = Date.now()): boolean {
     return !isPending(link)
         && link.status !== 'archived'
         && link.status !== 'favorite'
-        && link.reminderStatus !== 'pending';
+        && link.reminderStatus !== 'pending'
+        // Never kept (0) always passes; a recent Keep rests the card.
+        && getTimestampNumber(link.reviewedAt) <= now - REVIEWED_REST_DAYS * DAY_MS;
 }
 
 /** The full ordered candidate pool for review sessions. */
 export function reviewSessionQueue(links: Link[], now: number = Date.now()): Link[] {
-    const open = links.filter(isOpen);
+    // Arrow fn, not a bare `isOpen` reference: filter passes the INDEX as the
+    // second arg, which would land in isOpen's `now`.
+    const open = links.filter((l) => isOpen(l, now));
     const cutoff = now - FORGOTTEN_MIN_AGE_DAYS * DAY_MS;
 
     // Dustiest first: saved >30d ago and not opened in 30d.

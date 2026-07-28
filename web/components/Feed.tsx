@@ -10,7 +10,7 @@ import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
 import DigestView from './DigestView';
 import DigestCard from './DigestCard';
 import Dropdown from './Dropdown';
-import { deleteLink, updateLinkReminder, saveLink, toLink } from '@/lib/storage';
+import { deleteLink, updateLinkReminder, markLinkReviewed, saveLink, toLink } from '@/lib/storage';
 import { EXAMPLE_CARD } from '@/lib/exampleCard';
 import { track } from '@/lib/analytics';
 import { collection, onSnapshot, doc, getDoc, updateDoc, QuerySnapshot, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
@@ -1069,9 +1069,19 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // Stable SwipeDeck (Review mode) action handlers. Silent: the deck's own
     // motion + session tallies confirm each action, and stacked success toasts
     // were covering the deck's Undo/Archive/Remind/Keep buttons.
-    const swipeFavorite = useCallback((link: Link) => handleStatusChange(link.id, 'favorite', { silent: true }), [handleStatusChange]);
     const swipeArchive = useCallback((link: Link) => handleStatusChange(link.id, 'archived', { silent: true }), [handleStatusChange]);
     const swipeResetStatus = useCallback((link: Link) => handleStatusChange(link.id, 'unread', { silent: true }), [handleStatusChange]);
+    // Right swipe = Keep: the card does NOT move, change status, or get favorited
+    // — it only rests from review sessions for a cooldown (reviewQueue
+    // REVIEWED_REST_DAYS). `keep` false is the deck's Undo, which clears the stamp.
+    const swipeKeep = useCallback(async (link: Link, keep: boolean) => {
+        if (!uid) return;
+        try {
+            await markLinkReviewed(uid, link.id, keep);
+        } catch {
+            toast.error("Couldn't save that. Please try again.");
+        }
+    }, [uid, toast]);
     // Undo of an up-swipe: clear the reminder the deck just set for this card (F-29).
     // Clearing (not restoring a prior state) is safe because reviewQueue.isOpen
     // excludes reminder-pending cards from every deck queue — a dealt card can't
@@ -2349,7 +2359,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                     ) : viewMode === 'review' ? (
                         <SwipeDeck
                             links={filteredLinks}
-                            onFavorite={swipeFavorite}
+                            onKeep={swipeKeep}
                             onArchive={swipeArchive}
                             onRemind={handleOpenReminderModal}
                             onOpen={openLinkDetails}
