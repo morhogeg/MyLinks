@@ -12,6 +12,7 @@ from typing import List, Optional, Any
 from firebase_functions import firestore_fn, https_fn
 from firebase_admin import firestore
 from google.cloud import firestore as gc_firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 from google.cloud.firestore_v1.vector import Vector
 from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
 from google import genai
@@ -885,7 +886,7 @@ def private_collection_ids(uid: str) -> set:
     try:
         db = get_db()
         docs = (db.collection("users").document(uid).collection("collections")
-                .where("isPrivate", "==", True).stream())
+                .where(filter=FieldFilter("isPrivate", "==", True)).stream())
         return {d.id for d in docs}
     except Exception as e:
         logger.error(f"private_collection_ids read failed: {e}")
@@ -916,12 +917,12 @@ def category_cards(uid: str, category: str, limit: int = 10) -> List[dict]:
     links_ref = db.collection("users").document(uid).collection("links")
     try:
         docs = list(
-            links_ref.where("category", "==", category)
+            links_ref.where(filter=FieldFilter("category", "==", category))
             .order_by("createdAt", direction=gc_firestore.Query.DESCENDING)
             .limit(limit * 2).stream()
         )
     except Exception:
-        docs = list(links_ref.where("category", "==", category).limit(120).stream())
+        docs = list(links_ref.where(filter=FieldFilter("category", "==", category)).limit(120).stream())
     out = []
     for doc in docs:
         data = doc.to_dict() or {}

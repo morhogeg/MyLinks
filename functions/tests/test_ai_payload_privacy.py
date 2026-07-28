@@ -44,7 +44,8 @@ class FakeQuery:
     def get(self):
         return list(self._docs)
 
-    def where(self, field, _op, value):
+    def where(self, filter):
+        field, value = filter.field_path, filter.value
         return FakeQuery([d for d in self._docs if d.to_dict().get(field) == value])
 
     def stream(self):

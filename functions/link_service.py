@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from google.cloud import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from db import get_db
 from log_safe import mask_uid
@@ -65,7 +66,7 @@ def find_data_uid_by_auth_uid(auth_uid: str) -> Optional[str]:
     db = get_db()
     docs = (
         db.collection('users')
-        .where('authUids', 'array_contains', auth_uid)
+        .where(filter=FieldFilter('authUids', 'array_contains', auth_uid))
         .limit(1)
         .get()
     )
@@ -132,12 +133,12 @@ def delete_user_data(uid: str) -> int:
             doc.reference.delete()
             deleted += 1
     # Any queued processing rows for this user.
-    for doc in db.collection('pending_processing').where('uid', '==', uid).stream():
+    for doc in db.collection('pending_processing').where(filter=FieldFilter('uid', '==', uid)).stream():
         doc.reference.delete()
         deleted += 1
     # Background-processing heartbeats for this user. The uid is stored nested
     # under `data.uid` (see log_to_firestore in main.py), so query on that path.
-    for doc in db.collection('task_logs').where('data.uid', '==', uid).stream():
+    for doc in db.collection('task_logs').where(filter=FieldFilter('data.uid', '==', uid)).stream():
         doc.reference.delete()
         deleted += 1
     user_ref.delete()
@@ -239,7 +240,7 @@ def find_user_by_ingest_token(token: str) -> Optional[str]:
     if not token:
         return None
     db = get_db()
-    docs = db.collection('users').where('ingestToken', '==', token).limit(1).get()
+    docs = db.collection('users').where(filter=FieldFilter('ingestToken', '==', token)).limit(1).get()
     if docs:
         return docs[0].id
     return None
@@ -251,7 +252,7 @@ def link_exists_for_url(uid: str, url: str) -> bool:
         return False
     db = get_db()
     links_ref = db.collection('users').document(uid).collection('links')
-    docs = links_ref.where('url', '==', url).limit(1).get()
+    docs = links_ref.where(filter=FieldFilter('url', '==', url)).limit(1).get()
     return len(docs) > 0
 
 
@@ -262,8 +263,8 @@ def pending_exists_for_url(uid: str, url: str) -> bool:
     db = get_db()
     docs = (
         db.collection('pending_processing')
-        .where('uid', '==', uid)
-        .where('url', '==', url)
+        .where(filter=FieldFilter('uid', '==', uid))
+        .where(filter=FieldFilter('url', '==', url))
         .limit(1)
         .get()
     )
