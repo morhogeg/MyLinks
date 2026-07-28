@@ -2,6 +2,12 @@ import logging
 import json
 from typing import List, Dict, Optional
 from firebase_admin import firestore
+# DistanceMeasure is NOT re-exported by firebase_admin.firestore on the pinned
+# firebase-admin (6.9.0) — referencing firestore.DistanceMeasure raised
+# AttributeError on EVERY find_related_links call in prod (See-also candidates
+# silently empty since at least 2026-07-27). Import it from the real module,
+# exactly as search.py does.
+from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
 from google.cloud.firestore_v1.vector import Vector
 from ai_service import GeminiService, GEMINI_ANALYSIS_MODEL, embedding_needs_repair
 from log_safe import mask_uid
@@ -37,7 +43,7 @@ class GraphService:
             vector_query = links_ref.find_nearest(
                 vector_field="embedding_vector",
                 query_vector=Vector(embedding),
-                distance_measure=firestore.DistanceMeasure.COSINE,
+                distance_measure=DistanceMeasure.COSINE,
                 limit=10
             )
             

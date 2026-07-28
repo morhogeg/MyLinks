@@ -275,8 +275,9 @@ Requirements for the analysis:
 7. tags: Provide 3 to 5 specific, relevant tags for organization (aim for 3-4; use 5 only when genuinely warranted).
    - **LANGUAGE**: Write tags in the SAME language as the input content. This rule OVERRIDES tag reuse: NEVER attach a tag written in a different language than the content (e.g. no Hebrew tags on an English article, no English tags on a Hebrew one), even if that tag appears in the "Existing Tags" list.
    - Use lowercase.
-   - PREFER REUSING EXISTING TAGS provided in the "Existing Tags" list if they are applicable — but ONLY those written in the content's language; ignore the rest of the list for this content.
-   - Only create a new tag if no same-language existing tag fits the content.
+   - REUSE an existing tag from the "Existing Tags" list wherever one genuinely fits the content — but ONLY those written in the content's language; ignore the rest of the list for this content.
+   - Reuse NEVER reduces the count: after reusing what fits, CREATE new specific tags until you have 3-5 total. A single reused tag is not a complete answer.
+   - Prefer SPECIFIC tags over generic ones — the dish, person, place, technique, or topic actually named in the content (e.g. "spaghetti al limone", "pasta", "italian cuisine" — not just "recipe", which merely repeats the category).
 
 8. actionableTakeaway: One concrete, specific action the reader can apply. This field is OPTIONAL.
    - **LANGUAGE**: Write the takeaway in the SAME language as the input content.
