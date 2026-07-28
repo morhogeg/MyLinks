@@ -1021,6 +1021,17 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 (same session, round 12) — Ask answers get READABLE STRUCTURE
+  (owner: "one block of text, hard to follow" — app-wide, not graph-only).**
+  Two ends: (1) new rule in the shared `_build_rag_prompt` (buffered +
+  streaming): answers longer than ~4 sentences must break into short
+  blank-line-separated paragraphs, prefer bullets across facets/sources, and
+  may open sections with a brief **bold mini-heading** when it aids scanning;
+  short answers stay plain (no headings on a two-sentence answer). Tripwire
+  test added (553/553 green). (2) `MarkdownMessage` in AskBrain now renders
+  headings: h1–h4 all map to ONE modest style (15px bold, mt-3) so a model's
+  `#` choice can never shout inside a chat bubble; paragraphs/bullets/bold
+  already rendered. Deployed `Deploy-Functions: all` + Vercel + TestFlight.
 - **2026-07-28 (same session, round 11) — raw card ids leaked into Ask answer
   prose (owner screenshots: "…oil sanctions (fb9QaKkmjNvk4ueKybSv,
   F7wwq0PWJh3cpyMaCbBt)").** The citation contract puts ids ONLY in

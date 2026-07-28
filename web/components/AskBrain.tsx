@@ -109,6 +109,13 @@ function MarkdownMessage({ content, dir: dirProp }: { content: string; dir?: 'rt
         <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}
             components={{
+                // Mini-subheadings the structure prompt asks for on long
+                // answers. Every heading level maps to ONE modest size — a
+                // model's # choice must never shout inside a chat bubble.
+                h1: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
+                h2: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
+                h3: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
+                h4: ({ children }) => <h4 dir={dir} className="text-[15px] font-bold text-text mt-3 mb-1 first:mt-0">{children}</h4>,
                 p: ({ children }) => <p dir={dir} className="mb-2 last:mb-0">{children}</p>,
                 ul: ({ children }) => <ul dir={dir} className="list-disc ps-5 mb-2 last:mb-0 space-y-1">{children}</ul>,
                 ol: ({ children }) => <ol dir={dir} className="list-decimal ps-5 mb-2 last:mb-0 space-y-1">{children}</ol>,
