@@ -334,8 +334,15 @@ The multi-user auth work is **fully written but not live**:
    *that* project. A key from an unbilled project silently reverts every save
    to the unpaid terms, under which Google trains on user content — with no
    runtime signal, since the API and the code are identical either way.
-5b. **[ ] Gemini monthly spend cap is ₪5.00 — raise it before any cohort wider
-   than the owner (found 2026-07-27, privacy audit).** AI Studio shows the cap
+5b. **[x] Gemini monthly spend cap — RAISED TO 50 BY THE OWNER 2026-07-28.**
+   The kill-switch risk below is resolved for now: at §7's $1.30–2.00/mo per
+   heavy user that is roughly a 10x headroom increase, so it no longer binds at
+   two users. **Still do task 19's GCP budget alert** — the point of that item
+   stands: a spend cap is a kill-switch, not a monitor, and you want warning
+   before you hit it, not an outage. Re-check the headroom before any real
+   cohort. Original finding, kept for the reasoning:
+   ~~Gemini monthly spend cap is ₪5.00 — raise it before any cohort wider
+   than the owner (found 2026-07-27, privacy audit).~~ AI Studio showed the cap
    at ₪5.00/mo with ₪1.49 used by a single user. §7 puts one heavy user at
    $1.30–2.00/mo, so **two real users exhaust it mid-month**; hitting it is a
    hard kill-switch (429 "billing account has exceeded its monthly spending
