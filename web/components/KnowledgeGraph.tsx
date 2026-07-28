@@ -247,8 +247,12 @@ export default function KnowledgeGraph({
                 }
                 const desktop = w >= 640;
                 const freeW = desktop ? w - 360 : w;
-                const freeH = desktop ? h : h * 0.5;
-                const pad = 70;
+                // Phones: the sheet can take up to 66% of the height, so only
+                // the top third is genuinely free to frame into.
+                const freeH = desktop ? h : h * 0.34;
+                // The phone's free strip is short — a desktop-sized margin
+                // would shrink the cluster to a speck inside it.
+                const pad = desktop ? 70 : 34;
                 const bw = Math.max(80, maxX - minX);
                 const bh = Math.max(80, maxY - minY);
                 const tk = Math.min(1.3, Math.max(0.2, Math.min((freeW - pad * 2) / bw, (freeH - pad * 2) / bh)));
@@ -259,21 +263,38 @@ export default function KnowledgeGraph({
                 cam.y += (freeH / 2 - ((minY + maxY) / 2) * cam.k - cam.y) * ease;
                 drawPendingRef.current = true;
             } else if (followRef.current !== null && model.nodes[followRef.current]) {
-                // Frame the followed node in the area the selection panel leaves
-                // free (right panel on desktop, bottom sheet on mobile).
-                const n = model.nodes[followRef.current];
+                // Frame the whole EGO NETWORK — the card and everything it
+                // connects to — inside the area the panel leaves free (right
+                // of the desktop panel, above the phone sheet). Framing the
+                // single node instead pushed its neighbours off the top edge
+                // on a phone, which is exactly what the selection is for.
+                const fi = followRef.current;
+                const n = model.nodes[fi];
                 const dpr = Math.min(2, window.devicePixelRatio || 1);
                 const w = canvas.width / dpr;
                 const h = canvas.height / dpr;
                 const desktop = w >= 640;
-                const cx = desktop ? (w - 342) / 2 : w / 2;
-                const cy = desktop ? h / 2 : h * 0.28;
+                const freeW = desktop ? w - 360 : w;
+                const freeH = desktop ? h : h * 0.34;
+                let minX = n.x - n.r, minY = n.y - n.r, maxX = n.x + n.r, maxY = n.y + n.r;
+                for (const ei of model.adjacency[fi]) {
+                    const e = model.edges[ei];
+                    const o = model.nodes[e.a === fi ? e.b : e.a];
+                    minX = Math.min(minX, o.x - o.r);
+                    minY = Math.min(minY, o.y - o.r);
+                    maxX = Math.max(maxX, o.x + o.r);
+                    maxY = Math.max(maxY, o.y + o.r);
+                }
+                // Leave room for the labels that hang under each dot.
+                const pad = 46;
+                const bw = Math.max(60, maxX - minX);
+                const bh = Math.max(60, maxY - minY);
+                const tk = Math.min(1.25, Math.max(0.4, Math.min((freeW - pad * 2) / bw, (freeH - pad * 2) / bh)));
                 const cam = camRef.current;
                 const ease = reducedMotionRef.current ? 1 : 0.11;
-                const tk = Math.min(1.25, Math.max(0.7, cam.k));
                 cam.k += (tk - cam.k) * ease;
-                cam.x += (cx - n.x * cam.k - cam.x) * ease;
-                cam.y += (cy - n.y * cam.k - cam.y) * ease;
+                cam.x += (freeW / 2 - ((minX + maxX) / 2) * cam.k - cam.x) * ease;
+                cam.y += (freeH / 2 - ((minY + maxY) / 2) * cam.k - cam.y) * ease;
                 drawPendingRef.current = true;
             }
             if (simActive || drawPendingRef.current) {
@@ -310,6 +331,8 @@ export default function KnowledgeGraph({
             const cam = camRef.current;
             return { x: (p.x - cam.x) / cam.k, y: (p.y - cam.y) / cam.k };
         };
+        // Touch needs a fatter target than a mouse cursor does.
+        const minHit = window.matchMedia?.('(pointer: coarse)').matches ? 22 : 16;
         const hitTest = (p: { x: number; y: number }): number => {
             const m = modelRef.current;
             if (!m) return -1;
@@ -324,7 +347,7 @@ export default function KnowledgeGraph({
                 // Every dot must be hittable: at least a 16px screen-space
                 // target regardless of how small the node draws (owner QA:
                 // low-degree dots were effectively un-tappable).
-                const reach = Math.max(n.r + 4 / cam.k, 16 / cam.k);
+                const reach = Math.max(n.r + 4 / cam.k, minHit / cam.k);
                 const d2 = dx * dx + dy * dy;
                 if (d2 < reach * reach && d2 < bestDist) {
                     best = i;
@@ -513,7 +536,17 @@ export default function KnowledgeGraph({
                 };
             })
             .sort((a, b) => b.weight - a.weight);
-        return { node, neighbors };
+        // The cluster this card belongs to, surfaced as a chip in the panel —
+        // the discoverable route to the cluster actions (Ask / Save as
+        // collection). Tapping a caption on canvas is a small target on a
+        // phone; tapping cards is what people actually do (owner mobile QA).
+        const cluster = model.clusters[node.cluster];
+        return {
+            node,
+            neighbors,
+            clusterIndex: node.cluster,
+            clusterLabel: cluster && cluster.nodeIndices.length >= 3 ? cluster.label : null,
+        };
     }, [model, selected]);
 
     // ── Cluster panel data ───────────────────────────────────────────────────
@@ -600,8 +633,12 @@ export default function KnowledgeGraph({
                     Tap a card to explore · tap it again to open · drag to pan · scroll to zoom
                 </div>
             </div>
+            {/* Category legend. On a phone this WRAPPED to three rows and ate
+                ~110px of the canvas (owner mobile QA) — it's one horizontally
+                scrollable row there, and only wraps from sm up where there's
+                width to spare. */}
             {legend.length > 1 && (
-                <div className="flex flex-wrap items-center gap-1.5">
+                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap sm:overflow-visible">
                     {legend.map(({ category, count, color }) => {
                         const active = categoryFocus === category;
                         return (
@@ -609,7 +646,7 @@ export default function KnowledgeGraph({
                                 key={category}
                                 onClick={() => setCategoryFocus(active ? null : category)}
                                 aria-pressed={active}
-                                className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border text-[12px] font-medium transition-colors cursor-pointer ${active
+                                className={`inline-flex shrink-0 items-center gap-1.5 h-7 px-2.5 rounded-full border text-[12px] font-medium transition-colors cursor-pointer ${active
                                     ? 'bg-fill-strong border-border-strong text-text'
                                     : 'bg-card border-border-subtle text-text-secondary hover:text-text hover:bg-card-hover'
                                     }`}
@@ -626,7 +663,8 @@ export default function KnowledgeGraph({
             {/* The constellation */}
             <div
                 ref={containerRef}
-                className="relative overflow-hidden rounded-2xl border border-border-subtle h-[calc(100dvh-330px)] min-h-[380px] sm:h-[calc(100dvh-290px)] sm:min-h-[460px]"
+                /* Mobile reserves less chrome now that the legend is one row. */
+                className="relative overflow-hidden rounded-2xl border border-border-subtle h-[calc(100dvh-268px)] min-h-[420px] sm:h-[calc(100dvh-290px)] sm:min-h-[460px]"
                 style={{ background: 'radial-gradient(120% 100% at 50% 38%, var(--card), var(--background) 88%)' }}
             >
                 <canvas
@@ -642,7 +680,10 @@ export default function KnowledgeGraph({
                         onClick={refit}
                         title="Fit graph to view"
                         aria-label="Fit graph to view"
-                        className="absolute bottom-3 end-3 w-9 h-9 rounded-full bg-card/90 backdrop-blur border border-border-subtle text-text-secondary hover:text-text hover:bg-card-hover flex items-center justify-center shadow-sm transition-colors cursor-pointer"
+                        /* Top-right on phones (the panel owns the bottom edge
+                           there and was burying this button), bottom-right on
+                           desktop where the panel sits top-right. */
+                        className="absolute top-3 end-3 sm:top-auto sm:bottom-3 w-9 h-9 rounded-full bg-card/90 backdrop-blur border border-border-subtle text-text-secondary hover:text-text hover:bg-card-hover flex items-center justify-center shadow-sm transition-colors cursor-pointer"
                     >
                         <Maximize2 className="w-4 h-4" />
                     </button>
@@ -681,8 +722,8 @@ export default function KnowledgeGraph({
                     that card (the camera follows), and each row's ↗ opens that
                     card's detail directly. */}
                 {selection && (
-                    <div className="absolute inset-x-2 bottom-2 sm:inset-x-auto sm:bottom-auto sm:top-3 sm:end-3 sm:w-[330px] max-h-[48%] sm:max-h-[calc(100%-24px)] flex flex-col rounded-2xl bg-card/95 backdrop-blur-xl border border-border-subtle shadow-[var(--shadow-card)] animate-fade-in">
-                        <div className="p-3.5 pb-3">
+                    <div className="absolute inset-x-2 bottom-2 sm:inset-x-auto sm:bottom-auto sm:top-3 sm:end-3 sm:w-[330px] max-h-[66%] sm:max-h-[calc(100%-24px)] flex flex-col rounded-2xl bg-card/95 backdrop-blur-xl border border-border-subtle shadow-[var(--shadow-card)] animate-fade-in">
+                        <div className="p-3 pb-2.5 sm:p-3.5 sm:pb-3">
                             <div className="flex items-start gap-2.5">
                                 <span
                                     className="mt-1 w-2.5 h-2.5 rounded-full shrink-0"
@@ -695,6 +736,16 @@ export default function KnowledgeGraph({
                                     <p className="mt-0.5 text-[11px] font-medium text-text-muted uppercase tracking-wide">
                                         {selection.node.category}
                                     </p>
+                                    {selection.clusterLabel && (
+                                        <button
+                                            onClick={() => { setSelected(null); setClusterFocus(selection.clusterIndex); }}
+                                            title="See this whole cluster"
+                                            className="mt-1.5 inline-flex max-w-full items-center gap-1 h-6 ps-1.5 pe-2 rounded-full bg-fill-subtle border border-border-subtle text-[11px] font-semibold text-text-secondary hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
+                                        >
+                                            <Waypoints className="w-3 h-3 shrink-0" />
+                                            <span className="truncate">{selection.clusterLabel}</span>
+                                        </button>
+                                    )}
                                 </div>
                                 <button
                                     onClick={() => setSelected(null)}
@@ -712,7 +763,7 @@ export default function KnowledgeGraph({
                                 <ArrowUpRight className="w-3.5 h-3.5" />
                             </button>
                         </div>
-                        <p className="px-3.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-text-muted">
+                        <p className="px-3 sm:px-3.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-text-muted">
                             Connections · {selection.neighbors.length}
                         </p>
                         <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2 space-y-0.5">
@@ -762,8 +813,8 @@ export default function KnowledgeGraph({
                     your brain about it, keep it as a collection). Selection
                     takes precedence; closing a selection returns here. */}
                 {!selection && clusterPanel && (
-                    <div className="absolute inset-x-2 bottom-2 sm:inset-x-auto sm:bottom-auto sm:top-3 sm:end-3 sm:w-[330px] max-h-[48%] sm:max-h-[calc(100%-24px)] flex flex-col rounded-2xl bg-card/95 backdrop-blur-xl border border-border-subtle shadow-[var(--shadow-card)] animate-fade-in">
-                        <div className="p-3.5 pb-3">
+                    <div className="absolute inset-x-2 bottom-2 sm:inset-x-auto sm:bottom-auto sm:top-3 sm:end-3 sm:w-[330px] max-h-[66%] sm:max-h-[calc(100%-24px)] flex flex-col rounded-2xl bg-card/95 backdrop-blur-xl border border-border-subtle shadow-[var(--shadow-card)] animate-fade-in">
+                        <div className="p-3 pb-2.5 sm:p-3.5 sm:pb-3">
                             <div className="flex items-start gap-2.5">
                                 <Waypoints className="mt-0.5 w-4 h-4 shrink-0 text-text-muted" />
                                 <div className="flex-1 min-w-0">
@@ -802,7 +853,7 @@ export default function KnowledgeGraph({
                                 )}
                             </div>
                         </div>
-                        <p className="px-3.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-text-muted">
+                        <p className="px-3 sm:px-3.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-text-muted">
                             Cards in this cluster
                         </p>
                         <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2 space-y-0.5">
@@ -1076,7 +1127,23 @@ function draw(
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const viewW = canvas.width / dpr;
     const viewH = canvas.height / dpr;
-    const placed: Rect[] = [];
+    // Chrome that floats OVER the canvas claims its space before any text is
+    // laid out: the re-fit button (top-right on phones, bottom-right on
+    // desktop) and, while open, the panel. A title drawn under either is at
+    // best invisible and at worst sliced in half by the panel's edge.
+    const isDesktop = viewW >= 640;
+    const placed: Rect[] = [
+        isDesktop
+            ? { x1: viewW - 60, y1: viewH - 60, x2: viewW - 4, y2: viewH - 4 }
+            : { x1: viewW - 60, y1: 4, x2: viewW - 4, y2: 60 },
+    ];
+    if (state.selected !== null || state.clusterFocus !== null) {
+        placed.push(isDesktop
+            // Mirrors the panel's own sizing (sm:w-[330px] at end-3 / the
+            // phone sheet's max-h-[66%]) and the camera's framing math.
+            ? { x1: viewW - 346, y1: 4, x2: viewW - 4, y2: viewH - 4 }
+            : { x1: 4, y1: viewH * 0.34, x2: viewW - 4, y2: viewH });
+    }
     const fits = (r: Rect) =>
         placed.every((p) =>
             r.x2 + LABEL_PAD < p.x1 || r.x1 - LABEL_PAD > p.x2
@@ -1113,8 +1180,9 @@ function draw(
         ctx.strokeText(label, sx, sy);
         ctx.fillStyle = rgba(hexToRgb(focusedCaption ? palette.text : palette.textSecondary), alpha);
         ctx.fillText(label, sx, sy);
-        // A generous tap halo around the drawn text.
-        rects.push({ x1: sx - tw / 2 - 14, y1: sy - 22, x2: sx + tw / 2 + 14, y2: sy + 10, cluster: c });
+        // A generous tap halo around the drawn text — only consulted when no
+        // node was hit, so it can afford to be finger-sized.
+        rects.push({ x1: sx - tw / 2 - 18, y1: sy - 25, x2: sx + tw / 2 + 18, y2: sy + 15, cluster: c });
         // Only a caption that actually reads claims space from node labels —
         // a dimmed-to-0.12 one is background texture, not text.
         if (alpha >= 0.3) placed.push({ x1: sx - tw / 2, y1: sy - 11, x2: sx + tw / 2, y2: sy + 3 });

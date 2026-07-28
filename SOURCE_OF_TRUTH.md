@@ -1021,6 +1021,28 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 (same session, round 5) — Graph mobile pass (owner device QA).**
+  The phone panel showed only 2 of 5 connections. Fixes: (1) **legend is one
+  horizontally-scrollable row on phones** (it wrapped to 3 rows and ate ~110px
+  of canvas) — `sm:` still wraps; canvas grew `100dvh-330px → -268px`,
+  min-h 380→420. (2) **Panel max-height 48% → 66%** with tighter phone padding
+  — 5 connections now visible without scrolling. (3) **Camera frames the whole
+  EGO NETWORK** (card + its connections) into the panel-free area instead of
+  centring the single node, which had been pushing neighbours off the top edge;
+  cluster-fit padding shrunk on phones (70→34). (4) **Overlay chrome reserves
+  its space before labels are laid out** — the re-fit ⤢ button (moved to
+  TOP-right on phones, where it was previously buried under the sheet) and the
+  open panel are seeded into the collision-culling `placed` list, so no title
+  is drawn under them or sliced by the panel edge. (5) **Cluster actions made
+  discoverable**: the selection panel now carries a cluster chip ("⁂ Systems
+  Thinking · AI Agents") under the category — tap it to jump to that cluster's
+  panel, where **Save as collection** already lived (answering "should we have
+  one-tap collection from clusters": it shipped in round 3; the gap was that
+  the only route in was a small canvas caption). Touch hit targets: node
+  minimum 16→22px on coarse pointers, caption halo enlarged. Verified: tsc 0;
+  Playwright iPhone-390 (touch emulation) + 1440 desktop, both themes — 5/5
+  rows visible, chip → cluster panel → Save fires, ego network fully framed,
+  zero console errors.
 - **2026-07-28 (same session, round 4) — Graph legibility + related-count
   parity (owner QA round 3; implemented by an Opus 5 subagent, lead-reviewed).**
   (1) **Label collision culling**: node labels moved to constant 11px SCREEN
