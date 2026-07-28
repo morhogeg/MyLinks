@@ -7,7 +7,7 @@ import SourceByline from './SourceByline';
 import SimpleMarkdown from './SimpleMarkdown';
 import { hasHebrew } from '@/lib/rtl';
 import { hapticLight } from '@/lib/haptics';
-import { Check, Archive, Bell, RotateCcw, Sparkles } from 'lucide-react';
+import { Check, Archive, Bell, RotateCcw, Sparkles, Info, X } from 'lucide-react';
 import { REVIEW_SESSION_SIZE, isOpen, reviewSessionQueue } from '@/lib/reviewQueue';
 
 type SwipeDir = 'left' | 'right' | 'up';
@@ -37,6 +37,17 @@ interface SwipeDeckProps {
 }
 
 const THRESHOLD = 110; // px past which a drag commits to a swipe
+
+/** What each deck action actually does, in a few words. ONE source of truth for
+ *  both surfaces: the desktop hover tooltip and the mobile ⓘ panel. Phrased as
+ *  outcomes ("where does this card end up"), not as gesture names — the labels
+ *  under the buttons already carry the arrows. */
+const ACTION_HINTS = {
+    undo: 'Take back the last card',
+    archive: 'File it away, out of your feed',
+    remind: 'Bring this card back later',
+    keep: 'Leave it exactly where it is',
+} as const;
 
 /**
  * The interactive twin of the digest: a short, curated resurfacing session.
@@ -75,6 +86,8 @@ export default function SwipeDeck({
     const [drag, setDrag] = useState({ x: 0, y: 0 });
     const [phase, setPhase] = useState<Phase>('idle');
     const [lastAction, setLastAction] = useState<{ index: number; kind: ActionKind; link: Link } | null>(null);
+    // Mobile-only ⓘ panel explaining the four actions (desktop gets hover tooltips).
+    const [helpOpen, setHelpOpen] = useState(false);
     // Session tallies for the summary screen.
     const [kept, setKept] = useState(0);
     const [archived, setArchived] = useState(0);
@@ -257,6 +270,7 @@ export default function SwipeDeck({
     // keeps a stale timer from finishing a LATER fling early.
     const fling = (dir: SwipeDir) => {
         hapticLight(); // crisp tap at the moment the card commits to its action
+        setHelpOpen(false); // the user is acting; the explainer has done its job
         exitDir.current = dir;
         const seq = ++flingSeq.current;
         window.setTimeout(() => {
@@ -327,6 +341,7 @@ export default function SwipeDeck({
             // Never drive the deck while a modal/sheet (card detail, reminder, etc.)
             // is open over it.
             if (document.querySelector('[role="dialog"], [aria-modal="true"]')) return;
+            if (e.key === 'Escape' && helpOpen) { e.preventDefault(); setHelpOpen(false); return; }
             if (e.key === 'Backspace') {
                 if (lastAction) { e.preventDefault(); undo(); }
                 return;
@@ -339,7 +354,7 @@ export default function SwipeDeck({
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [phase, current?.id, lastAction, pos]);
+    }, [phase, current?.id, lastAction, pos, helpOpen]);
 
     // Hint overlays react to the live drag.
     const rightHint = Math.max(0, Math.min(1, drag.x / THRESHOLD));
@@ -403,6 +418,17 @@ export default function SwipeDeck({
     return (
         <div ref={rootRef} className="flex flex-col items-center gap-3 select-none" style={{ height: maxH ? maxH : undefined, paddingBottom: 'max(calc(env(safe-area-inset-bottom) - 18px), 8px)' }}>
             <div className="w-full max-w-[440px] flex items-center justify-center shrink-0 relative">
+                {/* Touch has no hover, so the tooltips need a tap target of their
+                    own. Hidden on hover-capable pointers, where the buttons
+                    explain themselves on hover instead. */}
+                <button
+                    onClick={() => { hapticLight(); setHelpOpen((o) => !o); }}
+                    aria-label="What do these buttons do?"
+                    aria-expanded={helpOpen}
+                    className={`absolute start-0 h-7 w-7 -ms-1 rounded-full flex items-center justify-center transition-colors cursor-pointer [@media(hover:hover)]:hidden ${helpOpen ? 'text-accent bg-accent/10' : 'text-text-muted'}`}
+                >
+                    <Info className="w-[18px] h-[18px]" />
+                </button>
                 <span className="text-xs font-semibold text-text-muted tabular-nums">
                     {passed + 1} of {passed + remaining} · {remaining} left
                 </span>
@@ -456,18 +482,21 @@ export default function SwipeDeck({
             </div>
 
             {/* Action buttons — each labelled with the swipe direction it mirrors,
-                so it's obvious what left/right/up do without having to try. */}
-            <div className="flex items-end justify-center gap-3 shrink-0">
-                <DeckAction label="Undo" onClick={undo} disabled={!lastAction} buttonClassName="text-text-muted hover:text-text">
+                so it's obvious what left/right/up do without having to try, and
+                each carrying a hover tooltip (desktop) / ⓘ panel row (touch)
+                spelling out where the card actually ends up. */}
+            <div className="relative w-full max-w-[440px] flex items-end justify-center gap-3 shrink-0">
+                {helpOpen && <ActionHelp onClose={() => setHelpOpen(false)} />}
+                <DeckAction label="Undo" hint={ACTION_HINTS.undo} onClick={undo} disabled={!lastAction} buttonClassName="text-text-muted hover:text-text">
                     <RotateCcw className="w-5 h-5" />
                 </DeckAction>
-                <DeckAction label="← Archive" onClick={() => fling('left')} buttonClassName="text-blue-500 hover:bg-blue-500 hover:text-white border-blue-500/30">
+                <DeckAction label="← Archive" hint={ACTION_HINTS.archive} onClick={() => fling('left')} buttonClassName="text-blue-500 hover:bg-blue-500 hover:text-white border-blue-500/30">
                     <Archive className="w-6 h-6" />
                 </DeckAction>
-                <DeckAction label="↑ Remind" onClick={() => fling('up')} buttonClassName="text-accent hover:bg-accent hover:text-accent-ink border-accent/30">
+                <DeckAction label="↑ Remind" hint={ACTION_HINTS.remind} onClick={() => fling('up')} buttonClassName="text-accent hover:bg-accent hover:text-accent-ink border-accent/30">
                     <Bell className="w-6 h-6" />
                 </DeckAction>
-                <DeckAction label="Keep →" onClick={() => fling('right')} buttonClassName="text-green-500 hover:bg-green-500 hover:text-white border-green-500/30">
+                <DeckAction label="Keep →" hint={ACTION_HINTS.keep} onClick={() => fling('right')} buttonClassName="text-green-500 hover:bg-green-500 hover:text-white border-green-500/30">
                     <Check className="w-6 h-6" />
                 </DeckAction>
             </div>
@@ -476,12 +505,23 @@ export default function SwipeDeck({
     );
 }
 
-/** A deck action: the round button plus a small label spelling out the swipe
- *  direction it mirrors, so the gesture mapping is always visible. */
-function DeckAction({ children, onClick, label, disabled, buttonClassName = '' }: { children: React.ReactNode; onClick: () => void; label: string; disabled?: boolean; buttonClassName?: string }) {
+/** A deck action: the round button, a small label spelling out the swipe
+ *  direction it mirrors, and — on hover-capable pointers — a tooltip saying what
+ *  the action actually does to the card. */
+function DeckAction({ children, onClick, label, hint, disabled, buttonClassName = '' }: { children: React.ReactNode; onClick: () => void; label: string; hint: string; disabled?: boolean; buttonClassName?: string }) {
     return (
-        <div className="flex flex-col items-center gap-1.5">
-            <DeckButton title={label} onClick={onClick} disabled={disabled} className={buttonClassName}>
+        <div className="group relative flex flex-col items-center gap-1.5">
+            {/* Pure CSS (no hover state in React): the deck re-renders on every
+                drag frame, and the media query keeps this off touch, where a tap
+                would otherwise leave a tooltip stuck open. z-40 clears the card
+                stack's z-30 — they share a stacking context. */}
+            <span
+                role="tooltip"
+                className="pointer-events-none absolute bottom-full mb-2 z-40 hidden [@media(hover:hover)]:block opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap rounded-lg bg-card border border-border-subtle shadow-[var(--shadow-card)] px-2.5 py-1.5 text-[11px] font-semibold text-text-secondary"
+            >
+                {hint}
+            </span>
+            <DeckButton title={`${label} — ${hint}`} onClick={onClick} disabled={disabled} className={buttonClassName}>
                 {children}
             </DeckButton>
             <span className={`text-[10px] font-bold uppercase tracking-wide whitespace-nowrap ${disabled ? 'text-text-muted/40' : 'text-text-muted'}`}>
@@ -491,12 +531,48 @@ function DeckAction({ children, onClick, label, disabled, buttonClassName = '' }
     );
 }
 
+/** The touch counterpart of the hover tooltips: one tap on the header's ⓘ
+ *  explains all four actions at once, right above the buttons they describe. */
+function ActionHelp({ onClose }: { onClose: () => void }) {
+    const rows: { icon: React.ReactNode; label: string; hint: string }[] = [
+        { icon: <Check className="w-4 h-4 text-green-500" />, label: 'Keep', hint: ACTION_HINTS.keep },
+        { icon: <Archive className="w-4 h-4 text-blue-500" />, label: 'Archive', hint: ACTION_HINTS.archive },
+        { icon: <Bell className="w-4 h-4 text-accent" />, label: 'Remind', hint: ACTION_HINTS.remind },
+        { icon: <RotateCcw className="w-4 h-4 text-text-muted" />, label: 'Undo', hint: ACTION_HINTS.undo },
+    ];
+    return (
+        // Deliberately NOT role="dialog": the deck's key handler treats any open
+        // dialog as "a modal owns the screen" and stops driving the arrow keys.
+        <div
+            aria-label="What the review buttons do"
+            className="absolute bottom-full inset-x-0 mb-3 z-40 rounded-2xl bg-card border border-border-subtle shadow-[var(--shadow-card)] p-3 pe-9"
+            style={{ animation: 'slide-up 0.2s var(--ease-modal)' }}
+        >
+            <button
+                onClick={onClose}
+                aria-label="Close"
+                className="absolute top-2 end-2 h-7 w-7 rounded-full flex items-center justify-center text-text-muted hover:text-text transition-colors cursor-pointer"
+            >
+                <X className="w-4 h-4" />
+            </button>
+            <ul className="flex flex-col gap-2">
+                {rows.map((r) => (
+                    <li key={r.label} className="flex items-center gap-2.5">
+                        <span className="w-6 h-6 shrink-0 rounded-lg bg-fill-subtle flex items-center justify-center">{r.icon}</span>
+                        <span className="text-[13px] font-bold text-text">{r.label}</span>
+                        <span className="text-[13px] text-text-muted">{r.hint}</span>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
 function DeckButton({ children, onClick, title, disabled, className = '' }: { children: React.ReactNode; onClick: () => void; title: string; disabled?: boolean; className?: string }) {
     return (
         <button
             onClick={onClick}
             disabled={disabled}
-            title={title}
             aria-label={title}
             className={`h-14 w-14 rounded-full bg-card border border-border-subtle flex items-center justify-center transition-all cursor-pointer shadow-sm disabled:opacity-30 disabled:cursor-not-allowed ${className}`}
         >

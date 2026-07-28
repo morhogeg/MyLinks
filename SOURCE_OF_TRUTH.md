@@ -907,6 +907,34 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 (same session, follow-up) — the four Review buttons now explain
+  themselves.** Desktop: a hover tooltip per button (`DeckAction` gained a
+  `hint`); touch: a small **ⓘ** at the start of the deck's progress header opens
+  a panel listing all four actions above the buttons. One source of truth for
+  the copy — `ACTION_HINTS` in `SwipeDeck.tsx` — feeds both surfaces plus each
+  button's `aria-label` ("Keep → — Leave it exactly where it is"). The HTML
+  `title` attribute was REMOVED from `DeckButton`: it duplicated the label as a
+  slow OS tooltip, and would have double-tipped alongside the new one.
+  Surface split is CSS, not JS (`[@media(hover:hover)]:hidden` on the ⓘ,
+  `:block` on the tooltips) — the deck re-renders every drag frame, so hover
+  state must not live in React, and a tapped tooltip on touch would stick open.
+  Two traps worth remembering: the panel is deliberately **not**
+  `role="dialog"`, because the deck's key handler treats any open dialog as
+  "a modal owns the screen" and would stop driving the arrow keys; and the
+  tooltip needs `z-40` since the card stack's `z-30` shares its stacking
+  context. Render-verified in the Browser pane, light + dark, hover tooltip and
+  ⓘ panel both. **Known cosmetic limit:** a tooltip on an outer button can clip
+  at the viewport edge in a hover-capable window narrower than ~500px — real
+  desktop widths centre the 440px deck with room to spare.
+  **Local-dev gotcha found while verifying (worth keeping):** the app cannot be
+  render-checked at `http://localhost:3000` (that origin flips the Firebase
+  **emulator** gate) and at `http://127.0.0.1:3000` Next 16 blocks
+  `/_next/webpack-hmr` as a cross-origin dev resource, so **React never
+  hydrates and the page is a frozen SSR shell** — every click and state change
+  silently does nothing. Fix for a one-off harness: add
+  `allowedDevOrigins: ["127.0.0.1"]` to `next.config.ts` (revert after). Also
+  note `AuthGate` swaps EVERY non-public route for the LoginScreen, so a
+  throwaway preview route must be added to `PUBLIC_ROUTES` to render at all.
 - **2026-07-28 — Review's right swipe means KEEP again, not "favorite"** (branch
   `claude/review-view-swipe-behavior-efa5ee`). Owner: the deck's setup reads as
   confusing — right swipe should simply keep the card where it is. It was
