@@ -1065,6 +1065,19 @@ exact-match, capped.
   `allowedDevOrigins: ["127.0.0.1"]` to `next.config.ts` (revert after). Also
   note `AuthGate` swaps EVERY non-public route for the LoginScreen, so a
   throwaway preview route must be added to `PUBLIC_ROUTES` to render at all.
+- **2026-07-28 — Tag language enforced in CODE (`4ecea70`, run #61 green) —
+  the prompt rule alone was not obeyed.** After run #60 shipped the f3055f8
+  prompt fix, the owner re-saved the same English recipe card on the new
+  revision and STILL got Hebrew tags — the model ignores the same-language
+  instruction when the reuse vocabulary is mostly Hebrew. New
+  `GeminiService._enforce_tag_language` backstop wraps all four analyzers'
+  returns: content language 'he' keeps only Hebrew-script tags, any other
+  KNOWN language drops Hebrew-script tags, an unreported language leaves tags
+  untouched (never guess the direction). Verified: 4-case harness
+  (en/he/unknown/es) + 544 pytest. **Lesson: an LLM instruction is a wish; if
+  a rule matters, enforce it after parsing.** That re-save also produced a
+  summary hallucination ("cold butter" → "St. Brigid's butter" with broken
+  `**` markers) — one occurrence, watch for recurrence before chasing.
 - **2026-07-28 — Tag-language prompt fix actually DEPLOYED (`769854e`, run
   #60 green).** Owner QA: an English recipe card saved "just now" still got
   Hebrew tags — because `f3055f8` (the same-language tag-reuse prompt fix)
