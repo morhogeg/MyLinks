@@ -548,7 +548,7 @@ Rules:
 - Questions about recent saves ("this week", "latest", "recap") → judge by each source's saved: date against today's date; only present sources actually in that window as recent, and mention when each was saved.
 - Don't announce a count of items (e.g. "three sources") — just give the list. If you do state a number, it MUST exactly match the number of items you list.
 - CRITICAL — match the user's language: write your ENTIRE answer in the same language as the User question, NOT the language of the sources. Judge the question's language from the user's OWN words, IGNORING any quoted card titles inside it — 'Give me more detail on "<Hebrew title>"' is an ENGLISH question and must be answered entirely in English (you may quote the title itself as-is). If the question is in English, answer in English even when every source is in Hebrew; if the question is in Hebrew, answer in Hebrew. The sources' language must not influence your answer's language.{language_override}
-- Only cite sources you actually used.{continuation}
+- Only cite sources you actually used. NEVER write a source's id (the bracketed token) in the answer text itself — ids are machine references the reader can't use; refer to sources by their titles. Citations belong ONLY in the citation field/marker.{continuation}
 
 Saved sources:
 {sources_text}
@@ -604,6 +604,30 @@ _CITED_JSON_PARAPHRASE_SUFFIX = (
     "just paraphrased. Cite the ids you relied on. "
     'Return ONLY a JSON object: {"answer": string, "citedIds": string[]}.'
 )
+
+
+def _strip_inline_ids(answer: str, cards: list) -> str:
+    """Remove raw card ids the model wrote INTO the answer prose.
+
+    The contract puts ids only in citedIds / the CITED marker, but the model
+    sometimes also parenthesizes them inline — "(fb9QaKk…, F7wwq0P…)" — which
+    reads as garbage to a human (owner report 2026-07-28). Deterministic and
+    safe: only the EXACT ids of in-context cards are removed (never prose),
+    then leftover empty "()" / "( , )" shells and doubled spaces are tidied.
+    """
+    if not answer:
+        return answer
+    ids = [str(c.get("id")) for c in (cards or []) if c.get("id")]
+    if not ids or not any(i in answer for i in ids):
+        return answer
+    out = answer
+    for i in ids:
+        out = out.replace(i, "")
+    # Collapse the husks the removals leave behind.
+    out = re.sub(r"[(\[（]\s*[,;·\s]*[)\]）]", "", out)   # empty (), [] shells
+    out = re.sub(r"\s+([,.;:!?])", r"\1", out)            # space before punct
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    return out
 
 
 def _valid_cited_ids(cited, cards: list) -> list:
@@ -1302,7 +1326,7 @@ Work only from what is legible: keep the subject at the level the image states i
                 logger.warning("ask answer empty (%s) — retrying paraphrase-safe", e)
                 data = self._answer_json(
                     base_prompt + _CITED_JSON_PARAPHRASE_SUFFIX, "answer (paraphrase retry)", attempts)
-        answer = (data.get("answer") or "") + filter_note
+        answer = _strip_inline_ids(data.get("answer") or "", context_cards) + filter_note
         cited = _valid_cited_ids(data.get("citedIds"), cards)
         if cited:
             return {"answer": answer, "citedIds": cited, "ungrounded": False,
@@ -1316,7 +1340,7 @@ Work only from what is legible: keep the subject at the level the image states i
         try:
             retry = (self._plain_answer(retry_prompt) if used_plain_mode
                      else self._answer_json(retry_prompt, "answer (citation retry)", attempts))
-            retry_answer = (retry.get("answer") or "") + filter_note
+            retry_answer = _strip_inline_ids(retry.get("answer") or "", context_cards) + filter_note
             retry_cited = _valid_cited_ids(retry.get("citedIds"), cards)
             if retry_cited:
                 return {"answer": retry_answer, "citedIds": retry_cited, "ungrounded": False,
