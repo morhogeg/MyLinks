@@ -1021,6 +1021,25 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 (same session, round 11) — raw card ids leaked into Ask answer
+  prose (owner screenshots: "…oil sanctions (fb9QaKkmjNvk4ueKybSv,
+  F7wwq0PWJh3cpyMaCbBt)").** The citation contract puts ids ONLY in
+  citedIds/the CITED marker, but nothing forbade the model from ALSO
+  parenthesizing them inline. Two layers: (1) new rule in the shared
+  `_build_rag_prompt` (covers buffered AND streaming) — never write a
+  source's id in the answer text, refer by title; (2) deterministic
+  `_strip_inline_ids` scrub on both buffered answer paths (first pass +
+  citation retry) — removes only EXACT in-context ids, then tidies empty
+  ()/[] husks and orphaned punctuation; prose can never false-positive.
+  Streaming relies on the prompt rule alone (can't scrub a token stream) —
+  acceptable: iOS (where the owner is) uses the buffered path. New
+  `tests/test_ask_answer_hygiene.py` (5 tests incl. a prompt-rule tripwire);
+  **552/552 backend tests green.** Backend-only — no TestFlight/Vercel
+  needed; deployed `Deploy-Functions: all` (ai_service is imported
+  everywhere; scoped drift isn't worth the debugging confusion, per the
+  FieldFilter precedent). NOTE: the owner's screenshots also re-showed the
+  6-counted/7-cited scope bug — that is round 10's fix, which their device
+  build predates; not a regression.
 - **2026-07-28 (same session, round 10) — Graph Ask made EXACT: exclusive
   anchor ids + ego scoping (owner bug: tapped a "cluster of 3", chat said 6
   cards and cited 7).** Two causes, both fixed. (1) **Scope**: the selection
