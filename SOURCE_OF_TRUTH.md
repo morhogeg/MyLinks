@@ -1097,6 +1097,27 @@ exact-match, capped.
   one-line commit, 1 device check.** No Mac, no firebase CLI, no emulator run.
   §4 task 2's owner list was rewritten accordingly, and the Apple Services ID +
   `.p8` demoted out of it — it gates *web* Apple sign-in only, never the cutover.
+  ⚠️ **The first three runs were `startup_failure` and the cause is worth
+  memorising: a GitHub Actions expression written inside a SHELL COMMENT still
+  gets evaluated.** The step comment read "never interpolate a secret into the
+  script body with `<expr braces>`" — and Actions expands expressions across the
+  whole `run:` block *before* the shell sees any of it, so that empty expression
+  was a parse error ("An expression was expected", line 60 col 14). The workflow
+  never started, no job was ever created — which at least means nothing
+  deployed. **The comment warning against interpolation was itself the bug.**
+  Two things made this hard to catch: (1) `python -c yaml.safe_load` and
+  `action-validator` BOTH pass the file — this is not a YAML or schema error,
+  it is Actions' own template pass, and no offline linter here models it;
+  (2) the only local signal is indirect — `get_workflow` reports the workflow's
+  `name` as its FILE PATH instead of the `name:` value when it cannot parse it
+  (compare: deploy-hosting.yml reports "Deploy Firebase Hosting"). The exact
+  line/col came from `WebFetch` on the run's html_url; `api.github.com` is
+  blocked in this sandbox but `github.com` run pages are readable.
+  **Rule: never write the literal expression-brace syntax anywhere inside a
+  `run:` block, including comments.** `deploy-functions.yml:135` has the same
+  shape but survives because its expression is well-formed (`secrets.X` resolves
+  to empty) — left alone deliberately; it works, and touching it triggers a
+  functions deploy.
 
 - **2026-07-27 — THE NAME LOSES ITS "AI": `Machina AI` → `Machina`, and a new
   `docs/BRANDING.md`.** Owner's call, on two arguments — AI fatigue in the

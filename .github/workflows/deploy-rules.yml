@@ -58,9 +58,17 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
-          # Read from the environment — never interpolate a secret into the
-          # script body with ${{ }}, which would bake it into the run command
-          # (same rule as deploy-functions.yml / deploy-hosting.yml).
+          # Read from the environment via `env:` above — never interpolate a
+          # secret directly into the script body, which would bake its value
+          # into the run command (same rule as deploy-functions.yml /
+          # deploy-hosting.yml).
+          #
+          # And do NOT name the interpolation syntax literally in here, even in
+          # a comment: Actions expands expressions across the WHOLE run block
+          # before the shell ever sees it, so a bare empty one is a parse error
+          # ("An expression was expected") and the workflow never starts. That
+          # is exactly how this file failed its first three runs — the comment
+          # warning against interpolating secrets was itself the bug.
           if [ -z "${FIREBASE_SERVICE_ACCOUNT}" ]; then
             echo "::error::FIREBASE_SERVICE_ACCOUNT secret is not set — it is already" \
                  "required by Deploy Cloud Functions and Deploy Firebase Hosting," \
