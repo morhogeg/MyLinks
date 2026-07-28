@@ -748,6 +748,21 @@ The multi-user auth work is **fully written but not live**:
 
 ### 🟢 P3 — product roadmap (post-launch)
 
+G1. **[ ] Category casing normalized at the SOURCE.** The Graph merges
+    "Sports"/"sports" display-side (2026-07-28 round 3), but the backend still
+    saves whatever casing the model emits, so facets/filters elsewhere can
+    split the same category. Fix in `ai_service` (canonicalize against the
+    user's existing categories on save) + optionally a one-off repair tool à
+    la `retag_language_mismatch.py`.
+
+G2. **[ ] Graph next levers (from the round-3 product pass):** (a) search/
+    locate a card in the graph (reuse library search, pulse the hit);
+    (b) surface the "N not yet connected" list — tap → those cards + a
+    Settings→Connections→Rebuild hook; (c) time lens (recency glow / fade by
+    age) to show how knowledge grew; (d) cluster-level "synthesize this"
+    (reuse M12 machinery scoped to a cluster's cards). Build in this order —
+    each is independent.
+
 18c. **[ ] Native share-extension indicator: per-phase states.** Web maps every
     capture phase to its own motion (`LINK_SCAN_ORBS` in `web/lib/scanPhases.ts` —
     fetch=`working`, read=`searching`, write=`shaping`, connect=`searching`,
@@ -1006,6 +1021,30 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 (same session, round 3) — Graph clusters get NAMES, and become
+  actionable (owner QA round 2).** (1) **Case-variant categories merged**
+  graph-side ("Sports"/"sports" → one legend chip on the majority spelling;
+  colors agree) — note the underlying data still stores both casings; a
+  backend/global normalization is a separate backlog item (added §4). (2)
+  **Cluster themes**: each island is auto-named client-side from its members'
+  shared concepts (widest coverage + a co-defining second, fallback dominant
+  category, null when diffuse — `clusterLabel` in graph.ts; no model call).
+  The theme is drawn as a caption above the island and doubles as a tap
+  target. (3) **Cluster panel**: tapping a caption spotlights the cluster,
+  frames it, and opens a panel with the theme, member list (row tap focuses,
+  ↗ opens), and two actions — **"Ask about this"** (deep-links into Ask: new
+  `initialAsk` nonce prop on AskBrain starts a fresh conversation with
+  "What have I saved about <theme>?" + member titles as `anchorTitles` hints)
+  and **"Save as collection"** (createCollection + addLinksToCollection,
+  button flips to Saved ✓). (4) **Ghost-glyph fix**: label/caption halos
+  stroked in `--background` read darker than the canvas's card→background
+  radial gradient and smeared ghost shapes around glyphs — halos now stroke
+  in the CARD tone at lower alpha (pixel-verified fix). Verified: tsc 0;
+  Playwright dark+light — merged legend, captions, caption-tap → panel →
+  Ask fires with anchors, Save flips to Saved ✓, zero console errors.
+  **Product roadmap for the graph (proposed, not built):** graph search/
+  locate, surfacing the "not yet connected" list with a rebuild hook, a
+  time-lens (recency glow), and cluster-level synthesis are the next levers.
 - **2026-07-28 (same session, round 2) — Graph view interaction refinement from
   owner desktop QA.** Five fixes on the just-shipped Graph: (1) **cluster
   islands** — each connected component now gets its own gravity anchor packed
