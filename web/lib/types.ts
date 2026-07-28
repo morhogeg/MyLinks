@@ -356,6 +356,11 @@ export interface AskHints {
   concept?: string;
   anchorTitles?: string[];
   excludeTitles?: string[];
+  /** Exact card ids the question is about (the Graph's "ask about these"). */
+  anchorIds?: string[];
+  /** With anchorIds: the named cards REPLACE retrieval as the whole context,
+   *  so the answer can neither miscount the set nor cite a stranger. */
+  exclusive?: boolean;
 }
 
 export interface ChatMessage {
