@@ -1,5 +1,5 @@
 """
-SecondBrain / Machina AI — Public share-page subsystem.
+SecondBrain / Machina — Public share-page subsystem.
 
 Extracted verbatim from `main.py` (the Cloud Functions entry point) so that the
 entry point stays focused on deployable-function discovery. This module owns

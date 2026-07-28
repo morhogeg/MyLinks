@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useReadingScale } from '@/lib/useReadingScale';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -32,6 +33,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // re-introducing the very dark flash the script exists to prevent.
     const [theme, setThemeState] = useState<Theme>(getInitialTheme);
     const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('dark');
+
+    // Publish `--reading-scale` from the reader's system text-size preference.
+    // Lives here because this provider already wraps the whole app and owns the
+    // other "how the reader wants things rendered" concern; it sets a CSS
+    // variable and holds no state, so it costs nothing per render.
+    useReadingScale();
 
     useEffect(() => {
         const root = window.document.documentElement;

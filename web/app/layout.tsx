@@ -11,13 +11,13 @@ const geistSans = GeistSans;
 const geistMono = GeistMono;
 
 export const metadata: Metadata = {
-  title: "Machina AI",
+  title: "Machina",
   description: "Your AI-powered knowledge capture and retrieval system",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Machina AI",
+    title: "Machina",
   },
   icons: {
     // Tab icons, declared explicitly and living in public/ rather than as an
@@ -80,7 +80,7 @@ export default function RootLayout({
         {/* PWA iOS meta tags */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Machina AI" />
+        <meta name="apple-mobile-web-app-title" content="Machina" />
         {/* No <link rel="apple-touch-icon"> here — `metadata.icons.apple` above
             already emits one, and having both shipped the tag twice. */}
       </head>

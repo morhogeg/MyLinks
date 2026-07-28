@@ -901,7 +901,7 @@ export default function LinkDetailModal({
                                                         <SimpleMarkdown
                                                             content={link.summary}
                                                             isRtl={isRtl}
-                                                            className="text-base"
+                                                            className="reading-prose"
                                                         />
                                                         {/* Non-note summaries keep a quiet hover pencil to correct
                                                             AI output. Notes are edited via the single pencil on the
@@ -934,7 +934,7 @@ export default function LinkDetailModal({
                                             <SimpleMarkdown
                                                 content={detailBody}
                                                 isRtl={isRtl}
-                                                className="text-base"
+                                                className="reading-prose"
                                             />
                                         )}
                                     </>

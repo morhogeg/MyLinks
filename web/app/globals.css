@@ -607,6 +607,32 @@ html {
   .safe-pb {
     padding-bottom: env(safe-area-inset-bottom);
   }
+
+  /* Reading prose — the card's summary and detailed summary, i.e. the text
+     people actually read at length. Scales with the reader's SYSTEM text-size
+     preference (iOS Dynamic Type), measured by lib/useReadingScale.ts and
+     published as --reading-scale (1 when there's no preference to honour, and
+     on desktop, where browser zoom already does this job).
+
+     SCOPED ON PURPOSE — do NOT promote this to html/body. About half this
+     codebase's type is hardcoded px (243 `text-[Npx]`) and half is Tailwind's
+     rem scale (223), so a root-level scale would grow one half and freeze the
+     other: a summary swelling while its own byline and chips stay put. That
+     breaks hierarchy instead of enlarging text. Chrome keeps its designed
+     sizes; only the prose moves.
+
+     Paragraphs and list items carry no size of their own, so they inherit.
+     The section headings do (`text-base`, i.e. 1rem of the ROOT), which would
+     leave them fixed while the body around them grew — so they are re-anchored
+     to 1em, preserving the exact heading:body relationship the design already
+     has, at whatever scale. */
+  .reading-prose {
+    font-size: calc(1rem * var(--reading-scale, 1));
+  }
+
+  .reading-prose :is(h1, h2, h3, h4) {
+    font-size: 1em;
+  }
 }
 
 

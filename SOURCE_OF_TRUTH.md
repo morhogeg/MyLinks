@@ -1,4 +1,4 @@
-# Machina AI — Single Source of Truth
+# Machina — Single Source of Truth
 
 > **This is the ONE document.** It consolidates and supersedes: `HANDOFF.md`,
 > `HANDOFF-iOS-AUTH.md`, `TASKS.md`, `MACHINA_SPEC.md`, `PRODUCT_REVIEW.md`,
@@ -26,7 +26,9 @@
 
 ## 1. What Machina is
 
-**Machina AI** (`com.morhogeg.machina`) — an AI-powered personal knowledge base.
+**Machina** (`com.morhogeg.machina`) — a personal knowledge base.
+**The name is `Machina`, not `Machina AI` — see `docs/BRANDING.md` D-1 before
+writing the name anywhere.**
 Capture a link/image from anywhere (iOS share sheet, web UI, browser
 extension) → Python Cloud Function scrapes + Gemini analyzes → a structured card
 (summary, category, tags, concepts, embedding, related links) lands in a real-time
@@ -412,6 +414,22 @@ The multi-user auth work is **fully written but not live**:
     keyboard never covers inputs (LinkDetailModal category/tag, AddToCollection,
     AddLinkForm on iPhone SE); pull-to-refresh vs edge-swipe conflicts; failed
     card → Retry; Apple + Google sign-in; account deletion end-to-end.
+
+8a. **[ ] Trademark clearance for the name "Machina"** *(new 2026-07-27, from the
+    rename — `docs/BRANDING.md` A-1/C-1).* Bare **`Machina` is already taken on
+    the App Store** by an *adjacent* app (Philip Gebben, Utilities, "Opening up
+    Creativity", screenshots referencing "Knowledge & Inspiration" and "Machina
+    Studio uses AI…"). App Store *listing* name uniqueness is handled — the
+    listing is `Machina: Save & Recall` — and `CFBundleDisplayName` has no
+    uniqueness requirement, so the home-screen label is safely plain `Machina`.
+    **Unmitigated: trademark.** Search USPTO + the Israel TM register (classes 9
+    and 42) before submission. The incumbent developer is an individual, which
+    suggests low odds of a registered mark, but this is the single finding that
+    could force another rename — and it gets more expensive every week the
+    identity is built out further. Secondary risk: App Review raising
+    "confusingly similar"; mitigations already in place are the differentiated
+    listing name, a different primary category (Productivity vs Utilities), and a
+    completely different mark/palette.
 
 ### 🟡 P2 — security/cost hardening & honest product surface
 
@@ -897,9 +915,11 @@ launch (Tuesday–Thursday), a Show HN, an X thread, and a 30-second screen-reco
 demo (share → analyzed card → ask → cited answer) reused everywhere including
 TikTok/Reels/Shorts — short-form screen demos of "I asked my bookmarks a question
 and it answered with sources" are exactly what performs organically in the
-productivity niche. (4) **Ongoing:** App Store Optimization (title "Machina AI —
-Ask Your Saves"; keywords: second brain, read later, bookmark manager, AI
-summary, save links, knowledge base), and a monthly public "what Machina learned
+productivity niche. (4) **Ongoing:** App Store Optimization — the exact Name /
+Subtitle / keywords live in `docs/APP_STORE.md` §2 and the reasoning behind them
+in `docs/BRANDING.md` (title `Machina: Save & Recall`, subtitle
+`Capture. Ask. Connect.`; **"second brain" and "ai" are keywords-field-only —
+never put either on a user-visible surface**, see BRANDING D-3), and a monthly public "what Machina learned
 this month" post generated from the actual synthesis feature — the product
 markets itself if you publish what it produces. Success metric for month one:
 1,000 installs, 20% week-2 retention, 50 organic shares — retention gates any
@@ -944,9 +964,10 @@ paid spend.
 *Product Hunt:* tagline "**Ask your bookmarks anything**"; first comment covers
 the origin story (WhatsApp self-messages), the capture surface, and the free tier.
 
-*App Store subtitle/promo:* "Save from anywhere. Ask it anything." / promo text:
-"Machina reads everything you save — links, screenshots, videos — and answers
-questions from it, with sources."
+*App Store subtitle/promo:* subtitle is `Capture. Ask. Connect.`
+(`docs/APP_STORE.md` §2; reasoning in `docs/BRANDING.md` D-2 — it opens on
+capture and ends on the knowledge graph on purpose) / promo text: "Machina reads everything you save — links, screenshots, videos — and
+answers questions from it, with sources."
 
 *Where to "advertise" for free:* X (primary), Product Hunt, Hacker News,
 r/PKMS + r/productivity (follow self-promo rules: give value first), Indie
@@ -1050,6 +1071,108 @@ exact-match, capped.
   §4 task 2's owner list was rewritten accordingly, and the Apple Services ID +
   `.p8` demoted out of it — it gates *web* Apple sign-in only, never the cutover.
 
+- **2026-07-27 — THE NAME LOSES ITS "AI": `Machina AI` → `Machina`, and a new
+  `docs/BRANDING.md`.** Owner's call, on two arguments — AI fatigue in the
+  market, and AI being the *infrastructure* under a capture-and-recall product
+  rather than the product itself (it is not a chatbot or an image generator).
+  Agreed, with a third argument they hadn't made: **the shipped identity never
+  had "AI" in it.** The wordmark from identity rounds 2/3/11/12 is letterspaced
+  **MACHINA** on the splash, the boot screen, and the header lockup — "AI"
+  survived only in display-name *strings*, so the name and the mark had been
+  contradicting each other for months. `com.morhogeg.machina` was already the
+  bundle ID, so this is display strings only: no bundle-ID change, no Firebase
+  change, no migration.
+  **The constraint that shaped everything: bare `Machina` is TAKEN on the App
+  Store** (owner screenshot — Philip Gebben, Utilities, "Opening up Creativity",
+  and its own screenshots read "Knowledge & Inspiration" + "Machina Studio uses
+  AI…"). That is an *adjacent* AI-knowledge app, not a distant collision, so
+  "confusingly similar" at review is a live risk. Resolved by splitting the name
+  into two layers, which works because **App Store name uniqueness does not apply
+  to `CFBundleDisplayName`**: the home screen, the web tab, the extension, and
+  all in-app copy say plain **Machina** (the layer the owner cared about most),
+  while the App Store *listing* name is **`Machina: Save & Recall`** (22/30) with
+  subtitle **`Capture. Ask. Connect.`** (22/30).
+  **Two title candidates were rejected, and the reasons are worth keeping.**
+  `Machina: Second Brain` — vetoed by the owner ("it carries weight that I don't
+  want to deal with") despite being the highest-volume term in the category.
+  `Machina: Ask Your Saves` (the old §8 plan) — accepted only lukewarmly, because
+  it leads with *recall* when the owner's favourite part of the product is the
+  frictionless share → auto summary + category capture. `Save & Recall` names
+  both halves and the subtitle leads with capture. **The lost search volume was
+  recovered, not conceded:** `second brain` and `ai` both moved into the App
+  Store **keywords** field, which is invisible to users — so the app ranks for
+  the query without ever calling itself the thing (`docs/BRANDING.md` D-3).
+  Keywords rebalanced to 98/100 after dropping `save links`/`recall`, which the
+  new Name field now indexes for free.
+  **One code hazard checked before renaming, and it was clean:**
+  `functions/main.py` `_ground_source_name()` rejects any Gemini-proposed
+  publisher containing the substring `"machina"` (the model seeds its own name
+  from the system prompt and emits it as the article's publisher — the old
+  alaxon.co.il bug). The guard matches `machina`, not `Machina AI`, and
+  `test_source_name_grounding.py` already covers the bare-`machina` case, so
+  shortening the prompt self-names in `ai_service.py` did not reopen it.
+  **If the brand ever changes to a name without "machina" in it, that guard and
+  `_MACHINA_HOSTS` must change in the same commit.**
+  Renamed: `Info.plist` (`CFBundleDisplayName`), `capacitor.config.ts`,
+  `manifest.json`, `layout.tsx`, `privacy`/`terms` pages, the extension manifest
+  + popup, the three Gemini prompt self-names, the public READMEs, `CLAUDE.md`,
+  and `docs/APP_STORE.md` §2. **Deliberately NOT renamed:** dated audit/history
+  docs (`AUDIT.md`, `AUDIT_FINDINGS.md`, `APP_WEAKNESSES.md`, `AUTH_SPEC.md`,
+  `PRODUCTION_READINESS_2026-07-14.md`), the `design/icon-concepts/` prototypes,
+  and the grounding-test fixtures — they are records of what was true on their
+  date, and rewriting them would falsify the history.
+  **New doc: `docs/BRANDING.md`** — the running record for branding/marketing
+  decisions (§1 decisions, §2 naming mechanics + the full list of files the name
+  lives in, §3 the App Store collision, §4 open questions, §5 action items, §6
+  discussion log). It is a *decision log*, not another handoff/spec/audit doc —
+  `SOURCE_OF_TRUTH.md` stays the single source of truth and §8 now points at it.
+  **Open owner items:** (A-1) **trademark search for "Machina"** (USPTO + Israel,
+  classes 9/42) before submission — the one finding that could still veto this;
+  (A-2) enter the new Name/Subtitle/keywords in App Store Connect; (A-4) the §4
+  task 9 screenshots must be shot with the new label. **Left open on purpose:**
+  the product description is still "Your AI-powered knowledge capture and
+  retrieval system" (`manifest.json` + `layout.tsx`) — same AI-forward problem,
+  but that is a positioning decision, not a naming one (BRANDING Q-1/A-3).
+  **Subtitle took four rounds and the reasoning is the useful part.** Two drafts
+  were rejected by the owner for the SAME flaw — `Save anything. It reads it.`
+  ("simplistic and lame") and `Analyzed, organized, connected` — both described a
+  *mechanism* instead of making a promise. The line only worked once it became
+  **verbs**: `Capture. Connect. Recall.` → `Remember` (the Name already supplies
+  `Recall`, and a token indexed twice buys nothing) → finally `Capture. Ask.
+  Connect.`, using the product's own verb. It ends on `Connect` because in a
+  three-beat line the first and last positions carry the weight: `Ask` is table
+  stakes, the knowledge graph is the moat, so the moat goes last. (The owner's
+  stated reason — "the question comes before the connection" — is actually
+  backwards for Machina, where the graph is computed on every save and surfaces
+  unprompted; the order survives on positioning, not chronology.)
+  🚢 **SHIPPED.** Feature `1a7b2b7`, merge `e223635` → pushed to `main`.
+  Desktop web → **Vercel** (auto on the push). Functions → **"Deploy Cloud
+  Functions" run #53** (`actions/runs/30306416602`) — **deliberately UNSCOPED, no
+  `Deploy-Functions:` trailer**: `ai_service.py` is a shared module imported by
+  every AI-touching function (analysis, RAG, weekly synthesis), so enumerating
+  targets risks silently missing one — **GREEN**. iOS → **"iOS → TestFlight" run
+  #223 = build 1223** (`actions/runs/30306427975`) — **GREEN, all 15 steps**,
+  including `Verify entitlements in exported IPA` (the App Group guard that
+  protects the Share Extension token bridge) and `Upload to TestFlight`.
+  **Merge-time finding — the stale local `main` is BACK, exactly as the previous
+  entry describes.** Local `main` was `7b86a77`, **not** an ancestor of
+  `origin/main`, with 127 commits origin had never seen while origin/main was 83
+  commits ahead. Verified by CONTENT again, not commit subject: `_ground_source_name`,
+  `cardThumbnail.ts`, and `askExcluded` are all present on `origin/main`, and the
+  `origin/main → main` diff is −14,439 lines (local main is *missing* work, not
+  holding unique work). Resolved the same way: `git checkout -B main origin/main`
+  then merge. **This sandbox's local `main` cannot be trusted at the start of a
+  ship — always fetch and check `merge-base --is-ancestor` first.**
+  Verified before merge: `npx tsc --noEmit` **exit 0** (needed `npm ci` first —
+  `node_modules` is absent in a fresh sandbox and tsc's "Cannot find module
+  'react'" errors are that, not a code break), `py_compile` clean, and the full
+  backend suite **537 passed / 0 failed** (`pip install --ignore-installed
+  blinker -r requirements.txt` — a plain `pip install -r` fails on the
+  debian-owned `blinker` with "Cannot uninstall … RECORD file not found").
+  **Owner steps:** the home-screen label only changes once **build 1223** is
+  installed from TestFlight; and **A-1, the trademark search on "Machina"**
+  (USPTO + Israel, classes 9/42) is the one open item that could still veto the
+  whole rename — now tracked as §4 P1 task 8a.
 - **2026-07-27 — ✅ OWNER DEVICE QA ON BUILD 1219: ALL CLEAR + a codebase
   review.** The owner ran the full 11a1 list on a physical iPhone and reported
   everything working. **The device-verification debt for 1219 is cleared**,
@@ -1159,6 +1282,59 @@ exact-match, capped.
   So the two directions need two different tests, and the workflow now says so
   in comments next to each. Both wrong versions would have passed a naive
   "deploy succeeded" check — which is exactly why the step exists.
+
+- **2026-07-27 — READING PROSE HONOURS SYSTEM TEXT SIZE (step 1 of the
+  text-size question; owner approved the scoped version over a settings
+  slider).** Owner asked whether to add a card text-size setting. Answer was
+  yes to the capability, no to a slider first — and the reason is structural:
+  **~half this codebase's type is hardcoded px** (243 `text-[Npx]`: `[11px]`
+  ×54, `[13px]` ×50, `[15px]` ×27 …) **and half is Tailwind's rem scale** (223).
+  Any root-level `font-size` scale — which is what both a slider and naive
+  Dynamic Type support would do — grows the rem half and freezes the px half,
+  so a summary swells while its own byline, chips and metadata stay put. That
+  breaks hierarchy rather than enlarging text; it is worse than shipping
+  nothing. **So the scale is scoped to the READING PROSE only.** New
+  `lib/useReadingScale.ts` measures the reader's Dynamic Type setting by
+  rendering an off-screen probe with `font: -apple-system-body` (the only thing
+  that resolves to the user's preferred body size — a WKWebView does not apply
+  it to ordinary CSS), divides by the 17px default, clamps to **1–1.35** (the
+  accessibility sizes go past 2× and would leave a few words per line), and
+  publishes `--reading-scale` on `:root`. Re-measures on foreground, since
+  Dynamic Type can change while Machina is backgrounded and the app is not
+  reloaded on return. Consumed by a new `.reading-prose` utility applied to the
+  card detail's summary + detailed summary; headings inside are re-anchored to
+  `1em` so the heading:body relationship holds at any scale. Desktop needs
+  nothing — browser zoom already does this, and the probe lands at ~1 there.
+  **Verified:** rendered at scale 1 / 1.2 / 1.35 in Chromium — prose grows,
+  the 11px and 15px chrome stays pixel-identical; probe leaves no DOM residue;
+  `--reading-scale` present in the production CSS bundle; tsc + eslint + full
+  `next build` clean. **NOT verified:** the actual measured value on a real
+  iPhone at a real Dynamic Type setting — that is device-only.
+  **Step 2 (NOT built, only if still wanted after living with step 1):** a
+  three-option control (Default / Large / Larger) next to Theme, writing the
+  same `--reading-scale`. Three discrete states are testable in light/dark and
+  EN/HE; a continuous slider gives a dozen states nobody will verify, and RTL
+  Hebrew at an arbitrary scale is exactly where it would break.
+  ⚠️ **Do NOT promote `.reading-prose` to `html`/`body`** — that reintroduces
+  the px/rem split above. The comment in `globals.css` says so at the rule.
+
+- **2026-07-27 — CAPTURE-NOTE WARNING REMOVED (owner: "remove it, I don't want
+  it anymore").** `main._append_capture_note` appended a trailing blockquote —
+  "⚠️ **הערה:** לא ניתן היה לקרוא את הטקסט המלא… נסו לשמור צילום מסך" / the
+  English twin — to `detailedSummary` whenever the scraper set
+  `scraped['truncated']` (Facebook's truncated `og:description`, social-teaser
+  fallbacks on JS shells, login walls, PDFs). Helper and both call sites in
+  `_analyze_scraped` deleted; a tombstone comment records why so it isn't
+  re-added as a "helpful honesty" feature. **`truncated` itself is untouched** —
+  the scraper still sets it and it is still read elsewhere; only the user-facing
+  text is gone. `py_compile` clean, 536 tests pass.
+  ⚠️ **AFFECTS NEW SAVES ONLY. Existing cards keep the note**, because it was
+  baked into each card's stored `detailedSummary` at analysis time, not rendered
+  from a flag. Cleaning them needs a one-off backfill that strips the trailing
+  blockquote from `users/{uid}/links/*.detailedSummary` — NOT written, since it
+  mutates the owner's real card text and was not requested. If wanted, the safe
+  shape is: match only a trailing `> ⚠️ **הערה:**` / `> ⚠️ **Note:**` blockquote
+  at the very end, batched per-user like `rebuild_connections`, idempotent.
 
 - **2026-07-27 — SETTINGS "DONE" BAR SAT TOO HIGH ON iOS (owner, device).** The
   footer padded `calc(env(safe-area-inset-bottom) + 0.5rem)` — on a

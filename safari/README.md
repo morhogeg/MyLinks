@@ -1,4 +1,4 @@
-# Machina AI — Safari extension
+# Machina — Safari extension
 
 Safari runs the **same** Web Extension code as Chrome (everything under
 [`/extension`](../extension)). The only difference is packaging: Safari extensions
@@ -53,7 +53,7 @@ See [`../extension/README.md`](../extension/README.md) for where to find the tok
 | Settings popup | ✅ — opens as a **tab** (Safari ignores `open_in_tab:false`) |
 | ✓ / ✗ toolbar **badge** | ✅ |
 | **System notification** confirmation | ❌ not supported by Safari Web Extensions — the save still happens and the badge confirms it; the card appears in the app as usual |
-| Real-time appearance in the Machina AI app | ✅ (Firestore sync — unchanged) |
+| Real-time appearance in the Machina app | ✅ (Firestore sync — unchanged) |
 
 The converter prints a warning about the `notifications` and `open_in_tab` manifest
 keys for this reason — both degrade gracefully, so no code changes are needed.
