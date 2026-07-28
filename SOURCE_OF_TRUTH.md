@@ -1022,6 +1022,12 @@ exact-match, capped.
   active (still "Clear filters" otherwise). Verified: `tsc --noEmit` clean +
   a tsx harness on the real card (query `תזונה` → titleHit, `תזונה ילדים` →
   titleHit, control word → null). Not render-verified in a browser.
+  **Shipped:** merge `8e33722` → Vercel (auto), TestFlight run #225 / **build
+  1225** green. Ship-time gotcha (the §2 shared-worktree race, live): a parallel
+  session was mid-merge in `~/MyLinks` during this ship — its conflicted
+  SOURCE_OF_TRUTH working tree looked alarming but origin stayed clean; both
+  sessions' entries survived. Build 1225 predates that session's Review-tooltips
+  merge (`dd01d0a`), so it should cut its own build if it wants iOS updated.
 - **2026-07-28 — Review's right swipe means KEEP again, not "favorite"** (branch
   `claude/review-view-swipe-behavior-efa5ee`). Owner: the deck's setup reads as
   confusing — right swipe should simply keep the card where it is. It was
