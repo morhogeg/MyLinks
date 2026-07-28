@@ -1021,6 +1021,22 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 (same session, round 6) — Graph selection panel made minimal
+  (owner design QA).** The panel had stacked four layers before content
+  (title → POLITICS row → grey cluster chip → big Open button), and the chip —
+  the only route to Ask/Save — read as an inert tag. New hierarchy: **title →
+  one action row → connections.** The category text row and the cluster chip
+  are deleted (the category dot + legend already encode category); the action
+  row is two equal pills — **Open card** (accent) and **Ask about this**
+  (quiet) — so Ask is now ONE tap from any selected card, no cluster-panel
+  hop. "Ask about this" asks about the card's neighborhood: the cluster theme
+  when one exists ("What have I saved about Political Polarization?"), else a
+  title-anchored question; anchors = the card + up to 7 neighbors. **Save as
+  collection stays cluster-panel-only** (deliberate, per the same-session
+  product discussion: it's the borderline feature — kept, but not surfaced on
+  every card); the cluster panel subtitle simplified ("6 cards"). Verified:
+  tsc 0; Playwright iPhone-390 light — new layout renders, Ask fires with
+  theme + 6 anchors, zero console errors.
 - **2026-07-28 (same session, round 5) — Graph mobile pass (owner device QA).**
   The phone panel showed only 2 of 5 connections. Fixes: (1) **legend is one
   horizontally-scrollable row on phones** (it wrapped to 3 rows and ate ~110px

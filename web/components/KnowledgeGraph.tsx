@@ -536,10 +536,8 @@ export default function KnowledgeGraph({
                 };
             })
             .sort((a, b) => b.weight - a.weight);
-        // The cluster this card belongs to, surfaced as a chip in the panel —
-        // the discoverable route to the cluster actions (Ask / Save as
-        // collection). Tapping a caption on canvas is a small target on a
-        // phone; tapping cards is what people actually do (owner mobile QA).
+        // The cluster's theme feeds the panel's "Ask about this" question —
+        // asking about "Political Polarization" beats asking about one title.
         const cluster = model.clusters[node.cluster];
         return {
             node,
@@ -566,6 +564,20 @@ export default function KnowledgeGraph({
             : `What connects these ${clusterPanel.members.length} cards I saved?`;
         onAskCluster(question, clusterPanel.members.slice(0, 8).map((m) => m.link.title));
     }, [clusterPanel, onAskCluster]);
+
+    // Ask about the SELECTED card's neighborhood — right in the selection
+    // panel, so reaching Ask never needs the extra hop through the cluster
+    // panel (owner QA: the chip route was one screen too many).
+    const askSelection = useCallback(() => {
+        if (!selection || !onAskCluster) return;
+        const question = selection.clusterLabel
+            ? `What have I saved about ${selection.clusterLabel.split(' · ')[0]}?`
+            : `How does “${selection.node.link.title.slice(0, 60)}” relate to my other saves?`;
+        onAskCluster(question, [
+            selection.node.link.title,
+            ...selection.neighbors.slice(0, 7).map((nb) => nb.link.title),
+        ]);
+    }, [selection, onAskCluster]);
 
     const saveCluster = useCallback(async () => {
         if (!clusterPanel || !onSaveCluster || savingCluster) return;
@@ -723,30 +735,21 @@ export default function KnowledgeGraph({
                     card's detail directly. */}
                 {selection && (
                     <div className="absolute inset-x-2 bottom-2 sm:inset-x-auto sm:bottom-auto sm:top-3 sm:end-3 sm:w-[330px] max-h-[66%] sm:max-h-[calc(100%-24px)] flex flex-col rounded-2xl bg-card/95 backdrop-blur-xl border border-border-subtle shadow-[var(--shadow-card)] animate-fade-in">
+                        {/* Minimal, intentional hierarchy: TITLE → one action
+                            row → connections. The category dot is the only
+                            metadata (its color already matches the legend);
+                            the old POLITICS row and the cluster chip stacked
+                            two grey layers here and buried the Ask route one
+                            panel deeper (owner QA). */}
                         <div className="p-3 pb-2.5 sm:p-3.5 sm:pb-3">
                             <div className="flex items-start gap-2.5">
                                 <span
                                     className="mt-1 w-2.5 h-2.5 rounded-full shrink-0"
                                     style={{ backgroundColor: getCategoryColorStyle(selection.node.category).color }}
                                 />
-                                <div className="flex-1 min-w-0">
-                                    <h3 dir="auto" className="text-[14px] font-semibold text-text leading-snug line-clamp-2">
-                                        {selection.node.link.title}
-                                    </h3>
-                                    <p className="mt-0.5 text-[11px] font-medium text-text-muted uppercase tracking-wide">
-                                        {selection.node.category}
-                                    </p>
-                                    {selection.clusterLabel && (
-                                        <button
-                                            onClick={() => { setSelected(null); setClusterFocus(selection.clusterIndex); }}
-                                            title="See this whole cluster"
-                                            className="mt-1.5 inline-flex max-w-full items-center gap-1 h-6 ps-1.5 pe-2 rounded-full bg-fill-subtle border border-border-subtle text-[11px] font-semibold text-text-secondary hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
-                                        >
-                                            <Waypoints className="w-3 h-3 shrink-0" />
-                                            <span className="truncate">{selection.clusterLabel}</span>
-                                        </button>
-                                    )}
-                                </div>
+                                <h3 dir="auto" className="flex-1 min-w-0 text-[14px] font-semibold text-text leading-snug line-clamp-2">
+                                    {selection.node.link.title}
+                                </h3>
                                 <button
                                     onClick={() => setSelected(null)}
                                     aria-label="Close card details"
@@ -755,13 +758,23 @@ export default function KnowledgeGraph({
                                     <X className="w-4 h-4" />
                                 </button>
                             </div>
-                            <button
-                                onClick={() => onOpenCard(selection.node.link)}
-                                className="mt-2.5 w-full h-9 inline-flex items-center justify-center gap-1.5 rounded-full bg-accent text-accent-ink text-[13px] font-bold hover:bg-accent-hover active:scale-[0.98] transition-all cursor-pointer"
-                            >
-                                Open this card
-                                <ArrowUpRight className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="mt-2.5 flex gap-2">
+                                <button
+                                    onClick={() => onOpenCard(selection.node.link)}
+                                    className="flex-1 h-9 inline-flex items-center justify-center gap-1.5 rounded-full bg-accent text-accent-ink text-[13px] font-bold hover:bg-accent-hover active:scale-[0.98] transition-all cursor-pointer"
+                                >
+                                    Open card
+                                    <ArrowUpRight className="w-3.5 h-3.5" />
+                                </button>
+                                {onAskCluster && (
+                                    <button
+                                        onClick={askSelection}
+                                        className="flex-1 h-9 inline-flex items-center justify-center rounded-full bg-card border border-border-strong text-[13px] font-bold text-text hover:bg-card-hover active:scale-[0.98] transition-all cursor-pointer"
+                                    >
+                                        Ask about this
+                                    </button>
+                                )}
+                            </div>
                         </div>
                         <p className="px-3 sm:px-3.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-text-muted">
                             Connections · {selection.neighbors.length}
@@ -822,7 +835,7 @@ export default function KnowledgeGraph({
                                         {clusterPanel.label ?? 'A cluster of related cards'}
                                     </h3>
                                     <p className="mt-0.5 text-[11px] font-medium text-text-muted uppercase tracking-wide">
-                                        Cluster · {clusterPanel.members.length} cards
+                                        {clusterPanel.members.length} cards
                                     </p>
                                 </div>
                                 <button
