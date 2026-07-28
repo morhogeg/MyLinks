@@ -1006,8 +1006,9 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
-- **2026-07-28 — Graph view: the knowledge graph made visible (branch
-  `claude/card-connections-knowledge-graph-fw6a1p`, not yet shipped).** New
+- **2026-07-28 — Graph view: the knowledge graph made visible (feature
+  `ddd505b`, merge **`cfb818b`** → Vercel auto; TestFlight run **#232 / build
+  1232**).** New
   fourth layout in the view switcher (Card/List/Review/**Graph**, `Waypoints`
   icon — mobile gets it via the Display sheet automatically): a canvas
   force-directed constellation of the whole library, nodes colored by category
