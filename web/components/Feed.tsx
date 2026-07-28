@@ -152,6 +152,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         handleToggleSource,
         handleToggleSourceKeys,
         matchingSources,
+        matchingTags,
         reminderCount,
     // LIVE query in — matching is instant per keystroke, no debounce anywhere.
     } = useFeedFilters(visibleLinks, searchQuery, libraryLinks, privateCollectionIds);
@@ -2131,37 +2132,70 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
 
                 {/* Links Grid / Ask */}
                 <div className="flex-grow min-w-0">
-                    {/* Search typeahead — split the live results into a "Sources" row
-                        (tap a publisher to jump straight to its cards) above the
-                        "Cards" grid below, so searching "ynet" offers both. */}
-                    {(viewMode === 'grid' || viewMode === 'list') && searchQuery.trim() && matchingSources.length > 0 && (
+                    {/* Search typeahead — split the live results into "Sources" and
+                        "Tags" rows (tap to jump straight to that filter) above the
+                        "Cards" grid below, so searching "ynet" or a tag offers both. */}
+                    {(viewMode === 'grid' || viewMode === 'list') && searchQuery.trim() && (matchingSources.length > 0 || matchingTags.length > 0) && (
                         <div className="mb-5 animate-in fade-in slide-in-from-top-1 duration-200">
-                            <div className="flex items-center gap-2 mb-2.5">
-                                <Globe className="w-3.5 h-3.5 text-accent/70" />
-                                <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">Sources</span>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {matchingSources.map(s => {
-                                    const active = selectedSources.has(s.key);
-                                    return (
-                                        <button
-                                            key={s.key}
-                                            onClick={() => {
-                                                handleToggleSource(s.key);
-                                                // Jump to the source's library view: filter, drop the query.
-                                                setSearchQuery('');
-                                            }}
-                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[13px] font-semibold border transition-colors ${active
-                                                ? 'bg-accent/12 border-accent/40 text-text'
-                                                : 'bg-card border-border-subtle text-text-secondary hover:border-text-muted/40 hover:text-text'}`}
-                                        >
-                                            <span className="shrink-0">{sourceIconFor(s, 'w-3.5 h-3.5')}</span>
-                                            <span className="truncate max-w-[12rem]">{s.label}</span>
-                                            <span className="tabular-nums text-text-muted">{s.count}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            {matchingSources.length > 0 && (
+                                <>
+                                    <div className="flex items-center gap-2 mb-2.5">
+                                        <Globe className="w-3.5 h-3.5 text-accent/70" />
+                                        <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">Sources</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {matchingSources.map(s => {
+                                            const active = selectedSources.has(s.key);
+                                            return (
+                                                <button
+                                                    key={s.key}
+                                                    onClick={() => {
+                                                        handleToggleSource(s.key);
+                                                        // Jump to the source's library view: filter, drop the query.
+                                                        setSearchQuery('');
+                                                    }}
+                                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[13px] font-semibold border transition-colors ${active
+                                                        ? 'bg-accent/12 border-accent/40 text-text'
+                                                        : 'bg-card border-border-subtle text-text-secondary hover:border-text-muted/40 hover:text-text'}`}
+                                                >
+                                                    <span className="shrink-0">{sourceIconFor(s, 'w-3.5 h-3.5')}</span>
+                                                    <span className="truncate max-w-[12rem]">{s.label}</span>
+                                                    <span className="tabular-nums text-text-muted">{s.count}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </>
+                            )}
+                            {matchingTags.length > 0 && (
+                                <>
+                                    <div className={`flex items-center gap-2 mb-2.5 ${matchingSources.length > 0 ? 'mt-5' : ''}`}>
+                                        <TagIcon className="w-3.5 h-3.5 text-accent/70" />
+                                        <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-text-muted">Tags</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {matchingTags.map(({ tag, count }) => {
+                                            const active = selectedTags.has(tag);
+                                            return (
+                                                <button
+                                                    key={tag}
+                                                    onClick={() => {
+                                                        handleToggleTag(tag);
+                                                        // Jump to the tag's library view: filter, drop the query.
+                                                        setSearchQuery('');
+                                                    }}
+                                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[13px] font-semibold border transition-colors ${active
+                                                        ? 'bg-accent/12 border-accent/40 text-text'
+                                                        : 'bg-card border-border-subtle text-text-secondary hover:border-text-muted/40 hover:text-text'}`}
+                                                >
+                                                    <span className="truncate max-w-[12rem]">{tag}</span>
+                                                    <span className="tabular-nums text-text-muted">{count}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </>
+                            )}
                             {filteredLinks.length > 0 && (
                                 <div className="flex items-center gap-2 mt-5 mb-1">
                                     <LayoutGrid className="w-3.5 h-3.5 text-accent/70" />
@@ -2256,7 +2290,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 ? {
                                     Icon: Search, title: 'No matches',
                                     body: searchingLibrary ? null
-                                        : 'Try different words — search looks in card titles and summaries.',
+                                        : 'Try different words — search looks in card titles, tags, and summaries.',
                                 }
                                 : filter === 'reminders' ? {
                                     Icon: Bell, title: 'No reminders yet',
@@ -2350,7 +2384,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                     className="mt-5 inline-flex items-center gap-2 px-4 h-10 rounded-full bg-accent text-accent-ink text-sm font-bold hover:bg-accent-hover active:scale-95 transition-all"
                                 >
                                     <X className="w-4 h-4" />
-                                    Clear filters
+                                    {/* Name the thing being cleared: a dead-end search
+                                        says "Clear search"; a filtered-out view says
+                                        "Clear filters" (both clear everything). */}
+                                    {searchQuery ? 'Clear search' : 'Clear filters'}
                                 </button>
                             )}
                         </div>

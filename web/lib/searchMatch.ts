@@ -4,7 +4,7 @@ import { Link } from '@/lib/types';
  * Machina search — rebuilt from the ground up (2026-07-17), deliberately simple.
  *
  * One rule: a card matches when EVERY word of the query appears (as a
- * substring) in its TITLE or SUMMARY, after normalization. No vector search,
+ * substring) in its TITLE, TAGS, or SUMMARY, after normalization. No vector search,
  * no server round-trip, no score fusion, no thresholds to tune — matching is
  * literal and predictable, and it runs locally on every keystroke.
  *
@@ -16,8 +16,10 @@ import { Link } from '@/lib/types';
  * ("muffins" finds "muffin"). Deliberately NO typo/fuzzy matching — a result
  * must always be explainable by the literal words on the card.
  *
- * Ranking is two tiers: cards whose title contains every query word rank
+ * Ranking is two tiers: cards whose title/tags contain every query word rank
  * above cards that needed the summary; recency breaks ties (see useFeedFilters).
+ * Tags rank with the title because they're curated labels — a user searching
+ * a tag word typed exactly the thing they put on the card.
  */
 
 /** Apostrophe-like marks folded out entirely, so quoted/elided forms match
@@ -50,13 +52,15 @@ export function tokenizeSearch(query: string): string[] {
 
 // Per-card normalized text, built once per card object and reused across
 // keystrokes. A Firestore update produces a new Link object → fresh entry.
-const textCache = new WeakMap<Link, { title: string; summary: string }>();
+const textCache = new WeakMap<Link, { title: string; tags: string; summary: string }>();
 
-function getSearchText(link: Link): { title: string; summary: string } {
+function getSearchText(link: Link): { title: string; tags: string; summary: string } {
     let text = textCache.get(link);
     if (!text) {
         text = {
             title: normalizeSearchText(link.title || ''),
+            // Joined with a space so a token can't straddle two tags.
+            tags: normalizeSearchText((link.tags || []).join(' ')),
             summary: normalizeSearchText(link.summary || ''),
         };
         textCache.set(link, text);
@@ -65,7 +69,7 @@ function getSearchText(link: Link): { title: string; summary: string } {
 }
 
 export interface SearchMatch {
-    /** True when every query token hit the title — those cards rank first. */
+    /** True when every query token hit the title or a tag — those cards rank first. */
     titleHit: boolean;
 }
 
@@ -86,16 +90,16 @@ const containsAny = (field: string, variants: string[]) =>
 
 /**
  * Match one card against pre-tokenized query words.
- * Returns null when any token appears in neither the title nor the summary
- * (AND semantics), otherwise whether the title alone covered every token.
+ * Returns null when any token appears in none of title/tags/summary
+ * (AND semantics), otherwise whether title+tags alone covered every token.
  */
 export function matchCard(link: Link, tokens: string[]): SearchMatch | null {
     if (tokens.length === 0) return null;
-    const { title, summary } = getSearchText(link);
+    const { title, tags, summary } = getSearchText(link);
     let titleHit = true;
     for (const token of tokens) {
         const variants = tokenVariants(token);
-        if (containsAny(title, variants)) continue;
+        if (containsAny(title, variants) || containsAny(tags, variants)) continue;
         titleHit = false;
         if (!containsAny(summary, variants)) return null;
     }
