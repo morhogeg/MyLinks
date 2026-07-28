@@ -834,12 +834,18 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // question pre-sent (nonce-gated inside AskBrain, fresh conversation). The
     // restore payload re-opens the same graph focus when the user comes back —
     // Ask is a detour from the graph, not an exit.
-    const [graphAsk, setGraphAsk] = useState<{ question: string; hints?: import('@/lib/askSuggestions').AskHints; nonce: number } | null>(null);
+    const [graphAsk, setGraphAsk] = useState<{ question: string; hints?: import('@/lib/askSuggestions').AskHints; restore?: import('./KnowledgeGraph').GraphRestoreFocus; nonce: number } | null>(null);
     const [graphRestore, setGraphRestore] = useState<import('./KnowledgeGraph').GraphRestoreFocus | null>(null);
     const handleAskCluster = useCallback((question: string, hints: import('@/lib/askSuggestions').AskHints, restore: import('./KnowledgeGraph').GraphRestoreFocus) => {
-        setGraphAsk((prev) => ({ question, hints, nonce: (prev?.nonce ?? 0) + 1 }));
+        setGraphAsk((prev) => ({ question, hints, restore, nonce: (prev?.nonce ?? 0) + 1 }));
         setGraphRestore(restore);
         setViewMode('ask');
+    }, []);
+    // An answer's "Graph" chip: open the Graph focused on the chat's origin
+    // cluster (graph-born chats) or the cited card's neighborhood.
+    const handleOpenGraphFocus = useCallback((focus: import('./KnowledgeGraph').GraphRestoreFocus) => {
+        setGraphRestore(focus);
+        setViewMode('graph');
     }, []);
     // A graph hand-off is for ONE Ask entry. Clear it the moment Ask is left,
     // so no later entrance (tab bar, toolbar, push intent) can replay the
@@ -2361,6 +2367,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             overlayOpen={anyOverlayOpen}
                             links={visibleLinks}
                             initialAsk={graphAsk}
+                            onOpenGraphFocus={handleOpenGraphFocus}
                         />
                     ) : filteredLinks.length === 0 && pendingCards.length === 0 ? (
                         (() => {

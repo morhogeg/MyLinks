@@ -58,6 +58,7 @@ function toSession(d: QueryDocumentSnapshot<DocumentData>): ChatSession {
         messages: (data.messages as ChatMessage[]) || [],
         createdAt: data.createdAt || 0,
         updatedAt: data.updatedAt || data.createdAt || 0,
+        ...(data.graphFocus ? { graphFocus: data.graphFocus } : {}),
     };
 }
 
@@ -79,14 +80,20 @@ export function subscribeChats(uid: string, cb: (chats: ChatSession[]) => void):
 }
 
 /** Create a new saved conversation; returns its Firestore id. */
-export async function createChat(uid: string, messages: ChatMessage[], title?: string): Promise<string> {
+export async function createChat(
+    uid: string,
+    messages: ChatMessage[],
+    title?: string,
+    graphFocus?: ChatSession['graphFocus'],
+): Promise<string> {
     const now = Date.now();
-    const ref = await addDoc(chatsCol(uid), {
+    const ref = await addDoc(chatsCol(uid), clean({
         title: title || deriveTitle(messages),
         messages: sanitizeMessages(messages),
         createdAt: now,
         updatedAt: now,
-    });
+        graphFocus,
+    }));
     return ref.id;
 }
 
