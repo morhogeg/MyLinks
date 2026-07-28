@@ -1006,6 +1006,18 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 — Firestore `.where()` warning silenced (FieldFilter
+  migration).** Every Cloud Functions invocation that ran a Firestore query was
+  emitting `UserWarning: Detected filter using positional arguments` into
+  stderr (seen on `sweep_stuck_processing` and others). All 17 positional
+  `.where("field", op, value)` call sites across `functions/main.py`,
+  `link_service.py`, `reminder_service.py`, and `search.py` migrated to
+  `.where(filter=FieldFilter(...))`; the two test fakes
+  (`test_reminder_check.py`, `test_ai_payload_privacy.py`) updated to the
+  keyword signature. Pure mechanical change, no query semantics touched; 544
+  backend tests green. **Shipped:** merged to main as `8fd7954`
+  (`Deploy-Functions: all` — the change spans shared modules imported by every
+  function); functions deploy run **#59**. Backend-only, no TestFlight build.
 - **2026-07-28 — tag language no longer leaks across cards (prompt fix +
   cleanup tool).** Owner spotted an English card ("Spaghetti al limone recipe")
   tagged אוכל/מטבח/מתכונים. Root cause: in `ai_service.SYSTEM_PROMPT` the
