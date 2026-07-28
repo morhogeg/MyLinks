@@ -424,6 +424,9 @@ ASK_CONTEXT_CARDS = 20
 MAX_HINT_TEXT_LENGTH = 60
 MAX_HINT_TITLE_LENGTH = 120
 MAX_HINT_TITLES = 8
+# Exclusive anchor ids (graph "ask about these"): matches ASK_CONTEXT_CARDS —
+# the whole point is that the named set IS the context.
+MAX_HINT_IDS = 20
 
 
 def _sanitize_history(history) -> list:
@@ -516,6 +519,20 @@ def _sanitize_hints(hints) -> dict:
             ]
             if clean:
                 out[key] = clean
+    # Exact card ids the question is about (graph "ask about these"). With
+    # `exclusive` they REPLACE retrieval as the whole context, so the model
+    # can neither miscount the set nor cite a topic-matched stranger.
+    # `exclusive` is only meaningful alongside ids.
+    v = hints.get("anchorIds")
+    if isinstance(v, list):
+        clean = [
+            s.strip()[:128]
+            for s in v[:MAX_HINT_IDS] if isinstance(s, str) and s.strip()
+        ]
+        if clean:
+            out["anchorIds"] = clean
+            if hints.get("exclusive"):
+                out["exclusive"] = True
     return out
 
 
@@ -1875,6 +1892,23 @@ def ask_brain(req: https_fn.Request) -> https_fn.Response:
                 cards, _ = pin_title_phrases(anchors, cards)
         except Exception as e:
             logger.error(f"ask_brain anchor pinning failed: {e}")
+
+        # 1g-2. EXCLUSIVE ANCHORS (graph "ask about these"): the client named
+        #     the exact cards the question is about, by id. Context becomes
+        #     THOSE cards and nothing else — topic retrieval above pulled in
+        #     look-alike strangers, and the model then counted and cited them
+        #     as if they were the asked set (owner bug: asked about a 3-card
+        #     cluster, answer discussed 6 and cited 7). Replace, don't merge;
+        #     the privacy strip, askExcluded filter, and cap below still apply.
+        #     An empty fetch (all ids deleted) keeps the retrieved context —
+        #     degraded is better than blank.
+        if hints.get("exclusive") and hints.get("anchorIds"):
+            try:
+                exclusive_cards = cards_by_ids(uid, hints["anchorIds"])
+                if exclusive_cards:
+                    cards = exclusive_cards
+            except Exception as e:
+                logger.error(f"ask_brain exclusive-anchor fetch failed: {e}")
 
         # 1h. PRIVACY: strip effectively-private cards (own isPrivate flag or
         #     membership in a private collection) from the assembled context.

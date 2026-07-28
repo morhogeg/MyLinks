@@ -1021,6 +1021,27 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 (same session, round 10) — Graph Ask made EXACT: exclusive
+  anchor ids + ego scoping (owner bug: tapped a "cluster of 3", chat said 6
+  cards and cited 7).** Two causes, both fixed. (1) **Scope**: the selection
+  panel's ask sent the whole connected COMPONENT while the panel showed only
+  the card + its connections — a low-degree card inside a 6-card component
+  asked about 6. Now the selection ask covers exactly the ego network the
+  panel lists (button relabeled **"Ask about these"**); the cluster panel
+  still asks about its full member list (which it displays). (2)
+  **Grounding**: even correct anchors couldn't stop citations of topic-
+  matched strangers retrieval added to context. New backend contract:
+  `hints.anchorIds` + `hints.exclusive` (sanitized: ≤20 ids ×128 chars,
+  exclusive dropped without ids) — in `ask_brain`, step 1g-2 REPLACES the
+  assembled context with `cards_by_ids(anchorIds)` (privacy strip,
+  askExcluded, cap still apply; empty fetch keeps retrieval as fallback), so
+  the model's context IS the named set — it cannot miscount or cite outside
+  it. Follow-up turns carry no hints → normal retrieval resumes. Frontend
+  sends ids+exclusive from both ask entry points; AskHints type extended.
+  Verified: 27/27 sanitizer tests (3 new — AST-harness constants extended);
+  py_compile clean; tsc 0; harness with the exact bug shape (leaf node in a
+  6-card component) → ask sent exactly 2 ids, exclusive=true. **Deployed
+  scoped `Deploy-Functions: ask_brain`.**
 - **2026-07-28 (same session, round 9) — Graph Ask GROUNDING BUG fixed (owner
   bug report: asked about 2 sunscreen cards, got an answer about 2 unrelated
   cards).** Root cause was the QUESTION, not retrieval: the round-8 phrasing

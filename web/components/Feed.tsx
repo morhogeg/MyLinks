@@ -836,8 +836,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // Ask is a detour from the graph, not an exit.
     const [graphAsk, setGraphAsk] = useState<{ question: string; hints?: import('@/lib/askSuggestions').AskHints; nonce: number } | null>(null);
     const [graphRestore, setGraphRestore] = useState<import('./KnowledgeGraph').GraphRestoreFocus | null>(null);
-    const handleAskCluster = useCallback((question: string, anchorTitles: string[], restore: import('./KnowledgeGraph').GraphRestoreFocus) => {
-        setGraphAsk((prev) => ({ question, hints: { anchorTitles }, nonce: (prev?.nonce ?? 0) + 1 }));
+    const handleAskCluster = useCallback((question: string, hints: import('@/lib/askSuggestions').AskHints, restore: import('./KnowledgeGraph').GraphRestoreFocus) => {
+        setGraphAsk((prev) => ({ question, hints, nonce: (prev?.nonce ?? 0) + 1 }));
         setGraphRestore(restore);
         setViewMode('ask');
     }, []);

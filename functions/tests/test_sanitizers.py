@@ -25,6 +25,7 @@ _WANTED_CONST = {
     "MAX_HINT_TEXT_LENGTH",
     "MAX_HINT_TITLE_LENGTH",
     "MAX_HINT_TITLES",
+    "MAX_HINT_IDS",
 }
 
 
@@ -48,6 +49,7 @@ _sanitize_history = _NS["_sanitize_history"]
 _sanitize_tags = _NS["_sanitize_tags"]
 MAX_HISTORY_ITEMS = _NS["MAX_HISTORY_ITEMS"]
 MAX_HISTORY_CONTENT_LENGTH = _NS["MAX_HISTORY_CONTENT_LENGTH"]
+MAX_HINT_IDS = _NS["MAX_HINT_IDS"]
 MAX_TAGS = _NS["MAX_TAGS"]
 MAX_TAG_LENGTH = _NS["MAX_TAG_LENGTH"]
 
@@ -171,3 +173,24 @@ def test_hints_caps_lengths_and_counts():
     assert len(out["category"]) == MAX_HINT_TEXT_LENGTH
     assert len(out["anchorTitles"]) == MAX_HINT_TITLES
     assert len(out["anchorTitles"][0]) == MAX_HINT_TITLE_LENGTH
+
+
+def test_hints_anchor_ids_and_exclusive():
+    out = _sanitize_hints({
+        "anchorIds": [" id-1 ", "id-2", 3, None, "  "],
+        "exclusive": True,
+    })
+    assert out == {"anchorIds": ["id-1", "id-2"], "exclusive": True}
+
+
+def test_hints_exclusive_requires_anchor_ids():
+    # exclusive without usable ids must not survive — it would tell the ask
+    # flow to replace retrieval with an empty set.
+    assert _sanitize_hints({"exclusive": True}) == {}
+    assert _sanitize_hints({"exclusive": True, "anchorIds": [1, "  "]}) == {}
+
+
+def test_hints_anchor_ids_caps():
+    out = _sanitize_hints({"anchorIds": [f"id-{i}" for i in range(50)] + ["x" * 500]})
+    assert len(out["anchorIds"]) == MAX_HINT_IDS
+    assert all(len(s) <= 128 for s in out["anchorIds"])

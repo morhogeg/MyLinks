@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, LocateFixed, Waypoints, X } from 'lucide-react';
-import { Link } from '@/lib/types';
-import { buildGraphModel, edgeReason, spacingScale, GraphModel, BuildSignal } from '@/lib/graph';
+import { AskHints, Link } from '@/lib/types';
+import { buildGraphModel, edgeReason, spacingScale, GraphModel, GraphNode, BuildSignal } from '@/lib/graph';
 import { getCategoryColorStyle } from '@/lib/colors';
 import { getDominantDirection } from '@/lib/rtl';
 import { hapticLight } from '@/lib/haptics';
@@ -99,9 +99,9 @@ export default function KnowledgeGraph({
     /** True when grid filters/search currently scope the pool. */
     filtered: boolean;
     onOpenCard: (link: Link) => void;
-    /** Hand a cluster to Ask Machina — question, the member titles as anchors,
-     *  and what to re-focus when the user comes BACK from Ask. */
-    onAskCluster?: (question: string, anchorTitles: string[], restore: GraphRestoreFocus) => void;
+    /** Hand a card group to Ask Machina — question, structured hints (exact
+     *  ids, exclusive grounding), and what to re-focus on return from Ask. */
+    onAskCluster?: (question: string, hints: AskHints, restore: GraphRestoreFocus) => void;
     /** The focus to re-apply after returning from Ask (see onAskCluster). */
     restoreFocus?: GraphRestoreFocus | null;
     /** Called once the restore has been applied (the owner clears it). */
@@ -612,17 +612,17 @@ export default function KnowledgeGraph({
         return { index: clusterFocus, label: cluster.label, members, why };
     }, [model, clusterFocus]);
 
-    // One cluster-scoped question for both entry points (selection panel and
-    // cluster panel): what TIES the cards together. The question must NAME the
-    // cards in quotes — quoted titles are the backend's anchor-pinning trigger
-    // AND the only phrasing the model can't reinterpret. A theme-only question
-    // ("my 2 cards about Data Interpretation") let the model pick whichever
-    // in-context cards IT thought matched the theme, and it answered about two
-    // entirely different cards (owner bug report, 2026-07-28).
-    const askAboutCluster = useCallback((clusterIndex: number, restore: GraphRestoreFocus) => {
-        if (!model || !onAskCluster || !model.clusters[clusterIndex]) return;
-        const cluster = model.clusters[clusterIndex];
-        const members = cluster.nodeIndices.map((i) => model.nodes[i]);
+    // One question builder for both entry points, over an EXPLICIT card set —
+    // and the set is always exactly what the open panel shows (owner bug:
+    // "ask about cluster" on a selected card sent its whole 6-card component
+    // while the panel showed 3, and the answer counted 6 and cited 7). The
+    // question NAMES the cards in quotes (quoted titles are the backend's
+    // anchor trigger and the only phrasing the model can't reinterpret), and
+    // the hints carry the exact ids with `exclusive` grounding, so the
+    // model's context IS the named set — it cannot miscount or cite a
+    // topic-matched stranger.
+    const askAboutCards = useCallback((members: GraphNode[], theme: string | null, restore: GraphRestoreFocus) => {
+        if (!onAskCluster || !members.length) return;
         // Internal double quotes would split the quoted span the backend
         // extracts; its title matching is punctuation-insensitive, so
         // dropping them loses nothing. Long titles truncate with an
@@ -640,21 +640,28 @@ export default function KnowledgeGraph({
                 : quoted.join(', ');
             question = `What connects ${list}?`;
         } else {
-            const theme = cluster.label ? ` about ${cluster.label.split(' · ')[0]}` : '';
-            question = `What connects my ${members.length} cards${theme}, like ${quote(titles[0])} and ${quote(titles[1])}?`;
+            const about = theme ? ` about ${theme.split(' · ')[0]}` : '';
+            question = `What connects my ${members.length} cards${about}, like ${quote(titles[0])} and ${quote(titles[1])}?`;
         }
-        onAskCluster(question, titles.slice(0, 8), restore);
-    }, [model, onAskCluster]);
+        onAskCluster(question, {
+            anchorTitles: titles.slice(0, 8),
+            anchorIds: members.slice(0, 20).map((m) => m.id),
+            exclusive: true,
+        }, restore);
+    }, [onAskCluster]);
 
     const askCluster = useCallback(() => {
         if (!clusterPanel) return;
-        askAboutCluster(clusterPanel.index, { clusterAnchorId: clusterPanel.members[0]?.id });
-    }, [clusterPanel, askAboutCluster]);
+        askAboutCards(clusterPanel.members, clusterPanel.label, { clusterAnchorId: clusterPanel.members[0]?.id });
+    }, [clusterPanel, askAboutCards]);
 
+    // The selection panel asks about the card AND the connections it lists —
+    // the ego network on screen — never the (possibly larger) component.
     const askSelection = useCallback(() => {
-        if (!selection) return;
-        askAboutCluster(selection.node.cluster, { selectedId: selection.node.id });
-    }, [selection, askAboutCluster]);
+        if (!selection || !model) return;
+        const members = [selection.node, ...selection.neighbors.map((nb) => model.nodes[nb.index])];
+        askAboutCards(members, selection.clusterLabel, { selectedId: selection.node.id });
+    }, [selection, model, askAboutCards]);
 
     const saveCluster = useCallback(async () => {
         if (!clusterPanel || !onSaveCluster || savingCluster) return;
@@ -854,7 +861,7 @@ export default function KnowledgeGraph({
                                         onClick={askSelection}
                                         className="flex-1 h-9 inline-flex items-center justify-center rounded-full bg-card border border-border-strong text-[13px] font-bold text-text hover:bg-card-hover active:scale-[0.98] transition-all cursor-pointer"
                                     >
-                                        Ask about cluster
+                                        Ask about these
                                     </button>
                                 )}
                             </div>
