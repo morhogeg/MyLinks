@@ -375,13 +375,17 @@ export async function buildGraphModel(
 }
 
 /**
- * Auto-name a cluster from what its cards actually share — the concept with the
- * widest coverage (plus a second when it genuinely co-defines the theme), falling
- * back to the dominant category. Deterministic, no model call; null when the
- * cluster is too small or too diffuse to name honestly.
+ * Auto-name a cluster from what its cards actually share. Preference order:
+ * a concept with wide coverage (plus a second when it genuinely co-defines
+ * the theme) → the dominant category (≥70%) → the single most common concept
+ * → the most common category. The tail of that chain is deliberately loose:
+ * EVERY island gets a caption (owner QA — unlabeled pairs looked broken and
+ * had no tap target for the cluster panel), and the caption doubles as the
+ * cluster's handle, so "roughly right" beats absent. Deterministic, no model
+ * call.
  */
 function clusterLabel(members: GraphNode[]): string | null {
-    if (members.length < 3) return null;
+    if (members.length < 2) return null;
     const counts = new Map<string, { display: string; count: number }>();
     for (const n of members) {
         for (const c of new Set((n.link.concepts ?? []).map((s) => s.trim()).filter(Boolean))) {
@@ -401,11 +405,12 @@ function clusterLabel(members: GraphNode[]): string | null {
         }
         return top.display;
     }
-    // No concept carries the room — fall back to a dominant category (≥70%).
     const byCategory = new Map<string, number>();
     for (const n of members) byCategory.set(n.category, (byCategory.get(n.category) ?? 0) + 1);
     const [cat, catCount] = [...byCategory.entries()].sort((a, b) => b[1] - a[1])[0];
-    return catCount >= members.length * 0.7 ? cat : null;
+    if (catCount >= members.length * 0.7) return cat;
+    if (top) return top.display;
+    return cat;
 }
 
 /**

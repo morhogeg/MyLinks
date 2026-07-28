@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUpRight, Maximize2, Waypoints, X } from 'lucide-react';
+import { ArrowUpRight, LocateFixed, Waypoints, X } from 'lucide-react';
 import { Link } from '@/lib/types';
 import { buildGraphModel, edgeReason, spacingScale, GraphModel, BuildSignal } from '@/lib/graph';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -543,7 +543,7 @@ export default function KnowledgeGraph({
             node,
             neighbors,
             clusterIndex: node.cluster,
-            clusterLabel: cluster && cluster.nodeIndices.length >= 3 ? cluster.label : null,
+            clusterLabel: cluster ? cluster.label : null,
         };
     }, [model, selected]);
 
@@ -697,7 +697,7 @@ export default function KnowledgeGraph({
                            desktop where the panel sits top-right. */
                         className="absolute top-3 end-3 sm:top-auto sm:bottom-3 w-9 h-9 rounded-full bg-card/90 backdrop-blur border border-border-subtle text-text-secondary hover:text-text hover:bg-card-hover flex items-center justify-center shadow-sm transition-colors cursor-pointer"
                     >
-                        <Maximize2 className="w-4 h-4" />
+                        <LocateFixed className="w-4 h-4" />
                     </button>
                 )}
 
@@ -758,27 +758,33 @@ export default function KnowledgeGraph({
                                     <X className="w-4 h-4" />
                                 </button>
                             </div>
-                            <div className="mt-2.5 flex gap-2">
-                                <button
-                                    onClick={() => onOpenCard(selection.node.link)}
-                                    className="flex-1 h-9 inline-flex items-center justify-center gap-1.5 rounded-full bg-accent text-accent-ink text-[13px] font-bold hover:bg-accent-hover active:scale-[0.98] transition-all cursor-pointer"
-                                >
-                                    Open card
-                                    <ArrowUpRight className="w-3.5 h-3.5" />
-                                </button>
-                                {onAskCluster && (
-                                    <button
-                                        onClick={askSelection}
-                                        className="flex-1 h-9 inline-flex items-center justify-center rounded-full bg-card border border-border-strong text-[13px] font-bold text-text hover:bg-card-hover active:scale-[0.98] transition-all cursor-pointer"
-                                    >
-                                        Ask about this
-                                    </button>
-                                )}
-                            </div>
+                            {/* One quiet, full-width action for the card itself.
+                                Ask lives on the Connections header below —
+                                sitting beside the title it read as "ask about
+                                this one card" when it actually asks about the
+                                whole neighborhood (owner QA); position now
+                                states the scope. */}
+                            <button
+                                onClick={() => onOpenCard(selection.node.link)}
+                                className="mt-2.5 w-full h-9 inline-flex items-center justify-center gap-1.5 rounded-full bg-card border border-border-strong text-[13px] font-bold text-text hover:bg-card-hover active:scale-[0.98] transition-all cursor-pointer"
+                            >
+                                Open card
+                                <ArrowUpRight className="w-3.5 h-3.5" />
+                            </button>
                         </div>
-                        <p className="px-3 sm:px-3.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-text-muted">
-                            Connections · {selection.neighbors.length}
-                        </p>
+                        <div className="flex items-center justify-between px-3 sm:px-3.5 pb-1">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
+                                Connections · {selection.neighbors.length}
+                            </p>
+                            {onAskCluster && (
+                                <button
+                                    onClick={askSelection}
+                                    className="text-[12px] font-bold text-accent hover:text-accent-hover transition-colors cursor-pointer"
+                                >
+                                    Ask about all
+                                </button>
+                            )}
+                        </div>
                         <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2 space-y-0.5">
                             {selection.neighbors.map((nb) => (
                                 <div key={nb.link.id} className="flex items-stretch gap-0.5">
@@ -1173,14 +1179,14 @@ function draw(
     ctx.lineWidth = 3;
     for (let c = 0; c < model.clusters.length; c++) {
         const cluster = model.clusters[c];
-        if (!cluster.label || cluster.nodeIndices.length < 3) continue;
+        if (!cluster.label) continue;
         let sumX = 0;
         let minY = Infinity;
         for (const i of cluster.nodeIndices) {
             sumX += nodes[i].x;
             minY = Math.min(minY, nodes[i].y - nodes[i].r);
         }
-        const sx = (sumX / cluster.nodeIndices.length) * cam.k + cam.x;
+        const rawX = (sumX / cluster.nodeIndices.length) * cam.k + cam.x;
         const sy = (minY * cam.k + cam.y) - 14;
         let alpha = 0.75;
         if (lit) alpha = 0.12;
@@ -1189,6 +1195,11 @@ function draw(
         const focusedCaption = state.clusterFocus === c;
         const label = cluster.label.toUpperCase();
         const tw = ctx.measureText(label).width;
+        // Nudge a caption whose island sits near a border back inside — same
+        // rule as node labels; a clipped theme name reads as a glitch.
+        const sx = rawX > 0 && rawX < viewW
+            ? Math.min(Math.max(rawX, tw / 2 + 8), viewW - tw / 2 - 8)
+            : rawX;
         ctx.strokeStyle = rgba(hexToRgb(palette.card), alpha * 0.7);
         ctx.strokeText(label, sx, sy);
         ctx.fillStyle = rgba(hexToRgb(focusedCaption ? palette.text : palette.textSecondary), alpha);
