@@ -115,10 +115,25 @@ export default function SimpleMarkdown({ content, className = '', isCompact = fa
         // If compact mode and text looks like multiple sentences without breaks, split them
         if (isCompact && trimmed.includes('. ') && !trimmed.includes('\n')) {
             // Split by period + space, but keep the period
-            const sentences = trimmed.split(/(\. )/g).reduce((acc: string[], part, i, arr) => {
+            const raw = trimmed.split(/(\. )/g).reduce((acc: string[], part, i, arr) => {
                 if (i % 2 === 0) {
                     const sentence = part + (arr[i + 1] || '');
                     if (sentence.trim()) acc.push(sentence.trim());
+                }
+                return acc;
+            }, []);
+            // Re-join false splits: a fragment ending in an abbreviation ("St.
+            // Brigid's butter" broke here — owner card, 2026-07-28), or one that
+            // leaves a **bold span** open — splitting inside it orphans the
+            // markers and they render as literal asterisks in both halves.
+            const ABBREV_END = /\b(?:St|Dr|Mr|Mrs|Ms|Prof|Sr|Jr|vs|No|approx|e\.g|i\.e|etc)\.$/i;
+            const sentences = raw.reduce((acc: string[], part) => {
+                const prev = acc[acc.length - 1];
+                const openBold = prev !== undefined && (prev.split('**').length - 1) % 2 === 1;
+                if (prev !== undefined && (openBold || ABBREV_END.test(prev))) {
+                    acc[acc.length - 1] = `${prev} ${part}`;
+                } else {
+                    acc.push(part);
                 }
                 return acc;
             }, []);

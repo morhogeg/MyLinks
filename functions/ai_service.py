@@ -777,6 +777,29 @@ class GeminiService:
             data["tags"] = kept
         return data
 
+    @staticmethod
+    def _same_script_tags(existing_tags: list, content_text: str) -> list:
+        """Offer the model only vocabulary matching the content's script.
+
+        Companion to _enforce_tag_language: the backstop DROPS wrong-language
+        reuse after the fact, but when the whole vocabulary is Hebrew and the
+        content is English the model reused Hebrew anyway and the card ended
+        up with ZERO tags (owner card, 2026-07-28). Filtering the offered list
+        up front removes the temptation, so the model generates fresh
+        same-language tags instead. Script detection on the content sample:
+        any Hebrew character → Hebrew content (Hebrew text often embeds Latin
+        brand names, so a ratio test would misfire; a pure-English text
+        contains no Hebrew at all).
+        """
+        if not existing_tags:
+            return existing_tags
+        has_hebrew = re.compile("[\\u0590-\\u05FF]").search
+        content_hebrew = bool(has_hebrew(content_text or ""))
+        return [
+            t for t in existing_tags
+            if isinstance(t, str) and bool(has_hebrew(t)) == content_hebrew
+        ]
+
     def analyze_text(self, text: str, existing_tags: list = None, content_type: str = None,
                      attempts: int = _MAX_GENERATE_ATTEMPTS) -> dict:
         """Analyze text content using Gemini. Raises AnalysisError on failure.
@@ -787,6 +810,7 @@ class GeminiService:
         (synchronous callers pass 2 to stay under the 60s budget).
         """
         clean_text = text[:30000]
+        existing_tags = self._same_script_tags(existing_tags, clean_text)
         tags_context = (
             f"\n\nExisting Tags in Brain (Reuse ONLY those in the content's language):\n{', '.join(existing_tags)}"
             if existing_tags else ""
@@ -834,6 +858,7 @@ class GeminiService:
         from google.genai import types
 
         clean_text = text[:30000]
+        existing_tags = self._same_script_tags(existing_tags, clean_text)
         tags_context = (
             f"\n\nExisting Tags in Brain (Reuse ONLY those in the content's language):\n{', '.join(existing_tags)}"
             if existing_tags else ""
