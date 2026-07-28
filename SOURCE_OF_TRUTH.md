@@ -907,6 +907,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 — Search now covers TAGS + a "Tags" typeahead row** (branch
+  `claude/hebrew-nutrition-tag-search-f01fbb`). Owner bug: a card tagged
+  `תזונה` was unfindable by searching that exact word — the 2026-07-17 search
+  rebuild matched only title+summary, and the summary held only the adjective
+  form `התזונתית` (not a substring hit). Fix in `web/lib/searchMatch.ts`: tags
+  join the per-card normalized text and rank at the title tier (a tag is a
+  curated label — typing it is typing the card's own word). `useFeedFilters`
+  gained `matchingTags` (tags containing every query token, ranked by count,
+  cap 8), and Feed renders it as a **Tags** chip row under the existing Sources
+  typeahead row — tap applies the tag filter and clears the query, same
+  gesture as Sources. Microcopy: empty state now says "titles, tags, and
+  summaries"; the dead-end button reads **"Clear search"** when a query is
+  active (still "Clear filters" otherwise). Verified: `tsc --noEmit` clean +
+  a tsx harness on the real card (query `תזונה` → titleHit, `תזונה ילדים` →
+  titleHit, control word → null). Not render-verified in a browser.
 - **2026-07-28 — Review's right swipe means KEEP again, not "favorite"** (branch
   `claude/review-view-swipe-behavior-efa5ee`). Owner: the deck's setup reads as
   confusing — right swipe should simply keep the card where it is. It was

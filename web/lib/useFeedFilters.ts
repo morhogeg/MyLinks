@@ -3,7 +3,7 @@ import { Link } from '@/lib/types';
 import { getSourceInfo, buildSourceFacets, sourceMatchesQuery } from '@/lib/source';
 import { PLATFORM_LABELS, type PlatformKey } from '@/lib/platform';
 import { isPending, getTimestampNumber } from '@/lib/feedUtils';
-import { tokenizeSearch, matchCard } from '@/lib/searchMatch';
+import { tokenizeSearch, matchCard, normalizeSearchText } from '@/lib/searchMatch';
 
 export type FilterType = 'all' | 'unread' | 'read' | 'archived' | 'favorite' | 'reminders' | 'private';
 export type SortType = 'date-desc' | 'date-asc' | 'title-asc' | 'category';
@@ -295,6 +295,21 @@ export function useFeedFilters(
         [searchQuery, sourceFacets]
     );
 
+    // Search "Tags" suggestions — same pattern as Sources: tags whose name
+    // contains every query word, ranked by card count, tap to filter.
+    const matchingTags = useMemo(() => {
+        const tokens = tokenizeSearch(searchQuery);
+        if (tokens.length === 0) return [] as { tag: string; count: number }[];
+        return allTags
+            .filter(tag => {
+                const norm = normalizeSearchText(tag);
+                return tokens.every(t => norm.includes(t));
+            })
+            .map(tag => ({ tag, count: tagCounts[tag] ?? 0 }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 8);
+    }, [searchQuery, allTags, tagCounts]);
+
     const reminderCount = useMemo(
         () => contentLinks.filter(l => l.reminderStatus === 'pending').length,
         [contentLinks]
@@ -318,6 +333,7 @@ export function useFeedFilters(
         handleToggleSource,
         handleToggleSourceKeys,
         matchingSources,
+        matchingTags,
         reminderCount,
     };
 }
