@@ -1065,6 +1065,22 @@ exact-match, capped.
   `allowedDevOrigins: ["127.0.0.1"]` to `next.config.ts` (revert after). Also
   note `AuthGate` swaps EVERY non-public route for the LoginScreen, so a
   throwaway preview route must be added to `PUBLIC_ROUTES` to render at all.
+- **2026-07-28 — Tag round 3: vocabulary pre-filter + abbreviation-safe card
+  markdown (`3045a44`; functions run #62 green, Vercel auto, TestFlight #230 /
+  build 1230 green).** Owner re-saved the recipe card on the #61 revision:
+  ZERO tags (the backstop stripped the all-Hebrew reuse) and broken `**` in
+  the summary. (1) `_same_script_tags` now filters the offered Existing-Tags
+  list to the CONTENT's script before the prompt (text + text+image paths;
+  youtube/image have no pre-call text and keep backstop-only) — English
+  content never sees Hebrew vocabulary, so the model generates fresh
+  same-language tags instead of reusable-then-stripped ones. (2) The
+  "St. Brigid's butter" mystery resolved: the SOURCE post really says that
+  (owner confirmed) — the bug was SimpleMarkdown's compact sentence splitter
+  breaking at the abbreviation period INSIDE a bold span, orphaning the `**`
+  in both halves. False splits are now re-joined when the previous fragment
+  ends in a known abbreviation (St/Dr/Mr/…/e.g/i.e/etc) or leaves a `**` span
+  open; verified by running the literal broken summary through the new
+  reduce. Owner: re-save the card once more to see English tags + clean bold.
 - **2026-07-28 — Tag language enforced in CODE (`4ecea70`, run #61 green) —
   the prompt rule alone was not obeyed.** After run #60 shipped the f3055f8
   prompt fix, the owner re-saved the same English recipe card on the new
