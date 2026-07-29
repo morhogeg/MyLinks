@@ -842,11 +842,21 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         setViewMode('ask');
     }, []);
     // An answer's "Graph" chip: open the Graph focused on the chat's origin
-    // cluster (graph-born chats) or the cited card's neighborhood.
-    const handleOpenGraphFocus = useCallback((focus: import('./KnowledgeGraph').GraphRestoreFocus) => {
+    // cluster (graph-born chats) or the cited card's neighborhood. The chat id
+    // rides along so the graph can offer a way BACK into that conversation —
+    // leaving Ask unmounts it, and the Ask tab is deliberately blank-slate.
+    const [graphFromChat, setGraphFromChat] = useState<string | null>(null);
+    const [askOpenChat, setAskOpenChat] = useState<{ id: string; nonce: number } | null>(null);
+    const handleOpenGraphFocus = useCallback((focus: import('./KnowledgeGraph').GraphRestoreFocus, fromChatId: string | null) => {
         setGraphRestore(focus);
+        setGraphFromChat(fromChatId);
         setViewMode('graph');
     }, []);
+    const handleBackToAsk = useCallback(() => {
+        if (!graphFromChat) return;
+        setAskOpenChat((prev) => ({ id: graphFromChat, nonce: (prev?.nonce ?? 0) + 1 }));
+        setViewMode('ask');
+    }, [graphFromChat]);
     // A graph hand-off is for ONE Ask entry. Clear it the moment Ask is left,
     // so no later entrance (tab bar, toolbar, push intent) can replay the
     // question — AskBrain's consumed-nonce guard resets on unmount, so the
@@ -854,7 +864,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // graphRestore survives this: the graph consumes it on return.
     const prevViewMode = useRef(viewMode);
     useEffect(() => {
-        if (prevViewMode.current === 'ask' && viewMode !== 'ask') setGraphAsk(null);
+        // Both Ask hand-offs are single-use. AskBrain's consumed-nonce guards
+        // are refs that reset when it unmounts, so a payload left in Feed
+        // state would re-fire on the next entry (the round-13 replay bug).
+        if (prevViewMode.current === 'ask' && viewMode !== 'ask') {
+            setGraphAsk(null);
+            setAskOpenChat(null);
+        }
+        // Leaving the graph retires the Ask return path: a later graph entry
+        // from the library must not offer "Back to Ask" to a stale chat.
+        // (handleBackToAsk has already captured the id by the time this runs.)
+        if (prevViewMode.current === 'graph' && viewMode !== 'graph') setGraphFromChat(null);
         prevViewMode.current = viewMode;
     }, [viewMode]);
     // Graph → Collections: keep a cluster as a real collection.
@@ -1263,6 +1283,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
             // sidebar, and a mid-stream answer still lands in its chat doc.
             setGraphAsk(null);
             setGraphRestore(null);
+            setAskOpenChat(null);
             setViewMode('ask');
         }
         else setViewMode('digest');
@@ -1795,7 +1816,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 data-tour="ask"
                                 // Blank-slate entrance, same as the mobile tab
                                 // (clears a pending graph hand-off — see selectTab).
-                                onClick={() => { setGraphAsk(null); setGraphRestore(null); setViewMode('ask'); }}
+                                onClick={() => { setGraphAsk(null); setGraphRestore(null); setAskOpenChat(null); setViewMode('ask'); }}
                                 title="Ask your brain"
                                 aria-label="Ask your brain"
                                 className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
@@ -2368,6 +2389,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             links={visibleLinks}
                             initialAsk={graphAsk}
                             onOpenGraphFocus={handleOpenGraphFocus}
+                            openChatId={askOpenChat}
                         />
                     ) : filteredLinks.length === 0 && pendingCards.length === 0 ? (
                         (() => {
@@ -2492,6 +2514,7 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             restoreFocus={graphRestore}
                             onRestoreConsumed={() => setGraphRestore(null)}
                             onSaveCluster={handleSaveCluster}
+                            onBackToAsk={graphFromChat ? handleBackToAsk : undefined}
                         />
                     ) : viewMode === 'review' ? (
                         <SwipeDeck

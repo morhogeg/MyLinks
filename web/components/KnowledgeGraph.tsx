@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUpRight, LocateFixed, Waypoints, X } from 'lucide-react';
+import { ArrowUpRight, ChevronLeft, LocateFixed, Waypoints, X } from 'lucide-react';
 import { AskHints, Link } from '@/lib/types';
 import { buildGraphModel, edgeReason, spacingScale, GraphModel, GraphNode, BuildSignal } from '@/lib/graph';
 import { getCategoryColorStyle } from '@/lib/colors';
@@ -91,6 +91,7 @@ export default function KnowledgeGraph({
     restoreFocus,
     onRestoreConsumed,
     onSaveCluster,
+    onBackToAsk,
 }: {
     /** The card pool (already privacy-filtered by the Feed). */
     links: Link[];
@@ -108,6 +109,9 @@ export default function KnowledgeGraph({
     onRestoreConsumed?: () => void;
     /** Save a cluster's members as a new collection; resolves true on success. */
     onSaveCluster?: (name: string, linkIds: string[]) => Promise<boolean>;
+    /** Present only when the Graph was opened FROM an Ask answer — returns to
+     *  that conversation (leaving Ask unmounted it, so this reopens it). */
+    onBackToAsk?: () => void;
 }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -144,6 +148,9 @@ export default function KnowledgeGraph({
     // Screen-space rects of the island captions drawn last frame, for tap tests.
     const captionRectsRef = useRef<{ x1: number; y1: number; x2: number; y2: number; cluster: number }[]>([]);
     const openRef = useRef(onOpenCard);
+    // Chrome the label pass must avoid (see draw()).
+    const backPillRef = useRef(false);
+    backPillRef.current = !!onBackToAsk;
     const restoreRef = useRef<GraphRestoreFocus | null>(restoreFocus ?? null);
     restoreRef.current = restoreFocus ?? restoreRef.current;
     const onRestoreConsumedRef = useRef(onRestoreConsumed);
@@ -337,6 +344,7 @@ export default function KnowledgeGraph({
                     hover: hoverRef.current,
                     categoryFocus: focusRef.current,
                     clusterFocus: clusterFocusRef.current,
+                    backPill: backPillRef.current,
                 });
             }
         };
@@ -776,6 +784,21 @@ export default function KnowledgeGraph({
                     aria-label="Knowledge graph of your saved cards and their connections"
                 />
 
+                {/* Back to the Ask conversation that opened this view. Floats
+                    over the canvas in the same material as the re-fit control,
+                    at the opposite corner so the two never collide on either
+                    breakpoint. Only present on the Ask → Graph path. */}
+                {onBackToAsk && (
+                    <button
+                        onClick={onBackToAsk}
+                        aria-label="Back to the chat"
+                        className="absolute top-3 start-3 z-10 inline-flex items-center gap-1 h-9 ps-2 pe-3.5 rounded-full bg-card/90 backdrop-blur border border-border-subtle text-text-secondary hover:text-text hover:bg-card-hover shadow-sm transition-colors cursor-pointer"
+                    >
+                        <ChevronLeft className="w-4 h-4 shrink-0 rtl:rotate-180" />
+                        <span className="text-[13px] font-semibold">Back to Ask</span>
+                    </button>
+                )}
+
                 {/* Re-fit control */}
                 {model && !showLoading && !showEmpty && (
                     <button
@@ -1125,7 +1148,7 @@ function draw(
     model: GraphModel,
     cam: Camera,
     palette: Palette,
-    state: { selected: number | null; hover: number | null; categoryFocus: string | null; clusterFocus: number | null },
+    state: { selected: number | null; hover: number | null; categoryFocus: string | null; clusterFocus: number | null; backPill?: boolean },
 ): CaptionRect[] {
     const ctx = canvas.getContext('2d');
     if (!ctx) return [];
@@ -1246,6 +1269,10 @@ function draw(
             ? { x1: viewW - 60, y1: viewH - 60, x2: viewW - 4, y2: viewH - 4 }
             : { x1: viewW - 60, y1: 4, x2: viewW - 4, y2: 60 },
     ];
+    if (state.backPill) {
+        // "Back to Ask" pill, top-start (mirrors its absolute placement).
+        placed.push({ x1: 4, y1: 4, x2: 160, y2: 56 });
+    }
     if (state.selected !== null || state.clusterFocus !== null) {
         placed.push(isDesktop
             // Mirrors the panel's own sizing (sm:w-[330px] at end-3 / the

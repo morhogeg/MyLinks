@@ -1021,6 +1021,23 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 (same session, round 16) — "Back to Ask" closes the graph⇄Ask
+  loop (owner: after the answer's Graph chip, you're stranded).** Leaving Ask
+  UNMOUNTS the chat and the Ask tab is deliberately blank-slate (round 13), so
+  "back" had to reopen the SPECIFIC conversation: the Graph chip now passes its
+  chat id (`onOpenGraphFocus(focus, fromChatId)`), Feed holds it as
+  `graphFromChat`, and the graph renders a **"Back to Ask" pill** — top-start
+  of the canvas, same material as the re-fit control (opposite corner on BOTH
+  breakpoints, so they never collide), ChevronLeft with `rtl:rotate-180`. It
+  hands back via `askOpenChat` {id, nonce} → AskBrain's new `openChatId` prop,
+  whose effect waits for `chatsLoaded` then `selectChat(id)`. **Replay guard
+  (the round-13 bug class):** AskBrain's consumed-nonce refs die on unmount, so
+  Feed clears `askOpenChat` on leaving Ask AND on both blank-slate entrances;
+  `graphFromChat` clears on leaving the graph, so a later library→graph entry
+  shows no stale pill. The pill's rect joins the label-culling reserve list.
+  Verified: tsc 0; Playwright iPhone-390 dark + 1440 light — pill renders,
+  fires, no label collisions, zero console errors. Frontend-only → Vercel +
+  TestFlight.
 - **2026-07-28 (same session, round 15) — cluster why-copy de-duplicated +
   answer structure ENFORCED at the suffix (owner QA round 6).** (1) The
   why-line said "linked by Geopolitics and Sovereignty" under a label reading
