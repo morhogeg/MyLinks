@@ -1021,6 +1021,16 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-28 (same session, round 17) — cluster panel action row evened out
+  (owner design QA).** Order swapped (**Save as collection** left, **Ask about
+  this** right) and Ask lost its filled accent fill for the same quiet
+  bordered pill — the cluster panel now matches the selection panel's
+  two-equal-pills row exactly, and no filled button competes with the panel
+  title. Reading order ends on the action that leaves the graph. Verified: tsc
+  0; Playwright iPhone-390 light — DOM order `[Save as collection, Ask about
+  this]`, both quiet, zero console errors. (Same capture incidentally
+  re-confirms round 15's why-line dedup: a label-covered cluster now reads
+  just "2 cards".) Frontend-only → Vercel + TestFlight.
 - **2026-07-28 (same session, round 16) — "Back to Ask" closes the graph⇄Ask
   loop (owner: after the answer's Graph chip, you're stranded).** Leaving Ask
   UNMOUNTS the chat and the Ask tab is deliberately blank-slate (round 13), so
