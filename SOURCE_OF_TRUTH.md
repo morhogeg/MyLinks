@@ -1021,6 +1021,20 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-29 — TestFlight 90382 daily upload limit hit (rounds 16–17 are web-
+  only for now).** Runs **#246 (`4bc9afb`, Back to Ask) and #247 (`a2ef9b4`,
+  cluster button row) both FAILED at upload** — App Store Connect error
+  **90382, "Upload limit reached"**. NOT a code failure: both compiled,
+  archived and exported the IPA fine; only the ASC upload was rejected. Cause:
+  16 builds today (1232→1247) exhausted the per-app daily quota — same incident
+  as 2026-07-26 (builds 1207/1208), which cleared in ~4h. **Live state:** all
+  code is merged to `main` and **live on Vercel**; **all Cloud Functions
+  deploys are green** (separate pipeline, unaffected). **Last good TestFlight
+  build is 1245** (`f2eca0c`) = everything through round 15. Missing from iOS
+  only: round 16 (Back to Ask) + round 17 (cluster action row). **Do NOT spam
+  re-triggers** — each burns a macOS runner and re-fails until the window
+  resets; one retry after the limit clears picks up main HEAD and supersedes
+  both.
 - **2026-07-28 (same session, round 17) — cluster panel action row evened out
   (owner design QA).** Order swapped (**Save as collection** left, **Ask about
   this** right) and Ask lost its filled accent fill for the same quiet
