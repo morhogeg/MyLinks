@@ -1,0 +1,497 @@
+import React from 'react';
+import {
+  Clock,
+  Home,
+  Layers,
+  MessagesSquare,
+  Newspaper,
+  Plus,
+  Search,
+  Sparkles,
+  StickyNote,
+  Image as ImageIcon,
+  Waypoints,
+} from 'lucide-react';
+import { T, categoryColor } from '../theme';
+import { sans } from '../fonts';
+import { CitationGlyph, Wordmark } from './Brand';
+import type { Card } from '../data/library';
+
+/**
+ * Machina's screen furniture, rebuilt from the shipped components
+ * (`Card.tsx`, `BottomTabBar.tsx`, `AskBrain.tsx`) with the same radii, type
+ * scale, chips and hairlines. Where the app uses a Tailwind token, this uses the
+ * token's value from `theme.ts`.
+ */
+
+export const Screen: React.FC<{ children: React.ReactNode; style?: React.CSSProperties }> = ({
+  children,
+  style,
+}) => (
+  <div
+    style={{
+      position: 'absolute',
+      inset: 0,
+      background: T.background,
+      color: T.text,
+      fontFamily: sans,
+      overflow: 'hidden',
+      ...style,
+    }}
+  >
+    {children}
+  </div>
+);
+
+/** The app header: the bare brand lockup, search, avatar, and the hairline glow. */
+export const AppHeader: React.FC<{ title?: string; showSearch?: boolean }> = ({
+  title,
+  showSearch = true,
+}) => (
+  <div
+    style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      paddingTop: 54,
+      background: 'rgba(5,5,5,0.85)',
+      backdropFilter: 'blur(20px)',
+      zIndex: 40,
+    }}
+  >
+    <div
+      style={{
+        height: 50,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 18px',
+      }}
+    >
+      {title ? (
+        <span style={{ fontSize: 19, fontWeight: 700, letterSpacing: '-0.02em' }}>{title}</span>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: T.text }}>
+          <CitationGlyph style={{ width: 13, height: 15 }} />
+          <Wordmark style={{ height: 11, width: 'auto', opacity: 0.95 }} />
+        </div>
+      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        {showSearch && <Search size={19} color={T.textSecondary} strokeWidth={2} />}
+        <div
+          style={{
+            width: 27,
+            height: 27,
+            borderRadius: 27,
+            background: 'linear-gradient(140deg, #3a3a44, #22222a)',
+            border: `1px solid ${T.borderStrong}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 11,
+            fontWeight: 700,
+            color: T.textSecondary,
+          }}
+        >
+          M
+        </div>
+      </div>
+    </div>
+    <div
+      style={{
+        height: 1,
+        background: T.accentGradient,
+        opacity: 0.3,
+      }}
+    />
+  </div>
+);
+
+/** The bottom tab bar — 44px row, four tabs around the center capture action. */
+export const TabBar: React.FC<{ active?: 'home' | 'collections' | 'ask' | 'digest' }> = ({
+  active = 'home',
+}) => {
+  const tabs = [
+    { key: 'home', label: 'Home', Icon: Home },
+    { key: 'collections', label: 'Collections', Icon: Layers },
+    { key: 'ask', label: 'Ask', Icon: MessagesSquare },
+    { key: 'digest', label: 'Digest', Icon: Newspaper },
+  ] as const;
+
+  const Tab: React.FC<{ t: (typeof tabs)[number] }> = ({ t }) => {
+    const on = active === t.key;
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 2,
+          minWidth: 58,
+          height: '100%',
+          color: on ? T.accent : T.tabbarInactive,
+        }}
+      >
+        <t.Icon size={20} strokeWidth={2} />
+        <span style={{ fontSize: 10, fontWeight: 600, lineHeight: 1 }}>{t.label}</span>
+      </div>
+    );
+  };
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        paddingBottom: 22,
+        background: 'rgba(5,5,5,0.85)',
+        backdropFilter: 'blur(20px)',
+        borderTop: `1px solid ${T.border}`,
+        zIndex: 50,
+      }}
+    >
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: T.accentGradient, opacity: 0.3 }} />
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-around',
+          height: 44,
+          padding: '0 4px',
+        }}
+      >
+        <Tab t={tabs[0]} />
+        <Tab t={tabs[1]} />
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            flexShrink: 0,
+            borderRadius: 40,
+            background: T.accentGradient,
+            color: T.accentInk,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: `0 8px 22px -6px ${T.accentRing}`,
+          }}
+        >
+          <Plus size={20} strokeWidth={2.4} />
+        </div>
+        <Tab t={tabs[2]} />
+        <Tab t={tabs[3]} />
+      </div>
+    </div>
+  );
+};
+
+/** Category chip — `text-[10px] uppercase font-black tracking-widest`, hashed color. */
+export const CategoryChip: React.FC<{ category: string }> = ({ category }) => {
+  const c = categoryColor(category);
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        textTransform: 'uppercase',
+        fontWeight: 900,
+        letterSpacing: '0.1em',
+        padding: '4px 8px',
+        borderRadius: 8,
+        background: c.bg,
+        color: c.fg,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {category}
+    </span>
+  );
+};
+
+export const TagChip: React.FC<{ tag: string }> = ({ tag }) => {
+  const parts = tag.split('/');
+  const leaf = parts[parts.length - 1];
+  const parents = parts.slice(0, -1).join('/');
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        fontSize: 9,
+        fontWeight: 900,
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+        padding: '2px 6px',
+        borderRadius: 6,
+        background: T.fillSubtle,
+        color: 'rgba(102,102,102,0.85)',
+      }}
+    >
+      {parents && <span style={{ opacity: 0.4, fontWeight: 400, marginRight: 2 }}>{parents}/</span>}
+      {leaf}
+    </span>
+  );
+};
+
+const SourceByline: React.FC<{ card: Card }> = ({ card }) => {
+  if (card.sourceKind === 'x') {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'rgba(102,102,102,0.7)' }}>
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M18.9 2H22l-7 8 7.6 12h-6.2l-4.9-7.7L5.9 22H2.8l7.3-8.4L2.8 2H9l4.6 7.2L18.9 2Z" />
+        </svg>
+        {card.source}
+      </span>
+    );
+  }
+  if (card.sourceKind === 'screenshot') {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, letterSpacing: '0.02em', color: 'rgba(102,102,102,0.8)' }}>
+        <ImageIcon size={11} />
+        Screenshot
+      </span>
+    );
+  }
+  return (
+    <span style={{ fontSize: 11, color: 'rgba(102,102,102,0.7)' }}>{card.source}</span>
+  );
+};
+
+/**
+ * A feed card. Anatomy follows `Card.tsx`: rounded-[20px] on bg-card with
+ * --shadow-card, a chrome row (category ↔ source), then title, summary, and a
+ * footer above a hairline holding tags, your note, and the metadata row.
+ */
+export const AppCard: React.FC<{
+  card: Card;
+  /** 0–1 entrance progress (fade + lift), matching animate-card-enter. */
+  enter?: number;
+  /** Highlight ring, for the search-hit and citation-target beats. */
+  highlight?: number;
+  style?: React.CSSProperties;
+}> = ({ card, enter = 1, highlight = 0, style }) => (
+  <div
+    style={{
+      background: T.card,
+      borderRadius: 20,
+      border: `1px solid ${highlight > 0 ? `rgba(233,233,242,${0.06 + highlight * 0.34})` : T.border}`,
+      boxShadow:
+        highlight > 0
+          ? `${T.shadowCard}, 0 0 ${18 + highlight * 26}px -6px rgba(174,184,206,${0.1 + highlight * 0.35})`
+          : T.shadowCard,
+      padding: 16,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 12,
+      opacity: enter,
+      transform: `translateY(${(1 - enter) * 16}px) scale(${0.985 + enter * 0.015})`,
+      ...style,
+    }}
+  >
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 22 }}>
+      <CategoryChip category={card.category} />
+      <SourceByline card={card} />
+    </div>
+
+    <h3
+      style={{
+        margin: 0,
+        fontSize: 16,
+        fontWeight: 700,
+        lineHeight: 1.2,
+        letterSpacing: '-0.015em',
+        color: T.text,
+      }}
+    >
+      {card.title}
+    </h3>
+
+    <p
+      style={{
+        margin: 0,
+        fontSize: 12.5,
+        lineHeight: 1.5,
+        color: T.textSecondary,
+      }}
+    >
+      {card.summary}
+    </p>
+
+    <div style={{ paddingTop: 12, borderTop: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {card.tags.map((t) => (
+          <TagChip key={t} tag={t} />
+        ))}
+      </div>
+
+      {card.note && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 6,
+            fontSize: 12,
+            lineHeight: 1.35,
+            fontStyle: 'italic',
+            color: 'rgba(160,160,160,0.9)',
+          }}
+        >
+          <StickyNote size={12} style={{ flexShrink: 0, marginTop: 2, opacity: 0.6 }} />
+          <span>{card.note}</span>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11, fontWeight: 500, color: 'rgba(102,102,102,0.6)' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <Clock size={11} />
+          {card.readTime}m
+        </span>
+        <span>{card.age}</span>
+      </div>
+    </div>
+  </div>
+);
+
+/** The search field, with an optional caret and a semantic-mode hint. */
+export const SearchField: React.FC<{ value: string; caret?: boolean; semantic?: number }> = ({
+  value,
+  caret = false,
+  semantic = 0,
+}) => (
+  <div
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 9,
+      height: 40,
+      padding: '0 13px',
+      borderRadius: 14,
+      background: T.card,
+      border: `1px solid ${semantic > 0 ? `rgba(233,233,242,${0.06 + semantic * 0.2})` : T.border}`,
+      boxShadow: semantic > 0 ? `0 0 22px -8px rgba(174,184,206,${0.4 * semantic})` : undefined,
+    }}
+  >
+    <Search size={15} color={T.textMuted} />
+    <span style={{ fontSize: 13.5, color: value ? T.text : T.textMuted, whiteSpace: 'nowrap' }}>
+      {value || 'Search your library'}
+      {caret && (
+        <span
+          style={{
+            display: 'inline-block',
+            width: 1.5,
+            height: 15,
+            background: T.accent,
+            marginLeft: 1,
+            verticalAlign: 'text-bottom',
+          }}
+        />
+      )}
+    </span>
+    {semantic > 0.4 && (
+      <span
+        style={{
+          marginLeft: 'auto',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          fontSize: 9,
+          fontWeight: 800,
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          color: T.accent,
+          background: 'rgba(233,233,242,0.10)',
+          border: '1px solid rgba(233,233,242,0.15)',
+          padding: '3px 6px',
+          borderRadius: 6,
+          opacity: (semantic - 0.4) / 0.6,
+        }}
+      >
+        <Sparkles size={9} />
+        Meaning
+      </span>
+    )}
+  </div>
+);
+
+/** A citation chip from the Ask answer — icon tile + source label + title. */
+export const CitationChip: React.FC<{
+  label: string;
+  title: string;
+  enter?: number;
+}> = ({ label, title, enter = 1 }) => (
+  <div
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 9,
+      padding: '7px 13px 7px 9px',
+      borderRadius: 12,
+      background: T.card,
+      border: `1px solid ${T.border}`,
+      boxShadow: '0 1px 2px rgba(0,0,0,0.4)',
+      opacity: enter,
+      transform: `translateY(${(1 - enter) * 10}px) scale(${0.96 + enter * 0.04})`,
+      maxWidth: '100%',
+    }}
+  >
+    <span
+      style={{
+        flexShrink: 0,
+        width: 26,
+        height: 26,
+        borderRadius: 9,
+        background: 'rgba(233,233,242,0.10)',
+        color: T.accent,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <CitationGlyph style={{ width: 11, height: 12 }} />
+    </span>
+    <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.02em', color: T.textMuted }}>
+        {label}
+      </span>
+      <span
+        style={{
+          fontSize: 12.5,
+          fontWeight: 500,
+          color: T.text,
+          lineHeight: 1.25,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          maxWidth: 250,
+        }}
+      >
+        {title}
+      </span>
+    </span>
+  </div>
+);
+
+/** The quiet dashed "Graph" chip the app appends to a cited answer. */
+export const GraphChip: React.FC<{ opacity?: number }> = ({ opacity = 1 }) => (
+  <span
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 5,
+      fontSize: 10.5,
+      fontWeight: 600,
+      letterSpacing: '0.02em',
+      color: T.textSecondary,
+      border: `1px dashed ${T.borderStrong}`,
+      borderRadius: 999,
+      padding: '4px 9px',
+      opacity,
+    }}
+  >
+    <Waypoints size={11} />
+    Graph
+  </span>
+);

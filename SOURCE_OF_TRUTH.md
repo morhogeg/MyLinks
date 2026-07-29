@@ -748,6 +748,15 @@ The multi-user auth work is **fully written but not live**:
 
 ### 🟢 P3 — product roadmap (post-launch)
 
+G0. **[x] Launch film built** *(2026-07-29 — `marketing/launch-clip/`, 67s
+    1920×1080 + `.srt`; details and the reuse caveats in §8 "Launch film").*
+    Open follow-ups, none blocking: **(a)** a 9:16 cut for
+    TikTok/Reels/Shorts — every scene reframes around `BASE_SCALE`/`BASE_Y` in
+    `src/film/anim.ts`, so a vertical composition is a reframe, not a rebuild;
+    **(b)** swap the endcard's closing line for the App Store badge once the
+    listing exists; **(c)** owner review of the score — the mix was verified by
+    per-bar RMS, not by ear (no audio device in the cloud sandbox).
+
 G1. **[ ] Category casing normalized at the SOURCE.** The Graph merges
     "Sports"/"sports" display-side (2026-07-28 round 3), but the backend still
     saves whatever casing the model emits, so facets/filters elsewhere can
@@ -1011,6 +1020,24 @@ the origin story (WhatsApp self-messages), the capture surface, and the free tie
 capture and ends on the knowledge graph on purpose) / promo text: "Machina reads everything you save — links, screenshots, videos — and
 answers questions from it, with sources."
 
+*Launch film (BUILT 2026-07-29):* `marketing/launch-clip/` — a 67s,
+1920×1080 film rendered from code (Remotion for picture, a dependency-free Node
+synth for the score), **superseding the "30-second screen-recorded demo"** in
+step (3) above: a recording needs a signed-in device with a real library, and this
+needs one command. It runs cold open → the generic pile that finds nothing →
+`[ MACHINA ]` → share sheet + the real five-phase pipeline → meaning-search →
+**Ask with three citation chips (the hero beat)** → the graph → digest → endcard.
+`npm run render` (see that folder's README). Three compositions ship: scored +
+captioned (the deliverable), silent + captioned (for a voice-over), and clean (no
+score, no captions — for social cuts; captions also emit as `.srt`). Two things to
+know before reusing it: the UI is **rebuilt from the shipped components**
+(`src/theme.ts` ports `globals.css` tokens, `src/ui/Brand.tsx` carries the real
+wordmark path data, the checklist is `web/lib/scanPhases.ts` verbatim) so it drifts
+if those change; and the endcard's last line (`Your knowledge, on iPhone.`) is the
+one slot meant to become a real App Store badge/URL once the listing is live —
+nothing in the film claims availability yet. The stills it renders double as the
+X-thread screenshots the posts above ask for.
+
 *Where to "advertise" for free:* X (primary), Product Hunt, Hacker News,
 r/PKMS + r/productivity (follow self-promo rules: give value first), Indie
 Hackers, a launch post on LinkedIn (the productivity-tools audience there is
@@ -1021,6 +1048,42 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-29 (later, separate session) — launch film built from code
+  (`marketing/launch-clip/`).** A 67s 1920×1080 launch clip, rendered rather than
+  edited: **Remotion** for picture, a **dependency-free Node synth** for the score,
+  and **`timeline.mjs` as the single source of truth for TIME** — 96 BPM, one bar =
+  2.5s = 75 frames, every scene boundary on a bar line, and the arrangement walks
+  the same bar map, so risers land on the bar before a cut and the sub thumps on
+  the frame the card lands. Nine scenes: cold open (the citation mark assembles) →
+  the generic un-branded pile that finds nothing → `[ MACHINA ]` (brackets open,
+  the name resolves between them) → capture (share sheet → the real five phases
+  from `lib/scanPhases.ts` → finished card) → meaning-search → **Ask + three
+  citation chips** → graph → digest → endcard. Fidelity is deliberate: `theme.ts`
+  ports `globals.css` tokens, `ui/Brand.tsx` carries the real wordmark/glyph path
+  data, type is the same self-hosted Geist — **so the film drifts if those change**
+  (noted in its README). Demo content is ONE coherent research trail so the beats
+  are honest: the Ask answer is genuinely assemblable from those three cards, and
+  the search query *"why cramming never sticks"* shares **not one word** with the
+  cards it retrieves, which is the only way that beat proves semantic search
+  instead of ⌘F. **Environment gotchas worth keeping** (all four cost real time):
+  Remotion can't download its own Chrome here (`remotion.media` not in the egress
+  allowlist) → `setBrowserExecutable` at the container's Playwright build, and it
+  must be the **headless-shell** binary because full `chrome` rejects the old
+  `--headless` flag; **TypeScript must be 5.x** (Remotion's esbuild loader calls
+  `typescript.sys`, absent from TS 7's `require` shape); fonts are
+  **base64-inlined with no `delayRender` gate** — Google Fonts is unreachable,
+  serving woff2 from `public/` stalled a frame ~500 in, and the rescue `setTimeout`
+  could never fire because **Remotion freezes page timers**, so the lesson is that
+  *any* pending `delayRender` on a page that wedges kills the whole render;
+  **concurrency 2**, since at 4 a page wedged around frame 512 while those same
+  frames render fine in isolation. Verified: `tsc` 0; 2025/2025 frames encoded
+  (67.56s, h264 + AAC); scene-by-scene still review at every beat; score checked
+  by per-bar RMS/peak (no clipping, DC ≈ 0, and the digest bar's earlier 4dB hole
+  filled so the exhale doesn't read as the music stopping). **Not verified by ear
+  — no audio device in the sandbox; owner should listen before publishing.**
+  Repo-only change (no app code, no deploy): `out/` and the 12MB `score.wav` are
+  gitignored because the synth is seeded and `npm run score` reproduces it
+  byte-identically.
 - **2026-07-29 — TestFlight 90382 daily upload limit hit (rounds 16–17 are web-
   only for now).** Runs **#246 (`4bc9afb`, Back to Ask) and #247 (`a2ef9b4`,
   cluster button row) both FAILED at upload** — App Store Connect error
