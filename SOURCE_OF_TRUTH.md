@@ -1034,7 +1034,16 @@ exact-match, capped.
   only: round 16 (Back to Ask) + round 17 (cluster action row). **Do NOT spam
   re-triggers** — each burns a macOS runner and re-fails until the window
   resets; one retry after the limit clears picks up main HEAD and supersedes
-  both.
+  both. **Retry log:** run **#248** (~1h later, 07:02Z) failed 90382 again —
+  the build itself was clean (all entitlement + URL-scheme tripwires passed;
+  it dies only at the ASC upload), so the window is longer than the ~4h of the
+  2026-07-26 incident. **GOTCHA worth keeping:** `git push -f origin
+  main:trigger/testflight` is a NO-OP when `trigger/testflight` already points
+  at main's SHA — no ref change, no push event, NO workflow run (it exits
+  "Everything up-to-date" and any `&& echo triggered` still prints, which is
+  how a 09:10Z "retry" silently launched nothing). To re-run the SAME code,
+  main HEAD must move first (a real commit, e.g. a doc update, or an empty
+  `--allow-empty` commit) — then push the trigger branch.
 - **2026-07-28 (same session, round 17) — cluster panel action row evened out
   (owner design QA).** Order swapped (**Save as collection** left, **Ask about
   this** right) and Ask lost its filled accent fill for the same quiet
