@@ -965,15 +965,12 @@ export default function KnowledgeGraph({
                                     <X className="w-4 h-4" />
                                 </button>
                             </div>
+                            {/* Two quiet pills, matching the selection panel's row
+                                (owner call): neither action outranks the other,
+                                and a filled button here read as the panel's
+                                headline. Save sits first, Ask last — the reading
+                                order ends on the action that leaves the graph. */}
                             <div className="mt-2.5 flex gap-2">
-                                {onAskCluster && (
-                                    <button
-                                        onClick={askCluster}
-                                        className="flex-1 h-9 inline-flex items-center justify-center gap-1.5 rounded-full bg-accent text-accent-ink text-[13px] font-bold hover:bg-accent-hover active:scale-[0.98] transition-all cursor-pointer"
-                                    >
-                                        Ask about this
-                                    </button>
-                                )}
                                 {onSaveCluster && (
                                     <button
                                         onClick={saveCluster}
@@ -981,6 +978,14 @@ export default function KnowledgeGraph({
                                         className="flex-1 h-9 inline-flex items-center justify-center gap-1.5 rounded-full bg-card border border-border-strong text-[13px] font-bold text-text hover:bg-card-hover active:scale-[0.98] transition-all cursor-pointer disabled:opacity-60 disabled:cursor-default"
                                     >
                                         {savedClusters.has(clusterPanel.index) ? 'Saved ✓' : savingCluster ? 'Saving…' : 'Save as collection'}
+                                    </button>
+                                )}
+                                {onAskCluster && (
+                                    <button
+                                        onClick={askCluster}
+                                        className="flex-1 h-9 inline-flex items-center justify-center gap-1.5 rounded-full bg-card border border-border-strong text-[13px] font-bold text-text hover:bg-card-hover active:scale-[0.98] transition-all cursor-pointer"
+                                    >
+                                        Ask about this
                                     </button>
                                 )}
                             </div>
