@@ -282,13 +282,18 @@ interface AskBrainProps {
      *  `restore` names the graph focus this conversation was born from (saved
      *  on the chat doc → sidebar badge + the answer's "Graph" chip). */
     initialAsk?: { question: string; hints?: AskHints; restore?: { selectedId?: string; clusterAnchorId?: string }; nonce: number } | null;
-    /** Open the Graph view focused on a card/cluster (the answer's "Graph" chip). */
-    onOpenGraphFocus?: (focus: { selectedId?: string; clusterAnchorId?: string }) => void;
+    /** Open the Graph view focused on a card/cluster (the answer's "Graph"
+     *  chip). `fromChatId` is the conversation being left, so the graph can
+     *  offer a way back INTO it (leaving Ask unmounts the chat). */
+    onOpenGraphFocus?: (focus: { selectedId?: string; clusterAnchorId?: string }, fromChatId: string | null) => void;
+    /** Reopen this saved conversation on entry — the graph's "Back to Ask".
+     *  Nonce-gated so one hand-back fires exactly once. */
+    openChatId?: { id: string; nonce: number } | null;
 }
 
 const HISTORY_COLLAPSE_KEY = 'askbrain:histcollapsed';
 
-export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayOpen = false, links, initialAsk, onOpenGraphFocus }: AskBrainProps) {
+export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayOpen = false, links, initialAsk, onOpenGraphFocus, openChatId }: AskBrainProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
@@ -633,6 +638,17 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
         }
         if (lastUser >= 0) pinQuestionToTop(lastUser, 'auto');
     };
+
+    // Hand-back from the Graph ("Back to Ask"): reopen the exact conversation
+    // that opened it. Waits for the chat list — selectChat resolves from it —
+    // and consumes each nonce once, so a later blank-slate entry stays blank.
+    const consumedOpenChat = useRef(0);
+    useEffect(() => {
+        if (!openChatId || !chatsLoaded || openChatId.nonce === consumedOpenChat.current) return;
+        consumedOpenChat.current = openChatId.nonce;
+        selectChat(openChatId.id);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [openChatId, chatsLoaded, chats]);
 
     const renameChat = (id: string, title: string) => {
         if (!uid) return;
@@ -1343,7 +1359,8 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                                     onClick={() => onOpenGraphFocus(
                                                         (chats.find(c => c.id === activeChatId)?.graphFocus
                                                             ?? convoRef.current.graphFocus)
-                                                        ?? { selectedId: m.sources![0].id })}
+                                                        ?? { selectedId: m.sources![0].id },
+                                                        activeChatId ?? convoRef.current.id)}
                                                     title="See these cards in the graph"
                                                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-dashed border-border-strong text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"
                                                 >
