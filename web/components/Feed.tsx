@@ -1754,10 +1754,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                 )}
 
 
-                {/* Row 2: Toolbar — filter / sort / source on the left, view & actions on the
-                    right. DESKTOP ONLY (mobile v4 moved all of this to the header
-                    glyphs + bottom bar); `hidden sm:flex` so it adds no empty row —
-                    or gap — on phones. */}
+                {/* Row 2: Toolbar. LEFT = everything that acts on the list you're
+                    looking at (search, filter, sources, sort, view switcher,
+                    select multiple); RIGHT = the destinations that LEAVE it
+                    (Ask, Collections, Digest, Notes). DESKTOP ONLY (mobile v4
+                    moved all of this to the header glyphs + bottom bar);
+                    `hidden sm:flex` so it adds no empty row — or gap — on
+                    phones, which is also why re-arranging inside this row
+                    cannot affect the iOS app. */}
                 {isLibraryView && (
                 <div className="hidden sm:flex flex-wrap items-center justify-between gap-y-3 gap-x-2 -mx-2 px-2 sm:mx-0 sm:px-0">
                     {/* Grid filters — inline on desktop/tablet; on mobile they move into the
@@ -1819,66 +1823,17 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             leadingIcon={<ArrowUpDown className="w-4 h-4 text-text-secondary" />}
                             options={sortOptions}
                         />
-                        </>)}
-                    </div>
 
-                    {/* (Mobile: the Filter funnel lives in the search row above. Desktop:
-                        the Filter button is in the left cluster of this row.) */}
-
-                    {/* Destinations. Mobile v4: these moved to the bottom tab bar —
-                        this row is now desktop-only (`hidden sm:contents` wrappers). */}
-                    <div className="flex items-center w-full gap-2 sm:w-auto">
-                        {/* Desktop: the original inline chips. */}
-                        <div className="hidden sm:contents">
-                            <button
-                                data-tour="collections"
-                                onClick={() => setViewMode('collections')}
-                                title="Browse collections"
-                                aria-label="Browse collections"
-                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
-                            >
-                                <Layers className="w-4 h-4" />
-                                <span>Collections</span>
-                            </button>
-                            {isLibraryView && (
-                            <button
-                                data-tour="ask"
-                                // Blank-slate entrance, same as the mobile tab
-                                // (clears a pending graph hand-off — see selectTab).
-                                onClick={() => { setGraphAsk(null); setGraphRestore(null); setAskOpenChat(null); setViewMode('ask'); }}
-                                title="Ask your brain"
-                                aria-label="Ask your brain"
-                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
-                            >
-                                <MessagesSquare className="w-4 h-4" />
-                                <span>Ask</span>
-                            </button>
-                            )}
-                            <button
-                                onClick={() => setViewMode('digest')}
-                                title="Your curated digests"
-                                aria-label="Digest"
-                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
-                            >
-                                <Newspaper className="w-4 h-4" />
-                                <span>Digest</span>
-                            </button>
-                            <button
-                                onClick={() => openNotesView()}
-                                title="All your notes, with their cards"
-                                aria-label="My Notes"
-                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
-                            >
-                                <StickyNote className="w-4 h-4" />
-                                <span>Notes</span>
-                            </button>
-                        </div>
-
-                        {/* Right zone — view switcher + select chip. Desktop-only here (the
-                            mobile copies live in Row 1); `hidden sm:contents` keeps them out
-                            of the mobile row while dissolving into the desktop cluster. */}
-                        <div className="hidden sm:contents">
-                        {isLibraryView && (
+                        {/* View switcher + Select multiple. These sit with the
+                            SCOPE controls, not with the destinations on the
+                            right (owner call, 2026-07-30): Collections / Ask /
+                            Digest / Notes all LEAVE the library, while search,
+                            filter, sources, sort, view and select all act on
+                            the list you are already looking at — and all of
+                            them go away together when you navigate off it.
+                            Desktop only: this whole row is `hidden sm:flex`,
+                            and the phone/iOS copies live in the header glyphs
+                            and the bottom tab bar, untouched. */}
                         <div data-tour="views" className="inline-flex items-center gap-0.5 p-1 rounded-full bg-card border border-border-subtle">
                             {viewModes.map(vm => {
                                 const active = viewMode === vm.key;
@@ -1901,12 +1856,10 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 );
                             })}
                         </div>
-                        )}
 
-                        {/* Select multiple — an icon chip beside the view switcher. Hidden
-                            while already in selection mode (the accent toolbar takes its
-                            place). */}
-                        {isLibraryView && !isSelectionMode && (
+                        {/* Hidden while already in selection mode — the accent
+                            toolbar on the right takes its place. */}
+                        {!isSelectionMode && (
                             <button
                                 onClick={() => setIsSelectionMode(true)}
                                 title="Select multiple"
@@ -1916,7 +1869,71 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                                 <CheckSquare className="w-4 h-4" />
                             </button>
                         )}
+                        </>)}
+                    </div>
 
+                    {/* (Mobile: the Filter funnel lives in the search row above. Desktop:
+                        the Filter button is in the left cluster of this row.) */}
+
+                    {/* Destinations. Mobile v4: these moved to the bottom tab bar —
+                        this row is now desktop-only (`hidden sm:contents` wrappers). */}
+                    <div className="flex items-center w-full gap-2 sm:w-auto">
+                        {/* Desktop: the original inline chips. Ask leads the
+                            group (owner call, 2026-07-30) — it's the Recall
+                            Engine, the hero of the product, so it takes the
+                            first position the eye reaches in this cluster. */}
+                        <div className="hidden sm:contents">
+                            {isLibraryView && (
+                            <button
+                                data-tour="ask"
+                                // Blank-slate entrance, same as the mobile tab
+                                // (clears a pending graph hand-off — see selectTab).
+                                onClick={() => { setGraphAsk(null); setGraphRestore(null); setAskOpenChat(null); setViewMode('ask'); }}
+                                title="Ask your brain"
+                                aria-label="Ask your brain"
+                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
+                            >
+                                <MessagesSquare className="w-4 h-4" />
+                                <span>Ask</span>
+                            </button>
+                            )}
+                            <button
+                                data-tour="collections"
+                                onClick={() => setViewMode('collections')}
+                                title="Browse collections"
+                                aria-label="Browse collections"
+                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
+                            >
+                                <Layers className="w-4 h-4" />
+                                <span>Collections</span>
+                            </button>
+                            <button
+                                onClick={() => setViewMode('digest')}
+                                title="Your curated digests"
+                                aria-label="Digest"
+                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
+                            >
+                                <Newspaper className="w-4 h-4" />
+                                <span>Digest</span>
+                            </button>
+                            <button
+                                onClick={() => openNotesView()}
+                                title="All your notes, with their cards"
+                                aria-label="My Notes"
+                                className={`${ctrlBase} px-3.5 ${ctrlIdle}`}
+                            >
+                                <StickyNote className="w-4 h-4" />
+                                <span>Notes</span>
+                            </button>
+                        </div>
+
+                        {/* Right zone — the tag toggle and the ACTIVE selection
+                            toolbar. The view switcher and the idle "select
+                            multiple" chip moved to the left cluster with the
+                            other list controls (see the comment there).
+                            Desktop-only; `hidden sm:contents` keeps these out of
+                            the mobile row while dissolving into the cluster. */}
+                        <div className="hidden sm:contents">
                         {/* Tag filter + bulk selection act on the grid — hide them in Ask mode. */}
                         {isLibraryView && (<>
                         {/* Tag toggle — tablet only (mobile uses the Filters sheet; desktop
