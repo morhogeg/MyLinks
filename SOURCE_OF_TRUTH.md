@@ -1021,6 +1021,46 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-30 (round 6) — two owner-QA design calls: Ask's thinking-row ink, and
+  the bottom bar's cramped icons.**
+  (1) **The mark was shouting over its own caption.** `CitationMark` draws in
+  `currentColor`, so Ask's thinking row let the mark inherit full `text-text`
+  (graphite/porcelain) while muting only the label to `text-text-muted` — the
+  owner read it as "too black" next to the grey phrase, correctly. The real
+  defect was **consistency, not a colour value**: `AnalyzingBanner` pairs the
+  same `OrbStatus` at ONE level (both `text-text`), so the same shared component
+  was pairing two different ways. Fixed by meeting in the middle — the row is
+  `text-text-secondary`, so the mark drops a step and the phrase lifts a step and
+  they read as one object. **Deliberately NOT the one-word fix** (mute the mark
+  to `text-text-muted`): at 26px the brackets are thin and `searching` already
+  floors the point at 0.46 opacity, so that would have cost the motion, which is
+  the actual signal that work is running. Because the ink is `currentColor`, one
+  change corrects dark mode too — the identical imbalance lived there with a
+  porcelain mark on grey.
+  (2) **Bottom tab bar raised 44px → 50px** (gap 2px → 3px). The crowding was
+  real and measurable: 20px icon + 2px gap + 10px label ≈ 32px of content in a
+  44px row left ~6px of slack, while the ~16px beneath is pure safe-area pad — so
+  the bar *looks* ~60px tall with the icons squeezed into the top 44. 50px lands
+  on the iOS tab-bar standard (49pt) rather than an arbitrary number. **The other
+  tempting lever is a trap and is now commented as such:** growing the
+  `max(safe-area - 18px, 4px)` pad adds dead space *below* the labels and makes
+  the crowding look worse. Ripple checked — the `-90px` scroll-away hide offset
+  still clears at 50 + 16 = 66px, and `SettingsModal.tsx:425` mirrors the -18px
+  inset, not the row height.
+  Verified: tsc 0, eslint clean. **`next build` cannot complete in the cloud
+  sandbox** — prerender dies at `auth/invalid-api-key` because the container has
+  no `.env.local`; confirmed pre-existing by stashing the diff and reproducing the
+  identical failure on a clean tree, and compile + TypeScript phases both pass.
+  Vercel has the env vars. Phone-only surfaces, so both changes need **owner
+  device QA** (light + dark).
+  **Also raised and dropped this session:** undo buttons on toasts. Verdict was
+  no for the case that prompted it (`AddToCollectionSheet` — the collection row is
+  a still-visible toggle one tap above the toast, so an Undo there duplicates an
+  on-screen control), and the only toasts that would earn one are bulk
+  **Archive** (trivial: `status` field flip) and bulk **Delete** (`Feed.tsx:740`
+  is a hard `batch.delete`, so real undo needs deferred-commit or client-side
+  snapshot restore — its own task, not a toast change). Owner said never mind;
+  **nothing was built.**
 - **2026-07-30 (round 5) — screenshot/note captures get their OWN mark on cited
   chips (owner device QA).** Round 4's leading mark keyed only off
   `getPlatform(url)`, so a screenshot capture — which has no platform — fell

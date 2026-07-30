@@ -229,7 +229,20 @@ function ThinkingIndicator({ origin }: { origin: AskOrigin }) {
                     so the 26px slot holds ~19px of resting ink right beside
                     the phrase — no dead margin. The phrase-exchange
                     choreography is OrbStatus's: only the mark dips; the label
-                    is replaced outright, never animated. */}
+                    is replaced outright, never animated.
+
+                    INK: the mark draws in `currentColor`, so mark and label are
+                    set as ONE object on the row (text-text-secondary) rather
+                    than the mark inheriting full text-text beside a muted
+                    label — that split read as the mark shouting over its own
+                    caption, and it broke symmetry with AnalyzingBanner, where
+                    the same component pairs both at one level. Deliberately met
+                    in the middle instead of muting the mark alone: at 26px the
+                    brackets are thin and `searching` already floors the point
+                    at 0.46 opacity, so dropping to text-text-muted would cost
+                    the motion — which is the actual signal that work is
+                    running. currentColor also makes this correct on dark, where
+                    the same split put a porcelain mark against a grey label. */}
                 <OrbStatus
                     orb="clamp"
                     label={stages[stage].phrase}
@@ -237,8 +250,8 @@ function ThinkingIndicator({ origin }: { origin: AskOrigin }) {
                     size={26}
                     entry="trace"
                     roam
-                    className="inline-flex items-center gap-2.5"
-                    labelClassName="text-[15px] text-text-muted"
+                    className="inline-flex items-center gap-2.5 text-text-secondary"
+                    labelClassName="text-[15px]"
                 />
             </div>
         </div>

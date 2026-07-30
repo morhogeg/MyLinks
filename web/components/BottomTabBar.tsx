@@ -48,9 +48,18 @@ export default function BottomTabBar({
                 bottom: hidden ? '-90px' : '0px',
             }}
         >
+            {/* Row height is 50px, not an arbitrary number: the iOS tab bar is
+                49pt, and the content (20px icon + 3px gap + 10px label ≈ 33px)
+                needs the slack — at the previous 44px it had ~6px of breathing
+                room and read as cramped, because the ~16px beneath it is pure
+                safe-area padding, so the bar LOOKS ~60px tall while the icons
+                sit squeezed in the top 44. Fix the crowding here, never by
+                growing the safe-area pad below (that adds dead space under the
+                labels and makes it look worse). The -90px hide offset still
+                clears the tallest bar at 50 + 16 = 66px. */}
             {/* hairline accent glow above the bar — the header's, mirrored. */}
             <div className="absolute inset-x-0 top-0 h-px bg-[image:var(--accent-gradient)] opacity-30" />
-            <div className="flex items-center justify-around h-[44px] px-1">
+            <div className="flex items-center justify-around h-[50px] px-1">
                 {tabs.slice(0, 2).map((t) => <TabButton key={t.key} tab={t} active={active === t.key} onSelect={onSelect} />)}
                 {/* Center capture — the app's core act. CONTAINED within the bar
                     (no upward overhang): a raised button poked above the bar and
@@ -84,7 +93,7 @@ function TabButton({
             onClick={() => { if (!active) hapticLight(); onSelect(tab.key); }}
             aria-label={tab.label}
             aria-current={active ? 'page' : undefined}
-            className={`flex flex-col items-center justify-center gap-[2px] h-full min-w-[58px] transition-colors ${active ? 'text-accent' : 'text-[color:var(--tabbar-inactive)] active:text-text'}`}
+            className={`flex flex-col items-center justify-center gap-[3px] h-full min-w-[58px] transition-colors ${active ? 'text-accent' : 'text-[color:var(--tabbar-inactive)] active:text-text'}`}
         >
             {tab.icon}
             <span className="text-[10px] font-semibold leading-none">{tab.label}</span>
