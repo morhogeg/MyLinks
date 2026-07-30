@@ -561,19 +561,28 @@ function titleWords(n: GraphNode): Set<string> {
  * comparative analysis.
  *
  * Three signals, multiplied:
+ *  - **title echo** (DOMINANT) — does the concept appear in the members' own
+ *    titles? This is the signal that actually separates a subject from a
+ *    method. Cards about Messi are *titled* about Messi; not one of them is
+ *    titled "Comparative Analysis", because that is how the card was analysed,
+ *    not what it is about. A concept absent from every title is knocked down to
+ *    a quarter of its weight, which no amount of coverage recovers.
  *  - **coverage** — how much of the cluster carries the concept (as before);
  *  - **distinctiveness** — what share of the concept's LIBRARY-wide appearances
- *    land in this cluster. "Lionel Messi" is nearly exclusive to its cluster
- *    (≈1.0); "Comparative Analysis" is spread everywhere (≈0.2). This is the
- *    signal that fixes the bug, and it needs no hand-maintained stopword list:
- *    a word is generic because the library says so.
- *  - **title echo** — a concept whose words also show up in the members' own
- *    titles is what the cards are literally about, so it gets a boost.
+ *    land in this cluster, which demotes vocabulary the model sprays across
+ *    unrelated clusters.
+ *
+ * The first attempt at this fix used distinctiveness alone and did NOT work on
+ * the real library (owner QA): when the model attaches its analysis vocabulary
+ * to ONLY the cards in one cluster, that vocabulary looks perfectly distinctive
+ * — 14/14 coverage, nothing elsewhere — and still beat the subject. Title echo
+ * is what tells the two apart, so it leads. Distinctiveness stays because it
+ * still catches the spread-everywhere case.
  */
 function conceptScores(
     members: GraphNode[],
     libraryDf: Map<string, number>,
-): { display: string; count: number; score: number }[] {
+): { display: string; count: number; score: number; titleShare: number }[] {
     const counts = new Map<string, { display: string; count: number; inTitles: number }>();
     const titles = members.map(titleWords);
     for (let mi = 0; mi < members.length; mi++) {
@@ -585,11 +594,16 @@ function conceptScores(
         }
     }
     for (const [key, entry] of counts) {
-        // A multi-word concept echoes a title when ALL its significant words do
-        // ("lionel messi" in "Lionel Messi's Dribbling…").
+        // A title echoes a concept when it carries at least half of the
+        // concept's significant words — so "Lionel Messi" still counts against
+        // a title that only says "Messi", while "Comparative Analysis" needs
+        // one of its own words to actually be there.
         const words = key.split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 2 && !TITLE_STOPWORDS.has(w));
         if (!words.length) continue;
-        for (const t of titles) if (words.every((w) => t.has(w))) entry.inTitles++;
+        for (const t of titles) {
+            const hits = words.filter((w) => t.has(w)).length;
+            if (hits / words.length >= 0.5) entry.inTitles++;
+        }
     }
     const size = members.length;
     return [...counts.entries()]
@@ -598,8 +612,13 @@ function conceptScores(
             // Library appearances can never be fewer than this cluster's, so
             // distinctiveness is in (0, 1].
             const distinctiveness = e.count / Math.max(e.count, libraryDf.get(key) ?? e.count);
-            const titleEcho = 1 + (e.inTitles / size);
-            return { display: e.display, count: e.count, score: coverage * distinctiveness * titleEcho };
+            // 0.25× when no title mentions it, up to 2× when they all do. This
+            // range is deliberately wide: it has to overturn a method word with
+            // full coverage in favour of a subject that only half the cluster
+            // is tagged with, which is exactly the reported case.
+            const titleShare = e.inTitles / size;
+            const titleEcho = 0.25 + 1.75 * titleShare;
+            return { display: e.display, count: e.count, titleShare, score: coverage * distinctiveness * titleEcho };
         })
         .sort((a, b) => b.score - a.score || b.count - a.count || a.display.localeCompare(b.display));
 }
@@ -637,12 +656,15 @@ function clusterLabel(
     const candidates: string[] = [];
     const pair = (a: string, b: string) => (a.toLowerCase() === b.toLowerCase() ? a : `${a} · ${b}`);
     if (top && top.count >= floor) {
-        // The partner must be a real second subject, not the runner-up of a
-        // one-subject cluster: it has to clear the coverage floor AND hold its
-        // own on score, or the caption dilutes the name that was right.
+        // The partner must be a real second SUBJECT, not the runner-up of a
+        // one-subject cluster. Beyond coverage and score it has to earn its
+        // place in the members' own titles — otherwise "Lionel Messi" picks up
+        // "· Performance Metrics" and the caption is half wrong again (owner QA:
+        // this is how the analysis vocabulary survived the first fix).
         const second = ranked.find((r) =>
             r.display.toLowerCase() !== top.display.toLowerCase()
             && r.count >= floor
+            && r.titleShare >= 0.25
             && r.score >= top.score * 0.6);
         if (second) candidates.push(pair(top.display, second.display));
         candidates.push(top.display);

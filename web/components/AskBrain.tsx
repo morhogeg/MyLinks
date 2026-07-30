@@ -8,7 +8,7 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { getDominantDirection } from '@/lib/rtl';
 import SourceByline from '@/components/SourceByline';
-import { getPlatform } from '@/lib/platform';
+import { getPlatform, platformIcon, platformColor } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl, isNativeApp, fetchWithTimeout } from '@/lib/api';
@@ -1288,24 +1288,30 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                                         // byline everything it knows.
                                                         const live = links.find(l => l.id === s.id);
                                                         const hasSource = !!(s.url || meaningfulName(s.sourceName) || live?.sourceType);
-                                                        // A branded source already HAS a logo — SourceByline
-                                                        // draws it inline, bare and brand-coloured, exactly as
-                                                        // the feed card does. The Machina citation mark is the
-                                                        // fallback for cards with no platform of their own, so
-                                                        // the two never appear together (owner QA: a boxed
-                                                        // brand logo, and then a Machina glyph standing in for
-                                                        // a logo that existed, were both wrong).
-                                                        const branded = !!getPlatform(s.url || undefined);
+                                                        // ONE leading mark, beside the title, on every chip —
+                                                        // the platform's own logo when the card has one
+                                                        // (YouTube, X, Facebook, Instagram, LinkedIn), else the
+                                                        // Machina citation glyph. Bare, brand-coloured, no
+                                                        // tinted box: the box was the original complaint, the
+                                                        // missing logo was the follow-up one (owner QA ×2).
+                                                        // The byline below therefore draws no icon of its own.
+                                                        const platform = getPlatform(s.url || undefined);
                                                         return (
                                                             <>
-                                                                {!branded && (
-                                                                    <span className="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-lg bg-accent/10 text-accent group-hover:bg-accent/15 transition-colors">
-                                                                        <CitationGlyph className="w-3.5 h-auto" />
-                                                                    </span>
-                                                                )}
+                                                                <span
+                                                                    className={`shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-lg transition-colors ${platform
+                                                                        ? ''
+                                                                        : 'bg-accent/10 text-accent group-hover:bg-accent/15'}`}
+                                                                    style={platform ? { color: platformColor(platform) } : undefined}
+                                                                >
+                                                                    {platform
+                                                                        ? platformIcon(platform, 'w-[18px] h-[18px]')
+                                                                        : <CitationGlyph className="w-3.5 h-auto" />}
+                                                                </span>
                                                                 <span className="min-w-0 flex flex-col gap-0.5">
                                                                     {hasSource ? (
                                                                         <SourceByline
+                                                                            showIcon={false}
                                                                             link={{
                                                                                 url: s.url || undefined,
                                                                                 sourceName: s.sourceName || undefined,

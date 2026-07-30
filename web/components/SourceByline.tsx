@@ -33,12 +33,18 @@ export interface SourceBylineLink {
 export default function SourceByline({
     link,
     size = 'sm',
+    showIcon = true,
 }: {
     link: SourceBylineLink;
     /** sm = cards (12px text, 3.5 icon); md = detail modal (14px, 4 icon). */
     size?: 'sm' | 'md';
+    /** Set false where the caller already draws the mark elsewhere (the Ask
+     *  citation chip puts it in a leading slot beside the title), so the same
+     *  logo never appears twice in one row. */
+    showIcon?: boolean;
 }) {
     const iconCls = size === 'md' ? 'w-4 h-4' : 'w-3.5 h-3.5';
+    const icon = (node: React.ReactNode) => (showIcon ? node : null);
     const wrap = `flex items-center gap-1.5 min-w-0 ${size === 'md' ? 'text-sm' : 'text-xs'} text-text-muted whitespace-nowrap max-w-[240px]`;
     const nameCls = 'truncate';
 
@@ -57,7 +63,7 @@ export default function SourceByline({
     if (isYouTube && youtubeChannel) {
         return (
             <span dir="ltr" className={wrap} title={youtubeChannel}>
-                <Youtube className={`${iconCls} text-red-500 shrink-0`} />
+                {icon(<Youtube className={`${iconCls} text-red-500 shrink-0`} />)}
                 <span className={nameCls}>{youtubeChannel}</span>
             </span>
         );
@@ -65,7 +71,7 @@ export default function SourceByline({
     if (xAuthor) {
         return (
             <span dir="ltr" className={wrap} title={`@${xAuthor}`}>
-                <span className="shrink-0 inline-flex" style={{ color: platformColor('x') }}>{platformIcon('x', iconCls)}</span>
+                {icon(<span className="shrink-0 inline-flex" style={{ color: platformColor('x') }}>{platformIcon('x', iconCls)}</span>)}
                 <span className={nameCls}>@{xAuthor}</span>
             </span>
         );
@@ -73,7 +79,7 @@ export default function SourceByline({
     if (isLinkedIn) {
         return (
             <span dir="auto" className={wrap} title={linkedInAuthor || 'LinkedIn'} aria-label={linkedInAuthor || 'LinkedIn'}>
-                <span className="shrink-0 inline-flex" style={{ color: platformColor('linkedin') }}>{platformIcon('linkedin', iconCls)}</span>
+                {icon(<span className="shrink-0 inline-flex" style={{ color: platformColor('linkedin') }}>{platformIcon('linkedin', iconCls)}</span>)}
                 {linkedInAuthor && <span className={nameCls}>{linkedInAuthor}</span>}
             </span>
         );
@@ -81,7 +87,7 @@ export default function SourceByline({
     if (isFacebook) {
         return (
             <span dir="auto" className={wrap} title={fbAuthor || 'Facebook'} aria-label={fbAuthor || 'Facebook'}>
-                <span className="shrink-0 inline-flex" style={{ color: platformColor('facebook') }}>{platformIcon('facebook', iconCls)}</span>
+                {icon(<span className="shrink-0 inline-flex" style={{ color: platformColor('facebook') }}>{platformIcon('facebook', iconCls)}</span>)}
                 {fbAuthor && <span className={nameCls}>{fbAuthor}</span>}
             </span>
         );
@@ -89,7 +95,7 @@ export default function SourceByline({
     if (igAuthor) {
         return (
             <span dir="ltr" className={wrap} title={`@${igAuthor}`}>
-                <span className="shrink-0 inline-flex" style={{ color: platformColor('instagram') }}>{platformIcon('instagram', iconCls)}</span>
+                {icon(<span className="shrink-0 inline-flex" style={{ color: platformColor('instagram') }}>{platformIcon('instagram', iconCls)}</span>)}
                 <span className={nameCls}>@{igAuthor}</span>
             </span>
         );
@@ -97,7 +103,7 @@ export default function SourceByline({
     if (link.sourceType === 'image') {
         return (
             <span className={wrap} title="Screenshot">
-                <ImageIcon className={`${iconCls} shrink-0`} />
+                {icon(<ImageIcon className={`${iconCls} shrink-0`} />)}
                 <span>Screenshot</span>
             </span>
         );
@@ -105,7 +111,7 @@ export default function SourceByline({
     if (link.sourceType === 'note') {
         return (
             <span className={wrap} title="Note">
-                <StickyNote className={`${iconCls} shrink-0`} />
+                {icon(<StickyNote className={`${iconCls} shrink-0`} />)}
                 <span>Note</span>
             </span>
         );
