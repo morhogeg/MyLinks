@@ -1071,8 +1071,8 @@ exact-match, capped.
   is behind the sign-in gate and the local dev server runs in emulator mode, so
   owner device/desktop QA is the check. Watch: caption crowding inside a split
   island at low zoom. Shipped as `d1234b9` (merge `819b01d`) + follow-up
-  `3c8c5b5`, **TestFlight run #250 = build 1250**. **Good news carried by that
-  run: the 90382 upload window from 2026-07-29 has CLEARED** — run #249
+  `3c8c5b5`, **TestFlight run #250 = build 1250 — GREEN, uploaded to App Store
+  Connect.** **The 90382 upload window from 2026-07-29 has CLEARED** — run #249
   (`0a0a021`) uploaded green, so rounds 16–17 are on TestFlight after all and
   build 1250 supersedes them. Follow-up `3c8c5b5` fixes a breakpoint mismatch
   the first pass introduced: the culling reserve read CANVAS width while
