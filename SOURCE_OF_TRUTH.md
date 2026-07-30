@@ -1021,6 +1021,37 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-30 (round 7) — Ask's suggested chips no longer re-offer the question
+  you just asked (owner QA).** Tapping a chip, finishing the answer, then hitting
+  **New** greeted you with the identical chip set: `newChat()`
+  (`AskBrain.tsx:592`) reset messages/chat id/input/streaming/fresh-card but
+  never `suggestSalt`, so `buildAskSuggestions(links, suggestSalt)` — a pure
+  function of two unchanged inputs — rebuilt a byte-identical set.
+  ⚠️ **The obvious one-line fix is a TRAP, and this is the durable lesson:**
+  bumping the salt in `newChat` (mirroring the "More ideas" button) looks like
+  the fix and is not one. `salt` only rotates PHRASINGS and POOL ORDER, and the
+  latest-save chip is seated ahead of the rotated pool unconditionally
+  (`askSuggestions.ts` tail), keyed to the newest ready card — which starting a
+  new chat does not change. **Proven, not assumed:** a probe against the real
+  module returned `latest:a` at position 1 with salt 8 exactly as with salt 7,
+  merely reworded "What's the gist of X?" → "Why is X worth my time?". That is
+  strictly worse than the bug: it LOOKS refreshed while re-asking what was just
+  answered. Retiring a chip needs identity, not randomness.
+  **Shipped fix:** `buildAskSuggestions(links, salt, used)` takes the session's
+  tapped keys (oldest first) and SINKS them to the back rather than dropping
+  them — filtering outright would empty the row in a small library. Fresh chips
+  first, stale backfill oldest-used first, so the question you just asked is the
+  very last to reappear. `usedSuggestions` is **in-memory only, by decision**: a
+  relaunch may re-offer, and persisting would slowly starve a small library.
+  Salt still bumps on `newChat`, but as a COMPLEMENT (rewords survivors), never
+  the mechanism — both call sites are commented to stop a future session
+  "simplifying" the used-key filter away.
+  Verified by transpiling the module and running a probe (this is pure logic, so
+  unlike round 6 it is genuinely verifiable in the sandbox): tapped chip leaves
+  position 1; row never empties, including a **1-card library** (returns
+  `[latest:z, recap]` after everything is used); fresh-before-stale holds; stale
+  order is oldest-used-first; most-recent tap returns last. tsc 0, eslint clean.
+  **Still owner-device QA only for round 6's two pixel changes** (build 1252).
 - **2026-07-30 (round 6) — two owner-QA design calls: Ask's thinking-row ink, and
   the bottom bar's cramped icons.**
   (1) **The mark was shouting over its own caption.** `CitationMark` draws in

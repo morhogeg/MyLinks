@@ -108,11 +108,26 @@ function rotate<T>(arr: T[], salt: number): T[] {
     return [...arr.slice(start), ...arr.slice(0, start)];
 }
 
+/** How many chips the Ask home screen shows at once. */
+const MAX_CHIPS = 4;
+
 /**
- * Build up to 4 suggestion chips from the live library. `salt` rotates the
- * mix and the phrasing — bump it for a fresh set ("More ideas").
+ * Build up to `MAX_CHIPS` suggestion chips from the live library. `salt`
+ * rotates the mix and the phrasing — bump it for a fresh set ("More ideas").
+ *
+ * `used` is the keys already tapped this session, OLDEST FIRST. They sink to
+ * the back of the list rather than being dropped, so the row can never render
+ * empty in a small library (see the tail of this function). Note that salt
+ * alone cannot retire a chip: it only rotates phrasings and pool ORDER, and
+ * the latest-save chip is seated ahead of the pool regardless — so a new chat
+ * that only bumped the salt would re-offer the same card in different words.
+ * Retiring a chip is what `used` is for.
  */
-export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[] {
+export function buildAskSuggestions(
+    links: Link[],
+    salt: number,
+    used: readonly string[] = [],
+): AskSuggestion[] {
     const ready = readyLinks(links);
     if (ready.length === 0) return [];
     const now = Date.now();
@@ -241,7 +256,19 @@ export function buildAskSuggestions(links: Link[], salt: number): AskSuggestion[
         });
     }
 
-    return [...latestChips, ...rotate(pool, salt).slice(0, 4 - latestChips.length)];
+    const all = [...latestChips, ...rotate(pool, salt)];
+    if (used.length === 0) return all.slice(0, MAX_CHIPS);
+
+    // Chips already asked this session SINK rather than vanish: filtering them
+    // out outright would empty the row in a small library after a few asks.
+    // Stale ones come back oldest-used first, so the question you just asked is
+    // the very last one to reappear.
+    const rank = new Map(used.map((k, i) => [k, i]));
+    const fresh = all.filter(s => !rank.has(s.key));
+    const stale = all
+        .filter(s => rank.has(s.key))
+        .sort((a, b) => rank.get(a.key)! - rank.get(b.key)!);
+    return [...fresh, ...stale].slice(0, MAX_CHIPS);
 }
 
 // ── Follow-up chips (shown under a completed answer) ─────────────────────────
