@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { getDominantDirection } from '@/lib/rtl';
 import SourceByline from '@/components/SourceByline';
+import { getPlatform } from '@/lib/platform';
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl, isNativeApp, fetchWithTimeout } from '@/lib/api';
@@ -1287,19 +1288,21 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                                         // byline everything it knows.
                                                         const live = links.find(l => l.id === s.id);
                                                         const hasSource = !!(s.url || meaningfulName(s.sourceName) || live?.sourceType);
+                                                        // A branded source already HAS a logo — SourceByline
+                                                        // draws it inline, bare and brand-coloured, exactly as
+                                                        // the feed card does. The Machina citation mark is the
+                                                        // fallback for cards with no platform of their own, so
+                                                        // the two never appear together (owner QA: a boxed
+                                                        // brand logo, and then a Machina glyph standing in for
+                                                        // a logo that existed, were both wrong).
+                                                        const branded = !!getPlatform(s.url || undefined);
                                                         return (
                                                             <>
-                                                                {/* One constant citation mark — the thing that was
-                                                                    searching is the thing that found this
-                                                                    (ask_in_situ_answer.png). Platform identity is
-                                                                    NOT expressed here: a brand logo boxed in a
-                                                                    tinted tile was the one place Machina drew
-                                                                    sources differently from every card surface
-                                                                    (owner QA). It now rides the byline below,
-                                                                    through the shared SourceByline. */}
-                                                                <span className="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-lg bg-accent/10 text-accent group-hover:bg-accent/15 transition-colors">
-                                                                    <CitationGlyph className="w-3.5 h-auto" />
-                                                                </span>
+                                                                {!branded && (
+                                                                    <span className="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-lg bg-accent/10 text-accent group-hover:bg-accent/15 transition-colors">
+                                                                        <CitationGlyph className="w-3.5 h-auto" />
+                                                                    </span>
+                                                                )}
                                                                 <span className="min-w-0 flex flex-col gap-0.5">
                                                                     {hasSource ? (
                                                                         <SourceByline

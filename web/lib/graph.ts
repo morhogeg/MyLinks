@@ -343,11 +343,17 @@ export async function buildGraphModel(
     // single generic word. Labels are deduped within a component — two adjacent
     // groups both called "AI" would name nothing.
     const compThemes = comps.map((members) => splitIntoThemes(members, nodes, edges, adjacency));
+    // Library-wide concept frequency — the denominator that tells a cluster's
+    // SUBJECT apart from its vocabulary (see conceptScores).
+    const libraryDf = new Map<string, number>();
+    for (const n of nodes) {
+        for (const c of conceptSet(n)) libraryDf.set(c, (libraryDf.get(c) ?? 0) + 1);
+    }
     const clusters: GraphCluster[] = [];
     for (const groups of compThemes) {
         const taken = new Set<string>();
         for (const g of groups) {
-            const label = clusterLabel(g.map((i) => nodes[i]), taken);
+            const label = clusterLabel(g.map((i) => nodes[i]), libraryDf, taken);
             if (label) taken.add(label.toLowerCase());
             clusters.push({ label, nodeIndices: g });
         }
@@ -520,15 +526,92 @@ function splitIntoThemes(
     return kept.sort((a, b) => b.length - a.length);
 }
 
+/** A card's concepts, lowercased and de-duplicated. */
+function conceptSet(n: GraphNode): Set<string> {
+    return new Set((n.link.concepts ?? []).map((s) => s.trim().toLowerCase()).filter(Boolean));
+}
+
+/** Words too common in titles to identify anything. */
+const TITLE_STOPWORDS = new Set([
+    'the', 'a', 'an', 'and', 'or', 'of', 'in', 'on', 'for', 'to', 'with', 'at', 'by', 'from',
+    'is', 'are', 'was', 'were', 'be', 'how', 'what', 'why', 'when', 'this', 'that', 'these',
+    'his', 'her', 'its', 'their', 'you', 'your', 'vs', 'new', 'more', 'about', 'into', 'over',
+]);
+
+/** Title words, lowercased — the second, independent evidence of a subject. */
+function titleWords(n: GraphNode): Set<string> {
+    return new Set(
+        (n.link.title ?? '')
+            .toLowerCase()
+            .split(/[^\p{L}\p{N}]+/u)
+            .filter((w) => w.length > 2 && !TITLE_STOPWORDS.has(w)),
+    );
+}
+
 /**
- * Auto-name a cluster from what its cards actually share. Preference order:
- * a concept with wide coverage (plus a second when it genuinely co-defines
- * the theme) → the dominant category (≥70%) → the single most common concept
- * → the most common category. The tail of that chain is deliberately loose:
- * EVERY island gets a caption (owner QA — unlabeled pairs looked broken and
- * had no tap target for the cluster panel), and the caption doubles as the
- * cluster's handle, so "roughly right" beats absent. Deterministic, no model
- * call.
+ * Rank a cluster's concepts by how well each one NAMES it, not by how often it
+ * appears.
+ *
+ * Raw frequency was the original rule and it produced captions like
+ * "Comparative Analysis · Performance Metrics" over fourteen cards about Lionel
+ * Messi (owner QA, 2026-07-30). The reason is that an analysis vocabulary
+ * ("comparative analysis", "performance metrics", "case study") gets attached
+ * by the model to cards ACROSS the whole library, so inside any one cluster it
+ * out-counts the subject — nobody saves ten cards in order to discuss
+ * comparative analysis.
+ *
+ * Three signals, multiplied:
+ *  - **coverage** — how much of the cluster carries the concept (as before);
+ *  - **distinctiveness** — what share of the concept's LIBRARY-wide appearances
+ *    land in this cluster. "Lionel Messi" is nearly exclusive to its cluster
+ *    (≈1.0); "Comparative Analysis" is spread everywhere (≈0.2). This is the
+ *    signal that fixes the bug, and it needs no hand-maintained stopword list:
+ *    a word is generic because the library says so.
+ *  - **title echo** — a concept whose words also show up in the members' own
+ *    titles is what the cards are literally about, so it gets a boost.
+ */
+function conceptScores(
+    members: GraphNode[],
+    libraryDf: Map<string, number>,
+): { display: string; count: number; score: number }[] {
+    const counts = new Map<string, { display: string; count: number; inTitles: number }>();
+    const titles = members.map(titleWords);
+    for (let mi = 0; mi < members.length; mi++) {
+        for (const c of new Set((members[mi].link.concepts ?? []).map((s) => s.trim()).filter(Boolean))) {
+            const key = c.toLowerCase();
+            let entry = counts.get(key);
+            if (!entry) counts.set(key, (entry = { display: c, count: 0, inTitles: 0 }));
+            entry.count++;
+        }
+    }
+    for (const [key, entry] of counts) {
+        // A multi-word concept echoes a title when ALL its significant words do
+        // ("lionel messi" in "Lionel Messi's Dribbling…").
+        const words = key.split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 2 && !TITLE_STOPWORDS.has(w));
+        if (!words.length) continue;
+        for (const t of titles) if (words.every((w) => t.has(w))) entry.inTitles++;
+    }
+    const size = members.length;
+    return [...counts.entries()]
+        .map(([key, e]) => {
+            const coverage = e.count / size;
+            // Library appearances can never be fewer than this cluster's, so
+            // distinctiveness is in (0, 1].
+            const distinctiveness = e.count / Math.max(e.count, libraryDf.get(key) ?? e.count);
+            const titleEcho = 1 + (e.inTitles / size);
+            return { display: e.display, count: e.count, score: coverage * distinctiveness * titleEcho };
+        })
+        .sort((a, b) => b.score - a.score || b.count - a.count || a.display.localeCompare(b.display));
+}
+
+/**
+ * Auto-name a cluster from what its cards are actually ABOUT — the best-scoring
+ * concept (see conceptScores), plus a second when it genuinely co-defines the
+ * theme, falling back to the dominant category and finally to the most common
+ * category. The tail of that chain is deliberately loose: EVERY island gets a
+ * caption (owner QA — unlabeled pairs looked broken and had no tap target for
+ * the cluster panel), and the caption doubles as the cluster's handle, so
+ * "roughly right" beats absent. Deterministic, no model call.
  *
  * `taken` holds the labels already used by sibling themes in the SAME
  * component; a candidate that collides is skipped in favour of the next one
@@ -536,34 +619,32 @@ function splitIntoThemes(
  * neither. When every candidate is taken the first one is used anyway — a
  * duplicate caption still beats a blank island with no tap target.
  */
-function clusterLabel(members: GraphNode[], taken?: Set<string>): string | null {
+function clusterLabel(
+    members: GraphNode[],
+    libraryDf: Map<string, number>,
+    taken?: Set<string>,
+): string | null {
     if (members.length < 2) return null;
-    const counts = new Map<string, { display: string; count: number }>();
-    for (const n of members) {
-        for (const c of new Set((n.link.concepts ?? []).map((s) => s.trim()).filter(Boolean))) {
-            const key = c.toLowerCase();
-            const entry = counts.get(key);
-            if (entry) entry.count++;
-            else counts.set(key, { display: c, count: 1 });
-        }
-    }
-    const ranked = [...counts.values()].sort((a, b) => b.count - a.count || a.display.localeCompare(b.display));
+    const ranked = conceptScores(members, libraryDf);
     const floor = Math.max(2, Math.ceil(members.length * 0.25));
     const top = ranked[0];
     const byCategory = new Map<string, number>();
     for (const n of members) byCategory.set(n.category, (byCategory.get(n.category) ?? 0) + 1);
     const [cat, catCount] = [...byCategory.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
 
-    // Ordered candidates. The first three reproduce the original chain exactly
-    // (so an unsplit island is captioned as before); the rest only come into
-    // play when a sibling already claimed the obvious name.
+    // Ordered candidates; the later ones only come into play when a sibling
+    // theme already claimed the obvious name.
     const candidates: string[] = [];
     const pair = (a: string, b: string) => (a.toLowerCase() === b.toLowerCase() ? a : `${a} · ${b}`);
     if (top && top.count >= floor) {
-        const second = ranked[1];
-        if (second && second.count >= floor && second.display.toLowerCase() !== top.display.toLowerCase()) {
-            candidates.push(pair(top.display, second.display));
-        }
+        // The partner must be a real second subject, not the runner-up of a
+        // one-subject cluster: it has to clear the coverage floor AND hold its
+        // own on score, or the caption dilutes the name that was right.
+        const second = ranked.find((r) =>
+            r.display.toLowerCase() !== top.display.toLowerCase()
+            && r.count >= floor
+            && r.score >= top.score * 0.6);
+        if (second) candidates.push(pair(top.display, second.display));
         candidates.push(top.display);
     } else {
         if (catCount >= members.length * 0.7) candidates.push(cat);
