@@ -1058,6 +1058,35 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-30 (same session, round 3) — launch film layout + motion pass (owner
+  review round 3).** Six notes, four of them real defects. **(1) Caption 4
+  ("Saving was never the hard part") was sitting over Machina's OWN analyzing
+  screen** — a line about the act of saving, played over our pipeline. Retimed to
+  end before the cut into the app, so it now runs over Safari + the iOS share
+  sheet where it belongs. **(2) Captions moved off the bottom into a LEFT
+  COLUMN.** Type centred under the device sat in its shadow and made the film look
+  subtitled; product scenes now hold the device right (`BASE_X` in
+  `film/anim.ts`) with the line set left, ranged against a short accent rule —
+  the editorial two-column setting. Beats with no device (scatter, the turn) keep
+  a centred line, declared per cue via `place` in `timeline.mjs`. **(3) The name
+  no longer lands three times.** The turn used to resolve into a full
+  `[ MACHINA ]` lockup between the boot at 0:00 and the endcard; it now closes on
+  the MARK holding what it gathered and pushes through into the product — the
+  same gesture the boot exits on. Name = small at the start, big at the end.
+  **(4) Two jitters in the Ask beat, both real bugs:** the typing helper added a
+  sine wobble to the CHARACTER COUNT, which could go backwards between frames, so
+  the question bubble grew and shrank a character at a time (the cadence is now
+  per-character dwell times, monotonic by construction); and the half-typed
+  question was rendered in BOTH the composer and a chat bubble, so the same
+  unfinished sentence was on screen twice — the bubble now only exists after the
+  question is sent. Caption motion also rounds to whole pixels, since sub-pixel
+  translation re-rasterizes glyphs every frame and shimmers at this size.
+  **(5) "Every save connects to the rest" was an untrue claim** → "See how your
+  saves connect." **(6) The endcard mark now ARRIVES** — `AnimatedMark` in
+  `ui/Brand.tsx` ports the app's own `launchAt` motion from `CitationMark`
+  (arms draw out from corner ticks via the two clip rects, brackets close, point
+  strikes last), played at 1.9× the app's 39-frame launch because the endcard is
+  settling rather than booting. Repo-only, no app code, nothing to deploy.
 - **2026-07-30 (same session, round 2) — launch film copy pass + boot-screen cold
   open (owner review round 2).** Owner note: focus the messaging on what the app
   actually is — **one place for every saved link, analyzed/filed/organized,

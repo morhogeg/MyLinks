@@ -1,22 +1,25 @@
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
-import { Wordmark } from '../ui/Brand';
+
 import { Stage } from '../film/effects';
 import { CONSTELLATION, PANEL_OFFSET, PlatformPanel } from '../ui/platforms';
-import { drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
+import { drift, prog, ramp, EASE_IN_OUT, EASE_OUT } from '../film/anim';
 
 /**
- * The turn: five places become one, and the one has a name.
+ * The turn: five places become one.
  *
  * The five platform panels rush back in from exactly where they drifted out to
- * and collapse into a single point of light; the brackets close around that
- * point, then open to release the name. That gather IS the promise from the
- * founder letter — "one place for everything that catches my interest, wherever
- * I found it" — so the film states it as a move rather than as a claim.
+ * and collapse into a single point of light, and the mark closes around it. That
+ * gather IS the promise from the founder letter — "one place for everything that
+ * catches my interest, wherever I found it" — so the film states it as a move
+ * rather than as a claim.
  *
- * No tagline here on purpose: `Capture. Ask. Connect.` belongs to the endcard,
- * and a caption is already carrying this beat. Two lines of type would make the
- * lockup an advert instead of a lockup.
+ * **The wordmark is deliberately NOT here.** An earlier cut resolved this beat
+ * into a full [ MACHINA ] lockup, which meant the name landed three times in one
+ * film: the boot at 0:00, here, and the endcard. The name now appears small at
+ * the start (the app launching) and big at the end (the lockup), and this beat
+ * closes with the MARK holding what it gathered — then pushes through into the
+ * product, the same gesture the boot exits on.
  */
 export const WordmarkScene: React.FC = () => {
   const f = useCurrentFrame();
@@ -27,13 +30,16 @@ export const WordmarkScene: React.FC = () => {
 
   // ── 2. the brackets close around the point (26–44)
   const close = prog(f, COLLAPSE, COLLAPSE + 18, EASE_OUT);
-  // ── 3. and open again, releasing the name (48–86)
-  const part = prog(f, 48, 86, EASE_OUT);
-  const wordIn = prog(f, 56, 94, EASE_MODAL);
-  const dotOut = prog(f, 46, 70, EASE_OUT);
+  // ── 3. the mark holds, breathing, while the caption lands (44–120)
+  const dotSettle = 1 + Math.sin(Math.max(0, f - 44) / 26) * 0.03;
 
-  // brackets travel from wide-open, to tight around the point, to the lockup
-  const spread = (1 - close) * 620 + close * 96 + part * (430 - 96);
+  // ── 4. then it pushes through, the way the boot screen exits (120–150)
+  const PUSH = 120;
+  const push = prog(f, PUSH, PUSH + 26, EASE_OUT);
+  const pushScale = 1 + Math.pow(push, 2.2) * 11;
+
+  // brackets travel from wide-open to closed around the point, and stay
+  const spread = (1 - close) * 620 + close * 96;
 
   // The flash BUILDS as the five converge and spikes on the landing. Written as
   // a plain decay it sat at full brightness for the whole gather and washed the
@@ -43,8 +49,8 @@ export const WordmarkScene: React.FC = () => {
       ? Math.pow(gather, 3.4) * 0.5
       : Math.max(0, 1 - (f - COLLAPSE) / 26);
   const float = drift(f, 4, 250);
-  const outScale = ramp(f, [112, 150], [1, 1.03], EASE_OUT);
-  const out = 1 - prog(f, 134, 150);
+  const outScale = ramp(f, [60, 120], [1, 1.02], EASE_OUT);
+  const out = 1 - prog(f, PUSH + 8, PUSH + 26);
 
   const bracket = (side: -1 | 1) => (
     <div
@@ -137,43 +143,28 @@ export const WordmarkScene: React.FC = () => {
             position: 'relative',
             width: 1500,
             height: 400,
-            transform: `translateY(${float}px) scale(${outScale})`,
+            transform: `translateY(${float}px) scale(${outScale * pushScale})`,
           }}
         >
           {bracket(-1)}
           {bracket(1)}
 
-          {/* everything the brackets gathered, held as one point — then released
-              into the name */}
+          {/* everything the brackets gathered, held as one point */}
           <div
             style={{
               position: 'absolute',
               left: '50%',
               top: '50%',
-              transform: `translate(-50%, -50%) scale(${(0.4 + gather * 0.6) * (1 + dotOut * 5.5)})`,
+              transform: `translate(-50%, -50%) scale(${(0.4 + gather * 0.6) * dotSettle})`,
               width: 62,
               height: 62,
               borderRadius: 62,
               background: '#F2F5FA',
-              opacity: gather * (1 - dotOut) * 0.92,
+              opacity: gather * 0.94,
               filter: 'blur(0.4px)',
+              boxShadow: `0 0 ${26 + flash * 40}px rgba(203,210,226,${0.4 + flash * 0.35})`,
             }}
           />
-
-          <div
-            style={{
-              position: 'absolute',
-              left: '50%',
-              top: '50%',
-              transform: `translate(-50%, -50%) scale(${0.94 + wordIn * 0.06})`,
-              width: 700,
-              color: '#F2F5FA',
-              opacity: wordIn,
-              filter: `drop-shadow(0 0 30px rgba(203,210,226,${0.22 * wordIn}))`,
-            }}
-          >
-            <Wordmark style={{ width: '100%', height: 'auto' }} />
-          </div>
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

@@ -40,8 +40,23 @@ export const pulse = (frame: number, f0: number, hold: number, fade = 10) =>
  */
 export const typed = (frame: number, f0: number, f1: number, len: number) => {
   const t = prog(frame, f0, f1, Easing.bezier(0.35, 0.6, 0.4, 1));
-  const jitter = Math.sin(frame * 1.7) * 0.6 + Math.sin(frame * 0.53) * 0.5;
-  return Math.max(0, Math.min(len, Math.round(t * len + (t > 0 && t < 1 ? jitter : 0))));
+  if (t <= 0) return 0;
+  if (t >= 1) return len;
+  // Each character gets its own dwell, and the count is "how many dwells have
+  // elapsed" — so the cadence is human but the count is MONOTONIC by
+  // construction. The previous version added a sine wobble to the count, which
+  // could go backwards between frames: the question bubble grew and shrank a
+  // character at a time, which is the jitter in the Ask mockup.
+  let total = 0;
+  let n = 0;
+  for (let i = 0; i < len; i++) total += 0.6 + 0.8 * ((Math.sin(i * 12.9898) * 43758.5453) % 1 + 1) / 2;
+  let acc = 0;
+  for (let i = 0; i < len; i++) {
+    acc += 0.6 + 0.8 * ((Math.sin(i * 12.9898) * 43758.5453) % 1 + 1) / 2;
+    if (acc / total <= t) n = i + 1;
+    else break;
+  }
+  return n;
 };
 
 /** Slow continuous drift — keeps a held shot alive without drawing attention. */
@@ -59,3 +74,11 @@ export const drift = (frame: number, amp = 6, period = 210, phase = 0) =>
  */
 export const BASE_SCALE = 0.86;
 export const BASE_Y = -52;
+
+/**
+ * Product shots hold the device RIGHT of centre, which opens the left column the
+ * captions live in (see `film/Subtitles.tsx`). Type under the device sat in its
+ * shadow and made the film look subtitled; beside it, the two read as one
+ * composition.
+ */
+export const BASE_X = 268;

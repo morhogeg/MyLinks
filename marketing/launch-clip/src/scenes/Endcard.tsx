@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
-import { CitationGlyph, Wordmark } from '../ui/Brand';
+import { AnimatedMark, MARK_LAUNCH_FRAMES, Wordmark } from '../ui/Brand';
 import { Stage } from '../film/effects';
 import { drift, prog, ramp, EASE_MODAL, EASE_OUT } from '../film/anim';
 import { sans } from '../fonts';
@@ -13,6 +13,11 @@ import { sans } from '../fonts';
  * app icon rather than as the brand mark"), and on a full-frame endcard the grey
  * squircle read as a screenshot of an icon instead of as an identity.
  *
+ * And it ARRIVES rather than appearing: `AnimatedMark` runs the app's own
+ * `launch` motion (ported from `CitationMark`) — the arms draw out from corner
+ * ticks, the brackets close, the point strikes last — played slower than the
+ * boot's 39 frames, because this is the closing statement rather than a launch.
+ *
  * No price, no urgency, no "download now" — the film's whole argument is that
  * the product is quiet and confident, and a hard sell in the last four seconds
  * would retract it. The closing line names the payoff the whole film has been
@@ -24,13 +29,13 @@ import { sans } from '../fonts';
 export const Endcard: React.FC = () => {
   const f = useCurrentFrame();
 
-  const icon = prog(f, 2, 30, EASE_OUT);
-  const word = prog(f, 24, 58, EASE_MODAL);
-  const tag = prog(f, 46, 80, EASE_MODAL);
-  const rule = prog(f, 84, 118, EASE_MODAL);
-  const foot = prog(f, 96, 126, EASE_MODAL);
+  const icon = prog(f, 2, 26, EASE_OUT);
+  const word = prog(f, 52, 88, EASE_MODAL);
+  const tag = prog(f, 74, 108, EASE_MODAL);
+  const rule = prog(f, 108, 140, EASE_MODAL);
+  const foot = prog(f, 120, 150, EASE_MODAL);
 
-  const bloom = Math.max(0, 1 - f / 34);
+  const bloom = Math.max(0, 1 - Math.max(0, f - 30) / 34);
   const float = drift(f, 4, 300);
   const out = 1 - prog(f, 186, 222);
 
@@ -55,17 +60,22 @@ export const Endcard: React.FC = () => {
         <div
           style={{
             opacity: icon,
-            transform: `scale(${ramp(f, [2, 30], [0.86, 1], EASE_OUT)})`,
+            transform: `scale(${ramp(f, [2, 34], [0.94, 1], EASE_OUT)})`,
             filter: `drop-shadow(0 0 ${34 + bloom * 60}px rgba(203,210,226,${
               0.34 + bloom * 0.32
             }))`,
-            marginBottom: 58,
-            width: 132,
-            height: 122,
+            marginBottom: 54,
+            width: 178,
             color: '#F2F5FA',
           }}
         >
-          <CitationGlyph style={{ width: '100%', height: '100%' }} />
+          {/* 1.9× the app's launch duration — the endcard's mark is settling,
+              not booting. */}
+          <AnimatedMark
+            id="end"
+            u={prog(f, 2, 2 + MARK_LAUNCH_FRAMES * 1.9, EASE_OUT)}
+            style={{ width: '100%', height: 'auto' }}
+          />
         </div>
 
         <div

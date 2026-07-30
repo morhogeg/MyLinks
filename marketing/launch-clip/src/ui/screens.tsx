@@ -541,7 +541,10 @@ export const AskScreen: React.FC<{
             </div>
           )}
 
-          {typed > 0 && (
+          {/* The bubble exists only AFTER the question is sent. While typing, the
+              text lives in the composer alone — rendering both showed the same
+              half-finished sentence twice on screen, which read as a glitch. */}
+          {asked && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 18 }}>
               <div
                 style={{
@@ -556,7 +559,7 @@ export const AskScreen: React.FC<{
                   fontWeight: 500,
                 }}
               >
-                {q}
+                {ASK_QUESTION}
               </div>
             </div>
           )}
@@ -1032,6 +1035,8 @@ export const CollectionsScreen: React.FC<{ enter?: number }> = ({ enter = 1 }) =
     { name: 'Attention economy', n: 9, key: 'teal' },
     { name: 'Product notes', n: 23, key: 'orange' },
     { name: 'Read again', n: 6, key: 'blue' },
+    { name: 'From YouTube', n: 18, key: 'red' },
+    { name: 'Saved on X', n: 31, key: 'cyan' },
   ];
   return (
     <Screen>

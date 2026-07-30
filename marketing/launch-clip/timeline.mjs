@@ -56,23 +56,26 @@ export const sceneAt = (id) => {
  * absorbed in a glance while the picture does the real talking.
  */
 export const SUBTITLES = [
-  // Act one: fragmentation. Named platforms rather than a vague "somewhere
-  // else" — the panels on screen say exactly these words.
-  { bar: 1.2, bars: 1.4, text: 'Instagram. X. YouTube. WhatsApp.' },
-  { bar: 2.8, bars: 1.2, text: "Then you can't remember which one." },
-  // The turn, landing just after the name resolves.
-  { bar: 5.2, bars: 1.2, text: 'One place for everything you save.' },
-  // What the product actually does, in order: reads it, files it, so it is
-  // findable; then connects it; then answers from it.
-  { bar: 6.5, bars: 1.6, text: 'Saving was never the hard part.' },
-  { bar: 8.3, bars: 1.7, text: 'Machina reads what you save.' },
-  { bar: 10.5, bars: 1.6, text: 'Summarized, tagged and filed for you.' },
-  { bar: 12.4, bars: 1.5, text: 'So you can actually find it again.' },
-  { bar: 14.4, bars: 1.6, text: 'Then ask it anything.' },
-  { bar: 16.3, bars: 1.7, text: 'Answers built from what you saved.' },
-  { bar: 18.4, bars: 1.6, text: 'Every save connects to the rest.' },
+  // `place` is a LAYOUT, not a style: 'left' puts the line in the left column
+  // with the device held right of centre; 'bottom' is the centred line, used
+  // only where there is no device to sit under.
+  { bar: 1.2, bars: 1.4, place: 'bottom', text: 'Instagram. X. YouTube. WhatsApp.' },
+  { bar: 2.8, bars: 1.2, place: 'bottom', text: "Then you can't remember which one." },
+  // The turn. Ends before the mark pushes through into the product section.
+  { bar: 4.75, bars: 0.9, place: 'bottom', text: 'One place for everything you save.' },
+  // This one has to clear the cut INTO the app: it is about the act of saving,
+  // and it looked absurd sitting over Machina's own analyzing screen.
+  { bar: 6.4, bars: 0.85, place: 'left', text: 'Saving was never the hard part.' },
+  { bar: 7.35, bars: 1.65, place: 'left', text: 'Machina reads what you save.' },
+  { bar: 10.5, bars: 1.6, place: 'left', text: 'Summarized, tagged and filed for you.' },
+  { bar: 12.4, bars: 1.5, place: 'left', text: 'So you can actually find it again.' },
+  { bar: 14.4, bars: 1.6, place: 'left', text: 'Then ask it anything.' },
+  { bar: 16.3, bars: 1.7, place: 'left', text: 'Answers built from what you saved.' },
+  // NOT "every save connects to the rest" — that claims something the product
+  // does not promise. The graph shows you the connections it found.
+  { bar: 18.4, bars: 1.6, place: 'left', text: 'See how your saves connect.' },
   // Bar 20 is deliberately silent — the graph earns a beat with no copy on it.
-  { bar: 21.3, bars: 1.6, text: 'Nothing worth keeping stays buried.' },
+  { bar: 21.3, bars: 1.6, place: 'left', text: 'Nothing worth keeping stays buried.' },
 ];
 
 /** Sound-design hits, in bars — the picture events the score has to acknowledge. */
@@ -81,7 +84,7 @@ export const HITS = {
   bootExit: 0.78, // the mark pushes through and the frame dissolves
   converge: 4.0, // the five platform panels rush back toward centre
   collapse: 4.35, // …and land as one point of light
-  nameIn: 4.75, // the brackets open, MACHINA resolves
+  markLock: 4.55, // the brackets close around the gathered point
   deviceIn: 6.0,
   shareSheet: 6.9,
   cardLands: 8.6,

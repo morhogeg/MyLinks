@@ -2,7 +2,7 @@ import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { Phone } from '../ui/Phone';
 import { FloorGlow, Rig, Stage } from '../film/effects';
-import { BASE_SCALE, BASE_Y, drift, prog, ramp, typed, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
+import { BASE_X, BASE_SCALE, BASE_Y, drift, prog, ramp, typed, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
 import { AskScreen } from '../ui/screens';
 import { ASK_ANSWER, ASK_QUESTION, ASK_SOURCES } from '../data/library';
 
@@ -39,7 +39,7 @@ export const AskScene: React.FC = () => {
   return (
     <AbsoluteFill style={{ background: '#050505', opacity: out * inFade }}>
       <Stage intensity={0.62} backlight={0.46} drift={push * 0.3} />
-      <Rig scale={scale} rotY={rotY} y={y} origin="center 44%">
+      <Rig scale={scale} rotY={rotY} x={BASE_X} y={y} origin="center 44%">
         <div style={{ position: 'relative' }}>
           <FloorGlow y={890} w={700} opacity={0.5} />
           <Phone>

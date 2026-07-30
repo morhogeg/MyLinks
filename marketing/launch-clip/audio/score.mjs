@@ -448,8 +448,8 @@ whoosh(b(HITS.converge) - 0.05, 0.85, 0.1, 0.35);
 riser(b(HITS.converge), BAR * 0.35, 0.075);
 impact(b(HITS.collapse), 0.4);
 sub(b(HITS.collapse), 45, 0.34, 0.5);
-// and the release into the name
-shimmer(b(HITS.nameIn), [69, 76, 81, 88], 0.062);
+// and the mark locking around it
+shimmer(b(HITS.markLock), [69, 76, 81, 88], 0.062);
 
 whoosh(b(HITS.deviceIn) - 0.3, 0.9, 0.085, 0.25);
 tick(b(HITS.shareSheet), 0.085, 1.1);

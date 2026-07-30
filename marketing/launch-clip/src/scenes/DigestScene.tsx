@@ -2,7 +2,7 @@ import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { Phone } from '../ui/Phone';
 import { FloorGlow, Rig, Stage } from '../film/effects';
-import { BASE_SCALE, BASE_Y, drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
+import { BASE_X, BASE_SCALE, BASE_Y, drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
 import { CollectionsScreen, DigestScreen } from '../ui/screens';
 
 /**
@@ -40,7 +40,7 @@ export const DigestScene: React.FC = () => {
   return (
     <AbsoluteFill style={{ background: '#050505', opacity: out * inFade }}>
       <Stage intensity={0.6} backlight={0.42} />
-      <Rig scale={scale} rotY={rotY} x={whipX} y={y} blur={whipBlur} origin="center 40%">
+      <Rig scale={scale} rotY={rotY} x={whipX + BASE_X} y={y} blur={whipBlur} origin="center 40%">
         <div style={{ position: 'relative' }}>
           <FloorGlow y={890} w={700} opacity={0.45} />
           <Phone>

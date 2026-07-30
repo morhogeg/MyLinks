@@ -2,7 +2,7 @@ import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { Phone } from '../ui/Phone';
 import { FloorGlow, Rig, Stage } from '../film/effects';
-import { BASE_SCALE, BASE_Y, drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
+import { BASE_X, BASE_SCALE, BASE_Y, drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
 import { AnalyzingScreen, ArticleScreen, ShareSheet } from '../ui/screens';
 
 /**
@@ -54,7 +54,7 @@ export const Capture: React.FC = () => {
         rotY={rotY}
         rotX={rotX}
         rotZ={rotZ}
-        x={x + camX}
+        x={x + camX + BASE_X}
         y={yIn + camY}
         origin="center 24%"
       >

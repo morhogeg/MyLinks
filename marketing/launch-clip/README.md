@@ -58,7 +58,7 @@ owner ruled out: it is **not** a learning app, and it does **not** sell
 |---|---|---|---|
 | 0–1 | 0:00 | `ColdOpen` | **The app booting** — the real `BootScreen`, ported from `web/app/page.tsx` |
 | 1–4 | 0:02.5 | `Scatter` | Five platforms drifting apart — Instagram, X, YouTube, WhatsApp, Reading List — then fading out one by one |
-| 4–6 | 0:10 | `WordmarkScene` | The five rush back and collapse into one point; the brackets close around it, then open: **[ MACHINA ]** |
+| 4–6 | 0:10 | `WordmarkScene` | The five rush back and collapse into one point; the mark closes around it, then pushes through into the product |
 | 6–10 | 0:15 | `Capture` | Article → share sheet → the real five-phase pipeline → a finished card |
 | 10–14 | 0:25 | `Library` | The feed, then the search that finds it again |
 | 14–18 | 0:35 | `AskScene` | **The hero.** Question → streamed answer → three citation chips |
@@ -81,6 +81,25 @@ beside the platform's name in type rather than reproductions of anyone's logo.
 `CONSTELLATION` in `src/ui/platforms.tsx` is shared by both scenes on purpose: the
 panels gather back to exactly where they drifted out from, because the gather only
 reads as an answer if it undoes the same scatter.
+
+## Captions are a layout, not a subtitle track
+
+Product beats hold the device **right of centre** (`BASE_X`) and set the line in
+a **left column** against a short accent rule; beats with no device (the scatter,
+the turn) keep a centred line. Which one a cue uses is declared per cue as
+`place` in `timeline.mjs`. Type centred under the device sat in its shadow and
+made the whole film read as something with subtitles burned on.
+
+All caption motion lands on whole pixels — sub-pixel translation makes Chromium
+re-rasterize the glyphs every frame, which shimmers at this size.
+
+## Where the name appears
+
+**Twice, deliberately: small at the start, big at the end.** The boot is the app
+launching; the endcard is the lockup. The turn at bar 4 used to resolve into a
+third `[ MACHINA ]`, which made the name land three times in 65 seconds — it now
+closes on the mark holding what it gathered and pushes through into the product,
+the same gesture the boot exits on.
 
 ## Compositions
 

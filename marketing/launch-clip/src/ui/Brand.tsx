@@ -90,3 +90,90 @@ export const AppIcon: React.FC<{ size: number; style?: React.CSSProperties }> = 
     </g>
   </svg>
 );
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * The mark's ARRIVAL motion, ported verbatim from
+ * `web/components/ui/CitationMark.tsx` (which itself ports
+ * design/icon-concepts/motion.js — "the C1-continuous core tuned against real
+ * renders. Do not re-derive the numbers.").
+ *
+ * This is the app's own `launch` entry: the arms draw outward from corner ticks
+ * to full brackets, the brackets close in from their spread, and the point
+ * strikes last. LAUNCH_MS is 1300 in the app, i.e. 39 frames at 30fps.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const TOP = 300;
+const BOT = 700;
+const W = 58;
+const ARM = 100;
+const LX = 296;
+const RX = 728;
+const CX = 512;
+const CY = 500;
+const SPREAD = 58;
+const R_HI = 52;
+const ARM_H = 58;
+const HALF = 200;
+
+/** The motion's travel envelope — the tight box clips the spread brackets. */
+const VIEWBOX_ROAM = '224 292 576 416';
+
+const c01 = (x: number) => Math.min(1, Math.max(0, x));
+const sstep = (a: number, b: number, x: number) => {
+  const t = c01((x - a) / (b - a));
+  return t * t * (3 - 2 * t);
+};
+
+const bracketPaths = (spread: number): [string, string] => {
+  const lx = LX - spread;
+  const rx = RX + spread;
+  return [
+    `M${lx} ${TOP} L${lx + ARM} ${TOP} L${lx + ARM} ${TOP + W} L${lx + W} ${TOP + W} ` +
+      `L${lx + W} ${BOT - W} L${lx + ARM} ${BOT - W} L${lx + ARM} ${BOT} L${lx} ${BOT} Z`,
+    `M${rx} ${TOP} L${rx - ARM} ${TOP} L${rx - ARM} ${TOP + W} L${rx - W} ${TOP + W} ` +
+      `L${rx - W} ${BOT - W} L${rx - ARM} ${BOT - W} L${rx - ARM} ${BOT} L${rx} ${BOT} Z`,
+  ];
+};
+
+/** `launchAt` from CitationMark — an arrival that resolves to the locked mark. */
+const launchAt = (u: number) => {
+  const g = sstep(0, 0.46, u);
+  const strike = sstep(0.44, 0.68, u);
+  return {
+    spread: SPREAD * (1 - sstep(0.3, 0.7, u)),
+    clipH: ARM_H + (HALF - ARM_H) * g,
+    dotR: R_HI * strike,
+    dotOp: strike,
+  };
+};
+
+/** The app's animated mark, driven by an explicit 0–1 progress. */
+export const AnimatedMark: React.FC<{
+  /** 0 → nothing drawn, 1 → the locked mark. Run it over ~39 frames for the app's pace. */
+  u: number;
+  style?: React.CSSProperties;
+  id?: string;
+}> = ({ u, style, id = 'mk' }) => {
+  const f = launchAt(c01(u));
+  const [l, r] = bracketPaths(f.spread);
+  return (
+    <svg viewBox={VIEWBOX_ROAM} style={style} fill="currentColor">
+      <defs>
+        <clipPath id={`${id}-clip`}>
+          {/* the arms are REVEALED from the corners inward — two rects that
+              grow toward the middle, exactly as the app clips them */}
+          <rect x="0" y={TOP} width="1024" height={f.clipH} />
+          <rect x="0" y={BOT - f.clipH} width="1024" height={f.clipH} />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${id}-clip)`}>
+        <path d={l} />
+        <path d={r} />
+      </g>
+      <circle cx={CX} cy={CY} r={f.dotR} opacity={f.dotOp} />
+    </svg>
+  );
+};
+
+/** Frames the app's launch arrival takes (LAUNCH_MS 1300 at 30fps). */
+export const MARK_LAUNCH_FRAMES = 39;
