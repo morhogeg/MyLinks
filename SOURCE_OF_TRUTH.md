@@ -1021,6 +1021,21 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-30 (round 3) — desktop toolbar regrouped around what the controls
+  ACT ON (owner call).** The bar's two clusters now split cleanly: **left = the
+  list you're looking at** (search, filter, sources, sort, **view switcher**,
+  **select multiple**), **right = the destinations that leave it** (**Ask**,
+  Collections, Digest, Notes). The view switcher and the idle select chip moved
+  out of the right zone — they were reading as peers of Ask/Digest when tapping
+  Ask leaves the library and tapping Card doesn't, and like the other list
+  controls they vanish the moment you navigate off it. **Ask now leads the
+  destination cluster** (was Collections): it's the Recall Engine, the product's
+  hero. **iOS/phone is untouched, structurally not just by intent** — this whole
+  row is `hidden sm:flex` and the phone has its own Row-1 tools capsule, so
+  nothing re-arranged here renders below the `sm` breakpoint. Also corrected a
+  stale comment claiming the desktop view switcher had a "mobile copy in Row 1".
+  `data-tour="views"`/`"ask"` anchors moved with their buttons, so the
+  onboarding tour still finds them. tsc 0, build green, eslint clean.
 - **2026-07-30 (round 2) — cluster names now name the SUBJECT; Ask chips keep
   their platform logos; Machina mark replaces the AI sparkle; digest width +
   chevrons; NOTES on a week (owner QA, six items).**
