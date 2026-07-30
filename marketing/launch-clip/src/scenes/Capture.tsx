@@ -30,49 +30,56 @@ const SOURCES = [
   { Screen: YouTubeSource, item: { title: 'Retrieval practice beats re-reading', site: 'youtube.com' } },
   { Screen: ArticleScreen, item: { title: 'Sleep-dependent memory consolidation', site: 'nature.com' } },
 ];
-const CUTS = [0, 62, 96]; // frames where the world behind the sheet swaps
+const CUTS = [0, 56, 88]; // frames where the world behind the sheet swaps
 
 export const Capture: React.FC = () => {
   const f = useCurrentFrame();
 
   // ── the device arrives
-  const entry = prog(f, 0, 32, EASE_OUT);
-  const x = ramp(f, [0, 32], [340, 0], EASE_OUT);
-  const yIn = ramp(f, [0, 32], [150, 0], EASE_OUT);
-  const rotZ = ramp(f, [0, 38], [6, 0], EASE_OUT);
+  const entry = prog(f, 0, 30, EASE_OUT);
+  const x = ramp(f, [0, 30], [340, 0], EASE_OUT);
+  const yIn = ramp(f, [0, 30], [150, 0], EASE_OUT);
+  const rotZ = ramp(f, [0, 36], [6, 0], EASE_OUT);
 
   // ── the sheet comes up once and holds; the SOURCE behind it changes
-  const sheet = prog(f, 20, 48, EASE_MODAL);
+  const sheet = prog(f, 18, 44, EASE_MODAL);
   const sourceIndex = Math.max(0, CUTS.filter((c) => f >= c).length - 1);
   const source = SOURCES[Math.min(SOURCES.length - 1, sourceIndex)];
   const Source = source.Screen;
-  // a one-frame-ish dip on each swap, so it reads as a cut and not a glitch
+  // a short dip on each swap, so it reads as a cut and not a glitch
   const cutDip = sourceIndex > 0 ? prog(f - CUTS[sourceIndex], 0, 7, EASE_OUT) : 1;
   // Machina pulses in the app row on every one of them
   const pick = Math.max(
-    prog(f, 36, 50, EASE_OUT) * (1 - prog(f, 54, 62)),
-    prog(f, 66, 78, EASE_OUT) * (1 - prog(f, 88, 96)),
-    prog(f, 100, 116, EASE_OUT),
+    prog(f, 32, 46, EASE_OUT) * (1 - prog(f, 48, 55)),
+    prog(f, 58, 70, EASE_OUT) * (1 - prog(f, 80, 88)),
+    prog(f, 92, 106, EASE_OUT),
   );
 
-  // ── then inside the app: the honest pipeline, ending on a finished card
-  const inApp = f >= 128;
-  const progress = ramp(f, [132, 196], [4, 100], EASE_IN_OUT);
-  const cardEnter = prog(f, 192, 214, EASE_MODAL);
+  // ── inside the app. THE PIPELINE IS THE PRODUCT, so it gets the time and the
+  // size: ~5.5 seconds under a hard push-in, roughly a second per phase, which
+  // is what it takes to actually read "Reading the page" → "Writing the
+  // summary" → "Searching connections" and understand what was bought by
+  // pressing share.
+  const inApp = f >= 118;
+  const progress = ramp(f, [126, 292], [3, 100], EASE_IN_OUT);
+  const cardEnter = prog(f, 288, 312, EASE_MODAL);
 
-  // ── camera: angled hold on the sheet, then a pure-2D push into the app
-  const shot = prog(f, 128, 146, EASE_MODAL);
-  const push = prog(f, 170, 250, EASE_IN_OUT);
-  const scale = BASE_SCALE * (1 + shot * 0.1) * (1 + push * 0.42);
-  const rotY = ramp(f, [0, 128], [15, 12], EASE_IN_OUT) * (1 - shot);
-  const rotX = ramp(f, [0, 128], [7, 5], EASE_IN_OUT) * (1 - shot);
-  const camY = BASE_Y + drift(f, 6, 300) + push * 120;
+  // ── camera: angled hold on the sheet, then a straight 2D push onto the
+  // checklist (2D so the small type stays sharp), easing back out as the
+  // finished card lands.
+  const shot = prog(f, 118, 136, EASE_MODAL);
+  const push = prog(f, 132, 250, EASE_IN_OUT);
+  const settle = prog(f, 288, 360, EASE_IN_OUT);
+  const scale = BASE_SCALE * (1 + shot * 0.08) * (1 + push * 0.62 - settle * 0.16);
+  const rotY = ramp(f, [0, 118], [15, 12], EASE_IN_OUT) * (1 - shot);
+  const rotX = ramp(f, [0, 118], [7, 5], EASE_IN_OUT) * (1 - shot);
+  const camY = BASE_Y + drift(f, 6, 320) + push * 210 - settle * 40;
 
-  const out = 1 - prog(f, 288, 300);
+  const out = 1 - prog(f, 363, 375);
 
   return (
     <AbsoluteFill style={{ background: '#050505', opacity: out * entry }}>
-      <Stage intensity={0.62} backlight={0.44} drift={push * 0.4} />
+      <Stage intensity={0.64} backlight={0.46} drift={push * 0.4} />
       <Rig
         scale={scale}
         rotY={rotY}
@@ -80,11 +87,11 @@ export const Capture: React.FC = () => {
         rotZ={rotZ}
         x={x + BASE_X}
         y={yIn + camY}
-        origin="center 24%"
+        origin="center 16%"
       >
         <div style={{ position: 'relative' }}>
           <FloorGlow y={890} w={720} opacity={0.5} />
-          <Phone sweep={f < 40 ? f / 40 : null}>
+          <Phone sweep={f < 38 ? f / 38 : null}>
             {inApp ? (
               <AnalyzingScreen progress={progress} cardEnter={cardEnter} />
             ) : (

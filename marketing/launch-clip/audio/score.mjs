@@ -339,16 +339,23 @@ const CHORDS = {
   Cmaj7: { bass: 48, upper: [59, 64, 67, 71] },
   G6: { bass: 43, upper: [59, 62, 64, 69] },
 };
+// Anchored to C MAJOR, not A minor.
+//
+// The chords were always these four; the film used to walk them Am9 → F → C → G
+// (i–VI–III–VII), which starts on the minor tonic and reads as melancholy — the
+// note was "the music at the beginning is too gloomy", and that ordering IS the
+// gloom. Walked C → G → Am → F (I–V–vi–IV) the same four chords open bright,
+// touch the minor in passing, and the film can end resolved at home on C.
 const BAR_CHORDS = [
-  'Am9', // 0     cold open (the boot)
-  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 1–4   scatter
-  'Am9', 'G6', // 5–6   the turn, and the lift out of it
-  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 7–10  capture
-  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 11–14 library
-  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 15–18 ask
-  'Am9', 'Fmaj7', 'Cmaj7', // 19–21 graph
-  'Am9', 'Fmaj7', // 22–23 digest
-  'Cmaj7', 'G6', 'Am9', // 24–26 endcard
+  'Cmaj7', // 0     cold open (the boot) — opens major
+  'Cmaj7', 'G6', 'Am9', 'Fmaj7', // 1–4   scatter
+  'Cmaj7', 'G6', // 5–6   the turn resolves home, then lifts
+  'Cmaj7', 'G6', 'Am9', 'Fmaj7', 'Cmaj7', // 7–11  capture
+  'G6', 'Am9', 'Fmaj7', 'Cmaj7', // 12–15 library
+  'G6', 'Am9', 'Fmaj7', 'Cmaj7', // 16–19 ask
+  'G6', 'Am9', 'Fmaj7', // 20–22 graph
+  'Cmaj7', 'G6', // 23–24 digest
+  'Am9', 'Fmaj7', 'Cmaj7', // 25–27 endcard, resolving home
 ];
 
 // A retime in timeline.mjs that forgets the arrangement would silently put the
@@ -362,8 +369,8 @@ const sceneOfBar = (bar) => SCENES.find((sc) => bar >= sc.bar && bar < sc.bar + 
 
 /** How much of the arrangement is switched on, per scene. */
 const SCENE_DENSITY = {
-  coldOpen: 0.18,
-  scatter: 0.46,
+  coldOpen: 0.3,
+  scatter: 0.62,
   wordmark: 0.62,
   capture: 0.78,
   library: 0.9,
@@ -383,6 +390,8 @@ const density = (bar) => {
 
 /** Bar of the first percussion-bearing scene, and of the endcard's drop-out. */
 const CAPTURE_BAR = SCENES.find((x) => x.id === 'capture').bar;
+/** The arpeggio starts with act one — silence under the scatter read as dread. */
+const ARP_FROM = SCENES.find((x) => x.id === 'scatter').bar;
 const GRAPH_END = SCENES.find((x) => x.id === 'graph');
 const DIGEST_BAR = SCENES.find((x) => x.id === 'digest').bar;
 const ENDCARD_BAR = SCENES.find((x) => x.id === 'endcard').bar;
@@ -395,10 +404,13 @@ for (let bar = 0; bar < BAR_CHORDS.length; bar++) {
 
   // ── pad: the harmony, voiced wider as the film opens up
   const padLevel = 0.1 + 0.075 * d;
+  // The first two bars are voiced an OCTAVE UP and stay open: the low, close
+  // voicing that opened the film was the other half of the gloom.
+  const lift = bar < 2 ? 12 : 0;
   ch.upper.forEach((m, i) => {
-    if (bar < 2 && i > 1) return; // cold open: two voices only
+    if (bar < 1 && i > 2) return; // the boot: three voices, airy
     const panPos = ((i / (ch.upper.length - 1)) * 2 - 1) * 0.55;
-    pad(t0, BAR, m, padLevel * (i === 0 ? 1 : 0.85), panPos);
+    pad(t0, BAR, m + lift, padLevel * (i === 0 ? 1 : 0.85), panPos);
   });
   pad(t0, BAR, ch.bass + 12, padLevel * 0.6, 0);
 
@@ -437,7 +449,7 @@ for (let bar = 0; bar < BAR_CHORDS.length; bar++) {
   // ── plucked figure. A 3-3-2 onset pattern (the eighth grid grouped 3+3+2)
   // instead of straight eighths — the single cheapest way to make a track feel
   // like it is going somewhere.
-  if (bar >= CAPTURE_BAR && bar < ENDCARD_BAR) {
+  if (bar >= ARP_FROM && bar < ENDCARD_BAR) {
     const notes = [...ch.upper, ch.upper[2] + 12];
     const dense = bar >= SIXTEENTH_FROM && bar < DIGEST_BAR;
     const onsets = dense
@@ -458,17 +470,18 @@ for (let bar = 0; bar < BAR_CHORDS.length; bar++) {
 
 // ── endcard glue: one long sustaining voicing under the last three bars, so the
 // per-bar pads stop pulsing and the ending reads as a single held breath.
-for (const m of [45, 57, 64, 69]) pad(b(ENDCARD_BAR), BAR * 3 - 0.3, m, 0.075, m === 57 ? -0.4 : 0.35);
+for (const m of [48, 64, 67, 72]) pad(b(ENDCARD_BAR), BAR * 3 - 0.3, m, 0.075, m === 64 ? -0.4 : 0.35);
 
 // ── melody: enters with the hero scene (Ask), returns for the endcard
 const MELODY = [
-  [14, 0, 76], [14, 2, 81], // Am9: E5 A5
-  [15, 0, 77], [15, 2.5, 72], // Fmaj7: F5 C5
-  [16, 0, 79], [16, 2, 76], // Cmaj7: G5 E5
-  [17, 0, 74], [17, 2, 71], // G6: D5 B4
-  [18, 0, 81], [19, 1, 77], [20, 0, 79],
-  [23, 0, 76], [24, 0, 74], [25, 0, 69], [25, 1.5, 81],
+  [16, 0, 74], [16, 2, 79], // G6:    D5 G5
+  [17, 0, 76], [17, 2.5, 81], // Am9:   E5 A5
+  [18, 0, 77], [18, 2, 72], // Fmaj7: F5 C5
+  [19, 0, 79], [19, 2, 76], // Cmaj7: G5 E5
+  [20, 0, 81], [21, 1, 76], [22, 0, 77],
+  [25, 0, 76], [26, 0, 77], [27, 0, 72], [27, 1.5, 79], // …home on C
 ];
+
 for (const [bar, bt, m] of MELODY) {
   const last = bar >= ENDCARD_BAR;
   bell(beat(bar, bt), m, last ? 0.2 : 0.15, bar % 2 ? 0.22 : -0.22, last ? 3.6 : 2.4);
@@ -482,8 +495,8 @@ for (const r of RISERS) riser(b(r), BAR * (r === 6 ? 1 : 1.4), 0.085);
 // the viewer and the frame dissolves into the film
 whoosh(b(HITS.bootStrike) - 0.5, 0.62, 0.07, -0.4);
 whoosh(b(HITS.bootStrike) - 0.45, 0.58, 0.07, 0.4);
-impact(b(HITS.bootStrike), 0.42);
-shimmer(b(HITS.bootStrike) + 0.42, [76, 83], 0.045);
+impact(b(HITS.bootStrike), 0.26);
+shimmer(b(HITS.bootStrike) + 0.1, [79, 84, 88], 0.055);
 whoosh(b(HITS.bootExit), 0.62, 0.1, 0);
 riser(b(HITS.bootExit) - 0.1, 0.7, 0.07);
 
@@ -501,6 +514,8 @@ tick(b(HITS.shareSheet), 0.085, 1.1);
 // the world behind the sheet changing — a soft tick on each cut
 tick(b(HITS.sourceCutA), 0.075, 1.25);
 tick(b(HITS.sourceCutB), 0.075, 1.4);
+whoosh(b(HITS.pipelineIn) - 0.25, 0.7, 0.06, -0.25);
+shimmer(b(HITS.pipelineIn) + 0.15, [72, 76, 79], 0.04);
 tick(b(HITS.cardLands), 0.11, 0.9);
 sub(b(HITS.cardLands), 45, 0.3, 0.35);
 shimmer(b(HITS.cardLands) + 0.1, [72, 79, 84], 0.05);

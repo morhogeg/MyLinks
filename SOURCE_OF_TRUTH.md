@@ -1058,6 +1058,31 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-30 (same session, round 5) — the pipeline becomes a SHOT, and the
+  score stops being in a minor key (owner review round 5).** **(1) The magic is
+  the five phases, and the film was throwing them away** — the checklist ran for
+  ~2s at thumbnail size while the camera sat wide. Capture went 4→5 bars and the
+  pipeline now runs **~5.5s under a hard push-in** (roughly a second a phase), so
+  a viewer can actually read *Reading the page → Writing the summary → Searching
+  connections* and understand what pressing share bought them. Per the note,
+  reading and filing are ONE step, so one heading covers the whole thing:
+  **"Machina reads it, summarizes it, files it."** Film is now **70s**.
+  **(2) "Then you can't remember which one" is gone** → **"And then it's gone."**,
+  landing exactly as the five panels fade out; the old line explained the picture
+  instead of finishing it. **(3) The turn names the product:** "One place for
+  everything you save" (generic) → **"Machina keeps every save in one place."**
+  **(4) The library payoff is a callback, not a shrug:** "So you can actually
+  find it again" → **"Find it without remembering where."**, which answers act
+  one's complaint directly. Its partner line is "All of it, already sorted."
+  **(5) THE SCORE IS RE-ANCHORED FROM A MINOR TO C MAJOR.** The chords were
+  always the same four; the film walked them Am9→F→C→G (i–VI–III–VII), which
+  starts on the minor tonic — that ordering *was* the gloom. Walked C→G→Am→F
+  (I–V–vi–IV) it opens bright, passes through the minor, and **ends resolved at
+  home on C** (the endcard pedal is a C chord now, not an A). Also: the first two
+  bars are voiced an octave up (a low drone was the other half of it), the
+  arpeggio now starts with act one instead of silence, and the boot's impact is
+  softer with a brighter shimmer over it. Repo-only, no app code, nothing to
+  deploy.
 - **2026-07-30 (same session, round 4) — launch film explains the product
   properly (owner review round 4).** The note behind all six items: *"do a much
   better job at explaining the value of the app"* — one place for every saved

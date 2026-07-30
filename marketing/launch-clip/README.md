@@ -1,6 +1,6 @@
 # Machina — launch film
 
-A 67-second launch film, rendered from code. No editor project, no stock music, no
+A 70-second launch film, rendered from code. No editor project, no stock music, no
 screen recording: the picture is [Remotion](https://remotion.dev) (React → frames),
 the score is synthesized by a Node script, and both read their timing from one
 shared file.
@@ -59,12 +59,12 @@ owner ruled out: it is **not** a learning app, and it does **not** sell
 | 0–1 | 0:00 | `ColdOpen` | **The app booting** — the real `BootScreen`, ported from `web/app/page.tsx` |
 | 1–5 | 0:02.5 | `Scatter` | Five platforms drifting apart — Instagram, X, YouTube, WhatsApp, Reading List — then fading out one by one |
 | 5–7 | 0:12.5 | `WordmarkScene` | The five rush back and collapse into one point; the mark closes around it, then pushes through into the product |
-| 7–11 | 0:17.5 | `Capture` | **One share sheet, three sources behind it** → the real five-phase pipeline → a finished card |
-| 11–15 | 0:27.5 | `Library` | The feed, then the search that finds it again |
-| 15–19 | 0:37.5 | `AskScene` | **The hero.** Question → streamed answer → three citation chips, from three different platforms |
-| 19–22 | 0:47.5 | `GraphScene` | Edges draw in staggered — connections being found, not a diagram revealed |
-| 22–24 | 0:55 | `DigestScene` | Collections, then the weekly synthesis + resurface nudge |
-| 24–27 | 1:00 | `Endcard` | The bare mark, the wordmark, `Capture. Ask. Connect.` |
+| 7–12 | 0:17.5 | `Capture` | **One share sheet, three sources behind it** → the five-phase pipeline, held ~5.5s under a push-in → a finished card |
+| 12–16 | 0:30 | `Library` | Sorted, and findable without remembering where |
+| 16–20 | 0:40 | `AskScene` | **The hero.** Question → streamed answer → three citation chips, from three different platforms |
+| 20–23 | 0:50 | `GraphScene` | Edges draw in staggered — connections being found, not a diagram revealed |
+| 23–25 | 0:57.5 | `DigestScene` | Collections, then the weekly synthesis + resurface nudge |
+| 25–28 | 1:02.5 | `Endcard` | The bare mark, the wordmark, `Capture. Ask. Connect.` |
 
 The cold open is the app's own boot sequence, not an invented title card — same
 staged arrival (brackets close → the point strikes → only then does the wordmark
@@ -93,6 +93,12 @@ seconds and without a word of copy.
 
 The same argument then closes itself in the Ask beat: the three citation chips
 under the answer are a Nature paper, a YouTube video and an Instagram carousel.
+
+**The pipeline is a shot, not a transition.** The five phases from
+`web/lib/scanPhases.ts` run for ~5.5 seconds under a hard 2D push-in — about a
+second per phase, which is what it takes to actually read them. It is the one
+place the film shows what pressing *share* bought you, so it gets the time and
+the screen size, under a single heading.
 
 ## Captions are a layout, not a subtitle track
 
@@ -127,9 +133,11 @@ every render is bit-identical). Pad, sub, Karplus-Strong pluck, bell, kick, hat,
 rim, risers, whooshes and impacts, each with its own ADSR and one-pole filter, into
 a dotted-8th delay bus and a Freeverb-style tank (8 damped combs → 4 allpasses,
 23-sample stereo spread), then tanh saturation and film fades. Progression is
-Am9 → Fmaj7 → Cmaj7 → G6 under the whole film, with a per-bar density curve that
-brings percussion in for capture, peaks on Ask, and drops to a held pedal tone for
-the endcard.
+**C major**, walked C → G → Am → F (I–V–vi–IV) under the whole film, ending
+resolved at home on C. The same four chords walked Am → F → C → G is the same
+harmony and a completely different mood — that ordering is what made an earlier
+cut read as gloomy. Per-bar density brings percussion in for capture, peaks on
+Ask, and drops to a held C pedal for the endcard.
 
 There is no audio device in the render environment, so the mix is verified
 numerically — `npm run verify` prints per-bar RMS and peak, DC offset and a

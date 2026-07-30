@@ -32,14 +32,17 @@ export const SCENES = [
   { id: 'coldOpen', bar: 0, bars: 1 }, //  0.0 –  2.5  the app boots: mark + MACHINA
   // Four bars, not three: act one needs an opening SENTENCE before the list of
   // platforms, or the film starts on a fragment.
-  { id: 'scatter', bar: 1, bars: 4 }, //  2.5 – 12.5  five platforms, quietly disappearing
+  { id: 'scatter', bar: 1, bars: 4 }, //  2.5 – 12.5  five platforms, then gone
   { id: 'wordmark', bar: 5, bars: 2 }, // 12.5 – 17.5  five become one
-  { id: 'capture', bar: 7, bars: 4 }, // 17.5 – 27.5  share from anywhere → read + filed
-  { id: 'library', bar: 11, bars: 4 }, // 27.5 – 37.5  the feed + finding it again
-  { id: 'ask', bar: 15, bars: 4 }, // 37.5 – 47.5  the hero: cited answer
-  { id: 'graph', bar: 19, bars: 3 }, // 47.5 – 55.0  the knowledge graph
-  { id: 'digest', bar: 22, bars: 2 }, // 55.0 – 60.0  it resurfaces
-  { id: 'endcard', bar: 24, bars: 3 }, // 60.0 – 67.5  lockup
+  // FIVE bars. The pipeline is the magic and it used to flash past in two
+  // seconds at thumbnail size; it now runs ~5.5s under a hard push-in, which is
+  // long enough to actually read what Machina is doing to your save.
+  { id: 'capture', bar: 7, bars: 5 }, // 17.5 – 30.0  share from anywhere → read + filed
+  { id: 'library', bar: 12, bars: 4 }, // 30.0 – 40.0  sorted, and findable
+  { id: 'ask', bar: 16, bars: 4 }, // 40.0 – 50.0  the hero: cited answer
+  { id: 'graph', bar: 20, bars: 3 }, // 50.0 – 57.5  the knowledge graph
+  { id: 'digest', bar: 23, bars: 2 }, // 57.5 – 62.5  it resurfaces
+  { id: 'endcard', bar: 25, bars: 3 }, // 62.5 – 70.0  lockup
 ];
 
 export const TOTAL_BARS = SCENES.reduce((n, s) => Math.max(n, s.bar + s.bars), 0);
@@ -63,20 +66,27 @@ export const SUBTITLES = [
   // only where there is no device to sit under.
   { bar: 1.3, bars: 1.3, place: 'bottom', text: 'You save things everywhere.' },
   { bar: 2.8, bars: 1.3, place: 'bottom', text: 'Instagram. X. YouTube. WhatsApp.' },
-  { bar: 4.3, bars: 1.3, place: 'bottom', text: "Then you can't remember which one." },
-  // The turn. Ends before the mark pushes through into the product section.
-  { bar: 5.7, bars: 1.0, place: 'bottom', text: 'One place for everything you save.' },
-  // Capture, as a claim the picture is proving at the same moment: the sheet
-  // holds while Instagram, YouTube and an article pass behind it.
-  { bar: 7.5, bars: 1.5, place: 'left', text: 'Share it from anywhere.' },
-  { bar: 9.2, bars: 1.6, place: 'left', text: 'Machina reads every save.' },
-  { bar: 11.4, bars: 1.6, place: 'left', text: 'Summarized, tagged and filed.' },
-  { bar: 13.3, bars: 1.5, place: 'left', text: 'So you can actually find it again.' },
-  { bar: 15.4, bars: 1.6, place: 'left', text: 'Then ask it anything.' },
-  { bar: 17.3, bars: 1.7, place: 'left', text: 'Answers built from what you saved.' },
-  { bar: 19.4, bars: 1.6, place: 'left', text: 'See how your saves connect.' },
-  // Bar 21 is deliberately silent — the graph earns a beat with no copy on it.
-  { bar: 22.3, bars: 1.6, place: 'left', text: 'Nothing worth keeping stays buried.' },
+  // Lands as the panels themselves fade out, one by one. The previous line
+  // ("then you can't remember which one") explained the picture instead of
+  // finishing it.
+  { bar: 4.3, bars: 1.3, place: 'bottom', text: 'And then it’s gone.' },
+  // The turn names the product and the promise in one line, rather than making
+  // a generic claim about "one place".
+  { bar: 5.7, bars: 1.0, place: 'bottom', text: 'Machina keeps every save in one place.' },
+  // Clears the frame just before the cut inside the app at ~21.4s.
+  { bar: 7.5, bars: 1.0, place: 'left', text: 'Share it from anywhere.' },
+  // One heading over the whole pipeline: reading and filing are one step, and
+  // the shot now holds long enough to watch all five phases of it.
+  { bar: 8.8, bars: 2.6, place: 'left', text: 'Machina reads it, summarizes it, files it.' },
+  { bar: 12.4, bars: 1.6, place: 'left', text: 'All of it, already sorted.' },
+  // The payoff answers act one directly: the problem was never that you lost
+  // the link, it was that you could not remember where you put it.
+  { bar: 14.3, bars: 1.5, place: 'left', text: 'Find it without remembering where.' },
+  { bar: 16.4, bars: 1.6, place: 'left', text: 'Then ask it anything.' },
+  { bar: 18.3, bars: 1.7, place: 'left', text: 'Answers built from what you saved.' },
+  { bar: 20.4, bars: 1.6, place: 'left', text: 'See how your saves connect.' },
+  // Bar 22 is deliberately silent — the graph earns a beat with no copy on it.
+  { bar: 23.3, bars: 1.6, place: 'left', text: 'Nothing worth keeping stays buried.' },
 ];
 
 /** Sound-design hits, in bars — the picture events the score has to acknowledge. */
@@ -87,19 +97,20 @@ export const HITS = {
   collapse: 5.35, // …and land as one point of light
   markLock: 5.55, // the brackets close around the gathered point
   deviceIn: 7.0,
-  shareSheet: 7.7, // the sheet comes up and stays
-  sourceCutA: 8.55, // the world behind it changes…
-  sourceCutB: 9.05, // …and changes again
-  cardLands: 9.9,
-  searchIn: 11.0,
-  filterSnap: 13.1,
-  askIn: 15.0,
-  answerStart: 16.4,
-  citations: 17.6,
-  graphBloom: 19.0,
-  digestIn: 22.0,
-  endcard: 24.0,
+  shareSheet: 7.6, // the sheet comes up and stays
+  sourceCutA: 8.35, // the world behind it changes…
+  sourceCutB: 9.0, // …and changes again
+  pipelineIn: 9.6, // inside the app: the five phases, under a push-in
+  cardLands: 11.3,
+  searchIn: 12.0,
+  filterSnap: 14.1,
+  askIn: 16.0,
+  answerStart: 17.4,
+  citations: 18.6,
+  graphBloom: 20.0,
+  digestIn: 23.0,
+  endcard: 25.0,
 };
 
 /** One-bar risers that lead into the big cuts. */
-export const RISERS = [6.0, 10.6, 14.0, 18.4, 23.4];
+export const RISERS = [6.0, 11.6, 15.0, 19.4, 24.4];
