@@ -1058,6 +1058,32 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-30 (same session, round 6) — the score's instrument was the bug, and
+  the script tightened again (owner review round 6).** **(1) "The music sounds
+  Chinese" was a correct diagnosis of a real mistake, and it was not a mix
+  problem.** The film's rhythmic voice was a **Karplus-Strong pluck** — a
+  physically modelled plucked STRING — playing **chord-tone-only** arpeggios into
+  a long reverb. That is, acoustically, how you synthesize a koto. Fixed at both
+  causes: the instrument is now a **detuned band-limited saw pulse** (fast
+  attack, short decay, falling brightness, short send) with an **FM electric
+  piano** carrying the melody, and the NOTES now walk the C-major scale using
+  degrees 0-2-3-4-6, which puts **E→F and B→C** in the line — the two semitones a
+  pentatonic scale by definition cannot contain. Worth keeping: the first attempt
+  at this fix swapped the instrument but left the shape at 0-2-4-5 (C E G A),
+  which is *still pentatonic*, and it took checking the scheduled pitch classes
+  to catch that. **(2) The platform-name line is cut** — Instagram/X/YouTube are
+  written on the panels, so captioning them was pure redundancy. **(3) "And then
+  it's gone" → "And almost none of it comes back."** — the fade-out IS the
+  disappearing; the line's job is what it costs you, not narrating the picture.
+  **(4) The library beat is about ACCESS, not cleverness:** "All of it, already
+  sorted" / "Find it without remembering where" → **"Browse it, search it, filter
+  it."** / **"However you remember it."** **(5) Camera:** the Ask shot now holds
+  ~7° off-axis through the typing and streaming and **squares up to dead-on
+  exactly as the three citations land** (off-axis→on-axis is the move that says
+  "this is the point"); the graph orbits slowly *through* square-on rather than
+  sitting at a fixed angle; the library counter-settles as the filter snaps; and
+  scene dissolves went 9–10 frames → 4, so cuts land on the bar line instead of
+  softening across it. Repo-only, no app code, nothing to deploy.
 - **2026-07-30 (same session, round 5) — the pipeline becomes a SHOT, and the
   score stops being in a minor key (owner review round 5).** **(1) The magic is
   the five phases, and the film was throwing them away** — the checklist ran for

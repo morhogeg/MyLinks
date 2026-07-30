@@ -29,10 +29,10 @@ export const Library: React.FC = () => {
   // camera: a straight-on establishing hold, then a slow 2D push onto the hits
   const scale = BASE_SCALE * ramp(f, [0, 60], [1.06, 1.0], EASE_OUT) * (1 + prog(f, 170, 300, EASE_IN_OUT) * 0.42);
   const y = BASE_Y + drift(f, 5, 280) - prog(f, 170, 300, EASE_IN_OUT) * 74;
-  const rotY = ramp(f, [0, 46], [-8, 0], EASE_OUT);
+  const rotY = ramp(f, [0, 46], [-9, -4], EASE_OUT) * (1 - prog(f, 168, 214, EASE_IN_OUT));
 
   const out = 1 - prog(f, 288, 300);
-  const inFade = prog(f, 0, 10);
+  const inFade = prog(f, 0, 4);
 
   return (
     <AbsoluteFill style={{ background: '#050505', opacity: out * inFade }}>

@@ -30,11 +30,15 @@ export const AskScene: React.FC = () => {
   const settle = prog(f, 0, 26, EASE_OUT);
   const push = prog(f, 190, 300, EASE_IN_OUT);
   const scale = BASE_SCALE * (1.02 - settle * 0.02) * (1 + push * 0.44);
-  const rotY = ramp(f, [0, 30], [10, 0], EASE_OUT);
+  // The shot holds a slight angle through the typing and the streaming, then
+  // squares up to dead-on exactly as the three citations land. Off-axis to
+  // on-axis is the move that says "this is the point" without a caption doing
+  // it — and the citations are the point of the whole film.
+  const rotY = ramp(f, [0, 26], [11, 7], EASE_OUT) * (1 - prog(f, 194, 258, EASE_IN_OUT));
   const y = BASE_Y + drift(f, 4, 300) - push * 120;
 
   const out = 1 - prog(f, 288, 300);
-  const inFade = prog(f, 0, 9);
+  const inFade = prog(f, 0, 4);
 
   return (
     <AbsoluteFill style={{ background: '#050505', opacity: out * inFade }}>

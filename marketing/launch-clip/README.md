@@ -128,11 +128,19 @@ the same gesture the boot exits on.
 
 ## The score
 
-`audio/score.mjs` — ~500 lines, no dependencies, deterministic (seeded LCG, so
-every render is bit-identical). Pad, sub, Karplus-Strong pluck, bell, kick, hat,
-rim, risers, whooshes and impacts, each with its own ADSR and one-pole filter, into
-a dotted-8th delay bus and a Freeverb-style tank (8 damped combs → 4 allpasses,
-23-sample stereo spread), then tanh saturation and film fades. Progression is
+`audio/score.mjs` — no dependencies, deterministic (seeded LCG, so every render
+is bit-identical). Pad, moving sub bass, a detuned saw **pulse** (the engine), an
+**FM electric piano** for the melody, plus kick, clap, hat, shaker, rim, risers,
+whooshes and impacts — each with its own ADSR and one-pole filter, into a
+dotted-8th delay bus and a Freeverb-style tank (8 damped combs → 4 allpasses,
+23-sample stereo spread), then tanh saturation and film fades.
+
+**Do not put a plucked string back in.** An earlier cut used Karplus-Strong for
+the rhythmic figure, playing chord-tone-only arpeggios into a long reverb — which
+is, acoustically, a koto, and it got (correctly) described as sounding Chinese.
+Two things had to change together: the instrument, and the note choice. The pulse
+figure walks scale degrees **0-2-3-4-6**, which puts E→F and B→C in the line;
+degrees 0-2-4-5 (C E G A) are still pentatonic no matter what plays them. Progression is
 **C major**, walked C → G → Am → F (I–V–vi–IV) under the whole film, ending
 resolved at home on C. The same four chords walked Am → F → C → G is the same
 harmony and a completely different mood — that ordering is what made an earlier

@@ -28,10 +28,12 @@ export const GraphScene: React.FC = () => {
   const scale = BASE_SCALE * (1.32 - pull * 0.34);
   const x = ramp(f, [20, 200], [44, 0], EASE_IN_OUT);
   const y = BASE_Y + ramp(f, [20, 200], [64, 0], EASE_IN_OUT) + drift(f, 4, 260);
-  const rotY = ramp(f, [150, 225], [0, -7], EASE_IN_OUT);
+  // A slow orbit THROUGH square-on rather than a static angle: the graph is the
+  // only scene whose subject is spatial, so the camera is the thing that says so.
+  const rotY = ramp(f, [0, 225], [9, -8], EASE_IN_OUT);
 
   const out = 1 - prog(f, 213, 225);
-  const inFade = prog(f, 0, 9);
+  const inFade = prog(f, 0, 4);
 
   return (
     <AbsoluteFill style={{ background: '#050505', opacity: out * inFade }}>

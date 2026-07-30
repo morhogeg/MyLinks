@@ -35,7 +35,7 @@ export const DigestScene: React.FC = () => {
   const y = BASE_Y + drift(f, 5, 200) + (second ? -24 : -8);
 
   const out = 1 - prog(f, 140, 150);
-  const inFade = prog(f, 0, 8);
+  const inFade = prog(f, 0, 4);
 
   return (
     <AbsoluteFill style={{ background: '#050505', opacity: out * inFade }}>

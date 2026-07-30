@@ -64,24 +64,24 @@ export const SUBTITLES = [
   // `place` is a LAYOUT, not a style: 'left' puts the line in the left column
   // with the device held right of centre; 'bottom' is the centred line, used
   // only where there is no device to sit under.
-  { bar: 1.3, bars: 1.3, place: 'bottom', text: 'You save things everywhere.' },
-  { bar: 2.8, bars: 1.3, place: 'bottom', text: 'Instagram. X. YouTube. WhatsApp.' },
-  // Lands as the panels themselves fade out, one by one. The previous line
-  // ("then you can't remember which one") explained the picture instead of
-  // finishing it.
-  { bar: 4.3, bars: 1.3, place: 'bottom', text: 'And then it’s gone.' },
-  // The turn names the product and the promise in one line, rather than making
-  // a generic claim about "one place".
+  { bar: 1.4, bars: 1.5, place: 'bottom', text: 'You save things everywhere.' },
+  // No list of platform names here: they are ON THE PANELS. Captioning what the
+  // picture already says is the definition of a redundant line.
+  //
+  // And the loss is stated as a consequence, not as an event: "and then it's
+  // gone" was a shrug. The panels fading out ARE the disappearing; the line's
+  // job is to say what that costs you.
+  { bar: 3.4, bars: 1.5, place: 'bottom', text: 'And almost none of it comes back.' },
   { bar: 5.7, bars: 1.0, place: 'bottom', text: 'Machina keeps every save in one place.' },
-  // Clears the frame just before the cut inside the app at ~21.4s.
   { bar: 7.5, bars: 1.0, place: 'left', text: 'Share it from anywhere.' },
   // One heading over the whole pipeline: reading and filing are one step, and
   // the shot now holds long enough to watch all five phases of it.
   { bar: 8.8, bars: 2.6, place: 'left', text: 'Machina reads it, summarizes it, files it.' },
-  { bar: 12.4, bars: 1.6, place: 'left', text: 'All of it, already sorted.' },
-  // The payoff answers act one directly: the problem was never that you lost
-  // the link, it was that you could not remember where you put it.
-  { bar: 14.3, bars: 1.5, place: 'left', text: 'Find it without remembering where.' },
+  // The library beat is about ACCESS — the point is that there are several ways
+  // back in, not one clever one. ("All of it, already sorted" said nothing, and
+  // "find it without remembering where" described a search box.)
+  { bar: 12.4, bars: 1.6, place: 'left', text: 'Browse it, search it, filter it.' },
+  { bar: 14.3, bars: 1.5, place: 'left', text: 'However you remember it.' },
   { bar: 16.4, bars: 1.6, place: 'left', text: 'Then ask it anything.' },
   { bar: 18.3, bars: 1.7, place: 'left', text: 'Answers built from what you saved.' },
   { bar: 20.4, bars: 1.6, place: 'left', text: 'See how your saves connect.' },

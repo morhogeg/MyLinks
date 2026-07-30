@@ -165,6 +165,67 @@ const pluck = (startSec, midi, level = 0.2, panPos = 0, damp = 0.5) => {
   );
 };
 
+/**
+ * Pulse — the engine of the track.
+ *
+ * A detuned band-limited saw through a falling lowpass, fast attack, short
+ * decay. It replaces the Karplus-Strong pluck that used to carry the rhythm:
+ * a plucked STRING playing chord-tone-only arpeggios into a long reverb is,
+ * acoustically, a koto — which is exactly why an earlier cut got described as
+ * sounding Chinese. The fix was never EQ or level; it was the instrument and
+ * the note choice.
+ */
+const pulse = (startSec, midi, level = 0.14, panPos = 0, decay = 0.34) => {
+  const f = mtof(midi);
+  const det = [0, -0.08, 0.09];
+  const filt = lp(2600);
+  const HARM = 9;
+  render(
+    startSec,
+    decay + 0.3,
+    (t) => {
+      const e = Math.exp(-t * (3.4 / decay));
+      if (e < 1e-4) return 0;
+      // brightness falls with the envelope — a filter sweep without a filter
+      const open = 0.35 + 0.65 * e;
+      let v = 0;
+      for (const d of det) {
+        const ff = f * Math.pow(2, d / 12);
+        for (let h = 1; h <= HARM; h++) {
+          const amp = (1 / h) * Math.max(0, 1 - (h - 1) / (HARM * open));
+          if (amp <= 0) continue;
+          v += Math.sin(2 * Math.PI * ff * h * t) * amp;
+        }
+      }
+      return filt(v / (det.length * 2.2)) * e * level;
+    },
+    // a SHORT send: long reverb on the rhythmic voice is the other half of the
+    // folk-instrument sound
+    { pan: panPos, send: 0.12, delay: 0.22 },
+  );
+};
+
+/**
+ * Keys — a two-operator FM electric piano (sine carrier, sine modulator at 2:1
+ * with a decaying index). Carries the melody. Modern, warm, and unmistakably a
+ * keyboard rather than a plucked string.
+ */
+const keys = (startSec, midi, level = 0.16, panPos = 0, decay = 1.6) => {
+  const f = mtof(midi);
+  render(
+    startSec,
+    decay + 0.6,
+    (t) => {
+      const e = Math.exp(-t * (2.6 / decay));
+      if (e < 1e-4) return 0;
+      const index = 2.4 * Math.exp(-t * 6); // bell-like attack, mellow tail
+      const mod = Math.sin(2 * Math.PI * f * 2 * t) * index;
+      return (Math.sin(2 * Math.PI * f * t + mod) + 0.2 * Math.sin(2 * Math.PI * f * t)) * e * level;
+    },
+    { pan: panPos, send: 0.3, delay: 0.16 },
+  );
+};
+
 /** Bell — the melodic voice. Sine core plus a quiet 3rd partial, long decay. */
 const bell = (startSec, midi, level = 0.18, panPos = 0, decay = 2.6) => {
   const f = mtof(midi);
@@ -446,23 +507,37 @@ for (let bar = 0; bar < BAR_CHORDS.length; bar++) {
     }
   }
 
-  // ── plucked figure. A 3-3-2 onset pattern (the eighth grid grouped 3+3+2)
-  // instead of straight eighths — the single cheapest way to make a track feel
-  // like it is going somewhere.
+  // ── the pulse figure. Two things changed together here: the instrument (a
+  // synth pulse, not a plucked string) and the NOTES. The old figure walked
+  // chord tones only, which on a plucked string is a pentatonic folk pattern.
+  // This walks the C-major scale — including the semitones B→C and E→F, the
+  // intervals a pentatonic scale by definition does not have.
   if (bar >= ARP_FROM && bar < ENDCARD_BAR) {
-    const notes = [...ch.upper, ch.upper[2] + 12];
+    const root = ch.upper[0];
+    // scale steps above the chord's lowest voice, in a 3+3+2 grouping
+    // Degrees 0,2,3,4,6 → C E F G B. The 3 and the 6 are the whole point: they
+    // put E→F and B→C in the line, the two semitones a pentatonic scale does
+    // not have. A shape of 0,2,4,5 (C E G A) is still pentatonic no matter what
+    // instrument plays it — which is what the first attempt at this fix got
+    // wrong.
+    const shape = [0, 2, 3, 4, 6, 4, 3, 2];
     const dense = bar >= SIXTEENTH_FROM && bar < DIGEST_BAR;
     const onsets = dense
-      ? [0, 0.75, 1.5, 2, 2.75, 3.5, 3.75]
-      : [0, 0.75, 1.5, 2, 3, 3.5];
+      ? [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5]
+      : [0, 0.75, 1.5, 2, 2.75, 3.5];
     onsets.forEach((on, k) => {
-      const m = notes[(k + bar) % notes.length] + (on >= 2 ? 12 : 0);
-      pluck(
+      const step = shape[(k + bar) % shape.length];
+      // C major scale degrees, so passing tones land where a pentatonic
+      // pattern would skip
+      const SCALE = [0, 2, 4, 5, 7, 9, 11];
+      const oct = Math.floor(step / 7);
+      const m = root + SCALE[step % 7] + oct * 12 + (on >= 2.5 ? 12 : 0);
+      pulse(
         beat(bar, on),
         m,
-        (dense ? 0.11 : 0.145) * (0.62 + 0.38 * d),
-        ((k % 4) / 3) * 1.2 - 0.6,
-        dense ? 0.68 : 0.45,
+        (dense ? 0.085 : 0.105) * (0.62 + 0.38 * d),
+        ((k % 4) / 3) * 1.1 - 0.55,
+        dense ? 0.26 : 0.34,
       );
     });
   }
@@ -473,18 +548,20 @@ for (let bar = 0; bar < BAR_CHORDS.length; bar++) {
 for (const m of [48, 64, 67, 72]) pad(b(ENDCARD_BAR), BAR * 3 - 0.3, m, 0.075, m === 64 ? -0.4 : 0.35);
 
 // ── melody: enters with the hero scene (Ask), returns for the endcard
+// Stepwise, and deliberately full of the semitones a pentatonic line cannot
+// contain: B→C over the G, E→F over the F. 67 = G4, 72 = C5.
 const MELODY = [
-  [16, 0, 74], [16, 2, 79], // G6:    D5 G5
-  [17, 0, 76], [17, 2.5, 81], // Am9:   E5 A5
-  [18, 0, 77], [18, 2, 72], // Fmaj7: F5 C5
-  [19, 0, 79], [19, 2, 76], // Cmaj7: G5 E5
-  [20, 0, 81], [21, 1, 76], [22, 0, 77],
-  [25, 0, 76], [26, 0, 77], [27, 0, 72], [27, 1.5, 79], // …home on C
+  [16, 0, 67], [16, 1.5, 69], [16, 3, 71], //  G6:    G4 A4 B4  (up to the leading tone)
+  [17, 0, 72], [17, 2, 71], //  Am9:   C5 B4     (resolve down)
+  [18, 0, 69], [18, 1.5, 67], [18, 3, 64], //  Fmaj7: A4 G4 E4
+  [19, 0, 65], [19, 2, 67], //  Cmaj7: F4 G4     (E→F is the other semitone)
+  [20, 0, 72], [20, 2, 71], [21, 0, 69], [21, 2, 67], [22, 0, 65], [22, 2, 64],
+  [25, 0, 64], [25, 2, 65], [26, 0, 67], [27, 0, 72], [27, 1.5, 76], // …home on C
 ];
 
 for (const [bar, bt, m] of MELODY) {
   const last = bar >= ENDCARD_BAR;
-  bell(beat(bar, bt), m, last ? 0.2 : 0.15, bar % 2 ? 0.22 : -0.22, last ? 3.6 : 2.4);
+  keys(beat(bar, bt), m, last ? 0.2 : 0.155, bar % 2 ? 0.2 : -0.2, last ? 2.6 : 1.5);
 }
 
 // ── risers into the hard cuts
