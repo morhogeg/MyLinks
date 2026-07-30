@@ -407,6 +407,13 @@ const CHORDS = {
 // note was "the music at the beginning is too gloomy", and that ordering IS the
 // gloom. Walked C → G → Am → F (I–V–vi–IV) the same four chords open bright,
 // touch the minor in passing, and the film can end resolved at home on C.
+// Anchored to C MAJOR, not A minor.
+//
+// The chords were always these four; the film used to walk them Am9 → F → C → G
+// (i–VI–III–VII), which starts on the minor tonic and reads as melancholy — the
+// note was "the music at the beginning is too gloomy", and that ordering IS the
+// gloom. Walked C → G → Am → F (I–V–vi–IV) the same four chords open bright,
+// touch the minor in passing, and the film can end resolved at home on C.
 const BAR_CHORDS = [
   'Cmaj7', // 0     cold open (the boot) — opens major
   'Cmaj7', 'G6', 'Am9', 'Fmaj7', // 1–4   scatter
@@ -415,8 +422,9 @@ const BAR_CHORDS = [
   'G6', 'Am9', 'Fmaj7', 'Cmaj7', // 12–15 library
   'G6', 'Am9', 'Fmaj7', 'Cmaj7', // 16–19 ask
   'G6', 'Am9', 'Fmaj7', // 20–22 graph
-  'Cmaj7', 'G6', // 23–24 digest
-  'Am9', 'Fmaj7', 'Cmaj7', // 25–27 endcard, resolving home
+  'Cmaj7', 'G6', // 23–24 collections
+  'Am9', 'Fmaj7', // 25–26 digest
+  'Cmaj7', 'G6', 'Cmaj7', // 27–29 endcard, resolving home
 ];
 
 // A retime in timeline.mjs that forgets the arrangement would silently put the
@@ -437,7 +445,8 @@ const SCENE_DENSITY = {
   library: 0.9,
   ask: 1.0,
   graph: 0.94,
-  digest: 0.78,
+  collections: 0.82,
+  digest: 0.74,
   endcard: 0.52,
 };
 
@@ -550,13 +559,16 @@ for (const m of [48, 64, 67, 72]) pad(b(ENDCARD_BAR), BAR * 3 - 0.3, m, 0.075, m
 // ── melody: enters with the hero scene (Ask), returns for the endcard
 // Stepwise, and deliberately full of the semitones a pentatonic line cannot
 // contain: B→C over the G, E→F over the F. 67 = G4, 72 = C5.
+// Stepwise, and deliberately full of the semitones a pentatonic line cannot
+// contain: B→C over the G, E→F over the F. 67 = G4, 72 = C5.
 const MELODY = [
   [16, 0, 67], [16, 1.5, 69], [16, 3, 71], //  G6:    G4 A4 B4  (up to the leading tone)
   [17, 0, 72], [17, 2, 71], //  Am9:   C5 B4     (resolve down)
   [18, 0, 69], [18, 1.5, 67], [18, 3, 64], //  Fmaj7: A4 G4 E4
   [19, 0, 65], [19, 2, 67], //  Cmaj7: F4 G4     (E→F is the other semitone)
   [20, 0, 72], [20, 2, 71], [21, 0, 69], [21, 2, 67], [22, 0, 65], [22, 2, 64],
-  [25, 0, 64], [25, 2, 65], [26, 0, 67], [27, 0, 72], [27, 1.5, 76], // …home on C
+  [23, 0, 67], [24, 1, 71], [25, 0, 69], [26, 0, 65],
+  [27, 0, 64], [27, 2, 65], [28, 0, 67], [29, 0, 72], [29, 1.5, 76], // …home on C
 ];
 
 for (const [bar, bt, m] of MELODY) {
@@ -591,6 +603,7 @@ tick(b(HITS.shareSheet), 0.085, 1.1);
 // the world behind the sheet changing — a soft tick on each cut
 tick(b(HITS.sourceCutA), 0.075, 1.25);
 tick(b(HITS.sourceCutB), 0.075, 1.4);
+whoosh(b(HITS.collectionsIn) - 0.25, 0.7, 0.055, 0.25);
 whoosh(b(HITS.pipelineIn) - 0.25, 0.7, 0.06, -0.25);
 shimmer(b(HITS.pipelineIn) + 0.15, [72, 76, 79], 0.04);
 tick(b(HITS.cardLands), 0.11, 0.9);

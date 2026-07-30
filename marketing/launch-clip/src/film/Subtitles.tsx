@@ -20,8 +20,10 @@ import { sans } from '../fonts';
  * large — one of the two jitters in the Ask beat.
  */
 
-const LEFT_X = 132;
-const COLUMN_W = 660;
+const LEFT_X = 128;
+// Narrower than it was: the device now sits further right and much larger, so
+// the column gives up width to keep a clean gutter between type and product.
+const COLUMN_W = 665;
 
 export const Subtitles: React.FC = () => {
   const frame = useCurrentFrame();
@@ -75,10 +77,29 @@ export const Subtitles: React.FC = () => {
                   transformOrigin: 'center top',
                 }}
               />
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {s.kicker && (
+                /* The tagline word for this act — CAPTURE / ASK / CONNECT — set
+                   as a chapter marker above the line, so a viewer can place each
+                   beat inside `Capture. Ask. Connect.` without being told. */
+                <span
+                  style={{
+                    fontFamily: sans,
+                    fontSize: 15,
+                    fontWeight: 700,
+                    letterSpacing: '0.34em',
+                    textTransform: 'uppercase',
+                    color: 'rgba(203,210,226,0.62)',
+                    opacity: enter,
+                  }}
+                >
+                  {s.kicker}
+                </span>
+              )}
               <span
                 style={{
                   fontFamily: sans,
-                  fontSize: 50,
+                  fontSize: 46,
                   fontWeight: 500,
                   lineHeight: 1.14,
                   letterSpacing: '-0.026em',
@@ -87,6 +108,7 @@ export const Subtitles: React.FC = () => {
                 }}
               >
                 {s.text}
+              </span>
               </span>
             </div>
           );

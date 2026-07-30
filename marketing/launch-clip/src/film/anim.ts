@@ -81,4 +81,20 @@ export const BASE_Y = -52;
  * shadow and made the film look subtitled; beside it, the two read as one
  * composition.
  */
-export const BASE_X = 268;
+export const BASE_X = 330;
+
+/**
+ * Vertical offset that puts a given point of the SCREEN at a given point of the
+ * FRAME, at a given zoom.
+ *
+ * The film's shots are now framed like a product film rather than a device
+ * showcase: magnified enough to read on a phone, which means the device is
+ * cropped top and bottom and each shot has to aim at the part of the screen that
+ * matters — the checklist, the answer, the card stack. Without this the zoom
+ * just pushed content out of frame.
+ *
+ * screenY: 0–852 in the phone's own coordinates. frameY: 0–1080.
+ */
+export const SCREEN_MID = 426;
+export const focusY = (screenY: number, scale: number, frameY = 520) =>
+  frameY - 540 - (screenY - SCREEN_MID) * scale;

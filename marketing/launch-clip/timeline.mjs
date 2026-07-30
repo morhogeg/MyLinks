@@ -30,19 +30,18 @@ export const SCENES = [
   // title sequence. If you retime here, `audio/score.mjs` asserts its bar map
   // still matches.
   { id: 'coldOpen', bar: 0, bars: 1 }, //  0.0 –  2.5  the app boots: mark + MACHINA
-  // Four bars, not three: act one needs an opening SENTENCE before the list of
-  // platforms, or the film starts on a fragment.
-  { id: 'scatter', bar: 1, bars: 4 }, //  2.5 – 12.5  five platforms, then gone
+  { id: 'scatter', bar: 1, bars: 4 }, //  2.5 – 12.5  five platforms, then out of reach
   { id: 'wordmark', bar: 5, bars: 2 }, // 12.5 – 17.5  five become one
-  // FIVE bars. The pipeline is the magic and it used to flash past in two
-  // seconds at thumbnail size; it now runs ~5.5s under a hard push-in, which is
-  // long enough to actually read what Machina is doing to your save.
-  { id: 'capture', bar: 7, bars: 5 }, // 17.5 – 30.0  share from anywhere → read + filed
-  { id: 'library', bar: 12, bars: 4 }, // 30.0 – 40.0  sorted, and findable
-  { id: 'ask', bar: 16, bars: 4 }, // 40.0 – 50.0  the hero: cited answer
-  { id: 'graph', bar: 20, bars: 3 }, // 50.0 – 57.5  the knowledge graph
-  { id: 'digest', bar: 23, bars: 2 }, // 57.5 – 62.5  it resurfaces
-  { id: 'endcard', bar: 25, bars: 3 }, // 62.5 – 70.0  lockup
+  // FIVE bars: the pipeline is the magic and needs ~5.5s to be readable.
+  { id: 'capture', bar: 7, bars: 5 }, // 17.5 – 30.0  CAPTURE
+  { id: 'library', bar: 12, bars: 4 }, // 30.0 – 40.0  browse, search, filter
+  { id: 'ask', bar: 16, bars: 4 }, // 40.0 – 50.0  ASK
+  { id: 'graph', bar: 20, bars: 3 }, // 50.0 – 57.5  CONNECT
+  // Collections and the digest are separate features and now get separate
+  // beats — sharing two bars, they were a whip-cut most viewers read as one.
+  { id: 'collections', bar: 23, bars: 2 }, // 57.5 – 62.5  the ones you shape
+  { id: 'digest', bar: 25, bars: 2 }, // 62.5 – 67.5  the ones it brings back
+  { id: 'endcard', bar: 27, bars: 3 }, // 67.5 – 75.0  lockup
 ];
 
 export const TOTAL_BARS = SCENES.reduce((n, s) => Math.max(n, s.bar + s.bars), 0);
@@ -61,46 +60,40 @@ export const sceneAt = (id) => {
  * absorbed in a glance while the picture does the real talking.
  */
 export const SUBTITLES = [
-  // `place` is a LAYOUT, not a style: 'left' puts the line in the left column
-  // with the device held right of centre; 'bottom' is the centred line, used
-  // only where there is no device to sit under.
+  // `place` is a LAYOUT: 'left' puts the line in the left column with the device
+  // held right; 'bottom' is the centred line, for beats with no device.
+  // `kicker` prints the tagline word for that act above the line — CAPTURE /
+  // ASK / CONNECT — so a viewer can place each beat inside the tagline.
   { bar: 1.4, bars: 1.5, place: 'bottom', text: 'You save things everywhere.' },
-  // No list of platform names here: they are ON THE PANELS. Captioning what the
-  // picture already says is the definition of a redundant line.
-  //
-  // And the loss is stated as a consequence, not as an event: "and then it's
-  // gone" was a shrug. The panels fading out ARE the disappearing; the line's
-  // job is to say what that costs you.
-  { bar: 3.4, bars: 1.5, place: 'bottom', text: 'And almost none of it comes back.' },
+  // The loss is not that it fails to come back to you — it is that YOU can't
+  // get back to IT. That is the founder's actual complaint, and the active
+  // construction is what makes it land.
+  { bar: 3.4, bars: 1.5, place: 'bottom', text: 'And you can never get back to it.' },
   { bar: 5.7, bars: 1.0, place: 'bottom', text: 'Machina keeps every save in one place.' },
-  { bar: 7.5, bars: 1.0, place: 'left', text: 'Share it from anywhere.' },
-  // One heading over the whole pipeline: reading and filing are one step, and
-  // the shot now holds long enough to watch all five phases of it.
+  { bar: 7.5, bars: 1.0, place: 'left', kicker: 'Capture', text: 'Share it from anywhere.' },
   { bar: 8.8, bars: 2.6, place: 'left', text: 'Machina reads it, summarizes it, files it.' },
-  // The library beat is about ACCESS — the point is that there are several ways
-  // back in, not one clever one. ("All of it, already sorted" said nothing, and
-  // "find it without remembering where" described a search box.)
   { bar: 12.4, bars: 1.6, place: 'left', text: 'Browse it, search it, filter it.' },
   { bar: 14.3, bars: 1.5, place: 'left', text: 'However you remember it.' },
-  { bar: 16.4, bars: 1.6, place: 'left', text: 'Then ask it anything.' },
+  { bar: 16.4, bars: 1.6, place: 'left', kicker: 'Ask', text: 'Then ask it anything.' },
   { bar: 18.3, bars: 1.7, place: 'left', text: 'Answers built from what you saved.' },
-  { bar: 20.4, bars: 1.6, place: 'left', text: 'See how your saves connect.' },
-  // Bar 22 is deliberately silent — the graph earns a beat with no copy on it.
-  { bar: 23.3, bars: 1.6, place: 'left', text: 'Nothing worth keeping stays buried.' },
+  { bar: 20.4, bars: 1.8, place: 'left', kicker: 'Connect', text: 'See how your saves connect.' },
+  // Collections and the digest, each with its own beat and its own line.
+  { bar: 23.4, bars: 1.6, place: 'left', text: 'Group them the way you think.' },
+  { bar: 25.4, bars: 1.6, place: 'left', text: 'And it brings the right one back.' },
 ];
 
 /** Sound-design hits, in bars — the picture events the score has to acknowledge. */
 export const HITS = {
-  bootStrike: 0.32, // the boot's point lands
-  bootExit: 0.78, // the mark pushes through and the frame dissolves
-  converge: 5.0, // the five platform panels rush back toward centre
-  collapse: 5.35, // …and land as one point of light
-  markLock: 5.55, // the brackets close around the gathered point
+  bootStrike: 0.32,
+  bootExit: 0.78,
+  converge: 5.0,
+  collapse: 5.35,
+  markLock: 5.55,
   deviceIn: 7.0,
-  shareSheet: 7.6, // the sheet comes up and stays
-  sourceCutA: 8.35, // the world behind it changes…
-  sourceCutB: 9.0, // …and changes again
-  pipelineIn: 9.6, // inside the app: the five phases, under a push-in
+  shareSheet: 7.6,
+  sourceCutA: 8.35,
+  sourceCutB: 9.0,
+  pipelineIn: 9.6,
   cardLands: 11.3,
   searchIn: 12.0,
   filterSnap: 14.1,
@@ -108,9 +101,10 @@ export const HITS = {
   answerStart: 17.4,
   citations: 18.6,
   graphBloom: 20.0,
-  digestIn: 23.0,
-  endcard: 25.0,
+  collectionsIn: 23.0,
+  digestIn: 25.0,
+  endcard: 27.0,
 };
 
 /** One-bar risers that lead into the big cuts. */
-export const RISERS = [6.0, 11.6, 15.0, 19.4, 24.4];
+export const RISERS = [6.0, 11.6, 15.0, 19.4, 26.4];

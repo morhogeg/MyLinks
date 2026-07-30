@@ -1058,6 +1058,35 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-30 (same session, round 7) — reframed for a phone, real graph, and
+  the tagline threaded through (owner review round 7).** **(1) EVERY app shot is
+  now magnified.** Watching on a phone, the device sat too far away to read —
+  the previous framing was 0.86–1.3× with the whole handset in shot. Product
+  scenes now run **1.4–2.0×**, cropping the device top and bottom the way a real
+  product film does, with a new `focusY(screenY, scale)` helper in
+  `film/anim.ts` that puts a chosen point of the SCREEN at a chosen point of the
+  FRAME — so each shot aims at what matters (the checklist, the answer + chips,
+  the card stack) instead of the zoom pushing content out of frame. `BASE_X`
+  went 268→330 and the caption column narrowed to keep a clean gutter.
+  **(2) The graph is the SHIPPED design now, not a mockup.** Ported from
+  `KnowledgeGraph.tsx`'s canvas code: node bodies are the **category colour**
+  with a lit top-left radial and a 0.35-alpha ring (they were white discs with
+  coloured rings), edges are **muted grey** at 0.13–0.35 alpha (the app only
+  colours an edge when a selection lights it — the coloured constellation was
+  invented), the canvas sits in a `rounded-2xl` hairline container over
+  `radial-gradient(120% 100% at 50% 38%, var(--card), var(--background) 88%)`,
+  and labels are 600/700 11px in `textSecondary` with a **card-toned** halo
+  stroke (the app's own QA note says a background-toned halo smears ghosts).
+  **(3) The tagline is threaded through the film** — CAPTURE / ASK / CONNECT
+  print as a letterspaced kicker above the line on their respective beats, so a
+  viewer can place each act inside `Capture. Ask. Connect.` **(4) Collections
+  and Digest are separate scenes** with their own framing and their own lines
+  ("Group them the way you think." / "And it brings the right one back.") —
+  sharing two bars behind a whip-cut, they read as one feature. Film is **75s**,
+  30 bars. **(5) The act-one loss line is active:** "And almost none of it comes
+  back" → **"And you can never get back to it."** — the complaint was never that
+  it fails to return to you, it is that YOU cannot get back to IT.
+  Repo-only, no app code, nothing to deploy.
 - **2026-07-30 (same session, round 6) — the score's instrument was the bug, and
   the script tightened again (owner review round 6).** **(1) "The music sounds
   Chinese" was a correct diagnosis of a real mistake, and it was not a mix

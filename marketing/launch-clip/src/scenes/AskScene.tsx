@@ -2,7 +2,7 @@ import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { Phone } from '../ui/Phone';
 import { FloorGlow, Rig, Stage } from '../film/effects';
-import { BASE_X, BASE_SCALE, BASE_Y, drift, prog, ramp, typed, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
+import { BASE_X, drift, focusY, prog, ramp, typed, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
 import { AskScreen } from '../ui/screens';
 import { ASK_ANSWER, ASK_QUESTION, ASK_SOURCES } from '../data/library';
 
@@ -29,13 +29,15 @@ export const AskScene: React.FC = () => {
   // the proof. No rotation once the type starts — angled text is unreadable text.
   const settle = prog(f, 0, 26, EASE_OUT);
   const push = prog(f, 190, 300, EASE_IN_OUT);
-  const scale = BASE_SCALE * (1.02 - settle * 0.02) * (1 + push * 0.44);
+  const scale = ramp(f, [0, 26], [1.46, 1.52], EASE_OUT) + push * 0.36;
   // The shot holds a slight angle through the typing and the streaming, then
   // squares up to dead-on exactly as the three citations land. Off-axis to
   // on-axis is the move that says "this is the point" without a caption doing
   // it — and the citations are the point of the whole film.
   const rotY = ramp(f, [0, 26], [11, 7], EASE_OUT) * (1 - prog(f, 194, 258, EASE_IN_OUT));
-  const y = BASE_Y + drift(f, 4, 300) - push * 120;
+  // from the question, down onto the answer and its three chips
+  const target = ramp(f, [120, 250], [300, 370], EASE_IN_OUT);
+  const y = focusY(target, scale) + drift(f, 3, 300);
 
   const out = 1 - prog(f, 288, 300);
   const inFade = prog(f, 0, 4);

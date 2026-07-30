@@ -176,22 +176,24 @@ export const GRAPH_NODES: {
   y: number;
   r: number;
   cluster: number;
+  /** Drives the node's colour through the app's own category hash. */
+  category: string;
   label?: string;
 }[] = [
-  { id: 'sleep', x: 0.33, y: 0.36, r: 15, cluster: 0, label: 'Sleep consolidation' },
-  { id: 'retrieval', x: 0.47, y: 0.27, r: 13, cluster: 0, label: 'Retrieval practice' },
-  { id: 'curve', x: 0.24, y: 0.5, r: 11, cluster: 0 },
-  { id: 'spacing', x: 0.42, y: 0.5, r: 9, cluster: 0 },
-  { id: 'note', x: 0.35, y: 0.62, r: 8, cluster: 0 },
-  { id: 'switch', x: 0.7, y: 0.42, r: 12, cluster: 1, label: 'Cost of switching' },
-  { id: 'depth', x: 0.79, y: 0.56, r: 11, cluster: 1 },
-  { id: 'attention', x: 0.66, y: 0.62, r: 10, cluster: 1 },
-  { id: 'focus', x: 0.81, y: 0.33, r: 8, cluster: 1 },
+  { id: 'sleep', x: 0.33, y: 0.36, r: 15, cluster: 0, category: 'Neuroscience', label: 'Sleep consolidation' },
+  { id: 'retrieval', x: 0.47, y: 0.27, r: 13, cluster: 0, category: 'Learning', label: 'Retrieval practice' },
+  { id: 'curve', x: 0.24, y: 0.5, r: 11, cluster: 0, category: 'Research' },
+  { id: 'spacing', x: 0.42, y: 0.5, r: 9, cluster: 0, category: 'Learning' },
+  { id: 'note', x: 0.35, y: 0.62, r: 8, cluster: 0, category: 'Neuroscience' },
+  { id: 'switch', x: 0.7, y: 0.42, r: 12, cluster: 1, category: 'Focus', label: 'Cost of switching' },
+  { id: 'depth', x: 0.79, y: 0.56, r: 11, cluster: 1, category: 'Reading' },
+  { id: 'attention', x: 0.66, y: 0.62, r: 10, cluster: 1, category: 'Focus' },
+  { id: 'focus', x: 0.81, y: 0.33, r: 8, cluster: 1, category: 'Reading' },
   // NOT labelled 'Tools for thought' — that is the cluster's label, and the two
   // stacked read as the same words twice (the same dedup the app itself does).
-  { id: 'thread', x: 0.55, y: 0.78, r: 11, cluster: 2, label: 'Why second brains die' },
-  { id: 'shot', x: 0.44, y: 0.86, r: 8, cluster: 2 },
-  { id: 'loops', x: 0.66, y: 0.86, r: 8, cluster: 2 },
+  { id: 'thread', x: 0.55, y: 0.78, r: 11, cluster: 2, category: 'Product', label: 'Why second brains die' },
+  { id: 'shot', x: 0.44, y: 0.86, r: 8, cluster: 2, category: 'Design' },
+  { id: 'loops', x: 0.66, y: 0.86, r: 8, cluster: 2, category: 'Product' },
 ];
 
 export const GRAPH_EDGES: [string, string][] = [
@@ -213,10 +215,12 @@ export const GRAPH_EDGES: [string, string][] = [
   ['depth', 'thread'],
 ];
 
+/** Island captions. The app draws these in textSecondary, NOT in a cluster
+ *  colour — they are type, not legend. */
 export const CLUSTERS = [
-  { name: 'Memory · Retrieval', x: 0.35, y: 0.19, color: 'rgb(99, 102, 241)' },
-  { name: 'Attention · Focus', x: 0.74, y: 0.24, color: 'rgb(20, 184, 166)' },
-  { name: 'Tools for thought', x: 0.55, y: 0.93, color: 'rgb(249, 115, 22)' },
+  { name: 'Memory · Retrieval', x: 0.35, y: 0.19 },
+  { name: 'Attention · Focus', x: 0.74, y: 0.24 },
+  { name: 'Tools for thought', x: 0.55, y: 0.93 },
 ];
 
 /** The digest beat. */

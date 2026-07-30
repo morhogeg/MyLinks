@@ -2,7 +2,7 @@ import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { Phone } from '../ui/Phone';
 import { FloorGlow, Rig, Stage } from '../film/effects';
-import { BASE_X, BASE_SCALE, BASE_Y, drift, prog, ramp, typed, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
+import { BASE_X, drift, focusY, prog, ramp, typed, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
 import { FeedScreen } from '../ui/screens';
 import { CARDS, SEARCH_HITS, SEARCH_QUERY } from '../data/library';
 
@@ -27,8 +27,12 @@ export const Library: React.FC = () => {
   const filtered = prog(f, 166, 190, EASE_MODAL);
 
   // camera: a straight-on establishing hold, then a slow 2D push onto the hits
-  const scale = BASE_SCALE * ramp(f, [0, 60], [1.06, 1.0], EASE_OUT) * (1 + prog(f, 170, 300, EASE_IN_OUT) * 0.42);
-  const y = BASE_Y + drift(f, 5, 280) - prog(f, 170, 300, EASE_IN_OUT) * 74;
+  // Framed to READ: the feed at 1.5×, pushing to 1.85× on the matches. The old
+  // 0.9× "whole device on a table" shot was unreadable on a phone.
+  const push = prog(f, 168, 300, EASE_IN_OUT);
+  const scale = ramp(f, [0, 60], [1.44, 1.5], EASE_OUT) + push * 0.35;
+  const target = ramp(f, [120, 240], [430, 330], EASE_IN_OUT);
+  const y = focusY(target, scale) + drift(f, 4, 280);
   const rotY = ramp(f, [0, 46], [-9, -4], EASE_OUT) * (1 - prog(f, 168, 214, EASE_IN_OUT));
 
   const out = 1 - prog(f, 288, 300);

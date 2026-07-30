@@ -2,7 +2,7 @@ import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { Phone } from '../ui/Phone';
 import { FloorGlow, Rig, Stage } from '../film/effects';
-import { BASE_X, BASE_SCALE, BASE_Y, drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
+import { BASE_X, drift, focusY, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
 import { GraphScreen } from '../ui/screens';
 
 /**
@@ -25,9 +25,9 @@ export const GraphScene: React.FC = () => {
   // Opens closer than the other scenes but no longer inside the cluster: at
   // 1.72 the device was cropped top and bottom and the visible screen was
   // mostly empty canvas while the edges were still drawing.
-  const scale = BASE_SCALE * (1.32 - pull * 0.34);
-  const x = ramp(f, [20, 200], [44, 0], EASE_IN_OUT);
-  const y = BASE_Y + ramp(f, [20, 200], [64, 0], EASE_IN_OUT) + drift(f, 4, 260);
+  const scale = 1.72 - pull * 0.2;
+  const x = ramp(f, [20, 200], [30, 0], EASE_IN_OUT);
+  const y = focusY(ramp(f, [20, 200], [400, 440], EASE_IN_OUT), scale) + drift(f, 3, 260);
   // A slow orbit THROUGH square-on rather than a static angle: the graph is the
   // only scene whose subject is spatial, so the camera is the thing that says so.
   const rotY = ramp(f, [0, 225], [9, -8], EASE_IN_OUT);

@@ -821,115 +821,158 @@ export const GraphScreen: React.FC<{
 }> = ({ draw, labels = 0, backPill = 0 }) => {
   const W = SCREEN_W;
   const H = SCREEN_H;
-  const px = (n: { x: number; y: number }) => ({ x: n.x * W, y: 150 + n.y * (H - 268) });
-  const clusterInk = ['rgb(99, 102, 241)', 'rgb(20, 184, 166)', 'rgb(249, 115, 22)'];
+  // The canvas is inset in a rounded container, exactly as the app lays it out.
+  const PAD = 14;
+  const TOP = 118;
+  const BOT = 104;
+  const cw = W - PAD * 2;
+  const chh = H - TOP - BOT;
+  // Coordinates are relative to the CANVAS, which is already inset by PAD/TOP —
+  // adding those again pushed the whole constellation down and out of frame.
+  const px = (n: { x: number; y: number }) => ({ x: n.x * cw, y: n.y * chh });
 
   return (
     <Screen>
       <StatusBar />
       <AppHeader title="Graph" showSearch={false} />
-      <svg width={W} height={H} style={{ position: 'absolute', inset: 0 }}>
-        <defs>
-          <radialGradient id="gNode" cx="40%" cy="35%">
-            <stop offset="0%" stopColor="#FFFFFF" />
-            <stop offset="100%" stopColor="#CBD2E0" />
-          </radialGradient>
-        </defs>
-        {/* edges */}
-        {GRAPH_EDGES.map(([a, b], i) => {
-          const na = GRAPH_NODES.find((n) => n.id === a);
-          const nb = GRAPH_NODES.find((n) => n.id === b);
-          if (!na || !nb) return null;
-          const pa = px(na);
-          const pb = px(nb);
-          const len = Math.hypot(pb.x - pa.x, pb.y - pa.y);
-          // edges come in staggered — they read as connections being FOUND
-          const t = Math.max(0, Math.min(1, (draw - 0.06 * (i % 7)) / 0.5));
-          const cross = na.cluster !== nb.cluster;
-          return (
-            <line
-              key={i}
-              x1={pa.x}
-              y1={pa.y}
-              x2={pb.x}
-              y2={pb.y}
-              stroke={cross ? 'rgba(233,233,242,0.30)' : clusterInk[na.cluster]}
-              strokeOpacity={cross ? 0.5 : 0.4}
-              strokeWidth={cross ? 1.1 : 1.4}
-              strokeDasharray={len}
-              strokeDashoffset={len * (1 - t)}
-            />
-          );
-        })}
-        {/* nodes */}
-        {GRAPH_NODES.map((n, i) => {
-          const p = px(n);
-          const t = Math.max(0, Math.min(1, (draw - 0.03 * i) / 0.32));
-          const r = n.r * (0.2 + 0.8 * t);
-          return (
-            <g key={n.id} opacity={t}>
-              <circle cx={p.x} cy={p.y} r={r * 2.6} fill={clusterInk[n.cluster]} opacity={0.09 * t} />
-              <circle
-                cx={p.x}
-                cy={p.y}
-                r={r}
-                fill="url(#gNode)"
-                stroke={clusterInk[n.cluster]}
-                strokeOpacity={0.85}
-                strokeWidth={1.4}
-              />
-            </g>
-          );
-        })}
-        {/* node labels for the few named ones */}
-        {GRAPH_NODES.filter((n) => n.label).map((n) => {
-          const p = px(n);
-          const t = Math.max(0, Math.min(1, (draw - 0.55) / 0.3));
-          return (
-            <text
-              key={n.id}
-              x={p.x}
-              y={p.y + n.r + 15}
-              textAnchor="middle"
-              style={{ fontFamily: sans, fontSize: 11, fontWeight: 600 }}
-              fill={T.text}
-              opacity={t * 0.92}
-              stroke={T.card}
-              strokeWidth={2.6}
-              paintOrder="stroke"
-            >
-              {n.label}
-            </text>
-          );
-        })}
-        {/* cluster labels */}
-        {CLUSTERS.map((c, i) => (
-          <text
-            key={c.name}
-            x={c.x * W}
-            y={150 + c.y * (H - 268)}
-            textAnchor="middle"
-            style={{
-              fontFamily: sans,
-              fontSize: 10.5,
-              fontWeight: 800,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-            }}
-            fill={clusterInk[i]}
-            opacity={labels * 0.95}
-          >
-            {c.name.toUpperCase()}
-          </text>
-        ))}
-      </svg>
 
-      {/* Back to Ask pill (top-start) and the re-fit control (bottom-end) */}
+      {/* The app's own canvas container: rounded-2xl, a hairline, and a
+          card→background radial. Ported from KnowledgeGraph.tsx's inline style
+          rather than approximated. */}
       <div
         style={{
           position: 'absolute',
-          top: 118,
-          left: 14,
+          left: PAD,
+          right: PAD,
+          top: TOP,
+          height: chh,
+          borderRadius: 16,
+          border: `1px solid ${T.border}`,
+          background: `radial-gradient(120% 100% at 50% 38%, ${T.card}, ${T.background} 88%)`,
+          overflow: 'hidden',
+        }}
+      >
+        <svg width={cw} height={chh} style={{ position: 'absolute', inset: 0 }}>
+          <defs>
+            {GRAPH_NODES.map((n) => {
+              const c = categoryColor(n.category).fg;
+              return (
+                // Body: the category colour with a lit top — a radial offset up
+                // and left, exactly the app's createRadialGradient call.
+                <radialGradient
+                  key={n.id}
+                  id={`nd-${n.id}`}
+                  gradientUnits="objectBoundingBox"
+                  cx="0.32"
+                  cy="0.32"
+                  r="0.72"
+                >
+                  <stop offset="0%" stopColor={c} stopOpacity="1" />
+                  <stop offset="100%" stopColor={c} stopOpacity="0.65" />
+                </radialGradient>
+              );
+            })}
+          </defs>
+
+          {/* Edges are MUTED GREY at low alpha — the app only colours an edge
+              when it is lit by a selection. A constellation of coloured threads
+              was the mockup's invention. */}
+          {GRAPH_EDGES.map(([a, b], i) => {
+            const na = GRAPH_NODES.find((n) => n.id === a);
+            const nb = GRAPH_NODES.find((n) => n.id === b);
+            if (!na || !nb) return null;
+            const pa = px(na);
+            const pb = px(nb);
+            const len = Math.hypot(pb.x - pa.x, pb.y - pa.y);
+            const t = Math.max(0, Math.min(1, (draw - 0.05 * (i % 7)) / 0.5));
+            return (
+              <line
+                key={i}
+                x1={pa.x}
+                y1={pa.y}
+                x2={pb.x}
+                y2={pb.y}
+                stroke={T.textMuted}
+                strokeOpacity={0.13 + (i % 5) * 0.055}
+                strokeWidth={0.7 + (i % 3) * 0.35}
+                strokeDasharray={len}
+                strokeDashoffset={len * (1 - t)}
+              />
+            );
+          })}
+
+          {GRAPH_NODES.map((n, i) => {
+            const p = px(n);
+            const t = Math.max(0, Math.min(1, (draw - 0.03 * i) / 0.32));
+            const r = n.r * (0.2 + 0.8 * t);
+            const c = categoryColor(n.category).fg;
+            return (
+              <g key={n.id} opacity={t}>
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r={r}
+                  fill={`url(#nd-${n.id})`}
+                  stroke={c}
+                  strokeOpacity={0.35}
+                  strokeWidth={1}
+                />
+              </g>
+            );
+          })}
+
+          {/* Node labels: 600 11px, textSecondary, below the disc, with a
+              CARD-toned halo stroke — the app's exact treatment (a background-
+              toned halo smears ghost shapes, per its own QA note). */}
+          {GRAPH_NODES.filter((n) => n.label).map((n) => {
+            const p = px(n);
+            const t = Math.max(0, Math.min(1, (draw - 0.55) / 0.3));
+            return (
+              <text
+                key={n.id}
+                x={p.x}
+                y={p.y + n.r + 14}
+                textAnchor="middle"
+                style={{ fontFamily: sans, fontSize: 11, fontWeight: 600 }}
+                fill={T.textSecondary}
+                opacity={t}
+                stroke={T.card}
+                strokeOpacity={0.7}
+                strokeWidth={3}
+                paintOrder="stroke"
+              >
+                {n.label}
+              </text>
+            );
+          })}
+
+          {/* Island captions: 700 11px, UPPERCASE, textSecondary at 0.75. */}
+          {CLUSTERS.map((c) => (
+            <text
+              key={c.name}
+              x={c.x * cw}
+              y={c.y * chh}
+              textAnchor="middle"
+              style={{ fontFamily: sans, fontSize: 11, fontWeight: 700 }}
+              fill={T.textSecondary}
+              opacity={labels * 0.75}
+              stroke={T.card}
+              strokeOpacity={labels * 0.5}
+              strokeWidth={3}
+              paintOrder="stroke"
+            >
+              {c.name.toUpperCase()}
+            </text>
+          ))}
+        </svg>
+      </div>
+
+      {/* Back to Ask (top-start) and the re-fit control (bottom-end) */}
+      <div
+        style={{
+          position: 'absolute',
+          top: TOP + 12,
+          left: PAD + 10,
           display: 'flex',
           alignItems: 'center',
           gap: 5,
@@ -951,8 +994,8 @@ export const GraphScreen: React.FC<{
       <div
         style={{
           position: 'absolute',
-          bottom: 96,
-          right: 14,
+          top: TOP + chh - 46,
+          right: PAD + 10,
           width: 34,
           height: 34,
           borderRadius: 999,

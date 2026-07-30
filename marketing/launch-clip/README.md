@@ -1,6 +1,6 @@
 # Machina — launch film
 
-A 70-second launch film, rendered from code. No editor project, no stock music, no
+A 75-second launch film, rendered from code. No editor project, no stock music, no
 screen recording: the picture is [Remotion](https://remotion.dev) (React → frames),
 the score is synthesized by a Node script, and both read their timing from one
 shared file.
@@ -60,11 +60,16 @@ owner ruled out: it is **not** a learning app, and it does **not** sell
 | 1–5 | 0:02.5 | `Scatter` | Five platforms drifting apart — Instagram, X, YouTube, WhatsApp, Reading List — then fading out one by one |
 | 5–7 | 0:12.5 | `WordmarkScene` | The five rush back and collapse into one point; the mark closes around it, then pushes through into the product |
 | 7–12 | 0:17.5 | `Capture` | **One share sheet, three sources behind it** → the five-phase pipeline, held ~5.5s under a push-in → a finished card |
-| 12–16 | 0:30 | `Library` | Sorted, and findable without remembering where |
+| 12–16 | 0:30 | `Library` | Browse, search, filter — however you remember it |
 | 16–20 | 0:40 | `AskScene` | **The hero.** Question → streamed answer → three citation chips, from three different platforms |
 | 20–23 | 0:50 | `GraphScene` | Edges draw in staggered — connections being found, not a diagram revealed |
-| 23–25 | 0:57.5 | `DigestScene` | Collections, then the weekly synthesis + resurface nudge |
-| 25–28 | 1:02.5 | `Endcard` | The bare mark, the wordmark, `Capture. Ask. Connect.` |
+| 23–25 | 0:57.5 | `CollectionsScene` | The organising that is yours |
+| 25–27 | 1:02.5 | `DigestScene` | The weekly synthesis + the resurfaced save |
+| 27–30 | 1:07.5 | `Endcard` | The bare mark, the wordmark, `Capture. Ask. Connect.` |
+
+`Capture` / `Ask` / `Connect` print as a letterspaced kicker above the line on
+their own beats, so a viewer can place each act inside the tagline without being
+told.
 
 The cold open is the app's own boot sequence, not an invented title card — same
 staged arrival (brackets close → the point strikes → only then does the wordmark
@@ -99,6 +104,26 @@ under the answer are a Nature paper, a YouTube video and an Instagram carousel.
 second per phase, which is what it takes to actually read them. It is the one
 place the film shows what pressing *share* bought you, so it gets the time and
 the screen size, under a single heading.
+
+## Framing: magnified, and aimed
+
+Product shots run **1.4–2.0×** and deliberately crop the device top and bottom —
+a whole handset in shot is unreadable on a phone, which is where this film will
+mostly be watched. Because the device is cropped, every shot has to AIM:
+`focusY(screenY, scale)` in `film/anim.ts` puts a chosen point of the screen at a
+chosen point of the frame, so a scene targets the checklist, or the answer and
+its chips, or the card stack — rather than zooming and hoping.
+
+## The graph is the shipped design
+
+`GraphScreen` is ported from `KnowledgeGraph.tsx`'s canvas drawing, not
+approximated: node bodies are the **category colour** with a lit top-left radial
+and a 0.35-alpha ring; edges are **muted grey** at 0.13–0.35 (the app only
+colours an edge when a selection lights it); the canvas sits in a rounded
+hairline container over `radial-gradient(120% 100% at 50% 38%, var(--card),
+var(--background) 88%)`; labels are 11px in `textSecondary` with a **card**-toned
+halo stroke — the app's own QA note explains that a background-toned halo smears
+ghost shapes around glyphs.
 
 ## Captions are a layout, not a subtitle track
 

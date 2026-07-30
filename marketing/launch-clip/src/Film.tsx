@@ -10,6 +10,7 @@ import { Capture } from './scenes/Capture';
 import { Library } from './scenes/Library';
 import { AskScene } from './scenes/AskScene';
 import { GraphScene } from './scenes/GraphScene';
+import { CollectionsScene } from './scenes/CollectionsScene';
 import { DigestScene } from './scenes/DigestScene';
 import { Endcard } from './scenes/Endcard';
 import { sans } from './fonts';
@@ -22,6 +23,7 @@ const SCENE_COMPONENTS: Record<string, React.FC> = {
   library: Library,
   ask: AskScene,
   graph: GraphScene,
+  collections: CollectionsScene,
   digest: DigestScene,
   endcard: Endcard,
 };

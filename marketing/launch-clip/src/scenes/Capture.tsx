@@ -2,7 +2,7 @@ import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { Phone } from '../ui/Phone';
 import { FloorGlow, Rig, Stage } from '../film/effects';
-import { BASE_X, BASE_SCALE, BASE_Y, drift, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
+import { BASE_X, drift, focusY, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
 import {
   AnalyzingScreen,
   ArticleScreen,
@@ -70,10 +70,16 @@ export const Capture: React.FC = () => {
   const shot = prog(f, 118, 136, EASE_MODAL);
   const push = prog(f, 132, 250, EASE_IN_OUT);
   const settle = prog(f, 288, 360, EASE_IN_OUT);
-  const scale = BASE_SCALE * (1 + shot * 0.08) * (1 + push * 0.62 - settle * 0.16);
-  const rotY = ramp(f, [0, 118], [15, 12], EASE_IN_OUT) * (1 - shot);
-  const rotX = ramp(f, [0, 118], [7, 5], EASE_IN_OUT) * (1 - shot);
-  const camY = BASE_Y + drift(f, 6, 320) + push * 210 - settle * 40;
+  // Two framings in one scene: the sheet (which needs the source above it in
+  // shot, so it stays a touch wider) and then the checklist, which is the thing
+  // the film is actually here to show and gets a hard read at ~1.95×.
+  const scale = ramp(f, [0, 30], [1.24, 1.3], EASE_OUT) + push * 0.65 - settle * 0.14;
+  const rotY = ramp(f, [0, 118], [13, 10], EASE_IN_OUT) * (1 - shot);
+  const rotX = ramp(f, [0, 118], [6, 4], EASE_IN_OUT) * (1 - shot);
+  const target = inApp
+    ? ramp(f, [128, 300], [300, 250], EASE_IN_OUT)
+    : ramp(f, [0, 60], [480, 560], EASE_IN_OUT);
+  const camY = focusY(target, scale) + drift(f, 5, 320);
 
   const out = 1 - prog(f, 363, 375);
 
