@@ -95,10 +95,13 @@ const PANEL_INSET = 12;   // matches top-3 / end-3
 // interpolated class name would never be generated. Keep it in sync with the
 // two numbers above — they are the same measurement.
 const PANEL_CLASS_W = 'sm:w-[330px] lg:w-[440px]';
-/** Screen width the panel claims, including its inset. Mirrors the `lg:`
- *  breakpoint — the canvas is close enough to viewport width on desktop that
- *  the same 1024px threshold holds (the isDesktop test already trades on this). */
-const panelReserve = (viewW: number) => (viewW >= 1024 ? PANEL_W_LG : PANEL_W_SM) + PANEL_INSET * 2;
+/** Screen width the panel claims, including its inset. The breakpoint is read
+ *  from the WINDOW, not the canvas: `lg:` fires on viewport width, and the
+ *  canvas is narrower by the page's padding — testing the canvas would reserve
+ *  330px while the panel actually rendered at 440px for every window between
+ *  1024px and ~1200px, letting captions draw under the glass exactly there. */
+const panelReserve = () =>
+    (typeof window !== 'undefined' && window.innerWidth >= 1024 ? PANEL_W_LG : PANEL_W_SM) + PANEL_INSET * 2;
 
 export default function KnowledgeGraph({
     links,
@@ -304,7 +307,7 @@ export default function KnowledgeGraph({
                     maxY = Math.max(maxY, n.y + n.r);
                 }
                 const desktop = w >= 640;
-                const freeW = desktop ? w - panelReserve(w) - 18 : w;
+                const freeW = desktop ? w - panelReserve() - 18 : w;
                 // Phones: the sheet can take up to 66% of the height, so only
                 // the top third is genuinely free to frame into.
                 const freeH = desktop ? h : h * 0.34;
@@ -332,7 +335,7 @@ export default function KnowledgeGraph({
                 const w = canvas.width / dpr;
                 const h = canvas.height / dpr;
                 const desktop = w >= 640;
-                const freeW = desktop ? w - panelReserve(w) - 18 : w;
+                const freeW = desktop ? w - panelReserve() - 18 : w;
                 const freeH = desktop ? h : h * 0.34;
                 let minX = n.x - n.r, minY = n.y - n.r, maxX = n.x + n.r, maxY = n.y + n.r;
                 for (const ei of model.adjacency[fi]) {
@@ -1303,7 +1306,7 @@ function draw(
         placed.push(isDesktop
             // Mirrors the panel's own sizing (PANEL_CLASS_W at end-3 / the
             // phone sheet's max-h-[66%]) and the camera's framing math.
-            ? { x1: viewW - panelReserve(viewW) - 4, y1: 4, x2: viewW - 4, y2: viewH - 4 }
+            ? { x1: viewW - panelReserve() - 4, y1: 4, x2: viewW - 4, y2: viewH - 4 }
             : { x1: 4, y1: viewH * 0.34, x2: viewW - 4, y2: viewH });
     }
     const fits = (r: Rect) =>
