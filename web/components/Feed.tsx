@@ -4,7 +4,7 @@
 
 
 import { useState, useEffect, useRef, useMemo, useCallback, cloneElement, type ReactElement } from 'react';
-import { Link, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef } from '@/lib/types';
+import { Link, Collection, WeeklySynthesis, CuratedDigest, DigestCardRef, UserNote } from '@/lib/types';
 import { getColorStyleByKey, getCategoryColorStyle } from '@/lib/colors';
 import { platformIcon, platformColor, type PlatformKey } from '@/lib/platform';
 import DigestView from './DigestView';
@@ -56,7 +56,7 @@ import LoadMoreSentinel from './feed/LoadMoreSentinel';
 import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, Sparkles, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
-import { subscribeSyntheses } from '@/lib/synthesis';
+import { subscribeSyntheses, subscribeSynthesisNotes, saveSynthesisNotes } from '@/lib/synthesis';
 import { subscribeDigests, deleteDigest } from '@/lib/digest';
 import { PUSH_INTENT_EVENT, PUSH_FOREGROUND_EVENT, consumePendingPushIntent, readLocalPushPrompt, type PushIntent } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
@@ -327,6 +327,9 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     const [syntheses, setSyntheses] = useState<WeeklySynthesis[]>([]);
     const [dismissedSynthesisWeek, setDismissedSynthesisWeek] = useState<string | null>(null);
     const latestSynthesis = syntheses[0] ?? null;
+    // The user's own notes on each week (weekId → notes), stored apart from the
+    // function-written synthesis docs — see lib/synthesis.ts.
+    const [synthesisNotes, setSynthesisNotes] = useState<Map<string, UserNote[]>>(new Map());
 
     // Curated digest history — the dedicated Digest section (written
     // server-side to users/{uid}/digests; the in-app view is the always-on
@@ -386,6 +389,12 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     useEffect(() => {
         if (!uid) return;
         return subscribeSyntheses(uid, setSyntheses);
+    }, [uid]);
+
+    // The user's notes on those weeks — one listener for the whole archive.
+    useEffect(() => {
+        if (!uid) return;
+        return subscribeSynthesisNotes(uid, setSynthesisNotes);
     }, [uid]);
 
     // Subscribe to the curated digest history for the Digest section.
@@ -1358,10 +1367,19 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // both layouts (desktop inline / mobile full-screen overlay). The archive is
     // the FULL run, unfiltered by the feed banner's dismissal: dismissing the
     // banner hides a banner, it never removes a write-up.
+    const saveSynthesisNotesFor = (weekId: string, notes: UserNote[]) => {
+        if (!uid) return;
+        void saveSynthesisNotes(uid, weekId, notes).catch((e) => {
+            reportError(e, 'synthesis-notes-save');
+            toast.error("Couldn't save that note. Please try again.");
+        });
+    };
     const digestContent = (
         <DigestView
             digests={digests}
             syntheses={syntheses}
+            synthesisNotes={synthesisNotes}
+            onSaveSynthesisNotes={saveSynthesisNotesFor}
             onOpenCard={openDigestCard}
             onOpenSynthesisCard={(id) => setActiveLinkId(id)}
             onOpenDigestSettings={onOpenDigestSettings}
@@ -1380,7 +1398,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         ? (openSynthesis?.title || 'Weekly synthesis')
         : (openDigest?.title || 'Digest');
     const digestDetailContent = openSynthesis ? (
-        <SynthesisCard synthesis={openSynthesis} onOpenCard={(id) => setActiveLinkId(id)} alwaysOpen />
+        <SynthesisCard
+            synthesis={openSynthesis}
+            onOpenCard={(id) => setActiveLinkId(id)}
+            alwaysOpen
+            notes={synthesisNotes.get(openSynthesis.weekId)}
+            onSaveNotes={(n) => saveSynthesisNotesFor(openSynthesis.weekId, n)}
+        />
     ) : openDigest ? (
         <DigestCard
             key={openDigest.id}

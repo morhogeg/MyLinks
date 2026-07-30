@@ -4,6 +4,7 @@
 //   - workspace resolve: LIST query on /users where('authUids','array-contains', me)
 //   - owner doc updates (timezone/settings), links/chats/collections CRUD
 //   - syntheses / digests: client READ-ONLY (written by Cloud Functions via Admin SDK)
+//   - synthesisNotes: the user's own notes on a week — full owner read/write
 //   - shared_cards / shared_collections: public read, owner-only write
 //   - rate_limits / pending_processing / task_logs: never client-accessible
 //
@@ -207,6 +208,44 @@ test('nobody can write syntheses from the client (Cloud Functions only)', async 
 test('stranger and anon cannot read syntheses', async () => {
   await assertFails(getDoc(doc(strangerDb(), 'users', OWNER_DOC, 'syntheses', '2026-W27')));
   await assertFails(getDoc(doc(anonDb(), 'users', OWNER_DOC, 'syntheses', '2026-W27')));
+});
+
+// ── synthesisNotes: the user's OWN notes on a week — full owner read/write ───
+// This is the counterpart to the write-denied `syntheses` doc above: the
+// narrative stays Cloud-Function-owned, the margin notes are the user's. These
+// cases exist because the "Add a note" button is a direct client write — the
+// same shape as the digest Delete button that silently became a no-op under the
+// locked ruleset (audit S-9).
+
+test('owner can write, read and clear their own notes on a week', async () => {
+  const ref = doc(ownerDb(), 'users', OWNER_DOC, 'synthesisNotes', '2026-W27');
+  await assertSucceeds(setDoc(ref, { notes: [{ id: 'n1', text: 'Worth revisiting', createdAt: 1 }], updatedAt: 1 }));
+  await assertSucceeds(getDoc(ref));
+  await assertSucceeds(getDocs(collection(ownerDb(), 'users', OWNER_DOC, 'synthesisNotes')));
+  // Editing and removing a note are both the same whole-list write.
+  await assertSucceeds(setDoc(ref, { notes: [{ id: 'n1', text: 'Edited', createdAt: 1, updatedAt: 2 }], updatedAt: 2 }));
+  await assertSucceeds(setDoc(ref, { notes: [], updatedAt: 3 }));
+  await assertSucceeds(deleteDoc(ref));
+});
+
+test('a note on a week never opens up the synthesis doc itself', async () => {
+  await assertSucceeds(
+    setDoc(doc(ownerDb(), 'users', OWNER_DOC, 'synthesisNotes', '2026-W27'), { notes: [], updatedAt: 1 }),
+  );
+  await assertFails(
+    updateDoc(doc(ownerDb(), 'users', OWNER_DOC, 'syntheses', '2026-W27'), { narrative: 'tampered' }),
+  );
+});
+
+test('stranger and anon cannot touch synthesis notes', async () => {
+  await assertFails(getDoc(doc(strangerDb(), 'users', OWNER_DOC, 'synthesisNotes', '2026-W27')));
+  await assertFails(getDoc(doc(anonDb(), 'users', OWNER_DOC, 'synthesisNotes', '2026-W27')));
+  await assertFails(
+    setDoc(doc(strangerDb(), 'users', OWNER_DOC, 'synthesisNotes', '2026-W27'), { notes: [] }),
+  );
+  await assertFails(
+    setDoc(doc(anonDb(), 'users', OWNER_DOC, 'synthesisNotes', '2026-W27'), { notes: [] }),
+  );
 });
 
 // ── digests: read + delete for the owner, content written by functions ───────

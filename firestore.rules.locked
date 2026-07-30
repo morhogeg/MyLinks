@@ -76,6 +76,16 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // The user's OWN notes on a week (SynthesisCard's "Your notes"), keyed by
+      // the same weekId. Deliberately a separate collection rather than a field
+      // on the synthesis doc above: that doc is Cloud-Function-owned and stays
+      // write-denied, so a client can never damage the generated narrative
+      // while still being able to write its own margin notes. Fully owner
+      // read/write, like links/chats/collections — it is entirely user content.
+      match /synthesisNotes/{weekId} {
+        allow read, write: if owns(uid);
+      }
+
       // Curated digests (in-app Digest section). CONTENT is written by Cloud
       // Functions (Admin SDK, bypasses rules); the client reads to render the
       // digest history (lib/digest.ts).

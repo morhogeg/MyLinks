@@ -1,5 +1,7 @@
 import {
     collection,
+    doc,
+    setDoc,
     query,
     orderBy,
     limit,
@@ -8,7 +10,7 @@ import {
     DocumentData,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { WeeklySynthesis } from './types';
+import { WeeklySynthesis, UserNote } from './types';
 
 /**
  * Read access to the weekly "What you learned" syntheses (M12).
@@ -60,6 +62,50 @@ export function subscribeSyntheses(
         (snap) => cb(snap.docs.map(toSynthesis)),
         () => cb([]),
     );
+}
+
+// ── Your notes on a week ─────────────────────────────────────────────────────
+// Kept in a SEPARATE subcollection, `users/{uid}/synthesisNotes/{weekId}`,
+// rather than as a field on the synthesis doc. The synthesis is written by the
+// Cloud Function with the Admin SDK and the locked ruleset denies all client
+// writes to it (`firestore.rules.locked`) — opening that door so the client
+// could append a note would also let a buggy client overwrite the narrative.
+// A doc the user owns outright, keyed by the same weekId, has neither problem.
+
+const notesDoc = (uid: string, weekId: string) => doc(db, 'users', uid, 'synthesisNotes', weekId);
+
+/**
+ * Subscribe to every week's notes at once, as weekId → notes (newest note
+ * first). The archive is small enough that one listener beats one per open
+ * week, and it means a note is already in hand when the reader opens.
+ * Fails soft — a listener error yields an empty map.
+ */
+export function subscribeSynthesisNotes(
+    uid: string,
+    cb: (byWeek: Map<string, UserNote[]>) => void,
+): () => void {
+    return onSnapshot(
+        collection(db, 'users', uid, 'synthesisNotes'),
+        (snap) => {
+            const map = new Map<string, UserNote[]>();
+            for (const d of snap.docs) {
+                const raw = d.data().notes;
+                if (!Array.isArray(raw)) continue;
+                const notes = raw
+                    .filter((n): n is UserNote => !!n && typeof n.text === 'string' && !!n.text.trim())
+                    .sort((a, b) => Math.max(b.updatedAt ?? 0, b.createdAt) - Math.max(a.updatedAt ?? 0, a.createdAt));
+                if (notes.length) map.set(d.id, notes);
+            }
+            cb(map);
+        },
+        () => cb(new Map()),
+    );
+}
+
+/** Replace a week's notes. The caller owns the list (add/edit/remove happen in
+ *  the component against the live snapshot), so one write covers all three. */
+export async function saveSynthesisNotes(uid: string, weekId: string, notes: UserNote[]): Promise<void> {
+    await setDoc(notesDoc(uid, weekId), { notes, updatedAt: Date.now() });
 }
 
 /**

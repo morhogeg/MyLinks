@@ -1021,6 +1021,57 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-30 (round 2) — cluster names now name the SUBJECT; Ask chips keep
+  their platform logos; Machina mark replaces the AI sparkle; digest width +
+  chevrons; NOTES on a week (owner QA, six items).**
+  (1) **The crucial one: cluster captions.** Fourteen Messi/Ronaldo cards were
+  captioned "Comparative Analysis · Performance Metrics" — nobody saves ten
+  cards in order to discuss comparative analysis. Root cause: `clusterLabel`
+  ranked concepts by RAW FREQUENCY, and the model attaches an analysis
+  vocabulary ("comparative analysis", "performance metrics", "case study") to
+  cards across the WHOLE library, so inside any one cluster it out-counts the
+  subject. New `conceptScores` multiplies three signals: **coverage** (as
+  before) × **distinctiveness** (what share of that concept's library-wide
+  appearances land in this cluster — "Lionel Messi" ≈1.0, "Comparative
+  Analysis" ≈0.2) × **title echo** (the concept's words also appear in the
+  members' own titles). No hand-maintained stopword list: a word is generic
+  because the library says so, which means it keeps working as the library
+  changes. `buildGraphModel` now computes a library-wide concept DF once and
+  passes it down. The second half of a "A · B" caption must also clear 60% of
+  the leader's score, so a one-subject cluster stops diluting its own name.
+  **Verified against the exact reported case** (a 14-card sports cluster whose
+  generic vocabulary also appears on 20 unrelated cards): it now reads **"Lionel
+  Messi"**, and no cluster in the fixture keeps a generic caption.
+  (2) **Ask citation chips** — round 1 over-corrected: EVERY chip wore the
+  Machina glyph, including YouTube/Facebook cards that have a logo of their own.
+  Now the Machina mark appears only when `getPlatform()` finds no platform;
+  branded sources show their own bare, brand-coloured logo via `SourceByline`.
+  The two never appear together. (3) **The generic AI sparkle is gone** from the
+  synthesis (feed banner + archive header + sidebar rows) in favour of the
+  Machina `CitationGlyph`; the banner's gradient tile went with it, because
+  `Wordmark.tsx` is explicit that a rounded container makes the brand mark read
+  as a shrunken app icon. (4) **Digest uses the width**: `max-w-6xl` →
+  `max-w-[1500px]`, reading measure 62ch → **68ch**, and sidebar row titles wrap
+  to two lines instead of truncating ("A week of systems, performance, a…" did
+  not say which week). (5) **Every sidebar group collapses**, not just the
+  synthesis one — "Earlier this week"/"Earlier this month" got the same chevron.
+  State tracks only CLOSED groups, so a new date bucket appears expanded.
+  (6) **NEW FEATURE — notes on a week.** Add/edit/delete notes at the foot of a
+  synthesis, reusing the card-note shape (`UserNote`, `makeNote`/`touchNote`).
+  **Storage is deliberately a SEPARATE collection**, `users/{uid}/synthesisNotes/{weekId}`:
+  the synthesis doc is Cloud-Function-owned and `firestore.rules.locked` keeps
+  it `allow write: if false`, so opening it for a note would also let a buggy
+  client overwrite the narrative. New locked rule `match /synthesisNotes/{weekId}
+  { allow read, write: if owns(uid) }` **plus 3 emulator tests** — this is
+  exactly the audit-S-9 bug class (a direct client write that the locked ruleset
+  would have silently turned into a no-op at cutover), so it was not shipped on
+  trust. Verified: `tsc` 0, production build green, eslint clean (one
+  pre-existing `modelRef` error), **`firestore-rules-test` 44/44 green against a
+  real emulator** (was 41). **Worth recording: the emulator suite RAN in this
+  sandbox** — contrary to the long-standing note in task 2 that only CI can
+  download the JAR, it works when `firestore-rules-test/node_modules` from the
+  main checkout is linked in. Still NOT render-verified (sign-in gate; local dev
+  runs in emulator mode) — owner QA is the check.
 - **2026-07-30 — synthesis reading layout + synthesis ARCHIVE + wider graph
   panels + themed sub-clusters + Ask citation bylines (owner: five fixes).**
   (1) **Synthesis measure.** The weekly recap was prose set to the full pane

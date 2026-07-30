@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { Newspaper, Sparkles, ChevronRight, ChevronDown } from 'lucide-react';
-import type { CuratedDigest, WeeklySynthesis, DigestCardRef } from '@/lib/types';
+import { Newspaper, ChevronRight, ChevronDown } from 'lucide-react';
+import { CitationGlyph } from '@/components/ui/Wordmark';
+import type { CuratedDigest, WeeklySynthesis, DigestCardRef, UserNote } from '@/lib/types';
 import { track } from '@/lib/analytics';
 import { digestDisplayTitle, digestKindLabel } from '@/lib/digest';
 import { synthesisWeekLabel } from '@/lib/synthesis';
@@ -34,6 +35,10 @@ interface Props {
      *  filtered by the feed's dismissal: dismissing this week's banner hides a
      *  banner, it does not delete the write-up. */
     syntheses: WeeklySynthesis[];
+    /** weekId → that week's notes, newest first. */
+    synthesisNotes: Map<string, UserNote[]>;
+    /** Persist a week's whole note list (add / edit / delete). */
+    onSaveSynthesisNotes: (weekId: string, notes: UserNote[]) => void;
     onOpenCard: (card: DigestCardRef) => void;
     onOpenSynthesisCard: (id: string) => void;
     onOpenDigestSettings?: () => void;
@@ -53,7 +58,8 @@ interface Props {
  * scroll of collapsed headers.
  */
 export default function DigestView({
-    digests, syntheses, onOpenCard, onOpenSynthesisCard, onOpenDigestSettings, onDeleteDigest, onOpenDigest,
+    digests, syntheses, synthesisNotes, onSaveSynthesisNotes, onOpenCard, onOpenSynthesisCard,
+    onOpenDigestSettings, onDeleteDigest, onOpenDigest,
 }: Props) {
     // The Digest section mounts only when the user opens it (Feed swaps it in),
     // so a mount is a genuine "digest opened" view. Fired once per mount.
@@ -61,10 +67,17 @@ export default function DigestView({
         track('digest_opened');
     }, []);
 
-    // The synthesis archive is a collapsible submenu — open by default so this
-    // week's recap is one click away, collapsible because a year of weeks would
-    // otherwise push the digest history off the screen.
-    const [synthesesOpen, setSynthesesOpen] = useState(true);
+    // Every sidebar group collapses (owner QA: the synthesis chevron should not
+    // be the only one). Open by default; only the groups the user has closed are
+    // tracked, so a brand-new date bucket appears expanded like the rest.
+    const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+    const isOpen = (key: string) => !collapsed.has(key);
+    const toggle = (key: string) => setCollapsed((prev) => {
+        const next = new Set(prev);
+        if (!next.delete(key)) next.add(key);
+        return next;
+    });
+    const SYNTHESES_KEY = 'weekly-synthesis';
 
     // Sidebar selection. A digest id or `synthesis:<weekId>`; falls back to the
     // newest digest, or the newest synthesis when there are no digests yet.
@@ -127,33 +140,38 @@ export default function DigestView({
                         <SectionHeader
                             label="Weekly synthesis"
                             count={syntheses.length}
-                            open={synthesesOpen}
-                            onToggle={() => setSynthesesOpen((v) => !v)}
+                            open={isOpen(SYNTHESES_KEY)}
+                            onToggle={() => toggle(SYNTHESES_KEY)}
                         />
-                        {synthesesOpen && syntheses.map((s) => (
+                        {isOpen(SYNTHESES_KEY) && syntheses.map((s) => (
                             <SidebarRow
                                 key={s.weekId}
-                                icon={<Sparkles className="w-4 h-4" />}
+                                icon={<CitationGlyph className="w-3 h-auto" />}
                                 eyebrow={synthesisWeekLabel(s)}
                                 title={s.title || 'Your week, connected'}
                                 active={false}
                                 onClick={() => onOpenDigest?.(synthesisEntryId(s.weekId))}
-                                trailing={<ChevronRight className="w-4 h-4 text-text-muted shrink-0" />}
+                                trailing={<ChevronRight className="w-4 h-4 text-text-muted shrink-0 rtl:rotate-180" />}
                             />
                         ))}
                     </div>
                 )}
                 {groups.map((g) => (
                     <div key={g.label} className="flex flex-col gap-1.5">
-                        <div className="px-1 text-[11px] font-bold uppercase tracking-[0.14em] text-text-muted">{g.label}</div>
-                        {g.items.map((d) => (
+                        <SectionHeader
+                            label={g.label}
+                            count={g.items.length}
+                            open={isOpen(g.label)}
+                            onToggle={() => toggle(g.label)}
+                        />
+                        {isOpen(g.label) && g.items.map((d) => (
                             <SidebarRow
                                 key={d.id}
                                 eyebrow={d.frequency === 'weekly' ? digestKindLabel(d.frequency) : undefined}
                                 title={digestDisplayTitle(d)}
                                 active={false}
                                 onClick={() => onOpenDigest?.(d.id)}
-                                trailing={<ChevronRight className="w-4 h-4 text-text-muted shrink-0" />}
+                                trailing={<ChevronRight className="w-4 h-4 text-text-muted shrink-0 rtl:rotate-180" />}
                             />
                         ))}
                     </div>
@@ -161,20 +179,24 @@ export default function DigestView({
             </div>
 
             {/* Desktop — sidebar list + reading pane. */}
-            <div className="hidden lg:flex gap-5 max-w-6xl mx-auto">
+            {/* Wider than the old max-w-6xl (owner QA: the reader left desktop
+                width on the table). The sidebar keeps its 288px; the extra room
+                all goes to the reading pane, where the article column centres
+                itself at its own measure. */}
+            <div className="hidden lg:flex gap-6 max-w-[1500px] mx-auto">
                 <aside className="w-72 shrink-0 sticky top-2 self-start max-h-[calc(100vh-8rem)] overflow-y-auto scrollbar-subtle pr-1 flex flex-col gap-4">
                     {syntheses.length > 0 && (
                         <div className="flex flex-col gap-1">
                             <SectionHeader
                                 label="Weekly synthesis"
                                 count={syntheses.length}
-                                open={synthesesOpen}
-                                onToggle={() => setSynthesesOpen((v) => !v)}
+                                open={isOpen(SYNTHESES_KEY)}
+                                onToggle={() => toggle(SYNTHESES_KEY)}
                             />
-                            {synthesesOpen && syntheses.map((s) => (
+                            {isOpen(SYNTHESES_KEY) && syntheses.map((s) => (
                                 <SidebarRow
                                     key={s.weekId}
-                                    icon={<Sparkles className="w-4 h-4" />}
+                                    icon={<CitationGlyph className="w-3 h-auto" />}
                                     eyebrow={synthesisWeekLabel(s)}
                                     title={s.title || 'Your week, connected'}
                                     active={activeId === synthesisEntryId(s.weekId)}
@@ -185,8 +207,13 @@ export default function DigestView({
                     )}
                     {groups.map((g) => (
                         <div key={g.label} className="flex flex-col gap-1">
-                            <div className="px-1 text-[11px] font-bold uppercase tracking-[0.14em] text-text-muted">{g.label}</div>
-                            {g.items.map((d) => (
+                            <SectionHeader
+                                label={g.label}
+                                count={g.items.length}
+                                open={isOpen(g.label)}
+                                onToggle={() => toggle(g.label)}
+                            />
+                            {isOpen(g.label) && g.items.map((d) => (
                                 <SidebarRow
                                     key={d.id}
                                     eyebrow={d.frequency === 'weekly' ? digestKindLabel(d.frequency) : undefined}
@@ -201,7 +228,14 @@ export default function DigestView({
 
                 <div className="flex-1 min-w-0">
                     {activeSynthesis ? (
-                        <SynthesisCard key={activeSynthesis.weekId} synthesis={activeSynthesis} onOpenCard={onOpenSynthesisCard} alwaysOpen />
+                        <SynthesisCard
+                            key={activeSynthesis.weekId}
+                            synthesis={activeSynthesis}
+                            onOpenCard={onOpenSynthesisCard}
+                            alwaysOpen
+                            notes={synthesisNotes.get(activeSynthesis.weekId)}
+                            onSaveNotes={(n) => onSaveSynthesisNotes(activeSynthesis.weekId, n)}
+                        />
                     ) : activeDigest ? (
                         <DigestCard key={activeDigest.id} digest={activeDigest} alwaysOpen onOpenCard={onOpenCard} onOpenSettings={onOpenDigestSettings} onDelete={onDeleteDigest} />
                     ) : null}
@@ -255,7 +289,10 @@ function SidebarRow({ icon, eyebrow, title, meta, active, onClick, trailing }: {
                         {eyebrow && <span className="truncate">{eyebrow}</span>}
                     </span>
                 )}
-                <span dir="auto" className={`block text-[13.5px] font-semibold text-text truncate ${(icon || eyebrow) ? 'mt-0.5' : ''}`}>{title}</span>
+                {/* Wraps to two lines instead of truncating — a synthesis title
+                    is a sentence, and "A week of systems, performance, a…" told
+                    the user nothing about which week they were picking. */}
+                <span dir="auto" className={`block text-[13.5px] font-semibold text-text leading-snug line-clamp-2 ${(icon || eyebrow) ? 'mt-0.5' : ''}`}>{title}</span>
                 {meta && <span className="mt-0.5 flex items-center gap-1 min-w-0 text-[11px] text-text-muted">{meta}</span>}
             </span>
             {trailing}
