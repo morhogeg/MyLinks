@@ -14,7 +14,7 @@ export type Card = {
   title: string;
   summary: string;
   source: string;
-  sourceKind?: 'link' | 'x' | 'youtube' | 'instagram' | 'screenshot' | 'note';
+  sourceKind?: 'link' | 'x' | 'youtube' | 'instagram' | 'facebook' | 'screenshot' | 'note';
   tags: string[];
   readTime: number;
   age: string;
@@ -41,7 +41,8 @@ export const CARDS: Card[] = [
     title: 'Retrieval practice beats re-reading',
     summary:
       'Testing yourself once outperforms four passes of highlighting. The effort of pulling something back is the thing that strengthens it.',
-    source: 'pubmed.gov',
+    source: 'Veritasium',
+    sourceKind: 'youtube',
     tags: ['recall', 'testing-effect'],
     readTime: 9,
     age: '5d ago',
@@ -53,7 +54,8 @@ export const CARDS: Card[] = [
     title: 'The forgetting curve, replicated',
     summary:
       'A modern replication of Ebbinghaus: without a second exposure, most of what you read is gone inside a week.',
-    source: 'journals.plos.org',
+    source: '@neuro.explained',
+    sourceKind: 'instagram',
     tags: ['memory', 'spacing'],
     readTime: 7,
     age: '1w ago',
@@ -64,10 +66,10 @@ export const CARDS: Card[] = [
     title: 'The real cost of switching context',
     summary:
       'Each interruption carries a tail: the residue of the last task keeps consuming capacity long after you have moved on.',
-    source: 'Veritasium',
-    sourceKind: 'youtube',
+    source: 'Cal Newport',
+    sourceKind: 'facebook',
     tags: ['attention', 'deep-work'],
-    readTime: 18,
+    readTime: 5,
     age: '1w ago',
   },
   {
@@ -97,13 +99,13 @@ export const CARDS: Card[] = [
   {
     id: 'attention',
     category: 'Learning',
-    title: 'How a memory gets consolidated',
+    title: 'How to actually read a paper',
     summary:
-      'A carousel walking the hippocampus-to-cortex handoff one slide at a time. Saved for the third slide, which is the whole idea.',
-    source: '@neuro.explained',
-    sourceKind: 'instagram',
-    tags: ['memory', 'explainer'],
-    readTime: 3,
+      'The three-pass method, walked through on a real paper. The second pass is the one everybody skips and the one that does the work.',
+    source: 'Andrej Karpathy',
+    sourceKind: 'youtube',
+    tags: ['reading', 'method'],
+    readTime: 14,
     age: '3w ago',
   },
   {
@@ -158,13 +160,13 @@ export const ASK_QUESTION = 'Why do I keep forgetting what I read?';
 export const ASK_ANSWER = [
   'Three of your saves land on the same answer: the bottleneck is retrieval, not storage.',
   '',
-  'The Nature paper ties durability to sleep-stage replay, and the retrieval-practice work shows one act of recall beating four re-reads. Your own note is the bridge — you wrote that this is the one you never actually do.',
+  'The Nature paper ties durability to sleep-stage replay, the Veritasium video shows one act of recall beating four re-reads, and the carousel you saved puts a curve on it. Your own note is the bridge — you wrote that this is the one you never actually do.',
 ].join('\n');
 
 export const ASK_SOURCES = [
-  { id: 'sleep', label: 'nature.com', title: 'Sleep-dependent memory consolidation' },
-  { id: 'retrieval', label: 'pubmed.gov', title: 'Retrieval practice beats re-reading' },
-  { id: 'curve', label: 'journals.plos.org', title: 'The forgetting curve, replicated' },
+  { id: 'sleep', label: 'nature.com', kind: 'link' as const, title: 'Sleep-dependent memory consolidation' },
+  { id: 'retrieval', label: 'Veritasium', kind: 'youtube' as const, title: 'Retrieval practice beats re-reading' },
+  { id: 'curve', label: '@neuro.explained', kind: 'instagram' as const, title: 'The forgetting curve, replicated' },
 ];
 
 /** The graph scene. Positions are hand-set — a force layout that never settles reads as noise. */

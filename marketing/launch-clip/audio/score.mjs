@@ -226,6 +226,34 @@ const rim = (startSec, level = 0.16) => {
   );
 };
 
+/** Shaker — the quietest thing in the mix, and the reason it moves. */
+const shaker = (startSec, level = 0.03, panPos = 0.3) => {
+  const h = hp(4200);
+  const l = lp(11000);
+  render(
+    startSec,
+    0.07,
+    (t) => l(h(rnd())) * Math.exp(-t * 120) * level,
+    { pan: panPos, send: 0.14 },
+  );
+};
+
+/** Clap — three tight noise bursts, the backbeat that stops this being ambient. */
+const clap = (startSec, level = 0.13) => {
+  const h = hp(1100);
+  const l = lp(5200);
+  render(
+    startSec,
+    0.28,
+    (t) => {
+      const bursts = Math.exp(-t * 420) + Math.exp(-Math.max(0, t - 0.009) * 380) + Math.exp(-Math.max(0, t - 0.019) * 300);
+      const tail = Math.exp(-t * 22) * 0.5;
+      return l(h(rnd())) * (bursts * 0.5 + tail) * level;
+    },
+    { pan: 0.12, send: 0.42 },
+  );
+};
+
 /** Riser — noise with an opening filter and a slow sine sweep underneath. */
 const riser = (startSec, lenSec, level = 0.11) => {
   let z = 0;
@@ -313,14 +341,14 @@ const CHORDS = {
 };
 const BAR_CHORDS = [
   'Am9', // 0     cold open (the boot)
-  'Am9', 'Fmaj7', 'Cmaj7', // 1–3   scatter
-  'G6', 'G6', // 4–5   the turn
-  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 6–9   capture
-  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 10–13 library
-  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 14–17 ask
-  'Am9', 'Fmaj7', 'Cmaj7', // 18–20 graph
-  'Am9', 'Fmaj7', // 21–22 digest
-  'Cmaj7', 'G6', 'Am9', // 23–25 endcard
+  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 1–4   scatter
+  'Am9', 'G6', // 5–6   the turn, and the lift out of it
+  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 7–10  capture
+  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 11–14 library
+  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 15–18 ask
+  'Am9', 'Fmaj7', 'Cmaj7', // 19–21 graph
+  'Am9', 'Fmaj7', // 22–23 digest
+  'Cmaj7', 'G6', 'Am9', // 24–26 endcard
 ];
 
 // A retime in timeline.mjs that forgets the arrangement would silently put the
@@ -335,13 +363,13 @@ const sceneOfBar = (bar) => SCENES.find((sc) => bar >= sc.bar && bar < sc.bar + 
 /** How much of the arrangement is switched on, per scene. */
 const SCENE_DENSITY = {
   coldOpen: 0.18,
-  scatter: 0.45,
-  wordmark: 0.6,
-  capture: 0.72,
-  library: 0.84,
+  scatter: 0.46,
+  wordmark: 0.62,
+  capture: 0.78,
+  library: 0.9,
   ask: 1.0,
-  graph: 0.9,
-  digest: 0.74,
+  graph: 0.94,
+  digest: 0.78,
   endcard: 0.52,
 };
 
@@ -374,40 +402,57 @@ for (let bar = 0; bar < BAR_CHORDS.length; bar++) {
   });
   pad(t0, BAR, ch.bass + 12, padLevel * 0.6, 0);
 
-  // ── sub on the downbeat, plus a lift into the next bar late in the film
-  sub(t0, ch.bass, 0.34 + 0.26 * d, bar < 2 ? 1.4 : 0.8);
-  if (d >= 0.8) sub(beat(bar, 2.5), ch.bass + 12, 0.16, 0.3);
+  // ── bass: a MOVING line once the film is properly under way, not a pedal.
+  // The single downbeat sub was what made the earlier cut feel like a bed
+  // rather than a track.
+  sub(t0, ch.bass, 0.34 + 0.26 * d, d >= 0.7 ? 0.5 : 1.4);
+  if (d >= 0.7) {
+    sub(beat(bar, 1.5), ch.bass + 7, 0.2 + 0.1 * d, 0.34); // the fifth
+    sub(beat(bar, 2.5), ch.bass + 12, 0.18 + 0.1 * d, 0.3); // the octave
+    if (d >= 0.84) sub(beat(bar, 3.5), ch.bass + 7, 0.15, 0.26);
+  }
 
   // ── percussion
   if (d >= 0.7 && bar < ENDCARD_BAR) {
     kick(t0, 0.34 + 0.2 * d);
     kick(beat(bar, 2), 0.3 + 0.16 * d);
     if (d >= 0.82 && bar < DIGEST_BAR) kick(beat(bar, 3.5), 0.2);
-    if (d >= 0.82 && bar < DIGEST_BAR) rim(beat(bar, 2), 0.12 + 0.06 * d);
+    // the backbeat — beats 2 and 4
+    if (d >= 0.78 && bar < DIGEST_BAR) {
+      clap(beat(bar, 1), 0.1 + 0.05 * d);
+      clap(beat(bar, 3), 0.1 + 0.05 * d);
+    }
+    if (d >= 0.82 && bar < DIGEST_BAR) rim(beat(bar, 2), 0.1 + 0.05 * d);
     if (d >= 0.8 && bar < DIGEST_BAR) {
-      for (let k = 0; k < 8; k++) {
-        // offbeats accented — keeps it moving without a four-on-the-floor feel
-        hat(beat(bar, k * 0.5), (k % 2 ? 0.055 : 0.03) * d, k % 2 ? 0.22 : -0.18);
+      // 16ths once the film is at full tilt, 8ths before that
+      const steps = d >= 0.88 ? 16 : 8;
+      for (let k = 0; k < steps; k++) {
+        const accent = k % (steps / 4) === 0 ? 0.9 : k % 2 ? 1 : 0.55;
+        hat(beat(bar, (k * 4) / steps), 0.036 * accent * d, k % 2 ? 0.22 : -0.18);
       }
+      for (let k = 0; k < 16; k++) shaker(beat(bar, k * 0.25), 0.022 * d, k % 2 ? 0.34 : -0.3);
     }
   }
 
-  // ── plucked arpeggio: 8ths from the capture scene, 16ths over the graph
+  // ── plucked figure. A 3-3-2 onset pattern (the eighth grid grouped 3+3+2)
+  // instead of straight eighths — the single cheapest way to make a track feel
+  // like it is going somewhere.
   if (bar >= CAPTURE_BAR && bar < ENDCARD_BAR) {
     const notes = [...ch.upper, ch.upper[2] + 12];
-    const sixteenths = bar >= SIXTEENTH_FROM && bar < DIGEST_BAR;
-    const steps = sixteenths ? 16 : 8;
-    for (let k = 0; k < steps; k++) {
-      if (!sixteenths && k % 4 === 3 && bar % 2 === 0) continue; // breathe
-      const m = notes[(k + bar) % notes.length] + (k >= steps / 2 ? 12 : 0);
+    const dense = bar >= SIXTEENTH_FROM && bar < DIGEST_BAR;
+    const onsets = dense
+      ? [0, 0.75, 1.5, 2, 2.75, 3.5, 3.75]
+      : [0, 0.75, 1.5, 2, 3, 3.5];
+    onsets.forEach((on, k) => {
+      const m = notes[(k + bar) % notes.length] + (on >= 2 ? 12 : 0);
       pluck(
-        beat(bar, (k * 4) / steps),
+        beat(bar, on),
         m,
-        (sixteenths ? 0.1 : 0.15) * (0.6 + 0.4 * d),
+        (dense ? 0.11 : 0.145) * (0.62 + 0.38 * d),
         ((k % 4) / 3) * 1.2 - 0.6,
-        sixteenths ? 0.7 : 0.45,
+        dense ? 0.68 : 0.45,
       );
-    }
+    });
   }
 }
 
@@ -453,7 +498,9 @@ shimmer(b(HITS.markLock), [69, 76, 81, 88], 0.062);
 
 whoosh(b(HITS.deviceIn) - 0.3, 0.9, 0.085, 0.25);
 tick(b(HITS.shareSheet), 0.085, 1.1);
-tick(b(HITS.shareSheet) + 0.28, 0.07, 1.35);
+// the world behind the sheet changing — a soft tick on each cut
+tick(b(HITS.sourceCutA), 0.075, 1.25);
+tick(b(HITS.sourceCutB), 0.075, 1.4);
 tick(b(HITS.cardLands), 0.11, 0.9);
 sub(b(HITS.cardLands), 45, 0.3, 0.35);
 shimmer(b(HITS.cardLands) + 0.1, [72, 79, 84], 0.05);

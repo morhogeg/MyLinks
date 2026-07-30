@@ -1058,6 +1058,31 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-30 (same session, round 4) — launch film explains the product
+  properly (owner review round 4).** The note behind all six items: *"do a much
+  better job at explaining the value of the app"* — one place for every saved
+  link, analyzed and filed, connected, and made usable by Ask. **(1) Capture is
+  now SCHEMATIC.** It showed one article, one share sheet, then Machina — which
+  proves Machina can take a link, not that it takes them from anywhere. The sheet
+  now slides up ONCE and holds while the world behind it cross-cuts through an
+  Instagram carousel, a YouTube video and an article (the sheet's preview row
+  names each one). Same gesture, three places, no copy, then inside the app for
+  the pipeline. **(2) The demo library is platform-rich**, using the app's OWN
+  marks — this needed `lucide-react` pinned back to **0.563.0**, the version
+  `web/` uses: the film had drifted to lucide 1.x, which has dropped brand icons
+  entirely. Best consequence: **the three Ask citations are now a Nature paper, a
+  YouTube video and an Instagram carousel**, so the hero beat's chips prove the
+  one-place claim by themselves. **(3) Act one gained an opening SENTENCE** ("You
+  save things everywhere.") — it used to open on the bare platform list, which is
+  a fragment, not an opening. Scatter went 3→4 bars, so the film is **67.5s**
+  again and `BAR_CHORDS` is back to 27 entries. **(4) "Saving was never the hard
+  part" is cut.** **(5) Collections are TOPICS** — "From YouTube"/"Saved on X"
+  described where a card came from, which is exactly the organising principle
+  Machina replaces. **(6) The score is livelier** without becoming a trailer: a
+  moving bassline (root–fifth–octave instead of a downbeat pedal), backbeat
+  claps, 16th hats plus a shaker once the film is at full tilt, and the plucked
+  figure regrouped 3+3+2 instead of straight eighths. Per-bar RMS re-verified —
+  no clipping, no holes. Repo-only, no app code, nothing to deploy.
 - **2026-07-30 (same session, round 3) — launch film layout + motion pass (owner
   review round 3).** Six notes, four of them real defects. **(1) Caption 4
   ("Saving was never the hard part") was sitting over Machina's OWN analyzing

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, Crosshair, Lock, Newspaper, Share2, Sparkles, Waypoints } from 'lucide-react';
+import { ChevronLeft, Crosshair, Instagram, Lock, Newspaper, Play, Share2, Sparkles, Waypoints, Youtube } from 'lucide-react';
 import { T, categoryColor } from '../theme';
 import { sans } from '../fonts';
 import { StatusBar, HomeIndicator, SCREEN_W, SCREEN_H } from './Phone';
@@ -202,6 +202,119 @@ export const ArticleScreen: React.FC<{ dim?: number }> = ({ dim = 0 }) => (
 );
 
 /**
+ * The three places a save starts, for the "share it from anywhere" beat.
+ *
+ * The share sheet stays anchored while the SOURCE behind it cross-cuts through
+ * an Instagram post, a YouTube video and an article. Showing one app and then
+ * cutting into Machina made the claim once; holding the sheet still while the
+ * world behind it changes makes it three times, in the same ten seconds, and
+ * without a single word of copy.
+ */
+export const InstagramSource: React.FC = () => (
+  <Screen style={{ background: '#0a0a0c' }}>
+    <StatusBar />
+    <div style={{ position: 'absolute', top: 54, left: 0, right: 0, bottom: 0 }}>
+      <div
+        style={{
+          height: 46,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 9,
+          padding: '0 16px',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}
+      >
+        <Instagram size={17} color="rgb(225,48,108)" />
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#e6e6ee' }}>@neuro.explained</span>
+      </div>
+      <div style={{ padding: 14 }}>
+        <div
+          style={{
+            aspectRatio: '1',
+            borderRadius: 12,
+            background:
+              'linear-gradient(150deg, rgba(225,48,108,0.16), rgba(40,40,52,0.6) 55%, rgba(20,20,26,0.9))',
+            border: '1px solid rgba(255,255,255,0.07)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 26,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 25,
+              fontWeight: 700,
+              lineHeight: 1.18,
+              letterSpacing: '-0.03em',
+              color: '#f0f0f6',
+              textAlign: 'center',
+            }}
+          >
+            The forgetting curve, replicated
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 5, justifyContent: 'center', marginTop: 12 }}>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: 5,
+                background: i === 2 ? 'rgba(240,240,246,0.9)' : 'rgba(255,255,255,0.22)',
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  </Screen>
+);
+
+export const YouTubeSource: React.FC = () => (
+  <Screen style={{ background: '#0a0a0c' }}>
+    <StatusBar />
+    <div style={{ position: 'absolute', top: 54, left: 0, right: 0, bottom: 0 }}>
+      <div
+        style={{
+          height: 220,
+          background: 'linear-gradient(160deg, rgba(255,0,0,0.13), rgba(24,24,30,0.95))',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}
+      >
+        <div
+          style={{
+            width: 54,
+            height: 54,
+            borderRadius: 54,
+            background: 'rgba(255,255,255,0.12)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Play size={20} fill="#f0f0f6" strokeWidth={0} />
+        </div>
+      </div>
+      <div style={{ padding: '16px 16px 0' }}>
+        <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.22, letterSpacing: '-0.02em', color: '#ececf2' }}>
+          Retrieval practice beats re-reading
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 11 }}>
+          <Youtube size={15} color="rgb(255,0,0)" />
+          <span style={{ fontSize: 12.5, color: '#a4a4b0' }}>Veritasium · 4.2M views</span>
+        </div>
+      </div>
+    </div>
+  </Screen>
+);
+
+/**
  * The iOS share sheet, with Machina in the app row. This is the app's widest
  * capture surface and the reason the film opens the story here.
  */
@@ -210,7 +323,10 @@ export const ShareSheet: React.FC<{
   open: number;
   /** 0–1 how selected the Machina row is. */
   pick?: number;
-}> = ({ open, pick = 0 }) => {
+  /** What is actually being shared — the sheet must name the source behind it. */
+  item?: { title: string; site: string; mark?: string };
+}> = ({ open, pick = 0, item }) => {
+  const shared = item ?? { title: INCOMING.headline, site: INCOMING.site };
   const H = 420;
   return (
     <div
@@ -262,7 +378,7 @@ export const ShareSheet: React.FC<{
               color: '#9a9aa6',
             }}
           >
-            N
+            {shared.site.slice(0, 1).toUpperCase()}
           </div>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 13.5, fontWeight: 600, color: '#ececf2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 250 }}>
@@ -612,7 +728,7 @@ export const AskScreen: React.FC<{
               {sources.some((s) => s > 0) && (
                 <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {ASK_SOURCES.map((s, i) => (
-                    <CitationChip key={s.id} label={s.label} title={s.title} enter={sources[i] ?? 0} />
+                    <CitationChip key={s.id} label={s.label} kind={s.kind} title={s.title} enter={sources[i] ?? 0} />
                   ))}
                 </div>
               )}
@@ -1032,12 +1148,13 @@ export const DigestScreen: React.FC<{ enter?: number; reviewEnter?: number }> = 
 export const CollectionsScreen: React.FC<{ enter?: number }> = ({ enter = 1 }) => {
   const cols = [
     { name: 'How memory works', n: 14, key: 'indigo' },
-    { name: 'Attention economy', n: 9, key: 'teal' },
-    { name: 'Product notes', n: 23, key: 'orange' },
-    { name: 'Read again', n: 6, key: 'blue' },
-    { name: 'From YouTube', n: 18, key: 'red' },
-    { name: 'Saved on X', n: 31, key: 'cyan' },
+    { name: 'Attention & focus', n: 9, key: 'teal' },
+    { name: 'Tools for thought', n: 23, key: 'orange' },
+    { name: 'Deep work', n: 11, key: 'blue' },
+    { name: 'Design references', n: 17, key: 'pink' },
+    { name: 'Read again', n: 6, key: 'green' },
   ];
+
   return (
     <Screen>
       <StatusBar />

@@ -1,8 +1,10 @@
 import React from 'react';
 import {
   Clock,
+  Facebook,
   Home,
-  Play,
+  Instagram,
+  Youtube,
   Layers,
   MessagesSquare,
   Newspaper,
@@ -247,58 +249,49 @@ export const TagChip: React.FC<{ tag: string }> = ({ tag }) => {
 const PLATFORM_INK: Record<string, string> = {
   youtube: 'rgb(255, 0, 0)',
   instagram: 'rgb(225, 48, 108)',
+  facebook: 'rgb(24, 119, 242)',
   x: 'rgb(191, 201, 214)',
 };
 
+/** The app's platform marks — the same lucide icons `platformIcon` returns. */
+const PlatformMark: React.FC<{ kind: string; size?: number }> = ({ kind, size = 12 }) => {
+  if (kind === 'youtube') return <Youtube size={size} strokeWidth={2} />;
+  if (kind === 'instagram') return <Instagram size={size} strokeWidth={2} />;
+  if (kind === 'facebook') return <Facebook size={size} strokeWidth={2} />;
+  return (
+    <svg width={size - 2} height={size - 2} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M18.9 2H22l-7 8 7.6 12h-6.2l-4.9-7.7L5.9 22H2.8l7.3-8.4L2.8 2H9l4.6 7.2L18.9 2Z" />
+    </svg>
+  );
+};
+
+export const PlatformByline: React.FC<{ kind: string; label: string; size?: number }> = ({
+  kind,
+  label,
+  size = 12,
+}) => (
+  <span
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 5,
+      fontSize: 11,
+      fontWeight: 500,
+      color: PLATFORM_INK[kind] ?? T.textMuted,
+      whiteSpace: 'nowrap',
+    }}
+  >
+    <PlatformMark kind={kind} size={size} />
+    {label}
+  </span>
+);
+
 const SourceByline: React.FC<{ card: Card }> = ({ card }) => {
-  if (card.sourceKind === 'youtube') {
-    return (
-      <span
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 4.5,
-          fontSize: 11,
-          fontWeight: 500,
-          color: PLATFORM_INK.youtube,
-        }}
-      >
-        <Play size={10} fill="currentColor" strokeWidth={0} />
-        {card.source}
-      </span>
-    );
+  const k = card.sourceKind;
+  if (k === 'youtube' || k === 'instagram' || k === 'facebook' || k === 'x') {
+    return <PlatformByline kind={k} label={card.source} size={k === 'x' ? 11 : 12} />;
   }
-  if (card.sourceKind === 'instagram') {
-    return (
-      <span
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 4.5,
-          fontSize: 11,
-          fontWeight: 500,
-          color: PLATFORM_INK.instagram,
-        }}
-      >
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-          <rect x="3" y="3" width="18" height="18" rx="5" />
-          <circle cx="12" cy="12" r="4" />
-        </svg>
-        {card.source}
-      </span>
-    );
-  }
-  if (card.sourceKind === 'x') {
-    return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: PLATFORM_INK.x }}>
-        <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M18.9 2H22l-7 8 7.6 12h-6.2l-4.9-7.7L5.9 22H2.8l7.3-8.4L2.8 2H9l4.6 7.2L18.9 2Z" />
-        </svg>
-        {card.source}
-      </span>
-    );
-  }
-  if (card.sourceKind === 'screenshot') {
+  if (k === 'screenshot') {
     return (
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, letterSpacing: '0.02em', color: 'rgba(102,102,102,0.8)' }}>
         <ImageIcon size={11} />
@@ -306,9 +299,7 @@ const SourceByline: React.FC<{ card: Card }> = ({ card }) => {
       </span>
     );
   }
-  return (
-    <span style={{ fontSize: 11, color: 'rgba(102,102,102,0.7)' }}>{card.source}</span>
-  );
+  return <span style={{ fontSize: 11, color: 'rgba(102,102,102,0.7)' }}>{card.source}</span>;
 };
 
 /**
@@ -452,59 +443,67 @@ export const SearchField: React.FC<{ value: string; caret?: boolean; semantic?: 
 export const CitationChip: React.FC<{
   label: string;
   title: string;
+  /** Platform of the cited card, so the chip wears that platform's mark. */
+  kind?: string;
   enter?: number;
-}> = ({ label, title, enter = 1 }) => (
-  <div
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 9,
-      padding: '7px 13px 7px 9px',
-      borderRadius: 12,
-      background: T.card,
-      border: `1px solid ${T.border}`,
-      boxShadow: '0 1px 2px rgba(0,0,0,0.4)',
-      opacity: enter,
-      transform: `translateY(${(1 - enter) * 10}px) scale(${0.96 + enter * 0.04})`,
-      maxWidth: '100%',
-    }}
-  >
-    <span
+}> = ({ label, title, kind = 'link', enter = 1 }) => {
+  const platform = kind !== 'link' && kind !== 'screenshot';
+  return (
+    <div
       style={{
-        flexShrink: 0,
-        width: 26,
-        height: 26,
-        borderRadius: 9,
-        background: 'rgba(233,233,242,0.10)',
-        color: T.accent,
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
+        gap: 9,
+        padding: '7px 13px 7px 9px',
+        borderRadius: 12,
+        background: T.card,
+        border: `1px solid ${T.border}`,
+        boxShadow: '0 1px 2px rgba(0,0,0,0.4)',
+        opacity: enter,
+        transform: `translateY(${(1 - enter) * 10}px) scale(${0.96 + enter * 0.04})`,
+        maxWidth: '100%',
       }}
     >
-      <CitationGlyph style={{ width: 11, height: 12 }} />
-    </span>
-    <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-      <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.02em', color: T.textMuted }}>
-        {label}
-      </span>
+      {/* The app's rule: a platform source keeps its OWN mark, everything else
+          gets the bracket glyph. Here it also carries the argument — three chips
+          from three different platforms under one answer. */}
       <span
         style={{
-          fontSize: 12.5,
-          fontWeight: 500,
-          color: T.text,
-          lineHeight: 1.25,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          maxWidth: 250,
+          flexShrink: 0,
+          width: 26,
+          height: 26,
+          borderRadius: 9,
+          background: platform ? `${PLATFORM_INK[kind]}1F` : 'rgba(233,233,242,0.10)',
+          color: platform ? PLATFORM_INK[kind] : T.accent,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
       >
-        {title}
+        {platform ? <PlatformMark kind={kind} size={13} /> : <CitationGlyph style={{ width: 11, height: 12 }} />}
       </span>
-    </span>
-  </div>
-);
+      <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.02em', color: T.textMuted }}>
+          {label}
+        </span>
+        <span
+          style={{
+            fontSize: 12.5,
+            fontWeight: 500,
+            color: T.text,
+            lineHeight: 1.25,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: 250,
+          }}
+        >
+          {title}
+        </span>
+      </span>
+    </div>
+  );
+};
 
 /** The quiet dashed "Graph" chip the app appends to a cited answer. */
 export const GraphChip: React.FC<{ opacity?: number }> = ({ opacity = 1 }) => (

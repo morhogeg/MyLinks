@@ -1,6 +1,6 @@
 # Machina — launch film
 
-A 65-second launch film, rendered from code. No editor project, no stock music, no
+A 67-second launch film, rendered from code. No editor project, no stock music, no
 screen recording: the picture is [Remotion](https://remotion.dev) (React → frames),
 the score is synthesized by a Node script, and both read their timing from one
 shared file.
@@ -57,14 +57,14 @@ owner ruled out: it is **not** a learning app, and it does **not** sell
 | Bars | Time | Scene | What it does |
 |---|---|---|---|
 | 0–1 | 0:00 | `ColdOpen` | **The app booting** — the real `BootScreen`, ported from `web/app/page.tsx` |
-| 1–4 | 0:02.5 | `Scatter` | Five platforms drifting apart — Instagram, X, YouTube, WhatsApp, Reading List — then fading out one by one |
-| 4–6 | 0:10 | `WordmarkScene` | The five rush back and collapse into one point; the mark closes around it, then pushes through into the product |
-| 6–10 | 0:15 | `Capture` | Article → share sheet → the real five-phase pipeline → a finished card |
-| 10–14 | 0:25 | `Library` | The feed, then the search that finds it again |
-| 14–18 | 0:35 | `AskScene` | **The hero.** Question → streamed answer → three citation chips |
-| 18–21 | 0:45 | `GraphScene` | Edges draw in staggered — connections being found, not a diagram revealed |
-| 21–23 | 0:52.5 | `DigestScene` | Collections, then the weekly synthesis + resurface nudge |
-| 23–26 | 0:57.5 | `Endcard` | The bare mark, the wordmark, `Capture. Ask. Connect.` |
+| 1–5 | 0:02.5 | `Scatter` | Five platforms drifting apart — Instagram, X, YouTube, WhatsApp, Reading List — then fading out one by one |
+| 5–7 | 0:12.5 | `WordmarkScene` | The five rush back and collapse into one point; the mark closes around it, then pushes through into the product |
+| 7–11 | 0:17.5 | `Capture` | **One share sheet, three sources behind it** → the real five-phase pipeline → a finished card |
+| 11–15 | 0:27.5 | `Library` | The feed, then the search that finds it again |
+| 15–19 | 0:37.5 | `AskScene` | **The hero.** Question → streamed answer → three citation chips, from three different platforms |
+| 19–22 | 0:47.5 | `GraphScene` | Edges draw in staggered — connections being found, not a diagram revealed |
+| 22–24 | 0:55 | `DigestScene` | Collections, then the weekly synthesis + resurface nudge |
+| 24–27 | 1:00 | `Endcard` | The bare mark, the wordmark, `Capture. Ask. Connect.` |
 
 The cold open is the app's own boot sequence, not an invented title card — same
 staged arrival (brackets close → the point strikes → only then does the wordmark
@@ -81,6 +81,18 @@ beside the platform's name in type rather than reproductions of anyone's logo.
 `CONSTELLATION` in `src/ui/platforms.tsx` is shared by both scenes on purpose: the
 panels gather back to exactly where they drifted out from, because the gather only
 reads as an answer if it undoes the same scatter.
+
+## Capture is schematic on purpose
+
+The share sheet slides up **once and stays** while the source behind it
+cross-cuts through an Instagram carousel, a YouTube video and an article — the
+sheet's preview row names each one. Showing a single app and then cutting into
+Machina proved that Machina can take a link; holding the gesture still while the
+world behind it changes proves it takes them from *anywhere*, in the same ten
+seconds and without a word of copy.
+
+The same argument then closes itself in the Ask beat: the three citation chips
+under the answer are a Nature paper, a YouTube video and an Instagram carousel.
 
 ## Captions are a layout, not a subtitle track
 
@@ -133,6 +145,10 @@ captions ever overlap, which a still review cannot catch.
   egress allowlist). `remotion.config.ts` points `setBrowserExecutable` at the
   container's Playwright build. It must be the **headless shell** binary — the full
   `chrome` binary rejects Remotion's old-headless flag.
+- **`lucide-react` is pinned to 0.563.0** — the version `web/` uses. Later
+  majors (the film had drifted to 1.x) dropped the brand icons entirely, so
+  YouTube/Instagram/Facebook marks silently vanish. The film uses the app's own
+  icons, so it has to track the app's version.
 - **TypeScript must be 5.x.** Remotion's esbuild loader calls `typescript.sys`,
   which TypeScript 7 does not expose from `require`.
 - **Fonts are base64-inlined** (`src/fontData.ts`, regenerate with
