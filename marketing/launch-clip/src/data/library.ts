@@ -14,7 +14,7 @@ export type Card = {
   title: string;
   summary: string;
   source: string;
-  sourceKind?: 'link' | 'x' | 'youtube' | 'screenshot' | 'note';
+  sourceKind?: 'link' | 'x' | 'youtube' | 'instagram' | 'screenshot' | 'note';
   tags: string[];
   readTime: number;
   age: string;
@@ -64,9 +64,10 @@ export const CARDS: Card[] = [
     title: 'The real cost of switching context',
     summary:
       'Each interruption carries a tail: the residue of the last task keeps consuming capacity long after you have moved on.',
-    source: 'hbr.org',
+    source: 'Veritasium',
+    sourceKind: 'youtube',
     tags: ['attention', 'deep-work'],
-    readTime: 6,
+    readTime: 18,
     age: '1w ago',
   },
   {
@@ -95,13 +96,14 @@ export const CARDS: Card[] = [
   },
   {
     id: 'attention',
-    category: 'AI',
-    title: 'Attention Is All You Need',
+    category: 'Learning',
+    title: 'How a memory gets consolidated',
     summary:
-      'The transformer paper. Kept for the mechanism, not the hype — everything downstream of it is a footnote to this architecture.',
-    source: 'arxiv.org',
-    tags: ['research/transformers'],
-    readTime: 22,
+      'A carousel walking the hippocampus-to-cortex handoff one slide at a time. Saved for the third slide, which is the whole idea.',
+    source: '@neuro.explained',
+    sourceKind: 'instagram',
+    tags: ['memory', 'explainer'],
+    readTime: 3,
     age: '3w ago',
   },
   {

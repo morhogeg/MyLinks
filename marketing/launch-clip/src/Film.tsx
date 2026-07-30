@@ -4,7 +4,7 @@ import { SCENES, barToFrame } from '../timeline.mjs';
 import { CaptionScrim, Grain, Vignette } from './film/effects';
 import { Subtitles } from './film/Subtitles';
 import { ColdOpen } from './scenes/ColdOpen';
-import { Problem } from './scenes/Problem';
+import { Scatter } from './scenes/Scatter';
 import { WordmarkScene } from './scenes/WordmarkScene';
 import { Capture } from './scenes/Capture';
 import { Library } from './scenes/Library';
@@ -16,7 +16,7 @@ import { sans } from './fonts';
 
 const SCENE_COMPONENTS: Record<string, React.FC> = {
   coldOpen: ColdOpen,
-  problem: Problem,
+  scatter: Scatter,
   wordmark: WordmarkScene,
   capture: Capture,
   library: Library,

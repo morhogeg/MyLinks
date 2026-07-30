@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Clock,
   Home,
+  Play,
   Layers,
   MessagesSquare,
   Newspaper,
@@ -236,10 +237,61 @@ export const TagChip: React.FC<{ tag: string }> = ({ tag }) => {
   );
 };
 
+/**
+ * Platform bylines. The app's rule (`components/SourceByline.tsx`) is that
+ * platform sources keep their OWN recognisable mark and brand hue while
+ * everything else gets the muted host chip — and the film needs that especially,
+ * because a feed that visibly mixes YouTube, Instagram and X is what proves the
+ * "one place for all of it" promise instead of just captioning it. Hues are the
+ * app's PLATFORM_RGB values.
+ */
+const PLATFORM_INK: Record<string, string> = {
+  youtube: 'rgb(255, 0, 0)',
+  instagram: 'rgb(225, 48, 108)',
+  x: 'rgb(191, 201, 214)',
+};
+
 const SourceByline: React.FC<{ card: Card }> = ({ card }) => {
+  if (card.sourceKind === 'youtube') {
+    return (
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4.5,
+          fontSize: 11,
+          fontWeight: 500,
+          color: PLATFORM_INK.youtube,
+        }}
+      >
+        <Play size={10} fill="currentColor" strokeWidth={0} />
+        {card.source}
+      </span>
+    );
+  }
+  if (card.sourceKind === 'instagram') {
+    return (
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4.5,
+          fontSize: 11,
+          fontWeight: 500,
+          color: PLATFORM_INK.instagram,
+        }}
+      >
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+          <rect x="3" y="3" width="18" height="18" rx="5" />
+          <circle cx="12" cy="12" r="4" />
+        </svg>
+        {card.source}
+      </span>
+    );
+  }
   if (card.sourceKind === 'x') {
     return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'rgba(102,102,102,0.7)' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: PLATFORM_INK.x }}>
         <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
           <path d="M18.9 2H22l-7 8 7.6 12h-6.2l-4.9-7.7L5.9 22H2.8l7.3-8.4L2.8 2H9l4.6 7.2L18.9 2Z" />
         </svg>

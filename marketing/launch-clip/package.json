@@ -7,7 +7,8 @@
     "render": "remotion render src/index.ts MachinaLaunch out/machina-launch.mp4",
     "score": "node audio/score.mjs",
     "captions": "node audio/captions.mjs",
-    "fonts": "node audio/embed-fonts.mjs"
+    "fonts": "node audio/embed-fonts.mjs",
+    "verify": "node audio/verify.mjs"
   },
   "dependencies": {
     "@remotion/bundler": "^4.0.501",

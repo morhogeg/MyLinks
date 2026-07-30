@@ -414,8 +414,14 @@ impact(b(HITS.markImpact), 0.5);
 whoosh(b(HITS.markImpact) - 0.55, 0.7, 0.075, -0.4);
 whoosh(b(HITS.markImpact) - 0.5, 0.65, 0.075, 0.4);
 
-shimmer(b(HITS.wordmarkBloom), [69, 76, 81, 88], 0.06);
-impact(b(HITS.wordmarkBloom), 0.26);
+// the gather: five things rushing to one place, then landing as one
+whoosh(b(HITS.converge) - 0.15, 0.9, 0.1, -0.35);
+whoosh(b(HITS.converge) - 0.05, 0.85, 0.1, 0.35);
+riser(b(HITS.converge), BAR * 0.35, 0.075);
+impact(b(HITS.collapse), 0.4);
+sub(b(HITS.collapse), 45, 0.34, 0.5);
+// and the release into the name
+shimmer(b(HITS.nameIn), [69, 76, 81, 88], 0.062);
 
 whoosh(b(HITS.deviceIn) - 0.3, 0.9, 0.085, 0.25);
 tick(b(HITS.shareSheet), 0.085, 1.1);

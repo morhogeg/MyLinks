@@ -1,17 +1,24 @@
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
-import { AppIcon, Wordmark } from '../ui/Brand';
+import { CitationGlyph, Wordmark } from '../ui/Brand';
 import { Stage } from '../film/effects';
 import { drift, prog, ramp, EASE_MODAL, EASE_OUT } from '../film/anim';
 import { sans } from '../fonts';
 
 /**
- * The endcard: the shipped app icon, the drawn wordmark, the App Store subtitle.
+ * The endcard: the bare mark, the drawn wordmark, the App Store subtitle.
+ *
+ * The mark is the BARE glyph, not the app-icon tile — `docs/BRANDING.md` makes
+ * the same call for the header ("a rounded container there reads as a shrunken
+ * app icon rather than as the brand mark"), and on a full-frame endcard the grey
+ * squircle read as a screenshot of an icon instead of as an identity.
  *
  * No price, no urgency, no "download now" — the film's whole argument is that
  * the product is quiet and confident, and a hard sell in the last four seconds
- * would retract it. The line under the rule is the one slot to swap for a real
- * App Store badge or URL once the listing is live.
+ * would retract it. The closing line is the founder letter's actual belief
+ * ("recalling what you've read is a crucial part of actually learning it"), and
+ * it is the one slot to swap for a real App Store badge or URL once the listing
+ * is live.
  */
 export const Endcard: React.FC = () => {
   const f = useCurrentFrame();
@@ -48,13 +55,16 @@ export const Endcard: React.FC = () => {
           style={{
             opacity: icon,
             transform: `scale(${ramp(f, [2, 30], [0.86, 1], EASE_OUT)})`,
-            filter: `drop-shadow(0 26px 60px rgba(0,0,0,0.75)) drop-shadow(0 0 ${
-              30 + bloom * 60
-            }px rgba(174,184,206,${0.22 + bloom * 0.3}))`,
-            marginBottom: 52,
+            filter: `drop-shadow(0 0 ${34 + bloom * 60}px rgba(203,210,226,${
+              0.34 + bloom * 0.32
+            }))`,
+            marginBottom: 58,
+            width: 132,
+            height: 122,
+            color: '#F2F5FA',
           }}
         >
-          <AppIcon size={196} />
+          <CitationGlyph style={{ width: '100%', height: '100%' }} />
         </div>
 
         <div
@@ -105,7 +115,7 @@ export const Endcard: React.FC = () => {
             opacity: foot,
           }}
         >
-          Your knowledge, on iPhone.
+          Recalling it is how you learn it.
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

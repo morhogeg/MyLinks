@@ -10,6 +10,7 @@ cd marketing/launch-clip
 npm install
 npm run score      # → public/score.wav   (synthesize the music + sound design)
 npm run captions   # → out/machina-launch.srt
+npm run verify     # caption-overlap check + per-bar mix analysis (run before rendering)
 npm run render     # → out/machina-launch.mp4
 npm run studio     # interactive editor at localhost:3000
 ```
@@ -30,28 +31,45 @@ self-hosts. **If a token changes in `globals.css`, change it here too** — a dr
 film is worse than no film.
 
 **The demo content is one coherent research trail** (`src/data/library.ts`), not a
-grab-bag. That is load-bearing: the Ask scene's answer is genuinely assemblable
-from those specific cards, and the search scene's query — *"why cramming never
-sticks"* — shares **not one word** with the three cards it retrieves, which is the
-only way that beat proves semantic search rather than ⌘F.
+grab-bag. That is load-bearing three times over: the Ask scene's answer is
+genuinely assemblable from those specific cards; the search scene's query —
+*"why cramming never sticks"* — shares **not one word** with the three cards it
+retrieves, which is the only way that beat proves semantic search rather than ⌘F;
+and the feed visibly mixes YouTube, Instagram, X and articles, which is what
+proves "one place for all of it" instead of merely captioning it.
+
+**The story is the founder letter's, not a feature list.** The problem is
+*fragmentation*, not clutter — things saved across Instagram, X, YouTube,
+WhatsApp-to-yourself and Reading List, and no memory of which app swallowed
+which. So act one scatters those five surfaces across the frame and lets them
+drift apart and fade ("quietly disappearing"), act two gathers them into one
+point of light that the brackets close around, and the middle act's claim is
+"saving was never the hard part — Machina *reads* what you save." The closing line
+is the letter's belief: recalling it is how you learn it.
 
 ## The edit
 
 | Bars | Time | Scene | What it does |
 |---|---|---|---|
 | 0–2 | 0:00 | `ColdOpen` | The citation mark assembles; the dot lands on the first impact |
-| 2–5 | 0:05 | `Problem` | The generic pile — 1,284 unlabelled saves, then a search that finds nothing |
-| 5–7 | 0:12 | `WordmarkScene` | The brackets open and the name resolves between them: **[ MACHINA ]** |
+| 2–5 | 0:05 | `Scatter` | Five platforms drifting apart — Instagram, X, YouTube, WhatsApp, Reading List — then fading out one by one |
+| 5–7 | 0:12 | `WordmarkScene` | The five rush back and collapse into one point; the brackets close around it, then open: **[ MACHINA ]** |
 | 7–11 | 0:17 | `Capture` | Article → share sheet → the real five-phase pipeline → a finished card |
 | 11–15 | 0:27 | `Library` | The feed, then meaning-search: non-matches collapse, matches gather |
 | 15–19 | 0:37 | `AskScene` | **The hero.** Question → streamed answer → three citation chips |
 | 19–22 | 0:47 | `GraphScene` | Edges draw in staggered — connections being found, not a diagram revealed |
 | 22–24 | 0:55 | `DigestScene` | Collections, then the weekly synthesis + resurface nudge |
-| 24–27 | 1:00 | `Endcard` | Icon, wordmark, `Capture. Ask. Connect.` |
+| 24–27 | 1:00 | `Endcard` | The bare mark, the wordmark, `Capture. Ask. Connect.` |
 
-The `Problem` scene is deliberately **un-branded** — a generic read-later list, not
-Machina's UI. If it wore the app's chrome, the audience would read the failure as
-the product's.
+The `Scatter` scene is deliberately **un-branded** — five generic platform
+surfaces, no Machina chrome anywhere. If it wore the app's chrome, the audience
+would read the failure as the product's. Platform hues come from the app's own
+`PLATFORM_RGB`, and the glyphs are generic marks (play triangle, bubble, bookmark)
+beside the platform's name in type rather than reproductions of anyone's logo.
+
+`CONSTELLATION` in `src/ui/platforms.tsx` is shared by both scenes on purpose: the
+panels gather back to exactly where they drifted out from, because the gather only
+reads as an answer if it undoes the same scatter.
 
 ## Compositions
 
@@ -71,11 +89,13 @@ Am9 → Fmaj7 → Cmaj7 → G6 under the whole film, with a per-bar density curv
 brings percussion in for capture, peaks on Ask, and drops to a held pedal tone for
 the endcard.
 
-Verify the mix without listening to it:
+There is no audio device in the render environment, so the mix is verified
+numerically — `npm run verify` prints per-bar RMS and peak, DC offset and a
+near-clip count, and fails on a clipped master or a bar sitting >3.5dB below its
+neighbours (a hole that size reads as the music stopping). It also asserts no two
+captions ever overlap, which a still review cannot catch.
 
-```bash
-node -e '…'   # per-bar RMS/peak — see the session log entry in SOURCE_OF_TRUTH.md §9
-```
+**Someone still has to listen to it before it ships.**
 
 ## Environment notes (hard-won)
 
@@ -94,6 +114,11 @@ node -e '…'   # per-bar RMS/peak — see the session log entry in SOURCE_OF_TR
 
 ## Swapping the endcard
 
-The line under the rule (`Your knowledge, on iPhone.`) is the one slot meant to
-change: replace it with a real App Store badge or URL once the listing is live.
-Nothing else in the film claims availability.
+The endcard is the **bare** Citation mark — not the app-icon tile.
+`docs/BRANDING.md` makes the same call for the app header ("a rounded container
+there reads as a shrunken app icon rather than as the brand mark"), and full-frame
+the grey squircle read as a screenshot of an icon instead of as an identity.
+
+The line under the rule (`Recalling it is how you learn it.`) is the one slot
+meant to change: replace it with a real App Store badge or URL once the listing is
+live. Nothing else in the film claims availability.

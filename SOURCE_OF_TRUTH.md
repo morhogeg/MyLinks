@@ -749,7 +749,11 @@ The multi-user auth work is **fully written but not live**:
 ### 🟢 P3 — product roadmap (post-launch)
 
 G0. **[x] Launch film built** *(2026-07-29 — `marketing/launch-clip/`, 67s
-    1920×1080 + `.srt`; details and the reuse caveats in §8 "Launch film").*
+    1920×1080 + `.srt`; details and the reuse caveats in §8 "Launch film".
+    **Re-cut 2026-07-30** around `docs/BRANDING.md`-adjacent story work: act one
+    is now platform fragmentation, the turn gathers five surfaces into one, the
+    library visibly mixes platforms, and the endcard lost the icon tile — owner
+    review round 1, see §9.)*
     Open follow-ups, none blocking: **(a)** a 9:16 cut for
     TikTok/Reels/Shorts — every scene reframes around `BASE_SCALE`/`BASE_Y` in
     `src/film/anim.ts`, so a vertical composition is a reframe, not a rebuild;
@@ -1024,9 +1028,15 @@ answers questions from it, with sources."
 1920×1080 film rendered from code (Remotion for picture, a dependency-free Node
 synth for the score), **superseding the "30-second screen-recorded demo"** in
 step (3) above: a recording needs a signed-in device with a real library, and this
-needs one command. It runs cold open → the generic pile that finds nothing →
-`[ MACHINA ]` → share sheet + the real five-phase pipeline → meaning-search →
-**Ask with three citation chips (the hero beat)** → the graph → digest → endcard.
+needs one command. It runs cold open → **five platforms drifting apart and
+fading** (Instagram, X, YouTube, WhatsApp-to-yourself, Reading List) → **the five
+gathering into one point the brackets close around** → `[ MACHINA ]` → share sheet
++ the real five-phase pipeline → meaning-search → **Ask with three citation chips
+(the hero beat)** → the graph → digest → endcard. **The story is the founder
+letter's**: the problem is fragmentation, not clutter ("you never remember where
+you saved it"), the promise is one place that actually READS what you save
+("saving was never the hard part"), and the close is the letter's belief
+("recalling it is how you learn it") rather than an availability claim.
 `npm run render` (see that folder's README). Three compositions ship: scored +
 captioned (the deliverable), silent + captioned (for a voice-over), and clean (no
 score, no captions — for social cuts; captions also emit as `.srt`). Two things to
@@ -1048,6 +1058,54 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-30 — launch film re-cut around the founder letter (owner review
+  round 1).** Design, grade, rhythm and score structure were signed off as-is
+  ("the design is perfect"); the note was that the MESSAGES needed dramatic
+  tightening, so this round changed only story and copy. **(1) Act one is now
+  fragmentation, not clutter.** The old scene was one generic read-later list
+  that "finds nothing"; the letter's actual complaint is that everything was
+  "scattered across five platforms, quietly disappearing" and you cannot recall
+  WHICH app swallowed it. New `Scatter` scene: five un-branded platform surfaces
+  (Instagram Saved, X Bookmarks, YouTube Watch later, WhatsApp-to-yourself,
+  Safari Reading List) floating in 3D, drifting apart, then fading out one at a
+  time to an empty frame. Platform hues are the app's own `PLATFORM_RGB`; glyphs
+  are generic marks beside the platform NAME in type, never a reproduced logo.
+  **(2) The turn is now a move, not a claim.** The wordmark scene opens with the
+  same five panels rushing back to exactly where they drifted from
+  (`CONSTELLATION` is shared by both scenes) and collapsing into one point of
+  light that the brackets close around, then open to release the name. The
+  `Capture. Ask. Connect.` tagline moved OUT of this scene (it lives on the
+  endcard) so the beat carries one line of type, not two. **(3) The library is
+  visibly multi-platform** — two article cards became a YouTube save and an
+  Instagram save, with the app's platform bylines — because "one place for all of
+  it" has to be shown in the feed, not just captioned. **(4) Captions rewritten
+  and shortened** (11 cues, bar 21 deliberately silent): fragmentation → "one
+  place for all of it" → "saving was never the hard part" → "Machina reads what
+  you save" → meaning-search → Ask → graph → digest. **(5) Endcard: the app-icon
+  TILE is gone** (owner note — the grey squircle read as a screenshot of an icon);
+  it is the bare Citation mark now, matching `docs/BRANDING.md`'s
+  bare-glyph-in-the-header call, and the closing line is the letter's belief
+  instead of an availability claim. Score re-rendered for the new act-one hits
+  (converge whoosh + riser, collapse impact, release shimmer). **Two rendering
+  bugs found by still/encode review, worth remembering — all three are the same
+  lesson, that this film's bugs are invisible in code and obvious in a frame:**
+  (a) the collapse flash was a plain decay, so it sat at FULL brightness through
+  the entire gather and washed the incoming panels into one white blob (it now
+  builds with the gather and spikes on the landing); (b) an **unbraced `/* */`
+  block comment in JSX children position rendered as literal on-screen text** —
+  the first cut of the scatter scene shipped three paragraphs of my own comment
+  next to the panels, caught only by pulling frames out of the encoded mp4, so
+  every JSX comment in the film is now `{/* … */}`; (c) centring a panel with
+  `translate(-50%,-50%)` made it overflow its transformed parent and the two
+  lower panels were clipped mid-header. That one survived two wrong diagnoses
+  (transform order, then filter region) before the right fix, which was to stop
+  needing the transform at all: `PANEL_W`/`PANEL_H` are fixed and centring is
+  negative margins, i.e. layout. Verified: `tsc` 0; scene-by-scene stills at every
+  new beat; full re-render; and a new **`npm run verify`** that fails on a
+  clipped master, on any bar sitting >3.5dB below its neighbours, and on
+  overlapping captions — the last one exists because cue 3 ran 0.2 bars into cue
+  4 and would have stacked two lines on screen. Repo-only, no app code, nothing
+  to deploy.
 - **2026-07-29 (later, separate session) — launch film built from code
   (`marketing/launch-clip/`).** A 67s 1920×1080 launch clip, rendered rather than
   edited: **Remotion** for picture, a **dependency-free Node synth** for the score,
