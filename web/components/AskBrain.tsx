@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Plus, MessagesSquare, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X, Waypoints } from 'lucide-react';
+import { ArrowUp, Plus, MessagesSquare, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X, Waypoints, Image as ImageIcon, StickyNote } from 'lucide-react';
 import type { OrbState } from '@/components/ui/CitationMark';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -1289,23 +1289,30 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                                         const live = links.find(l => l.id === s.id);
                                                         const hasSource = !!(s.url || meaningfulName(s.sourceName) || live?.sourceType);
                                                         // ONE leading mark, beside the title, on every chip —
-                                                        // the platform's own logo when the card has one
-                                                        // (YouTube, X, Facebook, Instagram, LinkedIn), else the
-                                                        // Machina citation glyph. Bare, brand-coloured, no
-                                                        // tinted box: the box was the original complaint, the
-                                                        // missing logo was the follow-up one (owner QA ×2).
-                                                        // The byline below therefore draws no icon of its own.
+                                                        // whatever icon the card would show anywhere else:
+                                                        // its platform logo (YouTube, X, Facebook, Instagram,
+                                                        // LinkedIn), or the screenshot/note glyph for a capture
+                                                        // that has no platform. The Machina citation mark is the
+                                                        // LAST resort, for a plain publisher (BBC, CNN) that has
+                                                        // no mark of its own. Bare, no tinted box: the box was
+                                                        // the original complaint, the missing logo the second,
+                                                        // and a Machina glyph on a screenshot the third
+                                                        // (owner QA ×3). The byline draws no icon of its own.
                                                         const platform = getPlatform(s.url || undefined);
+                                                        const shot = !platform && live?.sourceType === 'image';
+                                                        const note = !platform && live?.sourceType === 'note';
+                                                        const ownMark = !!platform || shot || note;
                                                         return (
                                                             <>
                                                                 <span
-                                                                    className={`shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-lg transition-colors ${platform
-                                                                        ? ''
+                                                                    className={`shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-lg transition-colors ${ownMark
+                                                                        ? (platform ? '' : 'text-text-muted')
                                                                         : 'bg-accent/10 text-accent group-hover:bg-accent/15'}`}
                                                                     style={platform ? { color: platformColor(platform) } : undefined}
                                                                 >
-                                                                    {platform
-                                                                        ? platformIcon(platform, 'w-[18px] h-[18px]')
+                                                                    {platform ? platformIcon(platform, 'w-[18px] h-[18px]')
+                                                                        : shot ? <ImageIcon className="w-[18px] h-[18px]" />
+                                                                        : note ? <StickyNote className="w-[18px] h-[18px]" />
                                                                         : <CitationGlyph className="w-3.5 h-auto" />}
                                                                 </span>
                                                                 <span className="min-w-0 flex flex-col gap-0.5">

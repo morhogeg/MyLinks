@@ -1021,6 +1021,20 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-30 (round 5) — screenshot/note captures get their OWN mark on cited
+  chips (owner device QA).** Round 4's leading mark keyed only off
+  `getPlatform(url)`, so a screenshot capture — which has no platform — fell
+  through to the Machina glyph while its `🖼 Screenshot` icon sat demoted in the
+  byline. The rule is now "whatever mark that card would show anywhere else":
+  platform logo → screenshot/note glyph → **Machina mark only as the last
+  resort**, for a plain publisher (BBC, CNN) that genuinely has no mark. tsc 0,
+  build green. **OPEN QUESTION raised by the owner, not yet built:** the Graph
+  chip on an answer with N cited cards focuses only the FIRST cited card's
+  neighbourhood (`onOpenGraphFocus` → `selectedId`), so most of the cited set
+  isn't shown. Proposed but NOT implemented: a third focus mode carrying the
+  whole cited id SET — highlight exactly those nodes, dim the rest, frame their
+  bounding box, and say plainly when they span several clusters (that's
+  information about the answer, not a failure). Awaiting the owner's call.
 - **2026-07-30 (round 4) — three owner-QA bugs, two of them MINE from round 2.**
   (1) **"Couldn't save that note" — the live ruleset was never updated.** Round 2
   added `match /synthesisNotes/{weekId}` to `firestore.rules.locked` and three
