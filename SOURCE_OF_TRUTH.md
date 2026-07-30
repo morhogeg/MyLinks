@@ -1070,7 +1070,16 @@ exact-match, capped.
   identical across two builds. **NOT render-verified** — every changed surface
   is behind the sign-in gate and the local dev server runs in emulator mode, so
   owner device/desktop QA is the check. Watch: caption crowding inside a split
-  island at low zoom, and the 440px panel on a ~1024–1200px window.
+  island at low zoom. Shipped as `d1234b9` (merge `819b01d`) + follow-up
+  `3c8c5b5`, **TestFlight run #250 = build 1250**. **Good news carried by that
+  run: the 90382 upload window from 2026-07-29 has CLEARED** — run #249
+  (`0a0a021`) uploaded green, so rounds 16–17 are on TestFlight after all and
+  build 1250 supersedes them. Follow-up `3c8c5b5` fixes a breakpoint mismatch
+  the first pass introduced: the culling reserve read CANVAS width while
+  Tailwind's `lg:` fires on VIEWPORT width, so between 1024px and ~1200px it
+  reserved 330px against a 440px panel and captions could draw under the glass;
+  `panelReserve()` now reads `window.innerWidth`. Desktop-only, so build 1250
+  (iOS never reaches `lg:`) did not need re-triggering.
   Frontend-only → Vercel + TestFlight.
 - **2026-07-29 — TestFlight 90382 daily upload limit hit (rounds 16–17 are web-
   only for now).** Runs **#246 (`4bc9afb`, Back to Ask) and #247 (`a2ef9b4`,
