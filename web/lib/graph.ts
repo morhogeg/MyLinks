@@ -24,7 +24,8 @@ export interface GraphNode {
     /** Canonical category display name — case-variants ("Sports"/"sports")
      *  merged onto the majority spelling so the legend and colors agree. */
     category: string;
-    /** Index into the model's `clusters`. */
+    /** Index into the model's `clusters` — this node's THEME (a component, or
+     *  one community inside a large component). */
     cluster: number;
     /** Render radius (world units) — derived from degree. */
     r: number;
@@ -53,7 +54,15 @@ export interface GraphEdge {
     kind: 'ai' | 'semantic' | 'concept';
 }
 
-/** One connected component of the graph — an island on screen. */
+/**
+ * One THEMED group of cards — the unit the user sees captioned on the canvas
+ * and opens in the cluster panel. Usually a whole connected component, but a
+ * large component is sub-divided into its communities (see `splitIntoThemes`)
+ * so a 24-card island reads as "AI safety" / "coding agents" instead of one
+ * undifferentiated "TECH". Membership is DISJOINT — every node belongs to
+ * exactly one theme, which is what keeps "Save as collection" and "Ask about
+ * this" unambiguous.
+ */
 export interface GraphCluster {
     /** Auto-derived theme ("Claude Code · AI coding") — null when the cluster
      *  is too small or too diffuse to name honestly. */
@@ -66,7 +75,9 @@ export interface GraphModel {
     edges: GraphEdge[];
     /** Adjacency: node index → indices of its edges in `edges`. */
     adjacency: number[][];
-    /** Connected components, largest first — parallel to each node's `cluster`. */
+    /** Themed groups, largest component first — parallel to each node's
+     *  `cluster`. See GraphCluster: one per component, or one per community
+     *  inside a component large enough to hold several distinct themes. */
     clusters: GraphCluster[];
     /** Cards with no qualifying tie — counted, not drawn. */
     isolatedCount: number;
@@ -315,9 +326,6 @@ export async function buildGraphModel(
         const rb = find(e.b);
         if (ra !== rb) parent[ra] = rb;
     }
-    const roots = new Set<number>();
-    for (let i = 0; i < nodes.length; i++) roots.add(find(i));
-
     // Components → spatial anchors: each connected component gets its own
     // gravity island, packed on a spiral with clearance, so separate clusters
     // render as separate constellations instead of one entangled blob.
@@ -329,13 +337,29 @@ export async function buildGraphModel(
         list.push(i);
     }
     const comps = [...byRoot.values()].sort((a, b) => b.length - a.length);
-    const clusters: GraphCluster[] = comps.map((members, ci) => {
-        for (const i of members) nodes[i].cluster = ci;
-        return { label: clusterLabel(members.map((i) => nodes[i])), nodeIndices: members };
-    });
+
+    // Every component is split into its THEMES (one group for small islands,
+    // several communities for a big one) so no island is left captioned with a
+    // single generic word. Labels are deduped within a component — two adjacent
+    // groups both called "AI" would name nothing.
+    const compThemes = comps.map((members) => splitIntoThemes(members, nodes, edges, adjacency));
+    const clusters: GraphCluster[] = [];
+    for (const groups of compThemes) {
+        const taken = new Set<string>();
+        for (const g of groups) {
+            const label = clusterLabel(g.map((i) => nodes[i]), taken);
+            if (label) taken.add(label.toLowerCase());
+            clusters.push({ label, nodeIndices: g });
+        }
+    }
+    for (let ci = 0; ci < clusters.length; ci++) {
+        for (const i of clusters[ci].nodeIndices) nodes[i].cluster = ci;
+    }
+
     const placedIslands: { x: number; y: number; r: number }[] = [];
     const spacing = spacingScale(nodes.length);
-    for (const members of comps) {
+    for (let c = 0; c < comps.length; c++) {
+        const members = comps[c];
         const R = (70 + 52 * Math.sqrt(members.length)) * spacing;
         let x = 0;
         let y = 0;
@@ -350,16 +374,29 @@ export async function buildGraphModel(
             }
         }
         placedIslands.push({ x, y, r: R });
-        for (const i of members) {
-            const n = nodes[i];
-            n.cx = x;
-            n.cy = y;
-            // Deterministic in-island seed so the layout is stable across builds.
-            const h = idHash(n.id);
-            const angle = ((h % 1000) / 1000) * Math.PI * 2;
-            const dist = (((h >>> 10) % 1000) / 1000) * R * 0.8;
-            n.x = x + Math.cos(angle) * dist;
-            n.y = y + Math.sin(angle) * dist;
+        // A split island gives each theme its own gravity sub-anchor on a ring
+        // inside the island, so the communities settle as visibly separate lobes
+        // and each caption sits over the cards it actually names. Springs still
+        // hold the island together — this only biases where within it a group
+        // comes to rest.
+        const groups = compThemes[c];
+        const sub = groups.length > 1 ? R * 0.42 : 0;
+        for (let g = 0; g < groups.length; g++) {
+            const a = (g / groups.length) * Math.PI * 2;
+            const ax = x + Math.cos(a) * sub;
+            const ay = y + Math.sin(a) * sub;
+            const seedR = (sub ? R * 0.45 : R) * 0.8;
+            for (const i of groups[g]) {
+                const n = nodes[i];
+                n.cx = ax;
+                n.cy = ay;
+                // Deterministic in-island seed so the layout is stable across builds.
+                const h = idHash(n.id);
+                const angle = ((h % 1000) / 1000) * Math.PI * 2;
+                const dist = (((h >>> 10) % 1000) / 1000) * seedR;
+                n.x = ax + Math.cos(angle) * dist;
+                n.y = ay + Math.sin(angle) * dist;
+            }
         }
     }
 
@@ -369,9 +406,118 @@ export async function buildGraphModel(
         adjacency,
         clusters,
         isolatedCount: pool.length - nodes.length,
-        clusterCount: roots.size,
+        // What the header counts is what the user can see and tap: themes, not
+        // raw components (a split island contributes several).
+        clusterCount: clusters.length,
         totalCards: pool.length,
     };
+}
+
+// A component at or above this size is a candidate for splitting into themes —
+// below it, one island genuinely is one subject and a single caption tells the
+// truth. Each surviving community must hold at least MIN_THEME cards, or the
+// canvas fills with two-card captions that say nothing.
+const SPLIT_ABOVE = 9;
+const MIN_THEME = 3;
+
+/**
+ * Split one connected component into its themed communities, or return it whole.
+ *
+ * Weighted label propagation (a cheap Louvain stand-in): every node starts in
+ * its own community and repeatedly adopts whichever community its edges pull
+ * hardest toward. It converges in a handful of passes, needs no tuning
+ * parameter, and — visited in a fixed order with ties broken by lowest label —
+ * is fully deterministic, which the seeded layout depends on.
+ *
+ * Why this exists: connected components alone produce one giant hairball plus a
+ * scatter of pairs, so the big island could only ever be captioned with one
+ * generic word ("TECH") while actually containing several distinct subjects.
+ * Membership stays disjoint — a card sits in exactly one theme.
+ */
+function splitIntoThemes(
+    members: number[],
+    nodes: GraphNode[],
+    edges: GraphEdge[],
+    adjacency: number[][],
+): number[][] {
+    if (members.length < SPLIT_ABOVE) return [members];
+
+    const inComp = new Set(members);
+    const label = new Map<number, number>();
+    for (const i of members) label.set(i, i);
+    // Fixed visit order (hubs first, then by node index) — no Math.random, so
+    // two builds of the same library produce the same themes.
+    const order = [...members].sort((a, b) => nodes[b].degree - nodes[a].degree || a - b);
+
+    for (let pass = 0; pass < 12; pass++) {
+        let changed = false;
+        for (const i of order) {
+            const pull = new Map<number, number>();
+            for (const ei of adjacency[i]) {
+                const e = edges[ei];
+                const j = e.a === i ? e.b : e.a;
+                if (!inComp.has(j)) continue;
+                const l = label.get(j)!;
+                pull.set(l, (pull.get(l) ?? 0) + e.weight);
+            }
+            if (!pull.size) continue;
+            let best = label.get(i)!;
+            let bestPull = pull.get(best) ?? -1;
+            for (const [l, w] of pull) {
+                // Ties go to the lowest label — deterministic, and it stops two
+                // equally-pulled communities from swapping forever.
+                if (w > bestPull || (w === bestPull && l < best)) {
+                    best = l;
+                    bestPull = w;
+                }
+            }
+            if (best !== label.get(i)) {
+                label.set(i, best);
+                changed = true;
+            }
+        }
+        if (!changed) break;
+    }
+
+    const byLabel = new Map<number, number[]>();
+    for (const i of members) {
+        const l = label.get(i)!;
+        let list = byLabel.get(l);
+        if (!list) byLabel.set(l, (list = []));
+        list.push(i);
+    }
+    const groups = [...byLabel.values()].sort((a, b) => b.length - a.length);
+    const kept = groups.filter((g) => g.length >= MIN_THEME);
+    if (kept.length < 2) return [members];
+
+    // Re-home every node from a below-threshold community into whichever kept
+    // group it is most strongly tied to, so a split never silently drops cards.
+    const groupOf = new Map<number, number>();
+    kept.forEach((g, gi) => g.forEach((i) => groupOf.set(i, gi)));
+    for (const g of groups) {
+        if (g.length >= MIN_THEME) continue;
+        for (const i of g) {
+            const pull = new Map<number, number>();
+            for (const ei of adjacency[i]) {
+                const e = edges[ei];
+                const j = e.a === i ? e.b : e.a;
+                const gi = groupOf.get(j);
+                if (gi === undefined) continue;
+                pull.set(gi, (pull.get(gi) ?? 0) + e.weight);
+            }
+            let best = 0;
+            let bestPull = -1;
+            for (const [gi, w] of pull) {
+                if (w > bestPull || (w === bestPull && gi < best)) {
+                    best = gi;
+                    bestPull = w;
+                }
+            }
+            kept[best].push(i);
+            groupOf.set(i, best);
+        }
+    }
+    return kept.sort((a, b) => b.length - a.length);
 }
 
 /**
@@ -383,8 +529,14 @@ export async function buildGraphModel(
  * had no tap target for the cluster panel), and the caption doubles as the
  * cluster's handle, so "roughly right" beats absent. Deterministic, no model
  * call.
+ *
+ * `taken` holds the labels already used by sibling themes in the SAME
+ * component; a candidate that collides is skipped in favour of the next one
+ * down the chain, since two lobes of one island both reading "AI" would name
+ * neither. When every candidate is taken the first one is used anyway — a
+ * duplicate caption still beats a blank island with no tap target.
  */
-function clusterLabel(members: GraphNode[]): string | null {
+function clusterLabel(members: GraphNode[], taken?: Set<string>): string | null {
     if (members.length < 2) return null;
     const counts = new Map<string, { display: string; count: number }>();
     for (const n of members) {
@@ -395,22 +547,37 @@ function clusterLabel(members: GraphNode[]): string | null {
             else counts.set(key, { display: c, count: 1 });
         }
     }
-    const ranked = [...counts.values()].sort((a, b) => b.count - a.count);
+    const ranked = [...counts.values()].sort((a, b) => b.count - a.count || a.display.localeCompare(b.display));
     const floor = Math.max(2, Math.ceil(members.length * 0.25));
     const top = ranked[0];
+    const byCategory = new Map<string, number>();
+    for (const n of members) byCategory.set(n.category, (byCategory.get(n.category) ?? 0) + 1);
+    const [cat, catCount] = [...byCategory.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+
+    // Ordered candidates. The first three reproduce the original chain exactly
+    // (so an unsplit island is captioned as before); the rest only come into
+    // play when a sibling already claimed the obvious name.
+    const candidates: string[] = [];
+    const pair = (a: string, b: string) => (a.toLowerCase() === b.toLowerCase() ? a : `${a} · ${b}`);
     if (top && top.count >= floor) {
         const second = ranked[1];
         if (second && second.count >= floor && second.display.toLowerCase() !== top.display.toLowerCase()) {
-            return `${top.display} · ${second.display}`;
+            candidates.push(pair(top.display, second.display));
         }
-        return top.display;
+        candidates.push(top.display);
+    } else {
+        if (catCount >= members.length * 0.7) candidates.push(cat);
+        if (top) candidates.push(top.display);
+        candidates.push(cat);
     }
-    const byCategory = new Map<string, number>();
-    for (const n of members) byCategory.set(n.category, (byCategory.get(n.category) ?? 0) + 1);
-    const [cat, catCount] = [...byCategory.entries()].sort((a, b) => b[1] - a[1])[0];
-    if (catCount >= members.length * 0.7) return cat;
-    if (top) return top.display;
-    return cat;
+    for (const r of ranked.slice(1, 5)) {
+        if (top) candidates.push(pair(top.display, r.display));
+        candidates.push(r.display);
+    }
+    if (top) candidates.push(pair(top.display, cat));
+    candidates.push(cat);
+
+    return candidates.find((c) => !taken?.has(c.toLowerCase())) ?? candidates[0] ?? null;
 }
 
 /**

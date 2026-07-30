@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { ArrowUp, Plus, MessagesSquare, Image as ImageIcon, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X, Waypoints } from 'lucide-react';
+import { ArrowUp, Plus, MessagesSquare, Copy, Check, TriangleAlert, Sparkles, RefreshCw, Square, RotateCcw, ArrowDown, X, Waypoints } from 'lucide-react';
 import type { OrbState } from '@/components/ui/CitationMark';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { getDominantDirection } from '@/lib/rtl';
-import { getPlatform, platformIcon, platformActiveStyle, platformColor, PLATFORM_LABELS, xHandle, linkedinDisplayName } from '@/lib/platform';
+import SourceByline from '@/components/SourceByline';
 import { appCheckHeaders } from '@/lib/firebase';
 import { authHeaders } from '@/lib/auth';
 import { apiUrl, isNativeApp, fetchWithTimeout } from '@/lib/api';
@@ -35,28 +35,11 @@ function meaningfulName(name?: string | null): string | null {
     return null;
 }
 
-/** The byline shown on a citation card: the *specific* source identity when we
- *  can resolve one — an X @handle, a LinkedIn author, a channel/page or
- *  publisher name — otherwise the platform label, otherwise the category. The
- *  returned platform drives the brand icon/color. */
-function sourceTag(s: ChatSource): { label: string; platform: ReturnType<typeof getPlatform> } | null {
-    const platform = getPlatform(s.url || undefined);
-    const name = meaningfulName(s.sourceName);
-    if (platform === 'x') {
-        const h = xHandle(s.url || undefined);
-        return { label: h ? `@${h}` : (name || PLATFORM_LABELS[platform]), platform };
-    }
-    if (platform === 'linkedin') {
-        return { label: linkedinDisplayName(s.url || undefined, s.sourceName) || PLATFORM_LABELS[platform], platform };
-    }
-    if (platform) {
-        // YouTube channel / Facebook page / etc.: prefer the captured name.
-        return { label: name || PLATFORM_LABELS[platform], platform };
-    }
-    if (name) return { label: name, platform: null };
-    if (s.category) return { label: s.category, platform: null };
-    return null;
-}
+// The citation chip's byline is SourceByline — the same component every card
+// surface uses — so the source of a cited card reads exactly as it does in the
+// feed, the detail modal and the review deck. The bespoke sourceTag() that used
+// to live here (platform label + boxed brand logo) was the last copy of that
+// logic outside SourceByline, and it drifted, which is what this replaced.
 
 /** The model sometimes writes bullets as literal glyphs ("• a • b • c") or a
  *  numbered list ("1. a 2. b 3. c") all inline in one paragraph — Markdown
@@ -1298,47 +1281,38 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                                     className="group flex items-center gap-2.5 max-w-full ps-2.5 pe-3.5 py-2 rounded-xl bg-card border border-border-subtle shadow-sm hover:border-accent/50 hover:bg-card-hover transition-colors cursor-pointer text-start"
                                                 >
                                                     {(() => {
-                                                        const tag = sourceTag(s);
-                                                        // Screenshot captures: ChatSource doesn't carry
-                                                        // sourceType, but the live library does — resolve
-                                                        // the cited id so the chip can wear the feed's own
-                                                        // "🖼 Screenshot" tag (cards outside the loaded
-                                                        // window just keep the plain treatment).
-                                                        const isShot = links.some(l => l.id === s.id && l.sourceType === 'image');
+                                                        // The live card carries fields ChatSource doesn't
+                                                        // (sourceType, YouTube channel), so resolve the cited
+                                                        // id when it's in the loaded window and hand the
+                                                        // byline everything it knows.
+                                                        const live = links.find(l => l.id === s.id);
+                                                        const hasSource = !!(s.url || meaningfulName(s.sourceName) || live?.sourceType);
                                                         return (
                                                             <>
-                                                                {/* Platform sources keep their OWN icon (YouTube,
-                                                                    X, LinkedIn, Instagram, Facebook — owner call:
-                                                                    those must be recognisable at a glance). The
-                                                                    bracket glyph marks everything else — the thing
-                                                                    that was searching is the thing that found this
-                                                                    (ask_in_situ_answer.png). */}
-                                                                <span
-                                                                    className="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-lg bg-accent/10 text-accent group-hover:bg-accent/15 transition-colors"
-                                                                    style={tag?.platform ? platformActiveStyle(tag.platform) : undefined}
-                                                                >
-                                                                    {tag?.platform
-                                                                        ? platformIcon(tag.platform, 'w-3.5 h-3.5')
-                                                                        : <CitationGlyph className="w-3.5 h-auto" />}
+                                                                {/* One constant citation mark — the thing that was
+                                                                    searching is the thing that found this
+                                                                    (ask_in_situ_answer.png). Platform identity is
+                                                                    NOT expressed here: a brand logo boxed in a
+                                                                    tinted tile was the one place Machina drew
+                                                                    sources differently from every card surface
+                                                                    (owner QA). It now rides the byline below,
+                                                                    through the shared SourceByline. */}
+                                                                <span className="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-lg bg-accent/10 text-accent group-hover:bg-accent/15 transition-colors">
+                                                                    <CitationGlyph className="w-3.5 h-auto" />
                                                                 </span>
-                                                                <span className="min-w-0 flex flex-col">
-                                                                    {isShot ? (
-                                                                        /* Same vocabulary as the feed card's byline:
-                                                                           icon + "Screenshot", beside the Machina
-                                                                           glyph in the tile. */
-                                                                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wide text-text-muted text-start">
-                                                                            <ImageIcon className="w-3 h-3" />
-                                                                            Screenshot
-                                                                        </span>
-                                                                    ) : tag && (
-                                                                        <span
-                                                                            dir="auto"
-                                                                            className="inline-flex items-center gap-1 text-[10px] font-semibold tracking-wide text-text-muted text-start"
-                                                                            style={tag.platform ? { color: platformColor(tag.platform) } : undefined}
-                                                                        >
-                                                                            {tag.label}
-                                                                        </span>
-                                                                    )}
+                                                                <span className="min-w-0 flex flex-col gap-0.5">
+                                                                    {hasSource ? (
+                                                                        <SourceByline
+                                                                            link={{
+                                                                                url: s.url || undefined,
+                                                                                sourceName: s.sourceName || undefined,
+                                                                                sourceType: live?.sourceType,
+                                                                                metadata: live?.metadata,
+                                                                            }}
+                                                                        />
+                                                                    ) : s.category ? (
+                                                                        <span dir="auto" className="text-xs text-text-muted truncate text-start">{s.category}</span>
+                                                                    ) : null}
                                                                     {/* dir="auto" per title: a Hebrew title renders RTL inside
                                                                         the chip instead of scrambling around the LTR layout. */}
                                                                     <span dir="auto" className="text-[13px] font-medium text-text leading-snug text-start">{s.title}</span>
