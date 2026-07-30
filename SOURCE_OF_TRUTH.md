@@ -1036,6 +1036,13 @@ exact-match, capped.
   stale comment claiming the desktop view switcher had a "mobile copy in Row 1".
   `data-tour="views"`/`"ask"` anchors moved with their buttons, so the
   onboarding tour still finds them. tsc 0, build green, eslint clean.
+  **Follow-up bug from this same move (owner QA, fixed):** tapping select-multiple
+  opened the accent selection toolbar on the RIGHT — the trigger moved left but
+  the active toolbar was left behind in the right zone. They are one control in
+  two states, so they now share one slot (`{!isSelectionMode ? chip : toolbar}`)
+  and the toolbar opens exactly where the chip was. The right zone is down to the
+  tablet-only tag toggle. **Round-2 build shipped as TestFlight run #251 = build
+  1251, GREEN.**
 - **2026-07-30 (round 2) — cluster names now name the SUBJECT; Ask chips keep
   their platform logos; Machina mark replaces the AI sparkle; digest width +
   chevrons; NOTES on a week (owner QA, six items).**

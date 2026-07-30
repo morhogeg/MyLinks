@@ -1857,9 +1857,13 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             })}
                         </div>
 
-                        {/* Hidden while already in selection mode — the accent
-                            toolbar on the right takes its place. */}
-                        {!isSelectionMode && (
+                        {/* Select multiple, and the toolbar it turns into. These
+                            are one control in two states, so they occupy the
+                            SAME slot: the accent toolbar opens exactly where the
+                            chip you tapped was (owner bug — it used to appear
+                            across the row, because the trigger moved here and
+                            the active toolbar was left behind on the right). */}
+                        {!isSelectionMode ? (
                             <button
                                 onClick={() => setIsSelectionMode(true)}
                                 title="Select multiple"
@@ -1868,6 +1872,36 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             >
                                 <CheckSquare className="w-4 h-4" />
                             </button>
+                        ) : (
+                            <div className="flex items-center gap-1 h-9 px-1.5 rounded-full bg-accent/10 border border-accent/20 animate-slide-up">
+                                <span className="text-xs font-bold text-accent px-1.5 tabular-nums">{selectedIds.size}</span>
+                                <button
+                                    onClick={handleBulkArchive}
+                                    disabled={selectedIds.size === 0}
+                                    title="Archive selected"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-accent-ink transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
+                                    <Archive className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => setConfirmBulkDelete(true)}
+                                    disabled={selectedIds.size === 0}
+                                    title="Delete selected"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-red-500 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setIsSelectionMode(false);
+                                        setSelectedIds(new Set());
+                                    }}
+                                    title="Cancel selection"
+                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-card-hover hover:text-text transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
                         )}
                         </>)}
                     </div>
@@ -1927,14 +1961,14 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                             </button>
                         </div>
 
-                        {/* Right zone — the tag toggle and the ACTIVE selection
-                            toolbar. The view switcher and the idle "select
-                            multiple" chip moved to the left cluster with the
-                            other list controls (see the comment there).
-                            Desktop-only; `hidden sm:contents` keeps these out of
-                            the mobile row while dissolving into the cluster. */}
+                        {/* Right zone — just the tablet tag toggle now. The view
+                            switcher and BOTH states of select-multiple moved to
+                            the left cluster with the other list controls (see
+                            the comment there). Desktop-only; `hidden sm:contents`
+                            keeps this out of the mobile row while dissolving into
+                            the cluster. */}
                         <div className="hidden sm:contents">
-                        {/* Tag filter + bulk selection act on the grid — hide them in Ask mode. */}
+                        {/* Acts on the grid — hidden in Ask mode. */}
                         {isLibraryView && (<>
                         {/* Tag toggle — tablet only (mobile uses the Filters sheet; desktop
                             ≥lg has the persistent sidebar). */}
@@ -1952,39 +1986,6 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
                         </button>
                         </div>
 
-                        {/* Selection Control — the active toolbar. The idle trigger now
-                            lives as an icon chip beside the view switcher above. */}
-                        {isSelectionMode && (
-                            <div className="flex items-center gap-1 h-9 px-1.5 rounded-full bg-accent/10 border border-accent/20 animate-slide-up">
-                                <span className="text-xs font-bold text-accent px-1.5 tabular-nums">{selectedIds.size}</span>
-                                <button
-                                    onClick={handleBulkArchive}
-                                    disabled={selectedIds.size === 0}
-                                    title="Archive selected"
-                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-accent cursor-pointer hover:bg-accent hover:text-accent-ink transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                >
-                                    <Archive className="w-4 h-4" />
-                                </button>
-                                <button
-                                    onClick={() => setConfirmBulkDelete(true)}
-                                    disabled={selectedIds.size === 0}
-                                    title="Delete selected"
-                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-red-500 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setIsSelectionMode(false);
-                                        setSelectedIds(new Set());
-                                    }}
-                                    title="Cancel selection"
-                                    className="h-7 w-7 inline-flex items-center justify-center rounded-full text-text-secondary cursor-pointer hover:bg-card-hover hover:text-text transition-colors"
-                                >
-                                    <X className="w-4 h-4" />
-                                </button>
-                            </div>
-                        )}
                         </>)}
                         </div>{/* /right zone */}
                     </div>
