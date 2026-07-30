@@ -1058,6 +1058,33 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-30 (same session, round 2) — launch film copy pass + boot-screen cold
+  open (owner review round 2).** Owner note: focus the messaging on what the app
+  actually is — **one place for every saved link, analyzed/filed/organized,
+  connected, and made usable by Ask** — and stop wandering into narratives that
+  don't serve it. Changes: **(1) Cold open is now the app's real `BootScreen`**,
+  ported frame-for-frame from `web/app/page.tsx` + `globals.css` keyframes
+  (brackets 0.55s/ease-modal/0.14s delay, point strike 0.36s/ease-spring/0.6s,
+  glow 0.7s, MACHINA fading in as its letterspacing breathes 0.30em→0.46em in
+  the launch monospace setting, then the push-through exit that dissolves into
+  the film). It is **one bar (2.5s)** instead of two, so **every scene shifted a
+  bar earlier and the film is now 65s** (was 67.5s). **(2) The score's
+  arrangement now derives from `SCENES`** rather than hardcoded bar numbers, and
+  `BAR_CHORDS` asserts its length equals `TOTAL_BARS` — a retime used to be able
+  to silently put the wrong chord under a scene. **(3) Copy rewritten**:
+  "Somewhere else" → the platforms are named ("Instagram. X. YouTube.
+  WhatsApp."); the searchable-by-meaning narrative is **dropped entirely** (owner:
+  not the thing to focus on) and that beat is now "Summarized, tagged and filed
+  for you." → "So you can actually find it again."; the word **"library" is gone
+  from the film**, captions AND in-app strings (it read as limiting) — the Ask
+  blank slate is "Ask anything you've saved" and the search placeholder is
+  "Search everything you saved", **which means the shipped app still says
+  "library" in both places and may want the same edit**; "One place for all of
+  it" → "One place for everything you save"; the digest line is "Nothing worth
+  keeping stays buried". **(4) The endcard no longer closes on learning** —
+  "Recalling it is how you learn it" was pulled (owner: "I am not a learning
+  app") for **"Everything you save, finally useful."**, which is the letter's own
+  word for the payoff. Repo-only, no app code, nothing to deploy.
 - **2026-07-30 — launch film re-cut around the founder letter (owner review
   round 1).** Design, grade, rhythm and score structure were signed off as-is
   ("the design is perfect"); the note was that the MESSAGES needed dramatic

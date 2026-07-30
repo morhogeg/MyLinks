@@ -8,7 +8,6 @@ import {
   Newspaper,
   Plus,
   Search,
-  Sparkles,
   StickyNote,
   Image as ImageIcon,
   Waypoints,
@@ -422,13 +421,13 @@ export const SearchField: React.FC<{ value: string; caret?: boolean; semantic?: 
       padding: '0 13px',
       borderRadius: 14,
       background: T.card,
-      border: `1px solid ${semantic > 0 ? `rgba(233,233,242,${0.06 + semantic * 0.2})` : T.border}`,
-      boxShadow: semantic > 0 ? `0 0 22px -8px rgba(174,184,206,${0.4 * semantic})` : undefined,
+      border: `1px solid ${semantic > 0 ? `rgba(233,233,242,${0.06 + semantic * 0.24})` : T.border}`,
+      boxShadow: semantic > 0 ? `0 0 26px -8px rgba(174,184,206,${0.5 * semantic})` : undefined,
     }}
   >
     <Search size={15} color={T.textMuted} />
     <span style={{ fontSize: 13.5, color: value ? T.text : T.textMuted, whiteSpace: 'nowrap' }}>
-      {value || 'Search your library'}
+      {value || 'Search everything you saved'}
       {caret && (
         <span
           style={{
@@ -442,29 +441,10 @@ export const SearchField: React.FC<{ value: string; caret?: boolean; semantic?: 
         />
       )}
     </span>
-    {semantic > 0.4 && (
-      <span
-        style={{
-          marginLeft: 'auto',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 4,
-          fontSize: 9,
-          fontWeight: 800,
-          textTransform: 'uppercase',
-          letterSpacing: '0.08em',
-          color: T.accent,
-          background: 'rgba(233,233,242,0.10)',
-          border: '1px solid rgba(233,233,242,0.15)',
-          padding: '3px 6px',
-          borderRadius: 6,
-          opacity: (semantic - 0.4) / 0.6,
-        }}
-      >
-        <Sparkles size={9} />
-        Meaning
-      </span>
-    )}
+    {/* No "MEANING" badge. It was invented for the film to sell a
+        search-by-meaning narrative the owner dropped — and it is not a chip the
+        app actually paints, so it was both off-message and untrue. The field
+        still glows as the query lands; the search simply works. */}
   </div>
 );
 

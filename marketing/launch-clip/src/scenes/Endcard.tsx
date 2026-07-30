@@ -15,10 +15,11 @@ import { sans } from '../fonts';
  *
  * No price, no urgency, no "download now" — the film's whole argument is that
  * the product is quiet and confident, and a hard sell in the last four seconds
- * would retract it. The closing line is the founder letter's actual belief
- * ("recalling what you've read is a crucial part of actually learning it"), and
- * it is the one slot to swap for a real App Store badge or URL once the listing
- * is live.
+ * would retract it. The closing line names the payoff the whole film has been
+ * building — saves that are read, filed, connected and answerable, i.e. finally
+ * USEFUL — and it is the one slot to swap for a real App Store badge or URL once
+ * the listing is live. (It deliberately does NOT claim anything about learning:
+ * Machina is not a learning app.)
  */
 export const Endcard: React.FC = () => {
   const f = useCurrentFrame();
@@ -115,7 +116,7 @@ export const Endcard: React.FC = () => {
             opacity: foot,
           }}
         >
-          Recalling it is how you learn it.
+          Everything you save, finally useful.
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

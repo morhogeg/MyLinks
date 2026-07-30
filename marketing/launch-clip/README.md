@@ -1,6 +1,6 @@
 # Machina — launch film
 
-A 67-second launch film, rendered from code. No editor project, no stock music, no
+A 65-second launch film, rendered from code. No editor project, no stock music, no
 screen recording: the picture is [Remotion](https://remotion.dev) (React → frames),
 the score is synthesized by a Node script, and both read their timing from one
 shared file.
@@ -43,23 +43,34 @@ proves "one place for all of it" instead of merely captioning it.
 WhatsApp-to-yourself and Reading List, and no memory of which app swallowed
 which. So act one scatters those five surfaces across the frame and lets them
 drift apart and fade ("quietly disappearing"), act two gathers them into one
-point of light that the brackets close around, and the middle act's claim is
-"saving was never the hard part — Machina *reads* what you save." The closing line
-is the letter's belief: recalling it is how you learn it.
+point of light that the brackets close around, and the middle acts follow what the
+product actually does, in order: **saving was never the hard part → Machina reads
+what you save → summarized, tagged and filed → so you can find it again → then
+ask it anything → answers built from what you saved → every save connects to the
+rest → nothing worth keeping stays buried.** The film closes on
+"Everything you save, finally useful." It deliberately avoids two framings the
+owner ruled out: it is **not** a learning app, and it does **not** sell
+"search by meaning" as the headline. The word *library* appears nowhere.
 
 ## The edit
 
 | Bars | Time | Scene | What it does |
 |---|---|---|---|
-| 0–2 | 0:00 | `ColdOpen` | The citation mark assembles; the dot lands on the first impact |
-| 2–5 | 0:05 | `Scatter` | Five platforms drifting apart — Instagram, X, YouTube, WhatsApp, Reading List — then fading out one by one |
-| 5–7 | 0:12 | `WordmarkScene` | The five rush back and collapse into one point; the brackets close around it, then open: **[ MACHINA ]** |
-| 7–11 | 0:17 | `Capture` | Article → share sheet → the real five-phase pipeline → a finished card |
-| 11–15 | 0:27 | `Library` | The feed, then meaning-search: non-matches collapse, matches gather |
-| 15–19 | 0:37 | `AskScene` | **The hero.** Question → streamed answer → three citation chips |
-| 19–22 | 0:47 | `GraphScene` | Edges draw in staggered — connections being found, not a diagram revealed |
-| 22–24 | 0:55 | `DigestScene` | Collections, then the weekly synthesis + resurface nudge |
-| 24–27 | 1:00 | `Endcard` | The bare mark, the wordmark, `Capture. Ask. Connect.` |
+| 0–1 | 0:00 | `ColdOpen` | **The app booting** — the real `BootScreen`, ported from `web/app/page.tsx` |
+| 1–4 | 0:02.5 | `Scatter` | Five platforms drifting apart — Instagram, X, YouTube, WhatsApp, Reading List — then fading out one by one |
+| 4–6 | 0:10 | `WordmarkScene` | The five rush back and collapse into one point; the brackets close around it, then open: **[ MACHINA ]** |
+| 6–10 | 0:15 | `Capture` | Article → share sheet → the real five-phase pipeline → a finished card |
+| 10–14 | 0:25 | `Library` | The feed, then the search that finds it again |
+| 14–18 | 0:35 | `AskScene` | **The hero.** Question → streamed answer → three citation chips |
+| 18–21 | 0:45 | `GraphScene` | Edges draw in staggered — connections being found, not a diagram revealed |
+| 21–23 | 0:52.5 | `DigestScene` | Collections, then the weekly synthesis + resurface nudge |
+| 23–26 | 0:57.5 | `Endcard` | The bare mark, the wordmark, `Capture. Ask. Connect.` |
+
+The cold open is the app's own boot sequence, not an invented title card — same
+staged arrival (brackets close → the point strikes → only then does the wordmark
+arrive), same launch monospace setting for MACHINA, same push-through exit, with
+the CSS keyframe delays from `globals.css` converted to frames. **If the boot
+screen changes in the app, change it here too.**
 
 The `Scatter` scene is deliberately **un-branded** — five generic platform
 surfaces, no Machina chrome anywhere. If it wore the app's chrome, the audience

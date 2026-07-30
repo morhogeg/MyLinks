@@ -536,7 +536,7 @@ export const AskScreen: React.FC<{
                 <CitationGlyph style={{ width: '100%', height: '100%' }} />
               </div>
               <div style={{ marginTop: 18, fontSize: 15, color: T.textSecondary }}>
-                Ask your library anything
+                Ask anything you&apos;ve saved
               </div>
             </div>
           )}

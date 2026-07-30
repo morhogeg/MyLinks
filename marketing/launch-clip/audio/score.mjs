@@ -18,7 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BAR, BEAT, TOTAL_SEC, HITS, RISERS } from '../timeline.mjs';
+import { BAR, BEAT, TOTAL_SEC, TOTAL_BARS, SCENES, HITS, RISERS } from '../timeline.mjs';
 
 const SR = 44100;
 const OUT_SEC = TOTAL_SEC + 1.2; // room for the final reverb tail
@@ -312,31 +312,53 @@ const CHORDS = {
   G6: { bass: 43, upper: [59, 62, 64, 69] },
 };
 const BAR_CHORDS = [
-  'Am9', 'Am9', // 0–1 cold open
-  'Am9', 'Fmaj7', 'Cmaj7', // 2–4 problem
-  'G6', 'G6', // 5–6 wordmark
-  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 7–10 capture
-  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 11–14 library
-  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 15–18 ask
-  'Am9', 'Fmaj7', 'Cmaj7', // 19–21 graph
-  'Am9', 'Fmaj7', // 22–23 digest
-  'Cmaj7', 'G6', 'Am9', // 24–26 endcard
+  'Am9', // 0     cold open (the boot)
+  'Am9', 'Fmaj7', 'Cmaj7', // 1–3   scatter
+  'G6', 'G6', // 4–5   the turn
+  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 6–9   capture
+  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 10–13 library
+  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 14–17 ask
+  'Am9', 'Fmaj7', 'Cmaj7', // 18–20 graph
+  'Am9', 'Fmaj7', // 21–22 digest
+  'Cmaj7', 'G6', 'Am9', // 23–25 endcard
 ];
 
-/** Per-bar intensity — how much of the arrangement is switched on. */
-const density = (bar) => {
-  if (bar < 2) return 0.18;
-  if (bar < 5) return 0.42;
-  if (bar < 7) return 0.55;
-  if (bar < 11) return 0.7;
-  if (bar < 15) return 0.82;
-  if (bar < 19) return 1.0;
-  if (bar < 22) return 0.9;
-  // The digest beat pulls back without dropping out — a 4dB hole here read as
-  // "the music stopped" rather than "the film exhaled".
-  if (bar < 24) return 0.74;
-  return 0.52;
+// A retime in timeline.mjs that forgets the arrangement would silently put the
+// wrong chord under every scene. Fail loudly instead.
+if (BAR_CHORDS.length !== TOTAL_BARS) {
+  throw new Error(`BAR_CHORDS has ${BAR_CHORDS.length} bars but the film is ${TOTAL_BARS}`);
+}
+
+/** Which scene owns a bar — so the arrangement follows the EDIT, not magic numbers. */
+const sceneOfBar = (bar) => SCENES.find((sc) => bar >= sc.bar && bar < sc.bar + sc.bars)?.id;
+
+/** How much of the arrangement is switched on, per scene. */
+const SCENE_DENSITY = {
+  coldOpen: 0.18,
+  scatter: 0.45,
+  wordmark: 0.6,
+  capture: 0.72,
+  library: 0.84,
+  ask: 1.0,
+  graph: 0.9,
+  digest: 0.74,
+  endcard: 0.52,
 };
+
+const density = (bar) => {
+  const sc = SCENES.find((x) => bar >= x.bar && bar < x.bar + x.bars);
+  if (!sc) return 0.5;
+  // a small ramp inside each scene, so a four-bar hold still breathes
+  const within = sc.bars > 1 ? (bar - sc.bar) / (sc.bars - 1) : 0;
+  return SCENE_DENSITY[sc.id] + within * 0.05;
+};
+
+/** Bar of the first percussion-bearing scene, and of the endcard's drop-out. */
+const CAPTURE_BAR = SCENES.find((x) => x.id === 'capture').bar;
+const GRAPH_END = SCENES.find((x) => x.id === 'graph');
+const DIGEST_BAR = SCENES.find((x) => x.id === 'digest').bar;
+const ENDCARD_BAR = SCENES.find((x) => x.id === 'endcard').bar;
+const SIXTEENTH_FROM = GRAPH_END.bar;
 
 for (let bar = 0; bar < BAR_CHORDS.length; bar++) {
   const ch = CHORDS[BAR_CHORDS[bar]];
@@ -357,12 +379,12 @@ for (let bar = 0; bar < BAR_CHORDS.length; bar++) {
   if (d >= 0.8) sub(beat(bar, 2.5), ch.bass + 12, 0.16, 0.3);
 
   // ── percussion
-  if (d >= 0.7 && bar < 24) {
+  if (d >= 0.7 && bar < ENDCARD_BAR) {
     kick(t0, 0.34 + 0.2 * d);
     kick(beat(bar, 2), 0.3 + 0.16 * d);
-    if (d >= 0.82 && bar < 22) kick(beat(bar, 3.5), 0.2);
-    if (d >= 0.82 && bar < 22) rim(beat(bar, 2), 0.12 + 0.06 * d);
-    if (d >= 0.8 && bar < 22) {
+    if (d >= 0.82 && bar < DIGEST_BAR) kick(beat(bar, 3.5), 0.2);
+    if (d >= 0.82 && bar < DIGEST_BAR) rim(beat(bar, 2), 0.12 + 0.06 * d);
+    if (d >= 0.8 && bar < DIGEST_BAR) {
       for (let k = 0; k < 8; k++) {
         // offbeats accented — keeps it moving without a four-on-the-floor feel
         hat(beat(bar, k * 0.5), (k % 2 ? 0.055 : 0.03) * d, k % 2 ? 0.22 : -0.18);
@@ -371,9 +393,9 @@ for (let bar = 0; bar < BAR_CHORDS.length; bar++) {
   }
 
   // ── plucked arpeggio: 8ths from the capture scene, 16ths over the graph
-  if (bar >= 7 && bar < 24) {
+  if (bar >= CAPTURE_BAR && bar < ENDCARD_BAR) {
     const notes = [...ch.upper, ch.upper[2] + 12];
-    const sixteenths = bar >= 19 && bar < 22;
+    const sixteenths = bar >= SIXTEENTH_FROM && bar < DIGEST_BAR;
     const steps = sixteenths ? 16 : 8;
     for (let k = 0; k < steps; k++) {
       if (!sixteenths && k % 4 === 3 && bar % 2 === 0) continue; // breathe
@@ -391,28 +413,34 @@ for (let bar = 0; bar < BAR_CHORDS.length; bar++) {
 
 // ── endcard glue: one long sustaining voicing under the last three bars, so the
 // per-bar pads stop pulsing and the ending reads as a single held breath.
-for (const m of [45, 57, 64, 69]) pad(b(24), BAR * 3 - 0.3, m, 0.075, m === 57 ? -0.4 : 0.35);
+for (const m of [45, 57, 64, 69]) pad(b(ENDCARD_BAR), BAR * 3 - 0.3, m, 0.075, m === 57 ? -0.4 : 0.35);
 
 // ── melody: enters with the hero scene (Ask), returns for the endcard
 const MELODY = [
-  [15, 0, 76], [15, 2, 81], // Am9: E5 A5
-  [16, 0, 77], [16, 2.5, 72], // Fmaj7: F5 C5
-  [17, 0, 79], [17, 2, 76], // Cmaj7: G5 E5
-  [18, 0, 74], [18, 2, 71], // G6: D5 B4
-  [19, 0, 81], [20, 1, 77], [21, 0, 79],
-  [24, 0, 76], [25, 0, 74], [26, 0, 69], [26, 1.5, 81],
+  [14, 0, 76], [14, 2, 81], // Am9: E5 A5
+  [15, 0, 77], [15, 2.5, 72], // Fmaj7: F5 C5
+  [16, 0, 79], [16, 2, 76], // Cmaj7: G5 E5
+  [17, 0, 74], [17, 2, 71], // G6: D5 B4
+  [18, 0, 81], [19, 1, 77], [20, 0, 79],
+  [23, 0, 76], [24, 0, 74], [25, 0, 69], [25, 1.5, 81],
 ];
 for (const [bar, bt, m] of MELODY) {
-  bell(beat(bar, bt), m, bar >= 24 ? 0.2 : 0.15, bar % 2 ? 0.22 : -0.22, bar >= 24 ? 3.6 : 2.4);
+  const last = bar >= ENDCARD_BAR;
+  bell(beat(bar, bt), m, last ? 0.2 : 0.15, bar % 2 ? 0.22 : -0.22, last ? 3.6 : 2.4);
 }
 
 // ── risers into the hard cuts
 for (const r of RISERS) riser(b(r), BAR * (r === 6 ? 1 : 1.4), 0.085);
 
 // ── sound design against the picture
-impact(b(HITS.markImpact), 0.5);
-whoosh(b(HITS.markImpact) - 0.55, 0.7, 0.075, -0.4);
-whoosh(b(HITS.markImpact) - 0.5, 0.65, 0.075, 0.4);
+// the boot: the brackets close, the point strikes, then the mark pushes past
+// the viewer and the frame dissolves into the film
+whoosh(b(HITS.bootStrike) - 0.5, 0.62, 0.07, -0.4);
+whoosh(b(HITS.bootStrike) - 0.45, 0.58, 0.07, 0.4);
+impact(b(HITS.bootStrike), 0.42);
+shimmer(b(HITS.bootStrike) + 0.42, [76, 83], 0.045);
+whoosh(b(HITS.bootExit), 0.62, 0.1, 0);
+riser(b(HITS.bootExit) - 0.1, 0.7, 0.07);
 
 // the gather: five things rushing to one place, then landing as one
 whoosh(b(HITS.converge) - 0.15, 0.9, 0.1, -0.35);
