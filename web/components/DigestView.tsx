@@ -2,12 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { Newspaper, Sparkles, ChevronRight } from 'lucide-react';
+import { Newspaper, Sparkles, ChevronRight, ChevronDown } from 'lucide-react';
 import type { CuratedDigest, WeeklySynthesis, DigestCardRef } from '@/lib/types';
 import { track } from '@/lib/analytics';
 import { digestDisplayTitle, digestKindLabel } from '@/lib/digest';
+import { synthesisWeekLabel } from '@/lib/synthesis';
 import DigestCard from './DigestCard';
 import SynthesisCard from './SynthesisCard';
+
+/** Sidebar/list id for an archived synthesis — namespaced so it can never
+ *  collide with a digest id. Feed's detail route parses the same prefix. */
+export const synthesisEntryId = (weekId: string) => `synthesis:${weekId}`;
 
 /** Coarse recency bucket for the sidebar section headers. */
 function bucketLabel(ms: number): string {
@@ -25,17 +30,18 @@ function bucketLabel(ms: number): string {
 
 interface Props {
     digests: CuratedDigest[];
-    /** The weekly synthesis to surface, or null if none / dismissed. */
-    synthesis: WeeklySynthesis | null;
+    /** EVERY weekly synthesis, newest first — the archive. Deliberately NOT
+     *  filtered by the feed's dismissal: dismissing this week's banner hides a
+     *  banner, it does not delete the write-up. */
+    syntheses: WeeklySynthesis[];
     onOpenCard: (card: DigestCardRef) => void;
     onOpenSynthesisCard: (id: string) => void;
-    onDismissSynthesis: () => void;
     onOpenDigestSettings?: () => void;
     onDeleteDigest?: (id: string) => void;
-    /** Phone/tablet: open a single digest as its own screen. Passed the digest
-     *  id, or the sentinel 'synthesis' for the weekly-synthesis entry. When set,
-     *  the compact layout renders a tappable LIST instead of expanding the
-     *  latest digest inline. */
+    /** Phone/tablet: open a single entry as its own screen. Passed a digest id,
+     *  or `synthesis:<weekId>` for an archived synthesis. When set, the compact
+     *  layout renders a tappable LIST instead of expanding the latest digest
+     *  inline. */
     onOpenDigest?: (id: string) => void;
 }
 
@@ -47,7 +53,7 @@ interface Props {
  * scroll of collapsed headers.
  */
 export default function DigestView({
-    digests, synthesis, onOpenCard, onOpenSynthesisCard, onDismissSynthesis, onOpenDigestSettings, onDeleteDigest, onOpenDigest,
+    digests, syntheses, onOpenCard, onOpenSynthesisCard, onOpenDigestSettings, onDeleteDigest, onOpenDigest,
 }: Props) {
     // The Digest section mounts only when the user opens it (Feed swaps it in),
     // so a mount is a genuine "digest opened" view. Fired once per mount.
@@ -55,13 +61,25 @@ export default function DigestView({
         track('digest_opened');
     }, []);
 
-    // Sidebar selection. 'synthesis' or a digest id; falls back to the newest.
-    const [selId, setSelId] = useState<string | null>(null);
-    const ids = new Set(digests.map((d) => d.id));
-    const validSel = selId === 'synthesis' ? !!synthesis : (selId ? ids.has(selId) : false);
-    const activeId = validSel ? selId : (digests[0]?.id ?? (synthesis ? 'synthesis' : null));
+    // The synthesis archive is a collapsible submenu — open by default so this
+    // week's recap is one click away, collapsible because a year of weeks would
+    // otherwise push the digest history off the screen.
+    const [synthesesOpen, setSynthesesOpen] = useState(true);
 
-    const isEmpty = digests.length === 0 && !synthesis;
+    // Sidebar selection. A digest id or `synthesis:<weekId>`; falls back to the
+    // newest digest, or the newest synthesis when there are no digests yet.
+    const [selId, setSelId] = useState<string | null>(null);
+    const ids = new Set<string>([
+        ...digests.map((d) => d.id),
+        ...syntheses.map((s) => synthesisEntryId(s.weekId)),
+    ]);
+    const firstSynthesisId = syntheses[0] ? synthesisEntryId(syntheses[0].weekId) : null;
+    const activeId = selId && ids.has(selId) ? selId : (digests[0]?.id ?? firstSynthesisId);
+    const activeSynthesis = activeId
+        ? syntheses.find((s) => synthesisEntryId(s.weekId) === activeId) ?? null
+        : null;
+
+    const isEmpty = digests.length === 0 && syntheses.length === 0;
     if (isEmpty) {
         return (
             <div className="max-w-3xl mx-auto">
@@ -104,17 +122,25 @@ export default function DigestView({
                 back navigation). The old behaviour expanded the latest digest
                 inline, which hid the rest of the history behind a scroll. */}
             <div className="lg:hidden max-w-3xl mx-auto flex flex-col gap-4">
-                {synthesis && (
+                {syntheses.length > 0 && (
                     <div className="flex flex-col gap-1.5">
-                        <div className="px-1 text-[11px] font-bold uppercase tracking-[0.14em] text-text-muted">Highlights</div>
-                        <SidebarRow
-                            icon={<Sparkles className="w-4 h-4" />}
-                            eyebrow="Weekly synthesis"
-                            title={synthesis.title || 'Your week, connected'}
-                            active={false}
-                            onClick={() => onOpenDigest?.('synthesis')}
-                            trailing={<ChevronRight className="w-4 h-4 text-text-muted shrink-0" />}
+                        <SectionHeader
+                            label="Weekly synthesis"
+                            count={syntheses.length}
+                            open={synthesesOpen}
+                            onToggle={() => setSynthesesOpen((v) => !v)}
                         />
+                        {synthesesOpen && syntheses.map((s) => (
+                            <SidebarRow
+                                key={s.weekId}
+                                icon={<Sparkles className="w-4 h-4" />}
+                                eyebrow={synthesisWeekLabel(s)}
+                                title={s.title || 'Your week, connected'}
+                                active={false}
+                                onClick={() => onOpenDigest?.(synthesisEntryId(s.weekId))}
+                                trailing={<ChevronRight className="w-4 h-4 text-text-muted shrink-0" />}
+                            />
+                        ))}
                     </div>
                 )}
                 {groups.map((g) => (
@@ -137,14 +163,25 @@ export default function DigestView({
             {/* Desktop — sidebar list + reading pane. */}
             <div className="hidden lg:flex gap-5 max-w-6xl mx-auto">
                 <aside className="w-72 shrink-0 sticky top-2 self-start max-h-[calc(100vh-8rem)] overflow-y-auto scrollbar-subtle pr-1 flex flex-col gap-4">
-                    {synthesis && (
-                        <SidebarRow
-                            icon={<Sparkles className="w-4 h-4" />}
-                            eyebrow="Weekly synthesis"
-                            title={synthesis.title || 'Your week, connected'}
-                            active={activeId === 'synthesis'}
-                            onClick={() => setSelId('synthesis')}
-                        />
+                    {syntheses.length > 0 && (
+                        <div className="flex flex-col gap-1">
+                            <SectionHeader
+                                label="Weekly synthesis"
+                                count={syntheses.length}
+                                open={synthesesOpen}
+                                onToggle={() => setSynthesesOpen((v) => !v)}
+                            />
+                            {synthesesOpen && syntheses.map((s) => (
+                                <SidebarRow
+                                    key={s.weekId}
+                                    icon={<Sparkles className="w-4 h-4" />}
+                                    eyebrow={synthesisWeekLabel(s)}
+                                    title={s.title || 'Your week, connected'}
+                                    active={activeId === synthesisEntryId(s.weekId)}
+                                    onClick={() => setSelId(synthesisEntryId(s.weekId))}
+                                />
+                            ))}
+                        </div>
                     )}
                     {groups.map((g) => (
                         <div key={g.label} className="flex flex-col gap-1">
@@ -163,14 +200,36 @@ export default function DigestView({
                 </aside>
 
                 <div className="flex-1 min-w-0">
-                    {activeId === 'synthesis' && synthesis ? (
-                        <SynthesisCard synthesis={synthesis} onOpenCard={onOpenSynthesisCard} onDismiss={onDismissSynthesis} />
+                    {activeSynthesis ? (
+                        <SynthesisCard key={activeSynthesis.weekId} synthesis={activeSynthesis} onOpenCard={onOpenSynthesisCard} alwaysOpen />
                     ) : activeDigest ? (
                         <DigestCard key={activeDigest.id} digest={activeDigest} alwaysOpen onOpenCard={onOpenCard} onOpenSettings={onOpenDigestSettings} onDelete={onDeleteDigest} />
                     ) : null}
                 </div>
             </div>
         </>
+    );
+}
+
+/** A collapsible group header — same typographic weight as the plain date
+ *  headers next to it, so the submenu reads as part of the same list rather
+ *  than as a control bolted on top. */
+function SectionHeader({ label, count, open, onToggle }: {
+    label: string; count: number; open: boolean; onToggle: () => void;
+}) {
+    return (
+        <button
+            onClick={onToggle}
+            aria-expanded={open}
+            className="w-full flex items-center gap-1.5 px-1 py-0.5 text-[11px] font-bold uppercase tracking-[0.14em] text-text-muted hover:text-text-secondary transition-colors cursor-pointer"
+        >
+            <ChevronDown
+                className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${open ? '' : '-rotate-90 rtl:rotate-90'}`}
+                style={{ transitionTimingFunction: 'var(--ease-modal)' }}
+            />
+            <span className="truncate">{label}</span>
+            <span className="font-semibold tracking-normal opacity-70">{count}</span>
+        </button>
     );
 }
 

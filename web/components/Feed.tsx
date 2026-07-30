@@ -56,7 +56,7 @@ import LoadMoreSentinel from './feed/LoadMoreSentinel';
 import { Search, Inbox, Archive, Star, X, LayoutGrid, MessagesSquare, Trash2, ArrowUpDown, Tag as TagIcon, Filter, Bell, CheckCircle2, CheckSquare, Layers, GalleryHorizontalEnd, List, Image as ImageIcon, Share2, Globe, Plus, Pencil, Newspaper, Sparkles, Lock, BookOpenCheck, ChevronLeft, BarChart3, StickyNote, Waypoints } from 'lucide-react';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
 import { useProcessingBanner } from '@/lib/useProcessingBanner';
-import { subscribeLatestSynthesis } from '@/lib/synthesis';
+import { subscribeSyntheses } from '@/lib/synthesis';
 import { subscribeDigests, deleteDigest } from '@/lib/digest';
 import { PUSH_INTENT_EVENT, PUSH_FOREGROUND_EVENT, consumePendingPushIntent, readLocalPushPrompt, type PushIntent } from '@/lib/push';
 import { isNativeApp } from '@/lib/api';
@@ -257,8 +257,8 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'review' | 'graph' | 'ask' | 'collections' | 'collection' | 'digest' | 'digestDetail' | 'notes'>('grid');
     // The collection currently open as a place (viewMode 'collection').
     const [openCollectionId, setOpenCollectionId] = useState<string | null>(null);
-    // The digest currently open as a place (viewMode 'digestDetail'); the sentinel
-    // 'synthesis' opens the weekly-synthesis entry.
+    // The digest currently open as a place (viewMode 'digestDetail'); a
+    // `synthesis:<weekId>` id opens that week's archived synthesis.
     const [openDigestId, setOpenDigestId] = useState<string | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -322,9 +322,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     // Bumped when a suggestion is dismissed so the memo below re-reads localStorage.
     const [suggestionTick, setSuggestionTick] = useState(0);
 
-    // Weekly synthesis (M12) — the in-app "What you learned" special card.
-    const [latestSynthesis, setLatestSynthesis] = useState<WeeklySynthesis | null>(null);
+    // Weekly syntheses (M12), newest first — [0] is the in-app "What you
+    // learned" feed card; the whole run is the Digest section's archive.
+    const [syntheses, setSyntheses] = useState<WeeklySynthesis[]>([]);
     const [dismissedSynthesisWeek, setDismissedSynthesisWeek] = useState<string | null>(null);
+    const latestSynthesis = syntheses[0] ?? null;
 
     // Curated digest history — the dedicated Digest section (written
     // server-side to users/{uid}/digests; the in-app view is the always-on
@@ -379,10 +381,11 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
         setDismissedSynthesisWeek(localStorage.getItem('synthesis-dismissed-week'));
     }, []);
 
-    // Subscribe to the latest weekly synthesis (M12), surfaced as a feed card.
+    // Subscribe to the weekly syntheses (M12) — newest surfaces as a feed card,
+    // the rest stay browsable in the Digest section.
     useEffect(() => {
         if (!uid) return;
-        return subscribeLatestSynthesis(uid, setLatestSynthesis);
+        return subscribeSyntheses(uid, setSyntheses);
     }, [uid]);
 
     // Subscribe to the curated digest history for the Digest section.
@@ -1350,32 +1353,34 @@ function FeedContent({ onAskModeChange, onHideAddButton, onProcessingChange, onF
     const activeMobileFilters =
         (filter !== 'all' ? 1 : 0) + selectedCategory.size + selectedTags.size + selectedSources.size;
 
-    // The Digest section's scrollable history — the weekly synthesis rides on
+    // The Digest section's scrollable history — the weekly-synthesis archive on
     // top, then every curated digest, newest first. Built once and rendered in
-    // both layouts (desktop inline / mobile full-screen overlay).
-    const activeSynthesis = latestSynthesis && latestSynthesis.weekId !== dismissedSynthesisWeek ? latestSynthesis : null;
+    // both layouts (desktop inline / mobile full-screen overlay). The archive is
+    // the FULL run, unfiltered by the feed banner's dismissal: dismissing the
+    // banner hides a banner, it never removes a write-up.
     const digestContent = (
         <DigestView
             digests={digests}
-            synthesis={activeSynthesis}
+            syntheses={syntheses}
             onOpenCard={openDigestCard}
             onOpenSynthesisCard={(id) => setActiveLinkId(id)}
-            onDismissSynthesis={dismissSynthesis}
             onOpenDigestSettings={onOpenDigestSettings}
             onDeleteDigest={uid ? (id) => { void deleteDigest(uid, id); } : undefined}
             onOpenDigest={openDigestDetail}
         />
     );
 
-    // One digest opened as its own place (Task B). 'synthesis' opens the weekly
-    // synthesis; any other id opens that curated digest, pinned open with no
-    // collapse chrome. Deleting from here pops back to the list.
-    const openDigest = openDigestId && openDigestId !== 'synthesis' ? digests.find((d) => d.id === openDigestId) ?? null : null;
-    const digestDetailTitle = openDigestId === 'synthesis'
-        ? (activeSynthesis?.title || 'Weekly synthesis')
+    // One digest opened as its own place (Task B). `synthesis:<weekId>` opens
+    // that archived synthesis; any other id opens that curated digest, pinned
+    // open with no collapse chrome. Deleting from here pops back to the list.
+    const openSynthesisWeek = openDigestId?.startsWith('synthesis:') ? openDigestId.slice('synthesis:'.length) : null;
+    const openSynthesis = openSynthesisWeek ? syntheses.find((s) => s.weekId === openSynthesisWeek) ?? null : null;
+    const openDigest = openDigestId && !openSynthesisWeek ? digests.find((d) => d.id === openDigestId) ?? null : null;
+    const digestDetailTitle = openSynthesisWeek
+        ? (openSynthesis?.title || 'Weekly synthesis')
         : (openDigest?.title || 'Digest');
-    const digestDetailContent = openDigestId === 'synthesis' && activeSynthesis ? (
-        <SynthesisCard synthesis={activeSynthesis} onOpenCard={(id) => setActiveLinkId(id)} onDismiss={dismissSynthesis} />
+    const digestDetailContent = openSynthesis ? (
+        <SynthesisCard synthesis={openSynthesis} onOpenCard={(id) => setActiveLinkId(id)} alwaysOpen />
     ) : openDigest ? (
         <DigestCard
             key={openDigest.id}

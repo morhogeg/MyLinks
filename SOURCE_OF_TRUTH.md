@@ -1021,6 +1021,57 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-30 — synthesis reading layout + synthesis ARCHIVE + wider graph
+  panels + themed sub-clusters + Ask citation bylines (owner: five fixes).**
+  (1) **Synthesis measure.** The weekly recap was prose set to the full pane
+  width (~1700px on a 1440 desktop). `SynthesisCard` now caps its body at a
+  **62ch column**, leads with a larger opening paragraph, and gives each theme
+  a hairline-separated section with a 17px heading; card links lost their
+  all-accent "link soup" colouring (muted, accent on hover). New `alwaysOpen`
+  prop renders it as an article (masthead, no chevron, no dismiss) in the
+  Digest reader. (2) **Syntheses accumulate.** `subscribeLatestSynthesis`
+  (`limit(1)`) is replaced by **`subscribeSyntheses`** (52 weeks, newest
+  first); Feed derives the banner from `[0]` and hands the FULL run to
+  `DigestView`, which shows a **collapsible "Weekly synthesis" submenu** above
+  the digest history (desktop sidebar + phone list), each row labelled with its
+  week range (`synthesisWeekLabel` parses the ISO `weekId`). Entry ids are
+  namespaced `synthesis:<weekId>` (the old bare `'synthesis'` sentinel is
+  gone). **Contract:** dismissing the feed banner (`localStorage
+  synthesis-dismissed-week`) hides a BANNER — the archive is deliberately not
+  filtered by it, so a write-up can never be lost by tapping X. (3) **Graph
+  panels.** Desktop panels go 330→**440px** (`lg:`) and drop their truncation
+  (`lg:line-clamp-none` / `lg:whitespace-normal`). The width was duplicated in
+  three places that must agree — the Tailwind class, the canvas label-culling
+  reserve, and the camera framing — so all three now read one constant block
+  (`PANEL_W_SM/LG`, `panelReserve()`); `PANEL_CLASS_W` is a LITERAL string
+  because Tailwind scans source text and would never emit an interpolated
+  class. (4) **Every cluster gets a real theme.** Clusters were connected
+  components, so the 24-card island could only ever be captioned with its
+  category ("TECH"). `splitIntoThemes` (weighted **label propagation**,
+  deterministic: fixed visit order, ties to the lowest label) now splits any
+  component ≥9 nodes into communities of ≥3, re-homes sub-threshold strays into
+  their strongest neighbour group, and each community becomes a captioned,
+  tappable `GraphCluster` with its own gravity sub-anchor inside the island so
+  the lobes visibly separate. `clusterLabel` gained a `taken` set so sibling
+  themes never share a caption. **Membership stays DISJOINT** — the owner asked
+  for cards in several clusters, but that would make "Save as collection" /
+  "Ask about this" scope undefined, so it was deliberately not built.
+  `clusterCount` now counts themes (what you can see and tap), not components.
+  (5) **Ask citation chips** wore boxed, brand-tinted platform logos — the last
+  copy of source-identity logic outside `SourceByline`. The bespoke
+  `sourceTag()` is deleted; chips keep ONE constant citation glyph and render
+  the byline through the shared `SourceByline`, so a cited card's source reads
+  exactly as it does on a feed card. Verified: `tsc` 0, production build green,
+  eslint clean (one pre-existing `modelRef` error unchanged), and the theme
+  split checked with a throwaway jiti harness over the real `buildGraphModel` —
+  a genuine single 12-node component (asserted, after a first fixture silently
+  failed to bridge because the live-edge cap starved it) splits into two
+  concept-labelled themes; disjoint, total coverage, distinct captions,
+  identical across two builds. **NOT render-verified** — every changed surface
+  is behind the sign-in gate and the local dev server runs in emulator mode, so
+  owner device/desktop QA is the check. Watch: caption crowding inside a split
+  island at low zoom, and the 440px panel on a ~1024–1200px window.
+  Frontend-only → Vercel + TestFlight.
 - **2026-07-29 — TestFlight 90382 daily upload limit hit (rounds 16–17 are web-
   only for now).** Runs **#246 (`4bc9afb`, Back to Ask) and #247 (`a2ef9b4`,
   cluster button row) both FAILED at upload** — App Store Connect error

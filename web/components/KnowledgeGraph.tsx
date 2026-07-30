@@ -82,6 +82,24 @@ const ALPHA_DECAY = 0.99;
 const ALPHA_MIN = 0.015;
 const TAP_SLOP = 7;            // px of movement that still counts as a tap
 
+// ── Desktop panel geometry — ONE source of truth ─────────────────────────────
+// The floating panel's width is duplicated in three places that must agree:
+// the Tailwind class on the panel itself, the canvas label-culling reserve (a
+// title drawn under the panel is invisible or sliced), and the camera framing
+// that keeps a selection clear of it. Change PANEL_CLASS_W and these numbers
+// together or captions start hiding behind the glass.
+const PANEL_W_SM = 330;
+const PANEL_W_LG = 440;   // wide desktop: room for full titles, no truncation
+const PANEL_INSET = 12;   // matches top-3 / end-3
+// Written out literally on purpose: Tailwind scans source TEXT, so an
+// interpolated class name would never be generated. Keep it in sync with the
+// two numbers above — they are the same measurement.
+const PANEL_CLASS_W = 'sm:w-[330px] lg:w-[440px]';
+/** Screen width the panel claims, including its inset. Mirrors the `lg:`
+ *  breakpoint — the canvas is close enough to viewport width on desktop that
+ *  the same 1024px threshold holds (the isDesktop test already trades on this). */
+const panelReserve = (viewW: number) => (viewW >= 1024 ? PANEL_W_LG : PANEL_W_SM) + PANEL_INSET * 2;
+
 export default function KnowledgeGraph({
     links,
     loading,
@@ -286,7 +304,7 @@ export default function KnowledgeGraph({
                     maxY = Math.max(maxY, n.y + n.r);
                 }
                 const desktop = w >= 640;
-                const freeW = desktop ? w - 360 : w;
+                const freeW = desktop ? w - panelReserve(w) - 18 : w;
                 // Phones: the sheet can take up to 66% of the height, so only
                 // the top third is genuinely free to frame into.
                 const freeH = desktop ? h : h * 0.34;
@@ -314,7 +332,7 @@ export default function KnowledgeGraph({
                 const w = canvas.width / dpr;
                 const h = canvas.height / dpr;
                 const desktop = w >= 640;
-                const freeW = desktop ? w - 360 : w;
+                const freeW = desktop ? w - panelReserve(w) - 18 : w;
                 const freeH = desktop ? h : h * 0.34;
                 let minX = n.x - n.r, minY = n.y - n.r, maxX = n.x + n.r, maxY = n.y + n.r;
                 for (const ei of model.adjacency[fi]) {
@@ -847,7 +865,7 @@ export default function KnowledgeGraph({
                     that card (the camera follows), and each row's ↗ opens that
                     card's detail directly. */}
                 {selection && (
-                    <div className="absolute inset-x-2 bottom-2 sm:inset-x-auto sm:bottom-auto sm:top-3 sm:end-3 sm:w-[330px] max-h-[66%] sm:max-h-[calc(100%-24px)] flex flex-col rounded-2xl bg-card/95 backdrop-blur-xl border border-border-subtle shadow-[var(--shadow-card)] animate-fade-in">
+                    <div className={`absolute inset-x-2 bottom-2 sm:inset-x-auto sm:bottom-auto sm:top-3 sm:end-3 ${PANEL_CLASS_W} max-h-[66%] sm:max-h-[calc(100%-24px)] flex flex-col rounded-2xl bg-card/95 backdrop-blur-xl border border-border-subtle shadow-[var(--shadow-card)] animate-fade-in`}>
                         {/* Minimal, intentional hierarchy: TITLE → one action
                             row → connections. The category dot is the only
                             metadata (its color already matches the legend);
@@ -860,7 +878,10 @@ export default function KnowledgeGraph({
                                     className="mt-1 w-2.5 h-2.5 rounded-full shrink-0"
                                     style={{ backgroundColor: getCategoryColorStyle(selection.node.category).color }}
                                 />
-                                <h3 dir="auto" className="flex-1 min-w-0 text-[14px] font-semibold text-text leading-snug line-clamp-2">
+                                {/* Desktop has the room, so it gets the whole
+                                    title — clamping is a phone constraint, not
+                                    a style. Same rule for every row below. */}
+                                <h3 dir="auto" className="flex-1 min-w-0 text-[14px] font-semibold text-text leading-snug line-clamp-2 lg:line-clamp-none">
                                     {selection.node.link.title}
                                 </h3>
                                 <button
@@ -909,7 +930,7 @@ export default function KnowledgeGraph({
                                                 className="w-1.5 h-1.5 rounded-full shrink-0"
                                                 style={{ backgroundColor: getCategoryColorStyle(nb.category).color }}
                                             />
-                                            <span dir="auto" className="flex-1 min-w-0 text-[13px] font-medium text-text truncate">
+                                            <span dir="auto" className="flex-1 min-w-0 text-[13px] font-medium text-text truncate lg:whitespace-normal lg:overflow-visible">
                                                 {nb.link.title}
                                             </span>
                                             {nb.strong && (
@@ -919,7 +940,7 @@ export default function KnowledgeGraph({
                                             )}
                                         </span>
                                         {nb.reason && (
-                                            <span dir="auto" className="block ms-3.5 mt-0.5 text-[12px] text-text-secondary leading-snug line-clamp-2">
+                                            <span dir="auto" className="block ms-3.5 mt-0.5 text-[12px] text-text-secondary leading-snug line-clamp-2 lg:line-clamp-none">
                                                 {nb.reason}
                                             </span>
                                         )}
@@ -943,12 +964,12 @@ export default function KnowledgeGraph({
                     your brain about it, keep it as a collection). Selection
                     takes precedence; closing a selection returns here. */}
                 {!selection && clusterPanel && (
-                    <div className="absolute inset-x-2 bottom-2 sm:inset-x-auto sm:bottom-auto sm:top-3 sm:end-3 sm:w-[330px] max-h-[66%] sm:max-h-[calc(100%-24px)] flex flex-col rounded-2xl bg-card/95 backdrop-blur-xl border border-border-subtle shadow-[var(--shadow-card)] animate-fade-in">
+                    <div className={`absolute inset-x-2 bottom-2 sm:inset-x-auto sm:bottom-auto sm:top-3 sm:end-3 ${PANEL_CLASS_W} max-h-[66%] sm:max-h-[calc(100%-24px)] flex flex-col rounded-2xl bg-card/95 backdrop-blur-xl border border-border-subtle shadow-[var(--shadow-card)] animate-fade-in`}>
                         <div className="p-3 pb-2.5 sm:p-3.5 sm:pb-3">
                             <div className="flex items-start gap-2.5">
                                 <Waypoints className="mt-0.5 w-4 h-4 shrink-0 text-text-muted" />
                                 <div className="flex-1 min-w-0">
-                                    <h3 dir="auto" className="text-[14px] font-semibold text-text leading-snug line-clamp-2">
+                                    <h3 dir="auto" className="text-[14px] font-semibold text-text leading-snug line-clamp-2 lg:line-clamp-none">
                                         {clusterPanel.label ?? 'A cluster of related cards'}
                                     </h3>
                                     {/* Sentence case — this line now carries the
@@ -1008,7 +1029,7 @@ export default function KnowledgeGraph({
                                                     className="w-1.5 h-1.5 rounded-full shrink-0"
                                                     style={{ backgroundColor: getCategoryColorStyle(m.category).color }}
                                                 />
-                                                <span dir="auto" className="flex-1 min-w-0 text-[13px] font-medium text-text truncate">
+                                                <span dir="auto" className="flex-1 min-w-0 text-[13px] font-medium text-text truncate lg:whitespace-normal lg:overflow-visible">
                                                     {m.link.title}
                                                 </span>
                                             </span>
@@ -1280,9 +1301,9 @@ function draw(
     }
     if (state.selected !== null || state.clusterFocus !== null) {
         placed.push(isDesktop
-            // Mirrors the panel's own sizing (sm:w-[330px] at end-3 / the
+            // Mirrors the panel's own sizing (PANEL_CLASS_W at end-3 / the
             // phone sheet's max-h-[66%]) and the camera's framing math.
-            ? { x1: viewW - 346, y1: 4, x2: viewW - 4, y2: viewH - 4 }
+            ? { x1: viewW - panelReserve(viewW) - 4, y1: 4, x2: viewW - 4, y2: viewH - 4 }
             : { x1: 4, y1: viewH * 0.34, x2: viewW - 4, y2: viewH });
     }
     const fits = (r: Rect) =>
