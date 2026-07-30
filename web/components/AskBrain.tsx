@@ -376,7 +376,15 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
     // shows up in the chips immediately. `suggestSalt` rotates the mix and the
     // phrasing; "More ideas" bumps it. All client-side, no extra tokens.
     const [suggestSalt, setSuggestSalt] = useState(() => Math.floor(Math.random() * 997));
-    const suggestions = useMemo(() => buildAskSuggestions(links, suggestSalt), [links, suggestSalt]);
+    // Chips already asked THIS SESSION, oldest first — they sink to the back of
+    // the set instead of being re-offered. Deliberately in memory only: a
+    // relaunch should be free to suggest them again, and persisting would
+    // slowly starve a small library of chips it is allowed to show.
+    const [usedSuggestions, setUsedSuggestions] = useState<string[]>([]);
+    const suggestions = useMemo(
+        () => buildAskSuggestions(links, suggestSalt, usedSuggestions),
+        [links, suggestSalt, usedSuggestions],
+    );
 
     // One-tap follow-ups under the latest answer, tailored to what it actually
     // discussed. The answer's citations only carry id/title/category, but the
@@ -599,6 +607,11 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
         lastSavedRef.current = '';
         setInput('');
         setFreshCard(null);         // the banner belongs to the conversation it appeared in
+        // Reword what survives. This is a COMPLEMENT to the used-key filter
+        // above, never the fix on its own: salt rotates phrasing and pool order
+        // but cannot retire the latest-save chip, so on its own it would greet a
+        // new chat with the same card it just answered, in different words.
+        setSuggestSalt(v => v + 1);
         textareaRef.current?.focus();
     };
 
@@ -1203,6 +1216,10 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                     // suggested; the rest genuinely sweep the library.
                                     onClick={() => {
                                         trackAskSuggestionUsed(s.kind);
+                                        // Retire this chip for the session (moved
+                                        // to the end = most recently used, so it
+                                        // is the last to come back as backfill).
+                                        setUsedSuggestions(prev => [...prev.filter(k => k !== s.key), s.key]);
                                         // Send the full-title question; the pill shows the
                                         // ellipsized text (bubbles never truncate titles).
                                         send(s.question ?? s.text, undefined, s.kind === 'latest' || s.kind === 'rediscover' ? 'card' : 'library', s.hints);
