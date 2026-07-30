@@ -48,6 +48,18 @@ service cloud.firestore {
         allow read, write: if true;
       }
 
+      // The user's OWN notes on a week (SynthesisCard's "Your notes"), keyed by
+      // the same weekId — a DIRECT client write, unlike the synthesis above.
+      //
+      // This match must exist even though the parent `users/{uid}` rule is
+      // `if true`: Firestore rules do NOT cascade into subcollections, so an
+      // undeclared subcollection is denied, which is exactly why every one of
+      // them is spelled out here. Shipping the locked-ruleset match without
+      // this one is what made "Add a note" fail with a permission error.
+      match /synthesisNotes/{weekId} {
+        allow read, write: if true;
+      }
+
       // Curated digests (in-app Digest section). Written by Cloud Functions
       // (admin SDK); the client only reads to render the digest history.
       match /digests/{digestId} {

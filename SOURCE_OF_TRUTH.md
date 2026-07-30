@@ -1021,6 +1021,40 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-30 (round 4) — three owner-QA bugs, two of them MINE from round 2.**
+  (1) **"Couldn't save that note" — the live ruleset was never updated.** Round 2
+  added `match /synthesisNotes/{weekId}` to `firestore.rules.locked` and three
+  emulator tests, and shipped. But **Firestore rules do NOT cascade into
+  subcollections** — `match /users/{uid} { allow read, write: if true }` covers
+  the user DOC only, which is exactly why every subcollection is spelled out in
+  `firestore.rules`. The new one wasn't, so every note write was denied in
+  production. Added to the LIVE `firestore.rules` (`allow read, write: if true`,
+  matching its siblings); the deploy-rules workflow ships it. **Generalisable
+  lesson: this repo has TWO rulesets and a feature needs BOTH — testing the
+  locked one proves nothing about today.**
+  (2) **Messi cluster STILL read "Comparative Analysis · Performance Metrics".**
+  Round 2's fix was verified against a fixture that encoded my HYPOTHESIS (the
+  analysis vocabulary is sprayed library-wide, so distinctiveness demotes it)
+  rather than the observed failure. In the real library that vocabulary sits on
+  ONLY those 14 cards — 14/14 coverage, nothing elsewhere — so it scored as
+  perfectly distinctive and still won. The real discriminator is that **no card
+  is TITLED "comparative analysis"**: subjects appear in titles, methods don't.
+  Title echo is now the DOMINANT term (0.25× when absent from every title, up to
+  2× when in all of them), a title counts if it carries ≥half the concept's
+  words (so "Messi" matches "Lionel Messi"), and the "A · B" partner slot now
+  additionally requires `titleShare ≥ 0.25` — without that, "Lionel Messi"
+  immediately picked up "· Performance Metrics" again. Re-verified against a
+  fixture built from the owner's ACTUAL card titles (incl. the Hebrew and
+  Portuguese ones): reads **"Lionel Messi"**. Regression-checked that the
+  community split, caption dedup, determinism and the title-less fallback all
+  still hold.
+  (3) **Cited chips lost their leading mark.** Round 2 removed the tile for
+  branded sources entirely; the owner wanted the ICON back on the title line,
+  just not boxed. Every chip now has one leading mark — the platform's own logo
+  (bare, brand-coloured, no tinted box) when the card has a platform, else the
+  Machina glyph in its subtle tile — and `SourceByline` gained `showIcon` so the
+  byline beneath doesn't draw the same logo twice.
+  Verified: tsc 0, build green, eslint clean, rules suite 44/44.
 - **2026-07-30 (round 3) — desktop toolbar regrouped around what the controls
   ACT ON (owner call).** The bar's two clusters now split cleanly: **left = the
   list you're looking at** (search, filter, sources, sort, **view switcher**,
