@@ -1,16 +1,19 @@
 /**
  * The library the film shows.
  *
- * Round 13 made it UNIVERSAL: a recipe, an apartment listing, a workout, a
- * gift idea, a trip being circled, an article a friend sent — the saves of
- * someone's actual week, in dinner-table words, so the film lands on people
- * who have never once thought about "saving links" as a problem.
+ * Round 13 (owner call): DIVERSE on purpose — a recipe, an X thread about AI,
+ * a philosophy video, a travel carousel, an apartment listing, a gift idea, a
+ * workout, an article a friend sent. The whole point of the product is that
+ * one life produces saves this different, across this many apps, and no single
+ * app holds them.
  *
- * It is still one coherent life, not a grab-bag, because three scenes depend
- * on that: the Ask answer is genuinely assemblable from the three travel
- * saves; the search query shares NOT ONE word with the one card it retrieves;
- * and the feed visibly mixes YouTube, Instagram, X and articles, which is what
- * proves "one place for all of it" instead of merely captioning it.
+ * Three scenes still need internal coherence, and get it from one THREAD
+ * running through the diversity: the AI/what-stays-human trio (the X thread,
+ * the philosophy video, the article Maya sent) powers the Ask answer with
+ * citations from three different platforms, gives the graph its months-apart
+ * pair (the video is 2mo old, the thread 2d), and gives the digest the thing
+ * "you keep circling". The search query — "easy dinner for guests" — shares
+ * NOT ONE word with the one card it retrieves (the one-pan lemon chicken).
  */
 
 export type Card = {
@@ -42,16 +45,16 @@ export const CARDS: Card[] = [
     note: 'Call about the viewing before Friday.',
   },
   {
-    id: 'lisbonvid',
-    category: 'Travel',
-    title: 'Three days in Lisbon',
+    id: 'aithread',
+    category: 'AI',
+    title: 'What AI actually changes about work',
     summary:
-      'A tight itinerary that skips the queues: morning markets, the ferry across the Tagus, and where to eat in Alfama.',
-    source: 'Beautiful Destinations',
-    sourceKind: 'youtube',
-    tags: ['lisbon', 'itinerary'],
-    readTime: 11,
-    age: '5d ago',
+      'A thread arguing the models take the typing, not the judgment — and which skills to bet on either way.',
+    source: '@futuretense',
+    sourceKind: 'x',
+    tags: ['ai', 'work'],
+    readTime: 4,
+    age: '2d ago',
   },
   {
     id: 'recipe',
@@ -66,28 +69,16 @@ export const CARDS: Card[] = [
     age: '1w ago',
   },
   {
-    id: 'rent',
-    category: 'Home',
-    title: 'How to actually negotiate rent',
-    summary:
-      'A thread of scripts that work: ask after the renewal notice lands, name a number, offer a longer term.',
-    source: '@rentwise',
-    sourceKind: 'x',
-    tags: ['apartment-hunt', 'money'],
-    readTime: 4,
-    age: '1w ago',
-  },
-  {
-    id: 'miradouros',
+    id: 'travelgram',
     category: 'Travel',
-    title: 'Lisbon’s quiet viewpoints',
+    title: 'Hidden coves of Sardinia',
     summary:
-      'A carousel of miradouros without the crowds — go at sunrise, bring coffee, the river does the rest.',
+      'A carousel of beaches you can only reach on foot — go in June, before the boats find them.',
     source: '@quietplaces',
     sourceKind: 'instagram',
-    tags: ['lisbon', 'places'],
+    tags: ['places', 'summer'],
     readTime: 2,
-    age: '2w ago',
+    age: '1w ago',
   },
   {
     id: 'gift',
@@ -115,16 +106,28 @@ export const CARDS: Card[] = [
     age: '3w ago',
   },
   {
-    id: 'shoulder',
-    category: 'Travel',
-    title: 'The case for the shoulder-season trip',
+    id: 'aiarticle',
+    category: 'AI',
+    title: 'The jobs AI actually changes',
     summary:
-      'October gets you the same city at half the crowds and a third off the flights. The catch: you have to book before summer ends.',
+      'A sober look past the hype at which work shifts first — and why the viral lists keep getting it wrong.',
     source: 'theatlantic.com',
-    tags: ['lisbon', 'when-to-go'],
+    tags: ['ai', 'work'],
     readTime: 9,
+    age: '3w ago',
+    note: 'Maya sent this — the part about editors is us.',
+  },
+  {
+    id: 'machineminds',
+    category: 'Philosophy',
+    title: 'Can a machine ever understand?',
+    summary:
+      'Forty minutes on the Chinese Room and what “knowing” even means — the rare video essay that changes how you argue.',
+    source: 'Philosophy Tube',
+    sourceKind: 'youtube',
+    tags: ['minds', 'watch-again'],
+    readTime: 40,
     age: '2mo ago',
-    note: 'Maya sent this — she’s right about October.',
   },
 ];
 
@@ -135,7 +138,7 @@ export const CARDS: Card[] = [
  * visible work to do; buried mid-feed, the non-matches collapse and the match
  * pulls up, which is what a filter actually looks like.
  */
-export const FEED_ORDER = ['apartment', 'lisbonvid', 'recipe', 'rent', 'miradouros', 'gift', 'workout', 'shoulder'];
+export const FEED_ORDER = ['apartment', 'machineminds', 'recipe', 'aithread', 'travelgram', 'gift', 'workout', 'aiarticle'];
 
 export const byId = (id: string) => {
   const c = CARDS.find((x) => x.id === id);
@@ -146,10 +149,10 @@ export const byId = (id: string) => {
 /** The capture scene's incoming article — the one a friend sent. */
 export const INCOMING = {
   site: 'theatlantic.com',
-  url: 'theatlantic.com/travel/shoulder-season',
-  headline: 'The case for the shoulder-season trip',
+  url: 'theatlantic.com/tech/jobs-ai-changes',
+  headline: 'The jobs AI actually changes',
   standfirst:
-    'Same city, half the crowds, a third off the flights — if you can commit before the summer rush does.',
+    'Past the hype: which work actually shifts first, and why the viral lists keep getting it wrong.',
 };
 
 /**
@@ -165,19 +168,19 @@ export const INCOMING = {
 export const SEARCH_QUERY = 'easy dinner for guests';
 export const SEARCH_HITS = ['recipe'];
 
-/** The Ask exchange. */
-export const ASK_QUESTION = 'Where was that place I wanted to go this fall?';
+/** The Ask exchange — assembled from the AI trio, one card per platform. */
+export const ASK_QUESTION = 'What have I been saving about AI?';
 
 export const ASK_ANSWER = [
-  'Lisbon — three of your saves point the same way.',
+  'Your saves circle one question: what stays human.',
   '',
-  'The video you saved lays out three days there, the carousel is the quiet viewpoints at sunrise, and the article Maya sent makes the case for going in October — before flights jump.',
+  'The thread you starred argues AI takes the typing and leaves the judgment, the article Maya sent maps which jobs actually shift, and that philosophy video pushes further — whether a machine can understand at all.',
 ].join('\n');
 
 export const ASK_SOURCES = [
-  { id: 'lisbonvid', label: 'Beautiful Destinations', kind: 'youtube' as const, title: 'Three days in Lisbon' },
-  { id: 'miradouros', label: '@quietplaces', kind: 'instagram' as const, title: 'Lisbon’s quiet viewpoints' },
-  { id: 'shoulder', label: 'theatlantic.com', kind: 'link' as const, title: 'The case for the shoulder-season trip' },
+  { id: 'aithread', label: '@futuretense', kind: 'x' as const, title: 'What AI actually changes about work' },
+  { id: 'machineminds', label: 'Philosophy Tube', kind: 'youtube' as const, title: 'Can a machine ever understand?' },
+  { id: 'aiarticle', label: 'theatlantic.com', kind: 'link' as const, title: 'The jobs AI actually changes' },
 ];
 
 /** The graph scene. Positions are hand-set — a force layout that never settles reads as noise. */
@@ -191,15 +194,15 @@ export const GRAPH_NODES: {
   category: string;
   label?: string;
 }[] = [
-  // The caption's claim lives in cluster 0: the video saved days ago and the
-  // article saved two months ago sit on the same island.
-  { id: 'lisbonvid', x: 0.33, y: 0.36, r: 15, cluster: 0, category: 'Travel', label: 'Three days in Lisbon' },
-  { id: 'shoulder', x: 0.47, y: 0.27, r: 13, cluster: 0, category: 'Travel', label: 'The October case' },
-  { id: 'miradouros', x: 0.24, y: 0.5, r: 11, cluster: 0, category: 'Travel' },
-  { id: 'flights', x: 0.42, y: 0.5, r: 9, cluster: 0, category: 'Travel' },
-  { id: 'packing', x: 0.35, y: 0.62, r: 8, cluster: 0, category: 'Travel' },
+  // The caption's claim lives in cluster 0: the thread saved two days ago and
+  // the philosophy video saved two months ago sit on the same island.
+  { id: 'aithread', x: 0.33, y: 0.36, r: 15, cluster: 0, category: 'AI', label: 'AI & work' },
+  { id: 'machineminds', x: 0.47, y: 0.27, r: 13, cluster: 0, category: 'Philosophy', label: 'Machine minds' },
+  { id: 'aiarticle', x: 0.24, y: 0.5, r: 11, cluster: 0, category: 'AI' },
+  { id: 'agents', x: 0.42, y: 0.5, r: 9, cluster: 0, category: 'AI' },
+  { id: 'ethics', x: 0.35, y: 0.62, r: 8, cluster: 0, category: 'Philosophy' },
   { id: 'apartment', x: 0.7, y: 0.42, r: 12, cluster: 1, category: 'Home', label: 'Balcony two-bed' },
-  { id: 'rent', x: 0.79, y: 0.56, r: 11, cluster: 1, category: 'Home' },
+  { id: 'renttips', x: 0.79, y: 0.56, r: 11, cluster: 1, category: 'Home' },
   { id: 'neighborhood', x: 0.66, y: 0.62, r: 10, cluster: 1, category: 'Home' },
   { id: 'commute', x: 0.81, y: 0.33, r: 8, cluster: 1, category: 'Home' },
   // NOT labelled with the cluster's own words — label and island caption
@@ -210,37 +213,39 @@ export const GRAPH_NODES: {
 ];
 
 export const GRAPH_EDGES: [string, string][] = [
-  ['lisbonvid', 'shoulder'],
-  ['lisbonvid', 'miradouros'],
-  ['shoulder', 'flights'],
-  ['miradouros', 'flights'],
-  ['lisbonvid', 'packing'],
-  ['packing', 'shoulder'],
-  ['apartment', 'rent'],
+  ['aithread', 'machineminds'],
+  ['aithread', 'aiarticle'],
+  ['machineminds', 'agents'],
+  ['aiarticle', 'agents'],
+  ['aithread', 'ethics'],
+  ['ethics', 'machineminds'],
+  ['apartment', 'renttips'],
   ['apartment', 'commute'],
-  ['rent', 'neighborhood'],
+  ['renttips', 'neighborhood'],
   ['neighborhood', 'apartment'],
-  ['shoulder', 'apartment'],
+  ['machineminds', 'apartment'],
   ['recipe', 'marketlist'],
   ['recipe', 'pasta'],
-  ['recipe', 'shoulder'],
+  ['recipe', 'aiarticle'],
   ['marketlist', 'pasta'],
-  ['rent', 'recipe'],
+  ['renttips', 'recipe'],
 ];
 
 /** Island captions. The app draws these in textSecondary, NOT in a cluster
  *  colour — they are type, not legend. */
 export const CLUSTERS = [
-  { name: 'Lisbon, this fall', x: 0.35, y: 0.19 },
+  { name: 'AI & what stays human', x: 0.35, y: 0.19 },
   { name: 'The apartment hunt', x: 0.74, y: 0.24 },
   { name: 'Weeknight cooking', x: 0.55, y: 0.93 },
 ];
 
-/** The digest beat. (No "library" anywhere in the film — standing owner rule.) */
+/** The digest beat. (No "library" anywhere in the film — standing owner rule.
+ *  Kicker dropped "This week" when the VO stopped claiming a weekly cadence —
+ *  the schedule is the user's.) */
 export const SYNTHESIS = {
-  kicker: 'This week in your saves',
-  title: 'You keep circling one trip',
-  body: 'Three of your six saves this week were about Lisbon — the itinerary, the viewpoints, and the article Maya sent. The city is chosen. The dates are not.',
+  kicker: 'In your saves',
+  title: 'You keep circling one idea',
+  body: 'The AI thread, Maya’s article, and a philosophy video about machine minds — three saves, one question: what stays human. You might be ready to write your own take.',
 };
 
 export const REVIEW = {

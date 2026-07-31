@@ -41,7 +41,10 @@ export const Library: React.FC = () => {
   const scale = ramp(f, [0, 50], [1.44, 1.5], EASE_OUT) + push * 0.42;
   // the push lands on the ONE surviving card, sitting right under the query
   const target = ramp(f, [95, 200], [430, 265], EASE_IN_OUT);
-  const y = fr.focusY(target, scale * fr.scaleMul) + drift(f, 4, 280);
+  // vertical: bias the device down so its top clears the caption block — the
+  // same fix digest/collections carry (round 10's collision, resurfaced here
+  // when round 13's earlier push lifted the device sooner)
+  const y = fr.focusY(target, scale * fr.scaleMul) + drift(f, 4, 280) + (fr.vertical ? 130 : 0);
   const rotY = ramp(f, [0, 40], [-9, -4], EASE_OUT) * (1 - prog(f, 138, 180, EASE_IN_OUT));
 
   const out = 1 - prog(f, 213, 225);

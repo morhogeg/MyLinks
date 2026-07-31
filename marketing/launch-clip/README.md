@@ -37,12 +37,14 @@ five real phases from `web/lib/scanPhases.ts`; the type is the same Geist the ap
 self-hosts. **If a token changes in `globals.css`, change it here too** — a drifted
 film is worse than no film.
 
-**The demo content is one person's actual week** (`src/data/library.ts`) — a
-recipe, an apartment listing, a workout, a gift idea, a trip being circled, an
-article a friend sent. Universal on purpose (round 13): the film has to land on
-people who never once thought about where their saved links go. It is still one
-coherent life, not a grab-bag, because that is load-bearing three times over:
-the Ask scene's answer is genuinely assemblable from the three travel saves;
+**The demo content is one person's actual week, DIVERSE on purpose**
+(`src/data/library.ts`, round 13 owner call) — a recipe, an X thread about AI,
+a philosophy video, a travel carousel, an apartment listing, a gift idea, a
+workout, an article a friend sent. That diversity is the founding story: one
+life produces saves this different, and no single app holds them. One THREAD
+still runs through it (the AI/what-stays-human trio: thread + philosophy video
++ Maya's article), because three scenes need internal coherence:
+the Ask scene's answer is genuinely assemblable from those three saves;
 the search scene's query — *"easy dinner for guests"* — shares **not one word**
 with the ONE card it retrieves (the one-pan lemon chicken; a single survivor
 reads as the app *finding the thing*, where three read as a filter narrowing),

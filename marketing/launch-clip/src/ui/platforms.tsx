@@ -239,10 +239,10 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
           </div>
         </div>
         <div style={{ marginTop: 12, fontSize: 15.5, fontWeight: 700, letterSpacing: '-0.02em', color: '#111318' }}>
-          Three days in Lisbon
+          Can a machine ever understand?
         </div>
         <div style={{ display: 'flex', alignItems: 'center', marginTop: 10 }}>
-          <span style={{ fontSize: 12, color: '#606068' }}>Beautiful Destinations</span>
+          <span style={{ fontSize: 12, color: '#606068' }}>Philosophy Tube</span>
           <span style={{ marginLeft: 'auto' }}>
             <ActionButton save={save} ink={p.rgb} wide>
               <Plus size={15} strokeWidth={2.6} />
@@ -323,9 +323,9 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
         <div style={{ display: 'flex', gap: 11 }}>
           <div style={{ width: 34, height: 34, borderRadius: 34, background: 'rgba(16,20,32,0.1)', flexShrink: 0 }} />
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
-            <div style={{ fontSize: 12, color: 'rgba(96,102,116,0.85)' }}>@rentwise</div>
+            <div style={{ fontSize: 12, color: 'rgba(96,102,116,0.85)' }}>@futuretense</div>
             <div style={{ fontSize: 14.5, fontWeight: 600, lineHeight: 1.3, color: '#14161c' }}>
-              How to actually negotiate rent — a thread of scripts that work:
+              What AI actually changes about work — a thread:
             </div>
             {grey(94)}
             {grey(78)}
@@ -366,7 +366,7 @@ export const SaveSurface: React.FC<{ k: PlatformKey; save: number }> = ({ k, sav
     <>
       <div style={{ fontSize: 11, color: 'rgba(96,102,116,0.8)' }}>theatlantic.com</div>
       <div style={{ marginTop: 10, fontSize: 17, fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.02em', color: '#111318' }}>
-        The case for the shoulder-season trip
+        The jobs AI actually changes
       </div>
       <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {grey(98)}

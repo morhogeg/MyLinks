@@ -1058,6 +1058,55 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-31 (launch film, round 13) — act one becomes a STORY, the script is
+  workshopped line-by-line with the owner, and the demo library goes DIVERSE.**
+  **(1) Act one rebuilt as scattered saving** (scatter 3→4 bars, bars 1–5):
+  beat A is five real save gestures — Instagram bookmark, YouTube
+  save-to-playlist, WhatsApp send-to-yourself, X star, Safari one-more-tab
+  (47→48, the tab-pile joke) — each tap ON the quarter-note grid (`SAVES` in
+  timeline.mjs, score ticks each one) with the save flying into that platform's
+  own silo; beat B is the five silos growing stacks of edge-on, faded,
+  title-less cards; beat C, ON bar 3 (still the film's ONLY minor — bar 4 hangs
+  on the dominant, deliberately not a second minor), is a fingertip opening the
+  WRONG pile twice, fanning through unreadable cards, dropping it shut with a
+  thud. The extra bar came from library's browse stretch (4→3) — the slowest
+  product beat — so capture/ask/graph/collections/digest keep their approved
+  widths and the whole back half of the bar map (and the hardcoded MELODY) is
+  untouched. WordmarkScene now gathers the SILOS from their pile positions.
+  **(2) Script rewritten WITH the owner, line by line** (six rounds of notes;
+  every line owner-approved): "Multiple apps, countless saved links." /
+  "…no idea where it IS" (not *went*) / "without leaving where you are" /
+  promise = **"Machina remembers, so you don't have to."** (the owner CUT the
+  separate search caption — the zero-overlap search plays wordless under the
+  promise) / "Get answers…" / "Machina notices when things you saved months
+  apart belong together." / "Organized the way you think." / digest =
+  **"You don't even have to ask — Machina spots what you keep circling."**
+  (deliberate rhyme with the Ask kicker; "keep circling" is the on-screen
+  headline) + "…on your schedule." (weekly-cadence claim dropped; kicker
+  softened to "In your saves"). 14 captions; VO re-synthesized (all lines
+  assert-fit; af_heart 0.95, "Makeena" unchanged).
+  **(3) Demo library DIVERSE (owner: "diversity is really what led me to
+  building this")**: recipe, AI thread (X), philosophy video (YouTube),
+  Sardinia carousel (Instagram), apartment listing, gift-idea screenshot,
+  workout, article a friend sent. One thread survives for coherence — the
+  AI/what-stays-human trio (thread + philosophy video + Maya's article) powers
+  Ask's three-platform citations, the graph's months-apart pair (video 2mo,
+  thread 2d), and the digest's "one idea you keep circling". Search is now
+  **"easy dinner for guests" → the one-pan lemon chicken**, still zero word
+  overlap, still ONE card. Considered & dropped: a Lisbon-trip cluster (owner:
+  too single-note), "Every app keeps its own pile" (unclear), "one tap away"
+  access framing (unimpressive), "Then there's the digest" (tiresome opening).
+  **(4) Energy pass:** risers END on the three big reveals (share-sheet icon,
+  first answer, endcard) plus turn/library/graph; every save/open/shut has a
+  tick or thud; finished card + feed cards land on EASE_SPRING; graph legend
+  chips stagger in. **Fixed in stills QA:** an inputRange inversion crashing
+  the last silo's growth, and the library device top riding into the vertical
+  caption block (same +130 down-bias digest/collections carry).
+  Verified: tsc 0, verify green (14 captions no overlap, no clipping, no
+  >3.5dB bar holes, bar 3 the only Am), stills at every changed beat, VO
+  fit-asserted, encode-frame + RMS checks on the delivered mp4. Deliverable:
+  `MachinaLaunchVerticalVO` only (round-12 owner call). **Score + voice still
+  unheard in-sandbox — owner's ears are the last gate.**
 - **2026-07-31 (round 10) — the answer's Graph chip now marks EVERY cited card,
   and never fails silently (owner: "this is crucial"). Closes round 5's open
   question.** Reported symptom: an answer citing 5 cards across several clusters

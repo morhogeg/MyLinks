@@ -96,7 +96,9 @@ export const Scatter: React.FC = () => {
             // the silo exists faintly from the start, brightens as ITS save lands
             const alive = 0.45 + 0.55 * prog(f, land - 4, land + 8, EASE_OUT);
             // the pile keeps growing through beat B — items nobody will read
-            const grow = prog(f, land, 118 + i * 9, EASE_IN_OUT) * 0.5 + prog(f, 118 + i * 9, 152, EASE_IN_OUT) * 0.5;
+            const grow =
+              prog(f, land, 112 + i * 8, EASE_IN_OUT) * 0.5 +
+              prog(f, 112 + i * 8, 148 + i * 5, EASE_IN_OUT) * 0.5;
             // landing bounce
             const bounce = Math.max(0, 1 - Math.abs(f - land - 4) / 9) * 0.06;
             // the wrong-pile opens (beat C)

@@ -226,7 +226,7 @@ export const InstagramSource: React.FC = () => (
         }}
       >
         <Instagram size={17} color="rgb(225,48,108)" />
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#111318' }}>@sundaytable</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#111318' }}>@quietplaces</span>
       </div>
       <div style={{ padding: 14 }}>
         <div
@@ -252,7 +252,7 @@ export const InstagramSource: React.FC = () => (
               textAlign: 'center',
             }}
           >
-            One-pan lemon chicken with orzo
+            Hidden coves of Sardinia
           </span>
         </div>
         <div style={{ display: 'flex', gap: 5, justifyContent: 'center', marginTop: 12 }}>
@@ -304,11 +304,11 @@ export const YouTubeSource: React.FC = () => (
       </div>
       <div style={{ padding: '16px 16px 0' }}>
         <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.22, letterSpacing: '-0.02em', color: '#111318' }}>
-          Three days in Lisbon
+          Can a machine ever understand?
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 11 }}>
           <Youtube size={15} color="rgb(255,0,0)" />
-          <span style={{ fontSize: 12.5, color: '#606068' }}>Beautiful Destinations · 2.1M views</span>
+          <span style={{ fontSize: 12.5, color: '#606068' }}>Philosophy Tube · 1.8M views</span>
         </div>
       </div>
     </div>
@@ -487,7 +487,7 @@ export const AnalyzingScreen: React.FC<{
   markPulse?: number | null;
 }> = ({ progress, cardEnter = 0, markU = 1, markPulse = null }) => {
   const step = progress >= 92 ? 4 : progress >= 72 ? 3 : progress >= 50 ? 2 : progress >= 25 ? 1 : 0;
-  const card = byId('shoulder');
+  const card = byId('aiarticle');
   return (
     <Screen>
       <StatusBar />
@@ -609,7 +609,7 @@ export const AnalyzingScreen: React.FC<{
             banner above an existing feed, and an empty screen behind the sheet
             made the shot read as a first-run demo instead of a real library. */}
         <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 16, opacity: 0.9 }}>
-          {CARDS.filter((c) => c.id !== 'shoulder')
+          {CARDS.filter((c) => c.id !== 'aiarticle')
             .slice(0, 2)
             .map((c) => (
               <AppCard key={c.id} card={c} />
@@ -844,11 +844,11 @@ export const AskScreen: React.FC<{
  * frame because in the film the user has just TAPPED Graph on a cited answer.
  */
 const GRAPH_LEGEND = [
-  { name: 'Travel', n: 5 },
+  { name: 'AI', n: 3 },
   { name: 'Home', n: 4 },
   { name: 'Cooking', n: 3 },
-  { name: 'Gifts', n: 1 },
-  { name: 'Fitness', n: 1 },
+  { name: 'Philosophy', n: 2 },
+  { name: 'Travel', n: 1 },
 ];
 
 export const GraphScreen: React.FC<{
@@ -1152,7 +1152,7 @@ export const DigestScreen: React.FC<{ enter?: number; reviewEnter?: number }> = 
             {SYNTHESIS.body}
           </p>
           <div style={{ marginTop: 15, display: 'flex', gap: 7 }}>
-            {['Travel', 'Lisbon', 'October'].map((t) => (
+            {['AI', 'Philosophy', 'Sent by Maya'].map((t) => (
               <span
                 key={t}
                 style={{
@@ -1271,7 +1271,7 @@ export const DigestScreen: React.FC<{ enter?: number; reviewEnter?: number }> = 
 /** Collections — a fast establishing beat, not a feature tour. */
 export const CollectionsScreen: React.FC<{ enter?: number }> = ({ enter = 1 }) => {
   const cols = [
-    { name: 'Lisbon in October', n: 12, key: 'indigo' },
+    { name: 'AI & what it means', n: 12, key: 'indigo' },
     { name: 'Recipes to try', n: 18, key: 'teal' },
     { name: 'The apartment hunt', n: 9, key: 'orange' },
     { name: 'Gift ideas', n: 7, key: 'blue' },

@@ -27,9 +27,9 @@ import {
  */
 
 const SOURCES = [
-  { Screen: InstagramSource, item: { title: 'One-pan lemon chicken with orzo', site: 'instagram.com' } },
-  { Screen: YouTubeSource, item: { title: 'Three days in Lisbon', site: 'youtube.com' } },
-  { Screen: ArticleScreen, item: { title: 'The case for the shoulder-season trip', site: 'theatlantic.com' } },
+  { Screen: InstagramSource, item: { title: 'Hidden coves of Sardinia', site: 'instagram.com' } },
+  { Screen: YouTubeSource, item: { title: 'Can a machine ever understand?', site: 'youtube.com' } },
+  { Screen: ArticleScreen, item: { title: 'The jobs AI actually changes', site: 'theatlantic.com' } },
 ];
 const CUTS = [0, 56, 88]; // frames where the world behind the sheet swaps
 

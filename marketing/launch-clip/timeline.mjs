@@ -81,37 +81,38 @@ export const SUBTITLES = [
   // ACT ONE (round 13) — everyday words, one idea per line, timed to the
   // picture: the line lists the saves as they fly, names the piles as they
   // grow, and lands the loss as the wrong pile opens.
+  // Every line below was workshopped with the owner line-by-line (round 13) —
+  // do not rewrite without them.
   { bar: 1.15, bars: 1.25, place: 'bottom', text: 'You save it here. And here. And here.' },
-  { bar: 2.45, bars: 0.8, place: 'bottom', text: 'Every app keeps its own pile.' },
+  { bar: 2.45, bars: 0.8, place: 'bottom', text: 'Multiple apps, countless saved links.' },
   // The emotional bottom — riding the bar-3 minor while the wrong silo opens.
-  { bar: 3.25, bars: 1.75, place: 'bottom', text: 'Then you need one thing back — and you have no idea where it went.' },
+  // "where it IS" (owner call): the thing still exists, you just can't reach it.
+  { bar: 3.25, bars: 1.75, place: 'bottom', text: 'Then you need one thing back — and you have no idea where it is.' },
   { bar: 5.5, bars: 1.1, place: 'bottom', text: 'So Machina keeps it all in one place.' },
-  // "Share it from anywhere" sounded like sharing WITH someone; the point is
-  // saving TO Machina without ever switching apps (owner note, round 12).
-  { bar: 7.35, bars: 1.25, place: 'left', kicker: 'Capture', text: 'One tap, and it’s saved — without leaving the app.' },
+  // "without leaving where you are" (owner refinement of the round-12 line).
+  { bar: 7.35, bars: 1.25, place: 'left', kicker: 'Capture', text: 'One tap, and it’s saved — without leaving where you are.' },
   { bar: 8.95, bars: 2.4, place: 'left', text: 'Machina reads it, summarizes it, and files it.' },
-  // THE PROMISE — the one sentence a stranger should be able to repeat back.
-  // It runs over the browse-and-type stretch; the search payoff proves it.
-  { bar: 12.3, bars: 2.0, place: 'left', text: 'Save from any app. Find it without remembering where.' },
-  // ONE card survives, sharing zero words with the query — the picture's claim,
-  // named. (Deliberately not a "search by meaning" line.)
-  { bar: 14.3, bars: 0.8, place: 'left', text: 'Machina finds the one you meant.' },
+  // THE PROMISE — Machina carries the memory burden. One line for the whole
+  // library beat (the owner cut the search caption: the picture — a query that
+  // shares no words with the one card it finds — plays under this line).
+  { bar: 12.3, bars: 2.45, place: 'left', text: 'Machina remembers, so you don’t have to.' },
   // "ask it anything" mushed into "ask HER anything" out loud — the name
   // carries the line instead of the pronoun (owner note, round 12).
   { bar: 15.35, bars: 1.6, place: 'left', kicker: 'Ask', text: 'Then ask Machina anything.' },
   // Ends BEFORE the Graph-chip tap at 19.5 — during the dive the device rises
   // through the caption band. The claim: answers come from YOUR saves and
-  // nowhere else (owner note, round 12).
-  { bar: 17.4, bars: 1.9, place: 'left', text: 'Answers from your saves — and nothing else.' },
-  // The graph beat says why it matters, not what it is (round 13): two saves
-  // from different months turning out to be the same interest.
-  { bar: 20.4, bars: 2.3, place: 'left', kicker: 'Connect', text: 'Two saves, months apart — Machina notices they belong together.' },
+  // nowhere else. "Get answers" — owner call, round 13.
+  { bar: 17.4, bars: 1.9, place: 'left', text: 'Get answers from your saves — and nothing else.' },
+  // The graph beat says why it matters, not what it is (round 13): things
+  // saved months apart turning out to be the same interest.
+  { bar: 20.4, bars: 2.3, place: 'left', kicker: 'Connect', text: 'Machina notices when things you saved months apart belong together.' },
   { bar: 23.3, bars: 1.35, place: 'left', text: 'Or group your saves into collections.' },
-  { bar: 24.8, bars: 1.15, place: 'left', text: 'Everything on a topic, one tap away.' },
-  // The digest's value is the NOTICING — and spoken, "it" was ambiguous, so
-  // the product takes the credit by name.
-  { bar: 26.35, bars: 1.5, place: 'left', text: 'Every week, Machina finds the patterns you missed.' },
-  { bar: 27.95, bars: 0.95, place: 'left', text: 'And brings back what you forgot.' },
+  // Collections are YOUR shape of thinking, not an access claim (owner call).
+  { bar: 24.8, bars: 1.15, place: 'left', text: 'Organized the way you think.' },
+  // The digest introduced as the thing you DON'T ask for — a deliberate rhyme
+  // with the Ask kicker line, and "keep circling" is the on-screen headline.
+  { bar: 26.1, bars: 1.65, place: 'left', text: 'You don’t even have to ask — Machina spots what you keep circling.' },
+  { bar: 27.8, bars: 1.2, place: 'left', text: 'And brings the right ones back — on your schedule.' },
 ];
 
 /**
