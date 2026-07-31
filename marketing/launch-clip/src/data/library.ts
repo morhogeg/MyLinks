@@ -223,9 +223,9 @@ export const CLUSTERS = [
   { name: 'Tools for thought', x: 0.55, y: 0.93 },
 ];
 
-/** The digest beat. */
+/** The digest beat. (No "library" anywhere in the film — standing owner rule.) */
 export const SYNTHESIS = {
-  kicker: 'This week in your library',
+  kicker: 'This week in your saves',
   title: 'You circled one idea all week',
   body: 'Five of your seven saves were about recall, not capture. The pattern you keep arriving at: nothing sticks without a second pass — and you have never scheduled one.',
 };

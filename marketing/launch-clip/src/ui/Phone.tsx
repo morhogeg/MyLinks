@@ -33,10 +33,10 @@ export const Phone: React.FC<{
         background:
           'linear-gradient(147deg, #8e8e96 0%, #3a3a40 18%, #24242a 44%, #4e4e57 62%, #1b1b20 84%, #6a6a73 100%)',
         boxShadow: [
-          '0 0 0 1px rgba(255,255,255,0.10)',
+          '0 0 0 1px rgba(255,255,255,0.35)',
           'inset 0 0 0 1px rgba(0,0,0,0.6)',
-          '0 40px 90px -20px rgba(0,0,0,0.85)',
-          '0 8px 26px rgba(0,0,0,0.6)',
+          '0 40px 90px -20px rgba(24,32,48,0.45)',
+          '0 8px 26px rgba(24,32,48,0.25)',
         ].join(', '),
         position: 'relative',
         ...style,
@@ -126,12 +126,14 @@ export const Phone: React.FC<{
   );
 };
 
-/** iOS status bar — the small truth that makes a mock read as a device. */
+/** iOS status bar — the small truth that makes a mock read as a device.
+ *  Ink follows the film's theme (`T.text`); pass `light` to force dark ink on
+ *  a surface that stays bright regardless of grade. */
 export const StatusBar: React.FC<{ time?: string; light?: boolean }> = ({
   time = '9:41',
   light = false,
 }) => {
-  const ink = light ? '#111827' : '#E5E5E5';
+  const ink = light ? '#111827' : T.text;
   return (
     <div
       style={{
@@ -196,7 +198,7 @@ export const HomeIndicator: React.FC = () => (
       width: 138,
       height: 5,
       borderRadius: 3,
-      background: 'rgba(229,229,229,0.55)',
+      background: 'rgba(20,20,27,0.4)',
       zIndex: 58,
     }}
   />

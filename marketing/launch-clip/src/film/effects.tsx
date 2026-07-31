@@ -95,13 +95,22 @@ export const Grain: React.FC<{ opacity?: number }> = ({ opacity = 0.055 }) => {
   );
 };
 
-/** Vignette + a faint top-light, so the frame has a lens rather than flat black. */
+/** The set's base tone — a shade under the app's #F9FAFB so the white phone
+ *  screen still separates from the world behind it. Every scene and the Film
+ *  root share this one constant. */
+export const SET_BG = '#EEF0F4';
+
+/**
+ * Vignette — on a light grade this is a whisper, not a hand. It is a cool
+ * slate darkening at the very edge of frame, just enough to give the frame a
+ * lens; the heavy black vignette of the dark grade read as smoke on paper.
+ */
 export const Vignette: React.FC<{ strength?: number }> = ({ strength = 1 }) => (
   <AbsoluteFill style={{ pointerEvents: 'none' }}>
     <AbsoluteFill
       style={{
-        background: `radial-gradient(128% 108% at 50% 42%, rgba(0,0,0,0) 52%, rgba(0,0,0,${
-          0.42 * strength
+        background: `radial-gradient(128% 108% at 50% 42%, rgba(30,38,54,0) 58%, rgba(30,38,54,${
+          0.14 * strength
         }) 100%)`,
       }}
     />
@@ -109,15 +118,16 @@ export const Vignette: React.FC<{ strength?: number }> = ({ strength = 1 }) => (
 );
 
 /**
- * A scrim under the captions. Without it, a caption crossing the device's tab bar
- * or a bright card loses its edge; with it, the type always has something to sit
- * on without a subtitle BOX, which is the thing that reads as cheap.
+ * A scrim under the captions. On the light grade it is the paper itself rising
+ * to meet the type: a soft wash of the set tone, so a dark line keeps its edge
+ * over a busy card without a subtitle BOX, which is the thing that reads as
+ * cheap.
  */
 export const CaptionScrim: React.FC<{ opacity?: number }> = ({ opacity = 1 }) => (
   <AbsoluteFill
     style={{
       background:
-        'linear-gradient(180deg, rgba(4,4,6,0) 62%, rgba(4,4,6,0.55) 84%, rgba(4,4,6,0.86) 100%)',
+        'linear-gradient(180deg, rgba(238,240,244,0) 62%, rgba(238,240,244,0.55) 84%, rgba(238,240,244,0.88) 100%)',
       opacity,
       pointerEvents: 'none',
     }}
@@ -125,24 +135,26 @@ export const CaptionScrim: React.FC<{ opacity?: number }> = ({ opacity = 1 }) =>
 );
 
 /**
- * The set. A graphite radial wash lifted from the app icon's ground, plus two
- * slow-drifting light pools so cuts never land on dead black.
+ * The set: a daylight studio. A bright top pool (the softbox), the paper-toned
+ * ground falling away slightly at the edges, and two slow-drifting cool pools
+ * so a held shot never reads as a flat fill.
  */
 export const Stage: React.FC<{
   intensity?: number;
   drift?: number;
   /**
-   * A bright elliptical pool behind the device. A near-black app on a near-black
-   * set has no silhouette — this is the backlight that separates the two, and
-   * the reason the product scenes stopped looking muddy.
+   * A brighter elliptical pool behind the device — the light-grade backlight.
+   * On paper-white the separation job flips: the phone's dark titanium body
+   * cuts its own silhouette, and this pool lifts the wall behind it toward
+   * white so the shot has depth instead of an even grey field.
    */
   backlight?: number;
 }> = ({ intensity = 1, drift = 0, backlight = 0 }) => (
-  <AbsoluteFill style={{ background: '#050505', overflow: 'hidden' }}>
+  <AbsoluteFill style={{ background: SET_BG, overflow: 'hidden' }}>
     <AbsoluteFill
       style={{
         background:
-          'radial-gradient(70% 58% at 50% 36%, rgba(52,52,66,0.98) 0%, rgba(28,28,37,0.72) 44%, rgba(7,7,10,0) 100%)',
+          'radial-gradient(70% 58% at 50% 34%, rgba(255,255,255,0.95) 0%, rgba(250,251,253,0.55) 44%, rgba(238,240,244,0) 100%)',
         opacity: intensity,
         transform: `translateY(${drift * 30}px)`,
       }}
@@ -158,7 +170,7 @@ export const Stage: React.FC<{
           height: 1180,
           borderRadius: '50%',
           background:
-            'radial-gradient(circle, rgba(186,196,218,0.30) 0%, rgba(150,160,186,0.13) 34%, rgba(120,130,160,0.04) 58%, rgba(0,0,0,0) 74%)',
+            'radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.4) 34%, rgba(255,255,255,0.1) 58%, rgba(255,255,255,0) 74%)',
           filter: 'blur(40px)',
           opacity: backlight,
         }}
@@ -172,7 +184,7 @@ export const Stage: React.FC<{
         left: -260 + drift * 60,
         top: -220,
         background:
-          'radial-gradient(circle, rgba(203,210,226,0.10) 0%, rgba(203,210,226,0) 62%)',
+          'radial-gradient(circle, rgba(52,64,84,0.05) 0%, rgba(52,64,84,0) 62%)',
         filter: 'blur(30px)',
         opacity: intensity,
       }}
@@ -185,7 +197,7 @@ export const Stage: React.FC<{
         right: -220 - drift * 40,
         bottom: -260,
         background:
-          'radial-gradient(circle, rgba(120,130,160,0.10) 0%, rgba(120,130,160,0) 64%)',
+          'radial-gradient(circle, rgba(52,64,84,0.06) 0%, rgba(52,64,84,0) 64%)',
         filter: 'blur(36px)',
         opacity: intensity,
       }}
@@ -193,7 +205,8 @@ export const Stage: React.FC<{
   </AbsoluteFill>
 );
 
-/** A soft floor reflection under a device — cheap contact shadow that sells weight. */
+/** A soft contact shadow under the device — on the light set this is what
+ *  gives the phone weight; the glow-style separation belongs to the dark grade. */
 export const FloorGlow: React.FC<{ y?: number; w?: number; opacity?: number }> = ({
   y = 880,
   w = 780,
@@ -208,7 +221,7 @@ export const FloorGlow: React.FC<{ y?: number; w?: number; opacity?: number }> =
       width: w,
       height: 120,
       background:
-        'radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 72%)',
+        'radial-gradient(50% 50% at 50% 50%, rgba(24,32,48,0.5) 0%, rgba(24,32,48,0) 72%)',
       opacity,
       filter: 'blur(18px)',
     }}

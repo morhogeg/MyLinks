@@ -1,9 +1,16 @@
 # Machina — launch film
 
-A 75-second launch film, rendered from code. No editor project, no stock music, no
+An 80-second launch film, rendered from code. No editor project, no stock music, no
 screen recording: the picture is [Remotion](https://remotion.dev) (React → frames),
 the score is synthesized by a Node script, and both read their timing from one
 shared file.
+
+**The film is graded light** (owner call) — the product's daytime face, white set,
+ink typography. The one deliberate exception is the cold open: the shipped
+`BootScreen` is fixed graphite regardless of theme, so the boot stays dark and its
+push-through exit is the moment the film blooms into the light. Act one's loss
+runs the same logic in reverse: the platform panels *bleach out* into the paper
+rather than sinking into black.
 
 ```bash
 cd marketing/launch-clip
@@ -56,16 +63,16 @@ owner ruled out: it is **not** a learning app, and it does **not** sell
 
 | Bars | Time | Scene | What it does |
 |---|---|---|---|
-| 0–1 | 0:00 | `ColdOpen` | **The app booting** — the real `BootScreen`, ported from `web/app/page.tsx` |
-| 1–5 | 0:02.5 | `Scatter` | Five platforms drifting apart — Instagram, X, YouTube, WhatsApp, Reading List — then fading out one by one |
-| 5–7 | 0:12.5 | `WordmarkScene` | The five rush back and collapse into one point; the mark closes around it, then pushes through into the product |
-| 7–12 | 0:17.5 | `Capture` | **One share sheet, three sources behind it** → the five-phase pipeline, held ~5.5s under a push-in → a finished card |
-| 12–16 | 0:30 | `Library` | Browse, search, filter — however you remember it |
-| 16–20 | 0:40 | `AskScene` | **The hero.** Question → streamed answer → three citation chips, from three different platforms |
+| 0–1 | 0:00 | `ColdOpen` | **The app booting** — the real `BootScreen`, ported from `web/app/page.tsx` (deliberately dark) |
+| 1–4 | 0:02.5 | `Scatter` | Five platforms drifting apart — Instagram, X, YouTube, WhatsApp, Reading List — then bleaching out one by one |
+| 4–6 | 0:10 | `WordmarkScene` | The five rush back and collapse into one point of ink; the mark closes around it, then pushes through into the product |
+| 6–11 | 0:15 | `Capture` | **One share sheet, three sources behind it** (the sheet names each one) → the five-phase pipeline, held ~5.5s under a push-in → a finished card |
+| 11–15 | 0:27.5 | `Library` | Browse, search, filter — even from half a memory |
+| 15–20 | 0:37.5 | `AskScene` | **The hero, five bars.** Question → streamed answer → three citation chips, from three different platforms |
 | 20–23 | 0:50 | `GraphScene` | Edges draw in staggered — connections being found, not a diagram revealed |
-| 23–25 | 0:57.5 | `CollectionsScene` | The organising that is yours |
-| 25–27 | 1:02.5 | `DigestScene` | The weekly synthesis + the resurfaced save |
-| 27–30 | 1:07.5 | `Endcard` | The bare mark, the wordmark, `Capture. Ask. Connect.` |
+| 23–26 | 0:57.5 | `CollectionsScene` | The organising that is yours |
+| 26–29 | 1:05 | `DigestScene` | The weekly write-up, then the resurfaced save as its own beat |
+| 29–32 | 1:12.5 | `Endcard` | The bare mark, the wordmark, `Capture. Ask. Connect.` |
 
 `Capture` / `Ask` / `Connect` print as a letterspaced kicker above the line on
 their own beats, so a viewer can place each act inside the tagline without being
@@ -80,8 +87,10 @@ screen changes in the app, change it here too.**
 The `Scatter` scene is deliberately **un-branded** — five generic platform
 surfaces, no Machina chrome anywhere. If it wore the app's chrome, the audience
 would read the failure as the product's. Platform hues come from the app's own
-`PLATFORM_RGB`, and the glyphs are generic marks (play triangle, bubble, bookmark)
-beside the platform's name in type rather than reproductions of anyone's logo.
+`PLATFORM_RGB` (with one light-grade exception: X's dark-theme silver vanishes on
+white, so X wears its light-mode black), and the glyphs are generic marks (play
+triangle, bubble, bookmark) beside the platform's name in type rather than
+reproductions of anyone's logo.
 
 `CONSTELLATION` in `src/ui/platforms.tsx` is shared by both scenes on purpose: the
 panels gather back to exactly where they drifted out from, because the gather only
@@ -206,6 +215,6 @@ The endcard is the **bare** Citation mark — not the app-icon tile.
 there reads as a shrunken app icon rather than as the brand mark"), and full-frame
 the grey squircle read as a screenshot of an icon instead of as an identity.
 
-The line under the rule (`Recalling it is how you learn it.`) is the one slot
+The line under the rule (`Everything you save, finally useful.`) is the one slot
 meant to change: replace it with a real App Store badge or URL once the listing is
 live. Nothing else in the film claims availability.

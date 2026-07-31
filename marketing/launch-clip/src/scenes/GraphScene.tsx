@@ -1,7 +1,7 @@
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { Phone } from '../ui/Phone';
-import { FloorGlow, Rig, Stage } from '../film/effects';
+import { FloorGlow, Rig, SET_BG, Stage } from '../film/effects';
 import { BASE_X, drift, focusY, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
 import { GraphScreen } from '../ui/screens';
 
@@ -36,8 +36,8 @@ export const GraphScene: React.FC = () => {
   const inFade = prog(f, 0, 4);
 
   return (
-    <AbsoluteFill style={{ background: '#050505', opacity: out * inFade }}>
-      <Stage intensity={0.6} backlight={0.44} />
+    <AbsoluteFill style={{ background: SET_BG, opacity: out * inFade }}>
+      <Stage intensity={0.64} backlight={0.38} />
       <Rig scale={scale} x={x + BASE_X} y={y} rotY={rotY} origin="center 40%">
         <div style={{ position: 'relative' }}>
           <FloorGlow y={890} w={700} opacity={0.45} />
@@ -49,9 +49,9 @@ export const GraphScene: React.FC = () => {
       {/* a breath of light from the graph itself */}
       <AbsoluteFill
         style={{
-          background: `radial-gradient(40% 34% at 50% 44%, rgba(174,184,206,${
-            0.1 * prog(f, 10, 90)
-          }) 0%, rgba(174,184,206,0) 72%)`,
+          background: `radial-gradient(40% 34% at 50% 44%, rgba(255,255,255,${
+            0.22 * prog(f, 10, 90)
+          }) 0%, rgba(255,255,255,0) 72%)`,
           mixBlendMode: 'screen',
           pointerEvents: 'none',
         }}

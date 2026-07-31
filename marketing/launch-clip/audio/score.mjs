@@ -392,8 +392,7 @@ const shimmer = (startSec, midis, level = 0.075) => {
 const b = (bar) => bar * BAR; // bar → seconds
 const beat = (bar, nBeats) => b(bar) + nBeats * BEAT;
 
-// Chord per bar. Am9 → Fmaj7 → Cmaj7 → G6, the progression sitting under the
-// whole film; bars 0–1 are a bare Am drone so the cold open has air.
+// The four chords under the whole film.
 const CHORDS = {
   Am9: { bass: 45, upper: [60, 64, 67, 71] },
   Fmaj7: { bass: 41, upper: [57, 60, 64, 69] },
@@ -407,24 +406,17 @@ const CHORDS = {
 // note was "the music at the beginning is too gloomy", and that ordering IS the
 // gloom. Walked C → G → Am → F (I–V–vi–IV) the same four chords open bright,
 // touch the minor in passing, and the film can end resolved at home on C.
-// Anchored to C MAJOR, not A minor.
-//
-// The chords were always these four; the film used to walk them Am9 → F → C → G
-// (i–VI–III–VII), which starts on the minor tonic and reads as melancholy — the
-// note was "the music at the beginning is too gloomy", and that ordering IS the
-// gloom. Walked C → G → Am → F (I–V–vi–IV) the same four chords open bright,
-// touch the minor in passing, and the film can end resolved at home on C.
 const BAR_CHORDS = [
   'Cmaj7', // 0     cold open (the boot) — opens major
-  'Cmaj7', 'G6', 'Am9', 'Fmaj7', // 1–4   scatter
-  'Cmaj7', 'G6', // 5–6   the turn resolves home, then lifts
-  'Cmaj7', 'G6', 'Am9', 'Fmaj7', 'Cmaj7', // 7–11  capture
-  'G6', 'Am9', 'Fmaj7', 'Cmaj7', // 12–15 library
-  'G6', 'Am9', 'Fmaj7', 'Cmaj7', // 16–19 ask
-  'G6', 'Am9', 'Fmaj7', // 20–22 graph
-  'Cmaj7', 'G6', // 23–24 collections
-  'Am9', 'Fmaj7', // 25–26 digest
-  'Cmaj7', 'G6', 'Cmaj7', // 27–29 endcard, resolving home
+  'Cmaj7', 'G6', 'Am9', // 1–3   scatter — ends on the minor: the loss
+  'Fmaj7', 'Cmaj7', // 4–5   the turn lifts on F and resolves home as the mark locks
+  'G6', 'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 6–10  capture
+  'Am9', 'Fmaj7', 'Cmaj7', 'G6', // 11–14 library
+  'Cmaj7', 'G6', 'Am9', 'Fmaj7', 'Cmaj7', // 15–19 ask — the hero opens at home
+  'Am9', 'Fmaj7', 'Cmaj7', // 20–22 graph
+  'G6', 'Cmaj7', 'G6', // 23–25 collections
+  'Am9', 'Fmaj7', 'G6', // 26–28 digest, leaning toward the resolve
+  'Cmaj7', 'Fmaj7', 'Cmaj7', // 29–31 endcard — home, a last breath of F, home
 ];
 
 // A retime in timeline.mjs that forgets the arrangement would silently put the
@@ -559,16 +551,18 @@ for (const m of [48, 64, 67, 72]) pad(b(ENDCARD_BAR), BAR * 3 - 0.3, m, 0.075, m
 // ── melody: enters with the hero scene (Ask), returns for the endcard
 // Stepwise, and deliberately full of the semitones a pentatonic line cannot
 // contain: B→C over the G, E→F over the F. 67 = G4, 72 = C5.
-// Stepwise, and deliberately full of the semitones a pentatonic line cannot
-// contain: B→C over the G, E→F over the F. 67 = G4, 72 = C5.
+// Bar numbers follow the 32-bar map: ask 15–19, graph 20–22, collections
+// 23–25, digest 26–28, endcard 29–31.
 const MELODY = [
+  [15, 0, 64], [15, 1.5, 65], [15, 3, 67], //  Cmaj7: E4 F4 G4  (E→F right away)
   [16, 0, 67], [16, 1.5, 69], [16, 3, 71], //  G6:    G4 A4 B4  (up to the leading tone)
   [17, 0, 72], [17, 2, 71], //  Am9:   C5 B4     (resolve down)
   [18, 0, 69], [18, 1.5, 67], [18, 3, 64], //  Fmaj7: A4 G4 E4
-  [19, 0, 65], [19, 2, 67], //  Cmaj7: F4 G4     (E→F is the other semitone)
-  [20, 0, 72], [20, 2, 71], [21, 0, 69], [21, 2, 67], [22, 0, 65], [22, 2, 64],
-  [23, 0, 67], [24, 1, 71], [25, 0, 69], [26, 0, 65],
-  [27, 0, 64], [27, 2, 65], [28, 0, 67], [29, 0, 72], [29, 1.5, 76], // …home on C
+  [19, 0, 65], [19, 2, 67], //  Cmaj7: F4 G4
+  [20, 0, 72], [20, 2, 71], [21, 0, 69], [21, 2, 67], [22, 0, 65], [22, 2, 64], // graph
+  [23, 0, 67], [24, 1, 71], [25, 0, 69], // collections
+  [26, 0, 72], [27, 0, 69], [27, 2, 65], [28, 0, 67], // digest
+  [29, 0, 64], [29, 2, 65], [30, 0, 69], [31, 0, 72], [31, 1.5, 76], // …home on C
 ];
 
 for (const [bar, bt, m] of MELODY) {
@@ -576,8 +570,8 @@ for (const [bar, bt, m] of MELODY) {
   keys(beat(bar, bt), m, last ? 0.2 : 0.155, bar % 2 ? 0.2 : -0.2, last ? 2.6 : 1.5);
 }
 
-// ── risers into the hard cuts
-for (const r of RISERS) riser(b(r), BAR * (r === 6 ? 1 : 1.4), 0.085);
+// ── risers into the hard cuts (the bar-5 riser is the short one into capture)
+for (const r of RISERS) riser(b(r), BAR * (r === 5 ? 1 : 1.4), 0.085);
 
 // ── sound design against the picture
 // the boot: the brackets close, the point strikes, then the mark pushes past

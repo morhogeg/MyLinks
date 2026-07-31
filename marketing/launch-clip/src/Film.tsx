@@ -1,7 +1,7 @@
 import React from 'react';
 import { AbsoluteFill, Audio, Sequence, staticFile, useCurrentFrame } from 'remotion';
 import { SCENES, barToFrame } from '../timeline.mjs';
-import { CaptionScrim, Grain, Vignette } from './film/effects';
+import { Grain, SET_BG, Vignette } from './film/effects';
 import { Subtitles } from './film/Subtitles';
 import { ColdOpen } from './scenes/ColdOpen';
 import { Scatter } from './scenes/Scatter';
@@ -43,7 +43,7 @@ export const Film: React.FC<{ withAudio?: boolean; withSubtitles?: boolean }> = 
   const frame = useCurrentFrame();
 
   return (
-    <AbsoluteFill style={{ background: '#050505', fontFamily: sans }}>
+    <AbsoluteFill style={{ background: SET_BG, fontFamily: sans }}>
       {withAudio && <Audio src={staticFile('score.wav')} />}
 
       {SCENES.map((s) => {
@@ -62,12 +62,9 @@ export const Film: React.FC<{ withAudio?: boolean; withSubtitles?: boolean }> = 
 
       <Vignette strength={0.9} />
       <Grain opacity={0.05} />
-      {withSubtitles && (
-        <>
-          <CaptionScrim opacity={0.9} />
-          <Subtitles />
-        </>
-      )}
+      {/* Captions bring their own per-cue scrim; a film-wide one was invisible
+          on the dark grade but washes the dark cold open on the light grade. */}
+      {withSubtitles && <Subtitles />}
 
       {/* the first and last breath of black — no film starts on a lit frame */}
       <AbsoluteFill

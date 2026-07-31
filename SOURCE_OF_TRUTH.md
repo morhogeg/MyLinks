@@ -1058,6 +1058,50 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-31 (launch film, round 8) — the film goes LIGHT, gains 5s of product
+  time, and the copy tightens (owner notes ×4 + a general sweep).**
+  **(1) The whole film is regraded to the app's light mode** (`theme.ts` `T =
+  light`): daylight studio set (`SET_BG #EEF0F4`, white softbox pools, contact
+  shadows instead of glows), ink typography, light iOS share sheet, light
+  Safari/Instagram/YouTube sources, light platform panels. **Two deliberate
+  exceptions, both argued:** the cold open stays the shipped graphite
+  `BootScreen` (it does not theme in the app — the push-through exit is now the
+  bloom into the light), and X's platform ink swaps its dark-theme silver
+  (191,201,214) for X's light-mode black, because silver on white is invisible.
+  Act one's loss now reads as panels **bleaching into the paper** (desaturate +
+  over-brighten) instead of sinking to black; the gather collapses into a point
+  of INK and the brackets close in ink. A film-wide `CaptionScrim` was deleted —
+  it was invisible on the dark grade but washed the dark boot's lower half on
+  the light one; the per-cue scrim in `Subtitles.tsx` already covers captions.
+  **(2) Retime 75s → 80s (30 → 32 bars), weight moved into the product:**
+  scatter 4→3 bars, ask 4→5, collections 2→3, digest 2→3. Caption windows
+  stretched to match ("hard to follow both the app and the text"). This touched
+  `BAR_CHORDS` (asserts 32), the hardcoded `MELODY` bar map, `HITS` and
+  `RISERS` — and the HITS for the capture beat were re-derived from the actual
+  scene frames (the old sourceCut/pipeline values had drifted from the picture).
+  **(3) Collections and digest keep their scenes but get value-explicit lines**
+  ("Gather them into collections." / "Yours to shape." and "Every week, it
+  writes up what you saved." / "And brings back what you forgot."); the digest's
+  camera now reads the write-up first and travels to the resurfaced card as its
+  own beat (revEnter 26→66).
+  **(4) Copy sweep:** the owner-flagged "And you can never get back to it." is
+  now **"And lose them everywhere."** — a hard parallel to "You save things
+  everywhere."; "However you remember it." → "Even when you only half-remember
+  it."; "See how your saves connect." → "See how it all connects."
+  **(5) Two standing-rule REGRESSIONS found and fixed: "library" was on screen
+  twice** — the Ask composer placeholder ("Ask about your library" → "Ask about
+  your saves") and the digest kicker ("This week in your library" → "This week
+  in your saves"). **Plus one real content bug:** the share sheet's preview row
+  always printed the Nature headline while the world behind it cross-cut through
+  Instagram/YouTube — the row now names the source actually behind it, which is
+  the whole "from anywhere" argument.
+  Verified: film tsc 0; `npm run verify` green (no clipping, no >3.5dB bar
+  holes, no caption overlaps); stills at every beat reviewed light; frames
+  pulled back out of the encoded mp4. **Score still never heard by a human — no
+  audio device in the sandbox; owner must listen before publishing.** Work
+  merged from `claude/ios-app-launch-clip-kw6xbr` into
+  `claude/machina-launch-film-overhaul-xl75i7` (the §9 merge conflict was two
+  parallel entry blocks; both kept). Repo-only, no app code, nothing to deploy.
 - **2026-07-31 (round 9) — "Back to Ask" moved OUT of the canvas to the top-left,
   above the stats and the category legend (owner call; round 8's open item, now
   closed).** The rationale is the hierarchy one: it is NAVIGATION (it leaves the

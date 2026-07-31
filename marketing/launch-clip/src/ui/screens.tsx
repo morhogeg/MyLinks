@@ -115,9 +115,9 @@ export const FeedScreen: React.FC<{
 
 /** The article being read, in a browser — where a save actually starts. */
 export const ArticleScreen: React.FC<{ dim?: number }> = ({ dim = 0 }) => (
-  <Screen style={{ background: '#0b0b0d' }}>
+  <Screen style={{ background: '#ffffff' }}>
     <StatusBar />
-    <div style={{ position: 'absolute', top: 54, left: 0, right: 0, bottom: 0, filter: dim ? `brightness(${1 - dim * 0.45})` : undefined }}>
+    <div style={{ position: 'absolute', top: 54, left: 0, right: 0, bottom: 0, filter: dim ? `brightness(${1 - dim * 0.25})` : undefined }}>
       {/* browser chrome */}
       <div
         style={{
@@ -126,12 +126,12 @@ export const ArticleScreen: React.FC<{ dim?: number }> = ({ dim = 0 }) => (
           alignItems: 'center',
           justifyContent: 'center',
           gap: 6,
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          background: 'rgba(20,20,23,0.92)',
+          borderBottom: '1px solid rgba(0,0,0,0.07)',
+          background: 'rgba(248,248,250,0.95)',
         }}
       >
         <Lock size={10} color="#8a8a92" />
-        <span style={{ fontSize: 12.5, color: '#c9c9d1' }}>{INCOMING.url}</span>
+        <span style={{ fontSize: 12.5, color: '#3c3c43' }}>{INCOMING.url}</span>
       </div>
       <div style={{ padding: '26px 26px 0' }}>
         <div
@@ -140,7 +140,7 @@ export const ArticleScreen: React.FC<{ dim?: number }> = ({ dim = 0 }) => (
             fontWeight: 800,
             letterSpacing: '0.16em',
             textTransform: 'uppercase',
-            color: '#7a7a86',
+            color: '#8a8a92',
           }}
         >
           {INCOMING.site}
@@ -152,12 +152,12 @@ export const ArticleScreen: React.FC<{ dim?: number }> = ({ dim = 0 }) => (
             lineHeight: 1.14,
             fontWeight: 700,
             letterSpacing: '-0.03em',
-            color: '#ececf2',
+            color: '#111318',
           }}
         >
           {INCOMING.headline}
         </h1>
-        <p style={{ marginTop: 14, fontSize: 14.5, lineHeight: 1.55, color: '#a4a4b0' }}>
+        <p style={{ marginTop: 14, fontSize: 14.5, lineHeight: 1.55, color: '#55555f' }}>
           {INCOMING.standfirst}
         </p>
         {/* body texture — greeked lines, never lorem gibberish on screen */}
@@ -169,7 +169,7 @@ export const ArticleScreen: React.FC<{ dim?: number }> = ({ dim = 0 }) => (
                 height: 8,
                 width: `${w}%`,
                 borderRadius: 4,
-                background: 'rgba(255,255,255,0.055)',
+                background: 'rgba(0,0,0,0.07)',
               }}
             />
           ))}
@@ -183,8 +183,8 @@ export const ArticleScreen: React.FC<{ dim?: number }> = ({ dim = 0 }) => (
           left: 0,
           right: 0,
           height: 62,
-          background: 'rgba(20,20,23,0.95)',
-          borderTop: '1px solid rgba(255,255,255,0.06)',
+          background: 'rgba(248,248,250,0.96)',
+          borderTop: '1px solid rgba(0,0,0,0.07)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-around',
@@ -194,7 +194,7 @@ export const ArticleScreen: React.FC<{ dim?: number }> = ({ dim = 0 }) => (
       >
         <ChevronLeft size={20} />
         <ChevronLeft size={20} style={{ transform: 'rotate(180deg)', opacity: 0.35 }} />
-        <Share2 size={19} color="#e9e9f2" />
+        <Share2 size={19} color="#26262b" />
         <Newspaper size={19} />
       </div>
     </div>
@@ -211,7 +211,7 @@ export const ArticleScreen: React.FC<{ dim?: number }> = ({ dim = 0 }) => (
  * without a single word of copy.
  */
 export const InstagramSource: React.FC = () => (
-  <Screen style={{ background: '#0a0a0c' }}>
+  <Screen style={{ background: '#ffffff' }}>
     <StatusBar />
     <div style={{ position: 'absolute', top: 54, left: 0, right: 0, bottom: 0 }}>
       <div
@@ -221,11 +221,11 @@ export const InstagramSource: React.FC = () => (
           alignItems: 'center',
           gap: 9,
           padding: '0 16px',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          borderBottom: '1px solid rgba(0,0,0,0.08)',
         }}
       >
         <Instagram size={17} color="rgb(225,48,108)" />
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#e6e6ee' }}>@neuro.explained</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#111318' }}>@neuro.explained</span>
       </div>
       <div style={{ padding: 14 }}>
         <div
@@ -233,8 +233,8 @@ export const InstagramSource: React.FC = () => (
             aspectRatio: '1',
             borderRadius: 12,
             background:
-              'linear-gradient(150deg, rgba(225,48,108,0.16), rgba(40,40,52,0.6) 55%, rgba(20,20,26,0.9))',
-            border: '1px solid rgba(255,255,255,0.07)',
+              'linear-gradient(150deg, rgba(225,48,108,0.12), rgba(244,244,248,0.9) 55%, rgba(230,231,238,0.95))',
+            border: '1px solid rgba(0,0,0,0.07)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -247,7 +247,7 @@ export const InstagramSource: React.FC = () => (
               fontWeight: 700,
               lineHeight: 1.18,
               letterSpacing: '-0.03em',
-              color: '#f0f0f6',
+              color: '#1b1c22',
               textAlign: 'center',
             }}
           >
@@ -262,7 +262,7 @@ export const InstagramSource: React.FC = () => (
                 width: 5,
                 height: 5,
                 borderRadius: 5,
-                background: i === 2 ? 'rgba(240,240,246,0.9)' : 'rgba(255,255,255,0.22)',
+                background: i === 2 ? 'rgba(27,28,34,0.9)' : 'rgba(0,0,0,0.18)',
               }}
             />
           ))}
@@ -273,17 +273,17 @@ export const InstagramSource: React.FC = () => (
 );
 
 export const YouTubeSource: React.FC = () => (
-  <Screen style={{ background: '#0a0a0c' }}>
+  <Screen style={{ background: '#ffffff' }}>
     <StatusBar />
     <div style={{ position: 'absolute', top: 54, left: 0, right: 0, bottom: 0 }}>
       <div
         style={{
           height: 220,
-          background: 'linear-gradient(160deg, rgba(255,0,0,0.13), rgba(24,24,30,0.95))',
+          background: 'linear-gradient(160deg, rgba(255,0,0,0.10), rgba(233,235,241,0.95))',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          borderBottom: '1px solid rgba(0,0,0,0.07)',
         }}
       >
         <div
@@ -291,23 +291,23 @@ export const YouTubeSource: React.FC = () => (
             width: 54,
             height: 54,
             borderRadius: 54,
-            background: 'rgba(255,255,255,0.12)',
-            border: '1px solid rgba(255,255,255,0.2)',
+            background: 'rgba(17,19,24,0.55)',
+            border: '1px solid rgba(255,255,255,0.4)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Play size={20} fill="#f0f0f6" strokeWidth={0} />
+          <Play size={20} fill="#ffffff" strokeWidth={0} />
         </div>
       </div>
       <div style={{ padding: '16px 16px 0' }}>
-        <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.22, letterSpacing: '-0.02em', color: '#ececf2' }}>
+        <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.22, letterSpacing: '-0.02em', color: '#111318' }}>
           Retrieval practice beats re-reading
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 11 }}>
           <Youtube size={15} color="rgb(255,0,0)" />
-          <span style={{ fontSize: 12.5, color: '#a4a4b0' }}>Veritasium · 4.2M views</span>
+          <span style={{ fontSize: 12.5, color: '#606068' }}>Veritasium · 4.2M views</span>
         </div>
       </div>
     </div>
@@ -344,10 +344,10 @@ export const ShareSheet: React.FC<{
         style={{
           margin: '0 8px',
           borderRadius: 34,
-          background: 'rgba(28,28,32,0.94)',
+          background: 'rgba(247,247,249,0.96)',
           backdropFilter: 'blur(30px)',
-          border: '1px solid rgba(255,255,255,0.09)',
-          boxShadow: '0 -20px 60px rgba(0,0,0,0.7)',
+          border: '1px solid rgba(0,0,0,0.06)',
+          boxShadow: '0 -20px 60px rgba(24,32,48,0.28)',
           padding: '10px 0 26px',
           height: H - 12,
         }}
@@ -357,7 +357,7 @@ export const ShareSheet: React.FC<{
             width: 38,
             height: 5,
             borderRadius: 3,
-            background: 'rgba(255,255,255,0.22)',
+            background: 'rgba(0,0,0,0.18)',
             margin: '0 auto 14px',
           }}
         />
@@ -368,26 +368,28 @@ export const ShareSheet: React.FC<{
               width: 42,
               height: 42,
               borderRadius: 9,
-              background: 'linear-gradient(140deg, #2a2a31, #15151a)',
-              border: '1px solid rgba(255,255,255,0.08)',
+              background: 'linear-gradient(140deg, #FFFFFF, #E8E8EE)',
+              border: '1px solid rgba(0,0,0,0.08)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 9,
               fontWeight: 800,
-              color: '#9a9aa6',
+              color: '#6b6b74',
             }}
           >
             {shared.site.slice(0, 1).toUpperCase()}
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 600, color: '#ececf2', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 250 }}>
-              {INCOMING.headline}
+            {/* The row must name the SOURCE currently behind the sheet — the
+                cross-cut only argues "from anywhere" if the sheet agrees. */}
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: '#111318', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 250 }}>
+              {shared.title}
             </div>
-            <div style={{ fontSize: 11.5, color: '#84848e' }}>{INCOMING.site}</div>
+            <div style={{ fontSize: 11.5, color: '#7a7a84' }}>{shared.site}</div>
           </div>
         </div>
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '0 0 14px' }} />
+        <div style={{ height: 1, background: 'rgba(0,0,0,0.08)', margin: '0 0 14px' }} />
         {/* app row — Machina first */}
         <div style={{ display: 'flex', gap: 20, padding: '0 20px 18px' }}>
           {[
@@ -403,16 +405,19 @@ export const ShareSheet: React.FC<{
                   height: 58,
                   borderRadius: 14,
                   margin: '0 auto 7px',
+                  // The Machina app icon does not theme — it is the dark
+                  // graphite tile in light mode too, which also makes it the
+                  // strongest mark in the row.
                   background: a.machina
                     ? 'radial-gradient(circle at 50% 36%, #282833, #16161d 46%, #07070a 100%)'
                     : a.hue,
-                  border: a.machina ? '1px solid rgba(255,255,255,0.1)' : 'none',
+                  border: a.machina ? '1px solid rgba(0,0,0,0.25)' : 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   transform: a.machina ? `scale(${1 + pick * 0.08})` : 'none',
                   boxShadow: a.machina
-                    ? `0 0 ${10 + pick * 30}px -4px rgba(203,210,226,${0.15 + pick * 0.5})`
+                    ? `0 ${4 + pick * 8}px ${10 + pick * 22}px -4px rgba(24,32,48,${0.2 + pick * 0.35})`
                     : 'none',
                 }}
               >
@@ -425,7 +430,7 @@ export const ShareSheet: React.FC<{
               <div
                 style={{
                   fontSize: 10.5,
-                  color: a.machina ? '#ececf2' : '#9a9aa6',
+                  color: a.machina ? '#111318' : '#6b6b74',
                   fontWeight: a.machina ? 600 : 400,
                 }}
               >
@@ -434,7 +439,7 @@ export const ShareSheet: React.FC<{
             </div>
           ))}
         </div>
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '0 0 8px' }} />
+        <div style={{ height: 1, background: 'rgba(0,0,0,0.08)', margin: '0 0 8px' }} />
         {[
           { label: 'Copy', icon: '⧉' },
           { label: 'Add to Reading List', icon: '⌾' },
@@ -447,7 +452,7 @@ export const ShareSheet: React.FC<{
               justifyContent: 'space-between',
               padding: '13px 20px',
               fontSize: 14,
-              color: '#c9c9d1',
+              color: '#26262b',
             }}
           >
             {r.label}
@@ -498,7 +503,7 @@ export const AnalyzingScreen: React.FC<{
                 width: 30,
                 height: 30,
                 borderRadius: 10,
-                background: 'rgba(233,233,242,0.10)',
+                background: 'rgba(20,20,27,0.06)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -550,7 +555,7 @@ export const AnalyzingScreen: React.FC<{
                       width: 15,
                       height: 15,
                       borderRadius: 15,
-                      border: `1.5px solid ${done || active ? 'rgba(233,233,242,0.5)' : T.borderStrong}`,
+                      border: `1.5px solid ${done || active ? 'rgba(20,20,27,0.45)' : T.borderStrong}`,
                       background: done ? T.accent : 'transparent',
                       display: 'flex',
                       alignItems: 'center',
@@ -764,11 +769,12 @@ export const AskScreen: React.FC<{
             borderRadius: 22,
             background: T.card,
             border: `1px solid ${T.border}`,
-            boxShadow: '0 8px 24px -10px rgba(0,0,0,0.8)',
+            boxShadow: '0 8px 24px -10px rgba(24,32,48,0.18)',
           }}
         >
           <span style={{ fontSize: 13.5, color: asked ? T.textMuted : T.text, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden' }}>
-            {asked ? 'Ask a follow-up' : q || 'Ask about your library'}
+            {/* No "library" anywhere in the film — standing owner rule. */}
+            {asked ? 'Ask a follow-up' : q || 'Ask about your saves'}
             {!asked && typed > 0 && (
               <span
                 style={{
@@ -978,7 +984,7 @@ export const GraphScreen: React.FC<{
           gap: 5,
           padding: '7px 12px 7px 9px',
           borderRadius: 999,
-          background: 'rgba(18,18,18,0.8)',
+          background: 'rgba(255,255,255,0.85)',
           backdropFilter: 'blur(12px)',
           border: `1px solid ${T.borderStrong}`,
           fontSize: 12,
@@ -999,7 +1005,7 @@ export const GraphScreen: React.FC<{
           width: 34,
           height: 34,
           borderRadius: 999,
-          background: 'rgba(18,18,18,0.8)',
+          background: 'rgba(255,255,255,0.85)',
           backdropFilter: 'blur(12px)',
           border: `1px solid ${T.borderStrong}`,
           display: 'flex',
@@ -1113,7 +1119,7 @@ export const DigestScreen: React.FC<{ enter?: number; reviewEnter?: number }> = 
             width: 34,
             height: 34,
             borderRadius: 12,
-            background: 'rgba(233,233,242,0.10)',
+            background: 'rgba(20,20,27,0.06)',
             color: T.accent,
             display: 'flex',
             alignItems: 'center',

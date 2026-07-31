@@ -1,7 +1,7 @@
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { Phone } from '../ui/Phone';
-import { FloorGlow, Rig, Stage } from '../film/effects';
+import { FloorGlow, Rig, SET_BG, Stage } from '../film/effects';
 import { BASE_X, drift, focusY, prog, ramp, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
 import {
   AnalyzingScreen,
@@ -84,8 +84,8 @@ export const Capture: React.FC = () => {
   const out = 1 - prog(f, 363, 375);
 
   return (
-    <AbsoluteFill style={{ background: '#050505', opacity: out * entry }}>
-      <Stage intensity={0.64} backlight={0.46} drift={push * 0.4} />
+    <AbsoluteFill style={{ background: SET_BG, opacity: out * entry }}>
+      <Stage intensity={0.66} backlight={0.4} drift={push * 0.4} />
       <Rig
         scale={scale}
         rotY={rotY}
@@ -105,11 +105,13 @@ export const Capture: React.FC = () => {
                 <div style={{ position: 'absolute', inset: 0, opacity: cutDip }}>
                   <Source />
                 </div>
+                {/* iOS dims the page behind a sheet with dark glass in light
+                    mode too — just far less of it than the dark grade used */}
                 <div
                   style={{
                     position: 'absolute',
                     inset: 0,
-                    background: `rgba(4,4,6,${sheet * 0.5})`,
+                    background: `rgba(10,12,18,${sheet * 0.26})`,
                     zIndex: 70,
                   }}
                 />

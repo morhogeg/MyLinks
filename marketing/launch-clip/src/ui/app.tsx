@@ -57,7 +57,7 @@ export const AppHeader: React.FC<{ title?: string; showSearch?: boolean }> = ({
       left: 0,
       right: 0,
       paddingTop: 54,
-      background: 'rgba(5,5,5,0.85)',
+      background: 'rgba(249,250,251,0.88)',
       backdropFilter: 'blur(20px)',
       zIndex: 40,
     }}
@@ -86,7 +86,7 @@ export const AppHeader: React.FC<{ title?: string; showSearch?: boolean }> = ({
             width: 27,
             height: 27,
             borderRadius: 27,
-            background: 'linear-gradient(140deg, #3a3a44, #22222a)',
+            background: 'linear-gradient(140deg, #ECECF1, #D8D8E0)',
             border: `1px solid ${T.borderStrong}`,
             display: 'flex',
             alignItems: 'center',
@@ -150,7 +150,7 @@ export const TabBar: React.FC<{ active?: 'home' | 'collections' | 'ask' | 'diges
         right: 0,
         bottom: 0,
         paddingBottom: 22,
-        background: 'rgba(5,5,5,0.85)',
+        background: 'rgba(249,250,251,0.88)',
         backdropFilter: 'blur(20px)',
         borderTop: `1px solid ${T.border}`,
         zIndex: 50,
@@ -250,7 +250,9 @@ const PLATFORM_INK: Record<string, string> = {
   youtube: 'rgb(255, 0, 0)',
   instagram: 'rgb(225, 48, 108)',
   facebook: 'rgb(24, 119, 242)',
-  x: 'rgb(191, 201, 214)',
+  // The app's PLATFORM_RGB silver (191,201,214) is tuned for the dark theme
+  // and disappears on white; on the light grade X wears its light-mode black.
+  x: 'rgb(15, 20, 25)',
 };
 
 /** The app's platform marks — the same lucide icons `platformIcon` returns. */
@@ -319,10 +321,10 @@ export const AppCard: React.FC<{
     style={{
       background: T.card,
       borderRadius: 20,
-      border: `1px solid ${highlight > 0 ? `rgba(233,233,242,${0.06 + highlight * 0.34})` : T.border}`,
+      border: `1px solid ${highlight > 0 ? `rgba(20,20,27,${0.06 + highlight * 0.28})` : T.border}`,
       boxShadow:
         highlight > 0
-          ? `${T.shadowCard}, 0 0 ${18 + highlight * 26}px -6px rgba(174,184,206,${0.1 + highlight * 0.35})`
+          ? `${T.shadowCard}, 0 8px ${18 + highlight * 22}px -8px rgba(24,32,48,${0.08 + highlight * 0.22})`
           : T.shadowCard,
       padding: 16,
       display: 'flex',
@@ -378,7 +380,7 @@ export const AppCard: React.FC<{
             fontSize: 12,
             lineHeight: 1.35,
             fontStyle: 'italic',
-            color: 'rgba(160,160,160,0.9)',
+            color: 'rgba(107,114,128,0.95)',
           }}
         >
           <StickyNote size={12} style={{ flexShrink: 0, marginTop: 2, opacity: 0.6 }} />
@@ -412,8 +414,8 @@ export const SearchField: React.FC<{ value: string; caret?: boolean; semantic?: 
       padding: '0 13px',
       borderRadius: 14,
       background: T.card,
-      border: `1px solid ${semantic > 0 ? `rgba(233,233,242,${0.06 + semantic * 0.24})` : T.border}`,
-      boxShadow: semantic > 0 ? `0 0 26px -8px rgba(174,184,206,${0.5 * semantic})` : undefined,
+      border: `1px solid ${semantic > 0 ? `rgba(20,20,27,${0.06 + semantic * 0.24})` : T.border}`,
+      boxShadow: semantic > 0 ? `0 6px 26px -8px rgba(24,32,48,${0.3 * semantic})` : undefined,
     }}
   >
     <Search size={15} color={T.textMuted} />
@@ -458,7 +460,7 @@ export const CitationChip: React.FC<{
         borderRadius: 12,
         background: T.card,
         border: `1px solid ${T.border}`,
-        boxShadow: '0 1px 2px rgba(0,0,0,0.4)',
+        boxShadow: '0 1px 2px rgba(16,24,40,0.08)',
         opacity: enter,
         transform: `translateY(${(1 - enter) * 10}px) scale(${0.96 + enter * 0.04})`,
         maxWidth: '100%',
@@ -473,7 +475,7 @@ export const CitationChip: React.FC<{
           width: 26,
           height: 26,
           borderRadius: 9,
-          background: platform ? `${PLATFORM_INK[kind]}1F` : 'rgba(233,233,242,0.10)',
+          background: platform ? `${PLATFORM_INK[kind]}1F` : 'rgba(20,20,27,0.06)',
           color: platform ? PLATFORM_INK[kind] : T.accent,
           display: 'flex',
           alignItems: 'center',

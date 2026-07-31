@@ -1,7 +1,7 @@
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
 
-import { Stage } from '../film/effects';
+import { SET_BG, Stage } from '../film/effects';
 import { CONSTELLATION, PANEL_OFFSET, PlatformPanel } from '../ui/platforms';
 import { drift, prog, ramp, EASE_IN_OUT, EASE_OUT } from '../film/anim';
 
@@ -63,8 +63,10 @@ export const WordmarkScene: React.FC = () => {
         // stems thicken and it stops being the shipped geometry
         width: 49,
         height: 176,
-        color: '#F2F5FA',
-        filter: `drop-shadow(0 0 ${20 + flash * 26}px rgba(203,210,226,${0.3 + flash * 0.3}))`,
+        // On the light grade the mark is INK — the accent in light mode is the
+        // dark graphite, so the brackets close in ink around an ink point.
+        color: '#14141B',
+        filter: `drop-shadow(0 ${6 + flash * 6}px ${20 + flash * 26}px rgba(24,32,48,${0.25 + flash * 0.25}))`,
         opacity: close,
         overflow: 'hidden',
       }}
@@ -81,8 +83,8 @@ export const WordmarkScene: React.FC = () => {
   );
 
   return (
-    <AbsoluteFill style={{ background: '#050505', opacity: out }}>
-      <Stage intensity={0.6} backlight={0.26 * (1 - gather)} />
+    <AbsoluteFill style={{ background: SET_BG, opacity: out }}>
+      <Stage intensity={0.62} backlight={0.3 * (1 - gather)} />
 
       {/* the gather — the same constellation, running backwards into a point */}
       {gather < 1 && (
@@ -128,12 +130,13 @@ export const WordmarkScene: React.FC = () => {
         </AbsoluteFill>
       )}
 
-      {/* the collapse flash */}
+      {/* the collapse flash — pure white light on the light set, so the landing
+          still reads as a spike of energy rather than a hole */}
       <AbsoluteFill
         style={{
-          background: `radial-gradient(42% 38% at 50% 50%, rgba(242,245,250,${
-            0.42 * flash * flash
-          }) 0%, rgba(203,210,226,0) 70%)`,
+          background: `radial-gradient(42% 38% at 50% 50%, rgba(255,255,255,${
+            0.85 * flash * flash
+          }) 0%, rgba(255,255,255,0) 70%)`,
         }}
       />
 
@@ -159,10 +162,11 @@ export const WordmarkScene: React.FC = () => {
               width: 62,
               height: 62,
               borderRadius: 62,
-              background: '#F2F5FA',
-              opacity: gather * 0.94,
+              // everything the brackets gathered, held as one point of INK
+              background: '#14141B',
+              opacity: gather * 0.96,
               filter: 'blur(0.4px)',
-              boxShadow: `0 0 ${26 + flash * 40}px rgba(203,210,226,${0.4 + flash * 0.35})`,
+              boxShadow: `0 ${8 + flash * 8}px ${26 + flash * 40}px rgba(24,32,48,${0.3 + flash * 0.3})`,
             }}
           />
         </div>

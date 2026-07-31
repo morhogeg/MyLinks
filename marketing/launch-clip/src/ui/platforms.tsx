@@ -27,7 +27,9 @@ export const PLATFORM: Record<
 > = {
   // PLATFORM_RGB from web/lib/platform.tsx, verbatim where the app defines one.
   instagram: { name: 'Instagram', label: 'Saved', rgb: '225, 48, 108' },
-  x: { name: 'X', label: 'Bookmarks', rgb: '191, 201, 214' },
+  // X's app silver (191,201,214) is a dark-theme value and vanishes on a white
+  // panel; the light grade uses X's own light-mode black.
+  x: { name: 'X', label: 'Bookmarks', rgb: '15, 20, 25' },
   youtube: { name: 'YouTube', label: 'Watch later', rgb: '255, 0, 0' },
   whatsapp: { name: 'WhatsApp', label: 'Messages to you', rgb: '37, 211, 102' },
   reading: { name: 'Safari', label: 'Reading List', rgb: '90, 160, 230' },
@@ -55,8 +57,8 @@ export const PlatformGlyph: React.FC<{ k: PlatformKey; size?: number }> = ({ k, 
   return <Bookmark size={size} />;
 };
 
-const grey = (w: number, h = 7, o = 0.13) => (
-  <div style={{ width: `${w}%`, height: h, borderRadius: 4, background: `rgba(255,255,255,${o})` }} />
+const grey = (w: number, h = 7, o = 0.1) => (
+  <div style={{ width: `${w}%`, height: h, borderRadius: 4, background: `rgba(16,20,32,${o})` }} />
 );
 
 /**
@@ -82,9 +84,9 @@ export const PlatformPanel: React.FC<{ k: PlatformKey; w?: number }> = ({ k, w =
         // transform order) before the shape of the box became the fix.
         height: PANEL_H,
         borderRadius: 18,
-        background: 'linear-gradient(168deg, rgba(33,33,39,0.99), rgba(19,19,24,0.99))',
-        border: '1px solid rgba(255,255,255,0.11)',
-        boxShadow: '0 24px 60px -18px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.09)',
+        background: 'linear-gradient(168deg, rgba(255,255,255,0.99), rgba(243,244,248,0.99))',
+        border: '1px solid rgba(16,24,40,0.09)',
+        boxShadow: '0 24px 60px -18px rgba(24,32,48,0.35), inset 0 1px 0 rgba(255,255,255,0.9)',
         fontFamily: sans,
         overflow: 'hidden',
       }}
@@ -95,19 +97,19 @@ export const PlatformPanel: React.FC<{ k: PlatformKey; w?: number }> = ({ k, w =
           alignItems: 'center',
           gap: 8,
           padding: '13px 15px',
-          borderBottom: '1px solid rgba(255,255,255,0.055)',
+          borderBottom: '1px solid rgba(16,24,40,0.06)',
         }}
       >
-        <span style={{ color: ink, display: 'inline-flex', opacity: 0.9 }}>
+        <span style={{ color: ink, display: 'inline-flex', opacity: 0.95 }}>
           <PlatformGlyph k={k} size={13} />
         </span>
         {/* X's mark IS its name — printing both read as "✕ X". */}
         {k !== 'x' && (
-          <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(232,232,240,0.95)' }}>
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(20,24,34,0.92)' }}>
             {p.name}
           </span>
         )}
-        <span style={{ fontSize: 11, color: 'rgba(160,160,172,0.8)', marginLeft: 'auto' }}>
+        <span style={{ fontSize: 11, color: 'rgba(96,102,116,0.85)', marginLeft: 'auto' }}>
           {p.label}
         </span>
       </div>
@@ -121,7 +123,7 @@ export const PlatformPanel: React.FC<{ k: PlatformKey; w?: number }> = ({ k, w =
                 style={{
                   aspectRatio: '1',
                   borderRadius: 5,
-                  background: `rgba(255,255,255,${0.085 + (i % 3) * 0.018})`,
+                  background: `rgba(16,20,32,${0.07 + (i % 3) * 0.016})`,
                 }}
               />
             ))}
@@ -132,9 +134,9 @@ export const PlatformPanel: React.FC<{ k: PlatformKey; w?: number }> = ({ k, w =
           <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
             {['@shreyas', '@naval', '@patio11'].map((h) => (
               <div key={h} style={{ display: 'flex', gap: 9 }}>
-                <div style={{ width: 26, height: 26, borderRadius: 26, background: 'rgba(255,255,255,0.11)', flexShrink: 0 }} />
+                <div style={{ width: 26, height: 26, borderRadius: 26, background: 'rgba(16,20,32,0.1)', flexShrink: 0 }} />
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <div style={{ fontSize: 10.5, color: 'rgba(172,172,184,0.8)' }}>{h}</div>
+                  <div style={{ fontSize: 10.5, color: 'rgba(96,102,116,0.85)' }}>{h}</div>
                   {grey(96)}
                   {grey(72)}
                 </div>
@@ -152,7 +154,7 @@ export const PlatformPanel: React.FC<{ k: PlatformKey; w?: number }> = ({ k, w =
                     width: 58,
                     height: 33,
                     borderRadius: 5,
-                    background: 'rgba(255,255,255,0.11)',
+                    background: 'rgba(16,20,32,0.1)',
                     flexShrink: 0,
                   }}
                 />
@@ -175,10 +177,10 @@ export const PlatformPanel: React.FC<{ k: PlatformKey; w?: number }> = ({ k, w =
                   padding: '8px 11px',
                   borderRadius: 12,
                   borderBottomRightRadius: 4,
-                  background: 'rgba(37,211,102,0.12)',
-                  border: '1px solid rgba(37,211,102,0.16)',
+                  background: 'rgba(37,211,102,0.14)',
+                  border: '1px solid rgba(37,211,102,0.3)',
                   fontSize: 11,
-                  color: 'rgba(200,214,204,0.85)',
+                  color: 'rgba(38,74,52,0.9)',
                 }}
               >
                 {u}
@@ -192,7 +194,7 @@ export const PlatformPanel: React.FC<{ k: PlatformKey; w?: number }> = ({ k, w =
             {['nature.com', 'newyorker.com', 'stratechery.com'].map((h) => (
               <div key={h} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {grey(88)}
-                <div style={{ fontSize: 10.5, color: 'rgba(160,160,172,0.72)' }}>{h}</div>
+                <div style={{ fontSize: 10.5, color: 'rgba(96,102,116,0.8)' }}>{h}</div>
               </div>
             ))}
           </div>

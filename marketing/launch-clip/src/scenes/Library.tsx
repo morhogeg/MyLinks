@@ -1,7 +1,7 @@
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { Phone } from '../ui/Phone';
-import { FloorGlow, Rig, Stage } from '../film/effects';
+import { FloorGlow, Rig, SET_BG, Stage } from '../film/effects';
 import { BASE_X, drift, focusY, prog, ramp, typed, EASE_IN_OUT, EASE_MODAL, EASE_OUT } from '../film/anim';
 import { FeedScreen } from '../ui/screens';
 import { CARDS, SEARCH_HITS, SEARCH_QUERY } from '../data/library';
@@ -39,8 +39,8 @@ export const Library: React.FC = () => {
   const inFade = prog(f, 0, 4);
 
   return (
-    <AbsoluteFill style={{ background: '#050505', opacity: out * inFade }}>
-      <Stage intensity={0.6} backlight={0.42} />
+    <AbsoluteFill style={{ background: SET_BG, opacity: out * inFade }}>
+      <Stage intensity={0.64} backlight={0.36} />
       <Rig scale={scale} rotY={rotY} x={BASE_X} y={y} origin="center 38%">
         <div style={{ position: 'relative' }}>
           <FloorGlow y={890} w={700} opacity={0.5} />

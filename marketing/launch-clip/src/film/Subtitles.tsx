@@ -66,12 +66,13 @@ export const Subtitles: React.FC = () => {
                 alignItems: 'stretch',
               }}
             >
-              {/* the accent rule grows with the line — the app's own gradient */}
+              {/* the accent rule grows with the line — the app's own light-mode
+                  accent gradient (ink, not chrome) */}
               <div
                 style={{
                   width: 3,
                   borderRadius: 2,
-                  background: 'linear-gradient(180deg, #FFFFFF, #CBD2E0)',
+                  background: 'linear-gradient(180deg, #34343F, #14141B)',
                   opacity: 0.85,
                   transform: `scaleY(${enter})`,
                   transformOrigin: 'center top',
@@ -89,7 +90,7 @@ export const Subtitles: React.FC = () => {
                     fontWeight: 700,
                     letterSpacing: '0.34em',
                     textTransform: 'uppercase',
-                    color: 'rgba(203,210,226,0.62)',
+                    color: 'rgba(75,85,99,0.72)',
                     opacity: enter,
                   }}
                 >
@@ -103,8 +104,8 @@ export const Subtitles: React.FC = () => {
                   fontWeight: 500,
                   lineHeight: 1.14,
                   letterSpacing: '-0.026em',
-                  color: 'rgba(242,242,248,0.98)',
-                  textShadow: '0 2px 30px rgba(0,0,0,0.75)',
+                  color: 'rgba(17,24,39,0.96)',
+                  textShadow: '0 1px 2px rgba(255,255,255,0.6), 0 2px 30px rgba(238,240,244,0.9)',
                 }}
               >
                 {s.text}
@@ -116,11 +117,12 @@ export const Subtitles: React.FC = () => {
 
         return (
           <React.Fragment key={s.text}>
-            {/* a scrim only where a centred line actually needs one */}
+            {/* a scrim only where a centred line actually needs one — the set
+                tone rising to hold the type, never a dark band on paper */}
             <AbsoluteFill
               style={{
                 background:
-                  'linear-gradient(180deg, rgba(4,4,6,0) 64%, rgba(4,4,6,0.5) 84%, rgba(4,4,6,0.82) 100%)',
+                  'linear-gradient(180deg, rgba(238,240,244,0) 64%, rgba(238,240,244,0.5) 84%, rgba(238,240,244,0.85) 100%)',
                 opacity: o,
               }}
             />
@@ -142,8 +144,8 @@ export const Subtitles: React.FC = () => {
                   fontSize: 44,
                   fontWeight: 500,
                   letterSpacing: '-0.024em',
-                  color: 'rgba(242,242,248,0.98)',
-                  textShadow: '0 1px 2px rgba(0,0,0,0.7), 0 8px 34px rgba(0,0,0,0.85)',
+                  color: 'rgba(17,24,39,0.96)',
+                  textShadow: '0 1px 2px rgba(255,255,255,0.6), 0 8px 34px rgba(238,240,244,0.9)',
                   textAlign: 'center',
                   maxWidth: 1300,
                 }}
