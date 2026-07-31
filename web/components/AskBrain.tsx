@@ -278,11 +278,11 @@ interface AskBrainProps {
      *  fresh conversation; the hints carry the cluster's anchor ids/titles and
      *  `restore` names the graph focus this conversation was born from (saved
      *  on the chat doc → sidebar badge + the answer's "Graph" chip). */
-    initialAsk?: { question: string; hints?: AskHints; restore?: { selectedId?: string; clusterAnchorId?: string }; nonce: number } | null;
+    initialAsk?: { question: string; hints?: AskHints; restore?: { selectedId?: string; clusterAnchorId?: string; citedIds?: string[] }; nonce: number } | null;
     /** Open the Graph view focused on a card/cluster (the answer's "Graph"
      *  chip). `fromChatId` is the conversation being left, so the graph can
      *  offer a way back INTO it (leaving Ask unmounts the chat). */
-    onOpenGraphFocus?: (focus: { selectedId?: string; clusterAnchorId?: string }, fromChatId: string | null) => void;
+    onOpenGraphFocus?: (focus: { selectedId?: string; clusterAnchorId?: string; citedIds?: string[] }, fromChatId: string | null) => void;
     /** Reopen this saved conversation on entry — the graph's "Back to Ask".
      *  Nonce-gated so one hand-back fires exactly once. */
     openChatId?: { id: string; nonce: number } | null;
@@ -1379,7 +1379,17 @@ export default function AskBrain({ uid, totalLinks, onOpenLink, onExit, overlayO
                                                     onClick={() => onOpenGraphFocus(
                                                         (chats.find(c => c.id === activeChatId)?.graphFocus
                                                             ?? convoRef.current.graphFocus)
-                                                        ?? { selectedId: m.sources![0].id },
+                                                        // EVERY cited card, not just the first.
+                                                        // Sending one id meant the other sources
+                                                        // were never marked — and when that one
+                                                        // card had no connections it isn't a node
+                                                        // at all, so the graph opened with nothing
+                                                        // highlighted. selectedId stays as the
+                                                        // single-card fallback for older payloads.
+                                                        ?? {
+                                                            citedIds: m.sources!.map(s => s.id),
+                                                            selectedId: m.sources![0].id,
+                                                        },
                                                         activeChatId ?? convoRef.current.id)}
                                                     title="See these cards in the graph"
                                                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-dashed border-border-strong text-text-muted hover:text-text hover:bg-card-hover transition-colors cursor-pointer"

@@ -51,6 +51,12 @@ interface Camera {
 export interface GraphRestoreFocus {
     selectedId?: string;
     clusterAnchorId?: string;
+    /** EVERY card an Ask answer cited — the answer's "Graph" chip sends the
+     *  whole set, not just the first. These light up together and the camera
+     *  frames all of them, however many clusters they span. Ids that aren't in
+     *  the model (a card with no connections is not a node — see graph.ts's
+     *  `if (!degree[i]) continue`) are REPORTED, never silently dropped. */
+    citedIds?: string[];
 }
 
 /** Parse "rgb(r, g, b)" / "rgba(…)" into an rgba() string at the given alpha. */
@@ -143,6 +149,10 @@ export default function KnowledgeGraph({
     const [categoryFocus, setCategoryFocus] = useState<string | null>(null);
     // A tapped island caption spotlights that cluster and opens its panel.
     const [clusterFocus, setClusterFocus] = useState<number | null>(null);
+    // The cards an Ask answer cited, held as IDS. Deliberately not indices:
+    // indices die on every rebuild, so storing ids means the highlight survives
+    // the same library-fetch rebuild that used to drop single-card focus.
+    const [citedIds, setCitedIds] = useState<string[] | null>(null);
     const [savingCluster, setSavingCluster] = useState(false);
     const [savedClusters, setSavedClusters] = useState<Set<number>>(new Set());
     // Bumped by the MutationObserver when the .light class flips — palette and
@@ -193,6 +203,35 @@ export default function KnowledgeGraph({
     useEffect(() => {
         selectedCardIdRef.current = selected !== null ? model?.nodes[selected]?.id ?? null : null;
     }, [selected, model]);
+
+    // Cited ids → node indices, re-derived from whatever model is current, so
+    // the highlight survives a rebuild for free. An id that resolves to nothing
+    // is a card with NO CONNECTIONS: graph.ts only makes nodes out of cards with
+    // degree ≥ 1, so those cards genuinely are not on the map. They are counted
+    // here and reported in the header — the old code sent a single id and, when
+    // that card happened to be unconnected, showed the plain graph with nothing
+    // marked and said nothing about why.
+    const cited = useMemo(() => {
+        if (!citedIds?.length || !model) return null;
+        const byId = new Map(model.nodes.map((n, i) => [n.id, i]));
+        const idx = new Set<number>();
+        for (const id of citedIds) {
+            const i = byId.get(id);
+            if (i !== undefined) idx.add(i);
+        }
+        return { idx, total: citedIds.length, shown: idx.size, missing: citedIds.length - idx.size };
+    }, [citedIds, model]);
+
+    // Mirrored into refs from an EFFECT (never during render) — the rAF loop
+    // reads them, and react-hooks/immutability rejects a render-phase mutation
+    // that an effect then reads.
+    const citedRef = useRef<Set<number> | null>(null);
+    const citedFitRef = useRef<number[] | null>(null);
+    useEffect(() => {
+        citedRef.current = cited && cited.idx.size ? cited.idx : null;
+        citedFitRef.current = cited && cited.idx.size ? [...cited.idx] : null;
+        drawPendingRef.current = true;
+    }, [cited]);
     useEffect(() => {
         clusterFitRef.current = clusterFocus;
         if (clusterFocus !== null) autoFitRef.current = false;
@@ -230,10 +269,18 @@ export default function KnowledgeGraph({
             // Coming back from an Ask this graph launched: re-open the focus
             // that launched it, so Ask reads as a detour, not an exit.
             const restore = restoreRef.current;
+            // A cited SET takes precedence over a single card: the answer's
+            // Graph chip is asking "where do these live?", so lighting one of
+            // them and framing its neighbourhood would answer a question the
+            // user did not ask.
+            if (restore?.citedIds?.length) {
+                setCitedIds(restore.citedIds);
+                autoFitRef.current = false;
+            }
             // An explicit restore wins; otherwise keep whatever the user was
             // already looking at. A missing id (card deleted or filtered out of
             // the pool) simply falls through to the default full-graph fit.
-            const focusId = restore?.selectedId ?? keepId;
+            const focusId = restore?.citedIds?.length ? null : restore?.selectedId ?? keepId;
             if (focusId) {
                 const idx = m.nodes.findIndex((n) => n.id === focusId);
                 if (idx >= 0) {
@@ -387,6 +434,49 @@ export default function KnowledgeGraph({
                 cam.x += (freeW / 2 - ((minX + maxX) / 2) * cam.k - cam.x) * ease;
                 cam.y += (freeH / 2 - ((minY + maxY) / 2) * cam.k - cam.y) * ease;
                 drawPendingRef.current = true;
+            } else if (citedFitRef.current?.length) {
+                // Frame every card the answer cited, however many clusters they
+                // span — a set that straddles three islands SHOULD zoom out far
+                // enough to show all three; that spread is information about the
+                // answer, not a failure to frame.
+                // Deliberately LAST in this chain: the moment the user taps one
+                // of the lit cards, followRef takes over above and the camera
+                // walks to that card's ego network. No extra state needed to
+                // hand over — ordering does it.
+                const members = citedFitRef.current;
+                const dpr = Math.min(2, window.devicePixelRatio || 1);
+                const w = canvas.width / dpr;
+                const h = canvas.height / dpr;
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                for (const i of members) {
+                    const n = model.nodes[i];
+                    if (!n) continue;
+                    minX = Math.min(minX, n.x - n.r);
+                    minY = Math.min(minY, n.y - n.r);
+                    maxX = Math.max(maxX, n.x + n.r);
+                    maxY = Math.max(maxY, n.y + n.r);
+                }
+                if (minX < Infinity) {
+                    const desktop = w >= 640;
+                    // NO panel is open in this branch — it only runs when both
+                    // followRef and clusterFit are null, and those are exactly
+                    // what open one. So unlike the branches above, the whole
+                    // viewport is free: reserving the desktop panel's width or
+                    // the phone sheet's 66% here would cram the cited set into a
+                    // strip for a sheet that isn't there.
+                    const freeW = w;
+                    const freeH = h;
+                    const pad = desktop ? 70 : 34;
+                    const bw = Math.max(80, maxX - minX);
+                    const bh = Math.max(80, maxY - minY);
+                    const tk = Math.min(1.3, Math.max(0.12, Math.min((freeW - pad * 2) / bw, (freeH - pad * 2) / bh)));
+                    const cam = camRef.current;
+                    const ease = reducedMotionRef.current ? 1 : 0.1;
+                    cam.k += (tk - cam.k) * ease;
+                    cam.x += (freeW / 2 - ((minX + maxX) / 2) * cam.k - cam.x) * ease;
+                    cam.y += (freeH / 2 - ((minY + maxY) / 2) * cam.k - cam.y) * ease;
+                    drawPendingRef.current = true;
+                }
             }
             if (simActive || drawPendingRef.current) {
                 drawPendingRef.current = false;
@@ -395,6 +485,7 @@ export default function KnowledgeGraph({
                     hover: hoverRef.current,
                     categoryFocus: focusRef.current,
                     clusterFocus: clusterFocusRef.current,
+                    cited: citedRef.current,
                 });
             }
         };
@@ -557,9 +648,13 @@ export default function KnowledgeGraph({
                 if (caption) {
                     hapticLight();
                     setSelected(null);
+                    setCitedIds(null);
                     setClusterFocus((cur) => (cur === caption.cluster ? null : caption.cluster));
                 } else {
                     setSelected(null);
+                    // "Clears every focus" has to include the cited set, or an
+                    // empty-space tap would dim the graph back down to it.
+                    setCitedIds(null);
                     setClusterFocus(null);
                 }
             }
@@ -787,6 +882,31 @@ export default function KnowledgeGraph({
                         <ChevronLeft className="w-4 h-4 shrink-0 rtl:rotate-180 text-accent" />
                         <MessagesSquare className="w-3.5 h-3.5 shrink-0 text-accent" />
                         <span>Back to Ask</span>
+                    </button>
+                </div>
+            )}
+
+            {/* What the cited-set focus is showing — and, crucially, what it
+                CANNOT show. A card with no connections is not a node
+                (graph.ts), so silently omitting it is what made this look
+                broken: the graph opened unmarked and never said why. */}
+            {cited && (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-0.5 text-[13px] font-medium">
+                    <span className="text-text">
+                        {cited.shown > 0
+                            ? `Showing ${cited.shown} cited ${cited.shown === 1 ? 'card' : 'cards'}`
+                            : `None of the ${cited.total} cited ${cited.total === 1 ? 'card is' : 'cards are'} on the map yet`}
+                    </span>
+                    {cited.missing > 0 && cited.shown > 0 && (
+                        <span className="text-text-muted">
+                            · {cited.missing} not yet connected
+                        </span>
+                    )}
+                    <button
+                        onClick={() => setCitedIds(null)}
+                        className="ms-auto shrink-0 text-[12px] font-semibold text-accent hover:underline cursor-pointer"
+                    >
+                        Show all
                     </button>
                 </div>
             )}
@@ -1224,7 +1344,7 @@ function draw(
     model: GraphModel,
     cam: Camera,
     palette: Palette,
-    state: { selected: number | null; hover: number | null; categoryFocus: string | null; clusterFocus: number | null },
+    state: { selected: number | null; hover: number | null; categoryFocus: string | null; clusterFocus: number | null; cited?: Set<number> | null },
 ): CaptionRect[] {
     const ctx = canvas.getContext('2d');
     if (!ctx) return [];
@@ -1247,6 +1367,17 @@ function draw(
             litEdges.add(ei);
             const e = edges[ei];
             lit.add(e.a === focusNode ? e.b : e.a);
+        }
+    } else if (state.cited?.size) {
+        // An answer's cited set: light EXACTLY those cards — no one-hop
+        // expansion. The question is "which cards did this answer use", so
+        // pulling in neighbours would pad the answer with cards it never cited.
+        // Edges between two cited cards still light, because a connection
+        // WITHIN the set is part of what the user came to see.
+        lit = new Set(state.cited);
+        litEdges = new Set();
+        for (let ei = 0; ei < edges.length; ei++) {
+            if (lit.has(edges[ei].a) && lit.has(edges[ei].b)) litEdges.add(ei);
         }
     }
     const inFocusCategory = (i: number) =>
@@ -1295,7 +1426,9 @@ function draw(
         const color = getCategoryColorStyle(n.category).color;
         const dim = dimOf(i);
 
-        const isFocused = i === state.selected || i === state.hover;
+        // Cited cards carry the same halo as a focused one — that halo IS the
+        // "marked" affordance, and a set of five needs it on all five.
+        const isFocused = i === state.selected || i === state.hover || !!state.cited?.has(i);
         if (isFocused) {
             // A soft halo behind the focused node.
             const halo = ctx.createRadialGradient(n.x, n.y, n.r * 0.4, n.x, n.y, n.r * 3);
@@ -1411,7 +1544,10 @@ function draw(
     for (let i = 0; i < nodes.length; i++) {
         const n = nodes[i];
         const inLit = lit?.has(i) ?? false;
-        const isFocused = i === state.selected || i === state.hover;
+        // Cited cards label at top tier: naming them IS the answer to "where do
+        // these live", so their titles must win any contested label slot rather
+        // than being culled as ordinary lit neighbours.
+        const isFocused = i === state.selected || i === state.hover || !!state.cited?.has(i);
         if (isFocused) candidates.push({ i, alpha: 1, tier: 0, focused: true });
         else if (inLit) candidates.push({ i, alpha: 0.9, tier: 1, focused: false });
         else if (!lit && labelAlpha > 0 && (hubs.has(i) || (cam.k >= 1.05 && n.r * cam.k >= 7))) {

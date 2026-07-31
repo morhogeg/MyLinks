@@ -1021,6 +1021,51 @@ exact-match, capped.
 
 > One short paragraph per session, newest first. Detail lives in git history and
 
+- **2026-07-31 (round 10) — the answer's Graph chip now marks EVERY cited card,
+  and never fails silently (owner: "this is crucial"). Closes round 5's open
+  question.** Reported symptom: an answer citing 5 cards across several clusters
+  opened the plain graph with **nothing** marked. Two compounding faults, not
+  one:
+  (1) The chip sent only `{ selectedId: sources[0].id }` — one card of five (the
+  known round-5 limitation).
+  (2) **The silent-failure half, which is why NOTHING was marked:** `graph.ts`
+  builds nodes only from cards with degree ≥ 1 (`if (!degree[i]) continue`) —
+  that is what the header's "40 not yet connected" counts. When the FIRST cited
+  card happens to be one of those (a lone screenshot, a fresh save), the
+  `findIndex` returns −1, no focus is applied, and the graph opens looking
+  completely normal with no explanation. **Reproduced in a probe** against the
+  real `buildGraphModel`: a 5-card pool with one unconnected card yields 4 nodes,
+  `isolatedCount: 1`, and `findIndex('lonely') === -1`.
+  **Fix:** `GraphRestoreFocus.citedIds` carries the WHOLE cited set. The graph
+  holds them as IDS (not indices — the same reason round 8's fix uses ids: they
+  survive a rebuild) and derives `{idx, shown, missing}` from whatever model is
+  current. Lit set = exactly those cards, with **no one-hop expansion** — the
+  question is which cards the answer used, and pulling in neighbours would pad
+  it with cards it never cited; edges *between* two cited cards do light, since a
+  connection inside the set is part of what you came to see. Each cited card gets
+  the focused card's halo and ring, and labels at **top tier** so their titles
+  win contested slots. A new camera branch frames the whole set — sitting LAST in
+  the chain, so the moment you tap one of the lit cards `followRef` takes over
+  and walks to its ego network; ordering does the hand-over, no extra state.
+  **The header now states what the map cannot show** — "Showing 3 cited cards ·
+  2 not yet connected", or "None of the 5 cited cards are on the map yet" — plus
+  a "Show all" escape. That line is the actual fix for the reported experience:
+  a spread across clusters is information about the answer, and an unconnected
+  card is a fact about the library, but neither may be communicated by silence.
+  ⚠️ **Framing subtlety worth keeping:** the cited branch deliberately uses the
+  FULL viewport, not the `panelReserve()`/`h * 0.34` strip the cluster and follow
+  branches use. It only runs when both of those are null — i.e. when no panel or
+  sheet is open — so reserving space for absent chrome would squeeze the set into
+  a strip. Empty-space tap clears the cited set along with every other focus.
+  **Graph-born chats are deliberately unchanged:** they still reopen the exact
+  focus they were asked from (a prior decision); only the ordinary-answer
+  fallback gained `citedIds`.
+  Verified by probe: old path returns −1 on an unconnected first card; new path
+  lights 2 of 3 and reports 1 missing; an all-unconnected set reports rather than
+  silently rendering a plain graph. tsc 0, eslint unchanged (still only the
+  pre-existing `modelRef.current = model`). **Owner device QA:** the multi-card
+  answer from the 2026-07-31 screenshot — expect several haloed, labelled cards
+  and a count line.
 - **2026-07-31 (round 9) — "Back to Ask" moved OUT of the canvas to the top-left,
   above the stats and the category legend (owner call; round 8's open item, now
   closed).** The rationale is the hierarchy one: it is NAVIGATION (it leaves the
